@@ -1,0 +1,8 @@
+@import "tailwindcss/base.css";
+@import "tailwindcss/components.css";
+@import "tailwindcss/utilities.css";
+
+body, html {
+    min-height: 100vh;
+    height:100%
+}
