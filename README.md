@@ -8,7 +8,7 @@ Link to blog post?
 ### Requirements before installation
 - [Docker](https://docs.docker.com/engine/install/) version 20+  
 - Docker in [swarm mode enabled](https://docs.docker.com/engine/reference/commandline/swarm_init/) (should be set manually before installation)
-- [MongoDB](https://docs.mongodb.com/manual/installation/) instance. (We have a simple installation if you need it [here](https://github.com/coollabsio/infrastructure))
+- [MongoDB](https://docs.mongodb.com/manual/installation/) instance. (We have a simple installation if you need it [here](https://github.com/coollabsio/infrastructure/tree/main/mongo))
 - Set DNS name
 - [Github OAuth App](https://docs.github.com/en/developers/apps/creating-an-oauth-app)
 - [Github App](https://docs.github.com/en/developers/apps/creating-a-github-app)
