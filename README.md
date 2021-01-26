@@ -11,6 +11,11 @@ https://andrasbacsai.com/farewell-netlify-and-heroku-after-3-days-of-coding
 - Environment variables stored encrypted.
 - Hassle-free self-hosting.
 
+# Upcoming features
+- Backups & monitoring
+- Scalable environment
+- Databases
+
 # Getting Started
 ### Requirements before installation
 - [Docker](https://docs.docker.com/engine/install/) version 20+  
