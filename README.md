@@ -2,7 +2,7 @@
 
 # About
 
-Link to blog post?
+https://andrasbacsai.com/farewell-netlify-and-heroku-after-3-days-of-coding
 
 # Features
 - Deploy your application just by pushing code to git.
