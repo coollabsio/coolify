@@ -1,17 +1,24 @@
-### **In beta!**
+**WARNING**: It's still in beta, but I would like to ship it as soon as possible, without overthinking everything - as a mostly do. 😁
 
 # About
 
 Link to blog post?
 
+# Features
+- Deploy your application just by pushing code to git.
+- Environment variables stored encrypted.
+- Hassle-free self-hosting.
+
 # Getting Started
 ### Requirements before installation
 - [Docker](https://docs.docker.com/engine/install/) version 20+  
 - Docker in [swarm mode enabled](https://docs.docker.com/engine/reference/commandline/swarm_init/) (should be set manually before installation)
-- [MongoDB](https://docs.mongodb.com/manual/installation/) instance. (We have a simple installation if you need it [here](https://github.com/coollabsio/infrastructure/tree/main/mongo))
-- Set DNS name
+- A [MongoDB](https://docs.mongodb.com/manual/installation/) instance. (We have a simple installation if you need it [here](https://github.com/coollabsio/infrastructure/tree/main/mongo))
+- A configured DNS enrty for the builder server (see `.env.template`)
 - [Github OAuth App](https://docs.github.com/en/developers/apps/creating-an-oauth-app)
+  - Authorization callback URL set to `https://<your domain>/api/v1/login/github/oauth`
 - [Github App](https://docs.github.com/en/developers/apps/creating-a-github-app)
+  - Callback URL set to `http://<your domain>/api/v1/login/github/app`
 
 ### Installation
 - Clone this repository: `git clone git@github.com:coollabsio/coolify.git`
