@@ -1,5 +1,6 @@
 const axios = require("axios");
 const User = require("../../models/User");
+const Settings = require("../../models/Settings");
 const cuid = require("cuid");
 const mongoose = require("mongoose");
 const jwt = require('jsonwebtoken')
@@ -46,6 +47,8 @@ module.exports = async function (fastify) {
           const email = (await githubAxios.get("/user/emails")).data.filter(
             (e) => e.primary
           )[0].email;
+          const settings = await Settings.findOne({ applicationName: 'coolify' })
+          const registeredUsers = await User.find().count();
           const foundUser = await User.findOne({ email });
           if (foundUser) {
             await User.findOneAndUpdate(
@@ -55,18 +58,43 @@ module.exports = async function (fastify) {
             );
             uid = foundUser.uid
           } else {
-            const newUser = new User({
-              _id: new mongoose.Types.ObjectId(),
-              email,
-              avatar: avatar_url,
-              uid,
-            });
-            try {
-              await newUser.save();
-            } catch (e) {
-              console.log(e);
-              reply.code(500).send({ success: false, error: e });
-              return;
+            if (registeredUsers === 0) {
+              const newUser = new User({
+                _id: new mongoose.Types.ObjectId(),
+                email,
+                avatar: avatar_url,
+                uid,
+              });
+              try {
+                await newUser.save();
+              } catch (e) {
+                console.log(e);
+                reply.code(500).send({ success: false, error: e });
+                return;
+              }
+            } else {
+              if (!settings && registeredUsers > 0) {
+                reply.code(500).send('Registration disabled, enable it in settings.');
+              } else {
+                if (!settings.allowRegistration) {
+                  reply.code(500).send('You are not allowed here!');
+                } else {
+                  const newUser = new User({
+                    _id: new mongoose.Types.ObjectId(),
+                    email,
+                    avatar: avatar_url,
+                    uid,
+                  });
+                  try {
+                    await newUser.save();
+                  } catch (e) {
+                    console.log(e);
+                    reply.code(500).send({ success: false, error: e });
+                    return;
+                  }
+                }
+              }
+
             }
           }
           const jwtToken = jwt.sign({}, fastify.config.JWT_SIGNKEY, {

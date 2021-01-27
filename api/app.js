@@ -2,6 +2,7 @@ module.exports = async function (fastify, opts) {
   // Private routes
   fastify.register(async function (server) {
     server.register(require("./plugins/authentication"));
+    server.register(require("./v1/settings"), { prefix: "/settings" });
     server.register(require("./v1/dashboard"), { prefix: "/dashboard" });
     server.register(require("./v1/config"), { prefix: "/config" });
     server.register(require("./v1/secret"), { prefix: "/secret" });

@@ -26,6 +26,11 @@
       url: "/dashboard",
       auth: true,
     },
+    {
+      name: "Settings",
+      url: "/settings",
+      auth: true,
+    },
   ];
   function logout() {
     localStorage.removeItem("token");
