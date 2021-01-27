@@ -21,7 +21,7 @@ https://andrasbacsai.com/farewell-netlify-and-heroku-after-3-days-of-coding
 - [Docker](https://docs.docker.com/engine/install/) version 20+  
 - Docker in [swarm mode enabled](https://docs.docker.com/engine/reference/commandline/swarm_init/) (should be set manually before installation)
 - A [MongoDB](https://docs.mongodb.com/manual/installation/) instance. (We have a simple installation if you need it [here](https://github.com/coollabsio/infrastructure/tree/main/mongo))
-- A configured DNS enrty for the builder server (see `.env.template`)
+- A configured DNS entry for the webhook service (see `.env.template`)
 - [Github OAuth App](https://docs.github.com/en/developers/apps/creating-an-oauth-app)
   - Authorization callback URL set to `https://<your domain>/api/v1/login/github/oauth`
 - [Github App](https://docs.github.com/en/developers/apps/creating-a-github-app)
