@@ -16,6 +16,22 @@ https://andrasbacsai.com/farewell-netlify-and-heroku-after-3-days-of-coding
 - Scalable environment
 - Databases
 
+# Screenshots
+
+The design is simple.
+
+[Login](https://coolify.coollabs.io/assets/login.png)
+
+[Dashboard](https://coolify.coollabs.io/assets/dashboard.png)
+
+[General configuration](https://coolify.coollabs.io/assets/configuration.png)
+
+[Build configuration](https://coolify.coollabs.io/assets/build_step.png)
+
+[Secrets](https://coolify.coollabs.io/assets/secrets.png)
+
+[Deployment Logs](https://coolify.coollabs.io/assets/logs.png)
+
 # Getting Started
 ### Requirements before installation
 - [Docker](https://docs.docker.com/engine/install/) version 20+  
