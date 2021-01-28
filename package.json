@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@roxi/routify": "^2.7.3",
+    "@zerodevx/svelte-toast": "^0.1.4",
     "axios": "^0.21.0",
     "commander": "^6.2.1",
     "cuid": "^2.1.8",

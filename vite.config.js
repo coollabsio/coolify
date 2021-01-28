@@ -18,7 +18,8 @@ module.exports = {
       "jsonwebtoken",
       "deepmerge",
       "dockerode",
-      "dayjs"
+      "dayjs",
+      "@zerodevx/svelte-toast"
     ]
   },
   proxy: {

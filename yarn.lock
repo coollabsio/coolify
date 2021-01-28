@@ -436,6 +436,11 @@
   resolved "https://registry.yarnpkg.com/@vue/shared/-/shared-3.0.5.tgz#c131d88bd6713cc4d93b3bb1372edb1983225ff0"
   integrity sha512-gYsNoGkWejBxNO6SNRjOh/xKeZ0H0V+TFzaPzODfBjkAIb0aQgBuixC1brandC/CDJy1wYPwSoYrXpvul7m6yw==
 
+"@zerodevx/svelte-toast@^0.1.4":
+  version "0.1.4"
+  resolved "https://registry.yarnpkg.com/@zerodevx/svelte-toast/-/svelte-toast-0.1.4.tgz#fc69930685dd9cdf0d82132fd5f5da7aa35908d3"
+  integrity sha512-UYtwgH0CISHE1UNpQi/1hvpFSWhjpvzSSDNPsCc5PTsCeW1g7PBEe+lnOMe1iSYiqtRx5R5gpDxMyj+9KH9Vjw==
+
 abab@^2.0.3:
   version "2.0.5"
   resolved "https://registry.yarnpkg.com/abab/-/abab-2.0.5.tgz#c0b678fb32d60fc1219c784d6a826fe385aeb79a"

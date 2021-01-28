@@ -1,4 +1,5 @@
 <script>
+    import { toast } from "@zerodevx/svelte-toast";
     import Loading from "../../components/Loading.svelte";
     import { fetch } from "../../store";
     let settings = {
@@ -16,6 +17,7 @@
                 ...settings,
             },
         });
+        toast.push("Configuration saved.");
     }
 </script>
 

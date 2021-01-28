@@ -80,7 +80,7 @@ module.exports = async function (fastify) {
       reply.code(200).send({ message: "Already queued." });
       return
     }
-    reply.code(201).send({ message: "Added to building queue." });
+    reply.code(201).send({ message: "Added to the queue." });
     const newDeploy = new Deploy({
       repoId, branch, deployId,
       events: [`[INFO] ${dayjs().format('YYYY-MM-DD HH:mm:ss.SSS')} Deployment queued.`]

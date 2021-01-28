@@ -5,7 +5,7 @@
   import Login from "../../../../components/Application/Login.svelte";
   import { fade } from "svelte/transition";
   import Loading from "../../../../components/Loading.svelte";
-  import Notification from "../../../../components/Notification/Notification.svelte";
+  import { toast } from '@zerodevx/svelte-toast'
 
   $: org = $params.org;
   $: repo = $params.repo;
@@ -52,10 +52,6 @@
     name: null,
     value: null,
   };
-  let isNotificationVisible = false;
-  let notification = {
-    message: "Default notification message.",
-  };
 
   // Check if the user changed anything in the loaded configuration.
   $: JSON.stringify(initialConfig) !== JSON.stringify(config)
@@ -82,12 +78,8 @@
           branch: config.branch,
         },
       });
-      notification.message = `Successfully deleted the ${config.branch} branch.`;
-      isNotificationVisible = true;
-      setTimeout(() => {
-        isNotificationVisible = false;
-        $goto("/dashboard");
-      }, 2000);
+      toast.push(`Successfully deleted the ${config.branch} branch.`)
+      $goto("/dashboard");
     } catch (error) {
       console.log(error);
     }
@@ -257,6 +249,7 @@
       config.installationId = installation.id;
       config = await $fetch(`/api/v1/config`, { body: { ...config, branch } });
       initialConfig = JSON.parse(JSON.stringify(config));
+      toast.push(`Configuration saved.`)
     } else {
       isDomainMissing = true;
       activateTab("general");
@@ -295,18 +288,10 @@
         "X-GitHub-Event": "push",
       },
     });
-
-    notification.message = response.message;
-    isNotificationVisible = true;
-    setTimeout(() => {
-      isNotificationVisible = false;
-    }, 2000);
+    toast.push(response.message)
   }
 </script>
 
-{#if isNotificationVisible}
-  <Notification {notification} />
-{/if}
 <div>
   {#if !$session.githubAppToken}
     <Login />
