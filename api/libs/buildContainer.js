@@ -17,11 +17,24 @@ module.exports = async function (config, engine) {
       );
 
       await saveLogs(
-        [{ stream: "Started building your application." }],
+        [
+          { stream: "Started working on your application." },
+        ],
         config
       );
-
+      await saveLogs(
+        [
+          { stream: "######### Building started #########" }
+        ],
+        config
+      );
       await execute(config, engine);
+      await saveLogs(
+        [
+          { stream: "######### Building done #########" }
+        ],
+        config
+      );
       await Deploy.findOneAndUpdate(
         { repoId, branch, deployId },
         { repoId, branch, deployId, progress: 'done' },

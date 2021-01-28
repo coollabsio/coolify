@@ -1,5 +1,5 @@
 <script>
-  import { fetch, logBranch, dateOptions } from "../../store";
+  import { fetch, savedBranch, dateOptions } from "../../store";
   import { url, goto } from "@roxi/routify/runtime";
   let running = [];
   let configOnly = [];
@@ -10,7 +10,7 @@
   }
   function switchTo(application) {
     const { branch, org, repo, to } = application;
-    $logBranch = branch;
+    $savedBranch = branch;
     if (to === "logs") {
       $goto(`/application/:org/:repo/logs`, {
         org,
@@ -72,7 +72,7 @@
         <div
           class="rounded-md p-4 tracking-tight bg-coolgray-300 border-2 shadow"
           class:border-yellow-300={application.progress === "building"}
-          class:border-red-300={application.progress === "failed"}
+          class:border-red-600={application.progress === "failed"}
           class:border-black={application.progress === "done" || !application.progress}
         >
           <div class="font-medium text-center text-xl">
@@ -82,8 +82,8 @@
             {application.Spec.Labels.branch}
           </div>
           <div class="text-xs text-center">
-            {#if application.Spec.Labels.path != null && application.Spec.Labels.path !== "/"}
-              {application.Spec.Labels.path}
+            {#if application.Spec.Labels.pathPrefix != null && application.Spec.Labels.pathPrefix !== "/"}
+              {application.Spec.Labels.pathPrefix}
             {/if}
           </div>
           <div
@@ -127,7 +127,7 @@
         <div
           class="rounded-md p-4 tracking-tight bg-coolgray-300 border-2 shadow"
           class:border-yellow-300={config.progress === "building"}
-          class:border-red-300={config.progress === "failed"}
+          class:border-red-600={config.progress === "failed"}
           class:border-black={config.progress === "done" || !config.progress}
         >
           <div class="font-medium text-center text-xl">
@@ -135,8 +135,8 @@
           </div>
           <div class="text-xs text-center">{config.branch}</div>
           <div class="text-xs text-center">
-            {#if config.publish.path != null && config.publish.path !== "/"}
-              {config.publish.path}
+            {#if config.publish.pathPrefix != null && config.publish.pathPrefix !== "/"}
+              {config.publish.pathPrefix}
             {/if}
           </div>
           <div

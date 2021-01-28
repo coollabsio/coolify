@@ -2,7 +2,8 @@
   import { url, isActive, goto, route } from "@roxi/routify/runtime";
   import { loggedIn, session, fetch } from "../store";
   import Home from "./index.svelte";
-  async function check() {
+
+  async function verifyToken() {
     if ($session.token) {
       try {
         await $fetch("/api/v1/verify", {
@@ -20,6 +21,7 @@
     logout();
     $goto("/index");
   }
+
   const routes = [
     {
       name: "Dashboard",
@@ -41,7 +43,7 @@
 </script>
 
 <div class="bg-coolgray-100 min-h-full text-white">
-  {#await check() then value}
+  {#await verifyToken() then notUsed}
     <main>
       {#if $route.path !== "/index"}
         <nav

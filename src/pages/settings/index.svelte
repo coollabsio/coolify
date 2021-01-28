@@ -1,4 +1,5 @@
 <script>
+    import Loading from "../../components/Loading.svelte";
     import { fetch } from "../../store";
     let settings = {
         allowRegistration: false,
@@ -23,9 +24,11 @@
 </div>
 <div class="text-center space-y-2 max-w-2xl md:mx-auto mx-6 pt-6 pb-4">
     <div class="flex items-center justify-center space-x-4">
-        {#await loadSettings() then notUsed}
-            <span class="text-sm font-medium text-white"
-                >Registration allowed</span
+        {#await loadSettings()}
+            <Loading />
+        {:then notUsed}
+            <span class="text-base font-bold text-white"
+                >Registration allowed?</span
             >
             <button
                 type="button"
@@ -48,7 +51,7 @@
                         aria-hidden="true"
                     >
                         <svg
-                            class="bg-white h-3 w-3 text-gray-400"
+                            class="bg-white h-3 w-3 text-red-600"
                             fill="none"
                             viewBox="0 0 12 12"
                         >
@@ -68,7 +71,7 @@
                         class:opacity-0={!settings.allowRegistration}
                     >
                         <svg
-                            class="bg-white h-3 w-3 text-indigo-600"
+                            class="bg-white h-3 w-3 text-green-600"
                             fill="currentColor"
                             viewBox="0 0 12 12"
                         >

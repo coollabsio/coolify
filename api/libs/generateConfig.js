@@ -1,11 +1,11 @@
 const { execShellAsync } = require("./common");
 
 module.exports = async function (config) {
-  const { domain, path, port } = config.publish;
+  const { domain, pathPrefix, port } = config.publish;
   const { workdir } = config.general;
 
-  // Default path
-  if (!path) config.publish.path = '/'
+  // Default pathPrefix
+  if (!pathPrefix) config.publish.pathPrefix = '/'
 
   // Generate valid name for the container
   config.build.container.name = domain.replace(/\//g, "-").replace(/\./g, "-");

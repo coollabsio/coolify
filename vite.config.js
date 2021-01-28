@@ -17,7 +17,8 @@ module.exports = {
       "shelljs",
       "jsonwebtoken",
       "deepmerge",
-      "dockerode"
+      "dockerode",
+      "dayjs"
     ]
   },
   proxy: {

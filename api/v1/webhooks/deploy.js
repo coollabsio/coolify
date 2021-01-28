@@ -8,6 +8,7 @@ const buildContainer = require("../../libs/buildContainer");
 const deploy = require("../../libs/deploy");
 const cuid = require("cuid");
 const Deploy = require('../../models/Deploy')
+const dayjs = require('dayjs')
 
 module.exports = async function (fastify) {
   const engine = new Dockerode({
@@ -51,11 +52,6 @@ module.exports = async function (fastify) {
     } else {
       return
     }
-
-    /*     request.body.ref.split("/").length === 3 ||
-        request.body.ref.split("/")[1] === "heads"
-          ? request.body.ref.split("/")[2]
-          : request.body.ref.split("/")[1], */
     const config = {
       repository: {
         installationId: request.body.installation.id,
@@ -79,18 +75,19 @@ module.exports = async function (fastify) {
     };
     const repoId = config.repository.id
     const deployId = config.general.random
-    const alreadyQueued = await Deploy.find({ repoId, branch, progress: { $ne: 'done' } })
+    const alreadyQueued = await Deploy.find({ repoId, branch, progress: { $eq: 'building' } })
     if (alreadyQueued.length > 0) {
       reply.code(200).send({ message: "Already queued." });
       return
     }
     reply.code(201).send({ message: "Added to building queue." });
     const newDeploy = new Deploy({
-      repoId, branch, deployId
+      repoId, branch, deployId,
+      events: [`[INFO] ${dayjs().format('YYYY-MM-DD HH:mm:ss.SSS')} Deployment queued.`]
     })
 
     await newDeploy.save()
-
+  
     try {
       await getSecrets(config);
       await getConfig(config);

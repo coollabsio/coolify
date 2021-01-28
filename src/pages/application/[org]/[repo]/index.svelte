@@ -1,18 +1,20 @@
 <script>
   import { onDestroy } from "svelte";
-  import { session, fetch, logBranch } from "../../../../store";
+  import { session, fetch, savedBranch } from "../../../../store";
   import { params, goto } from "@roxi/routify";
-  import Login from "../../../../components/application/Login.svelte";
+  import Login from "../../../../components/Application/Login.svelte";
   import { fade } from "svelte/transition";
   import Loading from "../../../../components/Loading.svelte";
-  import Notification from "../../../../components/Notification.svelte";
+  import Notification from "../../../../components/Notification/Notification.svelte";
+
   $: org = $params.org;
   $: repo = $params.repo;
 
   onDestroy(() => {
-    $logBranch = null;
+    $savedBranch = null;
   });
-  let branch = $logBranch || null;
+
+  let branch = $savedBranch || null;
   let installation, repoId, initialConfig;
   let activeTab = {
     general: true,
@@ -27,20 +29,19 @@
   let repos = [];
   let config = {
     build: { required: false, baseDir: null, installCmd: null, buildCmd: null },
-    publish: { baseDir: null, domain: null, path: null, port: null },
+    publish: { publishDir: null, domain: null, pathPrefix: null, port: null },
     branch: null,
     buildPack: "static",
     repoId: null,
     createdAt: null,
     updatedAt: null,
   };
-  let configChanged = false;
-  let missingDomain = false;
+
+  let isConfigChanged = false;
+  let isDomainMissing = false;
 
   let initialConfigValue = "Select a repository";
   let initialBranchValue = "Select a branch";
-
-  let buildRequired = false;
 
   let secrets = [];
   let secret = {
@@ -55,13 +56,12 @@
   let notification = {
     message: "Default notification message.",
   };
+
   // Check if the user changed anything in the loaded configuration.
-  $: if (JSON.stringify(initialConfig) !== JSON.stringify(config)) {
-    configChanged = true;
-  } else {
-    configChanged = false;
-  }
-  $: config.build.required = buildRequired;
+  $: JSON.stringify(initialConfig) !== JSON.stringify(config)
+    ? (isConfigChanged = true)
+    : (isConfigChanged = false);
+
   function activateTab(tab) {
     if (activeTab.hasOwnProperty(tab)) {
       activeTab = {
@@ -72,6 +72,7 @@
       activeTab[tab] = true;
     }
   }
+
   async function deleteApp() {
     try {
       await $fetch(`/api/v1/config`, {
@@ -91,13 +92,13 @@
       console.log(error);
     }
   }
-  function resetConfig() {
+
+  function resetState() {
     activeTab = {
       general: true,
       buildStep: false,
       secrets: false,
     };
-    buildRequired = false;
     branches = [];
     branch = "";
     secret = {
@@ -111,7 +112,7 @@
         installCmd: null,
         buildCmd: null,
       },
-      publish: { baseDir: null, domain: null, path: null, port: null },
+      publish: { publishDir: null, domain: null, pathPrefix: null, port: null },
       branch: null,
       buildPack: "static",
       repoId: null,
@@ -119,7 +120,7 @@
       updatedAt: null,
     };
   }
-  function modifyRepos() {
+  function modifyGithubAppConfig() {
     const left = screen.width / 2 - 1020 / 2;
     const top = screen.height / 2 - 618 / 2;
     const newWindow = open(
@@ -137,14 +138,14 @@
       if (newWindow.closed) {
         clearInterval(timer);
         loading.github = true;
-        resetConfig();
+        resetState();
         repoId = initialConfigValue;
-        await loadGithub();
+        await loadGithubRepositories();
         loading.github = false;
       }
     }, 100);
   }
-  function installApp() {
+  function installGithubApp() {
     const left = screen.width / 2 - 1020 / 2;
     const top = screen.height / 2 - 618 / 2;
     const newWindow = open(
@@ -166,13 +167,13 @@
             "="
           )[1];
           loading.github = true;
-          await loadGithub();
+          await loadGithubRepositories();
           loading.github = false;
         }
       }
     }, 100);
   }
-  async function loadGithub() {
+  async function loadGithubRepositories() {
     if ($session.githubAppToken) {
       const { installations } = await $fetch(
         "https://api.github.com/user/installations"
@@ -196,7 +197,7 @@
     }
   }
 
-  async function loadConfig() {
+  async function loadConfiguration() {
     if (repoId !== initialConfigValue && repoId !== undefined) {
       const data = await $fetch(
         `/api/v1/config?repoId=${repoId}&branch=${branch}`
@@ -204,9 +205,6 @@
       if (data) {
         config = data;
         initialConfig = JSON.parse(JSON.stringify(data));
-        if (config.build.required) {
-          buildRequired = true;
-        }
         await loadSecrets();
       } else {
         config = {
@@ -216,7 +214,7 @@
             installCmd: null,
             buildCmd: null,
           },
-          publish: { baseDir: null, domain: null, path: null },
+          publish: { publishDir: null, domain: null, pathPrefix: null },
           branch,
           buildPack: "static",
           repoId,
@@ -229,14 +227,14 @@
   async function loadBranches() {
     const repo = repos.find((r) => r.id === repoId);
     loading.branches = true;
-    resetConfig();
+    resetState();
     branches = await $fetch(
       `https://api.github.com/repos/${repo.owner.login}/${repo.name}/branches`
     );
     loading.branches = false;
-    if ($logBranch) {
-      branch = $logBranch;
-      loadConfig();
+    if ($savedBranch) {
+      branch = $savedBranch;
+      loadConfiguration();
     }
   }
   async function saveSecret() {
@@ -260,7 +258,7 @@
       config = await $fetch(`/api/v1/config`, { body: { ...config, branch } });
       initialConfig = JSON.parse(JSON.stringify(config));
     } else {
-      missingDomain = true;
+      isDomainMissing = true;
       activateTab("general");
     }
   }
@@ -278,7 +276,7 @@
     });
     await loadSecrets();
   }
-  async function deploy() {
+  async function queueDeployment() {
     const repo = repos.find((r) => r.id === repoId);
     const body = {
       ref: `refs/heads/${config.branch}`,
@@ -313,10 +311,10 @@
   {#if !$session.githubAppToken}
     <Login />
   {:else}
-    {#await loadGithub()}
+    {#await loadGithubRepositories()}
       <Loading message={"Loading Github..."} />
     {:then}
-      <div class="text-xl font-bold tracking-tight pt-6 text-center">
+      <div class="text-4xl font-bold tracking-tight pt-6 text-center">
         Configuration
       </div>
       <div
@@ -339,7 +337,8 @@
                 class="col-span-2"
                 bind:value={repoId}
                 on:change={() => loadBranches()}
-                disabled={org !== "new" && repo !== "start"}>
+                disabled={org !== "new" && repo !== "start"}
+              >
                 <option selected disabled>{initialConfigValue}</option>
                 {#each repos as repo}
                   <option value={repo.id}>
@@ -349,13 +348,16 @@
                   </option>
                 {/each}
               </select>
-              <button class="button col-span-1 ml-2" on:click={modifyRepos}
+              <button
+                class="button col-span-1 ml-2"
+                on:click={modifyGithubAppConfig}
                 >Configure on
                 <svg
                   class="w-6 inline-block mx-1"
                   fill="currentColor"
                   viewBox="0 0 20 20"
-                  aria-hidden="true">
+                  aria-hidden="true"
+                >
                   <path
                     fill-rule="evenodd"
                     d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z"
@@ -364,11 +366,12 @@
                 </svg></button
               >
               <button
-                class={config.branch == null && configChanged
+                class={config.branch == null && isConfigChanged
                   ? "button cursor-not-allowed bg-transparent border-transparent  ml-2 bg-red-500 opacity-25"
                   : "button  bg-red-500 col-span-1 ml-2 hover:bg-red-400"}
-                disabled={config.branch == null && configChanged}
-                on:click={deleteApp}>Delete
+                disabled={config.branch == null && isConfigChanged}
+                on:click={deleteApp}
+                >Delete
               </button>
             </div>
           </div>
@@ -386,7 +389,8 @@
               <select
                 id="branch"
                 bind:value={branch}
-                on:change={() => loadConfig()}>
+                on:change={() => loadConfiguration()}
+              >
                 <option disabled selected>{initialBranchValue}</option>
                 {#each branches as branch}
                   <option value={branch.name}>{branch.name}</option>
@@ -395,7 +399,7 @@
             </div>
             <div class="py-4">
               {#if config.branch}
-                {#if configChanged}
+                {#if isConfigChanged}
                   <button
                     class="button p-2 px-10 bg-blue-600 hover:bg-blue-500"
                     on:click={saveConfig}>Save Configuration</button
@@ -403,7 +407,7 @@
                 {:else}
                   <button
                     class="button p-2 px-10 bg-green-600 hover:bg-green-500"
-                    on:click={deploy}>Deploy Application</button
+                    on:click={queueDeployment}>Deploy Application</button
                   >
                 {/if}
               {/if}
@@ -414,7 +418,7 @@
         <Loading message={"Loading Github..."} />
       {:else}
         <div class="text-center py-10">
-          <button class="button p-2 px-10" on:click={installApp}
+          <button class="button p-2 px-10" on:click={installGithubApp}
             >Install & Authorize</button
           >
         </div>
@@ -432,21 +436,27 @@
             class:border-blue-500={activeTab.general}
             class:text-gray-200={activeTab.general}
             class="px-3 py-2 cursor-pointer border-b-4"
-          >General</div>
+          >
+            General
+          </div>
           <div
             on:click={() => activateTab("buildStep")}
             class:border-transparent={!activeTab.buildStep}
             class:border-blue-500={activeTab.buildStep}
             class:text-gray-200={activeTab.buildStep}
             class="px-3 py-2 cursor-pointer border-b-4"
-          >Build Step</div>
+          >
+            Build Step
+          </div>
           <div
             on:click={() => activateTab("secrets")}
             class:border-transparent={!activeTab.secrets}
             class:border-blue-500={activeTab.secrets}
             class:text-gray-200={activeTab.secrets}
             class="px-3 py-2 cursor-pointer border-b-4"
-          >Secrets</div>
+          >
+            Secrets
+          </div>
         </nav>
       </div>
       <div class="mx-2 md:mx-10 h-271">
@@ -467,9 +477,9 @@
               >
                 <label for="Domain">Domain</label>
                 <input
-                  class:placeholder-red-500={missingDomain}
-                  class:border-red-500={missingDomain}
-                  on:focus={() => (missingDomain = false)}
+                  class:placeholder-red-500={isDomainMissing}
+                  class:border-red-500={isDomainMissing}
+                  on:focus={() => (isDomainMissing = false)}
                   id="Domain"
                   bind:value={config.publish.domain}
                   placeholder="eg: coollabs.io (without www)"
@@ -477,13 +487,13 @@
                 <label for="Path">Path Prefix</label>
                 <input
                   id="Path"
-                  bind:value={config.publish.path}
+                  bind:value={config.publish.pathPrefix}
                   placeholder="/"
                 />
-                <label for="publishBaseDir">Publish Directory</label>
+                <label for="publishDir">Publish Directory</label>
                 <input
-                  id="publishBaseDir"
-                  bind:value={config.publish.baseDir}
+                  id="publishDir"
+                  bind:value={config.publish.publishDir}
                   placeholder="/"
                 />
               </div>
@@ -504,19 +514,20 @@
             <div
               class="grid grid-cols-1 space-y-2 max-w-2xl md:mx-auto mx-6 text-center"
             >
+              <label for="buildCommand">Build Command</label>
+              <input
+                id="buildCommand"
+                bind:value={config.build.buildCmd}
+                placeholder="eg: yarn build"
+              />
+
               <label for="installCommand">Install Command</label>
               <input
                 id="installCommand"
                 bind:value={config.build.installCmd}
                 placeholder="eg: yarn install"
               />
-              <label for="buildCommand">Build Command</label>
 
-              <input
-                id="buildCommand"
-                bind:value={config.build.buildCmd}
-                placeholder="eg: yarn build"
-              />
               <label for="baseDir">Base Directory</label>
               <input
                 id="baseDir"

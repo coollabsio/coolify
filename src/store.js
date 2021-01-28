@@ -69,7 +69,7 @@ export const session = writable(sessionStore);
 export const loggedIn = derived(session, ($session) => {
   return $session.token;
 });
-export const logBranch = writable();
+export const savedBranch = writable();
 
 export const dateOptions = readable({
   year: "numeric",

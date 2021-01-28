@@ -2,8 +2,8 @@ const fs = require("fs").promises;
 const { checkImageAvailable } = require("../../libs/common");
 const { streamDocker } = require("../../libs/streamDocker");
 module.exports = async function (config, engine) {
-  const installCommand = config.build.installCmd || "yarn install";
-  const publishDir = config.publish.directory || "dist";
+  const installCmd = config.build.installCmd || "yarn install";
+  const { publishDir } = config.publish;
   const commitImageAvailable = await checkImageAvailable(
     `${config.build.container.name}:${config.build.container.tag}`,
     engine
@@ -16,8 +16,8 @@ module.exports = async function (config, engine) {
               WORKDIR /usr/src/app
               COPY package*.json .
               `;
-    if (installCommand) {
-      dockerFile += `RUN ${installCommand}
+    if (installCmd) {
+      dockerFile += `RUN ${installCmd}
               `;
     }
     dockerFile += `COPY . .
@@ -31,7 +31,6 @@ module.exports = async function (config, engine) {
     );
     await streamDocker(engine, stream, config);
   }
-
   dockerFile = `# production stage
       FROM node:lts
       WORKDIR /usr/src/app
@@ -41,9 +40,9 @@ module.exports = async function (config, engine) {
   } else {
     dockerFile += `COPY . ./`;
   }
-  if (installCommand) {
+  if (installCmd) {
     dockerFile += `
-      RUN ${installCommand}
+      RUN ${installCmd}
       `;
   }
   dockerFile += `

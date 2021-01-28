@@ -4,6 +4,12 @@ const { execShellAsync } = require("./common");
 const { saveLogs } = require("./saveLogs");
 module.exports = async function (config, network) {
   try {
+    await saveLogs(
+      [
+        { stream: "######### Publishing started #########" }
+      ],
+      config
+    );
     const generateEnvs = {};
     for (const secret of config.publish.secrets) {
       generateEnvs[secret.name] = secret.value;
@@ -34,7 +40,7 @@ module.exports = async function (config, network) {
               "repo=" + config.repository.name.split('/')[1],
               "repoId=" + config.repository.id,
               "domain=" + config.publish.domain,
-              "path=" + config.publish.path,
+              "pathPrefix=" + config.publish.pathPrefix,
               "traefik.enable=true",
               "traefik.http.services." +
                 config.build.container.name +
@@ -47,7 +53,7 @@ module.exports = async function (config, network) {
                 ".rule=Host(`" +
                 config.publish.domain +
                 "`) && PathPrefix(`" +
-                config.publish.path +
+                config.publish.pathPrefix +
                 "`)",
               "traefik.http.routers." +
                 config.build.container.name +
@@ -71,6 +77,12 @@ module.exports = async function (config, network) {
     );
     await execShellAsync(
       `docker stack deploy --prune -c ${config.general.workdir}/stack.yml ${config.build.container.name}`
+    );
+    await saveLogs(
+      [
+        { stream: "######### Publishing done #########" }
+      ],
+      config
     );
   } catch (error) {
     await saveLogs(

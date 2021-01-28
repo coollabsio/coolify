@@ -18,6 +18,7 @@
     "axios": "^0.21.0",
     "commander": "^6.2.1",
     "cuid": "^2.1.8",
+    "dayjs": "^1.10.4",
     "deepmerge": "^4.2.2",
     "dockerode": "^3.2.1",
     "dotenv": "^8.2.0",

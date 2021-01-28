@@ -1,28 +1,31 @@
 <script>
     import { onDestroy } from "svelte";
-    import { fetch, logBranch } from "../../../../store";
+    import { fetch, savedBranch } from "../../../../store";
     import { params } from "@roxi/routify";
-    import Log from "../../../../components/application/Log.svelte";
+    import Log from "../../../../components/Application/Log.svelte";
+
     $: org = $params.org;
     $: repo = $params.repo;
+
     let logs = [];
     let branches;
 
-    let selectedBranch = $logBranch || null;
+    let selectedBranch = $savedBranch || null;
+    console.log(selectedBranch)
     let initialSelectedBranch = "Select a branch";
     async function loadLogs() {
         logs = await $fetch(`/api/v1/logs?org=${org}&repo=${repo}`);
         branches = [...new Set(logs.map((log) => log.branch))];
     }
     onDestroy(() => {
-        $logBranch = null;
+        $savedBranch = null;
     });
 </script>
 
 <div>
     {#await loadLogs() then notUsed}
         <div class="flex justify-center items-end">
-            <div class="text-xl font-bold tracking-tight pt-6 px-2 text-center">
+            <div class="text-4xl font-bold tracking-tight pt-6 px-2 text-center">
                 Deployment logs
             </div>
             <button
@@ -33,7 +36,8 @@
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
-                    stroke="currentColor">
+                    stroke="currentColor"
+                >
                     <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
@@ -48,12 +52,14 @@
         >
             {org}/{repo}
         </div>
+        {#if branches.length > 0}
         <div class="text-center space-y-2 max-w-2xl md:mx-auto mx-6 pb-4">
             <!-- svelte-ignore a11y-no-onchange -->
             <select
                 class="mb-6"
                 bind:value={selectedBranch}
-                on:change={() => (selectedBranch = selectedBranch)}>
+                on:change={() => (selectedBranch = selectedBranch)}
+            >
                 <option selected disabled>{initialSelectedBranch}</option>
                 {#each branches as branch}
                     <option value={branch}>{branch}</option>
@@ -64,6 +70,9 @@
                 <Log deploy={log} />
             {/each}
         </div>
+        {:else}
+        <div class="text-center space-y-2 max-w-2xl md:mx-auto mx-6 pb-4 font-bold">No logs found</div>
+        {/if}
     {/await}
 </div>
 

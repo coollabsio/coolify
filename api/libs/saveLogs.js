@@ -1,4 +1,8 @@
 const Deploy = require("../models/Deploy");
+const dayjs = require('dayjs')
+function getTimestamp() {
+  return `[INFO] ${dayjs().format('YYYY-MM-DD HH:mm:ss.SSS')} `
+}
 async function saveLogs(event, config) {
   try {
     const deployId = config.general.random;
@@ -15,10 +19,10 @@ async function saveLogs(event, config) {
       })
       .map((e) => {
         if (e && e.stream) {
-          e.stream = e.stream.replace(/(\r\n|\n|\r)/gm, "");
+          e.stream = getTimestamp() + e.stream.replace(/(\r\n|\n|\r)/gm, "");
         }
         if (e && e.error) {
-          e.error = e.error.replace(/(\r\n|\n|\r)/gm, "");
+          e.error = getTimestamp() + e.error.replace(/(\r\n|\n|\r)/gm, "");
         }
         return e;
       });

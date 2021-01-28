@@ -14,8 +14,13 @@ module.exports = async function (fastify) {
   fastify.get("/", { schema: getDeploySchema }, async (request, reply) => {
     const { repo, org } = request.query;
     const config = await Config.findOne({ fullName: `${org}/${repo}` });
-    return await Deploy.find({ repoId: config.repoId })
+    if(config) {
+      return await Deploy.find({ repoId: config.repoId })
       .select("-_id -__v -repoId")
       .sort({ createdAt: "desc" });
+    } else {
+      throw new Error('No configuration found');
+    }
+
   });
 };
