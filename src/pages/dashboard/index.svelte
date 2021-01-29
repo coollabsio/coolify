@@ -11,8 +11,8 @@
   function switchTo(application) {
     const { branch, org, repo, to } = application;
     $savedBranch = branch;
-    if (to === "logs") {
-      $goto(`/application/:org/:repo/logs`, {
+    if (to === "deployments") {
+      $goto(`/application/:org/:repo/deployments`, {
         org,
         repo,
       });
@@ -71,7 +71,7 @@
       {#each running as application}
         <div
           class="rounded-md p-4 tracking-tight bg-coolgray-300 border-2 shadow"
-          class:border-yellow-300={application.progress === "building"}
+          class:border-yellow-300={application.progress === "inprogress"}
           class:border-red-600={application.progress === "failed"}
           class:border-black={application.progress === "done" || !application.progress}
         >
@@ -89,11 +89,11 @@
           <div
             class="text-xs space-x-2 text-center font-medium tracking-tight pt-6"
           >
-            <a
+            <!-- <a
               href="https://{application.Spec.Labels.domain}"
               class="border-b-2 border-transparent hover:border-blue-500"
-              >Open App</a
-            >
+              >Open</a
+            > -->
             <button
               class="border-b-2 font-medium border-transparent hover:border-blue-500"
               on:click={() =>
@@ -102,7 +102,7 @@
                   org: application.Spec.Labels.org,
                   repo: application.Spec.Labels.repo,
                   to: "configuration",
-                })}>Configure</button
+                })}>Configure & Deploy</button
             >
             <button
               class="border-b-2 font-medium border-transparent hover:border-blue-500 cursor-pointer"
@@ -111,8 +111,8 @@
                   branch: application.Spec.Labels.branch,
                   org: application.Spec.Labels.org,
                   repo: application.Spec.Labels.repo,
-                  to: "logs",
-                })}> Deployment Logs </button>
+                  to: "deployments",
+                })}> Logs </button>
           </div>
         </div>
       {/each}
@@ -126,7 +126,7 @@
       {#each configOnly as config}
         <div
           class="rounded-md p-4 tracking-tight bg-coolgray-300 border-2 shadow"
-          class:border-yellow-300={config.progress === "building"}
+          class:border-yellow-300={config.progress === "inprogress"}
           class:border-red-600={config.progress === "failed"}
           class:border-black={config.progress === "done" || !config.progress}
         >

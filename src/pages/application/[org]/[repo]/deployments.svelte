@@ -7,15 +7,15 @@
     $: org = $params.org;
     $: repo = $params.repo;
 
-    let logs = [];
+    let deployments = [];
     let branches;
 
     let selectedBranch = $savedBranch || null;
-    console.log(selectedBranch)
     let initialSelectedBranch = "Select a branch";
-    async function loadLogs() {
-        logs = await $fetch(`/api/v1/logs?org=${org}&repo=${repo}`);
-        branches = [...new Set(logs.map((log) => log.branch))];
+    
+    async function loadDeployments() {
+        deployments = await $fetch(`/api/v1/deployments?org=${org}&repo=${repo}`);
+        branches = [...new Set(deployments.map((log) => log.branch))];
     }
     onDestroy(() => {
         $savedBranch = null;
@@ -23,14 +23,14 @@
 </script>
 
 <div>
-    {#await loadLogs() then notUsed}
+    {#await loadDeployments() then notUsed}
         <div class="flex justify-center items-end">
             <div class="text-4xl font-bold tracking-tight pt-6 px-2 text-center">
                 Deployment logs
             </div>
             <button
                 class="flex items-center justify-center h-8 w-8 bg-green-600 border border-black rounded-md text-white hover:bg-green-500"
-                on:click={loadLogs}
+                on:click={loadDeployments}
                 ><svg
                     class="w-6"
                     xmlns="http://www.w3.org/2000/svg"
@@ -66,8 +66,8 @@
                 {/each}
             </select>
 
-            {#each logs.filter((l) => l.branch === selectedBranch) as log}
-                <Log deploy={log} />
+            {#each deployments.filter((l) => l.branch === selectedBranch) as deployment}
+                <Log deployment={deployment} />
             {/each}
         </div>
         {:else}

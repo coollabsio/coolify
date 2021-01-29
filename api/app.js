@@ -6,7 +6,8 @@ module.exports = async function (fastify, opts) {
     server.register(require("./v1/dashboard"), { prefix: "/dashboard" });
     server.register(require("./v1/config"), { prefix: "/config" });
     server.register(require("./v1/secret"), { prefix: "/secret" });
-    server.register(require("./v1/logs"), { prefix: "/logs" });
+    server.register(require("./v1/deployments"), { prefix: "/deployments" });
+    server.register(require("./v1/deployments/logs"), { prefix: "/deployments/logs" });
   });
   // Public routes
   fastify.register(require("./v1/verify"), { prefix: "/verify" });

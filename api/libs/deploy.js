@@ -4,12 +4,6 @@ const { execShellAsync } = require("./common");
 const { saveLogs } = require("./saveLogs");
 module.exports = async function (config, network) {
   try {
-    await saveLogs(
-      [
-        { stream: "######### Publishing started #########" }
-      ],
-      config
-    );
     const generateEnvs = {};
     for (const secret of config.publish.secrets) {
       generateEnvs[secret.name] = secret.value;
@@ -80,7 +74,7 @@ module.exports = async function (config, network) {
     );
     await saveLogs(
       [
-        { stream: "######### Publishing done #########" }
+        { stream: "Published!" }
       ],
       config
     );

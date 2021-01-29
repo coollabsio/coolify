@@ -1,6 +1,6 @@
 const Config = require("../models/Config");
 const Secret = require("../models/Secret");
-const Deploy = require("../models/Deploy");
+const Log = require("../models/Log");
 const { execShellAsync } = require("../libs/common");
 module.exports = async function (fastify) {
   const getSchema = {
@@ -57,9 +57,9 @@ module.exports = async function (fastify) {
   fastify.delete("/", async (request, reply) => {
     const { repoId, branch } = request.body;
     const { publish } = await Config.findOneAndDelete({ repoId, branch })
-    const deploys = await Deploy.find({ repoId, branch })
+    const deploys = await Log.find({ repoId, branch })
     for (const deploy of deploys) {
-      await Deploy.findByIdAndRemove(deploy._id);
+      await Log.findByIdAndRemove(deploy._id);
     }
     const secrets = await Secret.find({ repoId, branch });
     for (const secret of secrets) {

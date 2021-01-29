@@ -7,7 +7,8 @@ const copyFiles = require("../../libs/copyFiles");
 const buildContainer = require("../../libs/buildContainer");
 const deploy = require("../../libs/deploy");
 const cuid = require("cuid");
-const Deploy = require('../../models/Deploy')
+const Log = require('../../models/Log')
+const Deployment= require('../../models/Deployment')
 const dayjs = require('dayjs')
 
 module.exports = async function (fastify) {
@@ -75,18 +76,20 @@ module.exports = async function (fastify) {
     };
     const repoId = config.repository.id
     const deployId = config.general.random
-    const alreadyQueued = await Deploy.find({ repoId, branch, progress: { $eq: 'building' } })
+    const alreadyQueued = await Log.find({ repoId, branch, progress: { $eq: 'building' } })
     if (alreadyQueued.length > 0) {
       reply.code(200).send({ message: "Already queued." });
       return
     }
     reply.code(201).send({ message: "Added to the queue." });
-    const newDeploy = new Deploy({
-      repoId, branch, deployId,
-      events: [`[INFO] ${dayjs().format('YYYY-MM-DD HH:mm:ss.SSS')} Deployment queued.`]
-    })
+    await new Deployment({
+      repoId, branch, deployId
+    }).save()
 
-    await newDeploy.save()
+    await new Log({
+      deployId,
+      events: [`[INFO] ${dayjs().format('YYYY-MM-DD HH:mm:ss.SSS')} Queued.`]
+    }).save()
   
     try {
       await getSecrets(config);

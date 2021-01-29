@@ -1,4 +1,4 @@
-const Deploy = require("../models/Deploy");
+const Log = require("../models/Log");
 const dayjs = require('dayjs')
 function getTimestamp() {
   return `[INFO] ${dayjs().format('YYYY-MM-DD HH:mm:ss.SSS')} `
@@ -26,26 +26,27 @@ async function saveLogs(event, config) {
         }
         return e;
       });
-
     try {
-      const found = await Deploy.findOne({ repoId, branch, deployId });
-      if (found) {
-        const events = found.events.concat(
-          clearedEvent.map((e) => e.error || e.stream)
-        );
-        await Deploy.findOneAndUpdate(
-          { repoId, branch, deployId },
-          { repoId, branch, deployId, events },
-          { upsert: true, new: true }
-        );
-      } else {
-        const events = event.map((e) => e.error || e.stream);
-        await Deploy.findOneAndUpdate(
-          { repoId, branch, deployId },
-          { repoId, branch, deployId, events },
-          { upsert: true, new: true }
-        );
-      }
+      new Log({ repoId, branch, deployId, events: clearedEvent.map((e) => e.error || e.stream) }).save()
+      // const found = await Deploy.findOne({ repoId, branch, deployId });
+      // if (found) {
+      //   const events = found.events.concat(
+      //     clearedEvent.map((e) => e.error || e.stream)
+      //   );
+      //   console.log(events)
+      //   await Deploy.findOneAndUpdate(
+      //     { repoId, branch, deployId },
+      //     { repoId, branch, deployId, events },
+      //     { upsert: true, new: true }
+      //   );
+      // } else {
+      //   const events = event.map((e) => e.error || e.stream);
+      //   await Deploy.findOneAndUpdate(
+      //     { repoId, branch, deployId },
+      //     { repoId, branch, deployId, events },
+      //     { upsert: true, new: true }
+      //   );
+      // }
     } catch (error) {
       console.log(error);
     }
