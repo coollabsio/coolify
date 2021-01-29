@@ -28,25 +28,6 @@ async function saveLogs(event, config) {
       });
     try {
       new Log({ repoId, branch, deployId, events: clearedEvent.map((e) => e.error || e.stream) }).save()
-      // const found = await Deploy.findOne({ repoId, branch, deployId });
-      // if (found) {
-      //   const events = found.events.concat(
-      //     clearedEvent.map((e) => e.error || e.stream)
-      //   );
-      //   console.log(events)
-      //   await Deploy.findOneAndUpdate(
-      //     { repoId, branch, deployId },
-      //     { repoId, branch, deployId, events },
-      //     { upsert: true, new: true }
-      //   );
-      // } else {
-      //   const events = event.map((e) => e.error || e.stream);
-      //   await Deploy.findOneAndUpdate(
-      //     { repoId, branch, deployId },
-      //     { repoId, branch, deployId, events },
-      //     { upsert: true, new: true }
-      //   );
-      // }
     } catch (error) {
       console.log(error);
     }

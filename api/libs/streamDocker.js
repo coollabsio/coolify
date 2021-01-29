@@ -5,10 +5,10 @@ async function streamDocker(engine, stream, config) {
       engine.modem.followProgress(stream, onFinished, onProgress);
       function onFinished(err, res) {
         if (err) reject(err);
-        saveLogs(res, config);
         resolve(res);
       }
       function onProgress(event) {
+        saveLogs([event], config)
         if (event.error) {
           reject(event.error);
         }
