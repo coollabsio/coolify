@@ -6,7 +6,7 @@ module.exports = async function (fastify) {
     socketPath: fastify.config.DOCKER_ENGINE,
   });
   fastify.get("/", async (request, reply) => {
-    let configOnly = await Config.find().select('-__v -_id')
+    let onlyConfigured = await Config.find().select('-__v -_id')
     const latestDeployments = await Deployment.aggregate([
       {
         $sort:{ updatedAt: -1 }
@@ -21,9 +21,9 @@ module.exports = async function (fastify) {
       }
     ])
 
-    let running = await (await dockerEngine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify')
-    running = running.map(r => {
-      configOnly = configOnly.filter(c => { 
+    let deployed = await (await dockerEngine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify')
+    deployed = deployed.map(r => {
+      onlyConfigured = onlyConfigured.filter(c => { 
         if (c.publish.domain !== r.Spec.Labels.domain) {
           let status = latestDeployments.find(l => r.Spec.Labels.repoId == l._id)
           if (status && status.progress) c.progress = status.progress
@@ -35,8 +35,10 @@ module.exports = async function (fastify) {
       return r
     })
     return {
-      running,
-      configOnly
+      applications: {
+        deployed,
+        onlyConfigured
+      }
     }
   });
 };
