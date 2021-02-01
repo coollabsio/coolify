@@ -11,7 +11,6 @@ module.exports = async function (workdir) {
         error_log  /var/log/nginx/error.log warn;
         pid        /var/run/nginx.pid;
         
-        
         events {
             worker_connections  1024;
         }
@@ -23,28 +22,18 @@ module.exports = async function (workdir) {
             sendfile        on;
             #tcp_nopush     on;
             keepalive_timeout  65;
-        
-            #gzip on;
-        
-            #include /etc/nginx/conf.d/*.conf;
+
             server {
                 listen       80;
                 server_name  localhost;
-        
-                if ($request_uri ~ (.*?\/)(\/+)$ ) {
-                    return 301 $scheme://$host$1;
-                }
-        
+                
                 location / {
                     root   /usr/share/nginx/html;
                     index  index.html;
                     try_files $uri $uri/index.html $uri/ /index.html =404;
-                    rewrite ^/index(?:\.html|/)?$ / permanent;
-                    rewrite ^/(.*)/index(?:\.html|/)?$ /$1 permanent;
-                    rewrite ^/(.*)(?:\.html|/)$ /$1 permanent;
                 }
         
-                #error_page  404              /404.html;
+                error_page  404              /50x.html;
         
                 # redirect server error pages to the static page /50x.html
                 #
