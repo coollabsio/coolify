@@ -50,14 +50,14 @@ The design is simple.
 
 ## Updating process
 ### Update everything (proxy+coolify)
-Updating proxy causing downtime!
+Updating proxy cause downtime!
 -  `bash install.sh all`
 
 ### Update coolify only
 -  `bash install.sh coolify`
 
 ### Update proxy only
-Updating proxy causing downtime!
+Updating proxy cause downtime!
 -  `bash install.sh proxy`
 
 # Contact
