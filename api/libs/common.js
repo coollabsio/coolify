@@ -6,7 +6,7 @@ const key = process.env.SECRETS_ENCRYPTION_KEY;
 
 function execShellAsync(cmd, opts = {}) {
   return new Promise(function (resolve, reject) {
-    shell.config.silent = false;
+    shell.config.silent = true;
     shell.exec(cmd, opts, function (code, stdout, stderr) {
       if (code !== 0) return reject(new Error(stderr));
       return resolve(stdout);

@@ -1,6 +1,7 @@
 const yaml = require("js-yaml");
 const { execShellAsync } = require("./common");
 const { saveLogs } = require("./saveLogs");
+const fs = require('fs').promises
 
 module.exports = async function (config, network) {
   try {
@@ -66,8 +67,9 @@ module.exports = async function (config, network) {
         },
       },
     };
+    await fs.writeFile(`${config.general.workdir}/stack.yml`, yaml.dump(stack))
     await execShellAsync(
-      `echo "${yaml.dump(stack)}" |docker stack deploy --prune -c - ${config.build.container.name}`
+      `cat ${config.general.workdir}/stack.yml |docker stack deploy --prune -c - ${config.build.container.name}`
     );
     await saveLogs(
       [
