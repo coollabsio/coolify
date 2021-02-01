@@ -39,6 +39,9 @@ module.exports = async function (workdir) {
                     root   /usr/share/nginx/html;
                     index  index.html;
                     try_files $uri $uri/index.html $uri/ /index.html =404;
+                    rewrite ^/index(?:\.html|/)?$ / permanent;
+                    rewrite ^/(.*)/index(?:\.html|/)?$ /$1 permanent;
+                    rewrite ^/(.*)(?:\.html|/)$ /$1 permanent;
                 }
         
                 #error_page  404              /404.html;
