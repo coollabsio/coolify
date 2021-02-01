@@ -97,7 +97,7 @@ module.exports = async function (fastify) {
 
             }
           }
-          const jwtToken = jwt.sign({}, fastify.config.JWT_SIGNKEY, {
+          const jwtToken = jwt.sign({}, fastify.config.JWT_SIGN_KEY, {
             expiresIn: 15778800,
             algorithm: 'HS256',
             audience: 'coolLabs',

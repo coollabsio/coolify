@@ -2,13 +2,13 @@
   import { fetch } from "../../store";
   import Applications from "../../components/Dashboard/Applications.svelte";
   import Databases from "../../components/Dashboard/Databases.svelte";
-
+  let deployments = {}
   async function loadDashboard() {
-    return await $fetch(`/api/v1/dashboard`);
+    deployments = await $fetch(`/api/v1/dashboard`);
   }
 </script>
 
-{#await loadDashboard() then response}
-  <Applications on:loadDashboard={loadDashboard} applications={response.applications} />
-  <!-- <Databases on:loadDashboard={loadDashboard} databases={response.databases}/> -->
+{#await loadDashboard() then notUsed}
+  <Applications on:loadDashboard={loadDashboard} applications={deployments.applications} />
+  <Databases on:loadDashboard={loadDashboard} databases={deployments.databases}/>
 {/await}

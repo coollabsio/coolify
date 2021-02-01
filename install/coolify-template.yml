@@ -86,7 +86,7 @@ services:
         - "traefik.enable=true"
         - "traefik.http.routers.coolify.entrypoints=websecure"
         - "traefik.http.routers.coolify.tls.certresolver=letsencrypt"
-        - "traefik.http.routers.coolify.rule=Host(`${SUBDOMAIN}.${DOMAIN}`) && PathPrefix(`/`)"
+        - "traefik.http.routers.coolify.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)"
         - "traefik.http.services.coolify.loadbalancer.server.port=3000"
         - "traefik.http.routers.coolify.middlewares=global-compress"
       

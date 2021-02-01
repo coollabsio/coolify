@@ -2,7 +2,7 @@ const fp = require("fastify-plugin");
 const User = require("../models/User");
 module.exports = fp(async function (fastify, options, next) {
   fastify.register(require("fastify-jwt"), {
-    secret: fastify.config.JWT_SIGNKEY,
+    secret: fastify.config.JWT_SIGN_KEY,
   });
   fastify.addHook("onRequest", async (request, reply) => {
     try {

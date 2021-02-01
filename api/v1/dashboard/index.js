@@ -2,6 +2,7 @@ const Config = require("../../models/Config");
 const Deployment = require("../../models/Deployment");
 const Dockerode = require("dockerode");
 module.exports = async function (fastify) {
+    // TODO: Add this to fastify plugin
   const dockerEngine = new Dockerode({
     socketPath: fastify.config.DOCKER_ENGINE,
   });
@@ -20,9 +21,12 @@ module.exports = async function (fastify) {
         }
       }
     ])
+    const services = await dockerEngine.listServices()
 
-    let deployed = await (await dockerEngine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify')
-    deployed = deployed.map(r => {
+    let deployedApplications = services.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
+    let deployedDatabases = services.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'database')
+    deployedApplications = deployedApplications.map(r => {
+
       onlyConfigured = onlyConfigured.filter(c => { 
         if (c.publish.domain !== r.Spec.Labels.domain) {
           let status = latestDeployments.find(l => r.Spec.Labels.repoId == l._id)
@@ -36,8 +40,11 @@ module.exports = async function (fastify) {
     })
     return {
       applications: {
-        deployed,
+        deployed: deployedApplications,
         onlyConfigured
+      },
+      databases: {
+        deployed: deployedDatabases
       }
     }
   });

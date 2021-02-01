@@ -37,7 +37,7 @@ export const fetch = writable(
     if (response.status >= 200 && response.status <= 299) {
       if (response.headers.get("content-type").match(/application\/json/)) {
         return await response.json();
-      } else if (response.headers.get("content-type").match(/text\/html/)) {
+      } else if (response.headers.get("content-type").match(/text\/plain/)) {
         return await response.text();
       } else if (response.headers.get("content-type").match(/multipart\/form-data/)) {
         return await response.formData()

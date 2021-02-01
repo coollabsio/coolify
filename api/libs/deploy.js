@@ -1,7 +1,7 @@
-const fs = require("fs").promises;
 const yaml = require("js-yaml");
 const { execShellAsync } = require("./common");
 const { saveLogs } = require("./saveLogs");
+
 module.exports = async function (config, network) {
   try {
     const generateEnvs = {};
@@ -29,6 +29,7 @@ module.exports = async function (config, network) {
             },
             labels: [
               "managedBy=coolify",
+              "type=application",
               "branch=" + config.repository.branch,
               "org=" + config.repository.name.split('/')[0],
               "repo=" + config.repository.name.split('/')[1],
@@ -65,12 +66,8 @@ module.exports = async function (config, network) {
         },
       },
     };
-    await fs.writeFile(
-      `${config.general.workdir}/stack.yml`,
-      yaml.dump(stack)
-    );
     await execShellAsync(
-      `docker stack deploy --prune -c ${config.general.workdir}/stack.yml ${config.build.container.name}`
+      `echo "${yaml.dump(stack)}" |docker stack deploy --prune -c - ${config.build.container.name}`
     );
     await saveLogs(
       [

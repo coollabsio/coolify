@@ -12,6 +12,7 @@ const Deployment= require('../../models/Deployment')
 const dayjs = require('dayjs')
 
 module.exports = async function (fastify) {
+  // TODO: Add this to fastify plugin
   const engine = new Dockerode({
     socketPath: fastify.config.DOCKER_ENGINE,
   });

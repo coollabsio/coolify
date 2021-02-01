@@ -2,21 +2,17 @@ const schema = {
     type: "object",
     required: [
         "DOMAIN",
-        "SUBDOMAIN",
         "EMAIL",
         "VITE_GITHUB_APP_CLIENTID",
         "VITE_GITHUB_OAUTH_CLIENTID",
         "GITHUB_OAUTH_SECRET",
         "GITHUB_APP_CLIENTSECRET",
         "GITHUB_APP_PRIVATE_KEY",
-        "JWT_SIGNKEY",
+        "JWT_SIGN_KEY",
         "SECRETS_ENCRYPTION_KEY"
     ],
     properties: {
         DOMAIN: {
-            type: "string",
-        },
-        SUBDOMAIN: {
             type: "string",
         },
         EMAIL: {
@@ -37,7 +33,7 @@ const schema = {
         GITHUB_APP_PRIVATE_KEY: {
             type: "string",
         },
-        JWT_SIGNKEY: {
+        JWT_SIGN_KEY: {
             type: "string",
         },
         DOCKER_ENGINE: {
