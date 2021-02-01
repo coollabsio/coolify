@@ -6,7 +6,7 @@ const schema = {
         "VITE_GITHUB_APP_CLIENTID",
         "VITE_GITHUB_OAUTH_CLIENTID",
         "GITHUB_OAUTH_SECRET",
-        "GITHUB_APP_CLIENTSECRET",
+        "GITHUB_APP_CLIENT_SECRET",
         "GITHUB_APP_PRIVATE_KEY",
         "JWT_SIGN_KEY",
         "SECRETS_ENCRYPTION_KEY"
@@ -27,7 +27,7 @@ const schema = {
         GITHUB_OAUTH_SECRET: {
             type: "string",
         },
-        GITHUB_APP_CLIENTSECRET: {
+        GITHUB_APP_CLIENT_SECRET: {
             type: "string",
         },
         GITHUB_APP_PRIVATE_KEY: {

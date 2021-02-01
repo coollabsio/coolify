@@ -128,7 +128,7 @@ module.exports = async function (fastify) {
     try {
       const { data } = await axios({
         method: "post",
-        url: `https://github.com/login/oauth/access_token?client_id=${fastify.config.VITE_GITHUB_APP_CLIENTID}&client_secret=${fastify.config.GITHUB_APP_CLIENTSECRET}&code=${code}`,
+        url: `https://github.com/login/oauth/access_token?client_id=${fastify.config.VITE_GITHUB_APP_CLIENTID}&client_secret=${fastify.config.GITHUB_APP_CLIENT_SECRET}&code=${code}`,
         headers: {
           accept: "application/json",
         },
