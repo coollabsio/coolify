@@ -103,7 +103,8 @@
       <li>
         <button
           class="button px-4 py-1 cursor-pointer"
-          class:cursor-not-allowed="{newApplication}"
+          class:cursor-not-allowed="{$configuration.publish.domain === '' ||
+          $configuration.publish.domain === null}"
           class:bg-gray-600="{$configuration.publish.domain === '' ||
             $configuration.publish.domain === null}"
           class:bg-green-600="{$configuration.publish.domain}"

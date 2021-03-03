@@ -7,7 +7,7 @@
   import { onMount } from "svelte";
 
   onMount(async () => {
-    if ($params.organization === "new" && $params.name === "start") {
+    if ($params.organization !== "new" && $params.name !== "start") {
       const config = await $fetch(`/api/v1/config`, {
         body: {
           name: $configuration.repository.name,
@@ -16,7 +16,7 @@
         },
       });
       $configuration = { ...config };
-      $redirect(`/application/:organization/:name/:branch`, {
+      $redirect(`/application/:organization/:name/:branch/configuration`, {
         name: $configuration.repository.name,
         organization: $configuration.repository.organization,
         branch: $configuration.repository.branch,

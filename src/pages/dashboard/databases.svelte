@@ -9,7 +9,7 @@
       <div
         class="hover:bg-purple-700 rounded transition-all hover:text-white duration-100 cursor-pointer flex justify-center items-center px-2"
         on:click="{() =>
-          $goto(`/database/${database.Spec.Labels.config.general.name}`)}"
+          $goto(`/database/${database.Spec.Labels.config.general.name}/overview`)}"
       >
         <div
           class="flex py-4 mx-auto w-full justify-center items-center space-x-2"

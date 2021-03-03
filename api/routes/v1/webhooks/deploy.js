@@ -3,6 +3,7 @@ const { verifyUserId } = require("../../../libs/common");
 const Deployment = require('../../../models/Deployment')
 const { queueAndBuild } = require("../../../libs/applications");
 const { setDefaultConfiguration } = require("../../../libs/applications/configuration");
+const { docker } = require('../../../libs/docker')
 
 module.exports = async function (fastify) {
   // TODO: Add this to fastify plugin
@@ -31,33 +32,43 @@ module.exports = async function (fastify) {
     },
   };
   fastify.post("/", { schema: postSchema }, async (request, reply) => {
-    if (request.headers.manual) {
-      if (!await verifyUserId(request.headers.authorization)) {
-        reply.code(500).send({ success: false, error: "Invalid request" });
-        return
-      }
-    } else {
-      const hmac = crypto.createHmac('sha256', fastify.config.GITHUP_APP_WEBHOOK_SECRET)
-      const digest = Buffer.from('sha256=' + hmac.update(JSON.stringify(request.body)).digest('hex'), 'utf8')
-      const checksum = Buffer.from(request.headers["x-hub-signature-256"], 'utf8')
-      if (checksum.length !== digest.length || !crypto.timingSafeEqual(digest, checksum)) {
-        reply.code(500).send({ success: false, error: "Invalid request" });
-        return
-      }
+    const hmac = crypto.createHmac('sha256', fastify.config.GITHUP_APP_WEBHOOK_SECRET)
+    const digest = Buffer.from('sha256=' + hmac.update(JSON.stringify(request.body)).digest('hex'), 'utf8')
+    const checksum = Buffer.from(request.headers["x-hub-signature-256"], 'utf8')
+    if (checksum.length !== digest.length || !crypto.timingSafeEqual(digest, checksum)) {
+      reply.code(500).send({  error: "Invalid request" });
+      return
     }
+
     if (request.headers["x-github-event"] !== "push") {
-      reply.code(500).send({ success: false, error: "Not a push event." });
+      reply.code(500).send({ error: "Not a push event." });
       return;
     }
 
-    const config = setDefaultConfiguration(request)
+    const services = await docker.engine.listServices()
+
+    let config = await services.find(r => {
+      if (r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')  {
+        if (JSON.parse(r.Spec.Labels.config).repository.id === request.body.repository.id) {
+          return r
+        }
+      }
+    })
+    
+    if (!config) {
+        reply.code(404).send({ error: "Nothing to do." })
+        return
+    }
+    
+    config = JSON.parse(config.Spec.Labels.config)
+    const configuration = setDefaultConfiguration(config)
 
     const alreadyQueued = await Deployment.find({ repoId: config.repository.id, branch: config.repository.branch, progress: { $in: ['queued', 'inprogress'] } })
     if (alreadyQueued.length > 0) {
       reply.code(200).send({ message: "Already in the queue." });
       return
     }
-    queueAndBuild(config)
+    queueAndBuild(configuration)
     reply.code(201).send({ message: "Deployment queued." });
   });
 };

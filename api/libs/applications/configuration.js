@@ -15,9 +15,7 @@ function getUniq() {
 function setDefaultConfiguration(configuration) {
   try { 
     const name = getUniq()
-    const base = JSON.stringify({ repository: configuration.repository, publish: configuration.publish })
-    const sha = crypto.createHash('sha256').update(base).digest('hex');
-  
+    
     configuration.build.container.name = name
   
     configuration.general.name = name
