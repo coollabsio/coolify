@@ -1,0 +1,13 @@
+@import "tailwindcss/base.css";
+@import "tailwindcss/components.css";
+@import "tailwindcss/utilities.css";
+
+body, html {
+    min-height: 100vh;
+    height: 100%;   
+}
+
+:root {
+    --toastProgressBackground: #2563EB;
+    --toastFont: 'Inter';
+}
