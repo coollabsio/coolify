@@ -32,7 +32,7 @@
           <div>
             {#if application.Spec.Labels.config.build.pack === "static"}
               <svg
-                class="text-red-500 w-6 h-6"
+                class="text-red-500 w-8 h-8"
                 xmlns="http://www.w3.org/2000/svg"
                 aria-hidden="true"
                 focusable="false"
@@ -47,7 +47,7 @@
               >
             {:else}
               <svg
-                class="text-green-500 w-6 h-6"
+                class="text-green-500 w-8 h-8"
                 xmlns="http://www.w3.org/2000/svg"
                 aria-hidden="true"
                 focusable="false"

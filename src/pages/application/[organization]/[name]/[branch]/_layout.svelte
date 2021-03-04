@@ -2,6 +2,7 @@
   import { params, goto, redirect, isActive } from "@roxi/routify";
   import { configuration, fetch, initialConfiguration } from "@store";
   import { onDestroy, onMount } from "svelte";
+  import Loading from "../../../../../components/Loading.svelte";
 
   $configuration.repository.organization = $params.organization;
   $configuration.repository.name = $params.name;
@@ -12,13 +13,7 @@
     $params.name === "start" &&
     $params.branch === "main";
 
-  onMount(async () => {
-    if (newApplication) {
-      $redirect(
-        `/application/${$configuration.repository.organization}/${$configuration.repository.name}/${$configuration.repository.branch}/configuration`,
-      );
-    }
-
+  async function loadConfiguration() {
     if ($params.organization !== "new" && $params.name !== "start") {
       try {
         const config = await $fetch(`/api/v1/config`, {
@@ -35,6 +30,13 @@
     } else {
       $configuration = JSON.parse(JSON.stringify(initialConfiguration));
     }
+  }
+  onMount(async () => {
+    if (newApplication) {
+      $redirect(
+        `/application/${$configuration.repository.organization}/${$configuration.repository.name}/${$configuration.repository.branch}/configuration`,
+      );
+    }
   });
 
   onDestroy(() => {
@@ -43,9 +45,6 @@
 
   async function deploy() {
     await $fetch(`/api/v1/application/deploy`, { body: $configuration });
-    $goto(
-      `/application/${$configuration.repository.organization}/${$configuration.repository.name}/${$configuration.repository.branch}/configuration`,
-    );
   }
 </script>
 
@@ -104,7 +103,7 @@
         <button
           class="button px-4 py-1 cursor-pointer"
           class:cursor-not-allowed="{$configuration.publish.domain === '' ||
-          $configuration.publish.domain === null}"
+            $configuration.publish.domain === null}"
           class:bg-gray-600="{$configuration.publish.domain === '' ||
             $configuration.publish.domain === null}"
           class:bg-green-600="{$configuration.publish.domain}"
@@ -121,4 +120,8 @@
     </ul>
   </nav>
 </div>
-<slot />
+{#await loadConfiguration()}
+  <Loading />
+{:then}
+  <slot />
+{/await}

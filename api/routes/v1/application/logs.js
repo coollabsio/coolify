@@ -4,9 +4,19 @@ module.exports = async function (fastify) {
     fastify.get("/:deployId", async (request, reply) => {
         const { deployId } = request.params;
         try {
-            return await ApplicationLog.find({ deployId })
+            const logs = await ApplicationLog.find({ deployId })
                 .select("-_id -__v")
                 .sort({ createdAt: "asc" });
+
+            const deploy = await Deployment.findOne({ deployId })
+                .select("-_id -__v")
+                .sort({ createdAt: "desc" });
+
+            let finalLogs = {}
+            finalLogs.progress = deploy.progress
+            finalLogs.events = logs.map(log => log.event)
+            return finalLogs
+
         } catch (e) {
             throw new Error('No logs found');
         }
