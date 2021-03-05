@@ -1,6 +1,42 @@
-const ApplicationLog = require("../../../models/ApplicationLog");
+const ApplicationLog = require("../../../models/Logs/Application");
 const Deployment = require("../../../models/Deployment");
+const dayjs = require('dayjs')
+const utc = require('dayjs/plugin/utc')
+const relativeTime = require('dayjs/plugin/relativeTime')
+dayjs.extend(utc)
+dayjs.extend(relativeTime)
+
 module.exports = async function (fastify) {
+    const getLogSchema = {
+        querystring: {
+            type: "object",
+            properties: {
+                repoId: { type: "string" },
+                branch: { type: "string" }
+            },
+            required: ["repoId", "branch"],
+        },
+    };
+    fastify.get("/", { schema: getLogSchema }, async (request, reply) => {
+        const { repoId, branch } = request.query;
+        const deploy = await Deployment.find({ repoId, branch })
+            .select("-_id -__v -repoId")
+            .sort({ createdAt: "desc" });
+            
+        const finalLogs = deploy.map(d => {
+            let finalLogs = { ...d._doc }
+
+            const updatedAt = dayjs(d.updatedAt).utc()
+
+            finalLogs.took = updatedAt.diff(dayjs(d.createdAt)) / 1000
+            finalLogs.since = updatedAt.fromNow()
+
+            return finalLogs
+        })
+        return finalLogs
+
+    });
+
     fastify.get("/:deployId", async (request, reply) => {
         const { deployId } = request.params;
         try {
@@ -15,6 +51,7 @@ module.exports = async function (fastify) {
             let finalLogs = {}
             finalLogs.progress = deploy.progress
             finalLogs.events = logs.map(log => log.event)
+            finalLogs.human = dayjs(deploy.updatedAt).from(dayjs(deploy.updatedAt))
             return finalLogs
 
         } catch (e) {
@@ -22,20 +59,5 @@ module.exports = async function (fastify) {
         }
 
     });
-    const getLogSchema = {
-        querystring: {
-            type: "object",
-            properties: {
-                repoId: { type: "string" }
-            },
-            required: ["repoId"],
-        },
-    };
-    fastify.get("/", { schema: getLogSchema }, async (request, reply) => {
-        const { repoId } = request.query;
-        return await Deployment.find({ repoId })
-            .select("-_id -__v -repoId")
-            .sort({ createdAt: "desc" });
 
-    });
 };

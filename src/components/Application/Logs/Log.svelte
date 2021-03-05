@@ -30,26 +30,28 @@
   }
 </script>
 
-<p
-  class="text-xs cursor-pointer py-2 hover:underline"
-  class:underline="{opened}"
-  on:click="{fetchLogs}"
->
-  {new Intl.DateTimeFormat("default", $dateOptions).format(
-    new Date(deployment.createdAt),
-  )}
-</p>
+<div class="flex justify-between">
+  <p
+    class="text-xs cursor-pointer py-2 hover:underline text-left"
+    class:underline="{opened}"
+    on:click="{fetchLogs}"
+  >
+    {new Intl.DateTimeFormat("default", $dateOptions).format(
+      new Date(deployment.createdAt),
+    )}
+  </p>
 
-{#if opened}
-  {#await loadLogs()}
-    Loading...
-  {:then}
-    <pre
-      transition:fade="{{ duration: 50 }}"
-      class="text-xs tracking-tighter text-justify border-2 bg-gray-100 text-black p-6 rounded-md whitespace-pre-wrap">
+  {#if opened}
+    {#await loadLogs()}
+      Loading...
+    {:then}
+      <pre
+        transition:fade="{{ duration: 50 }}"
+        class="text-xs tracking-tighter text-justify border-2 bg-gray-100 text-black p-6 rounded-md whitespace-pre-wrap">
     {#each logs as log}
       {log + '\n'}
     {/each}
     </pre>
-  {/await}
-{/if}
+    {/await}
+  {/if}
+</div>

@@ -26,7 +26,8 @@ module.exports = {
       "dayjs",
       "@zerodevx/svelte-toast",
       "mongodb-memory-server-core",
-      "unique-names-generator"
+      "unique-names-generator",
+      "generate-password"
     ]
   },
   proxy: {

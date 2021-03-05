@@ -8,18 +8,17 @@
 </script>
 <style lang="postcss">
   :global(input) {
-    @apply border text-xs rounded p-1 px-2  !important;
+    @apply border text-xs rounded py-2 px-2 bg-white !important;
   }
   :global(select) {
-    @apply border text-xs rounded p-1 px-2 !important;
+    @apply border text-xs rounded py-2 px-2 bg-white !important;
   }
   :global(label) {
     @apply text-left text-xs font-bold !important;
   }
   :global(.button) {
-    @apply rounded text-xs font-bold transition-all duration-150 !important;
+    @apply rounded text-xs font-bold transition-all duration-100 !important;
   }
-
   :global(.h-271) {
     min-height: 271px !important;
   }

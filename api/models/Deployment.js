@@ -1,11 +1,14 @@
 const mongoose = require("mongoose");
 const deploymentSchema = mongoose.Schema(
   {
-    domain: { type: String, required: true },
-    repoId: { type: Number, required: true },
-    progress: { type: String, require: true, default: "queued"},
-    branch: { type: String, required: true },
     deployId: { type: String, required: true },
+    nickname: { type: String, required: true },
+    repoId: { type: Number, required: true },
+    organization: { type: String, required: true },
+    name: { type: String, required: true },
+    branch: { type: String, required: true },
+    domain: { type: String, required: true },
+    progress: { type: String, require: true, default: "queued"},
   },
   { timestamps: true }
 );

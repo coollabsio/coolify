@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher } from "svelte";
-  import { params } from "@roxi/routify";
+  import { params, isActive } from "@roxi/routify";
   import { configuration } from "@store";
   export let repositories;
   const dispatch = createEventDispatcher();
@@ -14,12 +14,11 @@
     <!-- svelte-ignore a11y-no-onchange -->
     <select
       id="repository"
-      class:cursor-not-allowed="{$params.organization !== 'new' &&
-        $params.name !== 'start'}"
+      class:cursor-not-allowed="{!$isActive("/application/new")}"
       class="col-span-2"
       bind:value="{$configuration.repository.id}"
       on:change="{loadBranches}"
-      disabled="{$params.organization !== 'new' && $params.name !== 'start'}"
+      disabled="{!$isActive("/application/new")}"
     >
       <option selected disabled>Select a repository</option>
       {#each repositories as repo}
@@ -31,7 +30,7 @@
       {/each}
     </select>
     <button
-      class="button col-span-1 ml-2 bg-green-600 hover:bg-green-500 text-white"
+      class="button col-span-1 ml-2 bg-gray-200 hover:bg-gray-100 text-black"
       on:click="{modifyGithubAppConfig}"
       >Configure on
       <svg

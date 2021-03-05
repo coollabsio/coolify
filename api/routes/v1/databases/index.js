@@ -1,21 +1,24 @@
 const yaml = require("js-yaml");
 const fs = require('fs').promises
-
+const cuid = require('cuid')
 const { docker } = require('../../../libs/docker')
 const { execShellAsync } = require("../../../libs/common");
 
 const { uniqueNamesGenerator, adjectives, colors, animals } = require('unique-names-generator');
+const generator = require('generate-password');
+
+
 function getUniq() {
     return uniqueNamesGenerator({ dictionaries: [adjectives, animals, colors], length: 2 })
 }
 module.exports = async function (fastify) {
-    fastify.get("/:dbName", async (request, reply) => {
-        const { dbName } = request.params
+    fastify.get("/:deployId", async (request, reply) => {
+        const { deployId } = request.params
         try {
-            const database = (await docker.engine.listServices()).find(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'database' && JSON.parse(r.Spec.Labels.config).general.name === dbName)
+            const database = (await docker.engine.listServices()).find(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'database' && JSON.parse(r.Spec.Labels.configuration).general.deployId === deployId)
             if (database) {
                 const payload = {
-                    config: JSON.parse(database.Spec.Labels.config),
+                    config: JSON.parse(database.Spec.Labels.configuration),
                     envs: database.Spec.TaskTemplate.ContainerSpec.Env
                 }
                 reply.code(200).send(payload);
@@ -37,34 +40,53 @@ module.exports = async function (fastify) {
         },
     };
 
-    fastify.post("/new", { schema: postSchema }, async (request, reply) => {
+    fastify.post("/deploy", { schema: postSchema }, async (request, reply) => {
+        let { type, defaultDatabaseName } = request.body
+        const passwords = generator.generateMultiple(2, {
+            length: 24,
+            numbers: true,
+            strict: true
+        });
+        const username = generator.generate({
+            length: 10,
+            numbers: true,
+            strict: true
+        });
         // TODO: Query for existing db with the same name
-        reply.code(201).send({ message: "Added to the queue." });
-        const { type } = request.body
+        let nickname = getUniq()
+
+        if (!defaultDatabaseName) defaultDatabaseName = nickname
+
+        reply.code(201).send({ message: "Deploying." });
         // TODO: Persistent volume, custom inputs
-        let name = getUniq()
-        
-        const config = {
+        const deployId = cuid()
+        const configuration = {
             general: {
-                workdir: '.',
-                name,
+                workdir: `/tmp/${deployId}`,
+                deployId, 
+                nickname,
                 type
             },
+            database: {
+                username,
+                passwords,
+                defaultDatabaseName
+            },
             deploy: {
-                name,
+                name: nickname,
             }
         }
 
         const generateEnvs = {
-            MONGODB_ROOT_PASSWORD: '1234',
-            MONGODB_USERNAME: '1234',
-            MONGODB_PASSWORD: '1234',
-            MONGODB_DATABASE: '1234',
+            MONGODB_ROOT_PASSWORD: passwords[0],
+            MONGODB_USERNAME: username,
+            MONGODB_PASSWORD: passwords[1],
+            MONGODB_DATABASE: defaultDatabaseName,
         }
         const stack = {
             version: "3.8",
             services: {
-                [config.general.name]: {
+                [configuration.general.deployId]: {
                     image: 'bitnami/mongodb:4.4',
                     networks: [`${docker.network}`],
                     environment: generateEnvs,
@@ -83,7 +105,7 @@ module.exports = async function (fastify) {
                         labels: [
                             "managedBy=coolify",
                             "type=database",
-                            "config=" + JSON.stringify(config)
+                            "configuration=" + JSON.stringify(configuration)
                         ],
                     },
                 },
@@ -94,14 +116,18 @@ module.exports = async function (fastify) {
                 },
             },
         };
-        await fs.writeFile(`${config.general.workdir}/stack.yml`, yaml.dump(stack))
-        // await execShellAsync(
-        //     `echo "${yaml.dump(stack)}" | docker stack deploy -c - ${config.general.name}`
-        // );
+        await execShellAsync(`mkdir -p ${configuration.general.workdir}`)
+        await fs.writeFile(`${configuration.general.workdir}/stack.yml`, yaml.dump(stack))
         await execShellAsync(
-            `cat ${config.general.workdir}/stack.yml | docker stack deploy -c - ${config.general.name}`
+            `cat ${configuration.general.workdir}/stack.yml | docker stack deploy -c - ${configuration.general.deployId}`
         );
 
 
     });
+
+    fastify.delete("/:dbName", async (request, reply) => {
+        const { dbName } = request.params
+        await execShellAsync(`docker stack rm ${dbName}`)
+        reply.code(200).send({})
+    })
 };

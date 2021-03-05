@@ -1,11 +1,8 @@
 <script>
   import { fetch, deployments } from "@store";
   import { onDestroy, onMount } from "svelte";
-  import { goto, params } from "@roxi/routify/runtime";
+  import { goto, isActive, url } from "@roxi/routify/runtime";
   import { toast } from "@zerodevx/svelte-toast";
-  // import Applications from "../../components/Dashboard/Applications.svelte";
-  // import Databases from "../../components/Dashboard/Databases.svelte";
-  import { url, isActive } from "@roxi/routify";
 
   let loadDashboardInterval = null;
 
@@ -27,10 +24,16 @@
   onDestroy(() => {
     clearInterval(loadDashboardInterval);
   });
+  function newThing() {
+    const gotoUrl = $isActive("/dashboard/applications")
+      ? "/application/new"
+      : "/database/new";
+    $goto(gotoUrl);
+  }
 </script>
 
 <nav
-  class="mx-auto bg-coolgray-300 border-b-4 text-white mb-3 sm:px-4"
+  class="mx-auto bg-coolgray-300 border-b-4 text-white mb-3 sm:px-4  transition-all duration-250"
   class:border-green-500="{$isActive('/dashboard/applications')}"
   class:border-purple-500="{$isActive('/dashboard/databases')}"
 >
@@ -54,50 +57,30 @@
       </button>
     </li>
     <li class="flex-1 hidden lg:flex"></li>
-    {#if $isActive("/dashboard/applications")}
-      <li>
-        <button
-          class="bg-green-500 hover:bg-green-400 font-bold cursor-pointer rounded-lg text-white"
-          on:click="{() => $goto('/application/new/start/main/configuration')}"
+    <li>
+      <button
+        class:bg-green-600="{$isActive('/dashboard/applications')}"
+        class:hover:bg-green-500="{$isActive('/dashboard/applications')}"
+        class:bg-purple-500="{$isActive('/dashboard/databases')}"
+        class:hover:bg-purple-400="{$isActive('/dashboard/databases')}"
+        class="font-bold cursor-pointer rounded-lg text-white transition-all duration-250"
+        on:click="{newThing}"
+      >
+        <svg
+          class="w-6"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
         >
-          <svg
-            class="w-6"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-          </svg>
-        </button>
-      </li>
-    {/if}
-    {#if $isActive("/dashboard/databases")}
-      <li>
-        <button
-          class="bg-purple-500 hover:bg-purple-400 font-bold cursor-pointer rounded-lg text-white"
-          on:click="{() => $goto('/database/new')}"
-        >
-          <svg
-            class="w-6"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-          </svg>
-        </button>
-      </li>
-    {/if}
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+      </button>
+    </li>
   </ul>
 </nav>
 

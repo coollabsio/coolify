@@ -7,4 +7,4 @@ const logSchema = mongoose.Schema(
   { timestamps: { createdAt: 'createdAt', updatedAt: false } }
 );
 
-module.exports = mongoose.model("applicationlog", logSchema);
+module.exports = mongoose.model("logs-application", logSchema);

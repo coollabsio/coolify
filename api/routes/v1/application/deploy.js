@@ -37,10 +37,12 @@ module.exports = async function (fastify) {
         }
 
         const configuration = setDefaultConfiguration(request.body)
+        const { id, organization, name, branch } = configuration.repository
+        const { domain } = configuration.publish
 
         let found = false
         await (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application').map(s => {
-            const running = JSON.parse(s.Spec.Labels.config)
+            const running = JSON.parse(s.Spec.Labels.configuration)
             if (
                 running.publish.domain === configuration.publish.domain &&
                 running.repository.id !== configuration.repository.id &&
@@ -55,7 +57,7 @@ module.exports = async function (fastify) {
             return
         }
         
-        const alreadyQueued = await Deployment.find({ repoId: configuration.repository.id, branch: configuration.repository.branch, progress: { $in: ['queued', 'inprogress'] } })
+        const alreadyQueued = await Deployment.find({ repoId: id, branch, organization, name, domain, progress: { $in: ['queued', 'inprogress'] } })
         if (alreadyQueued.length > 0) {
             reply.code(200).send({ message: "Already in the queue." });
             return

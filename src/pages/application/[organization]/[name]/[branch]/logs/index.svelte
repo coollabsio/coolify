@@ -1,0 +1,80 @@
+<script>
+  import { fetch, configuration, dateOptions } from "@store";
+  import { fade } from "svelte/transition";
+  import { goto } from "@roxi/routify";
+  import { onDestroy, onMount } from "svelte";
+
+  import Loading from "../../../../../../components/Loading.svelte";
+
+  let loadDeploymentsInterval = null;
+  let deployments = [];
+
+  onMount(() => {
+    loadDeploymentsInterval = setInterval(() => {
+      loadDeployments();
+    }, 1000);
+  });
+  onDestroy(() => {
+    clearInterval(loadDeploymentsInterval);
+  });
+  async function loadDeployments() {
+    deployments = await $fetch(
+      `/api/v1/application/logs?repoId=${$configuration.repository.id}&branch=${$configuration.repository.branch}`,
+    );
+  }
+</script>
+
+<div
+  class="text-center space-y-2 max-w-4xl md:mx-auto mx-6"
+  in:fade="{{ duration: 100 }}"
+>
+  {#await loadDeployments()}
+    <Loading />
+  {:then}
+    {#if deployments.length > 0}
+      {#each deployments as deployment}
+        <div
+          class="flex space-x-4 text-md py-4 hover:bg-green-700 hover:text-white max-w-4xl mx-auto cursor-pointer transition-all duration-100 rounded"
+          class:bg-yellow-100={deployment.progress !== 'done'}
+          on:click="{() => $goto(`./${deployment.deployId}`)}"
+        >
+          <div class="font-bold text-sm px-3 flex justify-center items-center">
+            {deployment.branch}
+          </div>
+          <div class="flex-1"></div>
+          <div class="px-3">
+            <div
+              class="text-xs"
+              title="{new Intl.DateTimeFormat('default', $dateOptions).format(
+                new Date(deployment.createdAt),
+              )}"
+            >
+              {deployment.since}
+            </div>
+            {#if deployment.progress === 'done'}
+            <div class="text-xs">
+              Deployed in <span class="font-bold">{deployment.took}s</span>
+            </div>
+            {:else}
+            <div class="text-xs">
+              Deploying...
+            </div>
+            {/if}
+          </div>
+        </div>
+      {/each}
+    {:else}
+      <div
+        class="text-center space-y-2 max-w-2xl md:mx-auto mx-6 pb-4 font-bold text-xl tracking-tighter"
+      >
+        No logs found
+      </div>
+    {/if}
+  {:catch}
+    <div
+      class="text-center space-y-2 max-w-2xl md:mx-auto mx-6 pb-4 font-bold text-xl tracking-tighter"
+    >
+      No logs found
+    </div>
+  {/await}
+</div>

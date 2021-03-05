@@ -11,6 +11,9 @@ export const fetch = writable(
     { method, body, ...customConfig } = { body: null, method: null }
   ) => {
     let headers = { "Content-type": "application/json; charset=UTF-8" };
+    if (method === "DELETE") {
+      delete headers['Content-type']
+    }
     const isGithub = url.match(/api.github.com/);
     if (isGithub) {
       headers = Object.assign(headers, {
@@ -83,6 +86,7 @@ export const dateOptions = readable({
 
 export const deployments = writable({})
 
+export const initConf = writable({})
 export const configuration = writable({
   github: {
     installation: {
@@ -99,7 +103,8 @@ export const configuration = writable({
     branch: null,
   },
   general: {
-    name: null,
+    deployId: null,
+    nickname: null,
     workdir: null,
   },
   build: {
@@ -140,6 +145,7 @@ export const initialConfiguration = {
     branch: null,
   },
   general: {
+    deployId: null,
     name: null,
     workdir: null,
   },

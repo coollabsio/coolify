@@ -35,7 +35,7 @@ module.exports = async function (configuration) {
             labels: [
               "managedBy=coolify",
               "type=application",
-              "config=" + JSON.stringify(configuration),
+              "configuration=" + JSON.stringify(configuration),
               "traefik.enable=true",
               "traefik.http.services." +
               configuration.build.container.name +

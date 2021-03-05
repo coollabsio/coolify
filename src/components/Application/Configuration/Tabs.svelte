@@ -1,13 +1,13 @@
 <script>
-  import { params, redirect } from "@roxi/routify";
-  import { configuration, fetch, initialConfiguration } from "@store";
+  import { redirect, isActive } from "@roxi/routify";
+  import { configuration, fetch, deployments } from "@store";
   import General from "./ActiveTab/General.svelte";
   import BuildStep from "./ActiveTab/BuildStep.svelte";
   import Secrets from "./ActiveTab/Secrets.svelte";
   import { onMount } from "svelte";
 
   onMount(async () => {
-    if ($params.organization !== "new" && $params.name !== "start") {
+    if (!$isActive("/application/new")) {
       const config = await $fetch(`/api/v1/config`, {
         body: {
           name: $configuration.repository.name,
@@ -20,6 +20,22 @@
         name: $configuration.repository.name,
         organization: $configuration.repository.organization,
         branch: $configuration.repository.branch,
+      });
+    } else {
+      $deployments.applications.deployed.filter(d => {
+        const conf = d?.Spec?.Labels.configuration;
+        if (
+          conf.repository.organization ===
+            $configuration.repository.organization &&
+          conf.repository.name === $configuration.repository.name &&
+          conf.repository.branch === $configuration.repository.branch
+        ) {
+          $redirect(`/application/:organization/:name/:branch/configuration`, {
+            name: $configuration.repository.name,
+            organization: $configuration.repository.organization,
+            branch: $configuration.repository.branch,
+          });
+        }
       });
     }
   });

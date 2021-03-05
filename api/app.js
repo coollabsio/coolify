@@ -5,11 +5,15 @@ module.exports = async function (fastify, opts) {
     server.register(require("./routes/v1/settings"), { prefix: "/settings" });
     server.register(require("./routes/v1/dashboard"), { prefix: "/dashboard" });
     server.register(require("./routes/v1/config"), { prefix: "/config" });
-    server.register(require("./routes/v1/secret"), { prefix: "/secret" });
-    server.register(require("./routes/v1/application"), { prefix: "/application" });
+    // server.register(require("./routes/v1/secret"), { prefix: "/secret" });
+    // server.register(require("./routes/v1/application"), { prefix: "/application" });
+    server.register(require("./routes/v1/application/remove"), { prefix: "/application/remove" });
     server.register(require("./routes/v1/application/deploy"), { prefix: "/application/deploy" });
     server.register(require("./routes/v1/application/logs"), { prefix: "/application/logs" });
     // server.register(require("./routes/v1/applications/previews"), { prefix: "/applications/previews" });
+    
+    
+    // Databases or database??????
     server.register(require("./routes/v1/databases"), { prefix: "/databases" });
   });
   // Public routes

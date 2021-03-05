@@ -1,30 +1,25 @@
 const dayjs = require('dayjs')
 
 const { saveServerLog } = require('../logging')
-const { docker } = require('../docker')
 const { execShellAsync } = require('../common');
 
 const cloneRepository = require("./github/cloneRepository");
-const { generateConfiguration, getConfigFromDatabase } = require("./configuration");
 const { saveAppLog } = require('../logging')
 const copyFiles = require("./deploy/copyFiles");
 const buildContainer = require("./build/container");
 const deploy = require("./deploy/deploy");
 const Deployment = require('../../models/Deployment');
-const Config = require('../../models/Config');
-const ApplicationLog = require('../../models/ApplicationLog');
 const { cleanup } = require('./cleanup')
 
 
 async function queueAndBuild(configuration) {
     try {
-        const repoId = configuration.repository.id
-        const branch = configuration.repository.branch
-        const deployId = configuration.general.name
-        const domain = configuration.publish.domain
+        const { id, organization, name, branch } = configuration.repository
+        const { domain } = configuration.publish
+        const { deployId, nickname } = configuration.general
 
         await new Deployment({
-            repoId, branch, deployId, domain
+            repoId: id, branch, deployId, domain, organization, name, nickname
         }).save()
 
         await cloneRepository(configuration)

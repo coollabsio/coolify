@@ -36,7 +36,7 @@ module.exports = async function (fastify) {
     const digest = Buffer.from('sha256=' + hmac.update(JSON.stringify(request.body)).digest('hex'), 'utf8')
     const checksum = Buffer.from(request.headers["x-hub-signature-256"], 'utf8')
     if (checksum.length !== digest.length || !crypto.timingSafeEqual(digest, checksum)) {
-      reply.code(500).send({  error: "Invalid request" });
+      reply.code(500).send({ error: "Invalid request" });
       return
     }
 
@@ -47,27 +47,30 @@ module.exports = async function (fastify) {
 
     const services = await docker.engine.listServices()
 
-    let config = await services.find(r => {
-      if (r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')  {
-        if (JSON.parse(r.Spec.Labels.config).repository.id === request.body.repository.id) {
+    let configuration = await services.find(r => {
+      if (r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application') {
+        if (JSON.parse(r.Spec.Labels.configuration).repository.id === request.body.repository.id) {
           return r
         }
       }
     })
-    
-    if (!config) {
-        reply.code(404).send({ error: "Nothing to do." })
-        return
-    }
-    
-    config = JSON.parse(config.Spec.Labels.config)
-    const configuration = setDefaultConfiguration(config)
 
-    const alreadyQueued = await Deployment.find({ repoId: config.repository.id, branch: config.repository.branch, progress: { $in: ['queued', 'inprogress'] } })
+    if (!configuration) {
+      reply.code(404).send({ error: "Nothing to do." })
+      return
+    }
+
+    configuration = setDefaultConfiguration(JSON.parse(config.Spec.Labels.configuration))
+    const { id, organization, name, branch } = configuration.repository
+    const { domain } = configuration.publish
+    const deployId = configuration.general.deployId
+
+    const alreadyQueued = await Deployment.find({ repoId: id, branch, organization, name, domain, progress: { $in: ['queued', 'inprogress'] } })
     if (alreadyQueued.length > 0) {
       reply.code(200).send({ message: "Already in the queue." });
       return
     }
+
     queueAndBuild(configuration)
     reply.code(201).send({ message: "Deployment queued." });
   });

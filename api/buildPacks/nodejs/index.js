@@ -4,7 +4,7 @@ const { buildImage } = require("../../libs/applications/build/helpers");
 const { streamEvents, docker } = require("../../libs/docker");
 
 module.exports = async function (configuration) {
-  if (!configuration.build.installation) configuration.build.installation = "yarn install";
+  if (!configuration.build.command.installation) configuration.build.command.installation = "yarn install";
   
   // const onlyConfigurationChanged = await checkImageAvailable(
   //   `${config.build.container.name}:${config.build.container.tag}`

@@ -1,6 +1,6 @@
 const { docker } = require('../../../libs/docker')
 const Deployment = require("../../../models/Deployment");
-const ServerLog = require("../../../models/ServerLog");
+const ServerLog = require("../../../models/Logs/Server");
 
 module.exports = async function (fastify) {
   fastify.get("/", async (request, reply) => {
@@ -25,24 +25,23 @@ module.exports = async function (fastify) {
     let serverLogs = await ServerLog.find()
     const services = await docker.engine.listServices()
 
-    let applications = services.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
-    let databases = services.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'database')
+    let applications = services.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application' && r.Spec.Labels.configuration)
+    let databases = services.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'database' && r.Spec.Labels.configuration)
 
     applications = applications.map(r => {
-      const config = r.Spec.Labels.config ? JSON.parse(r.Spec.Labels.config) : null
+      const configuration = r.Spec.Labels.configuration ? JSON.parse(r.Spec.Labels.configuration) : null
 
-      let status = latestDeployments.find(l => config.repository.id === l._id.repoId && config.repository.branch === l._id.branch)
+      let status = latestDeployments.find(l => configuration.repository.id === l._id.repoId && configuration.repository.branch === l._id.branch)
       if (status && status.progress) r.progress = status.progress
-      r.Spec.Labels.config = config
+      r.Spec.Labels.configuration = configuration
       return r
     })
     databases = databases.map(r => {
-      const config = r.Spec.Labels.config ? JSON.parse(r.Spec.Labels.config) : null
-
-      r.Spec.Labels.config = config
+      const configuration = r.Spec.Labels.configuration ? JSON.parse(r.Spec.Labels.configuration) : null
+      r.Spec.Labels.configuration = configuration
       return r
     })
-    applications = [...new Map(applications.map(item => [item.Spec.Labels.config.publish.domain, item])).values()];
+    applications = [...new Map(applications.map(item => [item.Spec.Labels.configuration.publish.domain, item])).values()];
     return {
       serverLogs,
       applications: {

@@ -1,5 +1,5 @@
-const ApplicationLog = require("../models/ApplicationLog");
-const ServerLog = require("../models/ServerLog");
+const ApplicationLog = require("../models/Logs/Application");
+const ServerLog = require("../models/Logs/Server");
 const dayjs = require('dayjs')
 
 function generateTimestamp() {
@@ -8,7 +8,7 @@ function generateTimestamp() {
 
 async function saveAppLog(event, configuration, isError) {
   try {
-    const deployId = configuration.general.name;
+    const deployId = configuration.general.deployId;
     const repoId = configuration.repository.id;
     const branch = configuration.repository.branch;
 
@@ -43,7 +43,7 @@ async function saveServerLog(log, configuration) {
   console.log('-------')
   console.log(log)
   if (configuration) {
-    const deployId = configuration.general.name;
+    const deployId = configuration.general.deployId;
     const repoId = configuration.repository.id;
     const branch = configuration.repository.branch;
     await new ApplicationLog({ repoId, branch, deployId, event: `[SERVER ERROR 😖]: ${log}`}).save()
