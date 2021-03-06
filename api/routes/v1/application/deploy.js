@@ -2,7 +2,7 @@
 const { verifyUserId } = require("../../../libs/common");
 const Deployment = require('../../../models/Deployment')
 const { queueAndBuild } = require("../../../libs/applications");
-const { setDefaultConfiguration } = require("../../../libs/applications/configuration");
+const { setDefaultConfiguration, saveConfiguration } = require("../../../libs/applications/configuration");
 const { docker } = require('../../../libs/docker')
 
 module.exports = async function (fastify) {
@@ -62,6 +62,7 @@ module.exports = async function (fastify) {
             reply.code(200).send({ message: "Already in the queue." });
             return
         }
+        await saveConfiguration(configuration)
 
         queueAndBuild(configuration)
 

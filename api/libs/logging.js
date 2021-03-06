@@ -11,12 +11,13 @@ async function saveAppLog(event, configuration, isError) {
     const deployId = configuration.general.deployId;
     const repoId = configuration.repository.id;
     const branch = configuration.repository.branch;
-
     if (isError) {
       // console.log(event, config, isError)
       let clearedEvent = null
+      
       if (event.error) clearedEvent = '[ERROR] ' + generateTimestamp() + event.error.replace(/(\r\n|\n|\r)/gm, "")
-      if (event) clearedEvent = '[ERROR] ' + generateTimestamp() + event.replace(/(\r\n|\n|\r)/gm, "")
+      else if (event)clearedEvent = '[ERROR] ' + generateTimestamp() + event.replace(/(\r\n|\n|\r)/gm, "")
+
       try {
         await new ApplicationLog({ repoId, branch, deployId, event: clearedEvent }).save()
       } catch (error) {

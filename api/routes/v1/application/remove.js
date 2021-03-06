@@ -18,16 +18,18 @@ module.exports = async function (fastify) {
       }
     })
     if (found) {
-      // const deploys = await Deployment.find({ repoId, branch })
+
+      const deploys = await Deployment.find({ organization, branch, name })
+
       // const found = deploys.filter(d => d.progress !== 'done' && d.progress !== 'failed')
       // if (found.length > 0) {
       //   throw new Error('Deployment inprogress, cannot delete now.');
       // }
 
-      // for (const deploy of deploys) {
-      //   console.log(deploy)
-      //   // await ApplicationLog.findOneAndRemove({ deployId: deploy.deployId });
-      // }
+      for (const deploy of deploys) {
+        await ApplicationLog.deleteMany({ deployId: deploy.deployId });
+        await Deployment.deleteMany({ deployId: deploy.deployId });
+      }
       await execShellAsync(`docker stack rm ${found.general.deployId}`)
       reply.code(200).send({ organization, name, branch })
 

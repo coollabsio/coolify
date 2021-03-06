@@ -8,10 +8,10 @@
 </script>
 <style lang="postcss">
   :global(input) {
-    @apply border text-xs rounded py-2 px-2 bg-white !important;
+    @apply border text-sm rounded py-2 px-2 bg-white !important;
   }
   :global(select) {
-    @apply border text-xs rounded py-2 px-2 bg-white !important;
+    @apply border text-sm rounded py-2 px-2 bg-white !important;
   }
   :global(label) {
     @apply text-left text-xs font-bold !important;

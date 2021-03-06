@@ -13,12 +13,6 @@
       $redirect(`/dashboard/databases`);
     }
   }
-  async function removeDB() {
-    await $fetch(`/api/v1/databases/${name}`, {
-      method: "DELETE",
-    });
-    $redirect(`/dashboard/databases`);
-  }
 
   function showPasswords() {
     showEnvs = !showEnvs;
@@ -30,10 +24,7 @@
   in:fade="{{ duration: 100 }}"
 >
   {#await loadDatabaseConfig() then database}
-    <button
-      class="button bg-red-600 text-white p-2 hover:bg-red-500"
-      on:click="{removeDB}">Remove database</button
-    >
+
     <div>Name: {database.config.general.nickname}</div>
 
     <button on:click="{showPasswords}">Show connection URI</button>

@@ -11,7 +11,6 @@ const deploy = require("./deploy/deploy");
 const Deployment = require('../../models/Deployment');
 const { cleanup } = require('./cleanup')
 
-
 async function queueAndBuild(configuration) {
     try {
         const { id, organization, name, branch } = configuration.repository
@@ -36,11 +35,11 @@ async function queueAndBuild(configuration) {
         await deploy(configuration);
         await cleanup(configuration)
     } catch (error) {
-        console.log(error, type)
+        const { type } = error.error
         if (type === 'app') {
-            await saveAppLog(error, configuration, true)
+            await saveAppLog(error.error, configuration, true)
         } else {
-            await saveServerLog(error, configuration)
+            await saveServerLog(error.error, configuration)
         }
     }
 }

@@ -2,7 +2,7 @@
   import { deployments } from "@store";
   import { fade } from "svelte/transition";
   import { goto } from "@roxi/routify/runtime";
-  import Underdeployment from "../../components/Dashboard/Underdeployment.svelte";
+
 
   function switchTo(application) {
     const { branch, name, organization } = application;
@@ -19,7 +19,7 @@
     <div class="max-w-4xl mx-auto px-2 lg:px-0">
       {#each $deployments.applications.deployed as application}
         <div
-          class="hover:bg-green-700 rounded transition-all hover:text-white duration-100 cursor-pointer flex justify-center items-center px-2"
+          class="hover:bg-green-100 hover:shadow border-l-4 border-transparent hover:border-green-500 rounded transition-all duration-100 cursor-pointer flex justify-center items-center px-2"
         >
           <div
             class="flex py-4 mx-auto w-full justify-center items-center space-x-2"
@@ -98,22 +98,8 @@
       {/each}
     </div>
   {:else}
-    <div class="text-center font-bold tracking-tight text-xl">
+    <div class="text-center font-bold tracking-tight">
       No applications found
-    </div>
-  {/if}
-  {#if $deployments.applications?.underDeployment.length > 0}
-    <div class="flex flex-col items-center pb-6 px-5 justify-center">
-      <div class="text-base font-bold tracking-tight px-5 py-3 text-center">
-        Running deployments
-      </div>
-      <div
-        class="flex flex-col flex-wrap gap-4 justify-center items-center mx-6 pb-6"
-      >
-        {#each $deployments.applications.underDeployment as deployment}
-          <Underdeployment deployment="{deployment}" />
-        {/each}
-      </div>
     </div>
   {/if}
 </div>

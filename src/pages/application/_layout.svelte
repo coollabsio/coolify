@@ -9,7 +9,7 @@
   $configuration.repository.name = $params.name;
   $configuration.repository.branch = $params.branch;
 
-  $: mod = JSON.stringify($initConf) !== JSON.stringify($configuration);
+  // $: mod = JSON.stringify($initConf) !== JSON.stringify($configuration);
 
   async function loadConfiguration() {
     if (!$isActive("/application/new")) {
@@ -30,6 +30,18 @@
       $configuration = JSON.parse(JSON.stringify(initialConfiguration));
     }
   }
+
+  async function removeApplication() {
+    await $fetch(`/api/v1/application/remove`, {
+      body: {
+        organization: $params.organization,
+        name: $params.name,
+        branch: $params.branch,
+      },
+    });
+    $redirect(`/dashboard/applications`);
+  }
+
   onDestroy(() => {
     $configuration = JSON.parse(JSON.stringify(initialConfiguration));
   });
@@ -38,6 +50,9 @@
     try {
       await $fetch(`/api/v1/application/deploy`, { body: $configuration });
       $initConf = JSON.parse(JSON.stringify($configuration));
+      $redirect(
+        `/application/${$configuration.repository.organization}/${$configuration.repository.name}/${$configuration.repository.branch}/logs`,
+      );
     } catch (error) {
       console.log(error);
     }
@@ -72,7 +87,7 @@
           </button>
         </li>
         <li class="flex-1 hidden lg:flex"></li>
-        <li in:fade="{{ duration: 250 }}">
+        <li in:fade="{{ duration: 150 }}">
           <button
             class="button px-4 py-1 cursor-pointer"
             class:cursor-not-allowed="{$configuration.publish.domain === '' ||
@@ -136,17 +151,22 @@
           </button>
         </li>
         <li class="flex-1 hidden lg:flex"></li>
-        <li in:fade="{{ duration: 250 }}">
+        <li in:fade="{{ duration: 150 }}">
+          <button
+            class="button px-4 py-1 cursor-pointer bg-red-500 hover:bg-red-400"
+            on:click="{removeApplication}"
+          >
+            Remove
+          </button>
+        </li>
+        <li in:fade="{{ duration: 150 }}">
           <button
             class="button px-4 py-1 cursor-pointer"
             class:cursor-not-allowed="{$configuration.publish.domain === '' ||
               $configuration.publish.domain === null}"
             class:bg-gray-600="{$configuration.publish.domain === '' ||
               $configuration.publish.domain === null}"
-            class:bg-yellow-300="{mod}"
-            class:hover:bg-yellow-200="{mod}"
-            class:text-black="{mod}"
-            class:bg-green-600="{$configuration.publish.domain && !mod}"
+            class:bg-green-600="{$configuration.publish.domain}"
             class:hover:bg-green-500="{$configuration.publish.domain}"
             class:opacity-50="{$configuration.publish.domain === '' ||
               $configuration.publish.domain === null}"

@@ -63,23 +63,9 @@
         class:hover:bg-green-500="{$isActive('/dashboard/applications')}"
         class:bg-purple-500="{$isActive('/dashboard/databases')}"
         class:hover:bg-purple-400="{$isActive('/dashboard/databases')}"
-        class="font-bold cursor-pointer rounded-lg text-white transition-all duration-250"
+        class="button px-4 py-1 cursor-pointer transition-all duration-250"
         on:click="{newThing}"
-      >
-        <svg
-          class="w-6"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-        </svg>
-      </button>
+      > Add </button>
     </li>
   </ul>
 </nav>

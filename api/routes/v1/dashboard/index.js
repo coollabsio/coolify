@@ -4,7 +4,6 @@ const ServerLog = require("../../../models/Logs/Server");
 
 module.exports = async function (fastify) {
   fastify.get("/", async (request, reply) => {
-    let underDeployment = await Deployment.find({ progress: { $in: ['queued', 'inprogress'] } })
     const latestDeployments = await Deployment.aggregate([
       {
         $sort: { createdAt: -1 }
@@ -29,12 +28,17 @@ module.exports = async function (fastify) {
     let databases = services.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'database' && r.Spec.Labels.configuration)
 
     applications = applications.map(r => {
-      const configuration = r.Spec.Labels.configuration ? JSON.parse(r.Spec.Labels.configuration) : null
-
-      let status = latestDeployments.find(l => configuration.repository.id === l._id.repoId && configuration.repository.branch === l._id.branch)
-      if (status && status.progress) r.progress = status.progress
-      r.Spec.Labels.configuration = configuration
-      return r
+      if (JSON.parse(r.Spec.Labels.configuration)) {
+        const configuration = JSON.parse(r.Spec.Labels.configuration)
+        let status = latestDeployments.find(l => configuration.repository.id === l._id.repoId && configuration.repository.branch === l._id.branch)
+        if (status && status.progress) r.progress = status.progress
+        r.Spec.Labels.configuration = configuration
+        return r
+      }
+      throw {}
+   
+      
+    
     })
     databases = databases.map(r => {
       const configuration = r.Spec.Labels.configuration ? JSON.parse(r.Spec.Labels.configuration) : null
@@ -45,8 +49,7 @@ module.exports = async function (fastify) {
     return {
       serverLogs,
       applications: {
-        deployed: applications,
-        underDeployment
+        deployed: applications
       },
       databases: {
         deployed: databases

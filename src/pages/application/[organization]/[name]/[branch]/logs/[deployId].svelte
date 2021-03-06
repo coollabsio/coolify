@@ -30,9 +30,9 @@
 {#await loadLogs()}
   <Loading />
 {:then}
-  <div class="max-w-4xl shadow rounded-lg mx-auto">
+  <div class="max-w-4xl mx-auto">
     <pre
-      class="font-mono text-xs font-medium tracking-tighter border-2 rounded-lg bg-white text-gray-600 p-6  whitespace-pre-wrap">
+      class="font-mono text-xs font-medium tracking-tighter rounded-lg  text-gray-600 p-6  whitespace-pre-wrap">
 {#each logs as log}
   {log + '\n'}
 {/each}

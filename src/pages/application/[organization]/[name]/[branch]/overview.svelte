@@ -49,16 +49,11 @@
         class="text-blue-500 underline hover:text-blue-400"
         href="{'https://' +
           $configuration.publish.domain + $configuration.publish.path}"
-        >{$configuration.publish.domain}{$configuration.publish.path !== "/"
+        >https://{$configuration.publish.domain}{$configuration.publish.path !== "/"
           ? $configuration.publish.path
           : ""}</a
       >
     </p>
   </div>
-  <div class="pt-10">
-    <button
-      class="button bg-red-600 text-white p-2 hover:bg-red-500 "
-      on:click="{removeApplication}">Remove application</button
-    >
-  </div>
+
 </div>

@@ -34,15 +34,22 @@
     {#if deployments.length > 0}
       {#each deployments as deployment}
         <div
-          class="flex space-x-4 text-md py-4 hover:bg-green-700 hover:text-white max-w-4xl mx-auto cursor-pointer transition-all duration-100 rounded"
-          class:bg-yellow-100={deployment.progress !== 'done'}
+          class="flex space-x-4 text-md py-4  hover:shadow max-w-4xl mx-auto cursor-pointer transition-all duration-100 border-l-4 border-transparent rounded"
+          class:hover:border-green-500={deployment.progress === 'done'}
+          class:hover:bg-green-100={deployment.progress === 'done'}
+          class:border-yellow-500={deployment.progress !== 'done' && deployment.progress !== 'failed'}
+          class:hover:bg-yellow-200={deployment.progress !== 'done' && deployment.progress !== 'failed'}
+          class:bg-yellow-100={deployment.progress !== 'done' && deployment.progress !== 'failed'}
+          class:bg-white={deployment.progress !== 'done' && deployment.progress !== 'failed'}
+          class:shadow={deployment.progress !== 'done' && deployment.progress !== 'failed'}
+          class:border-red-500={deployment.progress === 'failed'}
           on:click="{() => $goto(`./${deployment.deployId}`)}"
         >
           <div class="font-bold text-sm px-3 flex justify-center items-center">
             {deployment.branch}
           </div>
           <div class="flex-1"></div>
-          <div class="px-3">
+          <div class="px-3 w-48">
             <div
               class="text-xs"
               title="{new Intl.DateTimeFormat('default', $dateOptions).format(
@@ -54,6 +61,10 @@
             {#if deployment.progress === 'done'}
             <div class="text-xs">
               Deployed in <span class="font-bold">{deployment.took}s</span>
+            </div>
+            {:else if deployment.progress === 'failed'}
+            <div class="text-xs">
+              Failed
             </div>
             {:else}
             <div class="text-xs">
