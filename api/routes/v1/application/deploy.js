@@ -66,6 +66,6 @@ module.exports = async function (fastify) {
 
         queueAndBuild(configuration)
 
-        reply.code(201).send({ message: "Deployment queued." });
+        reply.code(201).send({ message: "Deployment queued.", nickname: configuration.general.nickname  });
     });
 };

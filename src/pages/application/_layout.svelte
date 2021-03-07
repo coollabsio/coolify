@@ -48,7 +48,10 @@
 
   async function deploy() {
     try {
-      await $fetch(`/api/v1/application/deploy`, { body: $configuration });
+      const { nickname } = await $fetch(`/api/v1/application/deploy`, {
+        body: $configuration,
+      });
+      $configuration.general.nickname = nickname;
       $initConf = JSON.parse(JSON.stringify($configuration));
       $redirect(
         `/application/${$configuration.repository.organization}/${$configuration.repository.name}/${$configuration.repository.branch}/logs`,

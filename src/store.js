@@ -146,7 +146,7 @@ export const initialConfiguration = {
   },
   general: {
     deployId: null,
-    name: null,
+    nickname: null,
     workdir: null,
   },
   build: {
