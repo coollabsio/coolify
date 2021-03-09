@@ -33,7 +33,7 @@
     {#if showEnvs}
       <div class="text-sm font-bold">
         mongodb://{database.envs.MONGODB_USERNAME}:{database.envs
-          .MONGODB_PASSWORD}@{database.config.deploy.name}:27017/{database.envs
+          .MONGODB_PASSWORD}@{database.config.general.deployId}:27017/{database.envs
           .MONGODB_DATABASE}
       </div>
       <div class="text-xs">
