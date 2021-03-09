@@ -52,7 +52,7 @@ module.exports = async function (fastify) {
         for (const service of services) {
             const running = JSON.parse(service.Spec.Labels.configuration)
             if (running) {
-                if (running.publish.domain === configuration.publish.domain) {
+                if (running.repository.id === configuration.repository.id && running.repository.branch === configuration.repository.branch) {
                     foundService = true
                     if (
                         running.publish.domain === configuration.publish.domain &&
