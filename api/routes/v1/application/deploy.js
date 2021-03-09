@@ -37,33 +37,39 @@ module.exports = async function (fastify) {
             reply.code(500).send({ error: "Invalid request" });
             return
         }
+   
         const configuration = setDefaultConfiguration(request.body)
 
+        
         const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
-    
+
         await cloneRepository(configuration)
-     
+
         let foundService = false
         let foundDomain = false;
         let configChanged = false;
         let imageChanged = false;
-        
+
         for (const service of services) {
             const running = JSON.parse(service.Spec.Labels.configuration)
             if (running) {
-                foundService = true
-                if (
-                    running.publish.domain === configuration.publish.domain &&
-                    running.repository.id !== configuration.repository.id &&
-                    running.repository.branch !== configuration.repository.branch
-                ) {
-                    foundDomain = true
+                if (running.publish.domain === configuration.publish.domain) {
+                    foundService = true
+                    if (
+                        running.publish.domain === configuration.publish.domain &&
+                        running.repository.id !== configuration.repository.id &&
+                        running.repository.branch !== configuration.repository.branch
+                    ) {
+                        foundDomain = true
+                    }
+
+                    if (JSON.stringify(running.build) !== JSON.stringify(configuration.build) || JSON.stringify(running.publish) !== JSON.stringify(configuration.publish)) configChanged = true
+                    if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true
                 }
-    
-                if (JSON.stringify(running.build) !== JSON.stringify(configuration.build) || JSON.stringify(running.publish) !== JSON.stringify(configuration.publish)) configChanged = true
-                if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true
+
             }
         }
+        console.log({ foundService, imageChanged, configChanged })
         if (foundDomain) {
             cleanupTmp(configuration.general.workdir)
             reply.code(409).send({ message: "Domain already used." })
@@ -71,17 +77,18 @@ module.exports = async function (fastify) {
         }
         if (foundService && !imageChanged && !configChanged) {
             cleanupTmp(configuration.general.workdir)
+
             reply.code(400).send({ message: "Nothing changed." })
             return
         }
-        console.log({foundService, imageChanged, configChanged})
-        const alreadyQueued = await Deployment.find({ 
-            repoId: configuration.repository.id, 
-            branch: configuration.repository.branch, 
-            organization: configuration.repository.organization, 
-            name: configuration.repository.name, 
-            domain: configuration.publish.domain, 
-            progress: { $in: ['queued', 'inprogress'] } 
+
+        const alreadyQueued = await Deployment.find({
+            repoId: configuration.repository.id,
+            branch: configuration.repository.branch,
+            organization: configuration.repository.organization,
+            name: configuration.repository.name,
+            domain: configuration.publish.domain,
+            progress: { $in: ['queued', 'inprogress'] }
         })
 
         if (alreadyQueued.length > 0) {
@@ -91,7 +98,7 @@ module.exports = async function (fastify) {
 
 
         queueAndBuild(configuration, services, configChanged, imageChanged)
-        
+
         reply.code(201).send({ message: "Deployment queued.", nickname: configuration.general.nickname });
     });
 };
