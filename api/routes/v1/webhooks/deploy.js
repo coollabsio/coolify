@@ -1,9 +1,10 @@
 const crypto = require('crypto');
-const { verifyUserId } = require("../../../libs/common");
+const { verifyUserId, cleanupTmp } = require("../../../libs/common");
 const Deployment = require('../../../models/Deployment')
 const { queueAndBuild } = require("../../../libs/applications");
 const { setDefaultConfiguration } = require("../../../libs/applications/configuration");
 const { docker } = require('../../../libs/docker')
+const cloneRepository = require("../../../libs/applications/github/cloneRepository");
 
 module.exports = async function (fastify) {
   // TODO: Add this to fastify plugin
@@ -45,33 +46,67 @@ module.exports = async function (fastify) {
       return;
     }
 
-    const services = await docker.engine.listServices()
+    const configuration = setDefaultConfiguration(request.body)
 
-    let configuration = await services.find(r => {
-      if (r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application') {
-        if (JSON.parse(r.Spec.Labels.configuration).repository.id === request.body.repository.id) {
-          return r
+    const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
+
+    await cloneRepository(configuration)
+
+    let foundService = false
+    let foundDomain = false;
+    let configChanged = false;
+    let imageChanged = false;
+
+    for (const service of services) {
+        const running = JSON.parse(service.Spec.Labels.configuration)
+        if (running) {
+            if (running.repository.id === configuration.repository.id && running.repository.branch === configuration.repository.branch) {
+                foundService = true
+                if (
+                    running.publish.domain === configuration.publish.domain &&
+                    running.repository.id !== configuration.repository.id &&
+                    running.repository.branch !== configuration.repository.branch
+                ) {
+                    foundDomain = true
+                }
+                console.log(running.build, configuration.build)
+                console.log(running.publish, configuration.publish)
+                if (JSON.stringify(running.build) !== JSON.stringify(configuration.build) || JSON.stringify(running.publish) !== JSON.stringify(configuration.publish)) configChanged = true
+                if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true
+            }
+
         }
-      }
+    }
+    console.log({ foundService, imageChanged, configChanged })
+    if (foundDomain) {
+        cleanupTmp(configuration.general.workdir)
+        reply.code(409).send({ message: "Domain already used." })
+        return
+    }
+    if (foundService && !imageChanged && !configChanged) {
+        cleanupTmp(configuration.general.workdir)
+
+        reply.code(400).send({ message: "Nothing changed." })
+        return
+    }
+
+    const alreadyQueued = await Deployment.find({
+        repoId: configuration.repository.id,
+        branch: configuration.repository.branch,
+        organization: configuration.repository.organization,
+        name: configuration.repository.name,
+        domain: configuration.publish.domain,
+        progress: { $in: ['queued', 'inprogress'] }
     })
 
-    if (!configuration) {
-      reply.code(404).send({ error: "Nothing to do." })
-      return
-    }
-
-    configuration = setDefaultConfiguration(JSON.parse(configuration.Spec.Labels.configuration))
-    const { id, organization, name, branch } = configuration.repository
-    const { domain } = configuration.publish
-    const deployId = configuration.general.deployId
-
-    const alreadyQueued = await Deployment.find({ repoId: id, branch, organization, name, domain, progress: { $in: ['queued', 'inprogress'] } })
     if (alreadyQueued.length > 0) {
-      reply.code(200).send({ message: "Already in the queue." });
-      return
+        reply.code(200).send({ message: "Already in the queue." });
+        return
     }
 
-    queueAndBuild(configuration)
-    reply.code(201).send({ message: "Deployment queued." });
+
+    queueAndBuild(configuration, services, configChanged, imageChanged)
+
+    reply.code(201).send({ message: "Deployment queued.", nickname: configuration.general.nickname });
   });
 };
