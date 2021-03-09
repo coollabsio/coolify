@@ -40,7 +40,6 @@ module.exports = async function (fastify) {
    
         const configuration = setDefaultConfiguration(request.body)
 
-        
         const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
 
         await cloneRepository(configuration)
@@ -62,7 +61,8 @@ module.exports = async function (fastify) {
                     ) {
                         foundDomain = true
                     }
-
+                    console.log(running.build, configuration.build)
+                    console.log(running.publish, configuration.publish)
                     if (JSON.stringify(running.build) !== JSON.stringify(configuration.build) || JSON.stringify(running.publish) !== JSON.stringify(configuration.publish)) configChanged = true
                     if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true
                 }
