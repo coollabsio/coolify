@@ -42,6 +42,7 @@
           class:bg-yellow-100={deployment.progress !== 'done' && deployment.progress !== 'failed'}
           class:bg-white={deployment.progress !== 'done' && deployment.progress !== 'failed'}
           class:shadow={deployment.progress !== 'done' && deployment.progress !== 'failed'}
+          class:hover:bg-red-200={deployment.progress === 'failed'}
           class:border-red-500={deployment.progress === 'failed'}
           on:click="{() => $goto(`./${deployment.deployId}`)}"
         >

@@ -64,6 +64,6 @@
       </div>
     {/if}
   {:else}
-    Configuration will be here
+    <div class="text-xl font-bold tracking-tighter">Configuration will be here</div>
   {/if}
 </div>

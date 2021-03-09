@@ -1,6 +1,7 @@
 <script>
   import { params } from "@roxi/routify";
   import { onDestroy, onMount } from "svelte";
+  import { fade } from "svelte/transition";
   import { fetch } from "@store";
   import Loading from "../../../../../../components/Loading.svelte";
 
@@ -30,7 +31,7 @@
 {#await loadLogs()}
   <Loading />
 {:then}
-  <div class="max-w-4xl mx-auto">
+  <div class="max-w-4xl mx-auto" in:fade="{{ duration: 100 }}">
     <pre
       class="font-mono text-xs font-medium tracking-tighter rounded-lg text-gray-600 p-6  whitespace-pre-wrap">
       {#if logs.length > 0}

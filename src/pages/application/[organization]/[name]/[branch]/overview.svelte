@@ -8,7 +8,16 @@
   class="text-center space-y-2 max-w-4xl md:mx-auto mx-6"
   in:fade="{{ duration: 100 }}"
 >
-Overview will be here
+<div class="font-bold text-xl tracking-tighter">Overview will be here</div>
+<a
+target="_blank"
+class="text-blue-500 underline hover:text-blue-400 text-xs"
+href="{'https://' +
+  $configuration.publish.domain + $configuration.publish.path}"
+>https://{$configuration.publish.domain}{$configuration.publish.path !== "/"
+  ? $configuration.publish.path
+  : ""}</a
+>
   <!-- <div class="flex space-x-2 justify-center">
     <div class="text-xl font-bold">{$configuration.general.nickname}</div>
     <a
