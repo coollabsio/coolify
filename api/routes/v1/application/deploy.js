@@ -61,9 +61,14 @@ module.exports = async function (fastify) {
                     ) {
                         foundDomain = true
                     }
-                    console.log(running.build, configuration.build)
-                    console.log(running.publish, configuration.publish)
-                    if (JSON.stringify(running.build) !== JSON.stringify(configuration.build) || JSON.stringify(running.publish) !== JSON.stringify(configuration.publish)) configChanged = true
+
+                    let runningWithoutContainer = JSON.parse(JSON.stringify(running))
+                    delete runningWithoutContainer.build.container
+  
+                    let configurationWithoutContainer = JSON.parse(JSON.stringify(configuration))
+                    delete configurationWithoutContainer.build.container
+
+                    if (JSON.stringify(runningWithoutContainer.build) !== JSON.stringify(configurationWithoutContainer.build) || JSON.stringify(runningWithoutContainer.publish) !== JSON.stringify(configurationWithoutContainer.publish)) configChanged = true
                     if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true
                 }
 
