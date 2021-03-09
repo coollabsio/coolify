@@ -74,7 +74,6 @@ module.exports = async function (fastify) {
 
             }
         }
-        console.log({ foundService, imageChanged, configChanged })
         if (foundDomain) {
             cleanupTmp(configuration.general.workdir)
             reply.code(409).send({ message: "Domain already used." })
@@ -82,7 +81,6 @@ module.exports = async function (fastify) {
         }
         if (foundService && !imageChanged && !configChanged) {
             cleanupTmp(configuration.general.workdir)
-
             reply.code(400).send({ message: "Nothing changed." })
             return
         }

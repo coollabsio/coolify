@@ -20,17 +20,10 @@ module.exports = async function (fastify) {
       })
       if (found) {
         const deploys = await Deployment.find({ organization, branch, name })
-  
-        // const found = deploys.filter(d => d.progress !== 'done' && d.progress !== 'failed')
-        // if (found.length > 0) {
-        //   throw new Error('Deployment inprogress, cannot delete now.');
-        // }
-  
         for (const deploy of deploys) {
           await ApplicationLog.deleteMany({ deployId: deploy.deployId });
           await Deployment.deleteMany({ deployId: deploy.deployId });
         }
-        console.log(found.build.container.name)
         await execShellAsync(`docker stack rm ${found.build.container.name}`)
         reply.code(200).send({ organization, name, branch })
   
