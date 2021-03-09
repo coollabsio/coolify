@@ -48,20 +48,20 @@ module.exports = async function (fastify) {
 
     const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
 
-    let configuration = JSON.parse((await services.find(r => {
+    let configuration = await services.find(r => {
       if (r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application') {
         if (JSON.parse(r.Spec.Labels.configuration).repository.id === request.body.repository.id) {
           return r
         }
       }
-    })).Spec.Labels.configuration)
-
+    })
+    
     if (!configuration) {
       reply.code(404).send({ error: "Nothing to do." })
       return
     }
 
-    configuration = setDefaultConfiguration(configuration)
+    configuration = setDefaultConfiguration(JSON.parse(configuration.Spec.Labels.configuration))
 
     await cloneRepository(configuration)
 
