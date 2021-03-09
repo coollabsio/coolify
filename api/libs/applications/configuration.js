@@ -42,7 +42,7 @@ function setDefaultConfiguration(configuration) {
   }
 }
 
-async function saveConfiguration(configuration, services) {
+async function updateServiceLabels(configuration, services) {
   // In case of any failure during deployment, still update the current configuration.
   const found = services.find(s => {
     const config = JSON.parse(s.Spec.Labels.configuration)
@@ -54,7 +54,7 @@ async function saveConfiguration(configuration, services) {
     const { ID } = found
     try {
       const Labels = { ...JSON.parse(found.Spec.Labels.configuration), ...configuration }
-      execShellAsync(`docker service update --label-add configuration='${JSON.stringify(Labels)}' ${ID}`)
+      execShellAsync(`docker service update --label-add configuration='${JSON.stringify(Labels)}' --label-add com.docker.stack.image='${configuration.build.container.name}:${configuration.build.container.tag}' ${ID}`)
     } catch (error) {
       console.log(error)
     }
@@ -62,4 +62,4 @@ async function saveConfiguration(configuration, services) {
   }
 
 }
-module.exports = { setDefaultConfiguration, saveConfiguration }
+module.exports = { setDefaultConfiguration, updateServiceLabels }

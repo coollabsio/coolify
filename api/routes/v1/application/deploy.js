@@ -2,7 +2,7 @@
 const { verifyUserId, execShellAsync, cleanupTmp } = require("../../../libs/common");
 const Deployment = require('../../../models/Deployment');
 const { queueAndBuild } = require("../../../libs/applications");
-const { setDefaultConfiguration, saveConfiguration } = require("../../../libs/applications/configuration");
+const { setDefaultConfiguration } = require("../../../libs/applications/configuration");
 const { docker } = require('../../../libs/docker');
 const cloneRepository = require("../../../libs/applications/github/cloneRepository");
 const { cleanup } = require('../../../libs/applications/cleanup')
@@ -67,7 +67,7 @@ module.exports = async function (fastify) {
   
                     let configurationWithoutContainer = JSON.parse(JSON.stringify(configuration))
                     delete configurationWithoutContainer.build.container
-
+                    console.log(running.build.container.tag, configuration.build.container.tag)
                     if (JSON.stringify(runningWithoutContainer.build) !== JSON.stringify(configurationWithoutContainer.build) || JSON.stringify(runningWithoutContainer.publish) !== JSON.stringify(configurationWithoutContainer.publish)) configChanged = true
                     if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true
                 }
