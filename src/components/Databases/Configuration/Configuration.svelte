@@ -26,28 +26,36 @@
   in:fade="{{ duration: 100 }}"
 >
   {#if $isActive("/database/new")}
-    <div class="flex justify-center space-x-4 font-bold tracking-tighter">
-      <p
-        class="hover:text-green-600 cursor-pointer"
+  <div class="font-bold tracking-tighter text-xl">Select a database</div>
+    <div class="flex justify-center space-x-4 font-bold tracking-tighter pb-6">
+      <button
+        class="button bg-gray-500 p-2 text-white hover:bg-green-500 cursor-pointer w-32"
         on:click="{() => (type = 'mongodb')}"
-        class:text-green-600="{type === 'mongodb'}"
+        class:bg-green-600="{type === 'mongodb'}"
       >
         MongoDB
+      </button>
+      <p
+        class="button bg-gray-300 p-2 text-white  cursor-not-allowed w-32"
+        disabled
+        class:bg-blue-600="{type === 'postgresql'}"
+      >
+        PostgreSQL (soon)
       </p>
       <p
-        class="hover:text-blue-500 cursor-pointer"
-        on:click="{() => (type = 'postgresql')}"
-        class:text-blue-500="{type === 'postgresql'}"
-      >
-        PostgreSQL
-      </p>
+      class="button bg-gray-300 p-2 text-white  cursor-not-allowed w-32"
+      disabled
+      class:bg-blue-600="{type === 'postgresql'}"
+    >
+      Couchdb (soon)
+    </p>
     </div>
     {#if type}
-      <div class="flex flex-col justify-center items-center">
-        <div class="pb-4">
-          <label for="baseDir">Default Database</label>
+      <div >
+        <div class="grid grid-rows-1 justify-center items-center text-center pb-5">
+          <label for="defaultDB">Default database</label>
           <input
-            id="baseDir"
+            id="defaultDB"
             class="w-64"
             placeholder="empty means randomly generated"
             bind:value="{defaultDatabaseName}"

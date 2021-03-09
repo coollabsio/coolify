@@ -5,19 +5,22 @@
 </script>
 
 <div
-  class="text-center space-y-2 max-w-4xl md:mx-auto mx-6"
+  class="text-center space-y-2 max-w-4xl md:mx-auto mx-6 tracking-tighter"
   in:fade="{{ duration: 100 }}"
 >
-<div class="font-bold text-xl tracking-tighter">Overview will be here</div>
-<a
-target="_blank"
-class="text-blue-500 underline hover:text-blue-400 text-xs"
-href="{'https://' +
-  $configuration.publish.domain + $configuration.publish.path}"
->https://{$configuration.publish.domain}{$configuration.publish.path !== "/"
-  ? $configuration.publish.path
-  : ""}</a
->
+  <div>
+    <div class="font-bold text-xl">Overview will be here</div>
+    <button>
+      <a
+        target="_blank"
+        class="button p-1 bg-green-500 hover:bg-green-600 text-white"
+        href="{'https://' +
+          $configuration.publish.domain +
+          $configuration.publish.path}">Open application</a
+      ></button
+    >
+  </div>
+
   <!-- <div class="flex space-x-2 justify-center">
     <div class="text-xl font-bold">{$configuration.general.nickname}</div>
     <a
@@ -54,5 +57,4 @@ href="{'https://' +
       >
     </p>
   </div> -->
-
 </div>
