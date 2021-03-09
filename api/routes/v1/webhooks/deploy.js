@@ -60,7 +60,7 @@ module.exports = async function (fastify) {
       return
     }
 
-    configuration = setDefaultConfiguration(JSON.parse(config.Spec.Labels.configuration))
+    configuration = setDefaultConfiguration(JSON.parse(configuration.Spec.Labels.configuration))
     const { id, organization, name, branch } = configuration.repository
     const { domain } = configuration.publish
     const deployId = configuration.general.deployId
