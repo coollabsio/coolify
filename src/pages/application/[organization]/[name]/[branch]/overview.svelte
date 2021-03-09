@@ -2,24 +2,14 @@
   import { redirect, params } from "@roxi/routify";
   import { fade } from "svelte/transition";
   import { fetch, configuration } from "@store";
-
-  async function removeApplication() {
-    await $fetch(`/api/v1/application/remove`, {
-      body: {
-        organization: $params.organization,
-        name: $params.name,
-        branch: $params.branch,
-      },
-    });
-    $redirect(`/dashboard/applications`);
-  }
 </script>
 
 <div
   class="text-center space-y-2 max-w-4xl md:mx-auto mx-6"
   in:fade="{{ duration: 100 }}"
 >
-  <div class="flex space-x-2 justify-center">
+Overview will be here
+  <!-- <div class="flex space-x-2 justify-center">
     <div class="text-xl font-bold">{$configuration.general.nickname}</div>
     <a
       href="{'https://github.com/' +
@@ -54,6 +44,6 @@
           : ""}</a
       >
     </p>
-  </div>
+  </div> -->
 
 </div>

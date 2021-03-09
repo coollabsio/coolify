@@ -77,7 +77,7 @@ module.exports = async function (fastify) {
     if (found) {
       return JSON.parse(found.Spec.Labels.configuration);
     } else {
-      reply.code(200).send({message: 'No configuration found.'})
+      reply.code(404).send({message: 'No configuration found.'})
     }
 
   });

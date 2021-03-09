@@ -17,9 +17,14 @@ module.exports = async function (fastify) {
         try {
             const database = (await docker.engine.listServices()).find(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'database' && JSON.parse(r.Spec.Labels.configuration).general.deployId === deployId)
             if (database) {
+                let jsonEnvs = {}
+                database.Spec.TaskTemplate.ContainerSpec.Env.map(d => {
+                    const s = d.split('=')
+                    jsonEnvs[s[0]] = s[1]
+                  })
                 const payload = {
                     config: JSON.parse(database.Spec.Labels.configuration),
-                    envs: database.Spec.TaskTemplate.ContainerSpec.Env
+                    envs: jsonEnvs
                 }
                 reply.code(200).send(payload);
             } else {

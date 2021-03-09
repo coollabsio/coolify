@@ -5,7 +5,7 @@
 
   let showEnvs = false;
   $: name = $params.name;
-  
+
   async function loadDatabaseConfig() {
     try {
       return await $fetch(`/api/v1/databases/${name}`);
@@ -20,22 +20,25 @@
 </script>
 
 <div
-  class="text-center space-y-2 max-w-4xl md:mx-auto mx-6 py-4"
+  class="text-center space-y-2 max-w-4xl md:mx-auto mx-6 tracking-tighter"
   in:fade="{{ duration: 100 }}"
 >
   {#await loadDatabaseConfig() then database}
-
-    <div>Name: {database.config.general.nickname}</div>
-
-    <button on:click="{showPasswords}">Show connection URI</button>
+ 
+    <div class="font-bold text-xl">{database.config.general.nickname}</div>
+    <button
+      class="button bg-purple-600 hover:bg-purple-500 text-white p-2 tracking-tighter"
+      on:click="{showPasswords}">Show connection URI</button
+    >
     {#if showEnvs}
-      <div>
-        Connection URI: mongodb://MONGODB_USERNAME:MONGODB_PASSWORD@{database
-          .config.deploy.name}:27017/1234
+      <div class="text-sm font-bold">
+        mongodb://{database.envs.MONGODB_USERNAME}:{database.envs
+          .MONGODB_PASSWORD}@{database.config.deploy.name}:27017/{database.envs
+          .MONGODB_DATABASE}
       </div>
-      {#each database.envs as env}
-        <div>{env.replace("=", ": ")}</div>
-      {/each}
+      <div class="text-xs">
+        Root password : {database.envs.MONGODB_ROOT_PASSWORD}
+      </div>
     {/if}
   {/await}
 </div>
