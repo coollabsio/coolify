@@ -26,7 +26,7 @@ function execShellAsync(cmd, opts = {}) {
   });
 }
 function cleanupTmp(dir) {
-  shell.rm("-fr", dir);
+  if (dir !== '/') shell.rm("-fr", dir);
 }
 
 async function checkImageAvailable(name) {

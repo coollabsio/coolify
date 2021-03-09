@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
-const { execShellAsync } = require("../../common");
+const { execShellAsync, cleanupTmp } = require("../../common");
 
 module.exports = async function (configuration) {
   const { workdir } = configuration.general;
@@ -31,7 +31,13 @@ module.exports = async function (configuration) {
     await execShellAsync(
       `mkdir -p ${workdir} && git clone -q -b ${branch} https://x-access-token:${accessToken.data.token}@github.com/${organization}/${name}.git ${workdir}/`
     );
+    configuration.build.container.tag = (
+      await execShellAsync(`cd ${configuration.general.workdir}/ && git rev-parse HEAD`)
+  )
+      .replace("\n", "")
+      .slice(0, 7);
   } catch (error) {
+    cleanupTmp(workdir)
     if (error.stack) console.log(error.stack);
     throw { error, type: 'server' }
   }

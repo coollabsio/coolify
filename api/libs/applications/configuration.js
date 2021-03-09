@@ -2,6 +2,8 @@ const { uniqueNamesGenerator, adjectives, colors, animals } = require('unique-na
 const cuid = require('cuid')
 const { docker } = require('../docker')
 const { execShellAsync } = require('../common')
+const crypto = require('crypto')
+
 function getUniq() {
   return uniqueNamesGenerator({ dictionaries: [adjectives, animals, colors], length: 2 })
 }
@@ -11,7 +13,10 @@ function setDefaultConfiguration(configuration) {
     const nickname = getUniq()
     const deployId = cuid()
 
-    configuration.build.container.name = deployId
+    const shaBase = JSON.stringify({ repository: configuration.repository })
+    const sha256 = crypto.createHash('sha256').update(shaBase).digest('hex');
+
+    configuration.build.container.name = sha256.slice(0, 15)
 
     configuration.general.nickname = nickname
     configuration.general.deployId = deployId
@@ -19,18 +24,26 @@ function setDefaultConfiguration(configuration) {
 
     if (!configuration.publish.path) configuration.publish.path = '/'
     if (!configuration.publish.port) configuration.publish.port = configuration.build.pack === 'static' ? 80 : 3000
+    
+    if (configuration.build.pack === 'static') {
+      if (!configuration.build.command.installation) configuration.build.command.installation = "yarn install";
+      if (!configuration.build.directory) configuration.build.directory = "/";
+    }
 
+    if (configuration.build.pack === 'nodejs') {
+      if (!configuration.build.command.installation) configuration.build.command.installation = "yarn install";
+      if (!configuration.build.directory) configuration.build.directory = "/";
+    }
+    
     return configuration
+
   } catch (error) {
     throw { error, type: 'server' }
   }
-
 }
 
-async function saveConfiguration(configuration) {
+async function saveConfiguration(configuration, services) {
   // In case of any failure during deployment, still update the current configuration.
-  const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
-
   const found = services.find(s => {
     const config = JSON.parse(s.Spec.Labels.configuration)
     if (config.repository.id === configuration.repository.id && config.repository.branch === configuration.repository.branch) {

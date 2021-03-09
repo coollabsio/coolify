@@ -5,7 +5,7 @@ const { saveAppLog } = require("../../logging");
 const fs = require('fs').promises
 const { deleteSameDeployments } = require('../cleanup')
 
-module.exports = async function (configuration) {
+module.exports = async function (configuration, configChanged, imageChanged) {
   try {
     const generateEnvs = {};
     for (const secret of configuration.publish.secrets) {
@@ -66,12 +66,27 @@ module.exports = async function (configuration) {
         },
       },
     };
+    await saveAppLog("### Publishing.", configuration);
     await fs.writeFile(`${configuration.general.workdir}/stack.yml`, yaml.dump(stack))
-    await deleteSameDeployments(configuration)
-    await execShellAsync(
-      `cat ${configuration.general.workdir}/stack.yml | docker stack deploy -c - ${containerName}`
-    );
-    await saveAppLog("Published!", configuration);
+
+    if (configChanged) {
+      console.log('configuration changed')
+      // await deleteSameDeployments(configuration)
+      console.log(containerName)
+      await execShellAsync(
+        `cat ${configuration.general.workdir}/stack.yml | docker stack deploy -c - ${containerName}`
+      );
+    } else if (imageChanged) {
+      console.log('image changed')
+      await execShellAsync(`docker service update --image ${configuration.build.container.name}:${configuration.build.container.tag} ${configuration.build.container.name}_${configuration.build.container.name}`)
+    } else {
+      console.log('new deployment')
+      await execShellAsync(
+        `cat ${configuration.general.workdir}/stack.yml | docker stack deploy -c - ${containerName}`
+      );
+    }
+
+    await saveAppLog("### Published done!", configuration);
   } catch (error) {
     await saveAppLog(`Error occured during deployment: ${error.message}`, configuration)
     throw { error, type: 'server' }

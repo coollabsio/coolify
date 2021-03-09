@@ -13,14 +13,11 @@ module.exports = async function (configuration) {
       await Deployment.findOneAndUpdate(
         { repoId: id, branch, deployId, organization, name, domain },
         { repoId: id, branch, deployId, organization, name, domain, progress: 'inprogress' })
-      await saveAppLog("Work-work.", configuration);
+      await saveAppLog("### Building application.", configuration);
       
       await execute(configuration);
 
-      await saveAppLog("Work-work done.", configuration);
-      await Deployment.findOneAndUpdate(
-        { repoId: id, branch, deployId, organization, name, domain },
-        { repoId: id, branch, deployId, organization, name, domain, progress: 'done' })
+      await saveAppLog("### Building done.", configuration);
     } catch (error) {
       await Deployment.findOneAndUpdate(
         { repoId: id, branch, deployId, organization, name, domain },

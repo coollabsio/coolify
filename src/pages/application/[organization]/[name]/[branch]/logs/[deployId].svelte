@@ -32,10 +32,14 @@
 {:then}
   <div class="max-w-4xl mx-auto">
     <pre
-      class="font-mono text-xs font-medium tracking-tighter rounded-lg  text-gray-600 p-6  whitespace-pre-wrap">
-{#each logs as log}
-  {log + '\n'}
-{/each}
-</pre>
+      class="font-mono text-xs font-medium tracking-tighter rounded-lg text-gray-600 p-6  whitespace-pre-wrap">
+      {#if logs.length > 0}
+        {#each logs as log}
+          {log + '\n'}
+        {/each}
+      {:else}
+        It's starting soon.
+      {/if}
+    </pre>
   </div>
 {/await}

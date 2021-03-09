@@ -119,7 +119,7 @@ module.exports = async function (fastify) {
         await execShellAsync(`mkdir -p ${configuration.general.workdir}`)
         await fs.writeFile(`${configuration.general.workdir}/stack.yml`, yaml.dump(stack))
         await execShellAsync(
-            `cat ${configuration.general.workdir}/stack.yml | docker stack deploy -c - ${configuration.general.deployId}`
+            `cat ${configuration.general.workdir}/stack.yml | docker stack deploy --prune -c - ${configuration.general.deployId}`
         );
 
 

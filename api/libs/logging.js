@@ -16,7 +16,7 @@ async function saveAppLog(event, configuration, isError) {
       let clearedEvent = null
       
       if (event.error) clearedEvent = '[ERROR] ' + generateTimestamp() + event.error.replace(/(\r\n|\n|\r)/gm, "")
-      else if (event)clearedEvent = '[ERROR] ' + generateTimestamp() + event.replace(/(\r\n|\n|\r)/gm, "")
+      else if (event) clearedEvent = '[ERROR] ' + generateTimestamp() + event.replace(/(\r\n|\n|\r)/gm, "")
 
       try {
         await new ApplicationLog({ repoId, branch, deployId, event: clearedEvent }).save()
