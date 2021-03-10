@@ -18,5 +18,12 @@
           $configuration.publish.path}">Open application</a
       ></button
     >
+    <button>
+      <a
+        target="_blank"
+        class="button p-1 bg-gray-500 hover:bg-gray-600 text-white"
+        href="{`https://github.com/${$configuration.repository.organization}/${$configuration.repository.name}`}">Github</a
+      ></button
+    >
   </div>
 </div>

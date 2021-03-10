@@ -59,7 +59,7 @@
           class="bg-coolgray-300 h-12 px-4 grid grid-cols-3 font-bold tracking-tight text-white justify-center items-center"
         >
           <div class="absolute mt-2">
-            <a href="{$url('/dashboard')}"
+            <a href="{$url('/dashboard/applications')}"
               ><img class="w-8" src="/favicon.png" alt="coolLabs logo" /></a
             >
           </div>
