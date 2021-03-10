@@ -63,7 +63,7 @@
         `/application/${$configuration.repository.organization}/${$configuration.repository.name}/${$configuration.repository.branch}/logs`,
       );
     } catch (error) {
-      toast.push(error.error ? error.error : 'Ooops something went wrong.');
+      toast.push(error.error ? error.error : "Ooops something went wrong.");
       console.log(error);
     }
   }
@@ -97,7 +97,7 @@
           </button>
         </li>
         <li class="flex-1 hidden lg:flex"></li>
-        <li in:fade="{{ duration: 150 }}">
+        <li>
           <button
             class="button px-4 py-1 cursor-pointer"
             class:cursor-not-allowed="{$configuration.publish.domain === '' ||
@@ -161,7 +161,7 @@
           </button>
         </li>
         <li class="flex-1 hidden lg:flex"></li>
-        <li in:fade="{{ duration: 150 }}">
+        <li>
           <button
             class="button px-4 py-1 cursor-pointer bg-red-500 hover:bg-red-400"
             on:click="{removeApplication}"
@@ -169,23 +169,24 @@
             Remove
           </button>
         </li>
-        <li in:fade="{{ duration: 150 }}">
-          <button
-            class="button px-4 py-1 cursor-pointer"
-            class:cursor-not-allowed="{$configuration.publish.domain === '' ||
-              $configuration.publish.domain === null}"
-            class:bg-gray-600="{$configuration.publish.domain === '' ||
-              $configuration.publish.domain === null}"
-            class:bg-green-600="{$configuration.publish.domain}"
-            class:hover:bg-green-500="{$configuration.publish.domain}"
-            class:opacity-50="{$configuration.publish.domain === '' ||
-              $configuration.publish.domain === null}"
-            disabled="{$configuration.publish.domain === '' ||
-              $configuration.publish.domain === null}"
-            on:click="{deploy}"
-          >
-            Redeploy
-          </button>
+        <li>
+          {#if $configuration.publish.domain === "" || $configuration.publish.domain === null}
+            <button
+              class="button px-4 py-1  cursor-not-allowed bg-gray-600 opacity-50"
+              disabled
+            >
+              Redeploy
+            </button>
+          {:else}
+            <button
+              class="button px-4 py-1 cursor-pointer"
+              class:bg-green-600="{$configuration.publish.domain}"
+              class:hover:bg-green-500="{$configuration.publish.domain}"
+              on:click="{deploy}"
+            >
+              Redeploy
+            </button>
+          {/if}
         </li>
       </ul>
     {/if}
