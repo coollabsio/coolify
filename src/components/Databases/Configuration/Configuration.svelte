@@ -2,6 +2,7 @@
   import { fetch } from "@store";
   import { isActive, redirect } from "@roxi/routify/runtime";
   import { fade } from "svelte/transition";
+  import { toast } from "@zerodevx/svelte-toast";
 
   let type;
   let defaultDatabaseName;
@@ -14,6 +15,7 @@
           defaultDatabaseName,
         },
       });
+      toast.push("Database deployment queued.");
       $redirect(`/dashboard/databases`);
     } catch (error) {
       console.log(error);
@@ -26,7 +28,7 @@
   in:fade="{{ duration: 100 }}"
 >
   {#if $isActive("/database/new")}
-  <div class="font-bold tracking-tighter text-xl">Select a database</div>
+    <div class="font-bold tracking-tighter text-xl">Select a database</div>
     <div class="flex justify-center space-x-4 font-bold tracking-tighter pb-6">
       <button
         class="button bg-gray-500 p-2 text-white hover:bg-green-500 cursor-pointer w-32"
@@ -43,16 +45,18 @@
         PostgreSQL (soon)
       </p>
       <p
-      class="button bg-gray-300 p-2 text-white  cursor-not-allowed w-32"
-      disabled
-      class:bg-blue-600="{type === 'postgresql'}"
-    >
-      Couchdb (soon)
-    </p>
+        class="button bg-gray-300 p-2 text-white  cursor-not-allowed w-32"
+        disabled
+        class:bg-blue-600="{type === 'postgresql'}"
+      >
+        Couchdb (soon)
+      </p>
     </div>
     {#if type}
-      <div >
-        <div class="grid grid-rows-1 justify-center items-center text-center pb-5">
+      <div>
+        <div
+          class="grid grid-rows-1 justify-center items-center text-center pb-5"
+        >
           <label for="defaultDB">Default database</label>
           <input
             id="defaultDB"
@@ -72,6 +76,8 @@
       </div>
     {/if}
   {:else}
-    <div class="text-xl font-bold tracking-tighter">Configuration will be here</div>
+    <div class="text-xl font-bold tracking-tighter">
+      Configuration will be here
+    </div>
   {/if}
 </div>

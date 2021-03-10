@@ -28,11 +28,10 @@ module.exports = async function (fastify) {
         reply.code(200).send({ organization, name, branch })
   
       } else {
-        reply.code(404).send({ error: "Nothing to do." })
+        reply.code(500).send({ message: "Nothing to do." })
       }
     } catch(error) {
-      console.log(error)
-      reply.code(404).send({ error: "Nothing to do." })
+      reply.code(500).send({ message: "Nothing to do." })
     }
 
   })

@@ -4,6 +4,7 @@
   import { onDestroy } from "svelte";
   import { fade } from "svelte/transition";
   import Loading from "../../components/Loading.svelte";
+  import { toast } from "@zerodevx/svelte-toast";
 
   $configuration.repository.organization = $params.organization;
   $configuration.repository.name = $params.name;
@@ -24,6 +25,7 @@
         $configuration = { ...config };
         $initConf = JSON.parse(JSON.stringify($configuration));
       } catch (error) {
+        toast.push("Configuration not found.");
         $redirect("/dashboard/applications");
       }
     } else {
@@ -39,6 +41,8 @@
         branch: $params.branch,
       },
     });
+
+    toast.push("Application removed.");
     $redirect(`/dashboard/applications`);
   }
 
@@ -53,10 +57,13 @@
       });
       $configuration.general.nickname = nickname;
       $initConf = JSON.parse(JSON.stringify($configuration));
+      toast.push("Application deployment queued.");
+
       $redirect(
         `/application/${$configuration.repository.organization}/${$configuration.repository.name}/${$configuration.repository.branch}/logs`,
       );
     } catch (error) {
+      toast.push(error.error ? error.error : 'Ooops something went wrong.');
       console.log(error);
     }
   }

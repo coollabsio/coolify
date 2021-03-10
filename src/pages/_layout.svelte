@@ -8,6 +8,7 @@
   import { url, isActive, goto, route } from "@roxi/routify/runtime";
   import { loggedIn, session, fetch, deployments } from "@store";
   import Home from "./index.svelte";
+  import { toast } from "@zerodevx/svelte-toast";
 
   async function verifyToken() {
     if ($session.token) {
@@ -19,6 +20,7 @@
         });
         $deployments = await $fetch(`/api/v1/dashboard`);
       } catch (e) {
+        toast.push("Unauthorized.");
         logout();
       }
     }

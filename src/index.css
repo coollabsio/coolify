@@ -8,6 +8,6 @@ body, html {
 }
 
 :root {
-    --toastProgressBackground: #2563EB;
+    --toastProgressBackground: transparent;
     --toastFont: 'Inter';
 }

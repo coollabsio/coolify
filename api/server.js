@@ -1,4 +1,6 @@
 require('dotenv').config()
+const fs = require('fs');
+const util = require('util');
 const { saveServerLog } = require('./libs/logging')
 const Deployment = require('./models/Deployment')
 const fastify = require("fastify")({
@@ -6,7 +8,8 @@ const fastify = require("fastify")({
 });
 const mongoose = require("mongoose");
 const path = require("path");
-const { schema } = require('./schema')
+const { schema } = require('./schema');
+
 fastify.register(require("fastify-env"), {
   schema,
   dotenv: true,
@@ -56,8 +59,25 @@ mongoose.connection.once("open", async function () {
   if (process.env.NODE_ENV === "production") {
     fastify.listen(3000, '0.0.0.0');
     console.log('Coolify API is up and running in production.')
-
   } else {
+    const log_file = fs.createWriteStream('api/development/console.log', { flags: 'w' });
+    const log_stdout = process.stdout;
+
+    console.log = function (d) {
+      log_file.write(`[INFO]: ${util.format(d)}\n`);
+      log_stdout.write(util.format(d) + '\n');
+    };
+
+    console.error = function (d) {
+      log_file.write(`[ERROR]: ${util.format(d)}\n`);
+      log_stdout.write(util.format(d) + '\n');
+    };
+
+    console.warn = function (d) {
+      log_file.write(`[WARN]: ${util.format(d)}\n`);
+      log_stdout.write(util.format(d) + '\n');
+    };
+
     fastify.listen(3001);
     console.log('Coolify API is up and running in development.')
   }

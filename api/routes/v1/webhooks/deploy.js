@@ -57,7 +57,7 @@ module.exports = async function (fastify) {
     })
     
     if (!configuration) {
-      reply.code(404).send({ error: "Nothing to do." })
+      reply.code(500).send({ error: "No configuration found." })
       return
     }
 
@@ -96,12 +96,12 @@ module.exports = async function (fastify) {
     }
     if (foundDomain) {
       cleanupTmp(configuration.general.workdir)
-      reply.code(409).send({ message: "Domain already used." })
+      reply.code(500).send({ message: "Domain already used." })
       return
     }
     if (foundService && !imageChanged && !configChanged) {
       cleanupTmp(configuration.general.workdir)
-      reply.code(400).send({ message: "Nothing changed." })
+      reply.code(500).send({ message: "Nothing changed, no need to redeploy." })
       return
     }
 

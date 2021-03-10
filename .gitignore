@@ -6,3 +6,4 @@ dist-ssr
 .routify
 .env
 yarn-error.log
+api/development/console.log

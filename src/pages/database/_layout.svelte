@@ -1,12 +1,14 @@
 <script>
   import { params, goto, isActive, redirect } from "@roxi/routify";
   import { fetch } from "@store";
+  import { toast } from "@zerodevx/svelte-toast";
   $: name = $params.name;
 
   async function removeDB() {
     await $fetch(`/api/v1/databases/${name}`, {
       method: "DELETE",
     });
+    toast.push("Database removed.");
     $redirect(`/dashboard/databases`);
   }
 </script>

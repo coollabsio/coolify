@@ -3,6 +3,7 @@
   import { redirect, params } from "@roxi/routify/runtime";
   import { fade } from "svelte/transition";
   import Loading from "../../../components/Loading.svelte";
+  import { toast } from "@zerodevx/svelte-toast";
 
   let showEnvs = false;
   $: name = $params.name;
@@ -11,6 +12,7 @@
     try {
       return await $fetch(`/api/v1/databases/${name}`);
     } catch (error) {
+      toast.push(`Cannot find database ${name}`);
       $redirect(`/dashboard/databases`);
     }
   }

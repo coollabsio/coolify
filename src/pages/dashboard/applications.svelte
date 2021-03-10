@@ -2,8 +2,7 @@
   import { deployments } from "@store";
   import { fade } from "svelte/transition";
   import { goto } from "@roxi/routify/runtime";
-
-
+  
   function switchTo(application) {
     const { branch, name, organization } = application;
     $goto(`/application/:organization/:name/:branch`, {

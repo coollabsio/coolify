@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher } from "svelte";
-  import { params, isActive } from "@roxi/routify";
+  import { isActive } from "@roxi/routify";
   import { configuration } from "@store";
   export let repositories;
   const dispatch = createEventDispatcher();
