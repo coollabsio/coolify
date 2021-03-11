@@ -50,7 +50,10 @@ module.exports = async function (fastify) {
 
     let configuration = services.find(r => {
       if (r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application') {
-        if (JSON.parse(r.Spec.Labels.configuration).repository.id === request.body.repository.id) {
+        if (
+          JSON.parse(r.Spec.Labels.configuration).repository.id === request.body.repository.id &&
+          JSON.parse(r.Spec.Labels.configuration).repository.branch === request.body.repository.branch
+        ) {
           return r
         }
       }
