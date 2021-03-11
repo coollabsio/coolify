@@ -5,7 +5,6 @@
   import Loading from "../../../components/Loading.svelte";
   import { toast } from "@zerodevx/svelte-toast";
 
-  let showEnvs = false;
   $: name = $params.name;
 
   async function loadDatabaseConfig() {
@@ -16,39 +15,36 @@
       $redirect(`/dashboard/databases`);
     }
   }
-
-  function showPasswords() {
-    showEnvs = !showEnvs;
-  }
 </script>
 
 <div
-  class="text-center space-y-2 max-w-4xl md:mx-auto mx-6 tracking-tighter"
+  class=" space-y-2 max-w-4xl md:mx-auto mx-6 tracking-tighter"
   in:fade="{{ duration: 100 }}"
 >
   {#await loadDatabaseConfig()}
     <Loading />
   {:then database}
     <div in:fade="{{ duration: 100 }}">
-      <div class="font-bold text-xl">{database.config.general.nickname}</div>
-      <button
-        class="button bg-purple-600 hover:bg-purple-500 text-white p-1 tracking-tighter"
-        on:click="{showPasswords}">Show connection info</button
-      >
+      <div class="font-bold text-xl text-center">
+        {database.config.general.nickname}
+      </div>
     </div>
-    {#if showEnvs}
-      <div in:fade="{{ duration: 100 }}">
-        <div class="text-sm pb-2 pt-5">
-          <div class="font-bold">
+
+    <div in:fade="{{ duration: 100 }}">
+      <div class="pb-2 pt-5">
+        <div class="flex items-center">
+          <div class="font-bold w-48">Connection string</div>
+          <div class="text-sm">
             mongodb://{database.envs.MONGODB_USERNAME}:{database.envs
               .MONGODB_PASSWORD}@{database.config.general
               .deployId}:27017/{database.envs.MONGODB_DATABASE}
           </div>
         </div>
-        <div class="text-xs">
-          Root password : {database.envs.MONGODB_ROOT_PASSWORD}
-        </div>
       </div>
-    {/if}
+      <div class="flex items-center">
+        <div class="font-bold w-48">Root password</div>
+        <div class="text-sm">{database.envs.MONGODB_ROOT_PASSWORD}</div>
+      </div>
+    </div>
   {/await}
 </div>

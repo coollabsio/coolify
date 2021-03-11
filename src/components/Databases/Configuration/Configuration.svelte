@@ -76,7 +76,7 @@
       </div>
     {/if}
   {:else}
-    <div class="text-xl font-bold tracking-tighter">
+    <div class="tracking-tighter">
       Configuration will be here
     </div>
   {/if}

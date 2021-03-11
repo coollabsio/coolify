@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "license": "MIT",
   "scripts": {
+    "lint": "standard",
     "start": "NODE_ENV=production node api/server",
     "dev": "run-p dev:db dev:routify dev:svite dev:server",
     "dev:db": "NODE_ENV=development node api/development/mongodb.js",
@@ -46,6 +47,7 @@
     "postcss-preset-env": "^6.7.0",
     "prettier": "1.19",
     "prettier-plugin-svelte": "^2.1.6",
+    "standard": "^16.0.3",
     "svelte": "^3.29.7",
     "svelte-hmr": "^0.12.2",
     "svelte-preprocess": "^4.6.1",

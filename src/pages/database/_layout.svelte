@@ -47,11 +47,8 @@
         </li>
         <li>
           <button
-            class="hover:text-purple-400 font-bold text-sm cursor-pointer"
-            class:text-purple-400="{$isActive(
-              `/database/${$params.name}/configuration`,
-            )}"
-            on:click="{() => $goto(`/database/${$params.name}/configuration`)}"
+            class="text-gray-600 font-bold text-sm cursor-not-allowed"
+            disabled
           >
             Configuration
           </button>

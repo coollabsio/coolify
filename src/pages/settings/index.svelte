@@ -28,63 +28,78 @@
     </li>
   </ul>
 </nav>
-<div class="text-center space-y-2 max-w-2xl md:mx-auto mx-6 pb-4">
-  <div class="flex items-center justify-center space-x-4">
+<div class="space-y-2 max-w-2xl md:mx-auto mx-6 pb-4">
+  <div class="">
     {#await loadSettings()}
       <Loading />
     {:then notUsed}
-      <span class="text-base font-bold">Registration allowed?</span>
-      <button
-        type="button"
-        on:click="{() => changeSettings('allowRegistration')}"
-        aria-pressed="false"
-        class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200"
-        class:bg-green-400="{settings.allowRegistration}"
-        class:bg-gray-200="{!settings.allowRegistration}"
-      >
-        <span class="sr-only">Use setting</span>
-        <span
-          class="pointer-events-none relative inline-block h-5 w-5 rounded-full bg-white shadow transform transition ease-in-out duration-200"
-          class:translate-x-5="{settings.allowRegistration}"
-          class:translate-x-0="{!settings.allowRegistration}"
-        >
-          <span
-            class=" ease-in duration-200 absolute inset-0 h-full w-full flex items-center justify-center transition-opacity"
-            class:opacity-0="{settings.allowRegistration}"
-            class:opacity-100="{!settings.allowRegistration}"
-            aria-hidden="true"
+    <div class=" divide-y divide-gray-200">
+      <div class="px-4 sm:px-6">
+        <ul class="mt-2 divide-y divide-gray-200">
+          <li class="py-4 flex items-center justify-between">
+            <div class="flex flex-col">
+              <p class="text-base font-bold text-gray-900">
+                Registration allowed?
+              </p>
+              <p class="text-sm text-gray-500">
+                Allow further registrations to the application. It's turned off after the first registration, because currently everybody sees all the deployments.
+              </p>
+            </div>
+            <button
+            type="button"
+            on:click="{() => changeSettings('allowRegistration')}"
+            aria-pressed="false"
+            class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200"
+            class:bg-green-600="{settings.allowRegistration}"
+            class:bg-gray-200="{!settings.allowRegistration}"
           >
-            <svg
-              class="bg-white h-3 w-3 text-red-600"
-              fill="none"
-              viewBox="0 0 12 12"
+            <span class="sr-only">Use setting</span>
+            <span
+              class="pointer-events-none relative inline-block h-5 w-5 rounded-full bg-white shadow transform transition ease-in-out duration-200"
+              class:translate-x-5="{settings.allowRegistration}"
+              class:translate-x-0="{!settings.allowRegistration}"
             >
-              <path
-                d="M4 8l2-2m0 0l2-2M6 6L4 4m2 2l2 2"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"></path>
-            </svg>
-          </span>
-          <span
-            class="ease-out duration-100 absolute inset-0 h-full w-full flex items-center justify-center transition-opacity"
-            aria-hidden="true"
-            class:opacity-100="{settings.allowRegistration}"
-            class:opacity-0="{!settings.allowRegistration}"
-          >
-            <svg
-              class="bg-white h-3 w-3 text-green-400"
-              fill="currentColor"
-              viewBox="0 0 12 12"
-            >
-              <path
-                d="M3.707 5.293a1 1 0 00-1.414 1.414l1.414-1.414zM5 8l-.707.707a1 1 0 001.414 0L5 8zm4.707-3.293a1 1 0 00-1.414-1.414l1.414 1.414zm-7.414 2l2 2 1.414-1.414-2-2-1.414 1.414zm3.414 2l4-4-1.414-1.414-4 4 1.414 1.414z"
-              ></path>
-            </svg>
-          </span>
-        </span>
-      </button>
+              <span
+                class=" ease-in duration-200 absolute inset-0 h-full w-full flex items-center justify-center transition-opacity"
+                class:opacity-0="{settings.allowRegistration}"
+                class:opacity-100="{!settings.allowRegistration}"
+                aria-hidden="true"
+              >
+                <svg
+                  class="bg-white h-3 w-3 text-red-600"
+                  fill="none"
+                  viewBox="0 0 12 12"
+                >
+                  <path
+                    d="M4 8l2-2m0 0l2-2M6 6L4 4m2 2l2 2"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"></path>
+                </svg>
+              </span>
+              <span
+                class="ease-out duration-100 absolute inset-0 h-full w-full flex items-center justify-center transition-opacity"
+                aria-hidden="true"
+                class:opacity-100="{settings.allowRegistration}"
+                class:opacity-0="{!settings.allowRegistration}"
+              >
+                <svg
+                  class="bg-white h-3 w-3 text-green-600"
+                  fill="currentColor"
+                  viewBox="0 0 12 12"
+                >
+                  <path
+                    d="M3.707 5.293a1 1 0 00-1.414 1.414l1.414-1.414zM5 8l-.707.707a1 1 0 001.414 0L5 8zm4.707-3.293a1 1 0 00-1.414-1.414l1.414 1.414zm-7.414 2l2 2 1.414-1.414-2-2-1.414 1.414zm3.414 2l4-4-1.414-1.414-4 4 1.414 1.414z"
+                  ></path>
+                </svg>
+              </span>
+            </span>
+          </button>
+          </li>
+        </ul>
+      </div>
+      </div>
     {/await}
   </div>
 </div>

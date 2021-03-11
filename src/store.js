@@ -1,87 +1,89 @@
-import { writable, derived, readable } from "svelte/store";
+import { writable, derived, readable } from 'svelte/store'
 
 const sessionStore = {
-  token: localStorage.getItem("token") || null,
-  githubAppToken: null,
-};
+  token: window.localStorage.getItem('token') || null,
+  githubAppToken: null
+}
 
 export const fetch = writable(
   async (
     url,
     { method, body, ...customConfig } = { body: null, method: null }
   ) => {
-    let headers = { "Content-type": "application/json; charset=UTF-8" };
-    if (method === "DELETE") {
+    let headers = { 'Content-type': 'application/json; charset=UTF-8' }
+    if (method === 'DELETE') {
       delete headers['Content-type']
     }
-    const isGithub = url.match(/api.github.com/);
+    const isGithub = url.match(/api.github.com/)
     if (isGithub) {
       headers = Object.assign(headers, {
-        Authorization: `token ${sessionStore.githubAppToken}`,
-      });
+        Authorization: `token ${sessionStore.githubAppToken}`
+      })
     } else {
       headers = Object.assign(headers, {
-        Authorization: `Bearer ${sessionStore.token}`,
-      });
+        Authorization: `Bearer ${sessionStore.token}`
+      })
     }
     const config = {
-      cache: "no-cache",
-      method: method ? method : body ? "POST" : "GET",
+      cache: 'no-cache',
+      method: method || (body ? 'POST' : 'GET'),
       ...customConfig,
       headers: {
         ...headers,
-        ...customConfig.headers,
-      },
-    };
-    if (body) {
-      config.body = JSON.stringify(body);
+        ...customConfig.headers
+      }
     }
-    const response = await window.fetch(url, config);
+    if (body) {
+      config.body = JSON.stringify(body)
+    }
+    const response = await window.fetch(url, config)
     if (response.status >= 200 && response.status <= 299) {
-      if (response.headers.get("content-type").match(/application\/json/)) {
-        return await response.json();
-      } else if (response.headers.get("content-type").match(/text\/plain/)) {
-        return await response.text();
-      } else if (response.headers.get("content-type").match(/multipart\/form-data/)) {
+      if (response.headers.get('content-type').match(/application\/json/)) {
+        return await response.json()
+      } else if (response.headers.get('content-type').match(/text\/plain/)) {
+        return await response.text()
+      } else if (response.headers.get('content-type').match(/multipart\/form-data/)) {
         return await response.formData()
       } else {
         return await response.blob()
       }
     } else {
+      /* eslint-disable */
       if (response.status === 401) {
         return Promise.reject({
           code: response.status,
-          error: "Unauthorized",
-        });
+          error: 'Unauthorized'
+        })
       } else if (response.status >= 500) {
         const error = (await response.json()).message
         return Promise.reject({
           code: response.status,
-          error: error ? error : 'Oops, something is not okay. Are you okay?',
-        });
+          error: error || 'Oops, something is not okay. Are you okay?'
+        })
       } else {
         return Promise.reject({
           code: response.status,
-          error: response.statusText,
-        });
+          error: response.statusText
+        })
       }
+      /* eslint-enable */
     }
   }
-);
-export const session = writable(sessionStore);
+)
+export const session = writable(sessionStore)
 export const loggedIn = derived(session, ($session) => {
-  return $session.token;
-});
-export const savedBranch = writable();
+  return $session.token
+})
+export const savedBranch = writable()
 
 export const dateOptions = readable({
-  year: "numeric",
-  month: "short",
-  day: "2-digit",
-  hour: "numeric",
-  minute: "numeric",
-  second: "numeric",
-  hour12: false,
+  year: 'numeric',
+  month: 'short',
+  day: '2-digit',
+  hour: 'numeric',
+  minute: 'numeric',
+  second: 'numeric',
+  hour12: false
 })
 
 export const deployments = writable({})
@@ -90,82 +92,81 @@ export const initConf = writable({})
 export const configuration = writable({
   github: {
     installation: {
-      id: null,
+      id: null
     },
     app: {
-      id: null,
-    },
+      id: null
+    }
   },
   repository: {
     id: null,
     organization: 'new',
     name: 'start',
-    branch: null,
+    branch: null
   },
   general: {
     deployId: null,
     nickname: null,
-    workdir: null,
+    workdir: null
   },
   build: {
-    pack: "static",
+    pack: 'static',
     directory: null,
     command: {
       build: null,
-      installation: null,
+      installation: null
     },
     container: {
       name: null,
-      tag: null,
-    },
+      tag: null
+    }
   },
   publish: {
     directory: null,
     domain: null,
-    path: "/",
+    path: '/',
     port: null,
-    secrets: [],
-  },
-});
-
+    secrets: []
+  }
+})
 
 export const initialConfiguration = {
   github: {
     installation: {
-      id: null,
+      id: null
     },
     app: {
-      id: null,
-    },
+      id: null
+    }
   },
   repository: {
     id: null,
     organization: 'new',
     name: 'start',
-    branch: null,
+    branch: null
   },
   general: {
     deployId: null,
     nickname: null,
-    workdir: null,
+    workdir: null
   },
   build: {
-    pack: "static",
+    pack: 'static',
     directory: null,
     command: {
       build: null,
-      installation: null,
+      installation: null
     },
     container: {
       name: null,
-      tag: null,
-    },
+      tag: null
+    }
   },
   publish: {
     directory: null,
     domain: null,
-    path: "/",
+    path: '/',
     port: null,
-    secrets: [],
-  },
+    secrets: []
+  }
 }

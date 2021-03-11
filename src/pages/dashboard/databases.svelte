@@ -9,7 +9,7 @@
     <div class="max-w-4xl mx-auto px-2 lg:px-0">
       {#each $deployments.databases.deployed as database}
         <div
-          class=" hover:shadow border-l-4 border-transparent hover:bg-purple-100 hover:border-purple-500 rounded transition-all duration-100 cursor-pointer flex justify-center items-center px-2"
+          class="hover:shadow border-l-4 border-transparent hover:bg-purple-100 hover:border-purple-500 rounded transition-all duration-100 cursor-pointer flex justify-center items-center px-2"
         >
           <div
             class="flex py-4 mx-auto w-full justify-center items-center space-x-2"
@@ -117,6 +117,6 @@
       {/each}
     </div>
   {:else}
-    <div class="text-center font-bold tracking-tight">No databases found</div>
+    <div class="text-center font-bold tracking-tight text-xl">No databases found</div>
   {/if}
 </div>

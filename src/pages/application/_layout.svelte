@@ -12,6 +12,9 @@
 
   // $: mod = JSON.stringify($initConf) !== JSON.stringify($configuration);
 
+  let disabled = {
+    deploy: false,
+  };
   async function loadConfiguration() {
     if (!$isActive("/application/new")) {
       try {
@@ -51,7 +54,12 @@
   });
 
   async function deploy() {
+    disabled.deploy = true;
     try {
+      const status = await $fetch(`/api/v1/application/check`, {
+        body: $configuration,
+      });
+      console.log(status)
       const { nickname } = await $fetch(`/api/v1/application/deploy`, {
         body: $configuration,
       });
@@ -63,8 +71,10 @@
         `/application/${$configuration.repository.organization}/${$configuration.repository.name}/${$configuration.repository.branch}/logs`,
       );
     } catch (error) {
-      toast.push(error.error ? error.error : "Ooops something went wrong.");
       console.log(error);
+      toast.push(error.error ? error.error : "Ooops something went wrong.");
+    } finally {
+      disabled.deploy = false;
     }
   }
 </script>
@@ -162,15 +172,24 @@
         </li>
         <li class="flex-1 hidden lg:flex"></li>
         <li>
-          <button
-            class="button px-4 py-1 cursor-pointer bg-red-500 hover:bg-red-400"
-            on:click="{removeApplication}"
-          >
-            Remove
-          </button>
+          {#if disabled.deploy}
+            <button
+              class="button px-4 py-1  cursor-not-allowed bg-gray-600 opacity-50"
+              disabled
+            >
+              Remove
+            </button>
+          {:else}
+            <button
+              class="button px-4 py-1 cursor-pointer bg-red-500 hover:bg-red-400"
+              on:click="{removeApplication}"
+            >
+              Remove
+            </button>
+          {/if}
         </li>
         <li>
-          {#if $configuration.publish.domain === "" || $configuration.publish.domain === null}
+          {#if disabled.deploy || $configuration.publish.domain === "" || $configuration.publish.domain === null}
             <button
               class="button px-4 py-1  cursor-not-allowed bg-gray-600 opacity-50"
               disabled

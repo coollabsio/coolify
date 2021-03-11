@@ -77,14 +77,14 @@
       {/each}
     {:else}
       <div
-        class="text-center space-y-2 max-w-2xl md:mx-auto mx-6 pb-4 font-bold text-xl tracking-tighter"
+        class="text-center font-bold tracking-tight text-xl"
       >
         No logs found
       </div>
     {/if}
   {:catch}
     <div
-      class="text-center space-y-2 max-w-2xl md:mx-auto mx-6 pb-4 font-bold text-xl tracking-tighter"
+      class="text-center font-bold tracking-tight text-xl"
     >
       No logs found
     </div>

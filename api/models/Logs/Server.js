@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose')
 const { version } = require('../../../package.json')
 const logSchema = mongoose.Schema(
   {
@@ -7,6 +7,6 @@ const logSchema = mongoose.Schema(
     seen: { type: Boolean, required: true, default: false }
   },
   { timestamps: { createdAt: 'createdAt', updatedAt: false } }
-);
+)
 
-module.exports = mongoose.model("logs-server", logSchema);
+module.exports = mongoose.model('logs-server', logSchema)

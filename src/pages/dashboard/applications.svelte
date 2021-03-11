@@ -97,7 +97,7 @@
       {/each}
     </div>
   {:else}
-    <div class="text-center font-bold tracking-tight">
+    <div class="text-center font-bold tracking-tight text-xl">
       No applications found
     </div>
   {/if}

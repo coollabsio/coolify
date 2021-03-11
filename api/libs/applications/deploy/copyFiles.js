@@ -1,8 +1,8 @@
-const fs = require("fs").promises;
+const fs = require('fs').promises
 module.exports = async function (configuration) {
   try {
     // TODO: Do it better.
-    await fs.writeFile(`${configuration.general.workdir}/.dockerignore`, "node_modules");
+    await fs.writeFile(`${configuration.general.workdir}/.dockerignore`, 'node_modules')
     await fs.writeFile(
       `${configuration.general.workdir}/nginx.conf`,
       `user  nginx;
@@ -46,8 +46,8 @@ module.exports = async function (configuration) {
         
         }
         `
-    );
+    )
   } catch (error) {
     throw { error, type: 'server' }
   }
-};
+}
