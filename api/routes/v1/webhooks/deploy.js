@@ -49,8 +49,8 @@ module.exports = async function (fastify) {
     const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
 
     let configuration = services.find(r => {
-      if (request.body.repository.branch.startsWith('refs')) {
-        const branch = request.body.repository.branch.split('/')[2]
+      if (request.body.ref.startsWith('refs')) {
+        const branch = request.body.ref.split('/')[2]
         if (
           JSON.parse(r.Spec.Labels.configuration).repository.id === request.body.repository.id &&
           JSON.parse(r.Spec.Labels.configuration).repository.branch === branch
