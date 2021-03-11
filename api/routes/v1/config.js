@@ -71,6 +71,7 @@ module.exports = async function (fastify) {
           return r
         }
       }
+      return null
     })
     if (found) {
       return JSON.parse(found.Spec.Labels.configuration)

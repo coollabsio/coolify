@@ -15,6 +15,7 @@ module.exports = async function (fastify) {
           running.repository.branch === branch) {
           found = running
         }
+        return null
       })
       if (found) {
         const deploys = await Deployment.find({ organization, branch, name })

@@ -47,6 +47,7 @@ async function updateServiceLabels (configuration, services) {
     if (config.repository.id === configuration.repository.id && config.repository.branch === configuration.repository.branch) {
       return config
     }
+    return null
   })
   if (found) {
     const { ID } = found
