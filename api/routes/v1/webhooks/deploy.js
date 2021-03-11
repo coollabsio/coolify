@@ -57,7 +57,6 @@ module.exports = async function (fastify) {
           return r
         }
       }
-      return null
     })
 
     if (!configuration) {
