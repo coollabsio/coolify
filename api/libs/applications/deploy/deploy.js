@@ -2,6 +2,7 @@ const yaml = require('js-yaml')
 const { execShellAsync } = require('../../common')
 const { docker } = require('../../docker')
 const { saveAppLog } = require('../../logging')
+const { deleteSameDeployments } = require('../cleanup')
 const fs = require('fs').promises
 
 module.exports = async function (configuration, configChanged, imageChanged) {
@@ -20,6 +21,12 @@ module.exports = async function (configuration, configChanged, imageChanged) {
           environment: generateEnvs,
           deploy: {
             replicas: 1,
+            restart_policy: {
+              condition: 'on-failure',
+              delay: '5s',
+              max_attempts: 1,
+              window: '120s'
+            },
             update_config: {
               parallelism: 1,
               delay: '10s',
@@ -76,7 +83,8 @@ module.exports = async function (configuration, configChanged, imageChanged) {
       // console.log('image changed')
       await execShellAsync(`docker service update --image ${configuration.build.container.name}:${configuration.build.container.tag} ${configuration.build.container.name}_${configuration.build.container.name}`)
     } else {
-      // console.log('new deployment')
+      // console.log('new deployment or force deployment')
+      await deleteSameDeployments(configuration)
       await execShellAsync(
         `cat ${configuration.general.workdir}/stack.yml | docker stack deploy -c - ${containerName}`
       )

@@ -6,6 +6,14 @@ const User = require('../models/User')
 const algorithm = 'aes-256-cbc'
 const key = process.env.SECRETS_ENCRYPTION_KEY
 
+function delay (t) {
+  return new Promise(function (resolve) {
+    setTimeout(function () {
+      resolve('OK')
+    }, t)
+  })
+}
+
 async function verifyUserId (authorization) {
   const token = authorization.split(' ')[1]
   const verify = jsonwebtoken.verify(token, process.env.JWT_SIGN_KEY)
@@ -71,6 +79,7 @@ function createToken (payload) {
 }
 
 module.exports = {
+  delay,
   createToken,
   execShellAsync,
   cleanupTmp,

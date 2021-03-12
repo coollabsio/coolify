@@ -16,7 +16,7 @@
 
   async function loadLogs() {
     const { events, progress } = await $fetch(
-      `/api/v1/application/logs/${$params.deployId}`,
+      `/api/v1/application/deploy/logs/${$params.deployId}`,
     );
     logs = [...events];
     if (progress === "done" || progress === "failed") {
@@ -33,7 +33,7 @@
 {:then}
   <div class="max-w-4xl mx-auto" in:fade="{{ duration: 100 }}">
     <pre
-      class="font-mono text-xs font-medium tracking-tighter rounded-lg text-gray-600 p-6  whitespace-pre-wrap">
+      class="border-l-4 border-r-4 border-green-500 text-left font-mono text-xs font-medium tracking-tighter rounded-lg text-gray-200 bg-black p-4 whitespace-pre-wrap">
       {#if logs.length > 0}
         {#each logs as log}
           {log + '\n'}

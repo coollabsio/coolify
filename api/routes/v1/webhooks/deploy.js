@@ -127,6 +127,6 @@ module.exports = async function (fastify) {
 
     queueAndBuild(configuration, services, configChanged, imageChanged)
 
-    reply.code(201).send({ message: 'Deployment queued.', nickname: configuration.general.nickname })
+    reply.code(201).send({ message: 'Deployment queued.' })
   })
 }

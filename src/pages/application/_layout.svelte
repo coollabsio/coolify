@@ -59,11 +59,11 @@
       const status = await $fetch(`/api/v1/application/check`, {
         body: $configuration,
       });
-      console.log(status)
-      const { nickname } = await $fetch(`/api/v1/application/deploy`, {
+      const { nickname, name } = await $fetch(`/api/v1/application/deploy`, {
         body: $configuration,
       });
       $configuration.general.nickname = nickname;
+      $configuration.build.container.name = name;
       $initConf = JSON.parse(JSON.stringify($configuration));
       toast.push("Application deployment queued.");
 
