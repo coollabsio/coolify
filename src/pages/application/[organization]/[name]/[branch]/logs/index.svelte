@@ -56,13 +56,14 @@
         </div>
         {#if logs.length === 0}
           <div class="text-xs">Waiting for the logs...</div>
-        {/if}
-        <pre
+          {:else}
+          <pre
           class="border-l-4 border-r-4 border-green-500 text-left font-mono text-xs font-medium tracking-tighter rounded text-gray-200 bg-black p-4 whitespace-pre-wrap w-full">
-      {#each logs as log}
-        {log + '\n'}
-      {/each}
-    </pre>
+            {#each logs as log}
+              {log + '\n'}
+            {/each}
+          </pre>
+        {/if}
       </div>
       <div class="flex-1"></div>
       <div>
