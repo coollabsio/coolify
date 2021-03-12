@@ -1,5 +1,5 @@
 const crypto = require('crypto')
-const { cleanupTmp } = require('../../../libs/common')
+const { cleanupTmp, execShellAsync } = require('../../../libs/common')
 const Deployment = require('../../../models/Deployment')
 const { queueAndBuild } = require('../../../libs/applications')
 const { setDefaultConfiguration } = require('../../../libs/applications/configuration')
@@ -76,6 +76,8 @@ module.exports = async function (fastify) {
     let configChanged = false
     let imageChanged = false
 
+    let forceUpdate = false
+
     for (const service of services) {
       const running = JSON.parse(service.Spec.Labels.configuration)
       if (running) {
@@ -87,6 +89,9 @@ module.exports = async function (fastify) {
           foundDomain = true
         }
         if (running.repository.id === configuration.repository.id && running.repository.branch === configuration.repository.branch) {
+          const state = await execShellAsync(`docker stack ps ${running.build.container.name} --format '{{ json . }}'`)
+          const isError = state.split('\n').filter(n => n).map(s => JSON.parse(s)).filter(n => n.DesiredState !== 'Running')
+          if (isError.length > 0) forceUpdate = true
           foundService = true
 
           const runningWithoutContainer = JSON.parse(JSON.stringify(running))
@@ -105,10 +110,15 @@ module.exports = async function (fastify) {
       reply.code(500).send({ message: 'Domain already used.' })
       return
     }
-    if (foundService && !imageChanged && !configChanged) {
-      cleanupTmp(configuration.general.workdir)
-      reply.code(500).send({ message: 'Nothing changed, no need to redeploy.' })
-      return
+    if (forceUpdate) {
+      imageChanged = false
+      configChanged = false
+    } else {
+      if (foundService && !imageChanged && !configChanged) {
+        cleanupTmp(configuration.general.workdir)
+        reply.code(500).send({ message: 'Nothing changed, no need to redeploy.' })
+        return
+      }
     }
 
     const alreadyQueued = await Deployment.find({
