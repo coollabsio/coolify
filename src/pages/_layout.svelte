@@ -56,7 +56,14 @@
     $goto("/");
   }
   async function upgrade() {
-    await $fetch(`/api/v1/upgrade`);
+    try {
+      toast.push("Update started. It could take a while.");
+      await $fetch(`/api/v1/upgrade`);
+      toast.push("Update done. 🎉 Wait about a minute and refresh your browser to get the new version.");
+    } catch(error) {
+      toast.push("Something happened during update. Ooops. Automatic error reporting will happen soon.");
+    }
+    
   }
   async function checkUpgrade() {
     const latest = await window
@@ -91,7 +98,6 @@
                 >{route.name}</a
               >
             {/each}
-
             <button
               class="hover:text-yellow-400 tracking-tight font-bold"
               on:click="{logout}">Logout</button
@@ -104,12 +110,12 @@
       {/if}
     </main>
     <footer
-      class="absolute bottom-0 right-0 p-2 border-t-2 border-l-2 border-gray-400 bg-coolgray-300 text-white w-auto rounded-l"
+      class="absolute bottom-0 right-0 p-2 border-t-2 border-l-2 border-indigo-400 bg-coolgray-300 text-white w-auto rounded-tl"
     >
       <div class="flex items-center">
         <div></div>
         <div class="flex-1"></div>
-        {#if upgradeAvailable}
+        {#if !upgradeAvailable}
           <button
             class="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 tracking-tight font-bold text-xs rounded px-2 mr-2 hover:to-purple-500 hover:via-purple-500"
             on:click="{upgrade}">New version available,<br>click here to upgrade now!</button
