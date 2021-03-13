@@ -25,13 +25,17 @@ async function verifyUserId (authorization) {
   }
 }
 function execShellAsync (cmd, opts = {}) {
-  return new Promise(function (resolve, reject) {
-    shell.config.silent = true
-    shell.exec(cmd, opts, function (code, stdout, stderr) {
-      if (code !== 0) return reject(new Error(stderr))
-      return resolve(stdout)
+  try {
+    return new Promise(function (resolve, reject) {
+      shell.config.silent = true
+      shell.exec(cmd, opts, function (code, stdout, stderr) {
+        if (code !== 0) return reject(new Error(stderr))
+        return resolve(stdout)
+      })
     })
-  })
+  } catch (error) {
+    return new Error('Oops')
+  }
 }
 function cleanupTmp (dir) {
   if (dir !== '/') shell.rm('-fr', dir)

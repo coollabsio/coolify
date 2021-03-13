@@ -39,14 +39,14 @@ async function saveAppLog (event, configuration, isError) {
   }
 }
 
-async function saveServerLog (log, configuration) {
+async function saveServerLog ({ event, configuration, type }) {
   if (configuration) {
     const deployId = configuration.general.deployId
     const repoId = configuration.repository.id
     const branch = configuration.repository.branch
-    await new ApplicationLog({ repoId, branch, deployId, event: `[SERVER ERROR 😖]: ${log}` }).save()
+    await new ApplicationLog({ repoId, branch, deployId, event: `[SERVER ERROR 😖]: ${event}` }).save()
   }
-  await new ServerLog({ event: log }).save()
+  await new ServerLog({ event, type }).save()
 }
 
 module.exports = {

@@ -35,7 +35,7 @@ async function queueAndBuild (configuration, services, configChanged, imageChang
     if (type === 'app') {
       await saveAppLog(error.error, configuration, true)
     } else {
-      await saveServerLog(error.error, configuration)
+      await saveServerLog({ event: error.error, configuration })
     }
   }
 }

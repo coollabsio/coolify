@@ -5,10 +5,11 @@
 </style>
 
 <script>
-  import { url, isActive, goto, route } from "@roxi/routify/runtime";
+  import { url, goto, route } from "@roxi/routify/runtime";
   import { loggedIn, session, fetch, deployments } from "@store";
-  import Home from "./index.svelte";
   import { toast } from "@zerodevx/svelte-toast";
+  import Home from "./index.svelte";
+
 
   async function verifyToken() {
     if ($session.token) {
@@ -49,20 +50,26 @@
     $session.githubAppToken = null;
     $goto("/");
   }
+  async function upgrade() {
+    const data = await $fetch(`/api/v1/upgrade`);
+  }
 </script>
 
 <div class="min-h-full bg-gray-50">
   {#await verifyToken() then notUsed}
     <main>
+
       {#if $route.path !== "/index"}
         <nav
           class="bg-coolgray-300 h-12 px-4 grid grid-cols-3 font-bold tracking-tight text-white justify-center items-center"
         >
+
           <div class="absolute mt-2">
             <a href="{$url('/dashboard/applications')}"
               ><img class="w-8" src="/favicon.png" alt="coolLabs logo" /></a
             >
           </div>
+
           <div class="lg:col-span-2"></div>
           <div class="col-span-2 lg:col-span-1 space-x-4 text-right">
             {#each routes as route}
@@ -70,6 +77,10 @@
                 >{route.name}</a
               >
             {/each}
+            <button
+              class="hover:text-yellow-400 tracking-tight font-bold"
+              on:click="{upgrade}">Upgrade</button
+            >
             <button
               class="hover:text-yellow-400 tracking-tight font-bold"
               on:click="{logout}">Logout</button

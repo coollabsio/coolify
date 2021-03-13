@@ -37,7 +37,7 @@ fastify.setErrorHandler(async (error, request, reply) => {
   } else {
     reply.status(500).send({ message: error.message } || { message: 'Something is NOT okay. Are you okay?' })
   }
-  await saveServerLog(error)
+  await saveServerLog({ event: error })
 })
 
 if (process.env.NODE_ENV === 'production') {

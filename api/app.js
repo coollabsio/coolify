@@ -1,7 +1,8 @@
 module.exports = async function (fastify, opts) {
   // Private routes
   fastify.register(async function (server) {
-    // server.register(require("./plugins/authentication"));
+    if (process.env.NODE_ENV === 'production') server.register(require('./plugins/authentication'))
+    server.register(require('./routes/v1/upgrade'), { prefix: '/upgrade' })
     server.register(require('./routes/v1/settings'), { prefix: '/settings' })
     server.register(require('./routes/v1/dashboard'), { prefix: '/dashboard' })
     server.register(require('./routes/v1/config'), { prefix: '/config' })
