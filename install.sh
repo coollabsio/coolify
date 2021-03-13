@@ -27,6 +27,11 @@ case "$1" in
         echo "#### Rebuild proxy."
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type proxy
     ;;
+    "update")
+        echo "#### Rebuild coolify from frontend request."
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type update
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/update.js --type update
+    ;;
     *)
         echo "Use 'all' to build & deploy proxy+coolify, 'coolify' to build & deploy only coolify, 'proxy' to build & deploy only proxy."
         exit 1
