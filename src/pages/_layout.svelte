@@ -1,6 +1,6 @@
 <style lang="postcss">
-  .active {
-    @apply border-b-4 border-blue-500;
+  .w-260 {
+    width: 260px;
   }
 </style>
 
@@ -13,6 +13,9 @@
   import { onMount } from "svelte";
 
   let upgradeAvailable = false;
+  let upgradeDisabled = false;
+  let upgradeDone = false;
+  let latest = {}
   onMount(async () => {
     upgradeAvailable = await checkUpgrade();
   });
@@ -55,18 +58,27 @@
     $session.githubAppToken = null;
     $goto("/");
   }
+  function reloadInAMin() {
+    setTimeout(()=> {
+      location.reload();
+    },60000)
+  }
   async function upgrade() {
     try {
-      toast.push("Update started. It could take a while.");
+      upgradeDisabled = true;
       await $fetch(`/api/v1/upgrade`);
-      toast.push("Update done. 🎉 Wait about a minute and refresh your browser to get the new version.");
-    } catch(error) {
-      toast.push("Something happened during update. Ooops. Automatic error reporting will happen soon.");
+      upgradeDone = true;
+      toast.push(
+        "Update done. 🎉 Wait about a minute and refresh your browser to get the new version.",
+      );
+    } catch (error) {
+      toast.push(
+        "Something happened during update. Ooops. Automatic error reporting will happen soon.",
+      );
     }
-    
   }
   async function checkUpgrade() {
-    const latest = await window
+    latest = await window
       .fetch(
         "https://raw.githubusercontent.com/coollabsio/coolify/main/package.json",
         { cache: "no-cache" },
@@ -110,16 +122,32 @@
       {/if}
     </main>
     <footer
-      class="absolute bottom-0 right-0 p-2 border-t-2 border-l-2 border-indigo-400 bg-coolgray-300 text-white w-auto rounded-tl"
+      class="absolute bottom-0 right-0 p-2 border-t-2 border-l-2 border-black bg-coolgray-300 text-white w-auto rounded-tl"
     >
       <div class="flex items-center">
         <div></div>
         <div class="flex-1"></div>
         {#if upgradeAvailable}
-          <button
-            class="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 tracking-tight font-bold text-xs rounded px-2 mr-2 hover:to-purple-500 hover:via-purple-500"
-            on:click="{upgrade}">New version available,<br>click here to upgrade now!</button
-          >
+          {#if !upgradeDisabled}
+            <button
+              class="w-260 bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 tracking-tight font-bold text-xs rounded px-2 mr-2 hover:to-purple-500 hover:via-purple-500"
+              disabled="{upgradeDisabled}"
+              on:click="{upgrade}"
+              >New version ({latest.version}) available.<br>Click here to upgrade!</button
+            >
+          {:else if upgradeDone}
+            <button
+              use:reloadInAMin
+              class="w-260 tracking-tight font-bold text-xs rounded px-2 mr-2 cursor-not-allowed"
+              disabled="{upgradeDisabled}"
+              >Upgrade done. 🎉<br>Automatically reloading in a minute.</button
+            >
+          {:else}
+            <button
+              class="w-260 opacity-50 tracking-tight font-bold text-xs rounded px-2 mr-2 cursor-not-allowed"
+              disabled="{upgradeDisabled}">Upgrading.<br>It could take a while, please wait...</button
+            >
+          {/if}
           <div class="text-xs font-bold">{packageJson.version}</div>
         {:else}
           <div class="text-xs font-bold">{packageJson.version}</div>

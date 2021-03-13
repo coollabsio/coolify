@@ -51,7 +51,7 @@
     "svelte": "^3.29.7",
     "svelte-hmr": "^0.12.2",
     "svelte-preprocess": "^4.6.1",
-    "svite": "latest",
+    "svite": "0.8.1",
     "tailwindcss": "compat"
   },
   "keywords": [
