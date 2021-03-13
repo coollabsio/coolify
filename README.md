@@ -1,5 +1,3 @@
-**WARNING**: It's still in beta!
-
 # About
 
 https://andrasbacsai.com/farewell-netlify-and-heroku-after-3-days-of-coding
@@ -8,27 +6,26 @@ https://andrasbacsai.com/farewell-netlify-and-heroku-after-3-days-of-coding
 - Deploy your application just by pushing code to git.
 - Environment variables stored encrypted.
 - Hassle-free self-hosting.
+- Databases
 
 # Upcoming features
 - Backups & monitoring
-- Scalable environment
-- Databases
+- User analytics with privacy in mind
+- And much more
 
 # Screenshots
 
-The design is simple.
+[Login](https://coollabs.io/products/coolify/login.jpeg)
 
-[Login](https://coollabs.io/coolify/login.jpeg)
+[Dashboard](https://coollabs.io/products/coolify/dashboard.jpeg)
 
-[Dashboard](https://coollabs.io/coolify/dashboard.jpeg)
+[General configuration](https://coollabs.io/products/coolify/configuration.jpeg)
 
-[General configuration](https://coollabs.io/coolify/configuration.jpeg)
-
-[Settings](https://coollabs.io/coolify/settings.jpeg)
+[Settings](https://coollabs.io/products/coolify/settings.jpeg)
 
 # Getting Started
 
-Automatically: `sh -c "$(curl -fsSL https://get.coollabs.io/coolify.sh)"`
+Automatically: `sh <(curl -fsSL https://get.coollabs.io/install.sh) coolify`
 
 Manually:
 ### Requirements before installation
@@ -68,14 +65,14 @@ Manually:
 
 ## Updating process
 ### Update everything (proxy+coolify)
-Updating proxy cause downtime!
+Updating proxy will cause downtime!
 -  `bash install.sh all`
 
 ### Update coolify only
 -  `bash install.sh coolify`
 
 ### Update proxy only
-Updating proxy cause downtime!
+Updating proxy will cause downtime!
 -  `bash install.sh proxy`
 
 # Contact
