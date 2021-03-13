@@ -33,7 +33,7 @@
 </script>
 
 <nav
-  class="mx-auto bg-coolgray-300 border-b-4 text-white mb-3 sm:px-4  transition-all duration-250"
+  class="mx-auto bg-coolgray-300 border-b-4 text-white mb-3 sm:px-4 transition-all duration-250"
   class:border-green-500="{$isActive('/dashboard/applications')}"
   class:border-purple-500="{$isActive('/dashboard/databases')}"
 >

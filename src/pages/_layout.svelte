@@ -74,7 +74,7 @@
   }
 </script>
 
-<div class="min-h-full bg-gray-50">
+<div>
   {#await verifyToken() then notUsed}
     <main>
       {#if $route.path !== "/index"}
@@ -82,18 +82,10 @@
           class="bg-coolgray-300 h-12 px-4 flex font-bold tracking-tight text-white justify-center items-center"
         >
           <div class="absolute mt-2 mx-4 left-0">
-            <a href="{$url('/dashboard/applications')}"
-              ><img class="w-8" src="/favicon.png" alt="coolLabs logo" /></a
-            >
+            <img class="w-8" src="/favicon.png" alt="coolLabs logo" />
           </div>
           <div class="flex-1"></div>
           <div class="space-x-4 text-right">
-            {#if upgradeAvailable}
-              <button
-                class="bg-gray-600 hover:text-yellow-400 tracking-tight font-bold text-xs rounded px-2"
-                on:click="{upgrade}">New version available!</button
-              >
-            {/if}
             {#each routes as route}
               <a class="hover:text-yellow-400" href="{$url(route.url)}"
                 >{route.name}</a
@@ -111,6 +103,23 @@
         <Home />
       {/if}
     </main>
+    <footer
+      class="absolute bottom-0 right-0 p-2 border-t-2 border-l-2 border-gray-400 bg-coolgray-300 text-white w-auto rounded-l"
+    >
+      <div class="flex items-center">
+        <div></div>
+        <div class="flex-1"></div>
+        {#if upgradeAvailable}
+          <button
+            class="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 tracking-tight font-bold text-xs rounded px-2 mr-2 hover:to-purple-500 hover:via-purple-500"
+            on:click="{upgrade}">New version available,<br>click here to upgrade now!</button
+          >
+          <div class="text-xs font-bold">{packageJson.version}</div>
+        {:else}
+          <div class="text-xs font-bold">{packageJson.version}</div>
+        {/if}
+      </div>
+    </footer>
   {:catch test}
     {test}
     {$goto("/index")}

@@ -42,6 +42,11 @@
   }
 </script>
 
+<style lang="postcss">
+  .w-300{
+    width: 300px !important;
+  }
+</style>
 <div
   class="text-center space-y-2 max-w-6xl md:mx-auto mx-6"
   in:fade="{{ duration: 100 }}"
@@ -65,12 +70,11 @@
           </pre>
         {/if}
       </div>
-      <div class="flex-1"></div>
       <div>
-        {#if deployments.length > 0}
-          <div class="font-bold text-left pb-2 tracking-tighter text-xl">
+          <div class="font-bold text-left pb-2 tracking-tighter text-xl w-300">
             Deployment logs
           </div>
+          {#if deployments.length > 0}
           {#each deployments as deployment}
             <div
             in:fade="{{ duration: 100 }}"
@@ -121,15 +125,15 @@
             </div>
           {/each}
           <button
-            class="text-xs bg-green-600 hover:bg-green-500 p-1 rounded text-white px-2 font-bold my-6"
-            on:click={loadMoreDeploymentLogs}
-            >Show more</button
-          >
-        {:else}
-          <div class="text-center font-bold tracking-tight text-xl">
-            No logs found
+          class="text-xs bg-green-600 hover:bg-green-500 p-1 rounded text-white px-2 font-bold my-6"
+          on:click={loadMoreDeploymentLogs}
+          >Show more</button
+        >
+          {:else}
+          <div class="text-left text-sm tracking-tight">
+            No deployments found
           </div>
-        {/if}
+          {/if}
       </div>
     </div>
   {:catch}

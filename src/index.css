@@ -2,9 +2,15 @@
 @import "tailwindcss/components.css";
 @import "tailwindcss/utilities.css";
 
-body, html {
-    min-height: 100vh;
-    height: 100%;   
+html {
+  height: 100%;
+}
+body {
+  background-color: rgba(250, 250, 250);
+  position: relative;
+  margin: 0;
+  padding-bottom: 6rem;
+  min-height: 100%;  
 }
 
 :root {
