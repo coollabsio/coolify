@@ -51,7 +51,7 @@
     $goto("/");
   }
   async function upgrade() {
-    const data = await $fetch(`/api/v1/upgrade`);
+    await $fetch(`/api/v1/upgrade`);
   }
 </script>
 
@@ -79,7 +79,7 @@
             {/each}
             <button
               class="hover:text-yellow-400 tracking-tight font-bold"
-              on:click="{upgrade}">Upgrade</button
+              on:click="{upgrade}">Upgrades</button
             >
             <button
               class="hover:text-yellow-400 tracking-tight font-bold"
