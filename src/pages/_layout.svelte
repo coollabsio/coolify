@@ -115,7 +115,7 @@
       <div class="flex items-center">
         <div></div>
         <div class="flex-1"></div>
-        {#if !upgradeAvailable}
+        {#if upgradeAvailable}
           <button
             class="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 tracking-tight font-bold text-xs rounded px-2 mr-2 hover:to-purple-500 hover:via-purple-500"
             on:click="{upgrade}">New version available,<br>click here to upgrade now!</button
