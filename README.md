@@ -15,13 +15,13 @@ https://andrasbacsai.com/farewell-netlify-and-heroku-after-3-days-of-coding
 
 # Screenshots
 
-[Login](https://coollabs.io/products/coolify/login.jpeg)
+[Login](https://coollabs.io/coolify/login.jpeg)
 
-[Dashboard](https://coollabs.io/products/coolify/dashboard.jpeg)
+[Dashboard](https://coollabs.io/coolify/dashboard.jpeg)
 
-[General configuration](https://coollabs.io/products/coolify/configuration.jpeg)
+[General configuration](https://coollabs.io/coolify/configuration.jpeg)
 
-[Settings](https://coollabs.io/products/coolify/settings.jpeg)
+[Settings](https://coollabs.io/coolify/settings.jpeg)
 
 # Getting Started
 
