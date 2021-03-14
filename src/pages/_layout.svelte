@@ -61,16 +61,13 @@
   function reloadInAMin() {
     setTimeout(()=> {
       location.reload();
-    },60000)
+    },30000)
   }
   async function upgrade() {
     try {
       upgradeDisabled = true;
       await $fetch(`/api/v1/upgrade`);
       upgradeDone = true;
-      toast.push(
-        "Update done. 🎉 Wait about a minute and refresh your browser to get the new version.",
-      );
     } catch (error) {
       toast.push(
         "Something happened during update. Ooops. Automatic error reporting will happen soon.",
@@ -121,36 +118,37 @@
         <Home />
       {/if}
     </main>
+    {#if upgradeAvailable}
     <footer
       class="absolute bottom-0 right-0 p-2 border-t-2 border-l-2 border-black bg-coolgray-300 text-white w-auto rounded-tl"
     >
       <div class="flex items-center">
         <div></div>
         <div class="flex-1"></div>
-        {#if upgradeAvailable}
           {#if !upgradeDisabled}
             <button
-              class="w-260 bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 tracking-tight font-bold text-xs rounded px-2 mr-2 hover:to-purple-500 hover:via-purple-500"
+              class="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 tracking-tight font-bold text-xs rounded px-2"
               disabled="{upgradeDisabled}"
               on:click="{upgrade}"
-              >New version ({latest.version}) available.<br>Click here to upgrade!</button
+              >New version available. Click here to upgrade!</button
             >
           {:else if upgradeDone}
             <button
               use:reloadInAMin
-              class="w-260 tracking-tight font-bold text-xs rounded px-2 mr-2 cursor-not-allowed"
+              class="tracking-tight font-bold text-xs rounded px-2 cursor-not-allowed"
               disabled="{upgradeDisabled}"
-              >Upgrade done. 🎉<br>Automatically reloading in a minute.</button
+              >Upgrade done. 🎉 Automatically reloading in 30s.</button
             >
           {:else}
             <button
-              class="w-260 opacity-50 tracking-tight font-bold text-xs rounded px-2 mr-2 cursor-not-allowed"
-              disabled="{upgradeDisabled}">Upgrading.<br>It could take a while, please wait...</button
+              class="opacity-50 tracking-tight font-bold text-xs rounded px-2  cursor-not-allowed"
+              disabled="{upgradeDisabled}">Upgrading. It could take a while, please wait...</button
             >
           {/if}
-        {/if}
+    
       </div>
     </footer>
+    {/if}
   {:catch test}
     {test}
     {$goto("/index")}
