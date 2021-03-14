@@ -148,9 +148,6 @@
               disabled="{upgradeDisabled}">Upgrading.<br>It could take a while, please wait...</button
             >
           {/if}
-          <div class="text-xs font-bold">{packageJson.version}</div>
-        {:else}
-          <div class="text-xs font-bold">{packageJson.version}</div>
         {/if}
       </div>
     </footer>
