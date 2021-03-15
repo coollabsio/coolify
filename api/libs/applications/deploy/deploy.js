@@ -77,7 +77,7 @@ module.exports = async function (configuration, configChanged, imageChanged) {
     if (configChanged) {
       // console.log('configuration changed')
       await execShellAsync(
-        `cat ${configuration.general.workdir}/stack.yml | docker stack deploy -c - ${containerName}`
+        `cat ${configuration.general.workdir}/stack.yml | docker stack deploy --prune -c - ${containerName}`
       )
     } else if (imageChanged) {
       // console.log('image changed')
@@ -86,7 +86,7 @@ module.exports = async function (configuration, configChanged, imageChanged) {
       // console.log('new deployment or force deployment')
       await deleteSameDeployments(configuration)
       await execShellAsync(
-        `cat ${configuration.general.workdir}/stack.yml | docker stack deploy -c - ${containerName}`
+        `cat ${configuration.general.workdir}/stack.yml | docker stack deploy --prune -c - ${containerName}`
       )
     }
 

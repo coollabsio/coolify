@@ -6,12 +6,24 @@ https://andrasbacsai.com/farewell-netlify-and-heroku-after-3-days-of-coding
 - Deploy your application just by pushing code to git.
 - Environment variables stored encrypted.
 - Hassle-free self-hosting.
-- Databases
+- Databases.
 
 # Upcoming features
-- Backups & monitoring
-- User analytics with privacy in mind
-- And much more
+- Backups & monitoring.
+- User analytics with privacy in mind.
+- And much more (see [Roadmap](https://github.com/coollabsio/coolify/projects/1)).
+
+
+# FAQ
+Q: What does Buildpack means?
+
+A: It defines your application's final form. Static means that it will be hosted as a static site in the end. (see next question below 👇)
+
+---
+
+Q: How can I build a static site, like Next.js, Sapper, etc ?
+
+A: Use `static` builder and set your `Build command`.
 
 # Screenshots
 
@@ -65,19 +77,18 @@ Manually:
 
 ## Updating process
 ### Update everything (proxy+coolify)
-Updating proxy will cause downtime!
 -  `bash install.sh all`
 
 ### Update coolify only
 -  `bash install.sh coolify`
 
 ### Update proxy only
-Updating proxy will cause downtime!
 -  `bash install.sh proxy`
 
 # Contact
-- Email: hi@coollabs.io
-- Chat: [Discord](https://discord.gg/bvS3WhR)
+- Twitter: [@andrasbacsai](https://twitter.com/andrasbacsai)
+- Telegram: [@andrasbacsai](https://t.me/andrasbacsai)
+- Email: [andras@coollabs.io](mailto:andras@coollabs.io)
 
 # License
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. Please see the [LICENSE](/LICENSE) file in our repository for the full text.

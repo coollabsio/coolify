@@ -31,25 +31,32 @@
     <div class="font-bold tracking-tighter text-xl">Select a database</div>
     <div class="flex justify-center space-x-4 font-bold tracking-tighter pb-6">
       <button
-        class="button bg-gray-500 p-2 text-white hover:bg-green-500 cursor-pointer w-32"
+        class="button bg-gray-500 p-2 text-white hover:bg-green-600 cursor-pointer w-32"
         on:click="{() => (type = 'mongodb')}"
         class:bg-green-600="{type === 'mongodb'}"
       >
         MongoDB
       </button>
       <p
-        class="button bg-gray-300 p-2 text-white  cursor-not-allowed w-32"
-        disabled
+        class="button bg-gray-500 p-2 text-white hover:bg-blue-600 cursor-pointer w-32"
+        on:click="{() => (type = 'postgresql')}"
         class:bg-blue-600="{type === 'postgresql'}"
       >
-        PostgreSQL (soon)
+        PostgreSQL
       </p>
       <p
-        class="button bg-gray-300 p-2 text-white  cursor-not-allowed w-32"
-        disabled
-        class:bg-blue-600="{type === 'postgresql'}"
+        class="button bg-gray-500 p-2 text-white hover:bg-orange-600 cursor-pointer w-32"
+        on:click="{() => (type = 'mysql')}"
+        class:bg-orange-600="{type === 'mysql'}"
       >
-        Couchdb (soon)
+        MySQL
+      </p>
+      <p
+      class="button bg-gray-500 p-2 text-white hover:bg-red-600 cursor-pointer w-32"
+      on:click="{() => (type = 'couchdb')}"
+      class:bg-red-600="{type === 'couchdb'}"
+      >
+        Couchdb
       </p>
     </div>
     {#if type}
@@ -70,14 +77,16 @@
           class:hover:bg-green-500="{type === 'mongodb'}"
           class:bg-blue-600="{type === 'postgresql'}"
           class:hover:bg-blue-500="{type === 'postgresql'}"
+          class:bg-orange-600="{type === 'mysql'}"
+          class:hover:bg-orange-500="{type === 'mysql'}"
+          class:bg-red-600="{type === 'couchdb'}"
+          class:hover:bg-red-500="{type === 'couchdb'}"
           class="button p-2 w-32 text-white"
           on:click="{deploy}">Deploy</button
         >
       </div>
     {/if}
   {:else}
-    <div class="tracking-tighter">
-      Configuration will be here
-    </div>
+    <div class="tracking-tighter">Configuration will be here</div>
   {/if}
 </div>

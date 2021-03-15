@@ -34,17 +34,39 @@
       <div class="pb-2 pt-5">
         <div class="flex items-center">
           <div class="font-bold w-48">Connection string</div>
-          <div class="text-sm">
-            mongodb://{database.envs.MONGODB_USERNAME}:{database.envs
-              .MONGODB_PASSWORD}@{database.config.general
-              .deployId}:27017/{database.envs.MONGODB_DATABASE}
-          </div>
+          {#if database.config.general.type === "mongodb"}
+            <div class="text-sm">
+              mongodb://{database.envs.MONGODB_USERNAME}:{database.envs
+                .MONGODB_PASSWORD}@{database.config.general
+                .deployId}:27017/{database.envs.MONGODB_DATABASE}
+            </div>
+          {:else if database.config.general.type === "postgresql"}
+            <div class="text-sm">
+              postgresql://{database.envs.POSTGRESQL_USERNAME}:{database.envs
+                .POSTGRESQL_PASSWORD}@{database.config.general
+                .deployId}:5432/{database.envs.POSTGRESQL_DATABASE}
+            </div>
+          {:else if database.config.general.type === "mysql"}
+            <div class="text-sm">
+              mysql://{database.envs.MYSQL_USER}:{database.envs
+                .MYSQL_PASSWORD}@{database.config.general
+                .deployId}:3306/{database.envs.MYSQL_DATABASE}
+            </div>
+            {:else if database.config.general.type === "couchdb"}
+            <div class="text-sm">
+              http://{database.envs.COUCHDB_USER}:{database.envs
+                .COUCHDB_PASSWORD}@{database.config.general
+                .deployId}:5984
+            </div>
+          {/if}
         </div>
       </div>
-      <div class="flex items-center">
-        <div class="font-bold w-48">Root password</div>
-        <div class="text-sm">{database.envs.MONGODB_ROOT_PASSWORD}</div>
-      </div>
+      {#if database.config.general.type === "mongodb"}
+        <div class="flex items-center">
+          <div class="font-bold w-48">Root password</div>
+          <div class="text-sm">{database.envs.MONGODB_ROOT_PASSWORD}</div>
+        </div>
+      {/if}
     </div>
   {/await}
 </div>

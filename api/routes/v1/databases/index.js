@@ -38,7 +38,7 @@ module.exports = async function (fastify) {
     body: {
       type: 'object',
       properties: {
-        type: { type: 'string', enum: ['mongodb', 'postgresql'] }
+        type: { type: 'string', enum: ['mongodb', 'postgresql', 'mysql', 'couchdb'] }
       },
       required: ['type']
     }
@@ -51,7 +51,7 @@ module.exports = async function (fastify) {
       numbers: true,
       strict: true
     })
-    const username = generator.generate({
+    const usernames = generator.generateMultiple(2, {
       length: 10,
       numbers: true,
       strict: true
@@ -72,7 +72,7 @@ module.exports = async function (fastify) {
         type
       },
       database: {
-        username,
+        usernames,
         passwords,
         defaultDatabaseName
       },
@@ -80,20 +80,53 @@ module.exports = async function (fastify) {
         name: nickname
       }
     }
-
-    const generateEnvs = {
-      MONGODB_ROOT_PASSWORD: passwords[0],
-      MONGODB_USERNAME: username,
-      MONGODB_PASSWORD: passwords[1],
-      MONGODB_DATABASE: defaultDatabaseName
+    let generateEnvs = {}
+    let image = null
+    let volume = null
+    if (type === 'mongodb') {
+      generateEnvs = {
+        MONGODB_ROOT_PASSWORD: passwords[0],
+        MONGODB_USERNAME: usernames[0],
+        MONGODB_PASSWORD: passwords[1],
+        MONGODB_DATABASE: defaultDatabaseName
+      }
+      image = 'bitnami/mongodb:4.4'
+      volume = `${configuration.general.deployId}-${type}-data:/bitnami/mongodb`
+    } else if (type === 'postgresql') {
+      generateEnvs = {
+        POSTGRESQL_PASSWORD: passwords[0],
+        POSTGRESQL_USERNAME: usernames[0],
+        POSTGRESQL_DATABASE: defaultDatabaseName
+      }
+      image = 'bitnami/postgresql:13.2.0'
+      volume = `${configuration.general.deployId}-${type}-data:/bitnami/postgresql`
+    } else if (type === 'couchdb') {
+      generateEnvs = {
+        COUCHDB_PASSWORD: passwords[0],
+        COUCHDB_USER: usernames[0]
+      }
+      image = 'bitnami/couchdb:3'
+      volume = `${configuration.general.deployId}-${type}-data:/bitnami/couchdb`
+    } else if (type === 'mysql') {
+      generateEnvs = {
+        MYSQL_ROOT_PASSWORD: passwords[0],
+        MYSQL_ROOT_USER: usernames[0],
+        MYSQL_USER: usernames[1],
+        MYSQL_PASSWORD: passwords[1],
+        MYSQL_DATABASE: defaultDatabaseName
+      }
+      image = 'bitnami/mysql:8.0'
+      volume = `${configuration.general.deployId}-${type}-data:/bitnami/mysql/data`
     }
+
     const stack = {
       version: '3.8',
       services: {
         [configuration.general.deployId]: {
-          image: 'bitnami/mongodb:4.4',
+          image,
           networks: [`${docker.network}`],
           environment: generateEnvs,
+          volumes: [volume],
           deploy: {
             replicas: 1,
             update_config: {
@@ -118,12 +151,17 @@ module.exports = async function (fastify) {
         [`${docker.network}`]: {
           external: true
         }
+      },
+      volumes: {
+        [`${configuration.general.deployId}-${type}-data`]: {
+          external: true
+        }
       }
     }
     await execShellAsync(`mkdir -p ${configuration.general.workdir}`)
     await fs.writeFile(`${configuration.general.workdir}/stack.yml`, yaml.dump(stack))
     await execShellAsync(
-            `cat ${configuration.general.workdir}/stack.yml | docker stack deploy --prune -c - ${configuration.general.deployId}`
+            `cat ${configuration.general.workdir}/stack.yml | docker stack deploy -c - ${configuration.general.deployId}`
     )
   })
 

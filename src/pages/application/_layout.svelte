@@ -56,6 +56,7 @@
   async function deploy() {
     disabled.deploy = true;
     try {
+      toast.push("Checking some parameters.");
       const status = await $fetch(`/api/v1/application/check`, {
         body: $configuration,
       });
