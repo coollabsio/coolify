@@ -58,7 +58,7 @@
 
 <div class="block text-center py-4">
   <nav
-    class="flex space-x-4 justify-center font-bold tracking-tight text-sm text-black"
+    class="flex space-x-4 justify-center font-bold text-md text-white"
     aria-label="Tabs"
   >
     <div

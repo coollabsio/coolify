@@ -37,7 +37,7 @@
 </script>
 
 <div class="space-y-2 max-w-2xl md:mx-auto mx-6 text-center">
-  <div class="text-left text-xs font-bold">New secret</div>
+  <div class="text-left text-base font-bold tracking-tight text-warmGray-500">New Secret</div>
   <div class="grid md:grid-flow-col grid-flow-row gap-2">
     <input id="secretName" bind:value="{secret.name}" placeholder="Name" />
     <input id="secretValue" bind:value="{secret.value}" placeholder="Value" />

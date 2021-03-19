@@ -21,17 +21,30 @@
   :global(._toastBtn:hover) {
     @apply bg-gray-500 !important;
   }
+  :global(.icon) {
+    @apply text-white rounded p-2  transition duration-100 !important;
+  }
+  :global(.icon:hover) {
+    @apply bg-warmGray-700 !important;
+  }
+
   :global(input) {
-    @apply border text-sm rounded py-2 px-2 bg-white !important;
+    @apply text-sm rounded py-2 px-6 font-bold bg-warmGray-800 text-white transition duration-150 outline-none !important;
+  }
+  :global(input:hover) {
+    @apply bg-warmGray-700 !important;
   }
   :global(select) {
-    @apply border text-sm rounded py-2 px-2 bg-white !important;
+    @apply text-sm rounded py-2 px-6 font-bold bg-warmGray-800 text-white transition duration-150 outline-none !important;
+  }
+  :global(select:hover) {
+    @apply bg-warmGray-700 !important;
   }
   :global(label) {
-    @apply text-left text-xs font-bold !important;
+    @apply text-left text-base font-bold text-warmGray-500 !important;
   }
   :global(.button) {
-    @apply rounded text-xs font-bold transition-all duration-100 !important;
+    @apply rounded text-sm font-bold transition-all duration-100 !important;
   }
   :global(.h-271) {
     min-height: 271px !important;

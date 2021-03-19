@@ -30,7 +30,7 @@
       {/each}
     </select>
     <button
-      class="button col-span-1 ml-2 bg-gray-200 hover:bg-gray-100 text-black"
+      class="button col-span-1 ml-2 bg-warmGray-800 hover:bg-warmGray-700 text-white"
       on:click="{modifyGithubAppConfig}"
       >Configure on
       <svg

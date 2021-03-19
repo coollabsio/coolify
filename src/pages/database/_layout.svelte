@@ -38,9 +38,9 @@
           <button
             class="hover:text-purple-400 font-bold text-sm cursor-pointer"
             class:text-purple-400="{$isActive(
-              `/database/${$params.name}/overview`,
+              `/database/${$params.name}/configuration`,
             )}"
-            on:click="{() => $goto(`/database/${name}/overview`)}"
+            on:click="{() => $goto(`/database/${name}/configuration`)}"
           >
             Overview
           </button>

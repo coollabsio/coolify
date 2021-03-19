@@ -28,8 +28,8 @@
   }
 </script>
 
-<div class="text-center">
-  <div class="text-xl font-bold tracking-tighter text-center">
+<div class="text-center text-white">
+  <div class="text-2xl font-bold text-center">
     Choose your Git provider
   </div>
   <button on:click="{login}">

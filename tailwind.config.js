@@ -33,7 +33,7 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', ...defaultTheme.fontFamily.sans]
+        sans: ['Montserrat', ...defaultTheme.fontFamily.sans]
       },
       colors: {
         ...colors,
@@ -46,7 +46,8 @@ module.exports = {
   },
   variants: {
     extend: {
-      opacity: ['disabled']
+      opacity: ['disabled'],
+      animation: ['hover', 'focus']
     }
   },
   plugins: []

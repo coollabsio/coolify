@@ -1,37 +1,38 @@
 <script>
   import { fade } from "svelte/transition";
   import { configuration } from "@store";
+  import Configuration from "../../../../../components/Application/Configuration/Configuration.svelte";
 </script>
 
-<div
-  class="text-center space-y-2 max-w-4xl md:mx-auto mx-6 tracking-tighter"
-  in:fade="{{ duration: 100 }}"
->
-  <div class=" flex justify-center space-x-4 items-center">
+<div class="min-h-full text-white">
+  <div
+    class="py-5 text-left px-10 text-3xl tracking-tight font-bold flex items-center "
+  >
+    Overview of
     <a
       target="_blank"
-      class="font-bold text-xl hover:underline pl-4"
+      class="text-green-500 hover:underline cursor-pointer px-2"
       href="{'https://' +
         $configuration.publish.domain +
         $configuration.publish.path}">{$configuration.publish.domain}</a
     >
     <a
-    target="_blank"
-    class="text-black hover:text-gray-700 relative"
-    href="{`https://github.com/${$configuration.repository.organization}/${$configuration.repository.name}`}"
-  >
-    <svg
-      class="h-6 w-6"
-      fill="currentColor"
-      viewBox="0 0 20 20"
-      aria-hidden="true"
+      target="_blank"
+      class="icon"
+      href="{`https://github.com/${$configuration.repository.organization}/${$configuration.repository.name}`}"
     >
-      <path
-        fill-rule="evenodd"
-        d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z"
-        clip-rule="evenodd"></path>
-    </svg></a
-  >
-  </div>
+    <svg class="w-6" xmlns="http://www.w3.org/2000/svg"  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg></a
+    >
 
+  </div>
 </div>
+
+<!-- <div
+  class="text-center space-y-2 max-w-4xl md:mx-auto mx-6 text-warmGray-700 font-bold"
+  in:fade="{{ duration: 100 }}"
+>
+ Something will be here later on
+</div> -->
+
+
+<Configuration />
