@@ -28,12 +28,22 @@
   });
 </script>
 
+<div
+  class="py-5 text-left px-6 text-3xl tracking-tight font-bold flex items-center"
+  in:fade="{{ duration: 100 }}"
+>
+  <div>Deployment log</div>
+</div>
 {#await loadLogs()}
   <Loading />
 {:then}
-  <div class="max-w-4xl mx-auto" in:fade="{{ duration: 100 }}">
-    <pre
-      class="border-l-4 border-r-4 border-green-500 text-left font-mono text-xs font-medium tracking-tighter rounded-lg text-gray-200 bg-black p-4 whitespace-pre-wrap">
+  <div
+    class="text-center space-y-2 max-w-4xl md:mx-auto mx-6"
+    in:fade="{{ duration: 100 }}"
+  >
+    <div class="max-w-4xl mx-auto" in:fade="{{ duration: 100 }}">
+      <pre
+        class="text-left font-mono text-xs font-medium tracking-tighter rounded-lg bg-warmGray-800  p-4 whitespace-pre-wrap">
       {#if logs.length > 0}
         {#each logs as log}
           {log + '\n'}
@@ -42,5 +52,6 @@
         It's starting soon.
       {/if}
     </pre>
+    </div>
   </div>
 {/await}

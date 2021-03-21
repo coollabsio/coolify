@@ -1,72 +1,91 @@
 <script>
-  import { fetch } from "@store";
+  import { fetch, database } from "@store";
   import { redirect, params } from "@roxi/routify/runtime";
   import { fade } from "svelte/transition";
-  import Loading from "../../../components/Loading.svelte";
-  import { toast } from "@zerodevx/svelte-toast";
-
+  import CouchDb from "../../../components/Databases/SVGs/CouchDb.svelte";
+  import MongoDb from "../../../components/Databases/SVGs/MongoDb.svelte";
+  import Mysql from "../../../components/Databases/SVGs/Mysql.svelte";
+  import Postgresql from "../../../components/Databases/SVGs/Postgresql.svelte";
+import Loading from "../../../components/Loading.svelte";
+  
   $: name = $params.name;
 
   async function loadDatabaseConfig() {
-    try {
-      return await $fetch(`/api/v1/databases/${name}`);
-    } catch (error) {
-      toast.push(`Cannot find database ${name}`);
-      $redirect(`/dashboard/databases`);
+    if (name) {
+      try {
+        $database = await $fetch(`/api/v1/databases/${name}`);
+      } catch (error) {
+        toast.push(`Cannot find database ${name}`);
+        $redirect(`/dashboard/databases`);
+      }
     }
   }
 </script>
 
-<div
-  class=" space-y-2 max-w-4xl md:mx-auto mx-6 tracking-tighter"
-  in:fade="{{ duration: 100 }}"
->
-  {#await loadDatabaseConfig()}
-    <Loading />
-  {:then database}
-    <div in:fade="{{ duration: 100 }}">
-      <div class="font-bold text-xl text-center">
-        {database.config.general.nickname}
+{#await loadDatabaseConfig()}
+<Loading/>
+{:then}
+  <div class="min-h-full text-white">
+    <div
+      class="py-5 text-left px-6 text-3xl tracking-tight font-bold flex items-center"
+    >
+      <div class="text-purple-500">{$database.config.general.nickname}</div>
+      <div class="px-4">
+        {#if $database.config.general.type === "mongodb"}
+          <MongoDb customClass="w-8 h-8" />
+        {:else if $database.config.general.type === "postgresql"}
+          <Postgresql customClass="w-8 h-8" />
+        {:else if $database.config.general.type === "mysql"}
+          <Mysql customClass="w-8 h-8" />
+        {:else if $database.config.general.type === "couchdb"}
+          <CouchDb customClass="w-8 h-8 fill-current text-red-600" />
+        {/if}
       </div>
     </div>
-
-    <div in:fade="{{ duration: 100 }}">
-      <div class="pb-2 pt-5">
-        <div class="flex items-center">
-          <div class="font-bold w-48">Connection string</div>
-          {#if database.config.general.type === "mongodb"}
-            <div class="text-sm">
-              mongodb://{database.envs.MONGODB_USERNAME}:{database.envs
-                .MONGODB_PASSWORD}@{database.config.general
-                .deployId}:27017/{database.envs.MONGODB_DATABASE}
-            </div>
-          {:else if database.config.general.type === "postgresql"}
-            <div class="text-sm">
-              postgresql://{database.envs.POSTGRESQL_USERNAME}:{database.envs
-                .POSTGRESQL_PASSWORD}@{database.config.general
-                .deployId}:5432/{database.envs.POSTGRESQL_DATABASE}
-            </div>
-          {:else if database.config.general.type === "mysql"}
-            <div class="text-sm">
-              mysql://{database.envs.MYSQL_USER}:{database.envs
-                .MYSQL_PASSWORD}@{database.config.general
-                .deployId}:3306/{database.envs.MYSQL_DATABASE}
-            </div>
-            {:else if database.config.general.type === "couchdb"}
-            <div class="text-sm">
-              http://{database.envs.COUCHDB_USER}:{database.envs
-                .COUCHDB_PASSWORD}@{database.config.general
-                .deployId}:5984
-            </div>
-          {/if}
-        </div>
+  </div>
+  <div
+    class="text-left max-w-5xl md:mx-auto mx-6"
+    in:fade="{{ duration: 100 }}"
+  >
+    <div class="pb-2 pt-5">
+      <div class="flex items-center">
+        <div class="font-bold w-48 text-warmGray-400">Connection string</div>
+        {#if $database.config.general.type === "mongodb"}
+          <textarea
+            disabled
+            class="w-full"
+            value="{`mongodb://${$database.envs.MONGODB_USERNAME}:${$database.envs.MONGODB_PASSWORD}@${$database.config.general.deployId}:27017/${$database.envs.MONGODB_DATABASE}`}"
+          />
+        {:else if $database.config.general.type === "postgresql"}
+          <textarea
+            disabled
+            class="w-full"
+            value="{`postgresql://${$database.envs.POSTGRESQL_USERNAME}:${$database.envs.POSTGRESQL_PASSWORD}@${$database.config.general.deployId}:5432/${$database.envs.POSTGRESQL_DATABASE}`}"
+          />
+        {:else if $database.config.general.type === "mysql"}
+          <textarea
+            disabled
+            class="w-full"
+            value="{`mysql://${$database.envs.MYSQL_USER}:${$database.envs.MYSQL_PASSWORD}@${$database.config.general.deployId}:3306/${$database.envs.MYSQL_DATABASE}`}"
+          />
+        {:else if $database.config.general.type === "couchdb"}
+          <textarea
+            disabled
+            class="w-full"
+            value="{`http://${$database.envs.COUCHDB_USER}:${$database.envs.COUCHDB_PASSWORD}@${$database.config.general.deployId}:5984`}"
+          />
+        {/if}
       </div>
-      {#if database.config.general.type === "mongodb"}
-        <div class="flex items-center">
-          <div class="font-bold w-48">Root password</div>
-          <div class="text-sm">{database.envs.MONGODB_ROOT_PASSWORD}</div>
-        </div>
-      {/if}
     </div>
-  {/await}
-</div>
+    {#if $database.config.general.type === "mongodb"}
+      <div class="flex items-center">
+        <div class="font-bold w-48 text-warmGray-400">Root password</div>
+        <textarea
+          disabled
+          class="w-full"
+          value="{$database.envs.MONGODB_ROOT_PASSWORD}"
+        ></textarea>
+      </div>
+    {/if}
+  </div>
+{/await}

@@ -1,5 +1,5 @@
 <script>
-  import { configuration } from "@store";
+  import { application } from "@store";
 
   let secret = {
     name: null,
@@ -8,12 +8,12 @@
   let foundSecret = null;
   async function saveSecret() {
     if (secret.name && secret.value) {
-      const found = $configuration.publish.secrets.find(
+      const found = $application.publish.secrets.find(
       s => s.name === secret.name,
     );
     if (!found) {
-      $configuration.publish.secrets = [
-        ...$configuration.publish.secrets,
+      $application.publish.secrets = [
+        ...$application.publish.secrets,
         {
           name: secret.name,
           value: secret.value,
@@ -31,13 +31,13 @@
   }
 
   async function removeSecret(name) {
-    $configuration.publish.secrets = [...$configuration.publish.secrets.filter(s => s.name !== name)]
+    $application.publish.secrets = [...$application.publish.secrets.filter(s => s.name !== name)]
    
   }
 </script>
 
 <div class="space-y-2 max-w-2xl md:mx-auto mx-6 text-center">
-  <div class="text-left text-base font-bold tracking-tight text-warmGray-500">New Secret</div>
+  <div class="text-left text-base font-bold tracking-tight text-warmGray-400">New Secret</div>
   <div class="grid md:grid-flow-col grid-flow-row gap-2">
     <input id="secretName" bind:value="{secret.name}" placeholder="Name" />
     <input id="secretValue" bind:value="{secret.value}" placeholder="Value" />
@@ -46,8 +46,8 @@
       on:click="{saveSecret}">Save</button
     >
   </div>
-  {#if $configuration.publish.secrets.length > 0}
-    {#each $configuration.publish.secrets as s}
+  {#if $application.publish.secrets.length > 0}
+    {#each $application.publish.secrets as s}
       <div class="grid md:grid-flow-col grid-flow-row gap-2">
         <input
           id="{s.name}"
@@ -63,7 +63,7 @@
           class="bg-transparent border-transparent"
         />
         <button
-          class="button  w-20 bg-red-600 hover:bg-red-500 text-white"
+          class="button w-20 bg-red-600 hover:bg-red-500 text-white"
           on:click="{() => removeSecret(s.name)}">Delete</button
         >
       </div>

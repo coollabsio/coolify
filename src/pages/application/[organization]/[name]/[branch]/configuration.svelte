@@ -1,24 +1,47 @@
 <script>
-  import { configuration } from "@store";
+  import { redirect, isActive } from "@roxi/routify";
+  import { application, fetch, initialApplication, initConf } from "@store";
+  import { toast } from "@zerodevx/svelte-toast";
   import Configuration from "../../../../../components/Application/Configuration/Configuration.svelte";
+  import Loading from "../../../../../components/Loading.svelte";
+
+  async function loadConfiguration() {
+    if (!$isActive("/application/new")) {
+      try {
+        const config = await $fetch(`/api/v1/config`, {
+          body: {
+            name: $application.repository.name,
+            organization: $application.repository.organization,
+            branch: $application.repository.branch,
+          },
+        });
+        $application = { ...config };
+        $initConf = JSON.parse(JSON.stringify($application));
+      } catch (error) {
+        toast.push("Configuration not found.");
+        $redirect("/dashboard/applications");
+      }
+    } else {
+      $application = JSON.parse(JSON.stringify(initialApplication));
+    }
+  }
 </script>
 
 <div class="min-h-full text-white">
   <div
-    class="py-5 text-left px-14 text-3xl tracking-tight font-bold flex items-center"
+    class="py-5 text-left px-6 text-3xl tracking-tight font-bold flex items-center"
   >
-    Configuration of
     <a
       target="_blank"
       class="text-green-500 hover:underline cursor-pointer px-2"
       href="{'https://' +
-        $configuration.publish.domain +
-        $configuration.publish.path}">{$configuration.publish.domain}</a
+        $application.publish.domain +
+        $application.publish.path}">{$application.publish.domain}</a
     >
     <a
       target="_blank"
       class="icon"
-      href="{`https://github.com/${$configuration.repository.organization}/${$configuration.repository.name}`}"
+      href="{`https://github.com/${$application.repository.organization}/${$application.repository.name}`}"
     >
       <svg
         class="w-6"
@@ -36,12 +59,4 @@
     >
   </div>
 </div>
-
-<!-- <div
-  class="text-center space-y-2 max-w-4xl md:mx-auto mx-6 text-warmGray-700 font-bold"
-  in:fade="{{ duration: 100 }}"
->
- Something will be here later on
-</div> -->
-
 <Configuration />

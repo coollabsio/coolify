@@ -1,4 +1,4 @@
-const buildPacks = require('../../../buildPacks')
+const packs = require('../../../packs')
 const { saveAppLog } = require('../../logging')
 const Deployment = require('../../../models/Deployment')
 
@@ -7,7 +7,7 @@ module.exports = async function (configuration) {
   const { domain } = configuration.publish
   const deployId = configuration.general.deployId
 
-  const execute = buildPacks[configuration.build.pack]
+  const execute = packs[configuration.build.pack]
   if (execute) {
     try {
       await Deployment.findOneAndUpdate(

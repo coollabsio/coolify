@@ -1,6 +1,6 @@
 <script>
   export let loading, branches;
-  import { configuration } from "@store";
+  import { application } from "@store";
 </script>
 
 {#if loading}
@@ -14,10 +14,10 @@
   <div class="grid grid-cols-1">
     <label for="branch">Branch</label>
     <!-- svelte-ignore a11y-no-onchange -->
-    <select id="branch" bind:value="{$configuration.repository.branch}">
+    <select id="branch" bind:value="{$application.repository.branch}">
       <option disabled selected>Select a branch</option>
       {#each branches as branch}
-        <option value="{branch.name}">{branch.name}</option>
+        <option value="{branch.name}" class="font-medium">{branch.name}</option>
       {/each}
     </select>
   </div>

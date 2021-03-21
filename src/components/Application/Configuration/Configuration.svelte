@@ -1,7 +1,7 @@
 <script>
   import { redirect, isActive } from "@roxi/routify";
   import { fade } from "svelte/transition";
-  import { session, configuration, fetch, initialConfiguration } from "@store";
+  import { session, application, fetch, initialApplication } from "@store";
 
   import Login from "./Login.svelte";
   import Loading from "../../Loading.svelte";
@@ -10,7 +10,6 @@
   import Tabs from "./Tabs.svelte";
 
   let loading = {
-    github: false,
     branches: false,
   };
 
@@ -20,51 +19,48 @@
   async function loadBranches() {
     loading.branches = true;
     const selectedRepository = repositories.find(
-      r => r.id === $configuration.repository.id,
+      r => r.id === $application.repository.id,
     );
 
     if (selectedRepository) {
-      $configuration.repository.organization = selectedRepository.owner.login;
-      $configuration.repository.name = selectedRepository.name;
+      $application.repository.organization = selectedRepository.owner.login;
+      $application.repository.name = selectedRepository.name;
     }
 
     branches = await $fetch(
-      `https://api.github.com/repos/${$configuration.repository.organization}/${$configuration.repository.name}/branches`,
+      `https://api.github.com/repos/${$application.repository.organization}/${$application.repository.name}/branches`,
     );
     loading.branches = false;
   }
 
   async function loadGithub() {
     try {
-      loading.github = true;
       const { installations } = await $fetch(
         "https://api.github.com/user/installations",
       );
       if (installations.length === 0) {
         return false;
       }
-      $configuration.github.installation.id = installations[0].id;
-      $configuration.github.app.id = installations[0].app_id;
+      $application.github.installation.id = installations[0].id;
+      $application.github.app.id = installations[0].app_id;
 
       const data = await $fetch(
-        `https://api.github.com/user/installations/${$configuration.github.installation.id}/repositories?per_page=10000`,
+        `https://api.github.com/user/installations/${$application.github.installation.id}/repositories?per_page=10000`,
       );
 
       repositories = data.repositories;
       const foundRepositoryOnGithub = data.repositories.find(
         r =>
           r.full_name ===
-          `${$configuration.repository.organization}/${$configuration.repository.name}`,
+          `${$application.repository.organization}/${$application.repository.name}`,
       );
 
       if (foundRepositoryOnGithub) {
-        $configuration.repository.id = foundRepositoryOnGithub.id;
+        $application.repository.id = foundRepositoryOnGithub.id;
         await loadBranches();
       }
     } catch (error) {
       return false;
-    } finally {
-      loading.github = false;
     }
   }
   function modifyGithubAppConfig() {
@@ -84,27 +80,25 @@
     const timer = setInterval(async () => {
       if (newWindow.closed) {
         clearInterval(timer);
-        loading.github = true;
         if (!$isActive("/application/new")) {
           try {
             const config = await $fetch(`/api/v1/config`, {
               body: {
-                name: $configuration.repository.name,
-                organization: $configuration.repository.organization,
-                branch: $configuration.repository.branch,
+                name: $application.repository.name,
+                organization: $application.repository.organization,
+                branch: $application.repository.branch,
               },
             });
-            $configuration = { ...config };
+            $application = { ...config };
           } catch (error) {
             $redirect("/dashboard/applications");
           }
         } else {
-          $configuration = JSON.parse(JSON.stringify(initialConfiguration));
+          $application = JSON.parse(JSON.stringify(initialApplication));
         }
         branches = [];
         repositories = [];
         await loadGithub();
-        loading.github = false;
       }
     }, 100);
   }
@@ -115,29 +109,25 @@
     <Login />
   {:else}
     {#await loadGithub()}
-      <Loading message="{'Loading Github...'}" />
+      <Loading />
     {:then}
-      {#if loading.github}
-        <Loading message="{'Loading Github...'}" />
-      {:else}
-        <div
-          class="text-center space-y-2 max-w-4xl md:mx-auto mx-6 py-4"
-          in:fade="{{ duration: 100 }}"
-        >
-          <Repositories
-            bind:repositories
-            on:loadBranches="{loadBranches}"
-            on:modifyGithubAppConfig="{modifyGithubAppConfig}"
-          />
-          {#if $configuration.repository.organization !== "new"}
-            <Branches loading="{loading.branches}" branches="{branches}" />
-          {/if}
+      <div
+        class="text-center space-y-2 max-w-4xl md:mx-auto mx-6"
+        in:fade="{{ duration: 100 }}"
+      >
+        <Repositories
+          bind:repositories
+          on:loadBranches="{loadBranches}"
+          on:modifyGithubAppConfig="{modifyGithubAppConfig}"
+        />
+        {#if $application.repository.organization !== "new"}
+          <Branches loading="{loading.branches}" branches="{branches}" />
+        {/if}
 
-          {#if $configuration.repository.branch}
-            <Tabs />
-          {/if}
-        </div>
-      {/if}
+        {#if $application.repository.branch}
+          <Tabs />
+        {/if}
+      </div>
     {/await}
   {/if}
 </div>

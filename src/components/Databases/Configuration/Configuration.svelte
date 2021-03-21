@@ -1,5 +1,5 @@
 <script>
-  import { fetch } from "@store";
+  import { fetch, dbInprogress } from "@store";
   import { isActive, redirect } from "@roxi/routify/runtime";
   import { fade } from "svelte/transition";
   import { toast } from "@zerodevx/svelte-toast";
@@ -15,6 +15,7 @@
           defaultDatabaseName,
         },
       });
+      $dbInprogress = true
       toast.push("Database deployment queued.");
       $redirect(`/dashboard/databases`);
     } catch (error) {
@@ -28,8 +29,7 @@
   in:fade="{{ duration: 100 }}"
 >
   {#if $isActive("/database/new")}
-    <div class="font-bold tracking-tighter text-xl">Select a database</div>
-    <div class="flex justify-center space-x-4 font-bold tracking-tighter pb-6">
+    <div class="flex justify-center space-x-4 font-bold pb-6">
       <button
         class="button bg-gray-500 p-2 text-white hover:bg-green-600 cursor-pointer w-32"
         on:click="{() => (type = 'mongodb')}"
@@ -37,27 +37,27 @@
       >
         MongoDB
       </button>
-      <p
+      <button
         class="button bg-gray-500 p-2 text-white hover:bg-blue-600 cursor-pointer w-32"
         on:click="{() => (type = 'postgresql')}"
         class:bg-blue-600="{type === 'postgresql'}"
       >
         PostgreSQL
-      </p>
-      <p
+      </button>
+      <button
         class="button bg-gray-500 p-2 text-white hover:bg-orange-600 cursor-pointer w-32"
         on:click="{() => (type = 'mysql')}"
         class:bg-orange-600="{type === 'mysql'}"
       >
         MySQL
-      </p>
-      <p
+      </button>
+      <button
       class="button bg-gray-500 p-2 text-white hover:bg-red-600 cursor-pointer w-32"
       on:click="{() => (type = 'couchdb')}"
       class:bg-red-600="{type === 'couchdb'}"
       >
         Couchdb
-      </p>
+      </button>
     </div>
     {#if type}
       <div>
@@ -68,7 +68,7 @@
           <input
             id="defaultDB"
             class="w-64"
-            placeholder="empty means randomly generated"
+            placeholder="random"
             bind:value="{defaultDatabaseName}"
           />
         </div>
@@ -86,7 +86,5 @@
         >
       </div>
     {/if}
-  {:else}
-    <div class="tracking-tighter">Configuration will be here</div>
   {/if}
 </div>

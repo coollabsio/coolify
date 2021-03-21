@@ -71,8 +71,12 @@ module.exports = async function (fastify) {
           const configurationWithoutContainer = JSON.parse(JSON.stringify(configuration))
           delete configurationWithoutContainer.build.container
 
+          // If only the configuration changed
           if (JSON.stringify(runningWithoutContainer.build) !== JSON.stringify(configurationWithoutContainer.build) || JSON.stringify(runningWithoutContainer.publish) !== JSON.stringify(configurationWithoutContainer.publish)) configChanged = true
+          // If only the image changed
           if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true
+          // If build pack changed, forceUpdate the service
+          if (running.build.pack !== configuration.build.pack) forceUpdate = true
         }
       }
     }

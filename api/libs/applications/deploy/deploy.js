@@ -73,7 +73,8 @@ module.exports = async function (configuration, configChanged, imageChanged) {
     }
     await saveAppLog('### Publishing.', configuration)
     await fs.writeFile(`${configuration.general.workdir}/stack.yml`, yaml.dump(stack))
-
+    console.log('....')
+    console.log({ configChanged, imageChanged })
     if (configChanged) {
       // console.log('configuration changed')
       await execShellAsync(

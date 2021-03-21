@@ -22,16 +22,21 @@
     @apply bg-gray-500 !important;
   }
   :global(.icon) {
-    @apply text-white rounded p-2  transition duration-100 !important;
+    @apply text-white rounded p-2 transition duration-100 !important;
   }
   :global(.icon:hover) {
     @apply bg-warmGray-700 !important;
   }
-
   :global(input) {
     @apply text-sm rounded py-2 px-6 font-bold bg-warmGray-800 text-white transition duration-150 outline-none !important;
   }
   :global(input:hover) {
+    @apply bg-warmGray-700 !important;
+  }
+  :global(textarea) {
+    @apply text-sm rounded py-2 px-6 font-bold bg-warmGray-800 text-white transition duration-150 outline-none !important;
+  }
+  :global(textarea:hover) {
     @apply bg-warmGray-700 !important;
   }
   :global(select) {
@@ -41,7 +46,10 @@
     @apply bg-warmGray-700 !important;
   }
   :global(label) {
-    @apply text-left text-base font-bold text-warmGray-500 !important;
+    @apply text-left text-base font-bold text-warmGray-400 !important;
+  }
+  :global(button) {
+    @apply outline-none !important;
   }
   :global(.button) {
     @apply rounded text-sm font-bold transition-all duration-100 !important;

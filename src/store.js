@@ -5,6 +5,13 @@ const sessionStore = {
   githubAppToken: null
 }
 
+function waitAtLeast (time, promise) {
+  const timeoutPromise = new Promise((resolve) => {
+    setTimeout(resolve, time)
+  })
+  return Promise.all([promise, timeoutPromise]).then((values) => values[0])
+};
+
 export const fetch = writable(
   async (
     url,
@@ -36,7 +43,7 @@ export const fetch = writable(
     if (body) {
       config.body = JSON.stringify(body)
     }
-    const response = await window.fetch(url, config)
+    const response = await waitAtLeast(350, window.fetch(url, config))
     if (response.status >= 200 && response.status <= 299) {
       if (response.headers.get('content-type').match(/application\/json/)) {
         return await response.json()
@@ -89,7 +96,7 @@ export const dateOptions = readable({
 export const deployments = writable({})
 
 export const initConf = writable({})
-export const configuration = writable({
+export const application = writable({
   github: {
     installation: {
       id: null
@@ -130,7 +137,7 @@ export const configuration = writable({
   }
 })
 
-export const initialConfiguration = {
+export const initialApplication = {
   github: {
     installation: {
       id: null
@@ -170,3 +177,44 @@ export const initialConfiguration = {
     secrets: []
   }
 }
+export const initialDatabase = {
+  config: {
+    general: {
+      workdir: null,
+      deployId: null,
+      nickname: null,
+      type: null
+    },
+    database: {
+      username: null,
+      passwords: [],
+      defaultDatabaseName: null
+    },
+    deploy: {
+      name: null
+    }
+  },
+  envs: {}
+}
+
+export const database = writable({
+  config: {
+    general: {
+      workdir: null,
+      deployId: null,
+      nickname: null,
+      type: null
+    },
+    database: {
+      username: null,
+      passwords: [],
+      defaultDatabaseName: null
+    },
+    deploy: {
+      name: null
+    }
+  },
+  envs: {}
+})
+
+export const dbInprogress = writable(false)

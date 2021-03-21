@@ -1,12 +1,3 @@
-<style lang="postcss">
-  button {
-    @apply border border-black rounded-md text-sm font-medium bg-coolgray-300 text-white;
-    &:hover {
-      @apply bg-coolgray-200;
-    }
-  }
-</style>
-
 <script>
   import { goto } from "@roxi/routify";
   import { session, loggedIn } from "@store";
@@ -46,7 +37,7 @@
   }
 </script>
 
-<div class="flex justify-center items-center h-screen w-full bg-coolgray-100">
+<div class="flex justify-center items-center h-screen w-full bg-warmGray-900">
   <div class="max-w-7xl mx-auto px-4 sm:py-24 sm:px-6 lg:px-8">
     <div class="text-center">
       <p
@@ -61,10 +52,10 @@
       </h2>
       <div class="text-center py-10">
         {#if !$loggedIn}
-          <button class="p-2 px-10" on:click="{login}">Login with Github</button
+          <button class="text-white bg-warmGray-700 hover:bg-warmGray-600 rounded p-2 px-10 font-bold" on:click="{login}">Login with Github</button
           >
         {:else}
-          <button class="p-2 px-10" on:click="{() => $goto('/dashboard/applications')}"
+          <button class="text-white bg-warmGray-700 hover:bg-warmGray-600 rounded p-2 px-10 font-bold" on:click="{() => $goto('/dashboard/applications')}"
             >Get Started</button
           >
         {/if}

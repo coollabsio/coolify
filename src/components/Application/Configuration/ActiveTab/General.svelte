@@ -1,5 +1,5 @@
 <script>
-  import { configuration } from "@store";
+  import { application } from "@store";
 </script>
 
 <div>
@@ -7,9 +7,9 @@
       class="grid grid-cols-1 text-sm space-y-2 max-w-2xl md:mx-auto mx-6 pb-6 auto-cols-max"
     >
       <label for="buildPack">Build Pack</label>
-      <select id="buildPack" bind:value="{$configuration.build.pack}">
-        <option selected>static</option>
-        <option>nodejs</option>
+      <select id="buildPack" bind:value="{$application.build.pack}">
+        <option selected class="font-medium">static</option>
+        <option class="font-medium">nodejs</option>
       </select>
     </div>
     <div
@@ -17,30 +17,30 @@
     >
       <label for="Domain">Domain</label>
       <input
-        class:placeholder-red-500="{$configuration.publish.domain == null || $configuration.publish.domain == ''}"
-        class:border-red-500="{$configuration.publish.domain == null || $configuration.publish.domain == ''}"
+        class:placeholder-red-500="{$application.publish.domain == null || $application.publish.domain == ''}"
+        class:border-red-500="{$application.publish.domain == null || $application.publish.domain == ''}"
         id="Domain"
-        bind:value="{$configuration.publish.domain}"
-        placeholder="eg: coollabs.io (without www and http/https)"
+        bind:value="{$application.publish.domain}"
+        placeholder="eg: coollabs.io (without www)"
       />
       <label for="Path">Path Prefix</label>
       <input
         id="Path"
-        bind:value="{$configuration.publish.path}"
+        bind:value="{$application.publish.path}"
         placeholder="/"
       />
       <label for="publishDir">Publish Directory</label>
       <input
         id="publishDir"
-        bind:value="{$configuration.publish.directory}"
+        bind:value="{$application.publish.directory}"
         placeholder="/"
       />
-      {#if $configuration.build.pack !== "static"}
+      {#if $application.build.pack !== "static"}
         <label for="Port">Port</label>
         <input
           id="Port"
-          bind:value="{$configuration.publish.port}"
-          placeholder="{$configuration.build.pack === 'static'
+          bind:value="{$application.publish.port}"
+          placeholder="{$application.build.pack === 'static'
             ? '80'
             : '3000'}"
         />
