@@ -78,7 +78,7 @@ Manually:
 - Set `.env` (see `.env.template`)
 - Installation: `bash install.sh all`
 
-## Updating process
+## Manual updating process (You probably never need to do this!)
 ### Update everything (proxy+coolify)
 -  `bash install.sh all`
 
