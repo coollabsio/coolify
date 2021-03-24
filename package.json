@@ -1,0 +1,63 @@
+{
+  "name": "coolify",
+  "description": "An open-source, hassle-free, self-hostable Heroku & Netlify alternative.",
+  "version": "1.0.0",
+  "license": "AGPL-3.0",
+  "scripts": {
+    "lint": "standard",
+    "start": "NODE_ENV=production node api/server",
+    "dev": "run-p dev:db dev:routify dev:svite dev:server",
+    "dev:db": "NODE_ENV=development node api/development/mongodb.js",
+    "dev:server": "nodemon -w api api/server",
+    "dev:routify": "routify run",
+    "dev:svite": "svite",
+    "build": "run-s build:routify build:svite",
+    "build:routify": "routify run -b",
+    "build:svite": "svite build"
+  },
+  "dependencies": {
+    "@roxi/routify": "^2.7.3",
+    "@zerodevx/svelte-toast": "^0.1.4",
+    "axios": "^0.21.0",
+    "commander": "^6.2.1",
+    "cuid": "^2.1.8",
+    "dayjs": "^1.10.4",
+    "deepmerge": "^4.2.2",
+    "dockerode": "^3.2.1",
+    "dotenv": "^8.2.0",
+    "fastify": "^3.9.1",
+    "fastify-env": "^2.1.0",
+    "fastify-jwt": "^2.1.3",
+    "fastify-plugin": "^3.0.0",
+    "fastify-static": "^3.3.0",
+    "generate-password": "^1.6.0",
+    "js-yaml": "^4.0.0",
+    "jsonwebtoken": "^8.5.1",
+    "mongoose": "^5.11.4",
+    "shelljs": "^0.8.4",
+    "unique-names-generator": "^4.4.0"
+  },
+  "devDependencies": {
+    "mongodb-memory-server-core": "^6.9.3",
+    "nodemon": "^2.0.6",
+    "npm-run-all": "^4.1.5",
+    "postcss": "^7.0.35",
+    "postcss-import": "^12.0.1",
+    "postcss-load-config": "^3.0.0",
+    "postcss-preset-env": "^6.7.0",
+    "prettier": "1.19",
+    "prettier-plugin-svelte": "^2.1.6",
+    "standard": "^16.0.3",
+    "svelte": "^3.29.7",
+    "svelte-hmr": "^0.12.2",
+    "svelte-preprocess": "^4.6.1",
+    "svite": "0.8.1",
+    "tailwindcss": "compat"
+  },
+  "keywords": [
+    "svelte",
+    "routify",
+    "fastify",
+    "tailwind"
+  ]
+}
