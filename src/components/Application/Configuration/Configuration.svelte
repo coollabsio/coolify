@@ -11,10 +11,21 @@
 
   let loading = {
     branches: false,
+    github: false,
   };
 
   let branches = [];
   let repositories = [];
+
+  function dashify(str, options) {
+    if (typeof str !== "string") return str
+    return str
+      .trim()
+      .replace(/\W/g, m => (/[À-ž]/.test(m) ? m : "-"))
+      .replace(/^-+|-+$/g, "")
+      .replace(/-{2,}/g, m => (options && options.condense ? "-" : m))
+      .toLowerCase();
+  }
 
   async function loadBranches() {
     loading.branches = true;
@@ -62,14 +73,15 @@
     } catch (error) {
       return false;
     }
+    loading.github = false;
   }
   function modifyGithubAppConfig() {
     const left = screen.width / 2 - 1020 / 2;
     const top = screen.height / 2 - 618 / 2;
     const newWindow = open(
-      `https://github.com/apps/${
-        import.meta.env.VITE_GITHUB_APP_NAME
-      }/installations/new`,
+      `https://github.com/apps/${dashify(
+        import.meta.env.VITE_GITHUB_APP_NAME,
+      )}/installations/new`,
       "Install App",
       "resizable=1, scrollbars=1, fullscreen=0, height=1000, width=1020,top=" +
         top +
@@ -80,6 +92,7 @@
     const timer = setInterval(async () => {
       if (newWindow.closed) {
         clearInterval(timer);
+        loading.github = true;
         if (!$isActive("/application/new")) {
           try {
             const config = await $fetch(`/api/v1/config`, {
@@ -111,23 +124,27 @@
     {#await loadGithub()}
       <Loading />
     {:then}
-      <div
-        class="text-center space-y-2 max-w-4xl mx-auto px-6"
-        in:fade="{{ duration: 100 }}"
-      >
-        <Repositories
-          bind:repositories
-          on:loadBranches="{loadBranches}"
-          on:modifyGithubAppConfig="{modifyGithubAppConfig}"
-        />
-        {#if $application.repository.organization !== "new"}
-          <Branches loading="{loading.branches}" branches="{branches}" />
-        {/if}
+      {#if loading.github}
+        <Loading />
+      {:else}
+        <div
+          class="text-center space-y-2 max-w-4xl mx-auto px-6"
+          in:fade="{{ duration: 100 }}"
+        >
+          <Repositories
+            bind:repositories
+            on:loadBranches="{loadBranches}"
+            on:modifyGithubAppConfig="{modifyGithubAppConfig}"
+          />
+          {#if $application.repository.organization !== "new"}
+            <Branches loading="{loading.branches}" branches="{branches}" />
+          {/if}
 
-        {#if $application.repository.branch}
-          <Tabs />
-        {/if}
-      </div>
+          {#if $application.repository.branch}
+            <Tabs />
+          {/if}
+        </div>
+      {/if}
     {/await}
   {/if}
 </div>

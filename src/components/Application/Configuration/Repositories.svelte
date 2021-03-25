@@ -38,7 +38,7 @@
     </div>
   {:else}
     <button
-      class="button col-span-1 ml-2 bg-warmGray-800 hover:bg-warmGray-700 text-white"
+      class="button col-span-1 ml-2 bg-warmGray-800 hover:bg-warmGray-700 text-white py-2"
       on:click="{modifyGithubAppConfig}">Add repositories on Github</button
     >
   {/if}
