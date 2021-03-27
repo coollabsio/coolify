@@ -27,7 +27,7 @@ if (program.check) {
     process.exit(1)
   }
   shell.exec(`docker network create ${process.env.DOCKER_NETWORK} --driver overlay`, { silent: !program.debug })
-  shell.exec('docker build -t coolify -f scripts/Dockerfile .')
+  shell.exec('docker build -t coolify -f install/Dockerfile .')
   if (program.type === 'all') {
     shell.exec('docker stack rm coollabs-coolify', { silent: !program.debug })
   } else if (program.type === 'coolify') {
@@ -35,7 +35,7 @@ if (program.check) {
   } else if (program.type === 'proxy') {
     shell.exec('docker service rm coollabs-coolify_proxy')
   }
-  shell.exec('set -a && source .env && set +a && envsubst < scripts/coolify-template.yml | docker stack deploy -c - coollabs-coolify', { silent: !program.debug, shell: '/bin/bash' })
+  shell.exec('set -a && source .env && set +a && envsubst < install/coolify-template.yml | docker stack deploy -c - coollabs-coolify', { silent: !program.debug, shell: '/bin/bash' })
 }
 
 function checkConfig () {
