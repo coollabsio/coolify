@@ -49,6 +49,7 @@
 
   async function deploy() {
     try {
+      $application.build.pack =  $application.build.pack.replace('.','').toLowerCase()
       toast.push("Checking inputs.");
       await $fetch(`/api/v1/application/check`, {
         body: $application,

@@ -211,24 +211,24 @@
         <div
           class="cursor-pointer text-xs font-bold text-warmGray-400 py-2 hover:bg-warmGray-700 w-full text-center"
         >
-          v{packageJson.version}
+          {packageJson.version}
         </div>
       </div>
     </nav>
   {/if}
   {#if upgradeAvailable}
     <footer
-      class="absolute top-0 right-0 p-2 w-auto rounded-tl text-white "
+      class="absolute bottom-0 right-0 p-4 px-6 w-auto rounded-tl text-white "
     >
       <div class="flex items-center">
         <div></div>
         <div class="flex-1"></div>
           {#if !upgradeDisabled}
             <button
-              class="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 font-bold text-xs rounded px-2 py-2"
+              class="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-base rounded px-2 py-2"
               disabled="{upgradeDisabled}"
               on:click="{upgrade}"
-              >New version available. <br>Click here to upgrade!</button
+              >New version available, <br>click here to upgrade!</button
             >
           {:else if upgradeDone}
             <button

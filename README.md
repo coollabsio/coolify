@@ -14,15 +14,11 @@ https://andrasbacsai.com/farewell-netlify-and-heroku-after-3-days-of-coding
 
 
 # FAQ
-Q: What does Buildpack means?
+Q: What is a buildpack?
 
-A: It defines your application's final form. Static means that it will be hosted as a static site in the end. (see next question below 👇)
-
----
-
-Q: How can I build a static site, like Next.js, Sapper (prerendered), etc ?
-
-A: Use `static` builder and set your `Build command`.
+A: It defines your application's final form. 
+`Static` means that it will be hosted as a static site.
+`NodeJs` means that it will be started as a node application.
 
 # Screenshots
 

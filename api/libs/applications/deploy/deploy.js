@@ -23,8 +23,7 @@ module.exports = async function (configuration, configChanged, imageChanged) {
             replicas: 1,
             restart_policy: {
               condition: 'any',
-              max_attempts: 3,
-              window: '20s'
+              max_attempts: 3
             },
             update_config: {
               parallelism: 1,
