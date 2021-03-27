@@ -35,7 +35,7 @@ if (program.check) {
   } else if (program.type === 'proxy') {
     shell.exec('docker service rm coollabs-coolify_proxy')
   }
-  if (program.type !== 'upgrade') shell.exec('set -a && source .env && set +a && envsubst < install/coolify-template.yml | docker stack deploy -c - coollabs-coolify', { silent: !program.debug, shell: '/bin/bash' })
+  shell.exec('set -a && source .env && set +a && envsubst < install/coolify-template.yml | docker stack deploy -c - coollabs-coolify', { silent: !program.debug, shell: '/bin/bash' })
 }
 
 function checkConfig () {
