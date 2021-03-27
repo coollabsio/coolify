@@ -17,10 +17,10 @@ if (user !== 'root') {
 }
 if (program.type === 'upgrade-p1') {
   shell.exec(`docker network create ${process.env.DOCKER_NETWORK} --driver overlay`, { silent: !program.debug })
-  shell.exec('docker build -t coolify -f install/Dockerfile .')
+  shell.exec('docker build -t coolify -f scripts/Dockerfile .')
 }
 
 if (program.type === 'upgrade-p2') {
   shell.exec('docker service rm coollabs-coolify_coolify')
-  shell.exec('set -a && source .env && set +a && envsubst < install/coolify-template.yml | docker stack deploy -c - coollabs-coolify', { silent: !program.debug, shell: '/bin/bash' })
+  shell.exec('set -a && source .env && set +a && envsubst < scripts/coolify-template.yml | docker stack deploy -c - coollabs-coolify', { silent: !program.debug, shell: '/bin/bash' })
 }

@@ -17,7 +17,7 @@ echo '
 ##############################
 #### Building Base Image #####
 ##############################'
-docker build --label coolify-reserve=true -t coolify-base -f install/Dockerfile-base .
+docker build --label coolify-reserve=true -t coolify-base -f scripts/Dockerfile-base .
 
 if [ $? -ne 0 ]; then
     echo '
@@ -31,7 +31,7 @@ echo '
 ##################################
 #### Checking configuration. #####
 ##################################'
-docker run --rm -w /usr/src/app coolify-base node install/install.js --check
+docker run --rm -w /usr/src/app coolify-base node scripts/install.js --check
 if [ $? -ne 0 ]; then
    echo '
 ##################################
@@ -46,21 +46,21 @@ case "$1" in
 #################################
 #### Rebuilding everything. #####
 #################################'
-        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type all
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node scripts/install.js --type all
     ;;
     "coolify")
        echo '
 ##############################
 #### Rebuilding Coolify. #####
 ##############################'
-        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type coolify
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node scripts/install.js --type coolify
     ;;
     "proxy")
        echo '
 ############################
 #### Rebuilding Proxy. #####
 ############################'
-        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type proxy
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node scripts/install.js --type proxy
     ;;
     *)
         exit 1
