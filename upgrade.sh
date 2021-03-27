@@ -40,15 +40,16 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-case "$1" in
-    "upgrade")
-       echo '
+echo '
 #############################
 #### Upgrading Coolify. #####
 #############################'
-        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/upgrade.js --type upgrade
-    ;;
-    *)
-        exit 1
-     ;;
-esac
+
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/upgrade.js --type upgrade
+if [ $? -ne 0 ]; then
+   echo '
+##################################
+#### Missing configuration ! #####
+##################################'
+    exit 1
+fi
