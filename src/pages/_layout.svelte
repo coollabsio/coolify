@@ -225,7 +225,7 @@
         <div class="flex-1"></div>
           {#if !upgradeDisabled}
             <button
-              class="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-base rounded px-2 py-2"
+              class="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-xs font-bold rounded px-2 py-2"
               disabled="{upgradeDisabled}"
               on:click="{upgrade}"
               >New version available, <br>click here to upgrade!</button
