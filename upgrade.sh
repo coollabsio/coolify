@@ -41,26 +41,12 @@ if [ $? -ne 0 ]; then
 fi
 
 case "$1" in
-    "all")
+    "upgrade")
        echo '
-#################################
-#### Rebuilding everything. #####
-#################################'
-        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type all
-    ;;
-    "coolify")
-       echo '
-##############################
-#### Rebuilding Coolify. #####
-##############################'
-        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type coolify
-    ;;
-    "proxy")
-       echo '
-############################
-#### Rebuilding Proxy. #####
-############################'
-        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type proxy
+#############################
+#### Upgrading Coolify. #####
+#############################'
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/upgrade.js --type upgrade
     ;;
     *)
         exit 1

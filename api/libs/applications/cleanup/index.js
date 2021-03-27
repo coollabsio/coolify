@@ -1,5 +1,5 @@
 const { docker } = require('../../docker')
-const { execShellAsync, delay } = require('../../common')
+const { execShellAsync } = require('../../common')
 const Deployment = require('../../../models/Deployment')
 
 async function purgeOldThings () {
