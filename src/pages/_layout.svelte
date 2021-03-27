@@ -74,7 +74,7 @@
     }
   }
   async function checkUpgrade() {
-    const branch = process.env.NODE_ENV === 'production' ? 'main' : 'next'
+    const branch = process.env.NODE_ENV === 'production' && window.location.hostname !== 'test.andrasbacsai.dev' ? 'main' : 'next'
     latest = await window
       .fetch(
         `https://raw.githubusercontent.com/coollabsio/coolify/${branch}/package.json`,
