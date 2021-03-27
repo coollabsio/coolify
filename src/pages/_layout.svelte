@@ -19,8 +19,9 @@
     initConf,
   } from "@store";
   import { toast } from "@zerodevx/svelte-toast";
-  import packageJson from "../../package.json";
   import { onMount } from "svelte";
+  import compareVersions from 'compare-versions';
+  import packageJson from "../../package.json";
 
   let upgradeAvailable = false;
   let upgradeDisabled = false;
@@ -73,18 +74,14 @@
     }
   }
   async function checkUpgrade() {
+    const branch = process.env.NODE_ENV === 'production' ? 'main' : 'next'
     latest = await window
       .fetch(
-        "https://raw.githubusercontent.com/coollabsio/coolify/main/package.json",
+        `https://raw.githubusercontent.com/coollabsio/coolify/${branch}/package.json`,
         { cache: "no-cache" },
       )
       .then(r => r.json());
-    if (
-      latest.version.split(".").join("") >
-      packageJson.version.split(".").join("")
-    ) {
-      return true;
-    }
+      return compareVersions(latest.version,packageJson.version)
   }
 </script>
 

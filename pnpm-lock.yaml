@@ -3,6 +3,7 @@ dependencies:
   '@zerodevx/svelte-toast': 0.1.4
   axios: 0.21.1
   commander: 6.2.1
+  compare-versions: 3.6.0
   cuid: 2.1.8
   dayjs: 1.10.4
   deepmerge: 4.2.2
@@ -1188,6 +1189,10 @@ packages:
     dev: true
     resolution:
       integrity: sha1-3dgA2gxmEnOTzKWVDqloo6rxJTs=
+  /compare-versions/3.6.0:
+    dev: false
+    resolution:
+      integrity: sha512-W6Af2Iw1z4CB7q4uU4hv646dW9GQuBM+YpC0UvUCWSD8w90SJjp+ujJuXaEMtAXBtSqGfMPuFOVn4/+FlaqfBA==
   /concat-map/0.0.1:
     resolution:
       integrity: sha1-2Klr13/Wjfd5OnMDajug1UBdR3s=
@@ -6749,6 +6754,7 @@ specifiers:
   '@zerodevx/svelte-toast': ^0.1.4
   axios: ^0.21.0
   commander: ^6.2.1
+  compare-versions: ^3.6.0
   cuid: ^2.1.8
   dayjs: ^1.10.4
   deepmerge: ^4.2.2
