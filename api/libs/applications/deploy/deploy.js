@@ -22,10 +22,9 @@ module.exports = async function (configuration, configChanged, imageChanged) {
           deploy: {
             replicas: 1,
             restart_policy: {
-              condition: 'on-failure',
-              delay: '5s',
-              max_attempts: 1,
-              window: '120s'
+              condition: 'any',
+              max_attempts: 3,
+              window: '20s'
             },
             update_config: {
               parallelism: 1,
