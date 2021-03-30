@@ -62,14 +62,14 @@ case "$1" in
 ############################'
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type proxy
     ;;
-    "upgrade-phase-1")
+    "upgrade-p1")
         echo '
 ################################
 #### Upgrading Coolify P1. #####
 ################################'
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type upgrade
     ;;
-    "upgrade-phase-2")
+    "upgrade-p2")
         echo '
 ################################
 #### Upgrading Coolify P2. #####
