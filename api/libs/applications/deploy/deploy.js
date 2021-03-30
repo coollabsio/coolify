@@ -1,9 +1,9 @@
 const yaml = require('js-yaml')
-const fs = require('fs').promises
 const { execShellAsync } = require('../../common')
 const { docker } = require('../../docker')
 const { saveAppLog } = require('../../logging')
 const { deleteSameDeployments } = require('../cleanup')
+const fs = require('fs').promises
 
 module.exports = async function (configuration, configChanged, imageChanged) {
   try {
@@ -12,11 +12,6 @@ module.exports = async function (configuration, configChanged, imageChanged) {
       generateEnvs[secret.name] = secret.value
     }
     const containerName = configuration.build.container.name
-
-    // Only save SHA256 of it in the configuration label
-    const baseServiceConfiguration = configuration.baseServiceConfiguration
-    delete configuration.baseServiceConfiguration
-
     const stack = {
       version: '3.8',
       services: {
@@ -25,7 +20,23 @@ module.exports = async function (configuration, configChanged, imageChanged) {
           networks: [`${docker.network}`],
           environment: generateEnvs,
           deploy: {
-            ...baseServiceConfiguration,
+            replicas: 1,
+            restart_policy: {
+              condition: 'on-failure',
+              delay: '5s',
+              max_attempts: 1,
+              window: '120s'
+            },
+            update_config: {
+              parallelism: 1,
+              delay: '10s',
+              order: 'start-first'
+            },
+            rollback_config: {
+              parallelism: 1,
+              delay: '10s',
+              order: 'start-first'
+            },
             labels: [
               'managedBy=coolify',
               'type=application',
@@ -60,10 +71,8 @@ module.exports = async function (configuration, configChanged, imageChanged) {
         }
       }
     }
-    console.log(stack)
     await saveAppLog('### Publishing.', configuration)
     await fs.writeFile(`${configuration.general.workdir}/stack.yml`, yaml.dump(stack))
-    // TODO: Compare stack.yml with the currently running one to upgrade if something changes, like restart_policy
     if (configChanged) {
       // console.log('configuration changed')
       await execShellAsync(
@@ -82,7 +91,6 @@ module.exports = async function (configuration, configChanged, imageChanged) {
 
     await saveAppLog('### Published done!', configuration)
   } catch (error) {
-    console.log(error)
     await saveAppLog(`Error occured during deployment: ${error.message}`, configuration)
     throw { error, type: 'server' }
   }

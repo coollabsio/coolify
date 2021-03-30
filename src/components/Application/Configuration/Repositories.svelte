@@ -23,7 +23,7 @@
       >
         <option selected disabled>Select a repository</option>
         {#each repositories as repo}
-          <option value="{repo.id}" class="font-bold">
+          <option value="{repo.id}" class="font-medium">
             {repo.owner.login}
             /
             {repo.name}

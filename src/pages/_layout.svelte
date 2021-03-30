@@ -19,9 +19,8 @@
     initConf,
   } from "@store";
   import { toast } from "@zerodevx/svelte-toast";
-  import { onMount } from "svelte";
-  import compareVersions from 'compare-versions';
   import packageJson from "../../package.json";
+  import { onMount } from "svelte";
 
   let upgradeAvailable = false;
   let upgradeDisabled = false;
@@ -74,14 +73,18 @@
     }
   }
   async function checkUpgrade() {
-    const branch = process.env.NODE_ENV === 'production' && window.location.hostname !== 'test.andrasbacsai.dev' ? 'main' : 'next'
     latest = await window
       .fetch(
-        `https://raw.githubusercontent.com/coollabsio/coolify/${branch}/package.json`,
+        "https://raw.githubusercontent.com/coollabsio/coolify/main/package.json",
         { cache: "no-cache" },
       )
       .then(r => r.json());
-      return compareVersions(latest.version,packageJson.version)
+    if (
+      latest.version.split(".").join("") >
+      packageJson.version.split(".").join("")
+    ) {
+      return true;
+    }
   }
 </script>
 
@@ -211,24 +214,24 @@
         <div
           class="cursor-pointer text-xs font-bold text-warmGray-400 py-2 hover:bg-warmGray-700 w-full text-center"
         >
-          {packageJson.version}
+          v{packageJson.version}
         </div>
       </div>
     </nav>
   {/if}
   {#if upgradeAvailable}
     <footer
-      class="absolute bottom-0 right-0 p-4 px-6 w-auto rounded-tl text-white "
+      class="absolute top-0 right-0 p-2 w-auto rounded-tl text-white "
     >
       <div class="flex items-center">
         <div></div>
         <div class="flex-1"></div>
           {#if !upgradeDisabled}
             <button
-              class="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-xs font-bold rounded px-2 py-2"
+              class="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 font-bold text-xs rounded px-2 py-2"
               disabled="{upgradeDisabled}"
               on:click="{upgrade}"
-              >New version available, <br>click here to upgrade!</button
+              >New version available. <br>Click here to upgrade!</button
             >
           {:else if upgradeDone}
             <button
