@@ -1,9 +1,10 @@
 const { docker } = require('../../docker')
-const { execShellAsync, delay } = require('../../common')
+const { execShellAsync } = require('../../common')
 const Deployment = require('../../../models/Deployment')
 
 async function purgeOldThings () {
   try {
+    // TODO: Tweak this, because it deletes coolify-base, so the upgrade will be slow
     await docker.engine.pruneImages()
     await docker.engine.pruneContainers()
   } catch (error) {
