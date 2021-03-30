@@ -125,8 +125,7 @@ export const application = writable({
     },
     container: {
       name: null,
-      tag: null,
-      baseSHA: null
+      tag: null
     }
   },
   publish: {

@@ -1,8 +1,7 @@
 const { uniqueNamesGenerator, adjectives, colors, animals } = require('unique-names-generator')
 const cuid = require('cuid')
-const crypto = require('crypto')
-
 const { execShellAsync } = require('../common')
+const crypto = require('crypto')
 
 function getUniq () {
   return uniqueNamesGenerator({ dictionaries: [adjectives, animals, colors], length: 2 })
@@ -15,24 +14,6 @@ function setDefaultConfiguration (configuration) {
 
     const shaBase = JSON.stringify({ repository: configuration.repository })
     const sha256 = crypto.createHash('sha256').update(shaBase).digest('hex')
-
-    const baseServiceConfiguration = {
-      replicas: 1,
-      restart_policy: {
-        condition: 'any',
-        max_attempts: 3
-      },
-      update_config: {
-        parallelism: 1,
-        delay: '10s',
-        order: 'start-first'
-      },
-      rollback_config: {
-        parallelism: 1,
-        delay: '10s',
-        order: 'start-first'
-      }
-    }
 
     configuration.build.container.name = sha256.slice(0, 15)
 
@@ -52,9 +33,6 @@ function setDefaultConfiguration (configuration) {
       if (!configuration.build.command.installation) configuration.build.command.installation = 'yarn install'
       if (!configuration.build.directory) configuration.build.directory = '/'
     }
-
-    configuration.build.container.baseSHA = crypto.createHash('sha256').update(JSON.stringify(baseServiceConfiguration)).digest('hex')
-    configuration.baseServiceConfiguration = baseServiceConfiguration
 
     return configuration
   } catch (error) {

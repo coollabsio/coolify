@@ -17,7 +17,7 @@
     <select id="branch" bind:value="{$application.repository.branch}">
       <option disabled selected>Select a branch</option>
       {#each branches as branch}
-        <option value="{branch.name}" class="font-bold">{branch.name}</option>
+        <option value="{branch.name}" class="font-medium">{branch.name}</option>
       {/each}
     </select>
   </div>
