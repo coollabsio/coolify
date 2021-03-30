@@ -60,6 +60,10 @@ module.exports = async function (fastify) {
           foundDomain = true
         }
         if (running.repository.id === configuration.repository.id && running.repository.branch === configuration.repository.branch) {
+          // Base service configuration changed
+          if (!running.build.container.baseSHA || running.build.container.baseSHA !== configuration.build.container.baseSHA) {
+            configChanged = true
+          }
           const state = await execShellAsync(`docker stack ps ${running.build.container.name} --format '{{ json . }}'`)
           const isError = state.split('\n').filter(n => n).map(s => JSON.parse(s)).filter(n => n.DesiredState !== 'Running')
           if (isError.length > 0) forceUpdate = true
