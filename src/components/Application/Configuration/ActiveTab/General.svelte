@@ -10,6 +10,7 @@
       <select id="buildPack" bind:value="{$application.build.pack}">
         <option selected class="font-bold">Static</option>
         <option class="font-bold">Node.js</option>
+        <option class="font-bold">PHP</option>
       </select>
     </div>
     <div
@@ -35,7 +36,7 @@
         bind:value="{$application.publish.directory}"
         placeholder="/"
       />
-      {#if $application.build.pack !== "static"}
+      {#if $application.build.pack === "Node.js"}
         <label for="Port">Port</label>
         <input
           id="Port"

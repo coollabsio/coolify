@@ -10,9 +10,13 @@ module.exports = async function (configuration) {
     COPY nginx.conf /etc/nginx/nginx.conf
     `
   if (configuration.build.command.build) {
-    dockerFile += `COPY --from=${configuration.build.container.name}:${configuration.build.container.tag} /usr/src/app/${configuration.build.directory} /usr/share/nginx/html`
+    dockerFile += `COPY --from=${configuration.build.container.name}:${configuration.build.container.tag} /usr/src/app/${configuration.publish.directory} /usr/share/nginx/html`
   } else {
-    dockerFile += 'COPY . /usr/share/nginx/html'
+    if (configuration.publish.directory) {
+      dockerFile += `COPY .${configuration.publish.directory} /usr/share/nginx/html`
+    } else {
+      dockerFile += 'COPY . /usr/share/nginx/html'
+    }
   }
 
   dockerFile += `
