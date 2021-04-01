@@ -5,7 +5,6 @@ module.exports = async function (configuration) {
   let dockerFile = `# production stage
     FROM php:apache
     `
-  console.log(configuration)
   if (configuration.publish.directory) {
     dockerFile += `COPY ${configuration.publish.directory} /var/www/html`
   } else {
