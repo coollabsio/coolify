@@ -81,7 +81,7 @@
         { cache: "no-cache" },
       )
       .then(r => r.json());
-      return compareVersions(latest.version,packageJson.version)
+      return compareVersions(latest.version,packageJson.version) === 1 ? true : false
   }
 </script>
 
