@@ -18,7 +18,7 @@
   let repositories = [];
 
   function dashify(str, options) {
-    if (typeof str !== "string") return str
+    if (typeof str !== "string") return str;
     return str
       .trim()
       .replace(/\W/g, m => (/[À-ž]/.test(m) ? m : "-"))
@@ -44,6 +44,14 @@
     loading.branches = false;
   }
 
+  async function getGithubRepos(id, page) {
+    const data = await $fetch(
+      `https://api.github.com/user/installations/${id}/repositories?per_page=100&page=${page}`,
+    );
+
+    return data;
+  }
+
   async function loadGithub() {
     try {
       const { installations } = await $fetch(
@@ -55,12 +63,29 @@
       $application.github.installation.id = installations[0].id;
       $application.github.app.id = installations[0].app_id;
 
-      const data = await $fetch(
-        `https://api.github.com/user/installations/${$application.github.installation.id}/repositories?per_page=10000`,
+      let page = 1;
+      let userRepos = 0;
+      const data = await getGithubRepos(
+        $application.github.installation.id,
+        page,
       );
 
-      repositories = data.repositories;
-      const foundRepositoryOnGithub = data.repositories.find(
+      repositories = repositories.concat(data.repositories);
+      userRepos = data.total_count;
+
+      if (userRepos > repositories.length) {
+        while (userRepos > repositories.length) {
+          page = page + 1;
+          const repos = await getGithubRepos(
+            $application.github.installation.id,
+            page,
+          );
+
+          repositories = repositories.concat(repos.repositories);
+        }
+      }
+
+      const foundRepositoryOnGithub = repositories.find(
         r =>
           r.full_name ===
           `${$application.repository.organization}/${$application.repository.name}`,
