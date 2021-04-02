@@ -41,7 +41,15 @@ function setDefaultConfiguration (configuration) {
     configuration.general.workdir = `/tmp/${deployId}`
 
     if (!configuration.publish.path) configuration.publish.path = '/'
-    if (!configuration.publish.port) configuration.publish.port = configuration.build.pack === 'static' ? 80 : 3000
+    if (!configuration.publish.port) {
+      if (configuration.build.pack === 'php') {
+        configuration.publish.port = 80
+      } else if (configuration.build.pack === 'static') {
+        configuration.publish.port = 80
+      } else if (configuration.build.pack === 'nodejs') {
+        configuration.publish.port = 3000
+      }
+    }
 
     if (configuration.build.pack === 'static') {
       if (!configuration.build.command.installation) configuration.build.command.installation = 'yarn install'
