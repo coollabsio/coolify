@@ -31,7 +31,7 @@ if (process.env.NODE_ENV === 'production') {
 
 fastify.register(require('./app'), { prefix: '/api/v1' })
 fastify.setErrorHandler(async (error, request, reply) => {
-  console.log(error)
+  console.log({ error })
   if (error.statusCode) {
     reply.status(error.statusCode).send({ message: error.message } || { message: 'Something is NOT okay. Are you okay?' })
   } else {

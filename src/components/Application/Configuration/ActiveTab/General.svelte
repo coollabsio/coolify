@@ -30,7 +30,7 @@
         />
       </div>
       <div class="grid grid-flow-row">
-        <label for="Path">Path Prefix</label>
+        <label for="Path">Path</label>
         <input
           id="Path"
           bind:value="{$application.publish.path}"
@@ -45,7 +45,7 @@
       placeholder="/"
     />
     {#if $application.build.pack === "nodejs"}
-      <label for="Port">Port</label>
+      <label for="Port" class="pt-6">Port</label>
       <input
         id="Port"
         bind:value="{$application.publish.port}"
