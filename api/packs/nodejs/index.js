@@ -10,9 +10,13 @@ module.exports = async function (configuration) {
       WORKDIR /usr/src/app
       `
   if (configuration.build.command.build) {
-    dockerFile += `COPY --from=${configuration.build.container.name}:${configuration.build.container.tag} /usr/src/app/${configuration.build.directory} /usr/src/app`
+    dockerFile += `COPY --from=${configuration.build.container.name}:${configuration.build.container.tag} /usr/src/app/${configuration.publish.directory} /usr/src/app`
   } else {
-    dockerFile += 'COPY . ./'
+    if (configuration.publish.directory) {
+      dockerFile += `COPY .${configuration.publish.directory} ./`
+    } else {
+      dockerFile += 'COPY ./'
+    }
   }
   if (configuration.build.command.installation) {
     dockerFile += `

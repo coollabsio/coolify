@@ -64,16 +64,11 @@ module.exports = async function (configuration, configChanged, imageChanged) {
     await saveAppLog('### Publishing.', configuration)
     await fs.writeFile(`${configuration.general.workdir}/stack.yml`, yaml.dump(stack))
     // TODO: Compare stack.yml with the currently running one to upgrade if something changes, like restart_policy
-    if (configChanged) {
-      // console.log('configuration changed')
-      await execShellAsync(
-        `cat ${configuration.general.workdir}/stack.yml | docker stack deploy --prune -c - ${containerName}`
-      )
-    } else if (imageChanged) {
+    if (imageChanged) {
       // console.log('image changed')
       await execShellAsync(`docker service update --image ${configuration.build.container.name}:${configuration.build.container.tag} ${configuration.build.container.name}_${configuration.build.container.name}`)
     } else {
-      // console.log('new deployment or force deployment')
+      // console.log('new deployment or force deployment or config changed')
       await deleteSameDeployments(configuration)
       await execShellAsync(
         `cat ${configuration.general.workdir}/stack.yml | docker stack deploy --prune -c - ${containerName}`
