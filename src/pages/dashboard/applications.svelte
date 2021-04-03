@@ -44,7 +44,7 @@
         {#each $deployments.applications.deployed as application}
           <div class="px-4 pb-4">
             <div
-              class="relative rounded-xl py-6 w-52 h-32 bg-warmGray-800 border-2 border-transparent hover:border-green-500 text-white shadow-md cursor-pointer ease-in-out transform  duration-200 group"
+              class="relative rounded-xl py-6 w-52 h-32 bg-warmGray-800 hover:bg-green-500 text-white shadow-md cursor-pointer ease-in-out transform hover:scale-105 duration-200 hover:rotate-1 group"
               on:click="{() =>
                 switchTo({
                   branch:
@@ -188,7 +188,7 @@
                 {/if}
                 <div class="flex flex-col justify-center items-center w-full">
                 <div
-                  class="text-xs font-bold text-center w-full text-warmGray-300 group-hover:text-white pb-4"
+                  class="text-xs font-bold text-center w-full text-warmGray-300 group-hover:text-white pb-2"
                 >
                   {application.Spec.Labels.configuration.publish
                     .domain}{application.Spec.Labels.configuration.publish

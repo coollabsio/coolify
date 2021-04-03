@@ -55,7 +55,7 @@
 {#if fullscreen}
   {#if github}
     <div class="fixed top-0 flex flex-wrap content-center h-full w-full">
-      <div class="github animate-wiggle">
+      <div class="github animate-bounce">
         <svg
           class="w-28"
           xmlns="http://www.w3.org/2000/svg"
