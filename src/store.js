@@ -109,7 +109,7 @@ export const application = writable({
     id: null,
     organization: 'new',
     name: 'start',
-    branch: null
+    branch: null,
   },
   general: {
     deployId: null,
@@ -151,7 +151,7 @@ export const initialApplication = {
     id: null,
     organization: 'new',
     name: 'start',
-    branch: null
+    branch: null,
   },
   general: {
     deployId: null,
