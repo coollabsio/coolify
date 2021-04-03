@@ -68,13 +68,20 @@
     >
       General
     </div>
-    <div
-      on:click="{() => activateTab('buildStep')}"
-      class:text-green-500="{activeTab.buildStep}"
-      class="px-3 py-2 cursor-pointer hover:text-green-500"
-    >
-      Build Step
-    </div>
+    {#if $application.build.pack === "php"}
+      <div disabled class="px-3 py-2 text-warmGray-700 cursor-not-allowed">
+        Build Step
+      </div>
+    {:else}
+      <div
+        on:click="{() => activateTab('buildStep')}"
+        class:text-green-500="{activeTab.buildStep}"
+        class="px-3 py-2 cursor-pointer hover:text-green-500"
+      >
+        Build Step
+      </div>
+    {/if}
+
     <div
       on:click="{() => activateTab('secrets')}"
       class:text-green-500="{activeTab.secrets}"

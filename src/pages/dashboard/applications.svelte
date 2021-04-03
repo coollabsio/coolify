@@ -85,7 +85,7 @@
                   >
                 {:else if application.Spec.Labels.configuration.build.pack === "nodejs"}
                   <svg
-                    class="text-white w-10 h-10 absolute top-0 left-0 -m-4"
+                    class="text-green-400 w-10 h-10 absolute top-0 left-0 -m-4"
                     xmlns="http://www.w3.org/2000/svg"
                     aria-hidden="true"
                     focusable="false"
@@ -104,7 +104,7 @@
                     </svg>
                 {/if}
                 <div
-                  class="text-xs font-bold text-center w-full text-warmGray-300  group-hover:text-white"
+                  class="text-xs font-bold text-center w-full text-warmGray-300 group-hover:text-white"
                 >
                   {application.Spec.Labels.configuration.publish
                     .domain}{application.Spec.Labels.configuration.publish

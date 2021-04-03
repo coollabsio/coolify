@@ -1,5 +1,4 @@
 <script>
-  import { fade } from "svelte/transition";
   import { application } from "@store";
   import Configuration from "../../../../../components/Application/Configuration/Configuration.svelte";
 </script>

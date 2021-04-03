@@ -1,12 +1,17 @@
 <script>
   import { application } from "@store";
+  import Tooltip from "../../../Tooltip/TooltipInfo.svelte";
 </script>
 
 <div>
   <div
-    class="grid grid-cols-1 text-sm max-w-2xl md:mx-auto mx-6 pb-6 auto-cols-max "
+    class="grid grid-cols-1 text-sm max-w-xl md:mx-auto mx-6 pb-6 auto-cols-max "
   >
-    <label for="buildPack">Build Pack</label>
+    <label for="buildPack"
+      >Build Pack <Tooltip
+        label="The final form of your application. eg: Static means it will be served as a static site, but could have a build phase - fill 'Build Command' on the 'Build Step' tab."
+      /></label
+    >
     <select id="buildPack" bind:value="{$application.build.pack}">
       <option selected class="font-bold">static</option>
       <option class="font-bold">nodejs</option>
@@ -30,7 +35,11 @@
         />
       </div>
       <div class="grid grid-flow-row">
-        <label for="Path">Path</label>
+        <label for="Path"
+          >Path <Tooltip
+            label="{`Path to deploy your application. eg: /api means it will be deployed to -> https://${$application.publish.domain}/api`}"
+          /></label
+        >
         <input
           id="Path"
           bind:value="{$application.publish.path}"
@@ -38,14 +47,30 @@
         />
       </div>
     </div>
-    <label for="publishDir">Publish Directory</label>
-    <input
-      id="publishDir"
-      bind:value="{$application.publish.directory}"
-      placeholder="/"
-    />
+    <div class="grid grid-flow-col gap-2 items-center pb-6">
+      <div class="grid grid-flow-row">
+        <label for="baseDir">Base Directory <Tooltip
+          label="Base directory for your application. Useful if you have a monorepo."
+        /></label>
+        <input
+          id="baseDir"
+          bind:value="{$application.build.directory}"
+          placeholder="/"
+        />
+      </div>
+      <div class="grid grid-flow-row">
+        <label for="publishDir">Publish Directory <Tooltip
+          label="The directory that will be used to publish your files. eg: dist, _site, public."
+        /></label>
+        <input
+          id="publishDir"
+          bind:value="{$application.publish.directory}"
+          placeholder="/"
+        />
+      </div>
+    </div>
     {#if $application.build.pack === "nodejs"}
-      <label for="Port" class="pt-6">Port</label>
+      <label for="Port">Port</label>
       <input
         id="Port"
         bind:value="{$application.publish.port}"
