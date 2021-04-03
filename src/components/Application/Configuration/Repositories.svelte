@@ -34,6 +34,10 @@
     value: repo.id.toString(),
   }));
 
+  const selectedValue =
+    !$isActive("/application/new") &&
+    `${$application.repository.organization} / ${$application.repository.name}`;
+
   const dispatch = createEventDispatcher();
   const modifyGithubAppConfig = () => dispatch("modifyGithubAppConfig");
 </script>
@@ -46,6 +50,7 @@
         <Select
           containerClasses="w-full border-none bg-transparent "
           on:select="{handleSelect}"
+          selectedValue="{selectedValue}"
           isClearable="{false}"
           items="{items}"
           noOptionsMessage="No Repositories found"

@@ -153,7 +153,7 @@
         <Loading />
       {:else}
         <div
-          class="text-center space-y-2 max-w-4xl mx-auto px-6"
+          class="space-y-2 max-w-4xl mx-auto px-6"
           in:fade="{{ duration: 100 }}"
         >
           <Repositories
