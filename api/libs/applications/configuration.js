@@ -53,10 +53,6 @@ function setDefaultConfiguration (configuration) {
     if (!configuration.build.directory) {
       configuration.build.directory = '/'
     }
-    // } else {
-    //   console.log(/^\//.test(configuration.build.directory))
-    //   if (!/^\//.test(configuration.build.directory)) configuration.build.directory = `/${configuration.build.directory}`
-    // }
     if (configuration.build.pack === 'static' || configuration.build.pack === 'nodejs') {
       if (!configuration.build.command.installation) configuration.build.command.installation = 'yarn install'
     }

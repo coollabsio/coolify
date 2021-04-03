@@ -1,13 +1,14 @@
 <script>
   export let position = "top";
   export let label;
+  export let size = "large";
 </script>
 
 <span
   class="absolute px-1 py-1"
   aria-label="{label}"
   data-microtip-position="{position}"
-  data-microtip-size="large"
+  data-microtip-size="{size}"
   role="tooltip"
 >
   <svg

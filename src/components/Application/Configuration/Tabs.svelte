@@ -22,13 +22,13 @@
         branch: $application.repository.branch,
       });
     } else {
-      $deployments.applications.deployed.filter(d => {
+      $deployments?.applications?.deployed.filter(d => {
         const conf = d?.Spec?.Labels.application;
         if (
-          conf.repository.organization ===
+          conf?.repository?.organization ===
             $application.repository.organization &&
-          conf.repository.name === $application.repository.name &&
-          conf.repository.branch === $application.repository.branch
+          conf?.repository?.name === $application.repository.name &&
+          conf?.repository?.branch === $application.repository.branch
         ) {
           $redirect(`/application/:organization/:name/:branch/configuration`, {
             name: $application.repository.name,
@@ -37,6 +37,28 @@
           });
         }
       });
+      try {
+        const dir = await $fetch(
+          `https://api.github.com/repos/${$application.repository.organization}/${$application.repository.name}/contents/?ref=${$application.repository.branch}`,
+        );
+        const packageJson = dir.find(
+          f => f.type === "file" && f.name === "package.json",
+        );
+        const Dockerfile = dir.find(
+          f => f.type === "file" && f.name === "Dockerfile",
+        );
+
+        if (Dockerfile) {
+          $application.build.pack = "custom";
+          toast.push("Custom Dockerfile found. Buildpack set to custom.");
+        } else if (packageJson) {
+          const { content } = await $fetch(packageJson.git_url);
+          const packageJsonContent = atob(content);
+          // Check here for things like nextjs,vue,blabla
+        }
+      } catch (error) {
+        // No custom docker found
+      }
     }
   });
   let activeTab = {

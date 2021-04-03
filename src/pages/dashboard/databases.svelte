@@ -94,7 +94,7 @@
               )}"
           >
             <div
-              class="relative rounded-xl p-6 w-52 h-32 bg-warmGray-800 hover:bg-purple-500 text-white shadow-md cursor-pointer ease-in-out transform hover:scale-105 duration-200 hover:rotate-1 group"
+            class="relative rounded-xl py-6 w-52 h-32 bg-warmGray-800 border-2 border-transparent hover:border-purple-500 text-white shadow-md cursor-pointer ease-in-out transform  duration-200 group"
             >
               <div class="flex items-center">
                 {#if database.Spec.Labels.configuration.general.type == "mongodb"}

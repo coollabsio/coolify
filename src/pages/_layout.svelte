@@ -145,7 +145,7 @@
         </Tooltip>
         <Tooltip position="right" label="Databases">
           <div
-            class="p-2 hover:bg-warmGray-700 rounded hover:text-purple-500 my-4 transition-all duration-100 cursor-pointer"
+            class="p-2 hover:bg-warmGray-700 rounded hover:text-purple-500 transition-all duration-100 cursor-pointer"
             on:click="{() => $goto('/dashboard/databases')}"
             class:text-purple-500="{$isActive('/dashboard/databases') ||
               $isActive('/database')}"
@@ -171,7 +171,7 @@
         <div class="flex-1"></div>
         <Tooltip position="right" label="Settings">
           <button
-            class="p-2 hover:bg-warmGray-700 rounded hover:text-yellow-500 my-4 transition-all duration-100 cursor-pointer"
+            class="p-2 hover:bg-warmGray-700 rounded hover:text-yellow-500 transition-all duration-100 cursor-pointer"
             class:text-yellow-500="{$isActive('/settings')}"
             class:bg-warmGray-700="{$isActive('/settings')}"
             on:click="{() => $goto('/settings')}"

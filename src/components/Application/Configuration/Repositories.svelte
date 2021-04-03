@@ -1,7 +1,7 @@
 <style lang="postcss">
   :global(.repository-select-search .listItem .item),
   :global(.repository-select-search .empty) {
-    @apply text-sm py-4 font-bold bg-warmGray-800 text-white cursor-pointer border-none hover:bg-warmGray-700 !important;
+    @apply text-sm py-3 font-bold bg-warmGray-800 text-white cursor-pointer border-none hover:bg-warmGray-700 !important;
   }
 
   :global(.repository-select-search .listContainer) {
@@ -36,7 +36,7 @@
 
   const selectedValue =
     !$isActive("/application/new") &&
-    `${$application.repository.organization} / ${$application.repository.name}`;
+    `${$application.repository.organization}/${$application.repository.name}`;
 
   const dispatch = createEventDispatcher();
   const modifyGithubAppConfig = () => dispatch("modifyGithubAppConfig");
@@ -45,10 +45,10 @@
 <div class="grid grid-cols-1">
   {#if repositories.length !== 0}
     <label for="repository">Organization / Repository</label>
-    <div class="grid grid-cols-3">
+    <div class="grid grid-cols-3 ">
       <div class="repository-select-search col-span-2">
         <Select
-          containerClasses="w-full border-none bg-transparent "
+          containerClasses="w-full border-none bg-transparent"
           on:select="{handleSelect}"
           selectedValue="{selectedValue}"
           isClearable="{false}"

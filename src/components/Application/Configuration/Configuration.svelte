@@ -147,10 +147,10 @@
     <Login />
   {:else}
     {#await loadGithub()}
-      <Loading />
+      <Loading github />
     {:then}
       {#if loading.github}
-        <Loading />
+        <Loading github />
       {:else}
         <div
           class="space-y-2 max-w-4xl mx-auto px-6"
@@ -166,7 +166,9 @@
           {/if}
 
           {#if $application.repository.branch}
+          <div>
             <Tabs />
+          </div>
           {/if}
         </div>
       {/if}

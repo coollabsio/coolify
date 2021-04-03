@@ -1,7 +1,7 @@
 <script>
   export let position = "bottom";
   export let label;
-  export let size;
+  export let size = "fit";
 </script>
 
 <span
