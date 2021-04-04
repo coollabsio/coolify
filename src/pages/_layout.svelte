@@ -9,15 +9,8 @@
 </style>
 
 <script>
-  import { url, goto, route, isActive, redirect } from "@roxi/routify/runtime";
-  import {
-    loggedIn,
-    session,
-    fetch,
-    deployments,
-    application,
-    initConf,
-  } from "@store";
+  import { goto, route, isActive } from "@roxi/routify/runtime";
+  import { loggedIn, session, fetch, deployments } from "@store";
   import { toast } from "@zerodevx/svelte-toast";
   import { onMount } from "svelte";
   import compareVersions from "compare-versions";
@@ -29,7 +22,7 @@
   let upgradeDone = false;
   let latest = {};
   onMount(async () => {
-    upgradeAvailable = await checkUpgrade();
+    if ($session.token) upgradeAvailable = await checkUpgrade();
   });
   async function verifyToken() {
     if ($session.token) {

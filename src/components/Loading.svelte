@@ -39,12 +39,6 @@
       height: 4px;
     }
   }
-  .github {
-    display: block;
-    margin: 20px auto;
-    position: relative;
-    transform: translateY(-50%);
-  }
 </style>
 
 <script>
