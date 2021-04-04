@@ -50,15 +50,11 @@ function setDefaultConfiguration (configuration) {
         configuration.publish.port = 3000
       }
     }
-
-    if (configuration.build.pack === 'static') {
-      if (!configuration.build.command.installation) configuration.build.command.installation = 'yarn install'
-      if (!configuration.build.directory) configuration.build.directory = '/'
+    if (!configuration.build.directory) {
+      configuration.build.directory = '/'
     }
-
-    if (configuration.build.pack === 'nodejs') {
+    if (configuration.build.pack === 'static' || configuration.build.pack === 'nodejs') {
       if (!configuration.build.command.installation) configuration.build.command.installation = 'yarn install'
-      if (!configuration.build.directory) configuration.build.directory = '/'
     }
 
     configuration.build.container.baseSHA = crypto.createHash('sha256').update(JSON.stringify(baseServiceConfiguration)).digest('hex')

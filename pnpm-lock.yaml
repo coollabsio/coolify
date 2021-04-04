@@ -19,6 +19,7 @@ dependencies:
   jsonwebtoken: 8.5.1
   mongoose: 5.12.2
   shelljs: 0.8.4
+  svelte-select: 3.17.0
   unique-names-generator: 4.4.0
 devDependencies:
   mongodb-memory-server-core: 6.9.6
@@ -6042,6 +6043,10 @@ packages:
     requiresBuild: true
     resolution:
       integrity: sha512-SROWH0rB0DJ+0Ii264cprmNu/NJyZacs5wFD71ya93Cg/oA2lKHgQm4F6j0EWA4ktFMzeuJJm/eX6fka39hEHA==
+  /svelte-select/3.17.0:
+    dev: false
+    resolution:
+      integrity: sha512-ITmX/XUiSdkaILmsTviKRkZPaXckM5/FA7Y8BhiUPoamaZG/ZDyOo6ydjFu9fDVFTbwoAUGUi6HBjs+ZdK2AwA==
   /svelte/3.35.0:
     dev: true
     engines:
@@ -6783,6 +6788,7 @@ specifiers:
   svelte: ^3.29.7
   svelte-hmr: ^0.12.2
   svelte-preprocess: ^4.6.1
+  svelte-select: ^3.17.0
   svite: 0.8.1
   tailwindcss: compat
   unique-names-generator: ^4.4.0

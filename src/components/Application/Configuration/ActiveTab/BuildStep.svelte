@@ -1,29 +1,24 @@
 <script>
   import { application } from "@store";
+import Tooltip from "../../../Tooltip/TooltipInfo.svelte";
 </script>
 
 <div class="grid grid-cols-1 max-w-2xl md:mx-auto mx-6 text-center">
-  <label for="buildCommand">Build Command</label>
-  <input
-    class="mb-6"
-    id="buildCommand"
-    bind:value="{$application.build.command.build}"
-    placeholder="eg: yarn build"
-  />
+  <label for="installCommand"
+    >Install Command <Tooltip label="Command to run for installing dependencies. eg: yarn install." />
+  </label>
 
-  <label for="installCommand">Install Command</label>
   <input
     class="mb-6"
     id="installCommand"
     bind:value="{$application.build.command.installation}"
     placeholder="eg: yarn install"
   />
-
-  <label for="baseDir">Base Directory</label>
+  <label for="buildCommand">Build Command <Tooltip label="Command to run for building your application. If empty, no build phase initiated in the deploy process." /></label>
   <input
-    id="baseDir"
     class="mb-6"
-    bind:value="{$application.build.directory}"
-    placeholder="/"
+    id="buildCommand"
+    bind:value="{$application.build.command.build}"
+    placeholder="eg: yarn build"
   />
 </div>
