@@ -1,30 +1,6 @@
 <script>
-  import { redirect, isActive } from "@roxi/routify";
-  import { application, fetch, initialApplication, initConf } from "@store";
-  import { toast } from "@zerodevx/svelte-toast";
+  import { application } from "@store";
   import Configuration from "../../../../../components/Application/Configuration/Configuration.svelte";
-  import Loading from "../../../../../components/Loading.svelte";
-
-  async function loadConfiguration() {
-    if (!$isActive("/application/new")) {
-      try {
-        const config = await $fetch(`/api/v1/config`, {
-          body: {
-            name: $application.repository.name,
-            organization: $application.repository.organization,
-            branch: $application.repository.branch,
-          },
-        });
-        $application = { ...config };
-        $initConf = JSON.parse(JSON.stringify($application));
-      } catch (error) {
-        toast.push("Configuration not found.");
-        $redirect("/dashboard/applications");
-      }
-    } else {
-      $application = JSON.parse(JSON.stringify(initialApplication));
-    }
-  }
 </script>
 
 <div class="min-h-full text-white">

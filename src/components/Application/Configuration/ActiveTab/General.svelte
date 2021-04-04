@@ -1,16 +1,40 @@
 <script>
-  import { application } from "@store";
+  import { application} from "@store";
+  import TooltipInfo from "../../../Tooltip/TooltipInfo.svelte";
 </script>
 
 <div>
   <div
     class="grid grid-cols-1 text-sm max-w-2xl md:mx-auto mx-6 pb-6 auto-cols-max "
   >
-    <label for="buildPack">Build Pack</label>
+    <label for="buildPack"
+      >Build Pack 
+      {#if $application.build.pack === 'custom'}
+      <TooltipInfo
+        label="Your custom Dockerfile will be used from the root directory (or from 'Base Directory' specified below) of your repository. "
+      />
+      {:else if $application.build.pack === 'static'}
+      <TooltipInfo
+        label="Published as a static site (for build phase see 'Build Step' tab)."
+      />
+      {:else if $application.build.pack === 'nodejs'}
+      <TooltipInfo
+        label="Published as a Node.js application (for build phase see 'Build Step' tab)."
+      />
+      {:else if $application.build.pack === 'php'}
+      <TooltipInfo
+      size="large"
+        label="Published as a PHP application."
+      />
+      {/if}
+      
+</label
+    >
     <select id="buildPack" bind:value="{$application.build.pack}">
       <option selected class="font-bold">static</option>
       <option class="font-bold">nodejs</option>
       <option class="font-bold">php</option>
+      <option class="font-bold">custom</option>
     </select>
   </div>
   <div
@@ -30,7 +54,11 @@
         />
       </div>
       <div class="grid grid-flow-row">
-        <label for="Path">Path</label>
+        <label for="Path"
+          >Path <TooltipInfo
+            label="{`Path to deploy your application on your domain. eg: /api means it will be deployed to -> https://${$application.publish.domain}/api`}"
+          /></label
+        >
         <input
           id="Path"
           bind:value="{$application.publish.path}"
@@ -38,19 +66,40 @@
         />
       </div>
     </div>
-    <label for="publishDir">Publish Directory</label>
+    {#if $application.build.pack === "nodejs" || $application.build.pack === "custom"}
+    <label for="Port" >Port</label>
     <input
-      id="publishDir"
-      bind:value="{$application.publish.directory}"
-      placeholder="/"
+      id="Port"
+      class="mb-6"
+      bind:value="{$application.publish.port}"
+      placeholder="{$application.build.pack === 'static' ? '80' : '3000'}"
     />
-    {#if $application.build.pack === "nodejs"}
-      <label for="Port" class="pt-6">Port</label>
-      <input
-        id="Port"
-        bind:value="{$application.publish.port}"
-        placeholder="{$application.build.pack === 'static' ? '80' : '3000'}"
-      />
-    {/if}
+  {/if}
+    <div class="grid grid-flow-col gap-2 items-center pt-12">
+      <div class="grid grid-flow-row">
+        <label for="baseDir"
+          >Base Directory <TooltipInfo
+            label="The directory to use as base for every command (could be useful if you have a monorepo)."
+          /></label
+        >
+        <input
+          id="baseDir"
+          bind:value="{$application.build.directory}"
+          placeholder="/"
+        />
+      </div>
+      <div class="grid grid-flow-row">
+        <label for="publishDir"
+          >Publish Directory <TooltipInfo
+            label="The directory to deploy after running the build command.  eg: dist, _site, public."
+          /></label
+        >
+        <input
+          id="publishDir"
+          bind:value="{$application.publish.directory}"
+          placeholder="/"
+        />
+      </div>
+    </div>
   </div>
 </div>

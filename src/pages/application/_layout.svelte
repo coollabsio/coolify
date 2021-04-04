@@ -5,6 +5,7 @@
   import { fade } from "svelte/transition";
   import Loading from "../../components/Loading.svelte";
   import { toast } from "@zerodevx/svelte-toast";
+import Tooltip from "../../components/Tooltip/Tooltip.svelte";
 
   $application.repository.organization = $params.organization;
   $application.repository.name = $params.name;
@@ -77,8 +78,8 @@
 <nav
   class="flex text-white justify-end items-center m-4 fixed right-0 top-0 space-x-4"
 >
+<Tooltip position="bottom" label="Deploy" >
   <button
-    title="Deploy"
     disabled="{$application.publish.domain === '' ||
       $application.publish.domain === null}"
     class:cursor-not-allowed="{$application.publish.domain === '' ||
@@ -91,6 +92,7 @@
     class="icon"
     on:click="{deploy}"
   >
+ 
     <svg
       class="w-6"
       xmlns="http://www.w3.org/2000/svg"
@@ -108,9 +110,11 @@
         d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path><polyline
         points="16 16 12 12 8 16"></polyline></svg
     >
+
   </button>
+</Tooltip>
+<Tooltip position="bottom" label="Delete" >
   <button
-    title="Delete"
     disabled="{$application.publish.domain === '' ||
       $application.publish.domain === null ||
       $isActive('/application/new')}"
@@ -143,9 +147,11 @@
       ></path>
     </svg>
   </button>
+</Tooltip>
   <div class="border border-warmGray-700 h-8"></div>
+  <Tooltip position="bottom" label="Logs" >
   <button
-    title="Logs"
+
     class="icon"
     class:text-warmGray-700="{$isActive('/application/new')}"
     disabled="{$isActive('/application/new')}"
@@ -178,8 +184,9 @@
       ></path>
     </svg>
   </button>
+</Tooltip>
+<Tooltip position="bottom-left" label="Configuration" >
   <button
-    title="Configuration"
     class="icon hover:text-yellow-400"
     disabled="{$isActive(`/application/new`)}"
     class:text-yellow-400="{$isActive(
@@ -208,6 +215,7 @@
       ></path>
     </svg>
   </button>
+</Tooltip>
 </nav>
 
 <div class="text-white">
