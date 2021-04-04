@@ -39,6 +39,10 @@
       height: 4px;
     }
   }
+  .center {
+    width: calc(100% - 4rem);
+    margin-left: 4rem;
+  }
 </style>
 
 <script>
@@ -49,7 +53,7 @@
 
 {#if fullscreen}
   {#if github}
-    <div class="fixed left-0 top-0 flex flex-wrap content-center h-full w-full">
+    <div class="fixed left-0 top-0 flex flex-wrap content-center h-full center">
       <div class="w-full flex justify-center items-center">
         <div class="w-64">
           <svg
@@ -72,7 +76,7 @@
       </div>
     </div>
   {:else}
-    <div class="fixed left-0 top-0 flex flex-wrap content-center h-full w-full">
+    <div class="fixed left-0 top-0 flex flex-wrap content-center h-full center">
       <span class="loader"></span>
     </div>
   {/if}
