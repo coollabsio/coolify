@@ -3,8 +3,8 @@
   import { Router } from "@roxi/routify";
   import { routes } from "../.routify/routes";
   const options = {
-    duration: 2000,
-    dismissable: false
+    duration: 5000,
+    dismissable: true
   };
 </script>
 

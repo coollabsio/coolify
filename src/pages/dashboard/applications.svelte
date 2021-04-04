@@ -188,7 +188,7 @@
                 {/if}
                 <div class="flex flex-col justify-center items-center w-full">
                 <div
-                  class="text-xs font-bold text-center w-full text-warmGray-300 group-hover:text-white pb-2"
+                  class="text-xs font-bold text-center w-full text-warmGray-300 group-hover:text-white pb-6"
                 >
                   {application.Spec.Labels.configuration.publish
                     .domain}{application.Spec.Labels.configuration.publish
@@ -197,7 +197,7 @@
                     : ""}
                 </div>
                 <div class="text-xs font-bold text-center w-full text-warmGray-300 group-hover:text-white">
-                  Last Deployment:<br>
+                  Last deployment<br>
                   {new Intl.DateTimeFormat(
                     'default',
                     $dateOptions,
