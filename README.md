@@ -3,7 +3,7 @@
 https://andrasbacsai.com/farewell-netlify-and-heroku-after-3-days-of-coding
 
 # Features
-- Deploy your Node.js and static sites just by pushing code to git.
+- Deploy your Node.js, static sites, PHP or any custom application (with custom Dockerfile) just by pushing code to git.
 - Hassle-free installation and upgrade process.
 - One-click MongoDB, MySQL, PostgreSQL, CouchDB deployments!
 
