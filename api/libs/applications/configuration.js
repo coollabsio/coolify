@@ -48,6 +48,8 @@ function setDefaultConfiguration (configuration) {
         configuration.publish.port = 80
       } else if (configuration.build.pack === 'nodejs') {
         configuration.publish.port = 3000
+      } else if (configuration.build.pack === 'rust') {
+        configuration.publish.port = 5000
       }
     }
     if (!configuration.build.directory) {
