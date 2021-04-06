@@ -2,10 +2,6 @@
   .min-w-4rem {
     min-width: 4rem;
   }
-  .main {
-    width: calc(100% - 4rem);
-    margin-left: 4rem;
-  }
 </style>
 
 <script>

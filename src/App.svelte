@@ -9,6 +9,10 @@
 </script>
 
 <style lang="postcss">
+  :global(.main) {
+    width: calc(100% - 4rem);
+    margin-left: 4rem;
+  }
   :global(._toastMsg) {
     @apply text-sm font-bold !important;
   }
@@ -56,6 +60,22 @@
   }
   :global(.h-271) {
     min-height: 271px !important;
+  }
+  :global(.repository-select-search .listItem .item),
+  :global(.repository-select-search .empty) {
+    @apply text-sm py-3 font-bold bg-warmGray-800 text-white cursor-pointer border-none hover:bg-warmGray-700 !important;
+  }
+
+  :global(.repository-select-search .listContainer) {
+    @apply bg-transparent !important;
+  }
+
+  :global(.repository-select-search .clearSelect) {
+    @apply text-white cursor-pointer !important;
+  }
+
+  :global(.repository-select-search .selectedItem) {
+    @apply text-white relative cursor-pointer font-bold text-sm flex items-center !important;
   }
 </style>
 

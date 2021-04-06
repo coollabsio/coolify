@@ -151,7 +151,6 @@ import Tooltip from "../../components/Tooltip/Tooltip.svelte";
   <div class="border border-warmGray-700 h-8"></div>
   <Tooltip position="bottom" label="Logs" >
   <button
-
     class="icon"
     class:text-warmGray-700="{$isActive('/application/new')}"
     disabled="{$isActive('/application/new')}"

@@ -13,7 +13,8 @@ program
 
 program.parse(process.argv)
 
-if (program.check) {
+const options = program.opts()
+if (options.check) {
   checkConfig().then(() => {
     console.log('Config: OK')
   }).catch((err) => {
@@ -26,17 +27,17 @@ if (program.check) {
     console.error(`Please run as root! Current user: ${user}`)
     process.exit(1)
   }
-  shell.exec(`docker network create ${process.env.DOCKER_NETWORK} --driver overlay`, { silent: !program.debug })
+  shell.exec(`docker network create ${process.env.DOCKER_NETWORK} --driver overlay`, { silent: !options.debug })
   shell.exec('docker build -t coolify -f install/Dockerfile .')
-  if (program.type === 'all') {
-    shell.exec('docker stack rm coollabs-coolify', { silent: !program.debug })
-  } else if (program.type === 'coolify') {
+  if (options.type === 'all') {
+    shell.exec('docker stack rm coollabs-coolify', { silent: !options.debug })
+  } else if (options.type === 'coolify') {
     shell.exec('docker service rm coollabs-coolify_coolify')
-  } else if (program.type === 'proxy') {
+  } else if (options.type === 'proxy') {
     shell.exec('docker service rm coollabs-coolify_proxy')
   }
-  if (program.type !== 'upgrade') {
-    shell.exec('set -a && source .env && set +a && envsubst < install/coolify-template.yml | docker stack deploy -c - coollabs-coolify', { silent: !program.debug, shell: '/bin/bash' })
+  if (options.type !== 'upgrade') {
+    shell.exec('set -a && source .env && set +a && envsubst < install/coolify-template.yml | docker stack deploy -c - coollabs-coolify', { silent: !options.debug, shell: '/bin/bash' })
   }
 }
 

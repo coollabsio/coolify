@@ -29,6 +29,7 @@
 
   async function loadBranches() {
     loading.branches = true;
+    if ($isActive("/application/new")) $application.repository.branch = null
     const selectedRepository = repositories.find(
       r => r.id === $application.repository.id,
     );
@@ -80,7 +81,6 @@
             $application.github.installation.id,
             page,
           );
-
           repositories = repositories.concat(repos.repositories);
         }
       }
@@ -97,8 +97,10 @@
       }
     } catch (error) {
       return false;
+    } finally {
+      loading.github = false;
     }
-    loading.github = false;
+ 
   }
   function modifyGithubAppConfig() {
     const left = screen.width / 2 - 1020 / 2;

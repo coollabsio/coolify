@@ -2,7 +2,7 @@
   import { redirect, isActive } from "@roxi/routify";
   import { onMount } from "svelte";
   import { toast } from "@zerodevx/svelte-toast";
-
+  import templates from "../../../utils/templates";
   import { application, fetch, deployments } from "@store";
   import General from "./ActiveTab/General.svelte";
   import BuildStep from "./ActiveTab/BuildStep.svelte";
@@ -57,30 +57,43 @@
           $application.build.pack = "custom";
           toast.push("Custom Dockerfile found. Build pack set to custom.");
         } else if (packageJson) {
-          // Check here for things like nextjs,react,vue,blablabla
           const { content } = await $fetch(packageJson.git_url);
           const packageJsonContent = JSON.parse(atob(content));
-
-          if (packageJsonContent.dependencies.hasOwnProperty("next")) {
-            // Next.js
-            $application.build.pack = "nodejs";
-            $application.build.command.installation = "yarn install";
-            if (packageJsonContent.scripts.hasOwnProperty("build")) {
-              $application.build.command.build = `yarn build`;
-            }
-            toast.push("Next.js App detected. Build pack set to Node.js.");
-          } else if (packageJsonContent.dependencies.hasOwnProperty("react")) {
-            // CRA
-            $application.build.pack = "static";
-            $application.publish.directory = "build";
-            $application.build.command.installation = "yarn install";
-            if (packageJsonContent.scripts.hasOwnProperty("build")) {
-              $application.build.command.build = `yarn build`;
-            }
-            toast.push(
-              "React App detected. Build pack set to static with build phase.",
+          const checkPackageJSONContents = dep => {
+            return(
+              packageJsonContent?.dependencies?.hasOwnProperty(dep) ||
+              packageJsonContent?.devDependencies?.hasOwnProperty(dep)
             );
-          }
+          };
+          Object.keys(templates).map(dep => {
+            if (checkPackageJSONContents(dep)) {
+              const config = templates[dep];
+              $application.build.pack = config.pack;
+              if (config.installation) {
+                $application.build.command.installation = config.installation;
+              }
+
+              if (config.port) {
+                $application.publish.port = config.port;
+              }
+
+              if (config.directory) {
+                $application.publish.directory = config.directory;
+              }
+
+              if (
+                packageJsonContent.scripts.hasOwnProperty("build") &&
+                config.build
+              ) {
+                $application.build.command.build = config.build;
+              }
+              toast.push(
+                `${config.name} App detected. Default values set.`,
+              );
+            } 
+ 
+          });
+
         }
       } catch (error) {
         // Nothing detected
@@ -106,7 +119,7 @@
 </script>
 
 {#if loading}
-  <Loading github githubLoadingText="Scanning repository 🤖" />
+  <Loading github githubLoadingText="Scanning repository..." />
 {:else}
   <div class="block text-center py-4">
     <nav

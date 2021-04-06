@@ -43,7 +43,7 @@
       <p
         class="mt-1 pb-8 font-extrabold text-white text-5xl sm:tracking-tight lg:text-6xl text-center"
       >
-        Coolify
+        <span class="border-gradient">Coolify</span>
       </p>
       <h2 class="text-2xl md:text-3xl font-extrabold text-white">
         An open-source, hassle-free, self-hostable<br />
