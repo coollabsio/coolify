@@ -28,6 +28,6 @@
 </script>
 
 <div class="min-h-full text-white">
-  asd
+  24131
   <slot />
 </div>
