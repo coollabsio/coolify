@@ -39,6 +39,7 @@
         showIndicator
         noOptionsMessage="No branches found"
         placeholder="Select a branch"
+        isDisabled="{!$isActive('/application/new')}"
       />
     </div>
   </div>
