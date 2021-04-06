@@ -36,7 +36,7 @@
         selectedValue="{selectedValue}"
         isClearable="{false}"
         items="{branches.map(b => ({ label: b.name, value: b.name }))}"
-        showIndicator
+        showIndicator="{$isActive('/application/new')}"
         noOptionsMessage="No branches found"
         placeholder="Select a branch"
         isDisabled="{!$isActive('/application/new')}"
