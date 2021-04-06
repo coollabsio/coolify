@@ -9,9 +9,10 @@ RUN apt update && apt install -y docker-ce-cli && apt clean all
 FROM node:14 as modules
 COPY --from=binaries /usr/bin/docker /usr/bin/docker
 COPY --from=binaries /usr/bin/envsubst /usr/bin/envsubst
+RUN curl -L https://pnpm.js.org/pnpm.js | node - add --global pnpm
 WORKDIR /usr/src/app
 COPY ./package*.json .
-RUN yarn install
+RUN pnpm install
 
 FROM modules
 WORKDIR /usr/src/app

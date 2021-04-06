@@ -1,51 +1,51 @@
 const defaultBuildAndDeploy = {
-  installation: "yarn install",
-  build: "yarn build",
-};
+  installation: 'yarn install',
+  build: 'yarn build'
+}
 
 const templates = {
   next: {
-    pack: "nodejs",
+    pack: 'nodejs',
     ...defaultBuildAndDeploy,
     port: 3000,
-    name: "Next.js",
+    name: 'Next.js'
   },
   nuxt: {
-    pack: "nodejs",
+    pack: 'nodejs',
     ...defaultBuildAndDeploy,
     port: 8080,
-    name: "Nuxt",
+    name: 'Nuxt'
   },
-  "react-scripts": {
-    pack: "static",
+  'react-scripts': {
+    pack: 'static',
     ...defaultBuildAndDeploy,
-    directory: "build",
-    name: "Create React",
+    directory: 'build',
+    name: 'Create React'
   },
-  "parcel-bundler": {
-    pack: "static",
+  'parcel-bundler': {
+    pack: 'static',
     ...defaultBuildAndDeploy,
-    directory: "dist",
-    name: "Parcel",
+    directory: 'dist',
+    name: 'Parcel'
   },
-  "vue-cli-service": {
-    pack: "static",
+  'vue-cli-service': {
+    pack: 'static',
     ...defaultBuildAndDeploy,
-    directory: "dist",
-    name: "Vue CLI",
+    directory: 'dist',
+    name: 'Vue CLI'
   },
   gatsby: {
-    pack: "static",
+    pack: 'static',
     ...defaultBuildAndDeploy,
-    directory: "public",
-    name: "Gatsby",
+    directory: 'public',
+    name: 'Gatsby'
   },
-  "preact-cli": {
-    pack: "static",
+  'preact-cli': {
+    pack: 'static',
     ...defaultBuildAndDeploy,
-    directory: "build",
-    name: "Preact CLI",
-  },
-};
+    directory: 'build',
+    name: 'Preact CLI'
+  }
+}
 
-export default templates;
+export default templates

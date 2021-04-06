@@ -61,9 +61,9 @@
           const { content } = await $fetch(packageJson.git_url);
           const packageJsonContent = JSON.parse(atob(content));
           const checkPackageJSONContents = dep => {
-            return (
-              packageJsonContent.dependencies.hasOwnProperty(dep) ||
-              packageJsonContent.devDependencies.hasOwnProperty(dep)
+            return(
+              packageJsonContent?.dependencies?.hasOwnProperty(dep) ||
+              packageJsonContent?.devDependencies?.hasOwnProperty(dep)
             );
           };
           Object.keys(templates).map(dep => {
@@ -89,10 +89,12 @@
                 $application.build.command.build = config.build;
               }
               toast.push(
-                `${config.name} App detected. Build pack set to ${config.pack}.`,
+                `${config.name} App detected. Default values set.`,
               );
-            }
+            } 
+ 
           });
+
         }
       } catch (error) {
         // Nothing detected
