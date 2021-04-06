@@ -28,5 +28,6 @@
 </script>
 
 <div class="min-h-full text-white">
+  asd
   <slot />
 </div>
