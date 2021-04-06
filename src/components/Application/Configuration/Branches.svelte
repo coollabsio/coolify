@@ -1,8 +1,11 @@
 <script>
   export let loading, branches;
+  import { isActive } from "@roxi/routify";
   import { application } from "@store";
   import Select from "svelte-select";
-  let selectedValue;
+
+  const selectedValue =
+    !$isActive("/application/new") && $application.repository.branch
 
   function handleSelect(event) {
     $application.repository.branch = null;

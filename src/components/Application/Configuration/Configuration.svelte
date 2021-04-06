@@ -29,7 +29,10 @@
 
   async function loadBranches() {
     loading.branches = true;
-    if ($isActive("/application/new")) $application.repository.branch = null
+    if ($isActive("/application/new")) {
+      $application.repository.branch = null
+      console.log('asd')
+    }
     const selectedRepository = repositories.find(
       r => r.id === $application.repository.id,
     );
@@ -81,7 +84,6 @@
             $application.github.installation.id,
             page,
           );
-
           repositories = repositories.concat(repos.repositories);
         }
       }
@@ -93,7 +95,6 @@
       );
 
       if (foundRepositoryOnGithub) {
-        console.log(foundRepositoryOnGithub)
         $application.repository.id = foundRepositoryOnGithub.id;
         await loadBranches();
       }
