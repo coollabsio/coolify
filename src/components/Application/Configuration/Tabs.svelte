@@ -57,7 +57,6 @@
           $application.build.pack = "custom";
           toast.push("Custom Dockerfile found. Build pack set to custom.");
         } else if (packageJson) {
-          // Check here for things like nextjs,react,vue,blablabla
           const { content } = await $fetch(packageJson.git_url);
           const packageJsonContent = JSON.parse(atob(content));
           const checkPackageJSONContents = dep => {
@@ -120,7 +119,7 @@
 </script>
 
 {#if loading}
-  <Loading github githubLoadingText="Scanning repository 🤖" />
+  <Loading github githubLoadingText="Scanning repository..." />
 {:else}
   <div class="block text-center py-4">
     <nav

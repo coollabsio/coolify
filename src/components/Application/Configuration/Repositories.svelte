@@ -1,22 +1,3 @@
-<style lang="postcss">
-  :global(.repository-select-search .listItem .item),
-  :global(.repository-select-search .empty) {
-    @apply text-sm py-3 font-bold bg-warmGray-800 text-white cursor-pointer border-none hover:bg-warmGray-700 !important;
-  }
-
-  :global(.repository-select-search .listContainer) {
-    @apply bg-transparent !important;
-  }
-
-  :global(.repository-select-search .clearSelect) {
-    @apply text-white cursor-pointer !important;
-  }
-
-  :global(.repository-select-search .selectedItem) {
-    @apply text-white relative cursor-pointer font-bold text-sm flex items-center !important;
-  }
-</style>
-
 <script>
   import { createEventDispatcher } from "svelte";
   import { isActive } from "@roxi/routify";
