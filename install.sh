@@ -44,7 +44,7 @@ fi
 }
 case "$1" in
     "all")
-       preTasks()
+       preTasks
        echo '
 #################################
 #### Rebuilding everything. #####
@@ -52,7 +52,7 @@ case "$1" in
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type all
     ;;
     "coolify")
-       preTasks()
+       preTasks
        echo '
 ##############################
 #### Rebuilding Coolify. #####
@@ -60,7 +60,7 @@ case "$1" in
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type coolify
     ;;
     "proxy")
-       preTasks()
+       preTasks
        echo '
 ############################
 #### Rebuilding Proxy. #####
@@ -68,7 +68,7 @@ case "$1" in
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type proxy
     ;;
     "upgrade-phase-1")
-        preTasks()
+        preTasks
         echo '
 ################################
 #### Upgrading Coolify P1. #####
