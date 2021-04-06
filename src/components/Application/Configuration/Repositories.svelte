@@ -34,6 +34,7 @@
           selectedValue="{selectedValue}"
           isClearable="{false}"
           items="{items}"
+          showIndicator
           noOptionsMessage="No Repositories found"
           placeholder="Select a Repository"
           isDisabled="{!$isActive('/application/new')}"

@@ -29,6 +29,7 @@
 
   async function loadBranches() {
     loading.branches = true;
+    if ($isActive("/application/new")) $application.repository.branch = null
     const selectedRepository = repositories.find(
       r => r.id === $application.repository.id,
     );
@@ -92,13 +93,16 @@
       );
 
       if (foundRepositoryOnGithub) {
+        console.log(foundRepositoryOnGithub)
         $application.repository.id = foundRepositoryOnGithub.id;
         await loadBranches();
       }
     } catch (error) {
       return false;
+    } finally {
+      loading.github = false;
     }
-    loading.github = false;
+ 
   }
   function modifyGithubAppConfig() {
     const left = screen.width / 2 - 1020 / 2;
