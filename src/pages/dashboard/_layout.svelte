@@ -28,6 +28,5 @@
 </script>
 
 <div class="min-h-full text-white">
-  24131
   <slot />
 </div>
