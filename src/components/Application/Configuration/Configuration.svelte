@@ -29,10 +29,7 @@
 
   async function loadBranches() {
     loading.branches = true;
-    if ($isActive("/application/new")) {
-      $application.repository.branch = null
-      console.log('asd')
-    }
+    if ($isActive("/application/new")) $application.repository.branch = null
     const selectedRepository = repositories.find(
       r => r.id === $application.repository.id,
     );
