@@ -10,13 +10,13 @@ program
   .option('-t, --type <type>', 'Deploy type.')
 
 program.parse(process.argv)
-
+const options = program.opts()
 if (user !== 'root') {
   console.error(`Please run as root! Current user: ${user}`)
   process.exit(1)
 }
 
-if (program.type === 'upgrade') {
+if (options.type === 'upgrade') {
   shell.exec('docker service rm coollabs-coolify_coolify')
-  shell.exec('set -a && source .env && set +a && envsubst < install/coolify-template.yml | docker stack deploy -c - coollabs-coolify', { silent: !program.debug, shell: '/bin/bash' })
+  shell.exec('set -a && source .env && set +a && envsubst < install/coolify-template.yml | docker stack deploy -c - coollabs-coolify', { silent: !options.debug, shell: '/bin/bash' })
 }
