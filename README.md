@@ -36,7 +36,7 @@ A: It defines your application's final form.
 
 # Getting Started
 
-Automatically: `sh <(curl -fsSL https://get.coollabs.io/install.sh) coolify`
+Automatically: `/bin/bash -c "$(curl -fsSL https://get.coollabs.io/install.sh)"`
 
 Manually:
 ### Requirements before installation
