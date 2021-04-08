@@ -4,9 +4,8 @@ const Deployment = require('../../../models/Deployment')
 
 async function purgeOldThings () {
   try {
-    // TODO: Tweak this, because it deletes coolify-base, so the upgrade will be slow
-    await docker.engine.pruneImages()
-    await docker.engine.pruneContainers()
+    await execShellAsync('docker images --quiet --filter=dangling=true | xargs --no-run-if-empty docker rmi')
+    // await docker.engine.pruneContainers()
   } catch (error) {
     throw { error, type: 'server' }
   }
