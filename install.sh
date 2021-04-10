@@ -1,21 +1,6 @@
 #!/bin/bash
 
 preTasks() {
-    echo 'testtest'
-echo '
-##############################
-#### Pulling Git Updates #####
-##############################'
-GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" git pull
-
-if [ $? -ne 0 ]; then
-    echo '
-####################################
-#### Ooops something not okay! #####
-####################################'
-    exit 1
-fi
-
 echo '
 ##############################
 #### Building Base Image #####
