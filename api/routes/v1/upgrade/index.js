@@ -3,7 +3,7 @@ const { saveServerLog } = require('../../../libs/logging')
 
 module.exports = async function (fastify) {
   fastify.get('/', async (request, reply) => {
-    // await execShellAsync('git pull')
+    // await execShellAsync('GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" git pull')
     const upgradeP1 = await execShellAsync('bash ./install.sh upgrade-phase-1')
     await saveServerLog({ event: upgradeP1, type: 'UPGRADE-P-1' })
     reply.code(200).send('I\'m trying, okay?')
