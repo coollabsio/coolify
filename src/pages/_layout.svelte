@@ -69,16 +69,16 @@
         cache: "no-cache",
       })
       .then(r => r.json());
-      console.log(latest)
     const branch =
       process.env.NODE_ENV === "production" &&
       window.location.hostname !== "test.andrasbacsai.dev"
         ? "main"
         : "next";
-    console.log(branch)
-    console.log(latest.coolify[branch])
-    console.log(packageJson.version)
-    return compareVersions(latest.coolify[branch], packageJson.version) === 1
+
+    return compareVersions(
+      latest.coolify[branch].version,
+      packageJson.version,
+    ) === 1
       ? true
       : false;
   }
