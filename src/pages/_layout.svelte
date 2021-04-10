@@ -67,7 +67,7 @@
     const {
       coolify,
     } = await window
-      .fetch(`https://files.andrasbacsai.dev/version.json`, {
+      .fetch(`https://get.coollabs.io/version.json`, {
         cache: "no-cache",
       })
       .then(r => r.json());
