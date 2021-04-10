@@ -43,12 +43,13 @@ fi
 }
 case "$1" in
     "all")
-       bash -x scripts/install.sh
+        echo '
+#################################
+#### Rebuilding everything. #####
+#################################'
+        bash -x scripts/install.sh
 #        preTasks
-#        echo '
-# #################################
-# #### Rebuilding everything. #####
-# #################################'
+
 #         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type all
     ;;
     "upgrade-phase-1")
