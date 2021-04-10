@@ -64,19 +64,18 @@
     }
   }
   async function checkUpgrade() {
-    const {
-      coolify,
-    } = await window
+    latest = await window
       .fetch(`https://get.coollabs.io/version.json`, {
         cache: "no-cache",
       })
       .then(r => r.json());
+      console.log(latest)
     const branch =
       process.env.NODE_ENV === "production" &&
       window.location.hostname !== "test.andrasbacsai.dev"
         ? "main"
         : "next";
-    return compareVersions(coolify[branch], packageJson.version) === 1
+    return compareVersions(latest.coolify[branch], packageJson.version) === 1
       ? true
       : false;
   }
