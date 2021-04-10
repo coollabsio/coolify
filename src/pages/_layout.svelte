@@ -75,6 +75,9 @@
       window.location.hostname !== "test.andrasbacsai.dev"
         ? "main"
         : "next";
+    console.log(branch)
+    console.log(latest.coolify[branch])
+    console.log(packageJson.version)
     return compareVersions(latest.coolify[branch], packageJson.version) === 1
       ? true
       : false;
