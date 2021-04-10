@@ -13,7 +13,8 @@ if [ $? -ne 0 ]; then
 #### Ooops something not okay! #####
 ####################################'
     exit 1
-fi   
+fi
+
 echo '
 ##############################
 #### Building Base Image #####
@@ -43,21 +44,35 @@ fi
 }
 case "$1" in
     "all")
-        echo '
+       preTasks
+       echo '
 #################################
 #### Rebuilding everything. #####
 #################################'
-        # docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root coolify-base bash -x /usr/src/app/scripts/install.sh
-      preTasks
-      docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type all
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type all
+    ;;
+    "coolify")
+       preTasks
+       echo '
+##############################
+#### Rebuilding Coolify. #####
+##############################'
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type coolify
+    ;;
+    "proxy")
+       preTasks
+       echo '
+############################
+#### Rebuilding Proxy. #####
+############################'
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type proxy
     ;;
     "upgrade-phase-1")
+        preTasks
         echo '
 ################################
 #### Upgrading Coolify P1. #####
 ################################'
-        # docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root coolify-base bash -x /usr/src/app/scripts/upgrade-p1.sh
-        preTasks
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type upgrade
     ;;
     "upgrade-phase-2")
@@ -65,7 +80,6 @@ case "$1" in
 ################################
 #### Upgrading Coolify P2. #####
 ################################'
-        # docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root coolify-base bash -x /usr/src/app/scripts/upgrade-p2.sh
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/update.js --type upgrade
     ;;
     *)
