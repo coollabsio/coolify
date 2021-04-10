@@ -1,3 +1,4 @@
+set -x 
 WHO=$(whoami)
 if [ $WHO != 'root' ]; then
     echo 'You are not root. Ooops!'
