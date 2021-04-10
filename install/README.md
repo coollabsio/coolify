@@ -1,3 +1,3 @@
 These are only here for backward compatibility.
 
-I will delete this after 2 months.
+I will delete install.js and update.js after 2 months.
