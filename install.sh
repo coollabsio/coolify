@@ -48,19 +48,16 @@ case "$1" in
 #### Rebuilding everything. #####
 #################################'
         bash -x scripts/install.sh
-#        preTasks
-
-#         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type all
+#       preTasks
+#       docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type all
     ;;
     "upgrade-phase-1")
         echo '
 ################################
 #### Upgrading Coolify P1. #####
 ################################'
-        # bash -x scripts/upgrade-p1.sh
+        #bash -x scripts/upgrade-p1.sh
         preTasks
-
-        # 
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type upgrade
     ;;
     "upgrade-phase-2")
@@ -68,8 +65,8 @@ case "$1" in
 ################################
 #### Upgrading Coolify P2. #####
 ################################'
-        bash -x scripts/upgrade-p2.sh
-        #docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/update.js --type upgrade
+        #bash -x scripts/upgrade-p2.sh
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/update.js --type upgrade
     ;;
     *)
         exit 1
