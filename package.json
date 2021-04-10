@@ -1,7 +1,7 @@
 {
   "name": "coolify",
   "description": "An open-source, hassle-free, self-hostable Heroku & Netlify alternative.",
-  "version": "1.0.8",
+  "version": "1.0.5",
   "license": "AGPL-3.0",
   "scripts": {
     "lint": "standard",
