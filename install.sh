@@ -47,7 +47,7 @@ case "$1" in
 #################################
 #### Rebuilding everything. #####
 #################################'
-        bash -x scripts/install.sh
+        bash -x /usr/src/app/scripts/install.sh
 #       preTasks
 #       docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type all
     ;;
@@ -56,7 +56,7 @@ case "$1" in
 ################################
 #### Upgrading Coolify P1. #####
 ################################'
-        # bash -x scripts/upgrade-p1.sh
+        # bash -x /usr/src/app/scripts/upgrade-p1.sh
         preTasks
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/install.js --type upgrade
     ;;
@@ -65,7 +65,7 @@ case "$1" in
 ################################
 #### Upgrading Coolify P2. #####
 ################################'
-        # bash -x scripts/upgrade-p2.sh
+        # bash -x /usr/src/app/scripts/upgrade-p2.sh
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/update.js --type upgrade
     ;;
     *)
