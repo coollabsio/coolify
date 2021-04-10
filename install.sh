@@ -3,6 +3,20 @@
 preTasks() {
 echo '
 ##############################
+#### Pulling Git Updates #####
+##############################'
+GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" git pull
+
+if [ $? -ne 0 ]; then
+    echo '
+####################################
+#### Ooops something not okay! #####
+####################################'
+    exit 1
+fi
+
+echo '
+##############################
 #### Building Base Image #####
 ##############################'
 docker build --label coolify-reserve=true -t coolify-base -f install/Dockerfile-base .
@@ -66,7 +80,6 @@ case "$1" in
 ################################
 #### Upgrading Coolify P2. #####
 ################################'
-        echo 'something else happening here'
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /data/coolify:/data/coolify -u root -w /usr/src/app coolify-base node install/update.js --type upgrade
     ;;
     *)
