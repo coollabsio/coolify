@@ -1,7 +1,7 @@
 const { uniqueNamesGenerator, adjectives, colors, animals } = require('unique-names-generator')
 const cuid = require('cuid')
 const crypto = require('crypto')
-
+const { docker } = require('../docker')
 const { execShellAsync } = require('../common')
 
 function getUniq () {
@@ -49,12 +49,17 @@ function setDefaultConfiguration (configuration) {
       } else if (configuration.build.pack === 'nodejs') {
         configuration.publish.port = 3000
       } else if (configuration.build.pack === 'rust') {
-        configuration.publish.port = 5000
+        configuration.publish.port = 3000
       }
     }
+
     if (!configuration.build.directory) {
       configuration.build.directory = '/'
     }
+    if (!configuration.publish.directory) {
+      configuration.publish.directory = '/'
+    }
+
     if (configuration.build.pack === 'static' || configuration.build.pack === 'nodejs') {
       if (!configuration.build.command.installation) configuration.build.command.installation = 'yarn install'
     }
@@ -68,8 +73,9 @@ function setDefaultConfiguration (configuration) {
   }
 }
 
-async function updateServiceLabels (configuration, services) {
+async function updateServiceLabels (configuration) {
   // In case of any failure during deployment, still update the current configuration.
+  const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
   const found = services.find(s => {
     const config = JSON.parse(s.Spec.Labels.configuration)
     if (config.repository.id === configuration.repository.id && config.repository.branch === configuration.repository.branch) {
@@ -81,7 +87,7 @@ async function updateServiceLabels (configuration, services) {
     const { ID } = found
     try {
       const Labels = { ...JSON.parse(found.Spec.Labels.configuration), ...configuration }
-      execShellAsync(`docker service update --label-add configuration='${JSON.stringify(Labels)}' --label-add com.docker.stack.image='${configuration.build.container.name}:${configuration.build.container.tag}' ${ID}`)
+      await execShellAsync(`docker service update --label-add configuration='${JSON.stringify(Labels)}' --label-add com.docker.stack.image='${configuration.build.container.name}:${configuration.build.container.tag}' ${ID}`)
     } catch (error) {
       console.log(error)
     }

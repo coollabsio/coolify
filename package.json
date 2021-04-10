@@ -16,8 +16,9 @@
     "build:svite": "svite build"
   },
   "dependencies": {
+    "@iarna/toml": "^2.2.5",
     "@roxi/routify": "^2.15.1",
-    "@zerodevx/svelte-toast": "^0.2.0",
+    "@zerodevx/svelte-toast": "^0.2.1",
     "axios": "^0.21.1",
     "commander": "^7.2.0",
     "compare-versions": "^3.6.0",
@@ -26,7 +27,7 @@
     "deepmerge": "^4.2.2",
     "dockerode": "^3.2.1",
     "dotenv": "^8.2.0",
-    "fastify": "^3.14.1",
+    "fastify": "^3.14.2",
     "fastify-env": "^2.1.0",
     "fastify-jwt": "^2.4.0",
     "fastify-plugin": "^3.0.0",
@@ -52,7 +53,7 @@
     "standard": "^16.0.3",
     "svelte": "^3.37.0",
     "svelte-hmr": "^0.14.0",
-    "svelte-preprocess": "^4.6.1",
+    "svelte-preprocess": "^4.7.0",
     "svite": "0.8.1",
     "tailwindcss": "2.1.1"
   },

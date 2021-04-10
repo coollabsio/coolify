@@ -18,25 +18,29 @@ module.exports = async function (fastify) {
     }
   }
   fastify.get('/', { schema: getLogSchema }, async (request, reply) => {
-    const { repoId, branch, page } = request.query
-    const onePage = 5
-    const show = Number(page) * onePage || 5
-    const deploy = await Deployment.find({ repoId, branch })
-      .select('-_id -__v -repoId')
-      .sort({ createdAt: 'desc' })
-      .limit(show)
+    try {
+      const { repoId, branch, page } = request.query
+      const onePage = 5
+      const show = Number(page) * onePage || 5
+      const deploy = await Deployment.find({ repoId, branch })
+        .select('-_id -__v -repoId')
+        .sort({ createdAt: 'desc' })
+        .limit(show)
 
-    const finalLogs = deploy.map(d => {
-      const finalLogs = { ...d._doc }
+      const finalLogs = deploy.map(d => {
+        const finalLogs = { ...d._doc }
 
-      const updatedAt = dayjs(d.updatedAt).utc()
+        const updatedAt = dayjs(d.updatedAt).utc()
 
-      finalLogs.took = updatedAt.diff(dayjs(d.createdAt)) / 1000
-      finalLogs.since = updatedAt.fromNow()
+        finalLogs.took = updatedAt.diff(dayjs(d.createdAt)) / 1000
+        finalLogs.since = updatedAt.fromNow()
 
+        return finalLogs
+      })
       return finalLogs
-    })
-    return finalLogs
+    } catch (error) {
+      throw { error, type: 'server' }
+    }
   })
 
   fastify.get('/:deployId', async (request, reply) => {

@@ -10,6 +10,10 @@ const mongoose = require('mongoose')
 const path = require('path')
 const { schema } = require('./schema')
 
+process.on('unhandledRejection', (reason, p) => {
+  console.log(reason)
+  console.log(p)
+})
 fastify.register(require('fastify-env'), {
   schema,
   dotenv: true
@@ -31,13 +35,16 @@ if (process.env.NODE_ENV === 'production') {
 
 fastify.register(require('./app'), { prefix: '/api/v1' })
 fastify.setErrorHandler(async (error, request, reply) => {
-  console.log({ error })
   if (error.statusCode) {
     reply.status(error.statusCode).send({ message: error.message } || { message: 'Something is NOT okay. Are you okay?' })
   } else {
     reply.status(500).send({ message: error.message } || { message: 'Something is NOT okay. Are you okay?' })
   }
-  await saveServerLog({ event: error })
+  try {
+    await saveServerLog({ event: error })
+  } catch (error) {
+    //
+  }
 })
 
 if (process.env.NODE_ENV === 'production') {
@@ -83,8 +90,12 @@ mongoose.connection.once('open', async function () {
     console.log('Coolify API is up and running in development.')
   }
   // On start cleanup inprogress/queued deployments.
-  const deployments = await Deployment.find({ progress: { $in: ['queued', 'inprogress'] } })
-  for (const deployment of deployments) {
-    await Deployment.findByIdAndUpdate(deployment._id, { $set: { progress: 'failed' } })
+  try {
+    const deployments = await Deployment.find({ progress: { $in: ['queued', 'inprogress'] } })
+    for (const deployment of deployments) {
+      await Deployment.findByIdAndUpdate(deployment._id, { $set: { progress: 'failed' } })
+    }
+  } catch (error) {
+    // Could not cleanup DB 🤔
   }
 })

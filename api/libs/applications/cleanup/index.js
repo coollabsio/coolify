@@ -4,8 +4,9 @@ const Deployment = require('../../../models/Deployment')
 
 async function purgeOldThings () {
   try {
-    await execShellAsync('docker images --quiet --filter=dangling=true | xargs --no-run-if-empty docker rmi')
-    // await docker.engine.pruneContainers()
+    await docker.engine.pruneContainers()
+    await docker.engine.pruneImages()
+    // await execShellAsync('docker images --quiet --filter=dangling=true | xargs --no-run-if-empty docker rmi')
   } catch (error) {
     throw { error, type: 'server' }
   }

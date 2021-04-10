@@ -15,12 +15,16 @@ function delay (t) {
 }
 
 async function verifyUserId (authorization) {
-  const token = authorization.split(' ')[1]
-  const verify = jsonwebtoken.verify(token, process.env.JWT_SIGN_KEY)
-  const found = await User.findOne({ uid: verify.jti })
-  if (found) {
-    return true
-  } else {
+  try {
+    const token = authorization.split(' ')[1]
+    const verify = jsonwebtoken.verify(token, process.env.JWT_SIGN_KEY)
+    const found = await User.findOne({ uid: verify.jti })
+    if (found) {
+      return true
+    } else {
+      return false
+    }
+  } catch (error) {
     return false
   }
 }

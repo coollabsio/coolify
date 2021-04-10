@@ -55,6 +55,8 @@ module.exports = async function (fastify) {
     } catch (error) {
       if (error.code === 'ENOENT' && error.errno === -2) {
         throw new Error(`Docker service unavailable at ${error.address}.`)
+      } else {
+        throw { error, type: 'server' }
       }
     }
   })

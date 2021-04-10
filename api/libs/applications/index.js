@@ -11,7 +11,7 @@ const Deployment = require('../../models/Deployment')
 const { cleanup, purgeOldThings } = require('./cleanup')
 const { updateServiceLabels } = require('./configuration')
 
-async function queueAndBuild (configuration, services, configChanged, imageChanged) {
+async function queueAndBuild (configuration, configChanged, imageChanged) {
   const { id, organization, name, branch } = configuration.repository
   const { domain } = configuration.publish
   const { deployId, nickname, workdir } = configuration.general
@@ -26,7 +26,7 @@ async function queueAndBuild (configuration, services, configChanged, imageChang
     await Deployment.findOneAndUpdate(
       { repoId: id, branch, deployId, organization, name, domain },
       { repoId: id, branch, deployId, organization, name, domain, progress: 'done' })
-    await updateServiceLabels(configuration, services)
+    await updateServiceLabels(configuration)
     cleanupTmp(workdir)
     await purgeOldThings()
   } catch (error) {

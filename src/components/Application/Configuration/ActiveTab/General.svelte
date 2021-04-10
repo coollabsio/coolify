@@ -1,6 +1,7 @@
 <script>
   import { application} from "@store";
   import TooltipInfo from "../../../Tooltip/TooltipInfo.svelte";
+  const showPorts = ['nodejs','custom','rust']
 </script>
 
 <div>
@@ -72,7 +73,7 @@
         />
       </div>
     </div>
-    {#if $application.build.pack === "nodejs" || $application.build.pack === "custom"}
+    {#if showPorts.includes($application.build.pack)}
     <label for="Port" >Port</label>
     <input
       id="Port"

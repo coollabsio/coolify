@@ -9,3 +9,4 @@ yarn-error.log
 api/development/console.log
 .pnpm-debug.log
 yarn.lock
+.pnpm-store
