@@ -1,6 +1,7 @@
 #!/bin/bash
 
 preTasks() {
+    echo 'testtest'
 echo '
 ##############################
 #### Pulling Git Updates #####
