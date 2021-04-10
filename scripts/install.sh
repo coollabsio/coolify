@@ -5,8 +5,8 @@ if [ $WHO != 'root' ]; then
 fi
 
 GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no" git pull
-docker build --label coolify-reserve=true -t coolify-base -f scripts/Dockerfile-base .
-docker run --rm -w /usr/src/app coolify-base node scripts/check.js
+docker build --label coolify-reserve=true -t coolify-base -f /usr/src/app/scripts/Dockerfile-base .
+docker run --rm -w /usr/src/app coolify-base node /usr/src/app/scripts/check.js
 
 if [ $? -ne 0 ]; then
    echo '
@@ -18,6 +18,6 @@ fi
 
 export $(egrep -v '^#' .env | grep -v 'GITHUB_APP_PRIVATE_KEY'| xargs)
 docker network create $DOCKER_NETWORK --driver overlay
-docker build -t coolify -f scripts/Dockerfile .
+docker build -t coolify -f /usr/src/app/scripts/Dockerfile .
 docker stack rm coollabs-coolify
-set -a && source .env && set +a && envsubst < scripts/coolify-template.yml | docker stack deploy -c - coollabs-coolify
+set -a && source .env && set +a && envsubst < /usr/src/app/scripts/coolify-template.yml | docker stack deploy -c - coollabs-coolify
