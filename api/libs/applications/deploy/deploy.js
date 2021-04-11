@@ -63,10 +63,10 @@ module.exports = async function (configuration, imageChanged) {
     await saveAppLog('### Publishing.', configuration)
     await fs.writeFile(`${configuration.general.workdir}/stack.yml`, yaml.dump(stack))
     if (imageChanged) {
-      // console.log('image changed')
+      console.log('image changed')
       await execShellAsync(`docker service update --image ${configuration.build.container.name}:${configuration.build.container.tag} ${configuration.build.container.name}_${configuration.build.container.name}`)
     } else {
-      // console.log('new deployment or force deployment or config changed')
+      console.log('new deployment or force deployment or config changed')
       await deleteSameDeployments(configuration)
       await execShellAsync(
         `cat ${configuration.general.workdir}/stack.yml | docker stack deploy --prune -c - ${containerName}`
