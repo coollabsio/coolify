@@ -42,9 +42,9 @@ module.exports = async function (fastify) {
       const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
       const configuration = setDefaultConfiguration(request.body)
       await cloneRepository(configuration)
-      const { foundService, imageChanged, configChanged } = await precheckDeployment({ services, configuration })
+      const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment({ services, configuration })
 
-      if (foundService && !imageChanged && !configChanged) {
+      if (foundService && !forceUpdate && !imageChanged && !configChanged) {
         cleanupTmp(configuration.general.workdir)
         reply.code(500).send({ message: 'Nothing changed, no need to redeploy.' })
         return

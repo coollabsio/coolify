@@ -109,8 +109,9 @@ async function precheckDeployment ({ services, configuration }) {
         if (!running.build.container.baseSHA || running.build.container.baseSHA !== configuration.build.container.baseSHA) {
           configChanged = true
         }
+        // If the deployment is in error state, forceUpdate
         const state = await execShellAsync(`docker stack ps ${running.build.container.name} --format '{{ json . }}'`)
-        const isError = state.split('\n').filter(n => n).map(s => JSON.parse(s)).filter(n => n.DesiredState !== 'Running')
+        const isError = state.split('\n').filter(n => n).map(s => JSON.parse(s)).filter(n => n.DesiredState !== 'Running' && n.Image.split(':')[1] === running.build.container.tag)
         if (isError.length > 0) forceUpdate = true
         foundService = true
 
@@ -136,7 +137,8 @@ async function precheckDeployment ({ services, configuration }) {
   return {
     foundService,
     imageChanged,
-    configChanged
+    configChanged,
+    forceUpdate
   }
 }
 module.exports = { setDefaultConfiguration, updateServiceLabels, precheckDeployment }
