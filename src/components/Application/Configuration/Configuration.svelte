@@ -156,7 +156,7 @@
           $application.publish.domain +
           $application.publish.path}"
         >{$application.publish.domain
-          ? $application.publish.domain + $application.publish.path
+          ? `${$application.publish.domain}${$application.publish.path !== '/' ? $application.publish.path : ''}`
           : "Loading..."}</a
       >
       <a
