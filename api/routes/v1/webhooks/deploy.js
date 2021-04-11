@@ -69,7 +69,7 @@ module.exports = async function (fastify) {
       configuration = setDefaultConfiguration(JSON.parse(configuration.Spec.Labels.configuration))
       await cloneRepository(configuration)
       const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment({ services, configuration })
-      console.log({ foundService, imageChanged, configChanged, forceUpdate })
+
       if (foundService && !forceUpdate && !imageChanged && !configChanged) {
         cleanupTmp(configuration.general.workdir)
         reply.code(500).send({ message: 'Nothing changed, no need to redeploy.' })
@@ -89,7 +89,7 @@ module.exports = async function (fastify) {
         return
       }
 
-      queueAndBuild(configuration, configChanged, imageChanged)
+      queueAndBuild(configuration, imageChanged)
 
       reply.code(201).send({ message: 'Deployment queued.', nickname: configuration.general.nickname, name: configuration.build.container.name })
     } catch (error) {

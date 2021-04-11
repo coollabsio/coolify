@@ -11,7 +11,7 @@ const Deployment = require('../../models/Deployment')
 const { cleanup, purgeOldThings } = require('./cleanup')
 const { updateServiceLabels } = require('./configuration')
 
-async function queueAndBuild (configuration, configChanged, imageChanged) {
+async function queueAndBuild (configuration, imageChanged) {
   const { id, organization, name, branch } = configuration.repository
   const { domain } = configuration.publish
   const { deployId, nickname, workdir } = configuration.general
@@ -22,7 +22,7 @@ async function queueAndBuild (configuration, configChanged, imageChanged) {
     await saveAppLog(`${dayjs().format('YYYY-MM-DD HH:mm:ss.SSS')} Queued.`, configuration)
     await copyFiles(configuration)
     await buildContainer(configuration)
-    await deploy(configuration, configChanged, imageChanged)
+    await deploy(configuration, imageChanged)
     await Deployment.findOneAndUpdate(
       { repoId: id, branch, deployId, organization, name, domain },
       { repoId: id, branch, deployId, organization, name, domain, progress: 'done' })

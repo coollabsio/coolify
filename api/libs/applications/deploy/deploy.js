@@ -5,7 +5,7 @@ const { docker } = require('../../docker')
 const { saveAppLog } = require('../../logging')
 const { deleteSameDeployments } = require('../cleanup')
 
-module.exports = async function (configuration, configChanged, imageChanged) {
+module.exports = async function (configuration, imageChanged) {
   try {
     const generateEnvs = {}
     for (const secret of configuration.publish.secrets) {

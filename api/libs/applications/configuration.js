@@ -112,7 +112,6 @@ async function precheckDeployment ({ services, configuration }) {
         // If the deployment is in error state, forceUpdate
         const state = await execShellAsync(`docker stack ps ${running.build.container.name} --format '{{ json . }}'`)
         const isError = state.split('\n').filter(n => n).map(s => JSON.parse(s)).filter(n => n.DesiredState !== 'Running' && n.Image.split(':')[1] === running.build.container.tag)
-        console.log({ isError })
         if (isError.length > 0) forceUpdate = true
         foundService = true
 
@@ -127,9 +126,7 @@ async function precheckDeployment ({ services, configuration }) {
         // If only the image changed
         if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true
         // If build pack changed, forceUpdate the service
-        console.log(forceUpdate)
         if (running.build.pack !== configuration.build.pack) forceUpdate = true
-        console.log(forceUpdate)
       }
     }
   }
