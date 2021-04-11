@@ -98,4 +98,10 @@ mongoose.connection.once('open', async function () {
   } catch (error) {
     // Could not cleanup DB 🤔
   }
+  try {
+    // echo "FROM node:lts" | docker build --label coolify-reserve=true -t node:lts -
+    // echo "FROM ubuntu:20.04" | docker build --label coolify-reserve=true -t ubuntu:20.04 -
+  } catch (error) {
+
+  }
 })
