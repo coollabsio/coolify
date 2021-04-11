@@ -20,7 +20,8 @@ module.exports = async function (fastify) {
         if (running) {
           if (
             running.publish.domain === configuration.publish.domain &&
-            running.repository.id !== configuration.repository.id
+            running.repository.id !== configuration.repository.id &&
+            running.publish.path === configuration.publish.path
           ) {
             foundDomain = true
           }

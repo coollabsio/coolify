@@ -27,8 +27,8 @@
       });
     } else {
       loading = true;
-      $deployments?.applications?.deployed.filter(d => {
-        const conf = d?.Spec?.Labels.application;
+      $deployments?.applications?.deployed.find(d => {
+        const conf = d?.Spec?.Labels.configuration;
         if (
           conf?.repository?.organization ===
             $application.repository.organization &&
@@ -40,6 +40,7 @@
             organization: $application.repository.organization,
             branch: $application.repository.branch,
           });
+          toast.push("This repository & branch is already defined. Redirecting...");
         }
       });
       try {

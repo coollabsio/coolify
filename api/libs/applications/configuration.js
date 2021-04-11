@@ -93,4 +93,50 @@ async function updateServiceLabels (configuration) {
     }
   }
 }
-module.exports = { setDefaultConfiguration, updateServiceLabels }
+
+async function precheckDeployment ({ services, configuration }) {
+  let foundService = false
+  let configChanged = false
+  let imageChanged = false
+
+  let forceUpdate = false
+
+  for (const service of services) {
+    const running = JSON.parse(service.Spec.Labels.configuration)
+    if (running) {
+      if (running.repository.id === configuration.repository.id && running.repository.branch === configuration.repository.branch) {
+        // Base service configuration changed
+        if (!running.build.container.baseSHA || running.build.container.baseSHA !== configuration.build.container.baseSHA) {
+          configChanged = true
+        }
+        const state = await execShellAsync(`docker stack ps ${running.build.container.name} --format '{{ json . }}'`)
+        const isError = state.split('\n').filter(n => n).map(s => JSON.parse(s)).filter(n => n.DesiredState !== 'Running')
+        if (isError.length > 0) forceUpdate = true
+        foundService = true
+
+        const runningWithoutContainer = JSON.parse(JSON.stringify(running))
+        delete runningWithoutContainer.build.container
+
+        const configurationWithoutContainer = JSON.parse(JSON.stringify(configuration))
+        delete configurationWithoutContainer.build.container
+
+        // If only the configuration changed
+        if (JSON.stringify(runningWithoutContainer.build) !== JSON.stringify(configurationWithoutContainer.build) || JSON.stringify(runningWithoutContainer.publish) !== JSON.stringify(configurationWithoutContainer.publish)) configChanged = true
+        // If only the image changed
+        if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true
+        // If build pack changed, forceUpdate the service
+        if (running.build.pack !== configuration.build.pack) forceUpdate = true
+      }
+    }
+  }
+  if (forceUpdate) {
+    imageChanged = false
+    configChanged = false
+  }
+  return {
+    foundService,
+    imageChanged,
+    configChanged
+  }
+}
+module.exports = { setDefaultConfiguration, updateServiceLabels, precheckDeployment }
