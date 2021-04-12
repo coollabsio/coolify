@@ -8,7 +8,7 @@ const copyFiles = require('./deploy/copyFiles')
 const buildContainer = require('./build/container')
 const deploy = require('./deploy/deploy')
 const Deployment = require('../../models/Deployment')
-const { cleanup, purgeOldThings } = require('./cleanup')
+const { cleanupStuckedDeploymentsInDB, purgeImagesContainers } = require('./cleanup')
 const { updateServiceLabels } = require('./configuration')
 
 async function queueAndBuild (configuration, imageChanged) {
@@ -28,9 +28,9 @@ async function queueAndBuild (configuration, imageChanged) {
       { repoId: id, branch, deployId, organization, name, domain, progress: 'done' })
     await updateServiceLabels(configuration)
     cleanupTmp(workdir)
-    await purgeOldThings()
+    await purgeImagesContainers()
   } catch (error) {
-    await cleanup(configuration)
+    await cleanupStuckedDeploymentsInDB(configuration)
     cleanupTmp(workdir)
     const { type } = error.error
     if (type === 'app') {

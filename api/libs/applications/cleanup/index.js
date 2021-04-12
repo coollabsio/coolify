@@ -2,17 +2,16 @@ const { docker } = require('../../docker')
 const { execShellAsync } = require('../../common')
 const Deployment = require('../../../models/Deployment')
 
-async function purgeOldThings () {
+async function purgeImagesContainers () {
   try {
-    await docker.engine.pruneContainers()
-    await docker.engine.pruneImages()
-    // await execShellAsync('docker images --quiet --filter=dangling=true | xargs --no-run-if-empty docker rmi')
+    await execShellAsync('docker container prune')
+    await execShellAsync('docker image prune -f -a --filter=label!=coolify-reserve=true')
   } catch (error) {
     throw { error, type: 'server' }
   }
 }
 
-async function cleanup (configuration) {
+async function cleanupStuckedDeploymentsInDB (configuration) {
   const { id } = configuration.repository
   const deployId = configuration.general.deployId
   try {
@@ -39,4 +38,4 @@ async function deleteSameDeployments (configuration) {
   }
 }
 
-module.exports = { cleanup, deleteSameDeployments, purgeOldThings }
+module.exports = { cleanupStuckedDeploymentsInDB, deleteSameDeployments, purgeImagesContainers }

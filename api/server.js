@@ -2,6 +2,8 @@ require('dotenv').config()
 const fs = require('fs')
 const util = require('util')
 const { saveServerLog } = require('./libs/logging')
+const { execShellAsync } = require('./libs/common')
+const { purgeImagesContainers, cleanupStuckedDeploymentsInDB } = require('./libs/applications/cleanup')
 const Deployment = require('./models/Deployment')
 const fastify = require('fastify')({
   logger: { level: 'error' }
@@ -91,17 +93,22 @@ mongoose.connection.once('open', async function () {
   }
   // On start cleanup inprogress/queued deployments.
   try {
-    const deployments = await Deployment.find({ progress: { $in: ['queued', 'inprogress'] } })
-    for (const deployment of deployments) {
-      await Deployment.findByIdAndUpdate(deployment._id, { $set: { progress: 'failed' } })
-    }
+    await cleanupStuckedDeploymentsInDB()
   } catch (error) {
     // Could not cleanup DB 🤔
   }
   try {
-    // echo "FROM node:lts" | docker build --label coolify-reserve=true -t node:lts -
-    // echo "FROM ubuntu:20.04" | docker build --label coolify-reserve=true -t ubuntu:20.04 -
+    // Doing because I do not want to prune these images. Prune skip coolify-reserve labeled images.
+    await execShellAsync('echo "FROM node:lts" | docker build --label coolify-reserve=true -t node:lts -')
+    await execShellAsync('echo "FROM ubuntu:20.04" | docker build --label coolify-reserve=true -t ubuntu:20.04 -')
   } catch (error) {
-
+    console.log('Could not pull some basic images from Docker Hub.')
+    console.log(error)
+  }
+  try {
+    await purgeImagesContainers()
+  } catch (error) {
+    console.log('Could not purge containers/images.')
+    console.log(error)
   }
 })
