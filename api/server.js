@@ -99,8 +99,10 @@ mongoose.connection.once('open', async function () {
   }
   try {
     // Doing because I do not want to prune these images. Prune skip coolify-reserve labeled images.
-    await execShellAsync('echo "FROM node:lts" | docker build --label coolify-reserve=true -t node:lts -')
-    await execShellAsync('echo "FROM ubuntu:20.04" | docker build --label coolify-reserve=true -t ubuntu:20.04 -')
+    const basicImages = ['nginx:stable-alpine', 'node:lts', 'ubuntu:20.04']
+    for (const image of basicImages) {
+      await execShellAsync(`echo "FROM ${image}" | docker build --label coolify-reserve=true -t ${image} -`)
+    }
   } catch (error) {
     console.log('Could not pull some basic images from Docker Hub.')
     console.log(error)

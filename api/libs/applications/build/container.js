@@ -1,4 +1,4 @@
-const packs = require('../../../packs')
+const packs = require('../../../buildPacks')
 const { saveAppLog } = require('../../logging')
 const Deployment = require('../../../models/Deployment')
 

@@ -2,24 +2,24 @@ const fs = require('fs').promises
 const { buildImage } = require('../helpers')
 const { streamEvents, docker } = require('../../libs/docker')
 
-const publishStaticDocker = (configuration) => {
+const publishNodejsDocker = (configuration) => {
   return [
-    'FROM nginx:stable-alpine',
-    'COPY nginx.conf /etc/nginx/nginx.conf',
-    'WORKDIR /usr/share/nginx/html',
+    'FROM node:lts',
+    'WORKDIR /usr/src/app',
     configuration.build.command.build
       ? `COPY --from=${configuration.build.container.name}:${configuration.build.container.tag} /usr/src/app/${configuration.publish.directory} ./`
       : `COPY ${configuration.build.directory} ./`,
-    'EXPOSE 80',
-    'CMD ["nginx", "-g", "daemon off;"]'
+    configuration.build.command.installation && `RUN ${configuration.build.command.installation}`,
+    `EXPOSE ${configuration.publish.port}`,
+    `HEALTHCHECK --timeout=10s --start-period=10s CMD curl -I -s -f http://localhost:${configuration.publish.port}/ || exit 1`,
+    'CMD [ "yarn", "start" ]'
   ].join('\n')
 }
 
 module.exports = async function (configuration) {
   try {
     if (configuration.build.command.build) await buildImage(configuration)
-    await fs.writeFile(`${configuration.general.workdir}/Dockerfile`, publishStaticDocker(configuration))
-
+    await fs.writeFile(`${configuration.general.workdir}/Dockerfile`, publishNodejsDocker(configuration))
     const stream = await docker.engine.buildImage(
       { src: ['.'], context: configuration.general.workdir },
       { t: `${configuration.build.container.name}:${configuration.build.container.tag}` }
