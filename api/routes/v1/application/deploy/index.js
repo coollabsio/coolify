@@ -40,7 +40,6 @@ module.exports = async function (fastify) {
     }
     try {
       const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
-      console.log(services)
       const configuration = setDefaultConfiguration(request.body)
       await cloneRepository(configuration)
       const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment({ services, configuration })

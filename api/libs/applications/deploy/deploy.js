@@ -16,12 +16,7 @@ module.exports = async function (configuration, imageChanged) {
     // Only save SHA256 of it in the configuration label
     const baseServiceConfiguration = configuration.baseServiceConfiguration
     delete configuration.baseServiceConfiguration
-    // 'traefik.http.services.' +
-    // configuration.build.container.name +
-    // '.loadbalancer.healthcheck.path="/"',
-    // 'traefik.http.services.' +
-    // configuration.build.container.name +
-    // `.loadbalancer.healthcheck.port="${configuration.publish.port}"`,
+
     const stack = {
       version: '3.8',
       services: {
@@ -65,9 +60,9 @@ module.exports = async function (configuration, imageChanged) {
         }
       }
     }
-    console.log(JSON.stringify(stack))
     await saveAppLog('### Publishing.', configuration)
     await fs.writeFile(`${configuration.general.workdir}/stack.yml`, yaml.dump(stack))
+    console.log({ imageChanged })
     if (imageChanged) {
       // console.log('image changed')
       await execShellAsync(`docker service update --image ${configuration.build.container.name}:${configuration.build.container.tag} ${configuration.build.container.name}_${configuration.build.container.name}`)
