@@ -1,20 +1,4 @@
-FROM ubuntu:20.04 as binaries
-LABEL coolify-preserve=true
-RUN apt update && apt install -y curl gnupg2 ca-certificates
-RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-RUN echo 'deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable' >> /etc/apt/sources.list
-RUN curl -L https://github.com/a8m/envsubst/releases/download/v1.2.0/envsubst-`uname -s`-`uname -m` -o /usr/bin/envsubst
-RUN chmod +x /usr/bin/envsubst
-RUN apt update && apt install -y docker-ce-cli && apt clean all
-
-FROM node:lts as modules
-LABEL coolify-preserve=true
-COPY --from=binaries /usr/bin/docker /usr/bin/docker
-COPY --from=binaries /usr/bin/envsubst /usr/bin/envsubst
-RUN curl -f https://get.pnpm.io/v6.js | node - add --global pnpm@6
-
-FROM modules
-LABEL coolify-preserve=true
+FROM coolify-base-nodejs
 WORKDIR /usr/src/app
 COPY . .
 RUN pnpm install

@@ -1,0 +1,8 @@
+FROM ubuntu:20.04
+LABEL coolify-preserve=true
+RUN apt update && apt install -y curl gnupg2 ca-certificates
+RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+RUN echo 'deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable' >> /etc/apt/sources.list
+RUN curl -L https://github.com/a8m/envsubst/releases/download/v1.2.0/envsubst-`uname -s`-`uname -m` -o /usr/bin/envsubst
+RUN chmod +x /usr/bin/envsubst
+RUN apt update && apt install -y docker-ce-cli && apt clean all
