@@ -107,6 +107,8 @@ async function precheckDeployment ({ services, configuration }) {
     if (running) {
       if (running.repository.id === configuration.repository.id && running.repository.branch === configuration.repository.branch) {
         // Base service configuration changed
+        console.log(running.build.container.baseSHA)
+        console.log(configuration.build.container.baseSHA)
         if (!running.build.container.baseSHA || running.build.container.baseSHA !== configuration.build.container.baseSHA) {
           forceUpdate = true
         }
