@@ -17,7 +17,7 @@ function setDefaultConfiguration (configuration) {
     const sha256 = crypto.createHash('sha256').update(shaBase).digest('hex')
 
     const baseServiceConfiguration = {
-      replicas: 1,
+      replicas: 2,
       restart_policy: {
         condition: 'any',
         max_attempts: 3
