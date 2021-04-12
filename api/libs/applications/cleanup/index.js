@@ -4,10 +4,8 @@ const Deployment = require('../../../models/Deployment')
 
 async function purgeImagesContainers () {
   try {
-    // await execShellAsync('docker container prune -f')
-    // await execShellAsync('docker image prune -f --filter=label!=coolify-reserve=true')
-    // await docker.engine.pruneContainers()
-    // await docker.engine.pruneImages()
+    await execShellAsync('docker container prune -f')
+    await execShellAsync('docker image prune -f --filter=label!=coolify-reserve=true')
   } catch (error) {
     throw { error, type: 'server' }
   }
