@@ -23,14 +23,14 @@ function setDefaultConfiguration (configuration) {
         max_attempts: 3
       },
       update_config: {
-        parallelism: 2,
+        parallelism: 1,
         delay: '10s',
-        order: 'stop-first'
+        order: 'start-first'
       },
       rollback_config: {
-        parallelism: 2,
+        parallelism: 1,
         delay: '10s',
-        order: 'stop-first',
+        order: 'start-first',
         failure_action: 'rollback'
       }
     }
