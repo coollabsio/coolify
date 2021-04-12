@@ -10,7 +10,7 @@ const publishStaticDocker = (configuration) => {
     configuration.build.command.build
       ? `COPY --from=${configuration.build.container.name}:${configuration.build.container.tag} /usr/src/app/${configuration.publish.directory} ./`
       : `COPY ${configuration.build.directory} ./`,
-    'HEALTHCHECK --timeout=10s --start-period=10s CMD curl -I -s -f http://localhost/ || exit 1',
+    'HEALTHCHECK --timeout=10s --start-period=10s --interval=5s CMD curl -I -s -f http://localhost/ || exit 1',
     'EXPOSE 80',
     'CMD ["nginx", "-g", "daemon off;"]'
   ].join('\n')
