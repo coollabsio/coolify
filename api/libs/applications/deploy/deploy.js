@@ -16,7 +16,7 @@ module.exports = async function (configuration, imageChanged) {
     // Only save SHA256 of it in the configuration label
     const baseServiceConfiguration = configuration.baseServiceConfiguration
     delete configuration.baseServiceConfiguration
-
+    console.log(configuration.build.container.baseSHA)
     const stack = {
       version: '3.8',
       services: {
