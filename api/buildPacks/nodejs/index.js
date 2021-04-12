@@ -11,7 +11,7 @@ const publishNodejsDocker = (configuration) => {
       : `COPY ${configuration.build.directory} ./`,
     configuration.build.command.installation && `RUN ${configuration.build.command.installation}`,
     `EXPOSE ${configuration.publish.port}`,
-    `HEALTHCHECK --timeout=10s --start-period=10s CMD curl -I -s -f http://localhost:${configuration.publish.port}/ || exit 1`,
+    `HEALTHCHECK --timeout=10s --start-period=10s --interval=5s CMD curl -I -s -f http://localhost:${configuration.publish.port}/ || exit 1`,
     'CMD [ "yarn", "start" ]'
   ].join('\n')
 }
