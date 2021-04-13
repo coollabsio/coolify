@@ -4,11 +4,11 @@ module.exports = async function (configuration) {
     // TODO: Write full .dockerignore for all deployments!!
     if (configuration.build.pack === 'php') {
       await fs.writeFile(`${configuration.general.workdir}/.htaccess`, `
-      RewriteEngine on
-      RewriteCond %{REQUEST_FILENAME} !-f
+      RewriteEngine On
+      RewriteBase /
       RewriteCond %{REQUEST_FILENAME} !-d
-      RewriteCond $1 !^(index.php|public|css|js|robots.txt|test) 
-      RewriteRule ^(.*)$ index.php/$1 [L]
+      RewriteCond %{REQUEST_FILENAME} !-f
+      RewriteRule ^(.+)$ index.php [QSA,L]
       `)
     }
     await fs.writeFile(`${configuration.general.workdir}/.dockerignore`, 'node_modules')
