@@ -4,6 +4,7 @@ const { streamEvents, docker } = require('../../libs/docker')
 const publishPHPDocker = (configuration) => {
   return [
     'FROM php:apache',
+    'RUN a2enmod rewrite',
     'WORKDIR /usr/src/app',
     `COPY .${configuration.build.directory} /var/www/html`,
     'EXPOSE 80',
