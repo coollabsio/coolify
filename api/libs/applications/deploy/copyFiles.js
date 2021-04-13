@@ -2,6 +2,13 @@ const fs = require('fs').promises
 module.exports = async function (configuration) {
   try {
     // TODO: Write full .dockerignore for all deployments!!
+    await fs.writeFile(`${configuration.general.workdir}/.htaccess`, `
+    RewriteEngine On
+    RewriteBase /
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^(.+)$ index.php [QSA,L]
+    `)
     await fs.writeFile(`${configuration.general.workdir}/.dockerignore`, 'node_modules')
     await fs.writeFile(
       `${configuration.general.workdir}/nginx.conf`,
