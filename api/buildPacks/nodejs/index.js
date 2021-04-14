@@ -1,7 +1,7 @@
 const fs = require('fs').promises
 const { buildImage } = require('../helpers')
 const { streamEvents, docker } = require('../../libs/docker')
-
+//  `HEALTHCHECK --timeout=10s --start-period=10s --interval=5s CMD curl -I -s -f http://localhost:${configuration.publish.port}${configuration.publish.path} || exit 1`,
 const publishNodejsDocker = (configuration) => {
   return [
     'FROM node:lts',
@@ -11,7 +11,6 @@ const publishNodejsDocker = (configuration) => {
       : `COPY ${configuration.build.directory} ./`,
     configuration.build.command.installation && `RUN ${configuration.build.command.installation}`,
     `EXPOSE ${configuration.publish.port}`,
-    `HEALTHCHECK --timeout=10s --start-period=10s --interval=5s CMD curl -I -s -f http://localhost:${configuration.publish.port}/ || exit 1`,
     'CMD [ "yarn", "start" ]'
   ].join('\n')
 }

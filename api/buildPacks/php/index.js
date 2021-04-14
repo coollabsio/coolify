@@ -7,6 +7,7 @@ const publishPHPDocker = (configuration) => {
     'RUN a2enmod rewrite',
     'WORKDIR /usr/src/app',
     `COPY .${configuration.build.directory} /var/www/html`,
+    'HEALTHCHECK --timeout=10s --start-period=10s --interval=5s CMD curl -I -s -f http://localhost/ || exit 1',
     'EXPOSE 80',
     ' CMD ["apache2-foreground"]'
   ].join('\n')
