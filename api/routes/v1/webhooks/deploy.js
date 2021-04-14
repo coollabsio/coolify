@@ -33,18 +33,18 @@ module.exports = async function (fastify) {
     }
   }
   fastify.post('/', { schema: postSchema }, async (request, reply) => {
-    // const hmac = crypto.createHmac('sha256', fastify.config.GITHUP_APP_WEBHOOK_SECRET)
-    // const digest = Buffer.from('sha256=' + hmac.update(JSON.stringify(request.body)).digest('hex'), 'utf8')
-    // const checksum = Buffer.from(request.headers['x-hub-signature-256'], 'utf8')
-    // if (checksum.length !== digest.length || !crypto.timingSafeEqual(digest, checksum)) {
-    //   reply.code(500).send({ error: 'Invalid request' })
-    //   return
-    // }
+    const hmac = crypto.createHmac('sha256', fastify.config.GITHUP_APP_WEBHOOK_SECRET)
+    const digest = Buffer.from('sha256=' + hmac.update(JSON.stringify(request.body)).digest('hex'), 'utf8')
+    const checksum = Buffer.from(request.headers['x-hub-signature-256'], 'utf8')
+    if (checksum.length !== digest.length || !crypto.timingSafeEqual(digest, checksum)) {
+      reply.code(500).send({ error: 'Invalid request' })
+      return
+    }
 
-    // if (request.headers['x-github-event'] !== 'push') {
-    //   reply.code(500).send({ error: 'Not a push event.' })
-    //   return
-    // }
+    if (request.headers['x-github-event'] !== 'push') {
+      reply.code(500).send({ error: 'Not a push event.' })
+      return
+    }
     try {
       const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
 
