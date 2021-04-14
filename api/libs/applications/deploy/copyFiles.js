@@ -11,7 +11,7 @@ module.exports = async function (configuration) {
       RewriteRule ^(.+)$ index.php [QSA,L]
       `)
     }
-    await fs.writeFile(`${configuration.general.workdir}/.dockerignore`, 'node_modules')
+    // await fs.writeFile(`${configuration.general.workdir}/.dockerignore`, 'node_modules')
     if (configuration.build.pack === 'static') {
       await fs.writeFile(
         `${configuration.general.workdir}/nginx.conf`,

@@ -59,17 +59,17 @@
   <Loading />
 {:then}
   <div
-    class="text-center space-y-2 max-w-7xl mx-auto px-6"
+    class="text-center px-6"
     in:fade="{{ duration: 100 }}"
   >
     <div class="flex pt-2 space-x-4 w-full">
       <div class="w-full">
         <div class="font-bold text-left pb-2 text-xl">Application logs</div>
         {#if logs.length === 0}
-          <div class="text-xs">Waiting for the logs...</div>
+          <div class="text-xs font-semibold tracking-tighter">Waiting for the logs...</div>
         {:else}
-          <pre
-            class="text-left font-mono text-xs font-medium rounded bg-warmGray-800 text-white p-4 whitespace-pre-wrap w-full">
+        <pre
+        class="leading-4 text-left text-sm font-semibold tracking-tighter rounded-lg bg-black p-6 whitespace-pre-wrap w-full">
             {#each logs as log}
               {log + '\n'}
             {/each}
