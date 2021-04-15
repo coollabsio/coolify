@@ -2,7 +2,6 @@ require('dotenv').config()
 const { program } = require('commander')
 const shell = require('shelljs')
 const user = shell.exec('whoami', { silent: true }).stdout.replace('\n', '')
-
 program.version('0.0.1')
 program
   .option('-d, --debug', 'Debug outputs.')

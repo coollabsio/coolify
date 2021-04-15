@@ -1,4 +1,4 @@
-const packs = require('../../../packs')
+const packs = require('../../../buildPacks')
 const { saveAppLog } = require('../../logging')
 const Deployment = require('../../../models/Deployment')
 
@@ -26,9 +26,14 @@ module.exports = async function (configuration) {
       throw { error, type: 'app' }
     }
   } else {
-    await Deployment.findOneAndUpdate(
-      { repoId: id, branch, deployId, organization, name, domain },
-      { repoId: id, branch, deployId, organization, name, domain, progress: 'failed' })
+    try {
+      await Deployment.findOneAndUpdate(
+        { repoId: id, branch, deployId, organization, name, domain },
+        { repoId: id, branch, deployId, organization, name, domain, progress: 'failed' })
+    } catch (error) {
+      // Hmm.
+    }
+
     throw { error: 'No buildpack found.', type: 'app' }
   }
 }

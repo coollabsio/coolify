@@ -38,12 +38,12 @@
   <Loading />
 {:then}
   <div
-    class="text-center space-y-2 max-w-7xl mx-auto px-6"
+    class="text-center px-6"
     in:fade="{{ duration: 100 }}"
   >
-    <div class="max-w-4xl mx-auto" in:fade="{{ duration: 100 }}">
+    <div in:fade="{{ duration: 100 }}">
       <pre
-        class="text-left font-mono text-xs font-medium tracking-tighter rounded-lg bg-warmGray-800  p-4 whitespace-pre-wrap">
+        class="leading-4 text-left text-sm font-semibold tracking-tighter rounded-lg bg-black p-6 whitespace-pre-wrap">
       {#if logs.length > 0}
         {#each logs as log}
           {log + '\n'}

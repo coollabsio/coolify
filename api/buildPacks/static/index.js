@@ -2,6 +2,7 @@ const fs = require('fs').promises
 const { buildImage } = require('../helpers')
 const { streamEvents, docker } = require('../../libs/docker')
 
+//    'HEALTHCHECK --timeout=10s --start-period=10s --interval=5s CMD curl -I -s -f http://localhost/ || exit 1',
 const publishStaticDocker = (configuration) => {
   return [
     'FROM nginx:stable-alpine',
@@ -16,12 +17,16 @@ const publishStaticDocker = (configuration) => {
 }
 
 module.exports = async function (configuration) {
-  if (configuration.build.command.build) await buildImage(configuration)
-  await fs.writeFile(`${configuration.general.workdir}/Dockerfile`, publishStaticDocker(configuration))
+  try {
+    if (configuration.build.command.build) await buildImage(configuration)
+    await fs.writeFile(`${configuration.general.workdir}/Dockerfile`, publishStaticDocker(configuration))
 
-  const stream = await docker.engine.buildImage(
-    { src: ['.'], context: configuration.general.workdir },
-    { t: `${configuration.build.container.name}:${configuration.build.container.tag}` }
-  )
-  await streamEvents(stream, configuration)
+    const stream = await docker.engine.buildImage(
+      { src: ['.'], context: configuration.general.workdir },
+      { t: `${configuration.build.container.name}:${configuration.build.container.tag}` }
+    )
+    await streamEvents(stream, configuration)
+  } catch (error) {
+    throw { error, type: 'server' }
+  }
 }

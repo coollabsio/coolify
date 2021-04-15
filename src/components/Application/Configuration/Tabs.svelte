@@ -8,7 +8,7 @@
   import BuildStep from "./ActiveTab/BuildStep.svelte";
   import Secrets from "./ActiveTab/Secrets.svelte";
   import Loading from "../../Loading.svelte";
-
+  const buildPhaseActive = ["nodejs", "static"];
   let loading = false;
   onMount(async () => {
     if (!$isActive("/application/new")) {
@@ -27,8 +27,8 @@
       });
     } else {
       loading = true;
-      $deployments?.applications?.deployed.filter(d => {
-        const conf = d?.Spec?.Labels.application;
+      $deployments?.applications?.deployed.find(d => {
+        const conf = d?.Spec?.Labels.configuration;
         if (
           conf?.repository?.organization ===
             $application.repository.organization &&
@@ -40,6 +40,7 @@
             organization: $application.repository.organization,
             branch: $application.repository.branch,
           });
+          toast.push("This repository & branch is already defined. Redirecting...");
         }
       });
       try {
@@ -52,6 +53,9 @@
         const Dockerfile = dir.find(
           f => f.type === "file" && f.name === "Dockerfile",
         );
+        const CargoToml = dir.find(
+          f => f.type === "file" && f.name === "Cargo.toml",
+        );
 
         if (Dockerfile) {
           $application.build.pack = "custom";
@@ -60,7 +64,7 @@
           const { content } = await $fetch(packageJson.git_url);
           const packageJsonContent = JSON.parse(atob(content));
           const checkPackageJSONContents = dep => {
-            return(
+            return (
               packageJsonContent?.dependencies?.hasOwnProperty(dep) ||
               packageJsonContent?.devDependencies?.hasOwnProperty(dep)
             );
@@ -87,13 +91,12 @@
               ) {
                 $application.build.command.build = config.build;
               }
-              toast.push(
-                `${config.name} App detected. Default values set.`,
-              );
-            } 
- 
+              toast.push(`${config.name} App detected. Default values set.`);
+            }
           });
-
+        } else if (CargoToml) {
+          $application.build.pack = "rust";
+          toast.push(`Rust language detected. Default values set.`);
         }
       } catch (error) {
         // Nothing detected
@@ -133,7 +136,7 @@
       >
         General
       </div>
-      {#if $application.build.pack === "php"}
+      {#if !buildPhaseActive.includes($application.build.pack)}
         <div disabled class="px-3 py-2 text-warmGray-700 cursor-not-allowed">
           Build Step
         </div>
@@ -146,14 +149,19 @@
           Build Step
         </div>
       {/if}
-
-      <div
-        on:click="{() => activateTab('secrets')}"
-        class:text-green-500="{activeTab.secrets}"
-        class="px-3 py-2 cursor-pointer hover:text-green-500"
-      >
-        Secrets
-      </div>
+      {#if $application.build.pack === "custom"}
+        <div disabled class="px-3 py-2 text-warmGray-700 cursor-not-allowed">
+          Secrets
+        </div>
+      {:else}
+        <div
+          on:click="{() => activateTab('secrets')}"
+          class:text-green-500="{activeTab.secrets}"
+          class="px-3 py-2 cursor-pointer hover:text-green-500"
+        >
+          Secrets
+        </div>
+      {/if}
     </nav>
   </div>
   <div class="max-w-4xl mx-auto">

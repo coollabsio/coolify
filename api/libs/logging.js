@@ -40,13 +40,17 @@ async function saveAppLog (event, configuration, isError) {
 }
 
 async function saveServerLog ({ event, configuration, type }) {
-  if (configuration) {
-    const deployId = configuration.general.deployId
-    const repoId = configuration.repository.id
-    const branch = configuration.repository.branch
-    await new ApplicationLog({ repoId, branch, deployId, event: `[SERVER ERROR 😖]: ${event}` }).save()
+  try {
+    if (configuration) {
+      const deployId = configuration.general.deployId
+      const repoId = configuration.repository.id
+      const branch = configuration.repository.branch
+      await new ApplicationLog({ repoId, branch, deployId, event: `[SERVER ERROR 😖]: ${event}` }).save()
+    }
+    await new ServerLog({ event, type }).save()
+  } catch (error) {
+    // Hmm.
   }
-  await new ServerLog({ event, type }).save()
 }
 
 module.exports = {

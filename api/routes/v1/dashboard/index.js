@@ -42,7 +42,7 @@ module.exports = async function (fastify) {
         r.Spec.Labels.configuration = configuration
         return r
       })
-      applications = [...new Map(applications.map(item => [item.Spec.Labels.configuration.publish.domain, item])).values()]
+      applications = [...new Map(applications.map(item => [item.Spec.Labels.configuration.publish.domain + item.Spec.Labels.configuration.publish.path, item])).values()]
       return {
         serverLogs,
         applications: {
@@ -55,6 +55,8 @@ module.exports = async function (fastify) {
     } catch (error) {
       if (error.code === 'ENOENT' && error.errno === -2) {
         throw new Error(`Docker service unavailable at ${error.address}.`)
+      } else {
+        throw { error, type: 'server' }
       }
     }
   })

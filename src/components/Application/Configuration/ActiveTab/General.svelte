@@ -1,6 +1,7 @@
 <script>
   import { application} from "@store";
   import TooltipInfo from "../../../Tooltip/TooltipInfo.svelte";
+  const showPorts = ['nodejs','custom','rust']
 </script>
 
 <div>
@@ -8,7 +9,7 @@
     class="grid grid-cols-1 text-sm max-w-2xl md:mx-auto mx-6 pb-6 auto-cols-max "
   >
     <label for="buildPack"
-      >Build Pack 
+      >Build Pack
       {#if $application.build.pack === 'custom'}
       <TooltipInfo
         label="Your custom Dockerfile will be used from the root directory (or from 'Base Directory' specified below) of your repository. "
@@ -26,8 +27,13 @@
       size="large"
         label="Published as a PHP application."
       />
+      {:else if $application.build.pack === 'rust'}
+      <TooltipInfo
+      size="large"
+        label="Published as a Rust application."
+      />
       {/if}
-      
+
 </label
     >
     <select id="buildPack" bind:value="{$application.build.pack}">
@@ -35,6 +41,7 @@
       <option class="font-bold">nodejs</option>
       <option class="font-bold">php</option>
       <option class="font-bold">custom</option>
+      <option class="font-bold">rust</option>
     </select>
   </div>
   <div
@@ -66,7 +73,7 @@
         />
       </div>
     </div>
-    {#if $application.build.pack === "nodejs" || $application.build.pack === "custom"}
+    {#if showPorts.includes($application.build.pack)}
     <label for="Port" >Port</label>
     <input
       id="Port"

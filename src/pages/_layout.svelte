@@ -64,18 +64,21 @@
     }
   }
   async function checkUpgrade() {
+    latest = await window
+      .fetch(`https://get.coollabs.io/version.json`, {
+        cache: "no-cache",
+      })
+      .then(r => r.json());
     const branch =
       process.env.NODE_ENV === "production" &&
       window.location.hostname !== "test.andrasbacsai.dev"
         ? "main"
         : "next";
-    latest = await window
-      .fetch(
-        `https://raw.githubusercontent.com/coollabsio/coolify/${branch}/package.json`,
-        { cache: "no-cache" },
-      )
-      .then(r => r.json());
-    return compareVersions(latest.version, packageJson.version) === 1
+
+    return compareVersions(
+      latest.coolify[branch].version,
+      packageJson.version,
+    ) === 1
       ? true
       : false;
   }

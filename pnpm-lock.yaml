@@ -1,17 +1,18 @@
 lockfileVersion: 5.3
 
 specifiers:
+  '@iarna/toml': ^2.2.5
   '@roxi/routify': ^2.15.1
-  '@zerodevx/svelte-toast': ^0.2.0
+  '@zerodevx/svelte-toast': ^0.2.1
   axios: ^0.21.1
-  commander: ^6.2.1
+  commander: ^7.2.0
   compare-versions: ^3.6.0
   cuid: ^2.1.8
   dayjs: ^1.10.4
   deepmerge: ^4.2.2
   dockerode: ^3.2.1
   dotenv: ^8.2.0
-  fastify: ^3.14.1
+  fastify: ^3.14.2
   fastify-env: ^2.1.0
   fastify-jwt: ^2.4.0
   fastify-plugin: ^3.0.0
@@ -33,24 +34,25 @@ specifiers:
   standard: ^16.0.3
   svelte: ^3.37.0
   svelte-hmr: ^0.14.0
-  svelte-preprocess: ^4.6.1
+  svelte-preprocess: ^4.7.0
   svelte-select: ^3.17.0
   svite: 0.8.1
   tailwindcss: 2.1.1
   unique-names-generator: ^4.4.0
 
 dependencies:
+  '@iarna/toml': 2.2.5
   '@roxi/routify': 2.15.1
-  '@zerodevx/svelte-toast': 0.2.0
+  '@zerodevx/svelte-toast': 0.2.1
   axios: 0.21.1
-  commander: 6.2.1
+  commander: 7.2.0
   compare-versions: 3.6.0
   cuid: 2.1.8
   dayjs: 1.10.4
   deepmerge: 4.2.2
   dockerode: 3.2.1
   dotenv: 8.2.0
-  fastify: 3.14.1
+  fastify: 3.14.2
   fastify-env: 2.1.0
   fastify-jwt: 2.4.0
   fastify-plugin: 3.0.0
@@ -76,7 +78,7 @@ devDependencies:
   standard: 16.0.3
   svelte: 3.37.0
   svelte-hmr: 0.14.0_svelte@3.37.0
-  svelte-preprocess: 4.6.9_fa8d64e4f515eee295d8f0f45fceadd2
+  svelte-preprocess: 4.7.0_fa8d64e4f515eee295d8f0f45fceadd2
   svite: 0.8.1_d334b093211aa94b4e678204453b11ae
   tailwindcss: 2.1.1_postcss@8.2.9
 
@@ -154,6 +156,10 @@ packages:
     dependencies:
       purgecss: 3.1.3
     dev: true
+
+  /@iarna/toml/2.2.5:
+    resolution: {integrity: sha512-trnsAYxU3xnS1gPHPyU961coFyLkh4gAD/0zQ5mymY4yOZ+CYvsPqUbOFSw0aDM4y0tV7tiFxL/1XfXPNC6IPg==}
+    dev: false
 
   /@koa/cors/3.1.0:
     resolution: {integrity: sha512-7ulRC1da/rBa6kj6P4g2aJfnET3z8Uf3SWu60cjbtxTA5g8lxRdX/Bd2P92EagGwwAhANeNw8T8if99rJliR6Q==}
@@ -553,8 +559,8 @@ packages:
     resolution: {integrity: sha512-dn5FyfSc4ky424jH4FntiHno7Ss5yLkqKNmM/NXwANRnlkmqu74pnGetexDFVG5phMk9/FhwovUZCWGxsotVKg==}
     dev: true
 
-  /@zerodevx/svelte-toast/0.2.0:
-    resolution: {integrity: sha512-zfnu02ZwAxpXfiqvAIZY97+Bv2hsBJ2fJlK/CVxliVu/+1I/R/z5Deo2BUtaLWmKAZX29FtFN9IBjF9hmPHQTA==}
+  /@zerodevx/svelte-toast/0.2.1:
+    resolution: {integrity: sha512-3yOusE+/xDaVNxkBJwbxDZea5ePQ77B15tbHv6ZlSYtlJu0u0PDhGMu8eoI+SmcCt4j+2sf0A1uS9+LcBIqUgg==}
     dev: false
 
   /abab/2.0.5:
@@ -1167,6 +1173,7 @@ packages:
   /commander/6.2.1:
     resolution: {integrity: sha512-U7VdrJFnJgo4xjrHpTzu0yrHPGImdsmD95ZlgYSEajAn2JKzDhDTPG9kBTefmObL2w/ngeZnilk+OV9CG3d7UA==}
     engines: {node: '>= 6'}
+    dev: true
 
   /commander/7.2.0:
     resolution: {integrity: sha512-QrWXB+ZQSVPmIWIhtEO9H+gwHaMGYiF5ChvoJ+K9ZGHG/sVsa6yiesAD1GC/x46sET00Xlwo1u49RVVVzvcSkw==}
@@ -2163,8 +2170,8 @@ packages:
     resolution: {integrity: sha512-s1EQguBw/9qtc1p/WTY4eq9WMRIACkj+HTcOIK1in4MV5aFaQC9ZCIt0dJ7pr5bIf4lPpHvAtP2ywpTNgs7hqw==}
     dev: false
 
-  /fastify/3.14.1:
-    resolution: {integrity: sha512-9hoK1vvopsUJnUJpge90t8PZIqNQhGM54yDrd2veCZLkxh8eipnaHrXe2+f7tIt6UScUZ92JZQavxFGB4HX7xA==}
+  /fastify/3.14.2:
+    resolution: {integrity: sha512-/PY//7gJnGxLQORaRHCEW148vpFKFpBIQNz1Yo/DxbHuk5EQqK2comzyE2ug8FSEldDX8nleapTshl0m78Px2w==}
     engines: {node: '>=10.16.0'}
     dependencies:
       '@fastify/proxy-addr': 3.0.0
@@ -5723,6 +5730,57 @@ packages:
 
   /svelte-preprocess/4.6.9_fa8d64e4f515eee295d8f0f45fceadd2:
     resolution: {integrity: sha512-SROWH0rB0DJ+0Ii264cprmNu/NJyZacs5wFD71ya93Cg/oA2lKHgQm4F6j0EWA4ktFMzeuJJm/eX6fka39hEHA==}
+    engines: {node: '>= 9.11.2'}
+    requiresBuild: true
+    peerDependencies:
+      '@babel/core': ^7.10.2
+      coffeescript: ^2.5.1
+      less: ^3.11.3
+      node-sass: '*'
+      postcss: ^7 || ^8
+      postcss-load-config: ^2.1.0 || ^3.0.0
+      pug: ^3.0.0
+      sass: ^1.26.8
+      stylus: ^0.54.7
+      sugarss: ^2.0.0
+      svelte: ^3.23.0
+      typescript: ^3.9.5 || ^4.0.0
+    peerDependenciesMeta:
+      '@babel/core':
+        optional: true
+      coffeescript:
+        optional: true
+      less:
+        optional: true
+      node-sass:
+        optional: true
+      postcss:
+        optional: true
+      postcss-load-config:
+        optional: true
+      pug:
+        optional: true
+      sass:
+        optional: true
+      stylus:
+        optional: true
+      sugarss:
+        optional: true
+      typescript:
+        optional: true
+    dependencies:
+      '@types/pug': 2.0.4
+      '@types/sass': 1.16.0
+      detect-indent: 6.0.0
+      postcss: 8.2.9
+      postcss-load-config: 3.0.1
+      strip-indent: 3.0.0
+      svelte: 3.37.0
+    dev: true
+    optional: true
+
+  /svelte-preprocess/4.7.0_fa8d64e4f515eee295d8f0f45fceadd2:
+    resolution: {integrity: sha512-iNrY4YGqi0LD2e6oT9YbdSzOKntxk8gmzfqso1z/lUJOZh4o6fyIqkirmiZ8/dDJFqtIE1spVgDFWgkfhLEYlw==}
     engines: {node: '>= 9.11.2'}
     requiresBuild: true
     peerDependencies:

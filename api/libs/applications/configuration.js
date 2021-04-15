@@ -1,7 +1,7 @@
 const { uniqueNamesGenerator, adjectives, colors, animals } = require('unique-names-generator')
 const cuid = require('cuid')
 const crypto = require('crypto')
-
+const { docker } = require('../docker')
 const { execShellAsync } = require('../common')
 
 function getUniq () {
@@ -30,7 +30,8 @@ function setDefaultConfiguration (configuration) {
       rollback_config: {
         parallelism: 1,
         delay: '10s',
-        order: 'start-first'
+        order: 'start-first',
+        failure_action: 'rollback'
       }
     }
 
@@ -48,11 +49,18 @@ function setDefaultConfiguration (configuration) {
         configuration.publish.port = 80
       } else if (configuration.build.pack === 'nodejs') {
         configuration.publish.port = 3000
+      } else if (configuration.build.pack === 'rust') {
+        configuration.publish.port = 3000
       }
     }
+
     if (!configuration.build.directory) {
       configuration.build.directory = '/'
     }
+    if (!configuration.publish.directory) {
+      configuration.publish.directory = '/'
+    }
+
     if (configuration.build.pack === 'static' || configuration.build.pack === 'nodejs') {
       if (!configuration.build.command.installation) configuration.build.command.installation = 'yarn install'
     }
@@ -66,8 +74,9 @@ function setDefaultConfiguration (configuration) {
   }
 }
 
-async function updateServiceLabels (configuration, services) {
+async function updateServiceLabels (configuration) {
   // In case of any failure during deployment, still update the current configuration.
+  const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
   const found = services.find(s => {
     const config = JSON.parse(s.Spec.Labels.configuration)
     if (config.repository.id === configuration.repository.id && config.repository.branch === configuration.repository.branch) {
@@ -79,10 +88,58 @@ async function updateServiceLabels (configuration, services) {
     const { ID } = found
     try {
       const Labels = { ...JSON.parse(found.Spec.Labels.configuration), ...configuration }
-      execShellAsync(`docker service update --label-add configuration='${JSON.stringify(Labels)}' --label-add com.docker.stack.image='${configuration.build.container.name}:${configuration.build.container.tag}' ${ID}`)
+      await execShellAsync(`docker service update --label-add configuration='${JSON.stringify(Labels)}' --label-add com.docker.stack.image='${configuration.build.container.name}:${configuration.build.container.tag}' ${ID}`)
     } catch (error) {
       console.log(error)
     }
   }
 }
-module.exports = { setDefaultConfiguration, updateServiceLabels }
+
+async function precheckDeployment ({ services, configuration }) {
+  let foundService = false
+  let configChanged = false
+  let imageChanged = false
+
+  let forceUpdate = false
+
+  for (const service of services) {
+    const running = JSON.parse(service.Spec.Labels.configuration)
+    if (running) {
+      if (running.repository.id === configuration.repository.id && running.repository.branch === configuration.repository.branch) {
+        // Base service configuration changed
+        if (!running.build.container.baseSHA || running.build.container.baseSHA !== configuration.build.container.baseSHA) {
+          forceUpdate = true
+        }
+        // If the deployment is in error state, forceUpdate
+        const state = await execShellAsync(`docker stack ps ${running.build.container.name} --format '{{ json . }}'`)
+        const isError = state.split('\n').filter(n => n).map(s => JSON.parse(s)).filter(n => n.DesiredState !== 'Running' && n.Image.split(':')[1] === running.build.container.tag)
+        if (isError.length > 0) forceUpdate = true
+        foundService = true
+
+        const runningWithoutContainer = JSON.parse(JSON.stringify(running))
+        delete runningWithoutContainer.build.container
+
+        const configurationWithoutContainer = JSON.parse(JSON.stringify(configuration))
+        delete configurationWithoutContainer.build.container
+
+        // If only the configuration changed
+        if (JSON.stringify(runningWithoutContainer.build) !== JSON.stringify(configurationWithoutContainer.build) || JSON.stringify(runningWithoutContainer.publish) !== JSON.stringify(configurationWithoutContainer.publish)) configChanged = true
+        // If only the image changed
+        if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true
+        // If build pack changed, forceUpdate the service
+        if (running.build.pack !== configuration.build.pack) forceUpdate = true
+      }
+    }
+  }
+  if (forceUpdate) {
+    imageChanged = false
+    configChanged = false
+  }
+  return {
+    foundService,
+    imageChanged,
+    configChanged,
+    forceUpdate
+  }
+}
+module.exports = { setDefaultConfiguration, updateServiceLabels, precheckDeployment }

@@ -25,7 +25,7 @@ module.exports = async function (fastify) {
         settings
       }
     } catch (error) {
-      throw new Error(error)
+      throw { error, type: 'server' }
     }
   })
 
@@ -38,7 +38,7 @@ module.exports = async function (fastify) {
       ).select('-_id -__v')
       reply.code(201).send({ settings })
     } catch (error) {
-      throw new Error(error)
+      throw { error, type: 'server' }
     }
   })
 }

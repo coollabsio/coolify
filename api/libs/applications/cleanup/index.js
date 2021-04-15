@@ -2,17 +2,16 @@ const { docker } = require('../../docker')
 const { execShellAsync } = require('../../common')
 const Deployment = require('../../../models/Deployment')
 
-async function purgeOldThings () {
+async function purgeImagesContainers () {
   try {
-    // TODO: Tweak this, because it deletes coolify-base, so the upgrade will be slow
-    await docker.engine.pruneImages()
-    await docker.engine.pruneContainers()
+    await execShellAsync('docker container prune -f')
+    await execShellAsync('docker image prune -f --filter=label!=coolify-reserve=true')
   } catch (error) {
     throw { error, type: 'server' }
   }
 }
 
-async function cleanup (configuration) {
+async function cleanupStuckedDeploymentsInDB (configuration) {
   const { id } = configuration.repository
   const deployId = configuration.general.deployId
   try {
@@ -39,4 +38,4 @@ async function deleteSameDeployments (configuration) {
   }
 }
 
-module.exports = { cleanup, deleteSameDeployments, purgeOldThings }
+module.exports = { cleanupStuckedDeploymentsInDB, deleteSameDeployments, purgeImagesContainers }

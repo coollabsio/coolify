@@ -8,10 +8,10 @@ const copyFiles = require('./deploy/copyFiles')
 const buildContainer = require('./build/container')
 const deploy = require('./deploy/deploy')
 const Deployment = require('../../models/Deployment')
-const { cleanup, purgeOldThings } = require('./cleanup')
+const { cleanupStuckedDeploymentsInDB, purgeImagesContainers } = require('./cleanup')
 const { updateServiceLabels } = require('./configuration')
 
-async function queueAndBuild (configuration, services, configChanged, imageChanged) {
+async function queueAndBuild (configuration, imageChanged) {
   const { id, organization, name, branch } = configuration.repository
   const { domain } = configuration.publish
   const { deployId, nickname, workdir } = configuration.general
@@ -22,15 +22,15 @@ async function queueAndBuild (configuration, services, configChanged, imageChang
     await saveAppLog(`${dayjs().format('YYYY-MM-DD HH:mm:ss.SSS')} Queued.`, configuration)
     await copyFiles(configuration)
     await buildContainer(configuration)
-    await deploy(configuration, configChanged, imageChanged)
+    await deploy(configuration, imageChanged)
     await Deployment.findOneAndUpdate(
       { repoId: id, branch, deployId, organization, name, domain },
       { repoId: id, branch, deployId, organization, name, domain, progress: 'done' })
-    await updateServiceLabels(configuration, services)
+    await updateServiceLabels(configuration)
     cleanupTmp(workdir)
-    await purgeOldThings()
+    await purgeImagesContainers()
   } catch (error) {
-    await cleanup(configuration)
+    await cleanupStuckedDeploymentsInDB(configuration)
     cleanupTmp(workdir)
     const { type } = error.error
     if (type === 'app') {

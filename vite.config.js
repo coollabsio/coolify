@@ -26,7 +26,8 @@ module.exports = {
       '@zerodevx/svelte-toast',
       'mongodb-memory-server-core',
       'unique-names-generator',
-      'generate-password'
+      'generate-password',
+      '@iarna/toml'
     ]
   },
   proxy: {
