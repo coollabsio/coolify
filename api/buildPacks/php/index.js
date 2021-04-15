@@ -1,13 +1,12 @@
 const fs = require('fs').promises
 const { streamEvents, docker } = require('../../libs/docker')
-
+//   'HEALTHCHECK --timeout=10s --start-period=10s --interval=5s CMD curl -I -s -f http://localhost/ || exit 1',
 const publishPHPDocker = (configuration) => {
   return [
     'FROM php:apache',
     'RUN a2enmod rewrite',
     'WORKDIR /usr/src/app',
     `COPY .${configuration.build.directory} /var/www/html`,
-    'HEALTHCHECK --timeout=10s --start-period=10s --interval=5s CMD curl -I -s -f http://localhost/ || exit 1',
     'EXPOSE 80',
     ' CMD ["apache2-foreground"]'
   ].join('\n')
