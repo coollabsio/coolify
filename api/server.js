@@ -12,6 +12,7 @@ const fastify = require('fastify')({
     level: 'error'
   }
 })
+fastify.register(require('../api/libs/http-error'))
 
 const { schema } = require('./schema')
 
@@ -37,7 +38,7 @@ if (process.env.NODE_ENV === 'production') {
     root: path.join(__dirname, '../public/')
   })
 }
-fastify.register(require('fastify-http-errors-enhanced'))
+
 fastify.register(require('./app'), { prefix: '/api/v1' })
 
 if (process.env.NODE_ENV === 'production') {

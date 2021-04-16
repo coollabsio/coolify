@@ -27,7 +27,9 @@ module.exports = {
       'mongodb-memory-server-core',
       'unique-names-generator',
       'generate-password',
-      '@iarna/toml'
+      '@iarna/toml',
+      'http-errors-enhanced',
+      'ajv'
     ]
   },
   proxy: {

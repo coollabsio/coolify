@@ -46,7 +46,7 @@ module.exports = async function (fastify) {
         return
       }
 
-      reply.code(201).send({ message: 'Deployment queued.', nickname: configuration.general.nickname, name: configuration.build.container.name })
+      reply.code(201).send({ message: 'Deployment queued.', nickname: configuration.general.nickname, name: configuration.build.container.name, deployId: configuration.general.deployId })
       await queueAndBuild(configuration, imageChanged)
     } catch (error) {
       const { id, organization, name, branch } = configuration.repository
@@ -59,9 +59,10 @@ module.exports = async function (fastify) {
       if (error.name === 'Error') {
         // Error during runtime
         await new ApplicationLog({ repoId: id, branch, deployId, event: `[ERROR 😖]: ${error.stack}` }).save()
-      } else {
+      } else if (error.name) {
         // Error in my code
-        if (error.message && error.stack) await new ServerLog({ message: error.message, stack: error.stack, type: 'spaghetticode' }).save()
+        const payload = { message: error.message, stack: error.stack, type: 'spaghetticode' }
+        if (error.message && error.stack) await new ServerLog(payload).save()
         if (reply.sent) await new ApplicationLog({ repoId: id, branch, deployId, event: `[ERROR 😖]: ${error.stack}` }).save()
       }
       throw new Error(error)
