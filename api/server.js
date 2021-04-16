@@ -4,7 +4,6 @@ const util = require('util')
 const { saveServerLog } = require('./libs/logging')
 const { execShellAsync } = require('./libs/common')
 const { purgeImagesContainers, cleanupStuckedDeploymentsInDB } = require('./libs/applications/cleanup')
-const Deployment = require('./models/Deployment')
 const fastify = require('fastify')({
   logger: {
     level: 'error'
