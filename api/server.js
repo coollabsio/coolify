@@ -86,7 +86,6 @@ mongoose.connection.once('open', async function () {
   try {
     const { main } = (await axios.get('https://get.coollabs.io/version.json')).data.coolify
     if (main.clearServerLogs) {
-      console.log('clearing db')
       await mongoose.connection.db.dropCollection('logs-servers')
     }
   } catch (error) {

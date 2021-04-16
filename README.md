@@ -12,6 +12,7 @@ https://andrasbacsai.com/farewell-netlify-and-heroku-after-3-days-of-coding
 - User analytics with privacy in mind.
 - And much more (see [Roadmap](https://github.com/coollabsio/coolify/projects/1)).
 
+
 # FAQ
 Q: What is a buildpack?
 
