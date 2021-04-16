@@ -1,4 +1,4 @@
-FROM node:lts as installed
+FROM node:lts
 WORKDIR /usr/src/app
 RUN curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-20.10.6.tgz | tar -xzvf - docker/docker -C . --strip-components 1
 RUN mv /usr/src/app/docker /usr/bin/docker
@@ -9,13 +9,6 @@ RUN curl -f https://get.pnpm.io/v6.js | node - add --global pnpm
 LABEL coolify-preserve=true
 COPY ./*package.json .
 RUN pnpm install
-
-FROM installed
-LABEL coolify-preserve=true
-WORKDIR /usr/src/app
-COPY --from=installed /usr/bin/docker /usr/bin/docker
-COPY --from=installed /usr/bin/envsubst /usr/bin/envsubst
-COPY --from=installed /usr/bin/jq /usr/bin/jq
 COPY . .
 RUN pnpm build
 CMD ["pnpm", "start"]
