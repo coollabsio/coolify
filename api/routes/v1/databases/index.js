@@ -165,7 +165,7 @@ module.exports = async function (fastify) {
               `cat ${configuration.general.workdir}/stack.yml | docker stack deploy -c - ${configuration.general.deployId}`
       )
     } catch (error) {
-      throw { error, type: 'server' }
+      throw new Error(error)
     }
   })
 

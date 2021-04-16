@@ -1,10 +1,12 @@
 const ApplicationLog = require('../models/Logs/Application')
-const ServerLog = require('../models/Logs/Server')
 const dayjs = require('dayjs')
-
 function generateTimestamp () {
   return `${dayjs().format('YYYY-MM-DD HH:mm:ss.SSS')} `
 }
+const patterns = [
+  '[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)',
+  '(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-ntqry=><~]))'
+].join('|')
 
 async function saveAppLog (event, configuration, isError) {
   try {
@@ -12,25 +14,12 @@ async function saveAppLog (event, configuration, isError) {
     const repoId = configuration.repository.id
     const branch = configuration.repository.branch
     if (isError) {
-      // console.log(event, config, isError)
-      let clearedEvent = null
-
-      if (event.error) clearedEvent = '[ERROR] ' + generateTimestamp() + event.error.replace(/(\r\n|\n|\r)/gm, '')
-      else if (event) clearedEvent = '[ERROR] ' + generateTimestamp() + event.replace(/(\r\n|\n|\r)/gm, '')
-
-      try {
-        await new ApplicationLog({ repoId, branch, deployId, event: clearedEvent }).save()
-      } catch (error) {
-        console.log(error)
-      }
+      const clearedEvent = '[ERROR 😱] ' + generateTimestamp() + event.replace(new RegExp(patterns, 'g'), '').replace(/(\r\n|\n|\r)/gm, '')
+      await new ApplicationLog({ repoId, branch, deployId, event: clearedEvent }).save()
     } else {
       if (event && event !== '\n') {
-        const clearedEvent = '[INFO] ' + generateTimestamp() + event.replace(/(\r\n|\n|\r)/gm, '')
-        try {
-          await new ApplicationLog({ repoId, branch, deployId, event: clearedEvent }).save()
-        } catch (error) {
-          console.log(error)
-        }
+        const clearedEvent = '[INFO] ' + generateTimestamp() + event.replace(new RegExp(patterns, 'g'), '').replace(/(\r\n|\n|\r)/gm, '')
+        await new ApplicationLog({ repoId, branch, deployId, event: clearedEvent }).save()
       }
     }
   } catch (error) {
@@ -39,21 +28,6 @@ async function saveAppLog (event, configuration, isError) {
   }
 }
 
-async function saveServerLog ({ event, configuration, type }) {
-  try {
-    if (configuration) {
-      const deployId = configuration.general.deployId
-      const repoId = configuration.repository.id
-      const branch = configuration.repository.branch
-      await new ApplicationLog({ repoId, branch, deployId, event: `[SERVER ERROR 😖]: ${event}` }).save()
-    }
-    await new ServerLog({ event, type }).save()
-  } catch (error) {
-    // Hmm.
-  }
-}
-
 module.exports = {
-  saveAppLog,
-  saveServerLog
+  saveAppLog
 }

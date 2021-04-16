@@ -6,16 +6,19 @@ const { execShellAsync } = require('./libs/common')
 const { purgeImagesContainers, cleanupStuckedDeploymentsInDB } = require('./libs/applications/cleanup')
 const Deployment = require('./models/Deployment')
 const fastify = require('fastify')({
-  logger: { level: 'error' }
+  logger: {
+    level: 'error'
+  }
 })
+fastify.register(require('fastify-http-errors-enhanced'))
 const mongoose = require('mongoose')
 const path = require('path')
 const { schema } = require('./schema')
-
-process.on('unhandledRejection', (reason, p) => {
-  console.log(reason)
-  console.log(p)
-})
+//
+// process.on('unhandledRejection', (reason, p) => {
+//   console.log(reason)
+//   console.log(p)
+// })
 fastify.register(require('fastify-env'), {
   schema,
   dotenv: true
@@ -36,18 +39,6 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 fastify.register(require('./app'), { prefix: '/api/v1' })
-fastify.setErrorHandler(async (error, request, reply) => {
-  if (error.statusCode) {
-    reply.status(error.statusCode).send({ message: error.message } || { message: 'Something is NOT okay. Are you okay?' })
-  } else {
-    reply.status(500).send({ message: error.message } || { message: 'Something is NOT okay. Are you okay?' })
-  }
-  try {
-    await saveServerLog({ event: error })
-  } catch (error) {
-    //
-  }
-})
 
 if (process.env.NODE_ENV === 'production') {
   mongoose.connect(

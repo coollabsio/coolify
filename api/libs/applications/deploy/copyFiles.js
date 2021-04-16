@@ -59,6 +59,6 @@ module.exports = async function (configuration) {
       )
     }
   } catch (error) {
-    throw { error, type: 'server' }
+    throw new Error(error)
   }
 }

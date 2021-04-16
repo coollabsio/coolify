@@ -8,7 +8,7 @@ module.exports = async function (fastify) {
         serverLogs
       }
     } catch (error) {
-      throw { error, type: 'server' }
+      throw new Error(error)
     }
   })
 }

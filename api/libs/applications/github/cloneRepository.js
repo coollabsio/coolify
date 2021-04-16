@@ -15,30 +15,24 @@ module.exports = async function (configuration) {
     iss: parseInt(github.app.id)
   }
 
-  try {
-    const jwtToken = jwt.sign(payload, githubPrivateKey, {
-      algorithm: 'RS256'
-    })
-    const accessToken = await axios({
-      method: 'POST',
-      url: `https://api.github.com/app/installations/${github.installation.id}/access_tokens`,
-      data: {},
-      headers: {
-        Authorization: 'Bearer ' + jwtToken,
-        Accept: 'application/vnd.github.machine-man-preview+json'
-      }
-    })
-    await execShellAsync(
+  const jwtToken = jwt.sign(payload, githubPrivateKey, {
+    algorithm: 'RS256'
+  })
+  const accessToken = await axios({
+    method: 'POST',
+    url: `https://api.github.com/app/installations/${github.installation.id}/access_tokens`,
+    data: {},
+    headers: {
+      Authorization: 'Bearer ' + jwtToken,
+      Accept: 'application/vnd.github.machine-man-preview+json'
+    }
+  })
+  await execShellAsync(
       `mkdir -p ${workdir} && git clone -q -b ${branch} https://x-access-token:${accessToken.data.token}@github.com/${organization}/${name}.git ${workdir}/`
-    )
-    configuration.build.container.tag = (
-      await execShellAsync(`cd ${configuration.general.workdir}/ && git rev-parse HEAD`)
-    )
-      .replace('\n', '')
-      .slice(0, 7)
-  } catch (error) {
-    cleanupTmp(workdir)
-    if (error.stack) console.log(error.stack)
-    throw { error, type: 'server' }
-  }
+  )
+  configuration.build.container.tag = (
+    await execShellAsync(`cd ${configuration.general.workdir}/ && git rev-parse HEAD`)
+  )
+    .replace('\n', '')
+    .slice(0, 7)
 }

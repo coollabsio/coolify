@@ -111,8 +111,7 @@ module.exports = async function (fastify) {
         return
       }
     } catch (error) {
-      console.log(error)
-      reply.code(500).send({ success: false, error: error.message })
+      throw new Error(error)
     }
   })
   fastify.get('/success', async (request, reply) => {
