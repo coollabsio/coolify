@@ -1,17 +1,21 @@
 require('dotenv').config()
 const fs = require('fs')
 const util = require('util')
+const axios = require('axios')
+const mongoose = require('mongoose')
+const path = require('path')
 const { saveServerLog } = require('./libs/logging')
 const { execShellAsync } = require('./libs/common')
 const { purgeImagesContainers, cleanupStuckedDeploymentsInDB } = require('./libs/applications/cleanup')
+const Server = require('./models/Logs/Server')
 const fastify = require('fastify')({
   logger: {
     level: 'error'
   }
 })
+
 fastify.register(require('fastify-http-errors-enhanced'))
-const mongoose = require('mongoose')
-const path = require('path')
+
 const { schema } = require('./schema')
 
 process.on('unhandledRejection', async (reason, p) => {
@@ -80,6 +84,15 @@ mongoose.connection.once('open', async function () {
 
     fastify.listen(3001)
     console.log('Coolify API is up and running in development.')
+  }
+  try {
+    const { main } = (await axios.get('https://get.coollabs.io/version.json')).data.coolify
+    if (main.clearServerLogs) {
+      console.log('clearing db')
+      await mongoose.connection.db.dropCollection('logs-servers')
+    }
+  } catch (error) {
+    // Could not cleanup logs-servers collection
   }
   // On start cleanup inprogress/queued deployments.
   try {
