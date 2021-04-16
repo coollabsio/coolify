@@ -1,6 +1,7 @@
 const fs = require('fs').promises
 module.exports = async function (configuration) {
   try {
+    cu
     // TODO: Write full .dockerignore for all deployments!!
     if (configuration.build.pack === 'php') {
       await fs.writeFile(`${configuration.general.workdir}/.htaccess`, `
