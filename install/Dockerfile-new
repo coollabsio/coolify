@@ -8,17 +8,19 @@ RUN curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -
 RUN chmod +x /usr/bin/envsubst /usr/bin/jq
 RUN apt update && apt install -y docker-ce-cli && apt clean all
 
-FROM node:lts
+FROM node:lts as installed
 WORKDIR /usr/src/app
 LABEL coolify-preserve=true
+COPY ./*package.json .
+RUN yarn install
+
+FROM installed
+WORKDIR /usr/src/app
 COPY --from=binaries /usr/bin/docker /usr/bin/docker
 COPY --from=binaries /usr/bin/envsubst /usr/bin/envsubst
 COPY --from=binaries /usr/bin/jq /usr/bin/jq
+LABEL coolify-preserve=true
 COPY . .
-RUN curl -f https://get.pnpm.io/v6.js | node - add --global pnpm@6
-RUN pnpm install
-RUN pnpm build
-RUN rm -fr node_modules .pnpm-store
-RUN pnpm install -P
-CMD ["pnpm", "start"]
+RUN yarn build
+CMD ["yarn", "start"]
 EXPOSE 3000
