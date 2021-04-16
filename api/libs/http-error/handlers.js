@@ -6,10 +6,10 @@ const http_errors_enhanced_1 = require("http-errors-enhanced");
 const interfaces_1 = require("./interfaces");
 const utils_1 = require("./utils");
 const validation_1 = require("./validation");
-// function handleNotFoundError(request, reply) {
-//     handleErrors(new http_errors_enhanced_1.NotFoundError('Not found.'), request, reply);
-// }
-//exports.handleNotFoundError = handleNotFoundError;
+function handleNotFoundError(request, reply) {
+    handleErrors(new http_errors_enhanced_1.NotFoundError('Not found.'), request, reply);
+}
+exports.handleNotFoundError = handleNotFoundError;
 function handleValidationError(error, request) {
     /*
       As seen in https://github.com/fastify/fastify/blob/master/lib/validation.js

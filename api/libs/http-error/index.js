@@ -41,7 +41,7 @@ exports.plugin = fastify_plugin_1.default(function (instance, options, done) {
         request[interfaces_1.kHttpErrorsEnhancedConfiguration] = configuration;
     });
     instance.setErrorHandler(handlers_1.handleErrors);
-    instance.setNotFoundHandler(handlers_1.handleNotFoundError);
+    // instance.setNotFoundHandler(handlers_1.handleNotFoundError);
     if (convertResponsesValidationErrors) {
         instance.decorate(interfaces_1.kHttpErrorsEnhancedResponseValidations, []);
         instance.addHook('onRoute', validation_1.addResponseValidation);
