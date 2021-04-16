@@ -5,10 +5,8 @@ const ServerLog = require('../../../../models/Logs/Server')
 const { verifyUserId, cleanupTmp } = require('../../../../libs/common')
 const { queueAndBuild } = require('../../../../libs/applications')
 const { setDefaultConfiguration, precheckDeployment } = require('../../../../libs/applications/configuration')
-const { cleanupStuckedDeploymentsInDB } = require('../../../../libs/applications/cleanup')
 const { docker } = require('../../../../libs/docker')
 const cloneRepository = require('../../../../libs/applications/github/cloneRepository')
-const { saveServerLog, saveAppLog } = require('../../../../libs/logging')
 
 module.exports = async function (fastify) {
   fastify.post('/', async (request, reply) => {

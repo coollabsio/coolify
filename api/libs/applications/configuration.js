@@ -82,12 +82,8 @@ async function updateServiceLabels (configuration) {
   })
   if (found) {
     const { ID } = found
-    try {
-      const Labels = { ...JSON.parse(found.Spec.Labels.configuration), ...configuration }
-      await execShellAsync(`docker service update --label-add configuration='${JSON.stringify(Labels)}' --label-add com.docker.stack.image='${configuration.build.container.name}:${configuration.build.container.tag}' ${ID}`)
-    } catch (error) {
-      console.log(error)
-    }
+    const Labels = { ...JSON.parse(found.Spec.Labels.configuration), ...configuration }
+    await execShellAsync(`docker service update --label-add configuration='${JSON.stringify(Labels)}' --label-add com.docker.stack.image='${configuration.build.container.name}:${configuration.build.container.tag}' ${ID}`)
   }
 }
 
