@@ -89,7 +89,7 @@ mongoose.connection.once('open', async function () {
     // Could not cleanup DB 🤔
   }
   try {
-    // Doing because I do not want to prune these images. Prune skip coolify-reserve labeled images.
+    // Doing because I do not want to prune these images. Prune skips coolify-reserve labeled images.
     const basicImages = ['nginx:stable-alpine', 'node:lts', 'ubuntu:20.04', 'php:apache', 'rust:latest']
     for (const image of basicImages) {
       await execShellAsync(`echo "FROM ${image}" | docker build --label coolify-reserve=true -t ${image} -`)
