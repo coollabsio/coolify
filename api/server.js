@@ -13,8 +13,6 @@ const fastify = require('fastify')({
   }
 })
 
-fastify.register(require('fastify-http-errors-enhanced'))
-
 const { schema } = require('./schema')
 
 process.on('unhandledRejection', async (reason, p) => {
@@ -31,15 +29,15 @@ if (process.env.NODE_ENV === 'production') {
     root: path.join(__dirname, '../dist/')
   })
 
-  // fastify.setNotFoundHandler(function (request, reply) {
-  //   reply.sendFile('index.html')
-  // })
+  fastify.setNotFoundHandler(function (request, reply) {
+    reply.sendFile('index.html')
+  })
 } else {
   fastify.register(require('fastify-static'), {
     root: path.join(__dirname, '../public/')
   })
 }
-
+fastify.register(require('fastify-http-errors-enhanced'))
 fastify.register(require('./app'), { prefix: '/api/v1' })
 
 if (process.env.NODE_ENV === 'production') {
