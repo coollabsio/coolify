@@ -19,7 +19,6 @@ async function queueAndBuild (configuration, imageChanged) {
   }).save()
   await saveAppLog(`${dayjs().format('YYYY-MM-DD HH:mm:ss.SSS')} Queued.`, configuration)
   await copyFiles(configuration)
-  co
   await buildContainer(configuration)
   await deploy(configuration, imageChanged)
   await Deployment.findOneAndUpdate(

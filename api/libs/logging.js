@@ -1,4 +1,5 @@
 const ApplicationLog = require('../models/Logs/Application')
+const ServerLog = require('../models/Logs/Server')
 const dayjs = require('dayjs')
 function generateTimestamp () {
   return `${dayjs().format('YYYY-MM-DD HH:mm:ss.SSS')} `
@@ -28,6 +29,14 @@ async function saveAppLog (event, configuration, isError) {
   }
 }
 
+async function saveServerLog (error) {
+  const payload = { message: error.message, stack: error.stack, type: error.type || 'spaghetticode' }
+  const found = await ServerLog.find(payload)
+  if (found.length === 0) {
+    if (error.message) await new ServerLog(payload).save()
+  }
+}
 module.exports = {
-  saveAppLog
+  saveAppLog,
+  saveServerLog
 }

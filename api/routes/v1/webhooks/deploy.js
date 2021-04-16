@@ -93,7 +93,6 @@ module.exports = async function (fastify) {
         reply.code(200).send({ message: 'Already in the queue.' })
         return
       }
-
       queueAndBuild(configuration, imageChanged)
 
       reply.code(201).send({ message: 'Deployment queued.', nickname: configuration.general.nickname, name: configuration.build.container.name })
@@ -110,7 +109,8 @@ module.exports = async function (fastify) {
         await new ApplicationLog({ repoId: id, branch, deployId, event: `[ERROR 😖]: ${error.stack}` }).save()
       } else {
         // Error in my code
-        if (error.message && error.stack) await new ServerLog({ message: error.message, stack: error.stack, type: 'spaghetticode' }).save()
+        const payload = { message: error.message, stack: error.stack, type: 'spaghetticode' }
+        if (error.message && error.stack) await new ServerLog(payload).save()
         if (reply.sent) await new ApplicationLog({ repoId: id, branch, deployId, event: `[ERROR 😖]: ${error.stack}` }).save()
       }
       throw new Error(error)

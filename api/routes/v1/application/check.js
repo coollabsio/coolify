@@ -1,6 +1,7 @@
 
 const { setDefaultConfiguration } = require('../../../libs/applications/configuration')
 const { docker } = require('../../../libs/docker')
+const { saveServerLog } = require('../../../libs/logging')
 
 module.exports = async function (fastify) {
   fastify.post('/', async (request, reply) => {
@@ -29,6 +30,7 @@ module.exports = async function (fastify) {
       }
       return { message: 'OK' }
     } catch (error) {
+      await saveServerLog(error)
       throw new Error(error)
     }
   })

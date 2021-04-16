@@ -4,6 +4,8 @@ const Settings = require('../../../models/Settings')
 const cuid = require('cuid')
 const mongoose = require('mongoose')
 const jwt = require('jsonwebtoken')
+const { saveServerLog } = require('../../../libs/logging')
+
 module.exports = async function (fastify) {
   const githubCodeSchema = {
     schema: {
@@ -111,6 +113,7 @@ module.exports = async function (fastify) {
         return
       }
     } catch (error) {
+      await saveServerLog(error)
       throw new Error(error)
     }
   })

@@ -1,4 +1,6 @@
 const Settings = require('../../../models/Settings')
+const { saveServerLog } = require('../../../libs/logging')
+
 module.exports = async function (fastify) {
   const applicationName = 'coolify'
   const postSchema = {
@@ -25,6 +27,7 @@ module.exports = async function (fastify) {
         settings
       }
     } catch (error) {
+      await saveServerLog(error)
       throw new Error(error)
     }
   })
@@ -38,6 +41,7 @@ module.exports = async function (fastify) {
       ).select('-_id -__v')
       reply.code(201).send({ settings })
     } catch (error) {
+      await saveServerLog(error)
       throw new Error(error)
     }
   })
