@@ -31,9 +31,9 @@ if (process.env.NODE_ENV === 'production') {
     root: path.join(__dirname, '../dist/')
   })
 
-  fastify.setNotFoundHandler(function (request, reply) {
-    reply.sendFile('index.html')
-  })
+  // fastify.setNotFoundHandler(function (request, reply) {
+  //   reply.sendFile('index.html')
+  // })
 } else {
   fastify.register(require('fastify-static'), {
     root: path.join(__dirname, '../public/')
