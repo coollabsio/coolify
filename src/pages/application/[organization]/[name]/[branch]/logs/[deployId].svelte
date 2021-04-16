@@ -1,5 +1,5 @@
 <script>
-  import { params } from "@roxi/routify";
+  import { params, redirect } from "@roxi/routify";
   import { onDestroy, onMount } from "svelte";
   import { fade } from "svelte/transition";
   import { fetch } from "@store";
@@ -15,13 +15,18 @@
   });
 
   async function loadLogs() {
-    const { events, progress } = await $fetch(
+    try {
+      const { events, progress } = await $fetch(
       `/api/v1/application/deploy/logs/${$params.deployId}`,
     );
     logs = [...events];
     if (progress === "done" || progress === "failed") {
       clearInterval(loadLogsInterval);
     }
+    } catch(error) {
+      $redirect('/dashboard')
+    }
+
   }
   onDestroy(() => {
     clearInterval(loadLogsInterval);
