@@ -7,7 +7,6 @@ const path = require('path')
 const { saveServerLog } = require('./libs/logging')
 const { execShellAsync } = require('./libs/common')
 const { purgeImagesContainers, cleanupStuckedDeploymentsInDB } = require('./libs/applications/cleanup')
-const Server = require('./models/Logs/Server')
 const fastify = require('fastify')({
   logger: {
     level: 'error'
