@@ -12,6 +12,7 @@
   async function loadSettings() {
     const response = await $fetch(`/api/v1/settings`);
     settings.allowRegistration = response.settings.allowRegistration;
+    settings.sendErrors = response.settings.sendErrors;
   }
   async function changeSettings(value) {
     settings[value] = !settings[value];
@@ -24,7 +25,7 @@
   }
 </script>
 
-  <div class="min-h-full text-white"  in:fade="{{ duration: 100 }}">
+  <div class="min-h-full text-white" in:fade="{{ duration: 100 }}">
     <div
       class="py-5 text-left px-6 text-3xl tracking-tight font-bold flex items-center"
     >

@@ -37,15 +37,10 @@ async function saveAppLog (event, configuration, isError) {
 async function saveServerLog (error) {
   const settings = await Settings.findOne({ applicationName: 'coolify' })
   const payload = { message: error.message, stack: error.stack, type: error.type || 'spaghetticode', version }
+
   const found = await ServerLog.find(payload)
-  if (found.length === 0) {
-    if (error.message) {
-      await new ServerLog(payload).save()
-      if (settings && settings.sendErrors && process.env.NODE_ENV === 'production') {
-        await axios.post('https://errors.coollabs.io/api/error', payload)
-      }
-    }
-  }
+  if (found.length === 0 && error.message) await new ServerLog(payload).save()
+  if (settings && settings.sendErrors && process.env.NODE_ENV === 'production') await axios.post('https://errors.coollabs.io/api/error', payload)
 }
 module.exports = {
   saveAppLog,

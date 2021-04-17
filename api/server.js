@@ -8,6 +8,7 @@ const { saveServerLog } = require('./libs/logging')
 const { execShellAsync } = require('./libs/common')
 const { purgeImagesContainers, cleanupStuckedDeploymentsInDB } = require('./libs/applications/cleanup')
 const fastify = require('fastify')({
+  trustProxy: true,
   logger: {
     level: 'error'
   }
