@@ -16,17 +16,37 @@
   let upgradeAvailable = false;
   let upgradeDisabled = false;
   let upgradeDone = false;
-  let latest = {};  
+  let latest = {};
   let showAck = false;
+  const branch =
+    process.env.NODE_ENV === "production" &&
+    window.location.hostname !== "test.andrasbacsai.dev"
+      ? "main"
+      : "next";
   onMount(async () => {
     if ($session.token) {
       upgradeAvailable = await checkUpgrade();
-      if (!localStorage.getItem("automaticErrorReportsAck")) showAck = true;
+      if (!localStorage.getItem("automaticErrorReportsAck")) {
+        showAck = true;
+        if (latest?.coolify[branch]?.settings?.sendErrors) {
+          const settings = {
+            sendErrors: true,
+          };
+          await $fetch("/api/v1/settings", {
+            body: {
+              ...settings,
+            },
+            headers: {
+              Authorization: `Bearer ${$session.token}`,
+            },
+          });
+        }
+      }
     }
   });
   function ackError() {
-    localStorage.setItem('automaticErrorReportsAck','true')
-    showAck = false
+    localStorage.setItem("automaticErrorReportsAck", "true");
+    showAck = false;
   }
   async function verifyToken() {
     if ($session.token) {
@@ -77,11 +97,6 @@
         cache: "no-cache",
       })
       .then(r => r.json());
-    const branch =
-      process.env.NODE_ENV === "production" &&
-      window.location.hostname !== "test.andrasbacsai.dev"
-        ? "main"
-        : "next";
 
     return compareVersions(
       latest.coolify[branch].version,
@@ -94,20 +109,26 @@
 
 {#await verifyToken() then notUsed}
   {#if showAck}
-    <div class="p-2 fixed top-0 right-0 z-50 w-64 m-2 rounded border-gradient-full">
+    <div
+      class="p-2 fixed top-0 right-0 z-50 w-64 m-2 rounded border-gradient-full"
+    >
       <div class="text-white text-xs space-y-2 text-justify font-medium">
         <div>
           We implemented an automatic error reporting feature, which is enabled
           by default.
         </div>
-        <div>Why? Because we would like to hunt down bugs faster and easier.</div>
+        <div>
+          Why? Because we would like to hunt down bugs faster and easier.
+        </div>
         <div class="py-5">
-          If you do not like it, you can turn it off in the <button class="underline font-bold" on:click={$goto('/settings')}>Settings menu</button>.
+          If you do not like it, you can turn it off in the <button
+            class="underline font-bold"
+            on:click="{$goto('/settings')}">Settings menu</button
+          >.
         </div>
         <button
           class="button p-2 bg-warmGray-800 w-full text-center hover:bg-warmGray-700"
-          on:click={ackError}
-          >OK</button
+          on:click="{ackError}">OK</button
         >
       </div>
     </div>
