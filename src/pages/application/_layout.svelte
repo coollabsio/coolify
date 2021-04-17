@@ -68,7 +68,7 @@ import Tooltip from "../../components/Tooltip/Tooltip.svelte";
       );
     } catch (error) {
       console.log(error);
-      toast.push(error.error ? error.error : "Ooops something went wrong.");
+      toast.push(error.error || error || "Ooops something went wrong.");
     }
   }
 </script>

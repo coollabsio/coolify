@@ -56,7 +56,6 @@ module.exports = async function (fastify) {
         { repoId: id, branch, deployId, organization, name, domain },
         { repoId: id, branch, deployId, organization, name, domain, progress: 'failed' })
       cleanupTmp(configuration.general.workdir)
-      console.log(error.stack)
       if (error.name) {
         const payload = { message: error.message, stack: error.stack, type: error.type || 'spaghetticode' }
         if (error.message && error.stack) await new ServerLog(payload).save()
