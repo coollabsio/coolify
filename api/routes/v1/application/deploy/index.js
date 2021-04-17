@@ -1,11 +1,11 @@
 
 const Deployment = require('../../../../models/Deployment')
 const ApplicationLog = require('../../../../models/Logs/Application')
-const ServerLog = require('../../../../models/Logs/Server')
 const { verifyUserId, cleanupTmp } = require('../../../../libs/common')
 const { queueAndBuild } = require('../../../../libs/applications')
 const { setDefaultConfiguration, precheckDeployment } = require('../../../../libs/applications/configuration')
 const { docker } = require('../../../../libs/docker')
+const { saveServerLog } = require('../../../../libs/logging')
 const cloneRepository = require('../../../../libs/applications/github/cloneRepository')
 
 module.exports = async function (fastify) {
@@ -57,8 +57,7 @@ module.exports = async function (fastify) {
         { repoId: id, branch, deployId, organization, name, domain, progress: 'failed' })
       cleanupTmp(configuration.general.workdir)
       if (error.name) {
-        const payload = { message: error.message, stack: error.stack, type: error.type || 'spaghetticode' }
-        if (error.message && error.stack) await new ServerLog(payload).save()
+        if (error.message && error.stack) await saveServerLog(error)
         if (reply.sent) await new ApplicationLog({ repoId: id, branch, deployId, event: `[ERROR 😖]: ${error.stack}` }).save()
       }
       throw new Error(error)

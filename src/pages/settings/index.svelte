@@ -6,6 +6,7 @@
 
   let settings = {
     allowRegistration: false,
+    sendErrors: true
   };
 
   async function loadSettings() {

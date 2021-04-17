@@ -61,8 +61,12 @@ module.exports = async function (fastify) {
               avatar: avatar_url,
               uid
             })
+            const defaultSettings = new Settings({
+              _id: new mongoose.Types.ObjectId()
+            })
             try {
               await newUser.save()
+              await defaultSettings.save()
             } catch (e) {
               console.log(e)
               reply.code(500).send({ success: false, error: e })
