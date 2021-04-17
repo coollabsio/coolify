@@ -22,6 +22,11 @@ body {
     border-image: linear-gradient(0.25turn, rgba(255, 249, 34), rgba(255, 0, 128), rgba(56, 2, 155, 0));
     border-image-slice: 1;
 }
+.border-gradient-full {
+    border: 4px solid transparent;
+    border-image: linear-gradient(0.25turn, rgba(255, 249, 34), rgba(255, 0, 128), rgba(56, 2, 155, 0));
+    border-image-slice: 1;
+}
 
 [aria-label][role~="tooltip"]::after {
   background: rgba(41, 37, 36, 0.9);

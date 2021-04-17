@@ -7,9 +7,10 @@ module.exports = async function (fastify) {
     body: {
       type: 'object',
       properties: {
-        allowRegistration: { type: 'boolean' }
+        allowRegistration: { type: 'boolean' },
+        sendErrors: { type: 'boolean' }
       },
-      required: ['allowRegistration']
+      required: []
     }
   }
 
