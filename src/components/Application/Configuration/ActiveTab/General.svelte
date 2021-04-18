@@ -63,7 +63,7 @@
       <div class="grid grid-flow-row">
         <label for="Path"
           >Path <TooltipInfo
-            label="{`Path to deploy your application on your domain. eg: /api means it will be deployed to -> https://${$application.publish.domain}/api`}"
+            label="{`Path to deploy your application on your domain. eg: /api means it will be deployed to -> https://${$application.publish.domain || '<yourdomain>'}/api`}"
           /></label
         >
         <input
@@ -92,7 +92,7 @@
         <input
           id="baseDir"
           bind:value="{$application.build.directory}"
-          placeholder="/"
+          placeholder="eg: sourcedir"
         />
       </div>
       <div class="grid grid-flow-row">
@@ -104,7 +104,7 @@
         <input
           id="publishDir"
           bind:value="{$application.publish.directory}"
-          placeholder="/"
+          placeholder="eg: dist, _site, public"
         />
       </div>
     </div>

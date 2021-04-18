@@ -8,8 +8,10 @@ const publishNodejsDocker = (configuration) => {
     'WORKDIR /usr/src/app',
     configuration.build.command.build
       ? `COPY --from=${configuration.build.container.name}:${configuration.build.container.tag} /usr/src/app/${configuration.publish.directory} .`
-      : `COPY .${configuration.build.directory} .`,
-    configuration.build.command.installation && `RUN ${configuration.build.command.installation}`,
+      : `
+      COPY ${configuration.build.directory}/package*.json .
+      RUN ${configuration.build.command.installation}
+      COPY ./${configuration.build.directory} .`,
     `EXPOSE ${configuration.publish.port}`,
     'CMD [ "yarn", "start" ]'
   ].join('\n')

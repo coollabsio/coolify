@@ -6,7 +6,7 @@ const publishPHPDocker = (configuration) => {
     'FROM php:apache',
     'RUN a2enmod rewrite',
     'WORKDIR /usr/src/app',
-    `COPY .${configuration.build.directory} /var/www/html`,
+    `COPY ./${configuration.build.directory} /var/www/html`,
     'EXPOSE 80',
     ' CMD ["apache2-foreground"]'
   ].join('\n')

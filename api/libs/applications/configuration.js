@@ -53,12 +53,11 @@ function setDefaultConfiguration (configuration) {
     }
   }
 
-  if (!configuration.build.directory) {
-    configuration.build.directory = '/'
-  }
-  if (!configuration.publish.directory) {
-    configuration.publish.directory = '/'
-  }
+  if (!configuration.build.directory) configuration.build.directory = ''
+  if (configuration.build.directory.startsWith('/')) configuration.build.directory = configuration.build.directory.replace('/', '')
+
+  if (!configuration.publish.directory) configuration.publish.directory = ''
+  if (configuration.publish.directory.startsWith('/')) configuration.publish.directory = configuration.publish.directory.replace('/', '')
 
   if (configuration.build.pack === 'static' || configuration.build.pack === 'nodejs') {
     if (!configuration.build.command.installation) configuration.build.command.installation = 'yarn install'

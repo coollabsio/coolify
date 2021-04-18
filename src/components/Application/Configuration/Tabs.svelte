@@ -57,10 +57,7 @@
           f => f.type === "file" && f.name === "Cargo.toml",
         );
 
-        if (Dockerfile) {
-          $application.build.pack = "custom";
-          toast.push("Custom Dockerfile found. Build pack set to custom.");
-        } else if (packageJson) {
+        if (packageJson) {
           const { content } = await $fetch(packageJson.git_url);
           const packageJsonContent = JSON.parse(atob(content));
           const checkPackageJSONContents = dep => {
@@ -73,17 +70,9 @@
             if (checkPackageJSONContents(dep)) {
               const config = templates[dep];
               $application.build.pack = config.pack;
-              if (config.installation) {
-                $application.build.command.installation = config.installation;
-              }
-
-              if (config.port) {
-                $application.publish.port = config.port;
-              }
-
-              if (config.directory) {
-                $application.publish.directory = config.directory;
-              }
+              if (config.installation) $application.build.command.installation = config.installation;
+              if (config.port) $application.publish.port = config.port;
+              if (config.directory) $application.publish.directory = config.directory;
 
               if (
                 packageJsonContent.scripts.hasOwnProperty("build") &&
@@ -97,6 +86,9 @@
         } else if (CargoToml) {
           $application.build.pack = "rust";
           toast.push(`Rust language detected. Default values set.`);
+        } else if (Dockerfile) {
+          $application.build.pack = "custom";
+          toast.push("Custom Dockerfile found. Build pack set to custom.");
         }
       } catch (error) {
         // Nothing detected

@@ -63,7 +63,7 @@ import Tooltip from "../../components/Tooltip/Tooltip.svelte";
       $application.general.deployId = deployId;
       $initConf = JSON.parse(JSON.stringify($application));
       toast.push("Application deployment queued.");
-      $redirect(
+      $goto(
         `/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/logs/${$application.general.deployId}`,
       );
     } catch (error) {

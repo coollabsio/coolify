@@ -10,7 +10,7 @@ const publishStaticDocker = (configuration) => {
     'WORKDIR /usr/share/nginx/html',
     configuration.build.command.build
       ? `COPY --from=${configuration.build.container.name}:${configuration.build.container.tag} /usr/src/app/${configuration.publish.directory} .`
-      : `COPY .${configuration.build.directory} .`,
+      : `COPY ./${configuration.build.directory} .`,
     'EXPOSE 80',
     'CMD ["nginx", "-g", "daemon off;"]'
   ].join('\n')
