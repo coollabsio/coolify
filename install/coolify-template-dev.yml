@@ -13,10 +13,14 @@ services:
         published: 443
         protocol: tcp
         mode: host
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: host
     command:
-      - --api.insecure=false
-      - --api.dashboard=false
-      - --api.debug=false
+      - --api.insecure=true
+      - --api.dashboard=true
+      - --api.debug=true
       - --log.level=ERROR
       - --providers.docker=true
       - --providers.docker.swarmMode=true
@@ -25,13 +29,8 @@ services:
       - --providers.docker.swarmModeRefreshSeconds=1s
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
-      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
-      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
-      - --certificatesresolvers.letsencrypt.acme.email=${EMAIL}
-      - --certificatesresolvers.letsencrypt.acme.storage=/data/coolify/acme.json
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /data/coolify:/data/coolify
     networks:
       - ${DOCKER_NETWORK}
     deploy:
@@ -66,30 +65,6 @@ services:
         - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
         - "traefik.http.middlewares.global-compress.compress=true"
 
-  coolify:
-    image: coolify
-    hostname: coollabs-coolify
-    env_file:
-      - .env
-    networks:
-      - ${DOCKER_NETWORK}
-    command: "yarn start"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    deploy:
-      update_config:
-        parallelism: 1
-        delay: 10s
-        order: start-first
-      replicas: 1
-      labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.coolify.entrypoints=websecure"
-        - "traefik.http.routers.coolify.tls.certresolver=letsencrypt"
-        - "traefik.http.routers.coolify.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)"
-        - "traefik.http.services.coolify.loadbalancer.server.port=3000"
-        - "traefik.http.routers.coolify.middlewares=global-compress"
-      
 networks:
   ${DOCKER_NETWORK}:
     driver: overlay

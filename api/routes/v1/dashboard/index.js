@@ -1,6 +1,7 @@
 const { docker } = require('../../../libs/docker')
 const Deployment = require('../../../models/Deployment')
 const ServerLog = require('../../../models/Logs/Server')
+const { saveServerLog } = require('../../../libs/logging')
 
 module.exports = async function (fastify) {
   fastify.get('/', async (request, reply) => {
@@ -21,10 +22,8 @@ module.exports = async function (fastify) {
           }
         }
       ])
-
       const serverLogs = await ServerLog.find()
       const services = await docker.engine.listServices()
-
       let applications = services.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application' && r.Spec.Labels.configuration)
       let databases = services.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'database' && r.Spec.Labels.configuration)
       applications = applications.map(r => {
@@ -56,7 +55,8 @@ module.exports = async function (fastify) {
       if (error.code === 'ENOENT' && error.errno === -2) {
         throw new Error(`Docker service unavailable at ${error.address}.`)
       } else {
-        throw { error, type: 'server' }
+        await saveServerLog(error)
+        throw new Error(error)
       }
     }
   })

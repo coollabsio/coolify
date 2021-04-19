@@ -9,69 +9,64 @@ function getUniq () {
 }
 
 function setDefaultConfiguration (configuration) {
-  try {
-    const nickname = getUniq()
-    const deployId = cuid()
+  const nickname = getUniq()
+  const deployId = cuid()
 
-    const shaBase = JSON.stringify({ repository: configuration.repository })
-    const sha256 = crypto.createHash('sha256').update(shaBase).digest('hex')
+  const shaBase = JSON.stringify({ repository: configuration.repository })
+  const sha256 = crypto.createHash('sha256').update(shaBase).digest('hex')
 
-    const baseServiceConfiguration = {
-      replicas: 1,
-      restart_policy: {
-        condition: 'any',
-        max_attempts: 3
-      },
-      update_config: {
-        parallelism: 1,
-        delay: '10s',
-        order: 'start-first'
-      },
-      rollback_config: {
-        parallelism: 1,
-        delay: '10s',
-        order: 'start-first',
-        failure_action: 'rollback'
-      }
+  const baseServiceConfiguration = {
+    replicas: 1,
+    restart_policy: {
+      condition: 'any',
+      max_attempts: 3
+    },
+    update_config: {
+      parallelism: 1,
+      delay: '10s',
+      order: 'start-first'
+    },
+    rollback_config: {
+      parallelism: 1,
+      delay: '10s',
+      order: 'start-first',
+      failure_action: 'rollback'
     }
-
-    configuration.build.container.name = sha256.slice(0, 15)
-
-    configuration.general.nickname = nickname
-    configuration.general.deployId = deployId
-    configuration.general.workdir = `/tmp/${deployId}`
-
-    if (!configuration.publish.path) configuration.publish.path = '/'
-    if (!configuration.publish.port) {
-      if (configuration.build.pack === 'php') {
-        configuration.publish.port = 80
-      } else if (configuration.build.pack === 'static') {
-        configuration.publish.port = 80
-      } else if (configuration.build.pack === 'nodejs') {
-        configuration.publish.port = 3000
-      } else if (configuration.build.pack === 'rust') {
-        configuration.publish.port = 3000
-      }
-    }
-
-    if (!configuration.build.directory) {
-      configuration.build.directory = '/'
-    }
-    if (!configuration.publish.directory) {
-      configuration.publish.directory = '/'
-    }
-
-    if (configuration.build.pack === 'static' || configuration.build.pack === 'nodejs') {
-      if (!configuration.build.command.installation) configuration.build.command.installation = 'yarn install'
-    }
-
-    configuration.build.container.baseSHA = crypto.createHash('sha256').update(JSON.stringify(baseServiceConfiguration)).digest('hex')
-    configuration.baseServiceConfiguration = baseServiceConfiguration
-
-    return configuration
-  } catch (error) {
-    throw { error, type: 'server' }
   }
+
+  configuration.build.container.name = sha256.slice(0, 15)
+
+  configuration.general.nickname = nickname
+  configuration.general.deployId = deployId
+  configuration.general.workdir = `/tmp/${deployId}`
+
+  if (!configuration.publish.path) configuration.publish.path = '/'
+  if (!configuration.publish.port) {
+    if (configuration.build.pack === 'php') {
+      configuration.publish.port = 80
+    } else if (configuration.build.pack === 'static') {
+      configuration.publish.port = 80
+    } else if (configuration.build.pack === 'nodejs') {
+      configuration.publish.port = 3000
+    } else if (configuration.build.pack === 'rust') {
+      configuration.publish.port = 3000
+    }
+  }
+
+  if (!configuration.build.directory) configuration.build.directory = ''
+  if (configuration.build.directory.startsWith('/')) configuration.build.directory = configuration.build.directory.replace('/', '')
+
+  if (!configuration.publish.directory) configuration.publish.directory = ''
+  if (configuration.publish.directory.startsWith('/')) configuration.publish.directory = configuration.publish.directory.replace('/', '')
+
+  if (configuration.build.pack === 'static' || configuration.build.pack === 'nodejs') {
+    if (!configuration.build.command.installation) configuration.build.command.installation = 'yarn install'
+  }
+
+  configuration.build.container.baseSHA = crypto.createHash('sha256').update(JSON.stringify(baseServiceConfiguration)).digest('hex')
+  configuration.baseServiceConfiguration = baseServiceConfiguration
+
+  return configuration
 }
 
 async function updateServiceLabels (configuration) {
@@ -86,12 +81,8 @@ async function updateServiceLabels (configuration) {
   })
   if (found) {
     const { ID } = found
-    try {
-      const Labels = { ...JSON.parse(found.Spec.Labels.configuration), ...configuration }
-      await execShellAsync(`docker service update --label-add configuration='${JSON.stringify(Labels)}' --label-add com.docker.stack.image='${configuration.build.container.name}:${configuration.build.container.tag}' ${ID}`)
-    } catch (error) {
-      console.log(error)
-    }
+    const Labels = { ...JSON.parse(found.Spec.Labels.configuration), ...configuration }
+    await execShellAsync(`docker service update --label-add configuration='${JSON.stringify(Labels)}' --label-add com.docker.stack.image='${configuration.build.container.name}:${configuration.build.container.tag}' ${ID}`)
   }
 }
 

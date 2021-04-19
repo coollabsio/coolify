@@ -1,6 +1,10 @@
 const crypto = require('crypto')
 const { cleanupTmp } = require('../../../libs/common')
+
 const Deployment = require('../../../models/Deployment')
+const ApplicationLog = require('../../../models/Logs/Application')
+const ServerLog = require('../../../models/Logs/Server')
+
 const { queueAndBuild } = require('../../../libs/applications')
 const { setDefaultConfiguration, precheckDeployment } = require('../../../libs/applications/configuration')
 const { docker } = require('../../../libs/docker')
@@ -33,6 +37,7 @@ module.exports = async function (fastify) {
     }
   }
   fastify.post('/', { schema: postSchema }, async (request, reply) => {
+    let configuration
     const hmac = crypto.createHmac('sha256', fastify.config.GITHUP_APP_WEBHOOK_SECRET)
     const digest = Buffer.from('sha256=' + hmac.update(JSON.stringify(request.body)).digest('hex'), 'utf8')
     const checksum = Buffer.from(request.headers['x-hub-signature-256'], 'utf8')
@@ -48,7 +53,7 @@ module.exports = async function (fastify) {
     try {
       const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
 
-      let configuration = services.find(r => {
+      configuration = services.find(r => {
         if (request.body.ref.startsWith('refs')) {
           const branch = request.body.ref.split('/')[2]
           if (
@@ -88,12 +93,27 @@ module.exports = async function (fastify) {
         reply.code(200).send({ message: 'Already in the queue.' })
         return
       }
-
       queueAndBuild(configuration, imageChanged)
 
       reply.code(201).send({ message: 'Deployment queued.', nickname: configuration.general.nickname, name: configuration.build.container.name })
     } catch (error) {
-      throw { error, type: 'server' }
+      const { id, organization, name, branch } = configuration.repository
+      const { domain } = configuration.publish
+      const { deployId } = configuration.general
+      await Deployment.findOneAndUpdate(
+        { repoId: id, branch, deployId, organization, name, domain },
+        { repoId: id, branch, deployId, organization, name, domain, progress: 'failed' })
+      cleanupTmp(configuration.general.workdir)
+      if (error.name === 'Error') {
+        // Error during runtime
+        await new ApplicationLog({ repoId: id, branch, deployId, event: `[ERROR 😖]: ${error.stack}` }).save()
+      } else {
+        // Error in my code
+        const payload = { message: error.message, stack: error.stack, type: 'spaghetticode' }
+        if (error.message && error.stack) await new ServerLog(payload).save()
+        if (reply.sent) await new ApplicationLog({ repoId: id, branch, deployId, event: `[ERROR 😖]: ${error.stack}` }).save()
+      }
+      throw new Error(error)
     }
   })
 }

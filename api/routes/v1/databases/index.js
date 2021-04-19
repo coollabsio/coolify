@@ -3,6 +3,7 @@ const fs = require('fs').promises
 const cuid = require('cuid')
 const { docker } = require('../../../libs/docker')
 const { execShellAsync } = require('../../../libs/common')
+const { saveServerLog } = require('../../../libs/logging')
 
 const { uniqueNamesGenerator, adjectives, colors, animals } = require('unique-names-generator')
 const generator = require('generate-password')
@@ -165,7 +166,8 @@ module.exports = async function (fastify) {
               `cat ${configuration.general.workdir}/stack.yml | docker stack deploy -c - ${configuration.general.deployId}`
       )
     } catch (error) {
-      throw { error, type: 'server' }
+      await saveServerLog(error)
+      throw new Error(error)
     }
   })
 

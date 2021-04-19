@@ -1,13 +1,16 @@
 const Settings = require('../../../models/Settings')
+const { saveServerLog } = require('../../../libs/logging')
+
 module.exports = async function (fastify) {
   const applicationName = 'coolify'
   const postSchema = {
     body: {
       type: 'object',
       properties: {
-        allowRegistration: { type: 'boolean' }
+        allowRegistration: { type: 'boolean' },
+        sendErrors: { type: 'boolean' }
       },
-      required: ['allowRegistration']
+      required: []
     }
   }
 
@@ -25,7 +28,8 @@ module.exports = async function (fastify) {
         settings
       }
     } catch (error) {
-      throw { error, type: 'server' }
+      await saveServerLog(error)
+      throw new Error(error)
     }
   })
 
@@ -38,7 +42,8 @@ module.exports = async function (fastify) {
       ).select('-_id -__v')
       reply.code(201).send({ settings })
     } catch (error) {
-      throw { error, type: 'server' }
+      await saveServerLog(error)
+      throw new Error(error)
     }
   })
 }

@@ -28,7 +28,7 @@ const templates = {
     directory: 'dist',
     name: 'Parcel'
   },
-  'vue-cli-service': {
+  '@vue/cli-service': {
     pack: 'static',
     ...defaultBuildAndDeploy,
     directory: 'dist',

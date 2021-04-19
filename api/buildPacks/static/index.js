@@ -9,24 +9,20 @@ const publishStaticDocker = (configuration) => {
     'COPY nginx.conf /etc/nginx/nginx.conf',
     'WORKDIR /usr/share/nginx/html',
     configuration.build.command.build
-      ? `COPY --from=${configuration.build.container.name}:${configuration.build.container.tag} /usr/src/app/${configuration.publish.directory} ./`
-      : `COPY ${configuration.build.directory} ./`,
+      ? `COPY --from=${configuration.build.container.name}:${configuration.build.container.tag} /usr/src/app/${configuration.publish.directory} .`
+      : `COPY ./${configuration.build.directory} .`,
     'EXPOSE 80',
     'CMD ["nginx", "-g", "daemon off;"]'
   ].join('\n')
 }
 
 module.exports = async function (configuration) {
-  try {
-    if (configuration.build.command.build) await buildImage(configuration)
-    await fs.writeFile(`${configuration.general.workdir}/Dockerfile`, publishStaticDocker(configuration))
+  if (configuration.build.command.build) await buildImage(configuration)
+  await fs.writeFile(`${configuration.general.workdir}/Dockerfile`, publishStaticDocker(configuration))
 
-    const stream = await docker.engine.buildImage(
-      { src: ['.'], context: configuration.general.workdir },
-      { t: `${configuration.build.container.name}:${configuration.build.container.tag}` }
-    )
-    await streamEvents(stream, configuration)
-  } catch (error) {
-    throw { error, type: 'server' }
-  }
+  const stream = await docker.engine.buildImage(
+    { src: ['.'], context: configuration.general.workdir },
+    { t: `${configuration.build.container.name}:${configuration.build.container.tag}` }
+  )
+  await streamEvents(stream, configuration)
 }

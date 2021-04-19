@@ -1,7 +1,7 @@
 {
   "name": "coolify",
   "description": "An open-source, hassle-free, self-hostable Heroku & Netlify alternative.",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "license": "AGPL-3.0",
   "scripts": {
     "lint": "standard",
@@ -19,6 +19,7 @@
     "@iarna/toml": "^2.2.5",
     "@roxi/routify": "^2.15.1",
     "@zerodevx/svelte-toast": "^0.2.1",
+    "ajv": "^8.1.0",
     "axios": "^0.21.1",
     "commander": "^7.2.0",
     "compare-versions": "^3.6.0",
@@ -33,6 +34,7 @@
     "fastify-plugin": "^3.0.0",
     "fastify-static": "^4.0.1",
     "generate-password": "^1.6.0",
+    "http-errors-enhanced": "^0.7.0",
     "js-yaml": "^4.0.0",
     "jsonwebtoken": "^8.5.1",
     "mongoose": "^5.12.3",

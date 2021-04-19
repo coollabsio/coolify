@@ -55,19 +55,20 @@ import Tooltip from "../../components/Tooltip/Tooltip.svelte";
       await $fetch(`/api/v1/application/check`, {
         body: $application,
       });
-      const { nickname, name } = await $fetch(`/api/v1/application/deploy`, {
+      const { nickname, name, deployId } = await $fetch(`/api/v1/application/deploy`, {
         body: $application,
       });
       $application.general.nickname = nickname;
       $application.build.container.name = name;
+      $application.general.deployId = deployId;
       $initConf = JSON.parse(JSON.stringify($application));
       toast.push("Application deployment queued.");
-      $redirect(
-        `/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/logs`,
+      $goto(
+        `/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/logs/${$application.general.deployId}`,
       );
     } catch (error) {
       console.log(error);
-      toast.push(error.error ? error.error : "Ooops something went wrong.");
+      toast.push(error.error || error || "Ooops something went wrong.");
     }
   }
 </script>

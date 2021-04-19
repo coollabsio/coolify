@@ -4,6 +4,8 @@ const Settings = require('../../../models/Settings')
 const cuid = require('cuid')
 const mongoose = require('mongoose')
 const jwt = require('jsonwebtoken')
+const { saveServerLog } = require('../../../libs/logging')
+
 module.exports = async function (fastify) {
   const githubCodeSchema = {
     schema: {
@@ -59,8 +61,12 @@ module.exports = async function (fastify) {
               avatar: avatar_url,
               uid
             })
+            const defaultSettings = new Settings({
+              _id: new mongoose.Types.ObjectId()
+            })
             try {
               await newUser.save()
+              await defaultSettings.save()
             } catch (e) {
               console.log(e)
               reply.code(500).send({ success: false, error: e })
@@ -111,8 +117,8 @@ module.exports = async function (fastify) {
         return
       }
     } catch (error) {
-      console.log(error)
-      reply.code(500).send({ success: false, error: error.message })
+      await saveServerLog(error)
+      throw new Error(error)
     }
   })
   fastify.get('/success', async (request, reply) => {

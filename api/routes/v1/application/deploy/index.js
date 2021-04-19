@@ -1,37 +1,16 @@
 
-const { verifyUserId, cleanupTmp } = require('../../../../libs/common')
 const Deployment = require('../../../../models/Deployment')
+const ApplicationLog = require('../../../../models/Logs/Application')
+const { verifyUserId, cleanupTmp } = require('../../../../libs/common')
 const { queueAndBuild } = require('../../../../libs/applications')
 const { setDefaultConfiguration, precheckDeployment } = require('../../../../libs/applications/configuration')
 const { docker } = require('../../../../libs/docker')
+const { saveServerLog } = require('../../../../libs/logging')
 const cloneRepository = require('../../../../libs/applications/github/cloneRepository')
 
 module.exports = async function (fastify) {
-  // const postSchema = {
-  //     body: {
-  //         type: "object",
-  //         properties: {
-  //             ref: { type: "string" },
-  //             repository: {
-  //                 type: "object",
-  //                 properties: {
-  //                     id: { type: "number" },
-  //                     full_name: { type: "string" },
-  //                 },
-  //                 required: ["id", "full_name"],
-  //             },
-  //             installation: {
-  //                 type: "object",
-  //                 properties: {
-  //                     id: { type: "number" },
-  //                 },
-  //                 required: ["id"],
-  //             },
-  //         },
-  //         required: ["ref", "repository", "installation"],
-  //     },
-  // };
   fastify.post('/', async (request, reply) => {
+    let configuration
     try {
       await verifyUserId(request.headers.authorization)
     } catch (error) {
@@ -40,7 +19,10 @@ module.exports = async function (fastify) {
     }
     try {
       const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
-      const configuration = setDefaultConfiguration(request.body)
+      configuration = setDefaultConfiguration(request.body)
+      if (!configuration) {
+        throw new Error('Whaat?')
+      }
       await cloneRepository(configuration)
       const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment({ services, configuration })
 
@@ -64,11 +46,21 @@ module.exports = async function (fastify) {
         return
       }
 
-      queueAndBuild(configuration, imageChanged)
-
-      reply.code(201).send({ message: 'Deployment queued.', nickname: configuration.general.nickname, name: configuration.build.container.name })
+      reply.code(201).send({ message: 'Deployment queued.', nickname: configuration.general.nickname, name: configuration.build.container.name, deployId: configuration.general.deployId })
+      await queueAndBuild(configuration, imageChanged)
     } catch (error) {
-      throw { error, type: 'server' }
+      const { id, organization, name, branch } = configuration.repository
+      const { domain } = configuration.publish
+      const { deployId } = configuration.general
+      await Deployment.findOneAndUpdate(
+        { repoId: id, branch, deployId, organization, name, domain },
+        { repoId: id, branch, deployId, organization, name, domain, progress: 'failed' })
+      cleanupTmp(configuration.general.workdir)
+      if (error.name) {
+        if (error.message && error.stack) await saveServerLog(error)
+        if (reply.sent) await new ApplicationLog({ repoId: id, branch, deployId, event: `[ERROR 😖]: ${error.stack}` }).save()
+      }
+      throw new Error(error)
     }
   })
 }

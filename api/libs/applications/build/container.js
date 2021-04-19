@@ -9,22 +9,12 @@ module.exports = async function (configuration) {
 
   const execute = packs[configuration.build.pack]
   if (execute) {
-    try {
-      await Deployment.findOneAndUpdate(
-        { repoId: id, branch, deployId, organization, name, domain },
-        { repoId: id, branch, deployId, organization, name, domain, progress: 'inprogress' })
-      await saveAppLog('### Building application.', configuration)
-
-      await execute(configuration)
-
-      await saveAppLog('### Building done.', configuration)
-    } catch (error) {
-      await Deployment.findOneAndUpdate(
-        { repoId: id, branch, deployId, organization, name, domain },
-        { repoId: id, branch, deployId, organization, name, domain, progress: 'failed' })
-      if (error.stack) throw { error: error.stack, type: 'server' }
-      throw { error, type: 'app' }
-    }
+    await Deployment.findOneAndUpdate(
+      { repoId: id, branch, deployId, organization, name, domain },
+      { repoId: id, branch, deployId, organization, name, domain, progress: 'inprogress' })
+    await saveAppLog('### Building application.', configuration)
+    await execute(configuration)
+    await saveAppLog('### Building done.', configuration)
   } else {
     try {
       await Deployment.findOneAndUpdate(
@@ -33,7 +23,6 @@ module.exports = async function (configuration) {
     } catch (error) {
       // Hmm.
     }
-
-    throw { error: 'No buildpack found.', type: 'app' }
+    throw new Error('No buildpack found.')
   }
 }

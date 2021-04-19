@@ -37,28 +37,24 @@ const cacheRustDocker = (configuration, custom) => {
 }
 
 module.exports = async function (configuration) {
-  try {
-    const cargoToml = await execShellAsync(`cat ${configuration.general.workdir}/Cargo.toml`)
-    const parsedToml = TOML.parse(cargoToml)
-    const custom = {
-      name: parsedToml.package.name
-    }
-    await fs.writeFile(`${configuration.general.workdir}/Dockerfile`, cacheRustDocker(configuration, custom))
-
-    let stream = await docker.engine.buildImage(
-      { src: ['.'], context: configuration.general.workdir },
-      { t: `${configuration.build.container.name}:cache` }
-    )
-    await streamEvents(stream, configuration)
-
-    await fs.writeFile(`${configuration.general.workdir}/Dockerfile`, publishRustDocker(configuration, custom))
-
-    stream = await docker.engine.buildImage(
-      { src: ['.'], context: configuration.general.workdir },
-      { t: `${configuration.build.container.name}:${configuration.build.container.tag}` }
-    )
-    await streamEvents(stream, configuration)
-  } catch (error) {
-    throw { error, type: 'server' }
+  const cargoToml = await execShellAsync(`cat ${configuration.general.workdir}/Cargo.toml`)
+  const parsedToml = TOML.parse(cargoToml)
+  const custom = {
+    name: parsedToml.package.name
   }
+  await fs.writeFile(`${configuration.general.workdir}/Dockerfile`, cacheRustDocker(configuration, custom))
+
+  let stream = await docker.engine.buildImage(
+    { src: ['.'], context: configuration.general.workdir },
+    { t: `${configuration.build.container.name}:cache` }
+  )
+  await streamEvents(stream, configuration)
+
+  await fs.writeFile(`${configuration.general.workdir}/Dockerfile`, publishRustDocker(configuration, custom))
+
+  stream = await docker.engine.buildImage(
+    { src: ['.'], context: configuration.general.workdir },
+    { t: `${configuration.build.container.name}:${configuration.build.container.tag}` }
+  )
+  await streamEvents(stream, configuration)
 }

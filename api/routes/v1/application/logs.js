@@ -1,4 +1,5 @@
 const { docker } = require('../../../libs/docker')
+const { saveServerLog } = require('../../../libs/logging')
 
 module.exports = async function (fastify) {
   fastify.get('/', async (request, reply) => {
@@ -8,7 +9,8 @@ module.exports = async function (fastify) {
       const logs = (await service.logs({ stdout: true, stderr: true, timestamps: true })).toString().split('\n').map(l => l.slice(8)).filter((a) => a)
       return { logs }
     } catch (error) {
-      throw { error, type: 'server' }
+      await saveServerLog(error)
+      throw new Error(error)
     }
   })
 }

@@ -1,15 +1,11 @@
 
-const { verifyUserId } = require('../../../libs/common')
 const { setDefaultConfiguration } = require('../../../libs/applications/configuration')
 const { docker } = require('../../../libs/docker')
+const { saveServerLog } = require('../../../libs/logging')
 
 module.exports = async function (fastify) {
   fastify.post('/', async (request, reply) => {
     try {
-      if (!await verifyUserId(request.headers.authorization)) {
-        reply.code(500).send({ error: 'Invalid request' })
-        return
-      }
       const configuration = setDefaultConfiguration(request.body)
 
       const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
@@ -34,7 +30,8 @@ module.exports = async function (fastify) {
       }
       return { message: 'OK' }
     } catch (error) {
-      throw { error, type: 'server' }
+      await saveServerLog(error)
+      throw new Error(error)
     }
   })
 }

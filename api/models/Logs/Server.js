@@ -2,10 +2,11 @@ const mongoose = require('mongoose')
 const { version } = require('../../../package.json')
 const logSchema = mongoose.Schema(
   {
-    version: { type: String, required: true, default: version },
-    type: { type: String, required: true, enum: ['API', 'UPGRADE-P-1', 'UPGRADE-P-2'], default: 'API' },
-    event: { type: String, required: true },
-    seen: { type: Boolean, required: true, default: false }
+    version: { type: String, default: version },
+    type: { type: String, required: true },
+    message: { type: String, required: true },
+    stack: { type: String },
+    seen: { type: Boolean, default: false }
   },
   { timestamps: { createdAt: 'createdAt', updatedAt: false } }
 )
