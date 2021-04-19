@@ -110,7 +110,7 @@
 {#await verifyToken() then notUsed}
   {#if showAck}
     <div
-      class="p-2 fixed top-0 right-0 z-50 w-64 m-2 rounded border-gradient-full"
+      class="p-2 fixed top-0 right-0 z-50 w-64 m-2 rounded border-gradient-full bg-black"
     >
       <div class="text-white text-xs space-y-2 text-justify font-medium">
         <div>
