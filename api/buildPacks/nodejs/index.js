@@ -7,11 +7,11 @@ const publishNodejsDocker = (configuration) => {
     'FROM node:lts',
     'WORKDIR /usr/src/app',
     configuration.build.command.build
-      ? `COPY --from=${configuration.build.container.name}:${configuration.build.container.tag} /usr/src/app/${configuration.publish.directory} .`
+      ? `COPY --from=${configuration.build.container.name}:${configuration.build.container.tag} /usr/src/app/${configuration.publish.directory} ./`
       : `
-      COPY ${configuration.build.directory}/package*.json .
+      COPY ${configuration.build.directory}/package*.json ./
       RUN ${configuration.build.command.installation}
-      COPY ./${configuration.build.directory} .`,
+      COPY ./${configuration.build.directory} ./`,
     `EXPOSE ${configuration.publish.port}`,
     'CMD [ "yarn", "start" ]'
   ].join('\n')

@@ -4,9 +4,9 @@ const buildImageNodeDocker = (configuration) => {
   return [
     'FROM node:lts',
     'WORKDIR /usr/src/app',
-    `COPY ${configuration.build.directory}/package*.json .`,
+    `COPY ${configuration.build.directory}/package*.json ./`,
     configuration.build.command.installation && `RUN ${configuration.build.command.installation}`,
-    `COPY ./${configuration.build.directory} .`,
+    `COPY ./${configuration.build.directory} ./`,
     `RUN ${configuration.build.command.build}`
   ].join('\n')
 }
