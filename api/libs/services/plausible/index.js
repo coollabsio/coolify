@@ -93,7 +93,9 @@ async function plausible ({ email, userName, userPassword, baseURL }) {
             '.entrypoints=websecure',
             'traefik.http.routers.' +
             deployId +
-            '.rule=Host(`plausible.com`) && PathPrefix(`/`)',
+            '.rule=Host(`' +
+            baseURL +
+            '`) && PathPrefix(`/`)',
             'traefik.http.routers.' +
             deployId +
             '.tls.certresolver=letsencrypt',
