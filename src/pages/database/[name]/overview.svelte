@@ -73,6 +73,13 @@
             class="w-full"
             value="{`http://${$database.envs.COUCHDB_USER}:${$database.envs.COUCHDB_PASSWORD}@${$database.config.general.deployId}:5984`}"
           ></textarea>
+          {:else if $database.config.general.type === "clickhouse"}
+          <!-- {JSON.stringify($database)} -->
+          <!-- <textarea
+          disabled
+          class="w-full"
+          value="{`postgresql://${$database.envs.POSTGRESQL_USERNAME}:${$database.envs.POSTGRESQL_PASSWORD}@${$database.config.general.deployId}:5432/${$database.envs.POSTGRESQL_DATABASE}`}"
+        ></textarea> -->
         {/if}
       </div>
     </div>

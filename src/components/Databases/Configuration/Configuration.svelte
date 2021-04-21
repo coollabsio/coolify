@@ -58,13 +58,13 @@
       >
         Couchdb
       </button>
-      <button
+      <!-- <button
       class="button bg-gray-500 p-2 text-white hover:bg-yellow-500 cursor-pointer w-32"
       on:click="{() => (type = 'clickhouse')}"
       class:bg-yellow-500="{type === 'clickhouse'}"
     >
       Clickhouse
-    </button>
+    </button> -->
     </div>
     {#if type}
       <div>

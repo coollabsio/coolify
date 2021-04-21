@@ -18,13 +18,15 @@ module.exports = async function (fastify) {
       const database = (await docker.engine.listServices()).find(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'database' && JSON.parse(r.Spec.Labels.configuration).general.deployId === deployId)
       if (database) {
         const jsonEnvs = {}
-        for (const d of database.Spec.TaskTemplate.ContainerSpec.Env) {
-          const s = d.split('=')
-          jsonEnvs[s[0]] = s[1]
+        if (database.Spec.TaskTemplate.ContainerSpec.Env) {
+          for (const d of database.Spec.TaskTemplate.ContainerSpec.Env) {
+            const s = d.split('=')
+            jsonEnvs[s[0]] = s[1]
+          }
         }
         const payload = {
           config: JSON.parse(database.Spec.Labels.configuration),
-          envs: jsonEnvs
+          envs: jsonEnvs || null
         }
         reply.code(200).send(payload)
       } else {

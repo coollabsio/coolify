@@ -19,10 +19,16 @@
     }
   }
   async function activate() {
-    await $fetch(`/api/v1/services/deploy/${name}/activate`, {
-      method:"PATCH",
-      body: {}
-    });
+    try {
+      await $fetch(`/api/v1/services/deploy/${name}/activate`, {
+        method: "PATCH",
+        body: {},
+      });
+      toast.push(`All users are activated for Plausible.`);
+    } catch (error) {
+      console.log(error);
+      toast.push(`Ooops, there was an error activating users for Plausible?!`);
+    }
   }
 </script>
 
@@ -53,9 +59,12 @@
   </div>
   <div class="space-y-2 max-w-4xl mx-auto px-6" in:fade="{{ duration: 100 }}">
     <div class="block text-center py-4">
-    {#if name === "plausible"}
-      <button class="button bg-blue-500 hover:bg-blue-400 p-2" on:click={activate}>Activate All Users</button>
-    {/if}
+      {#if name === "plausible"}
+        <button
+          class="button bg-blue-500 hover:bg-blue-400 p-2"
+          on:click="{activate}">Activate All Users</button
+        >
+      {/if}
     </div>
   </div>
 {/await}
