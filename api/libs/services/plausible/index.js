@@ -4,7 +4,7 @@ const fs = require('fs').promises
 const generator = require('generate-password')
 const { docker } = require('../../docker')
 
-async function plausible ({ email, userName, userPassword, baseURL }) {
+async function plausible ({ email, userName, userPassword, baseURL, traefikURL }) {
   const deployId = 'plausible'
   const workdir = '/tmp/plausible'
   const secretKey = generator.generate({ length: 64, numbers: true, strict: true })
@@ -94,7 +94,7 @@ async function plausible ({ email, userName, userPassword, baseURL }) {
             'traefik.http.routers.' +
             deployId +
             '.rule=Host(`' +
-            baseURL +
+            traefikURL +
             '`) && PathPrefix(`/`)',
             'traefik.http.routers.' +
             deployId +
