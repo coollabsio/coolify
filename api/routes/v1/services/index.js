@@ -7,9 +7,10 @@ module.exports = async function (fastify) {
     try {
       const service = (await docker.engine.listServices()).find(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'service' && r.Spec.Labels.serviceName === serviceName)
       console.log(service)
+      console.log(typeof service)
       if (service) {
         const payload = {
-          config: JSON.parse(service.Spec.Labels.configuration)
+          config: service.Spec.Labels.configuration
         }
         reply.code(200).send(payload)
       } else {
