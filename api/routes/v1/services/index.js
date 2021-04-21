@@ -5,12 +5,10 @@ module.exports = async function (fastify) {
   fastify.get('/:serviceName', async (request, reply) => {
     const { serviceName } = request.params
     try {
-      const service = (await docker.engine.listServices()).find(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'service' && r.Spec.Labels.serviceName === serviceName)
-      console.log(service)
-      console.log(typeof service)
+      const service = (await docker.engine.listServices()).find(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'service' && r.Spec.Labels.serviceName === serviceName && r.Spec.Name === `${serviceName}_${serviceName}`)
       if (service) {
         const payload = {
-          config: service.Spec.Labels.configuration
+          config: JSON.parse(service.Spec.Labels.configuration)
         }
         reply.code(200).send(payload)
       } else {
