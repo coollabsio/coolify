@@ -6,7 +6,7 @@ module.exports = async function (fastify) {
     const { serviceName } = request.params
     try {
       const service = (await docker.engine.listServices()).find(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'service' && r.Spec.Labels.serviceName === serviceName)
-
+      console.log(service)
       if (service) {
         const payload = {
           config: JSON.parse(service.Spec.Labels.configuration)
@@ -16,6 +16,7 @@ module.exports = async function (fastify) {
         throw new Error()
       }
     } catch (error) {
+      console.log(error)
       throw new Error('No service found?')
     }
   })
