@@ -39,12 +39,12 @@
 </div>
 <div in:fade="{{ duration: 100 }}">
   {#if $deployments.applications?.deployed.length > 0}
-    <div class="px-4 mx-auto py-5">
+    <div class="px-4 mx-auto py-5 z-auto">
       <div class="flex items-center justify-center flex-wrap">
         {#each $deployments.applications.deployed as application}
           <div class="px-4 pb-4">
             <div
-              class="relative rounded-xl py-6 w-52 h-32 bg-warmGray-800 hover:bg-green-500 text-white shadow-md cursor-pointer ease-in-out transform hover:scale-105 duration-200 hover:rotate-1 group"
+              class="relative rounded-xl p-6 bg-warmGray-800 border-2 border-dashed border-transparent hover:border-green-500 text-white shadow-md cursor-pointer ease-in-out transform hover:scale-105 duration-100 group"
               on:click="{() =>
                 switchTo({
                   branch:
@@ -199,7 +199,7 @@
                 {/if}
                 <div class="flex flex-col justify-center items-center w-full">
                   <div
-                    class="text-xs font-bold text-center w-full text-warmGray-300 group-hover:text-white pb-6"
+                    class="text-base font-bold text-center w-full text-white pb-6"
                   >
                     {application.Spec.Labels.configuration.publish
                       .domain}{application.Spec.Labels.configuration.publish

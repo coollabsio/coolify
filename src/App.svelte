@@ -31,7 +31,7 @@
     @apply bg-warmGray-700 !important;
   }
   :global(input) {
-    @apply text-sm rounded py-2 px-6 font-bold bg-warmGray-800 text-white transition duration-150 outline-none !important;
+    @apply text-sm rounded py-2 px-6 font-bold bg-warmGray-800 text-white transition duration-150 outline-none border border-transparent !important;
   }
   :global(input:hover) {
     @apply bg-warmGray-700 !important;

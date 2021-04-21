@@ -23,9 +23,10 @@ module.exports = async function (fastify) {
         }
       ])
       const serverLogs = await ServerLog.find()
-      const services = await docker.engine.listServices()
-      let applications = services.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application' && r.Spec.Labels.configuration)
-      let databases = services.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'database' && r.Spec.Labels.configuration)
+      const dockerServices = await docker.engine.listServices()
+      let applications = dockerServices.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application' && r.Spec.Labels.configuration)
+      let databases = dockerServices.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'database' && r.Spec.Labels.configuration)
+      let services = dockerServices.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'service' && r.Spec.Labels.configuration)
       applications = applications.map(r => {
         if (JSON.parse(r.Spec.Labels.configuration)) {
           const configuration = JSON.parse(r.Spec.Labels.configuration)
@@ -41,6 +42,11 @@ module.exports = async function (fastify) {
         r.Spec.Labels.configuration = configuration
         return r
       })
+      services = services.map(r => {
+        const configuration = r.Spec.Labels.configuration ? JSON.parse(r.Spec.Labels.configuration) : null
+        r.Spec.Labels.configuration = configuration
+        return r
+      })
       applications = [...new Map(applications.map(item => [item.Spec.Labels.configuration.publish.domain + item.Spec.Labels.configuration.publish.path, item])).values()]
       return {
         serverLogs,
@@ -49,6 +55,9 @@ module.exports = async function (fastify) {
         },
         databases: {
           deployed: databases
+        },
+        services: {
+          deployed: services
         }
       }
     } catch (error) {

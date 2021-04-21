@@ -10,7 +10,7 @@
     Overview of
     <a
       target="_blank"
-      class="text-green-500 hover:underline cursor-pointer px-2"
+      class="hover:underline cursor-pointer px-2"
       href="{'https://' +
         $application.publish.domain +
         $application.publish.path}">{$application.publish.domain}</a
