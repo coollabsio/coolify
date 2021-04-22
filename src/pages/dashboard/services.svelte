@@ -57,7 +57,7 @@
                     <img
                       alt="plausible logo"
                       class="w-10 absolute top-0 left-0 -m-6"
-                      src="/logos/plausible_logo_sm.png"
+                      src="https://cdn.coollabs.io/assets/coolify/services/plausible/logo_sm.png"
                     />
                     <div class="text-white font-bold">Plausible Analytics</div>
                   </div>
