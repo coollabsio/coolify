@@ -2,7 +2,7 @@ const { uniqueNamesGenerator, adjectives, colors, animals } = require('unique-na
 const cuid = require('cuid')
 const crypto = require('crypto')
 const { docker } = require('../docker')
-const { execShellAsync } = require('../common')
+const { execShellAsync, baseServiceConfiguration } = require('../common')
 
 function getUniq () {
   return uniqueNamesGenerator({ dictionaries: [adjectives, animals, colors], length: 2 })
@@ -14,25 +14,6 @@ function setDefaultConfiguration (configuration) {
 
   const shaBase = JSON.stringify({ repository: configuration.repository })
   const sha256 = crypto.createHash('sha256').update(shaBase).digest('hex')
-
-  const baseServiceConfiguration = {
-    replicas: 1,
-    restart_policy: {
-      condition: 'any',
-      max_attempts: 3
-    },
-    update_config: {
-      parallelism: 1,
-      delay: '10s',
-      order: 'start-first'
-    },
-    rollback_config: {
-      parallelism: 1,
-      delay: '10s',
-      order: 'start-first',
-      failure_action: 'rollback'
-    }
-  }
 
   configuration.build.container.name = sha256.slice(0, 15)
 
@@ -133,4 +114,4 @@ async function precheckDeployment ({ services, configuration }) {
     forceUpdate
   }
 }
-module.exports = { setDefaultConfiguration, updateServiceLabels, precheckDeployment }
+module.exports = { setDefaultConfiguration, updateServiceLabels, precheckDeployment, baseServiceConfiguration }

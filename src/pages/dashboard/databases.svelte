@@ -49,6 +49,7 @@
   import Postgresql from "../../components/Databases/SVGs/Postgresql.svelte";
   import Mysql from "../../components/Databases/SVGs/Mysql.svelte";
   import CouchDb from "../../components/Databases/SVGs/CouchDb.svelte";
+  import Clickhouse from "../../components/Databases/SVGs/Clickhouse.svelte";
   const initialNumberOfDBs = $deployments.databases?.deployed.length;
   $: if ($deployments.databases?.deployed.length) {
     if (initialNumberOfDBs !== $deployments.databases?.deployed.length) {
@@ -86,15 +87,15 @@
       <div class="flex items-center justify-center flex-wrap">
         {#each $deployments.databases.deployed as database}
           <div
-          in:fade="{{ duration: 200 }}"
+            in:fade="{{ duration: 200 }}"
             class="px-4 pb-4"
             on:click="{() =>
               $goto(
-                `/database/${database.Spec.Labels.configuration.general.deployId}/overview`,
+                `/database/${database.Spec.Labels.configuration.general.deployId}/configuration`,
               )}"
           >
             <div
-              class="relative rounded-xl p-6 w-52 h-32 bg-warmGray-800 hover:bg-purple-500 text-white shadow-md cursor-pointer ease-in-out transform hover:scale-105 duration-200 hover:rotate-1 group"
+              class="relative rounded-xl p-6 bg-warmGray-800 border-2 border-dashed border-transparent hover:border-purple-500 text-white shadow-md cursor-pointer ease-in-out transform hover:scale-105 duration-100 group"
             >
               <div class="flex items-center">
                 {#if database.Spec.Labels.configuration.general.type == "mongodb"}
@@ -109,11 +110,20 @@
                   <CouchDb
                     customClass="w-10 h-10 fill-current text-red-600 absolute top-0 left-0 -m-4"
                   />
+                {:else if database.Spec.Labels.configuration.general.type == "clickhouse"}
+                  <Clickhouse
+                    customClass="w-10 h-10 fill-current text-red-600 absolute top-0 left-0 -m-4"
+                  />
                 {/if}
-                <div
-                  class="text-xs font-bold text-center w-full text-warmGray-300  group-hover:text-white"
-                >
-                  {database.Spec.Labels.configuration.general.nickname}
+                <div class="text-center w-full">
+                  <div
+                    class="text-base font-bold text-white group-hover:text-white"
+                  >
+                    {database.Spec.Labels.configuration.general.nickname}
+                  </div>
+                  <div class="text-xs font-bold text-warmGray-300 ">
+                    ({database.Spec.Labels.configuration.general.type})
+                  </div>
                 </div>
               </div>
             </div>
@@ -121,27 +131,26 @@
         {/each}
         {#if $dbInprogress}
           <div class=" px-4 pb-4">
-            <div class="gradient-border text-xs font-bold text-warmGray-300 pt-6">
+            <div
+              class="gradient-border text-xs font-bold text-warmGray-300 pt-6"
+            >
               Working...
             </div>
           </div>
         {/if}
       </div>
     </div>
-  {:else}
-
-    {#if $dbInprogress}
+  {:else if $dbInprogress}
     <div class="px-4 mx-auto py-5">
-    <div class="flex items-center justify-center flex-wrap">
-    <div class=" px-4 pb-4">
-      <div class="gradient-border text-xs font-bold text-warmGray-300 pt-6">
-        Working...
+      <div class="flex items-center justify-center flex-wrap">
+        <div class=" px-4 pb-4">
+          <div class="gradient-border text-xs font-bold text-warmGray-300 pt-6">
+            Working...
+          </div>
+        </div>
       </div>
     </div>
-    </div>
-  </div>
-    {:else}
+  {:else}
     <div class="text-2xl font-bold text-center">No databases found</div>
-  {/if}
   {/if}
 </div>

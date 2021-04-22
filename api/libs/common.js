@@ -6,6 +6,24 @@ const User = require('../models/User')
 const algorithm = 'aes-256-cbc'
 const key = process.env.SECRETS_ENCRYPTION_KEY
 
+const baseServiceConfiguration = {
+  replicas: 1,
+  restart_policy: {
+    condition: 'any',
+    max_attempts: 3
+  },
+  update_config: {
+    parallelism: 1,
+    delay: '10s',
+    order: 'start-first'
+  },
+  rollback_config: {
+    parallelism: 1,
+    delay: '10s',
+    order: 'start-first',
+    failure_action: 'rollback'
+  }
+}
 function delay (t) {
   return new Promise(function (resolve) {
     setTimeout(function () {
@@ -94,5 +112,6 @@ module.exports = {
   checkImageAvailable,
   encryptData,
   decryptData,
-  verifyUserId
+  verifyUserId,
+  baseServiceConfiguration
 }

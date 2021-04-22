@@ -58,6 +58,13 @@
       >
         Couchdb
       </button>
+      <!-- <button
+      class="button bg-gray-500 p-2 text-white hover:bg-yellow-500 cursor-pointer w-32"
+      on:click="{() => (type = 'clickhouse')}"
+      class:bg-yellow-500="{type === 'clickhouse'}"
+    >
+      Clickhouse
+    </button> -->
     </div>
     {#if type}
       <div>
@@ -81,6 +88,8 @@
           class:hover:bg-orange-500="{type === 'mysql'}"
           class:bg-red-600="{type === 'couchdb'}"
           class:hover:bg-red-500="{type === 'couchdb'}"
+          class:bg-yellow-500="{type === 'clickhouse'}"
+          class:hover:bg-yellow-400="{type === 'clickhouse'}"
           class="button p-2 w-32 text-white"
           on:click="{deploy}">Deploy</button
         >

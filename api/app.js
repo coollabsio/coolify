@@ -12,6 +12,8 @@ module.exports = async function (fastify, opts) {
     server.register(require('./routes/v1/application/deploy'), { prefix: '/application/deploy' })
     server.register(require('./routes/v1/application/deploy/logs'), { prefix: '/application/deploy/logs' })
     server.register(require('./routes/v1/databases'), { prefix: '/databases' })
+    server.register(require('./routes/v1/services'), { prefix: '/services' })
+    server.register(require('./routes/v1/services/deploy'), { prefix: '/services/deploy' })
     server.register(require('./routes/v1/server'), { prefix: '/server' })
   })
   // Public routes

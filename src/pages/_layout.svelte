@@ -145,7 +145,7 @@
         <img class="w-10 pt-4 pb-4" src="/favicon.png" alt="coolLabs logo" />
         <Tooltip position="right" label="Applications">
           <div
-            class="p-2 hover:bg-warmGray-700 rounded hover:text-green-500 my-4 transition-all duration-100 cursor-pointer"
+            class="p-2 hover:bg-warmGray-700 rounded hover:text-green-500 mt-4 transition-all duration-100 cursor-pointer"
             on:click="{() => $goto('/dashboard/applications')}"
             class:text-green-500="{$isActive('/dashboard/applications') ||
               $isActive('/application')}"
@@ -185,7 +185,7 @@
         </Tooltip>
         <Tooltip position="right" label="Databases">
           <div
-            class="p-2 hover:bg-warmGray-700 rounded hover:text-purple-500 transition-all duration-100 cursor-pointer"
+            class="p-2 hover:bg-warmGray-700 rounded hover:text-purple-500 my-4 transition-all duration-100 cursor-pointer"
             on:click="{() => $goto('/dashboard/databases')}"
             class:text-purple-500="{$isActive('/dashboard/databases') ||
               $isActive('/database')}"
@@ -206,6 +206,20 @@
                 d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
               ></path>
             </svg>
+          </div>
+        </Tooltip>
+        <Tooltip position="right" label="Services">
+          <div
+            class="p-2 hover:bg-warmGray-700 rounded hover:text-blue-500 transition-all duration-100 cursor-pointer"
+            on:click="{() => $goto('/dashboard/services')}"
+            class:text-blue-500="{$isActive('/dashboard/services') ||
+              $isActive('/service')}"
+            class:bg-warmGray-700="{$isActive('/dashboard/services') ||
+              $isActive('/service')}"
+          >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+          </svg>
           </div>
         </Tooltip>
         <div class="flex-1"></div>

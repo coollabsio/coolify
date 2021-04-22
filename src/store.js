@@ -219,3 +219,18 @@ export const database = writable({
 })
 
 export const dbInprogress = writable(false)
+
+export const newService = writable({
+  email: null,
+  userName: 'admin',
+  userPassword: null,
+  userPasswordAgain: null,
+  baseURL: null
+})
+export const initialNewService = {
+  email: null,
+  userName: 'admin',
+  userPassword: null,
+  userPasswordAgain: null,
+  baseURL: null
+}

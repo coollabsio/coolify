@@ -18,13 +18,15 @@ module.exports = async function (fastify) {
       const database = (await docker.engine.listServices()).find(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'database' && JSON.parse(r.Spec.Labels.configuration).general.deployId === deployId)
       if (database) {
         const jsonEnvs = {}
-        for (const d of database.Spec.TaskTemplate.ContainerSpec.Env) {
-          const s = d.split('=')
-          jsonEnvs[s[0]] = s[1]
+        if (database.Spec.TaskTemplate.ContainerSpec.Env) {
+          for (const d of database.Spec.TaskTemplate.ContainerSpec.Env) {
+            const s = d.split('=')
+            jsonEnvs[s[0]] = s[1]
+          }
         }
         const payload = {
           config: JSON.parse(database.Spec.Labels.configuration),
-          envs: jsonEnvs
+          envs: jsonEnvs || null
         }
         reply.code(200).send(payload)
       } else {
@@ -39,7 +41,7 @@ module.exports = async function (fastify) {
     body: {
       type: 'object',
       properties: {
-        type: { type: 'string', enum: ['mongodb', 'postgresql', 'mysql', 'couchdb'] }
+        type: { type: 'string', enum: ['mongodb', 'postgresql', 'mysql', 'couchdb', 'clickhouse'] }
       },
       required: ['type']
     }
@@ -82,9 +84,11 @@ module.exports = async function (fastify) {
           name: nickname
         }
       }
+      await execShellAsync(`mkdir -p ${configuration.general.workdir}`)
       let generateEnvs = {}
       let image = null
       let volume = null
+      let ulimits = {}
       if (type === 'mongodb') {
         generateEnvs = {
           MONGODB_ROOT_PASSWORD: passwords[0],
@@ -119,6 +123,15 @@ module.exports = async function (fastify) {
         }
         image = 'bitnami/mysql:8.0'
         volume = `${configuration.general.deployId}-${type}-data:/bitnami/mysql/data`
+      } else if (type === 'clickhouse') {
+        image = 'yandex/clickhouse-server'
+        volume = `${configuration.general.deployId}-${type}-data:/var/lib/clickhouse`
+        ulimits = {
+          nofile: {
+            soft: 262144,
+            hard: 262144
+          }
+        }
       }
 
       const stack = {
@@ -129,6 +142,7 @@ module.exports = async function (fastify) {
             networks: [`${docker.network}`],
             environment: generateEnvs,
             volumes: [volume],
+            ulimits,
             deploy: {
               replicas: 1,
               update_config: {
@@ -160,12 +174,12 @@ module.exports = async function (fastify) {
           }
         }
       }
-      await execShellAsync(`mkdir -p ${configuration.general.workdir}`)
       await fs.writeFile(`${configuration.general.workdir}/stack.yml`, yaml.dump(stack))
       await execShellAsync(
-              `cat ${configuration.general.workdir}/stack.yml | docker stack deploy -c - ${configuration.general.deployId}`
+        `cat ${configuration.general.workdir}/stack.yml | docker stack deploy -c - ${configuration.general.deployId}`
       )
     } catch (error) {
+      console.log(error)
       await saveServerLog(error)
       throw new Error(error)
     }

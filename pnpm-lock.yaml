@@ -3,7 +3,7 @@ lockfileVersion: 5.3
 specifiers:
   '@iarna/toml': ^2.2.5
   '@roxi/routify': ^2.15.1
-  '@zerodevx/svelte-toast': ^0.2.1
+  '@zerodevx/svelte-toast': ^0.2.2
   ajv: ^8.1.0
   axios: ^0.21.1
   commander: ^7.2.0
@@ -45,7 +45,7 @@ specifiers:
 dependencies:
   '@iarna/toml': 2.2.5
   '@roxi/routify': 2.15.1
-  '@zerodevx/svelte-toast': 0.2.1
+  '@zerodevx/svelte-toast': 0.2.2
   ajv: 8.1.0
   axios: 0.21.1
   commander: 7.2.0
@@ -563,8 +563,8 @@ packages:
     resolution: {integrity: sha512-b+zB8A2so8eCE0JsxjL24J7vdGl8rzPQ09hZNhystm+KqSbKcAej1A+Hbva1rCMmTTqA+hFnUSDc5kouEo0JzA==}
     dev: true
 
-  /@zerodevx/svelte-toast/0.2.1:
-    resolution: {integrity: sha512-3yOusE+/xDaVNxkBJwbxDZea5ePQ77B15tbHv6ZlSYtlJu0u0PDhGMu8eoI+SmcCt4j+2sf0A1uS9+LcBIqUgg==}
+  /@zerodevx/svelte-toast/0.2.2:
+    resolution: {integrity: sha512-zriB7tSY54OEbRDqJ1NbHBv5Z83tWKhqqW7a+z8HMtZeR49zZUMLISFXmY7B8tMwzO6auB3A5dxuFyqB9+TZkQ==}
     dev: false
 
   /abab/2.0.5:
