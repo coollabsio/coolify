@@ -5,7 +5,7 @@
   import Loading from "../../../../components/Loading.svelte";
   import TooltipInfo from "../../../../components/Tooltip/TooltipInfo.svelte";
   import { toast } from "@zerodevx/svelte-toast";
-  
+
   $: type = $params.type;
   $: deployable =
     $newService.baseURL === "" ||
@@ -27,7 +27,10 @@
       await $fetch(`/api/v1/services/deploy/${type}`, {
         body: payload,
       });
-      toast.push("Service deployment queued.");
+      toast.push(
+        "Service deployment queued.<br><br><br>It could take 2-5 minutes to be ready, be patient and grab a coffee/tea!",
+        { duration: 4000 },
+      );
       $redirect(`/dashboard/services`);
     } catch (error) {
       console.log(error);
