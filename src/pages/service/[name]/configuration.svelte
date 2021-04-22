@@ -5,6 +5,7 @@
   import { toast } from "@zerodevx/svelte-toast";
 
   import Loading from "../../../components/Loading.svelte";
+  import Plausible from "../../../components/Services/Plausible.svelte";
 
   $: name = $params.name;
   let service = {};
@@ -44,7 +45,7 @@
         target="_blank"
         class="inline-flex hover:underline cursor-pointer px-2"
       >
-        <div>{name}</div>
+        <div>{name === "plausible" ? "Plausible Analytics" : name}</div>
         <div class="px-4">
           {#if name === "plausible"}
             <img
@@ -60,10 +61,7 @@
   <div class="space-y-2 max-w-4xl mx-auto px-6" in:fade="{{ duration: 100 }}">
     <div class="block text-center py-4">
       {#if name === "plausible"}
-        <button
-          class="button bg-blue-500 hover:bg-blue-400 p-2"
-          on:click="{activate}">Activate All Users</button
-        >
+        <Plausible {service}/>
       {/if}
     </div>
   </div>

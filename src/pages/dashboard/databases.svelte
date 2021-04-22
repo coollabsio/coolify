@@ -91,7 +91,7 @@
             class="px-4 pb-4"
             on:click="{() =>
               $goto(
-                `/database/${database.Spec.Labels.configuration.general.deployId}/overview`,
+                `/database/${database.Spec.Labels.configuration.general.deployId}/configuration`,
               )}"
           >
             <div
