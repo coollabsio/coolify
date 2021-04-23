@@ -10,7 +10,7 @@ const baseServiceConfiguration = {
   replicas: 1,
   restart_policy: {
     condition: 'any',
-    max_attempts: 3
+    max_attempts: 6
   },
   update_config: {
     parallelism: 1,
