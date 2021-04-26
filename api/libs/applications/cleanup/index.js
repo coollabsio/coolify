@@ -2,9 +2,12 @@ const { docker } = require('../../docker')
 const { execShellAsync } = require('../../common')
 const Deployment = require('../../../models/Deployment')
 
-async function purgeImagesContainers () {
+async function purgeImagesContainers (configuration) {
+  const { name, tag } = configuration.build.container
   await execShellAsync('docker container prune -f')
-  await execShellAsync('docker image prune -f --filter=label!=coolify-reserve=true')
+  const IDsToDelete = (await execShellAsync(`docker images ls --filter=reference='${name}' --filter=before='${name}:${tag}' --format '{{json .ID }}'`)).trim().replace(/"/g, '').split('\n')
+  if (IDsToDelete.length !== 0) for (const id of IDsToDelete) await execShellAsync(`docker rmi -f ${id}`)
+  await execShellAsync('docker image prune -f')
 }
 
 async function cleanupStuckedDeploymentsInDB () {

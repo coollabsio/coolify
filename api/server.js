@@ -102,16 +102,11 @@ mongoose.connection.once('open', async function () {
     // Doing because I do not want to prune these images. Prune skips coolify-reserve labeled images.
     const basicImages = ['nginx:stable-alpine', 'node:lts', 'ubuntu:20.04', 'php:apache', 'rust:latest']
     for (const image of basicImages) {
-      await execShellAsync(`echo "FROM ${image}" | docker build --label coolify-reserve=true -t ${image} -`)
+      // await execShellAsync(`echo "FROM ${image}" | docker build --label coolify-reserve=true -t ${image} -`)
+      await execShellAsync(`docker pull ${image}`)
     }
   } catch (error) {
     console.log('Could not pull some basic images from Docker Hub.')
-    console.log(error)
-  }
-  try {
-    await purgeImagesContainers()
-  } catch (error) {
-    console.log('Could not purge containers/images.')
     console.log(error)
   }
 })
