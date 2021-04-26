@@ -80,11 +80,8 @@
     </div>
     {#if $database.config.general.type === "mongodb"}
       <div class="flex items-center">
-        <div class="font-bold w-48 text-warmGray-400">Root password</div>
-        <textarea
-          disabled
-          class="w-full"
-          value="{$database.envs.MONGODB_ROOT_PASSWORD}"></textarea>
+        <div class="font-bold w-64 text-warmGray-400">Root password</div>
+        <PasswordField value="{$database.envs.MONGODB_ROOT_PASSWORD}" />
       </div>
     {/if}
   </div>

@@ -149,16 +149,34 @@
     <div
       class="py-5 text-left px-6 text-3xl tracking-tight font-bold flex items-center"
     >
+      {$application.publish.domain
+        ? `${$application.publish.domain}${
+            $application.publish.path !== "/" ? $application.publish.path : ""
+          }`
+        : "<yourdomain>"}
       <a
         target="_blank"
-        class="text-green-500 hover:underline cursor-pointer px-2"
+        class="icon mx-2"
         href="{'https://' +
           $application.publish.domain +
           $application.publish.path}"
-        >{$application.publish.domain
-          ? `${$application.publish.domain}${$application.publish.path !== '/' ? $application.publish.path : ''}`
-          : "<yourdomain>"}</a
       >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-6 w-6"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+          ></path>
+        </svg></a
+      >
+
       <a
         target="_blank"
         class="icon"
