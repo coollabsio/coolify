@@ -13,7 +13,7 @@ const templates = {
   nuxt: {
     pack: 'nodejs',
     ...defaultBuildAndDeploy,
-    port: 8080,
+    port: 3000,
     name: 'Nuxt'
   },
   'react-scripts': {

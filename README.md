@@ -22,17 +22,17 @@ A: It defines your application's final form.
 
 # Screenshots
 
-[Login](https://coollabs.io/coolify/login.jpg)
+[Login](https://coolify.io/login.jpg)
 
-[Applications](https://coollabs.io/coolify/applications.jpg)
+[Applications](https://coolify.io/applications.jpg)
 
-[Databases](https://coollabs.io/coolify/databases.jpg)
+[Databases](https://coolify.io/databases.jpg)
 
-[Configuration](https://coollabs.io/coolify/configuration.jpg)
+[Configuration](https://coolify.io/configuration.jpg)
 
-[Settings](https://coollabs.io/coolify/settings.jpg)
+[Settings](https://coolify.io/settings.jpg)
 
-[Logs](https://coollabs.io/coolify/logs.jpg)
+[Logs](https://coolify.io/logs.jpg)
 
 # Getting Started
 
