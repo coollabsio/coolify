@@ -94,9 +94,9 @@ module.exports = async function (fastify) {
         reply.code(200).send({ message: 'Already in the queue.' })
         return
       }
-      queueAndBuild(configuration, imageChanged)
 
       reply.code(201).send({ message: 'Deployment queued.', nickname: configuration.general.nickname, name: configuration.build.container.name })
+      await queueAndBuild(configuration, imageChanged)
     } catch (error) {
       const { id, organization, name, branch } = configuration.repository
       const { domain } = configuration.publish
