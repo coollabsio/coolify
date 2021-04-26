@@ -85,10 +85,8 @@ mongoose.connection.once('open', async function () {
     console.log('Coolify API is up and running in development.')
   }
   try {
-    const { main } = (await axios.get('https://get.coollabs.io/version.json')).data.coolify
-    if (main.clearServerLogs) {
-      await mongoose.connection.db.dropCollection('logs-servers')
-    }
+    // Always cleanup server logs
+    await mongoose.connection.db.dropCollection('logs-servers')
   } catch (error) {
     // Could not cleanup logs-servers collection
   }
