@@ -9,6 +9,7 @@ const { queueAndBuild } = require('../../../libs/applications')
 const { setDefaultConfiguration, precheckDeployment } = require('../../../libs/applications/configuration')
 const { docker } = require('../../../libs/docker')
 const cloneRepository = require('../../../libs/applications/github/cloneRepository')
+const { purgeImagesContainers } = require('../../../libs/applications/cleanup')
 
 module.exports = async function (fastify) {
   // TODO: Add this to fastify plugin
@@ -103,7 +104,6 @@ module.exports = async function (fastify) {
       await Deployment.findOneAndUpdate(
         { repoId: id, branch, deployId, organization, name, domain },
         { repoId: id, branch, deployId, organization, name, domain, progress: 'failed' })
-      cleanupTmp(configuration.general.workdir)
       if (error.name === 'Error') {
         // Error during runtime
         await new ApplicationLog({ repoId: id, branch, deployId, event: `[ERROR 😖]: ${error.stack}` }).save()
@@ -114,6 +114,9 @@ module.exports = async function (fastify) {
         if (reply.sent) await new ApplicationLog({ repoId: id, branch, deployId, event: `[ERROR 😖]: ${error.stack}` }).save()
       }
       throw new Error(error)
+    } finally {
+      cleanupTmp(configuration.general.workdir)
+      await purgeImagesContainers(configuration)
     }
   })
 }
