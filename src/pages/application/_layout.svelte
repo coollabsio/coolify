@@ -50,7 +50,7 @@ import Tooltip from "../../components/Tooltip/Tooltip.svelte";
 
   async function deploy() {
     try {
-      $application.build.pack = $application.build.pack.replace('.','').toLowerCase()
+      // $application.build.pack = $application.build.pack.replace('.','').toLowerCase()
       toast.push("Checking inputs.");
       await $fetch(`/api/v1/application/check`, {
         body: $application,
@@ -85,8 +85,8 @@ import Tooltip from "../../components/Tooltip/Tooltip.svelte";
       $application.publish.domain === null}"
     class:cursor-not-allowed="{$application.publish.domain === '' ||
       $application.publish.domain === null}"
-    class:hover:text-green-500="{$application.publish.domain}"
-    class:hover:bg-warmGray-700="{$application.publish.domain}"
+    class:hover:bg-green-400="{$application.publish.domain}"
+    class:bg-green-500="{$application.publish.domain}"
     class:hover:bg-transparent="{$isActive('/application/new')}"
     class:text-warmGray-700="{$application.publish.domain === '' ||
       $application.publish.domain === null}"

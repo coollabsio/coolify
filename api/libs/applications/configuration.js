@@ -23,14 +23,10 @@ function setDefaultConfiguration (configuration) {
 
   if (!configuration.publish.path) configuration.publish.path = '/'
   if (!configuration.publish.port) {
-    if (configuration.build.pack === 'php') {
-      configuration.publish.port = 80
-    } else if (configuration.build.pack === 'static') {
-      configuration.publish.port = 80
-    } else if (configuration.build.pack === 'nodejs') {
+    if (configuration.build.pack === 'nodejs' && configuration.build.pack === 'vuejs' && configuration.build.pack === 'nuxtjs' && configuration.build.pack === 'rust' && configuration.build.pack === 'nextjs') {
       configuration.publish.port = 3000
-    } else if (configuration.build.pack === 'rust') {
-      configuration.publish.port = 3000
+    } else {
+      configuration.publish.port = 80
     }
   }
 

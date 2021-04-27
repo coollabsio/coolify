@@ -8,7 +8,15 @@
   import BuildStep from "./ActiveTab/BuildStep.svelte";
   import Secrets from "./ActiveTab/Secrets.svelte";
   import Loading from "../../Loading.svelte";
-  const buildPhaseActive = ["nodejs", "static"];
+  const buildPhaseActive = [
+    "nodejs",
+    "static",
+    "nextjs",
+    "nuxtjs",
+    "svelte",
+    "react",
+    "gatsby",
+  ];
   let loading = false;
   onMount(async () => {
     if (!$isActive("/application/new")) {
@@ -40,7 +48,9 @@
             organization: $application.repository.organization,
             branch: $application.repository.branch,
           });
-          toast.push("This repository & branch is already defined. Redirecting...");
+          toast.push(
+            "This repository & branch is already defined. Redirecting...",
+          );
         }
       });
       try {
@@ -70,9 +80,11 @@
             if (checkPackageJSONContents(dep)) {
               const config = templates[dep];
               $application.build.pack = config.pack;
-              if (config.installation) $application.build.command.installation = config.installation;
+              if (config.installation)
+                $application.build.command.installation = config.installation;
               if (config.port) $application.publish.port = config.port;
-              if (config.directory) $application.publish.directory = config.directory;
+              if (config.directory)
+                $application.publish.directory = config.directory;
 
               if (
                 packageJsonContent.scripts.hasOwnProperty("build") &&
@@ -80,15 +92,15 @@
               ) {
                 $application.build.command.build = config.build;
               }
-              toast.push(`${config.name} App detected. Default values set.`);
+              toast.push(`${config.name} detected. Default values set.`);
             }
           });
         } else if (CargoToml) {
           $application.build.pack = "rust";
           toast.push(`Rust language detected. Default values set.`);
         } else if (Dockerfile) {
-          $application.build.pack = "custom";
-          toast.push("Custom Dockerfile found. Build pack set to custom.");
+          $application.build.pack = "docker";
+          toast.push("Custom Dockerfile found. Build pack set to docker.");
         }
       } catch (error) {
         // Nothing detected
@@ -141,19 +153,14 @@
           Build Step
         </div>
       {/if}
-      {#if $application.build.pack === "custom"}
-        <div disabled class="px-3 py-2 text-warmGray-700 cursor-not-allowed">
-          Secrets
-        </div>
-      {:else}
-        <div
-          on:click="{() => activateTab('secrets')}"
-          class:text-green-500="{activeTab.secrets}"
-          class="px-3 py-2 cursor-pointer hover:text-green-500"
-        >
-          Secrets
-        </div>
-      {/if}
+
+      <div
+        on:click="{() => activateTab('secrets')}"
+        class:text-green-500="{activeTab.secrets}"
+        class="px-3 py-2 cursor-pointer hover:text-green-500"
+      >
+        Secrets
+      </div>
     </nav>
   </div>
   <div class="max-w-4xl mx-auto">

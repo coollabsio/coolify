@@ -6,7 +6,7 @@ async function purgeImagesContainers (configuration) {
   const { name, tag } = configuration.build.container
   await execShellAsync('docker container prune -f')
   const IDsToDelete = (await execShellAsync(`docker images ls --filter=reference='${name}' --filter=before='${name}:${tag}' --format '{{json .ID }}'`)).trim().replace(/"/g, '').split('\n')
-  if (IDsToDelete.length !== 0) for (const id of IDsToDelete) await execShellAsync(`docker rmi -f ${id}`)
+  if (IDsToDelete.length > 1) for (const id of IDsToDelete) await execShellAsync(`docker rmi -f ${id}`)
   await execShellAsync('docker image prune -f')
 }
 

@@ -1,5 +1,6 @@
 const fs = require('fs').promises
 module.exports = async function (configuration) {
+  const staticDeployments = ['react', 'vuejs', 'static', 'svelte', 'gatsby']
   try {
     // TODO: Write full .dockerignore for all deployments!!
     if (configuration.build.pack === 'php') {
@@ -12,7 +13,7 @@ module.exports = async function (configuration) {
       `)
     }
     // await fs.writeFile(`${configuration.general.workdir}/.dockerignore`, 'node_modules')
-    if (configuration.build.pack === 'static') {
+    if (staticDeployments.includes(configuration.build.pack)) {
       await fs.writeFile(
         `${configuration.general.workdir}/nginx.conf`,
         `user  nginx;
