@@ -38,21 +38,21 @@
   </button>
 </div>
 <div in:fade="{{ duration: 100 }}">
-  {#if $deployments.services?.deployed.length > 0}
+  {#if $deployments?.services?.deployed.length > 0}
     <div class="px-4 mx-auto py-5">
       <div class="flex items-center justify-center flex-wrap">
-        {#each $deployments.services.deployed as service}
+        {#each $deployments?.services?.deployed as service}
           <div
             in:fade="{{ duration: 200 }}"
             class="px-4 pb-4"
             on:click="{() =>
-              $goto(`/service/${service.Spec.Labels.serviceName}/configuration`)}"
+              $goto(`/service/${service.serviceName}/configuration`)}"
           >
             <div
               class="relative rounded-xl p-6 bg-warmGray-800 border-2 border-dashed border-transparent hover:border-blue-500 text-white shadow-md cursor-pointer ease-in-out transform hover:scale-105 duration-100 group"
             >
               <div class="flex items-center">
-                {#if service.Spec.Labels.serviceName == "plausible"}
+                {#if service.serviceName == "plausible"}
                   <div>
                     <img
                       alt="plausible logo"

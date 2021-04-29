@@ -1,7 +1,7 @@
 <script>
   import { createEventDispatcher } from "svelte";
   import { isActive } from "@roxi/routify";
-  import { application } from "@store";
+  import { application, githubRepositories } from "@store";
   import Select from "svelte-select";
 
   function handleSelect(event) {
@@ -9,8 +9,7 @@
     dispatch("loadBranches");
   }
 
-  export let repositories;
-  let items = repositories.map(repo => ({
+  let items = $githubRepositories.map(repo => ({
     label: `${repo.owner.login}/${repo.name}`,
     value: repo.id.toString(),
   }));
@@ -23,8 +22,9 @@
   const modifyGithubAppConfig = () => dispatch("modifyGithubAppConfig");
 </script>
 
-<div class="grid grid-cols-1">
-  {#if repositories.length !== 0}
+<div class="text-2xl font-bold border-gradient w-40  pt-6">Repository</div>
+<div class="grid grid-cols-1 pt-4">
+  {#if $githubRepositories.length !== 0}
     <label for="repository">Organization / Repository</label>
     <div class="grid grid-cols-3 ">
       <div class="repository-select-search col-span-2">

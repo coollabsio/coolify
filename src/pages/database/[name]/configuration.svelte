@@ -49,8 +49,8 @@
   </div>
   <div class="text-left max-w-6xl mx-auto px-6" in:fade="{{ duration: 100 }}">
     <div class="pb-2 pt-5 space-y-4">
-      <div class="text-2xl font-bold py-4 border-gradient w-32">Database</div>
-      <div class="flex items-center">
+      <div class="text-2xl font-bold border-gradient w-32">Database</div>
+      <div class="flex items-center pt-4">
         <div class="font-bold w-64 text-warmGray-400">Connection string</div>
         {#if $database.config.general.type === "mongodb"}
           <PasswordField

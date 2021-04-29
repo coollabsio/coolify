@@ -5,18 +5,9 @@
   import templates from "../../../utils/templates";
   import { application, fetch, deployments } from "@store";
   import General from "./ActiveTab/General.svelte";
-  import BuildStep from "./ActiveTab/BuildStep.svelte";
   import Secrets from "./ActiveTab/Secrets.svelte";
   import Loading from "../../Loading.svelte";
-  const buildPhaseActive = [
-    "nodejs",
-    "static",
-    "nextjs",
-    "nuxtjs",
-    "svelte",
-    "react",
-    "gatsby",
-  ];
+
   let loading = false;
   onMount(async () => {
     if (!$isActive("/application/new")) {
@@ -35,13 +26,12 @@
       });
     } else {
       loading = true;
-      $deployments?.applications?.deployed.find(d => {
-        const conf = d?.Spec?.Labels.configuration;
+      $deployments?.applications?.deployed.find(configuration => {
         if (
-          conf?.repository?.organization ===
+          configuration?.repository?.organization ===
             $application.repository.organization &&
-          conf?.repository?.name === $application.repository.name &&
-          conf?.repository?.branch === $application.repository.branch
+          configuration?.repository?.name === $application.repository.name &&
+          configuration?.repository?.branch === $application.repository.branch
         ) {
           $redirect(`/application/:organization/:name/:branch/configuration`, {
             name: $application.repository.name,
@@ -128,7 +118,7 @@
 {#if loading}
   <Loading github githubLoadingText="Scanning repository..." />
 {:else}
-  <div class="block text-center py-4">
+  <div class="block text-center py-8">
     <nav
       class="flex space-x-4 justify-center font-bold text-md text-white"
       aria-label="Tabs"
@@ -136,30 +126,16 @@
       <div
         on:click="{() => activateTab('general')}"
         class:text-green-500="{activeTab.general}"
-        class="px-3 py-2 cursor-pointer hover:text-green-500"
+        class="px-3 py-2 cursor-pointer hover:bg-warmGray-700 rounded-lg transition duration-100"
       >
-        General
+      General
       </div>
-      {#if !buildPhaseActive.includes($application.build.pack)}
-        <div disabled class="px-3 py-2 text-warmGray-700 cursor-not-allowed">
-          Build Step
-        </div>
-      {:else}
-        <div
-          on:click="{() => activateTab('buildStep')}"
-          class:text-green-500="{activeTab.buildStep}"
-          class="px-3 py-2 cursor-pointer hover:text-green-500"
-        >
-          Build Step
-        </div>
-      {/if}
-
       <div
         on:click="{() => activateTab('secrets')}"
         class:text-green-500="{activeTab.secrets}"
-        class="px-3 py-2 cursor-pointer hover:text-green-500"
+        class="px-3 py-2 cursor-pointer hover:bg-warmGray-700 rounded-lg transition duration-100"
       >
-        Secrets
+      Secrets
       </div>
     </nav>
   </div>
@@ -167,8 +143,6 @@
     <div class="h-full">
       {#if activeTab.general}
         <General />
-      {:else if activeTab.buildStep}
-        <BuildStep />
       {:else if activeTab.secrets}
         <Secrets />
       {/if}

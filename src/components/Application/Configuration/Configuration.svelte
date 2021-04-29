@@ -1,8 +1,15 @@
 <script>
   import { redirect, isActive } from "@roxi/routify";
   import { fade } from "svelte/transition";
-  import { session, application, fetch, initialApplication } from "@store";
-
+  import {
+    session,
+    application,
+    fetch,
+    initialApplication,
+    githubRepositories,
+    githubInstallations,
+  } from "@store";
+  
   import Login from "./Login.svelte";
   import Loading from "../../Loading.svelte";
   import Repositories from "./Repositories.svelte";
@@ -15,7 +22,6 @@
   };
 
   let branches = [];
-  let repositories = [];
 
   function dashify(str, options) {
     if (typeof str !== "string") return str;
@@ -30,7 +36,7 @@
   async function loadBranches() {
     loading.branches = true;
     if ($isActive("/application/new")) $application.repository.branch = null;
-    const selectedRepository = repositories.find(
+    const selectedRepository = $githubRepositories.find(
       r => r.id === $application.repository.id,
     );
 
@@ -54,6 +60,21 @@
   }
 
   async function loadGithub() {
+    if ($githubRepositories.length > 0) {
+      $application.github.installation.id = $githubInstallations.id;
+      $application.github.app.id = $githubInstallations.app_id;
+      const foundRepositoryOnGithub = $githubRepositories.find(
+        r =>
+          r.full_name ===
+          `${$application.repository.organization}/${$application.repository.name}`,
+      );
+
+      if (foundRepositoryOnGithub) {
+        $application.repository.id = foundRepositoryOnGithub.id;
+        await loadBranches();
+      }
+      return;
+    }
     loading.github = true;
     try {
       const { installations } = await $fetch(
@@ -64,6 +85,7 @@
       }
       $application.github.installation.id = installations[0].id;
       $application.github.app.id = installations[0].app_id;
+      $githubInstallations = installations[0];
 
       let page = 1;
       let userRepos = 0;
@@ -72,21 +94,21 @@
         page,
       );
 
-      repositories = repositories.concat(data.repositories);
+      $githubRepositories = $githubRepositories.concat(data.repositories);
       userRepos = data.total_count;
 
-      if (userRepos > repositories.length) {
-        while (userRepos > repositories.length) {
+      if (userRepos > $githubRepositories.length) {
+        while (userRepos > $githubRepositories.length) {
           page = page + 1;
           const repos = await getGithubRepos(
             $application.github.installation.id,
             page,
           );
-          repositories = repositories.concat(repos.repositories);
+          $githubRepositories = $githubRepositories.concat(repos.repositories);
         }
       }
-
-      const foundRepositoryOnGithub = repositories.find(
+      // $githubRepositories = repositories;
+      const foundRepositoryOnGithub = $githubRepositories.find(
         r =>
           r.full_name ===
           `${$application.repository.organization}/${$application.repository.name}`,
@@ -137,7 +159,7 @@
           $application = JSON.parse(JSON.stringify(initialApplication));
         }
         branches = [];
-        repositories = [];
+        $githubRepositories = [];
         await loadGithub();
       }
     }, 100);
@@ -212,7 +234,7 @@
   {#if !$session.githubAppToken}
     <Login />
   {:else}
-    {#await loadGithub()}
+    {#await $githubRepositories.length === 0 && loadGithub()}
       <Loading github githubLoadingText="Loading repositories..." />
     {:then}
       {#if loading.github}
@@ -223,7 +245,6 @@
           in:fade="{{ duration: 100 }}"
         >
           <Repositories
-            bind:repositories
             on:loadBranches="{loadBranches}"
             on:modifyGithubAppConfig="{modifyGithubAppConfig}"
           />

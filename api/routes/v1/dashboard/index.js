@@ -29,25 +29,31 @@ module.exports = async function (fastify) {
       let services = dockerServices.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'service' && r.Spec.Labels.configuration)
       applications = applications.map(r => {
         if (JSON.parse(r.Spec.Labels.configuration)) {
-          const configuration = JSON.parse(r.Spec.Labels.configuration)
-          const status = latestDeployments.find(l => configuration.repository.id === l._id.repoId && configuration.repository.branch === l._id.branch)
-          if (status && status.progress) r.progress = status.progress
-          r.Spec.Labels.configuration = configuration
-          return r
+          return {
+            configuration: JSON.parse(r.Spec.Labels.configuration),
+            UpdatedAt: r.UpdatedAt
+          }
         }
         return {}
       })
       databases = databases.map(r => {
-        const configuration = r.Spec.Labels.configuration ? JSON.parse(r.Spec.Labels.configuration) : null
-        r.Spec.Labels.configuration = configuration
-        return r
+        if (JSON.parse(r.Spec.Labels.configuration)) {
+          return {
+            configuration: JSON.parse(r.Spec.Labels.configuration)
+          }
+        }
+        return {}
       })
       services = services.map(r => {
-        const configuration = r.Spec.Labels.configuration ? JSON.parse(r.Spec.Labels.configuration) : null
-        r.Spec.Labels.configuration = configuration
-        return r
+        if (JSON.parse(r.Spec.Labels.configuration)) {
+          return {
+            serviceName: r.Spec.Labels.serviceName,
+            configuration: JSON.parse(r.Spec.Labels.configuration)
+          }
+        }
+        return {}
       })
-      applications = [...new Map(applications.map(item => [item.Spec.Labels.configuration.publish.domain + item.Spec.Labels.configuration.publish.path, item])).values()]
+      applications = [...new Map(applications.map(item => [item.configuration.publish.domain + item.configuration.publish.path, item])).values()]
       return {
         serverLogs,
         applications: {

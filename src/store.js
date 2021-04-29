@@ -81,6 +81,8 @@ export const session = writable(sessionStore)
 export const loggedIn = derived(session, ($session) => {
   return $session.token
 })
+export const githubRepositories = writable([])
+export const githubInstallations = writable({})
 export const savedBranch = writable()
 
 export const dateOptions = readable({
@@ -93,7 +95,7 @@ export const dateOptions = readable({
   hour12: false
 })
 
-export const deployments = writable({})
+export const deployments = writable([])
 
 export const initConf = writable({})
 export const application = writable({

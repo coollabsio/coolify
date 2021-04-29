@@ -38,10 +38,10 @@
 <div in:fade="{{ duration: 100 }}">
   <div class="max-w-4xl mx-auto px-6 pb-4">
     <div>
-      <div class="text-2xl font-bold py-4 border-gradient w-32 text-white">General</div>
-      <div class="divide-y divide-gray-200">
+      <div class="text-2xl font-bold border-gradient w-32 pt-4 text-white">General</div>
+      <div class=" pt-4">
         <div class="px-4 sm:px-6">
-          <ul class="mt-2 divide-y divide-gray-200">
+          <ul class="mt-2 divide-y divide-warmGray-800">
             <li class="py-4 flex items-center justify-between">
               <div class="flex flex-col">
                 <p class="text-base font-bold text-warmGray-100">

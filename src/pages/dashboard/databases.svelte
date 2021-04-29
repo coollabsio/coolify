@@ -91,26 +91,26 @@
             class="px-4 pb-4"
             on:click="{() =>
               $goto(
-                `/database/${database.Spec.Labels.configuration.general.deployId}/configuration`,
+                `/database/${database.configuration.general.deployId}/configuration`,
               )}"
           >
             <div
               class="relative rounded-xl p-6 bg-warmGray-800 border-2 border-dashed border-transparent hover:border-purple-500 text-white shadow-md cursor-pointer ease-in-out transform hover:scale-105 duration-100 group"
             >
               <div class="flex items-center">
-                {#if database.Spec.Labels.configuration.general.type == "mongodb"}
+                {#if database.configuration.general.type == "mongodb"}
                   <MongoDb customClass="w-10 h-10 absolute top-0 left-0 -m-4" />
-                {:else if database.Spec.Labels.configuration.general.type == "postgresql"}
+                {:else if database.configuration.general.type == "postgresql"}
                   <Postgresql
                     customClass="w-10 h-10 absolute top-0 left-0 -m-4"
                   />
-                {:else if database.Spec.Labels.configuration.general.type == "mysql"}
+                {:else if database.configuration.general.type == "mysql"}
                   <Mysql customClass="w-10 h-10 absolute top-0 left-0 -m-4" />
-                {:else if database.Spec.Labels.configuration.general.type == "couchdb"}
+                {:else if database.configuration.general.type == "couchdb"}
                   <CouchDb
                     customClass="w-10 h-10 fill-current text-red-600 absolute top-0 left-0 -m-4"
                   />
-                {:else if database.Spec.Labels.configuration.general.type == "clickhouse"}
+                {:else if database.configuration.general.type == "clickhouse"}
                   <Clickhouse
                     customClass="w-10 h-10 fill-current text-red-600 absolute top-0 left-0 -m-4"
                   />
@@ -119,10 +119,10 @@
                   <div
                     class="text-base font-bold text-white group-hover:text-white"
                   >
-                    {database.Spec.Labels.configuration.general.nickname}
+                    {database.configuration.general.nickname}
                   </div>
                   <div class="text-xs font-bold text-warmGray-300 ">
-                    ({database.Spec.Labels.configuration.general.type})
+                    ({database.configuration.general.type})
                   </div>
                 </div>
               </div>
