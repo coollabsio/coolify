@@ -3,6 +3,10 @@
   import { isActive, redirect } from "@roxi/routify/runtime";
   import { fade } from "svelte/transition";
   import { toast } from "@zerodevx/svelte-toast";
+  import MongoDb from "../SVGs/MongoDb.svelte";
+  import Postgresql from "../SVGs/Postgresql.svelte";
+  import Mysql from "../SVGs/Mysql.svelte";
+  import CouchDb from "../SVGs/CouchDb.svelte";
 
   let type;
   let defaultDatabaseName;
@@ -15,7 +19,7 @@
           defaultDatabaseName,
         },
       });
-      $dbInprogress = true
+      $dbInprogress = true;
       toast.push("Database deployment queued.");
       $redirect(`/dashboard/databases`);
     } catch (error) {
@@ -30,34 +34,47 @@
 >
   {#if $isActive("/database/new")}
     <div class="flex justify-center space-x-4 font-bold pb-6">
-      <button
-        class="button bg-gray-500 p-2 text-white hover:bg-green-600 cursor-pointer w-32"
+      <div
+        class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-green-600 p-2 rounded bg-warmGray-800 w-32"
+        class:border-green-600="{type === 'mongodb'}"
         on:click="{() => (type = 'mongodb')}"
-        class:bg-green-600="{type === 'mongodb'}"
       >
-        MongoDB
-      </button>
-      <button
-        class="button bg-gray-500 p-2 text-white hover:bg-blue-600 cursor-pointer w-32"
+        <div class="flex items-center justify-center  my-2">
+          <MongoDb customClass="w-6" />
+        </div>
+        <div class="text-white">MongoDB</div>
+      </div>
+      <div
+        class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-red-600 p-2 rounded bg-warmGray-800 w-32"
+        class:border-red-600="{type === 'couchdb'}"
+        on:click="{() => (type = 'couchdb')}"
+      >
+        <div class="flex items-center justify-center  my-2">
+          <CouchDb customClass="w-12 text-red-600 fill-current" />
+        </div>
+        <div class="text-white">Couchdb</div>
+      </div>
+      <div
+        class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-600 p-2 rounded bg-warmGray-800 w-32"
+        class:border-blue-600="{type === 'postgresql'}"
         on:click="{() => (type = 'postgresql')}"
-        class:bg-blue-600="{type === 'postgresql'}"
       >
-        PostgreSQL
-      </button>
-      <button
-        class="button bg-gray-500 p-2 text-white hover:bg-orange-600 cursor-pointer w-32"
+        <div class="flex items-center justify-center  my-2">
+          <Postgresql customClass="w-12" />
+        </div>
+        <div class="text-white">PostgreSQL</div>
+      </div>
+      <div
+        class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-orange-600 p-2 rounded bg-warmGray-800 w-32"
+        class:border-orange-600="{type === 'mysql'}"
         on:click="{() => (type = 'mysql')}"
-        class:bg-orange-600="{type === 'mysql'}"
       >
-        MySQL
-      </button>
-      <button
-      class="button bg-gray-500 p-2 text-white hover:bg-red-600 cursor-pointer w-32"
-      on:click="{() => (type = 'couchdb')}"
-      class:bg-red-600="{type === 'couchdb'}"
-      >
-        Couchdb
-      </button>
+        <div class="flex items-center justify-center">
+          <Mysql customClass="w-10" />
+        </div>
+        <div class="text-white">MySQL</div>
+      </div>
+
       <!-- <button
       class="button bg-gray-500 p-2 text-white hover:bg-yellow-500 cursor-pointer w-32"
       on:click="{() => (type = 'clickhouse')}"
@@ -67,18 +84,15 @@
     </button> -->
     </div>
     {#if type}
-      <div>
-        <div
-          class="grid grid-rows-1 justify-center items-center text-center pb-5"
-        >
-          <label for="defaultDB">Default database</label>
-          <input
-            id="defaultDB"
-            class="w-64"
-            placeholder="random"
-            bind:value="{defaultDatabaseName}"
-          />
-        </div>
+      <div class="flex justify-center space-x-4 items-center">
+        <label for="defaultDB">Default database</label>
+        <input
+          id="defaultDB"
+          class="w-64"
+          placeholder="random"
+          bind:value="{defaultDatabaseName}"
+        />
+
         <button
           class:bg-green-600="{type === 'mongodb'}"
           class:hover:bg-green-500="{type === 'mongodb'}"

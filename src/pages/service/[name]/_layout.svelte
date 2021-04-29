@@ -1,81 +1,74 @@
 <script>
-    import { params, goto, isActive, redirect, url } from "@roxi/routify";
-    import { fetch } from "@store";
-    import { toast } from "@zerodevx/svelte-toast";
-import Tooltip from "../../../components/Tooltip/Tooltip.svelte";
-  
-    $: name = $params.name
-  
-    async function removeService() {
-      await $fetch(`/api/v1/services/${name}`, {
-        method: "DELETE",
-      });
-      toast.push("Service removed.");
-      $redirect(`/dashboard/services`);
-    }
-  </script>
-  
+  import { params, goto, isActive, redirect, url } from "@roxi/routify";
+  import { fetch } from "@store";
+  import { toast } from "@zerodevx/svelte-toast";
+  import Tooltip from "../../../components/Tooltip/Tooltip.svelte";
 
-    <nav
-      class="flex text-white justify-end items-center m-4 fixed right-0 top-0 space-x-4"
+  $: name = $params.name;
+
+  async function removeService() {
+    await $fetch(`/api/v1/services/${name}`, {
+      method: "DELETE",
+    });
+    toast.push("Service removed.");
+    $redirect(`/dashboard/services`);
+  }
+</script>
+
+<nav
+  class="flex text-white justify-end items-center m-4 fixed right-0 top-0 space-x-4"
+>
+  <Tooltip position="bottom" label="Delete">
+    <button
+      title="Delete"
+      class="icon hover:text-red-500"
+      on:click="{removeService}"
     >
-    <Tooltip position="bottom" label="Delete" >
-      <button
-        title="Delete"
-        class="icon hover:text-red-500"
-        on:click="{removeService}"
+      <svg
+        class="w-6"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
       >
-        <svg
-          class="w-6"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-          ></path>
-        </svg>
-      </button>
-    </Tooltip>
-      <div class="border border-warmGray-700 h-8"></div>
-      <Tooltip position="bottom-left" label="Configuration" >
-        <button
-          class="icon hover:text-yellow-400"
-          disabled="{$isActive(`/application/new`)}"
-          class:text-yellow-400="{$isActive(
-            `/service/${name}/configuration`,
-          ) || $isActive(`/application/new`)}"
-          class:bg-warmGray-700="{$isActive(
-            `/service/${name}/configuration`,
-          ) || $isActive(`/application/new`)}"
-          on:click="{() =>
-            $goto(
-              `/service/${name}/configuration`,
-            )}"
-        >
-          <svg
-            class="w-6"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
-            ></path>
-          </svg>
-        </button>
-      </Tooltip>
-    </nav>
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+        ></path>
+      </svg>
+    </button>
+  </Tooltip>
+  <div class="border border-warmGray-700 h-8"></div>
+  <Tooltip position="bottom-left" label="Configuration">
+    <button
+      class="icon hover:text-yellow-400"
+      disabled="{$isActive(`/application/new`)}"
+      class:text-yellow-400="{$isActive(`/service/${name}/configuration`) ||
+        $isActive(`/application/new`)}"
+      class:bg-warmGray-700="{$isActive(`/service/${name}/configuration`) ||
+        $isActive(`/application/new`)}"
+      on:click="{() => $goto(`/service/${name}/configuration`)}"
+    >
+      <svg
+        class="w-6"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+        ></path>
+      </svg>
+    </button>
+  </Tooltip>
+</nav>
 
-  <div class="text-white">
-    <slot />
-  </div>
-  
+<div class="text-white">
+  <slot />
+</div>
