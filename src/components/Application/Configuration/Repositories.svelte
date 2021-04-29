@@ -22,7 +22,6 @@
   const modifyGithubAppConfig = () => dispatch("modifyGithubAppConfig");
 </script>
 
-<div class="text-2xl font-bold border-gradient w-40  pt-6">Repository</div>
 <div class="grid grid-cols-1 pt-4">
   {#if $githubRepositories.length !== 0}
     <label for="repository">Organization / Repository</label>
