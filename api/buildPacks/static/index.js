@@ -17,12 +17,16 @@ const publishStaticDocker = (configuration) => {
 }
 
 module.exports = async function (configuration) {
-  if (configuration.build.command.build) await buildImage(configuration)
+  const initialTag = configuration.build.container.tag
+  if (configuration.build.command.build) {
+    await buildImage(configuration)
+    configuration.build.container.tag = 'cache'
+  }
   await fs.writeFile(`${configuration.general.workdir}/Dockerfile`, publishStaticDocker(configuration))
 
   const stream = await docker.engine.buildImage(
     { src: ['.'], context: configuration.general.workdir },
-    { t: `${configuration.build.container.name}:${configuration.build.container.tag}` }
+    { t: `${configuration.build.container.name}:${initialTag}` }
   )
   await streamEvents(stream, configuration)
 }
