@@ -83,7 +83,6 @@
     try {
       // $application.build.pack = $application.build.pack.replace('.','').toLowerCase()
       toast.push("Checking inputs.");
-      console.log($application)
       await $fetch(`/api/v1/application/check`, {
         body: $application,
       });

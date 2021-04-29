@@ -17,7 +17,6 @@
     if (name) {
       try {
         $database = await $fetch(`/api/v1/databases/${name}`);
-        console.log($database);
       } catch (error) {
         toast.push(`Cannot find database ${name}`);
         $redirect(`/dashboard/databases`);
