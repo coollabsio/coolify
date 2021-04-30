@@ -8,9 +8,7 @@ const publishStaticDocker = (configuration) => {
     'FROM nginx:stable-alpine',
     'COPY nginx.conf /etc/nginx/nginx.conf',
     'WORKDIR /usr/share/nginx/html',
-    configuration.build.command.build
-      ? `COPY --from=${configuration.build.container.name}:${configuration.build.container.tag} /usr/src/app/${configuration.publish.directory} ./`
-      : `COPY ./${configuration.build.directory} ./`,
+    `COPY --from=${configuration.build.container.name}:${configuration.build.container.tag}-cache /usr/src/app/${configuration.publish.directory} ./`,
     'EXPOSE 80',
     'CMD ["nginx", "-g", "daemon off;"]'
   ].join('\n')
