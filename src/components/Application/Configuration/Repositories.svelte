@@ -3,7 +3,6 @@
   import { isActive } from "@roxi/routify";
   import { application, githubRepositories } from "@store";
   import Select from "svelte-select";
-
   function handleSelect(event) {
     $application.repository.id = parseInt(event.detail.value, 10);
     dispatch("loadBranches");
@@ -28,6 +27,7 @@
     <div class="grid grid-cols-3 ">
       <div class="repository-select-search col-span-2">
         <Select
+          isFocused=true
           containerClasses="w-full border-none bg-transparent"
           on:select="{handleSelect}"
           selectedValue="{selectedValue}"
