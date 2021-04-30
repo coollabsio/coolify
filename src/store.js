@@ -77,6 +77,7 @@ export const fetch = writable(
     }
   }
 )
+export const activePage = writable()
 export const session = writable(sessionStore)
 export const loggedIn = derived(session, ($session) => {
   return $session.token
