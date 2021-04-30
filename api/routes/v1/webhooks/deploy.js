@@ -12,7 +12,6 @@ const cloneRepository = require('../../../libs/applications/github/cloneReposito
 const { purgeImagesContainers } = require('../../../libs/applications/cleanup')
 
 module.exports = async function (fastify) {
-  // TODO: Add this to fastify plugin
   const postSchema = {
     body: {
       type: 'object',
