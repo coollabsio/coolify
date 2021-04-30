@@ -164,7 +164,7 @@
     }, 100);
   }
 </script>
-{#if $activePage.application !== 'new' && $activePage.application}
+{#if $activePage.application && $activePage.application !== 'new'}
   <div class="min-h-full text-white">
     <div
       class="py-5 text-left px-6 text-3xl tracking-tight font-bold flex items-center"
@@ -246,7 +246,7 @@
             on:loadBranches="{loadBranches}"
             on:modifyGithubAppConfig="{modifyGithubAppConfig}"
           />
-          {#if $application.repository.organization !== "new"}
+          {#if $application.repository.organization}
             <Branches loading="{loading.branches}" branches="{branches}" />
           {/if}
 

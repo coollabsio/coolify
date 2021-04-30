@@ -3,6 +3,7 @@
   import { application, githubRepositories, activePage } from "@store";
   import Select from "svelte-select";
   function handleSelect(event) {
+    $application.build.pack = 'static'
     $application.repository.id = parseInt(event.detail.value, 10);
     dispatch("loadBranches");
   }

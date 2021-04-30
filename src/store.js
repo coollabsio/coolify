@@ -43,7 +43,8 @@ export const fetch = writable(
     if (body) {
       config.body = JSON.stringify(body)
     }
-    const response = await waitAtLeast(350, window.fetch(url, config))
+    // const response = await waitAtLeast(350, window.fetch(url, config))
+    const response = await window.fetch(url, config)
     if (response.status >= 200 && response.status <= 299) {
       if (response.headers.get('content-type').match(/application\/json/)) {
         return await response.json()
@@ -155,8 +156,8 @@ export const initialApplication = {
   },
   repository: {
     id: null,
-    organization: 'new',
-    name: 'start',
+    organization: null,
+    name: null,
     branch: null
   },
   general: {

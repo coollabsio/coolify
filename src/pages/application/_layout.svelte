@@ -89,6 +89,7 @@
     });
 
     toast.push("Application removed.");
+    $application = JSON.parse(JSON.stringify(initialApplication));
     $redirect(`/dashboard/applications`);
   }
 
@@ -98,7 +99,7 @@
 
   async function deploy() {
     try {
-      toast.push("Checking inputs.");
+      toast.push("Checking configuration.");
       await $fetch(`/api/v1/application/check`, {
         body: $application,
       });
