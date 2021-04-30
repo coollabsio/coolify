@@ -6,7 +6,9 @@
 
 <script>
   import { application } from "@store";
+import { onMount } from "svelte";
   import TooltipInfo from "../../../Tooltip/TooltipInfo.svelte";
+  let domainInput;
   const buildpacks = {
     static: {
       port: {
@@ -95,6 +97,9 @@
         .toLowerCase();
     }
   }
+  onMount(()=> {
+    domainInput.focus();
+  })
 </script>
 
 <div>
@@ -201,6 +206,7 @@
       <div class="grid grid-flow-row">
         <label for="Domain" class="">Domain</label>
         <input
+          bind:this={domainInput}
           class="border-2"
           class:placeholder-red-500="{$application.publish.domain == null ||
             $application.publish.domain == ''}"
