@@ -20,7 +20,7 @@ module.exports = async function (configuration) {
   const initialTag = configuration.build.container.tag
   if (configuration.build.command.build) {
     await buildImage(configuration)
-    configuration.build.container.tag = 'cache'
+    configuration.build.container.tag = `${initialTag}-cache`
   }
   await fs.writeFile(`${configuration.general.workdir}/Dockerfile`, publishStaticDocker(configuration))
 
