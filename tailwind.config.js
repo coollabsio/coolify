@@ -16,7 +16,7 @@ module.exports = {
     ],
     preserveHtmlElements: true,
     options: {
-      safelist: [/svelte-/, 'border-green-500', 'border-yellow-300', 'border-red-500', 'hover:border-green-500', 'hover:border-red-200', 'hover:bg-red-200', 'hover:bg-warmGray-900'],
+      safelist: [/svelte-/, 'border-green-500', 'border-yellow-300', 'border-red-500', 'hover:border-green-500', 'hover:border-red-200', 'hover:bg-red-200', 'hover:bg-warmGray-900', 'hover:bg-transparent'],
       defaultExtractor: (content) => {
         // WARNING: tailwindExtractor is internal tailwind api
         // if this breaks after a tailwind update, report to svite repo

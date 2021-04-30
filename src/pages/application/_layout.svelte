@@ -8,7 +8,6 @@
     deployments,
   } from "@store";
   import { onDestroy } from "svelte";
-  import { fade } from "svelte/transition";
   import Loading from "../../components/Loading.svelte";
   import { toast } from "@zerodevx/svelte-toast";
   import Tooltip from "../../components/Tooltip/Tooltip.svelte";
@@ -81,7 +80,6 @@
 
   async function deploy() {
     try {
-      // $application.build.pack = $application.build.pack.replace('.','').toLowerCase()
       toast.push("Checking inputs.");
       await $fetch(`/api/v1/application/check`, {
         body: $application,

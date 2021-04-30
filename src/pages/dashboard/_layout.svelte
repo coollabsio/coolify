@@ -1,8 +1,6 @@
 <script>
   import { fetch, deployments } from "@store";
   import { onDestroy, onMount } from "svelte";
-  import { fade } from "svelte/transition";
-  import { goto, isActive } from "@roxi/routify/runtime";
   import { toast } from "@zerodevx/svelte-toast";
   let loadDashboardInterval = null;
 
