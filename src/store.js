@@ -43,7 +43,8 @@ export const fetch = writable(
     if (body) {
       config.body = JSON.stringify(body)
     }
-    const response = await waitAtLeast(350, window.fetch(url, config))
+    // const response = await waitAtLeast(350, window.fetch(url, config))
+    const response = await window.fetch(url, config)
     if (response.status >= 200 && response.status <= 299) {
       if (response.headers.get('content-type').match(/application\/json/)) {
         return await response.json()
@@ -77,10 +78,17 @@ export const fetch = writable(
     }
   }
 )
+export const activePage = writable({
+  application: null,
+  new: false,
+  mainmenu: null
+})
 export const session = writable(sessionStore)
 export const loggedIn = derived(session, ($session) => {
   return $session.token
 })
+export const githubRepositories = writable([])
+export const githubInstallations = writable({})
 export const savedBranch = writable()
 
 export const dateOptions = readable({
@@ -93,7 +101,7 @@ export const dateOptions = readable({
   hour12: false
 })
 
-export const deployments = writable({})
+export const deployments = writable([])
 
 export const initConf = writable({})
 export const application = writable({
@@ -149,8 +157,8 @@ export const initialApplication = {
   },
   repository: {
     id: null,
-    organization: 'new',
-    name: 'start',
+    organization: null,
+    name: null,
     branch: null
   },
   general: {

@@ -5,8 +5,8 @@
 </style>
 
 <script>
-  import { goto, route, isActive } from "@roxi/routify/runtime";
-  import { loggedIn, session, fetch, deployments } from "@store";
+  import { goto, route, isChangingPage } from "@roxi/routify/runtime";
+  import { loggedIn, session, fetch, deployments, activePage } from "@store";
   import { toast } from "@zerodevx/svelte-toast";
   import { onMount } from "svelte";
   import compareVersions from "compare-versions";
@@ -23,6 +23,34 @@
     window.location.hostname !== "test.andrasbacsai.dev"
       ? "main"
       : "next";
+
+  $: if ($isChangingPage) {
+    const path = window.location.pathname;
+    if (path === "/dashboard/applications" || path.match(/\/application/)) {
+      $activePage.mainmenu = "applications";
+    } else if (path === "/dashboard/databases" || path.match(/\/database/)) {
+      $activePage.mainmenu = "databases";
+    } else if (path === "/dashboard/services" || path.match(/\/service/)) {
+      $activePage.mainmenu = "services";
+    } else if (path === "/settings") {
+      $activePage.mainmenu = "settings";
+    } else {
+      $activePage.mainmenu = null;
+    }
+
+    if (path.match(/\/application\/.*\/logs/)) {
+      $activePage.application = "logs";
+      $activePage.new = false;
+    } else if (path === "/application/new") {
+      $activePage.application = "configuration";
+      $activePage.new = true;
+    } else if (path.match(/\/application\/.*\/configuration/)) {
+      $activePage.application = "configuration";
+      $activePage.new = false;
+    } else {
+      $activePage.application = null;
+    }
+  }
   onMount(async () => {
     if ($session.token) {
       upgradeAvailable = await checkUpgrade();
@@ -139,18 +167,16 @@
     >
       <div
         class="flex flex-col w-full h-screen items-center transition-all duration-100"
-        class:border-green-500="{$isActive('/dashboard/applications')}"
-        class:border-purple-500="{$isActive('/dashboard/databases')}"
+        class:border-green-500="{$activePage.mainmenu === 'applications'}"
+        class:border-purple-500="{$activePage.mainmenu === 'databases'}"
       >
         <img class="w-10 pt-4 pb-4" src="/favicon.png" alt="coolLabs logo" />
         <Tooltip position="right" label="Applications">
           <div
             class="p-2 hover:bg-warmGray-700 rounded hover:text-green-500 mt-4 transition-all duration-100 cursor-pointer"
             on:click="{() => $goto('/dashboard/applications')}"
-            class:text-green-500="{$isActive('/dashboard/applications') ||
-              $isActive('/application')}"
-            class:bg-warmGray-700="{$isActive('/dashboard/applications') ||
-              $isActive('/application')}"
+            class:text-green-500="{$activePage.mainmenu === 'applications'}"
+            class:bg-warmGray-700="{$activePage.mainmenu === 'applications'}"
           >
             <svg
               class="w-8"
@@ -187,10 +213,8 @@
           <div
             class="p-2 hover:bg-warmGray-700 rounded hover:text-purple-500 my-4 transition-all duration-100 cursor-pointer"
             on:click="{() => $goto('/dashboard/databases')}"
-            class:text-purple-500="{$isActive('/dashboard/databases') ||
-              $isActive('/database')}"
-            class:bg-warmGray-700="{$isActive('/dashboard/databases') ||
-              $isActive('/database')}"
+            class:text-purple-500="{$activePage.mainmenu === 'databases'}"
+            class:bg-warmGray-700="{$activePage.mainmenu === 'databases'}"
           >
             <svg
               class="w-8"
@@ -212,22 +236,31 @@
           <div
             class="p-2 hover:bg-warmGray-700 rounded hover:text-blue-500 transition-all duration-100 cursor-pointer"
             on:click="{() => $goto('/dashboard/services')}"
-            class:text-blue-500="{$isActive('/dashboard/services') ||
-              $isActive('/service')}"
-            class:bg-warmGray-700="{$isActive('/dashboard/services') ||
-              $isActive('/service')}"
+            class:text-blue-500="{$activePage.mainmenu === 'services'}"
+            class:bg-warmGray-700="{$activePage.mainmenu === 'services'}"
           >
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-          </svg>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="w-8"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
+              ></path>
+            </svg>
           </div>
         </Tooltip>
         <div class="flex-1"></div>
         <Tooltip position="right" label="Settings">
           <button
             class="p-2 hover:bg-warmGray-700 rounded hover:text-yellow-500 transition-all duration-100 cursor-pointer"
-            class:text-yellow-500="{$isActive('/settings')}"
-            class:bg-warmGray-700="{$isActive('/settings')}"
+            class:text-yellow-500="{$activePage.mainmenu === 'settings'}"
+            class:bg-warmGray-700="{$activePage.mainmenu === 'settings'}"
             on:click="{() => $goto('/settings')}"
           >
             <svg
@@ -284,7 +317,7 @@
   {/if}
   {#if upgradeAvailable}
     <footer
-      class="absolute bottom-0 right-0 p-4 px-6 w-auto rounded-tl text-white "
+      class="fixed bottom-0 right-0 p-4 px-6 w-auto rounded-tl text-white  hover:scale-110 transform transition duration-100"
     >
       <div class="flex items-center">
         <div></div>

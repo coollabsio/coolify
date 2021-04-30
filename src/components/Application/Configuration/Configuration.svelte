@@ -1,7 +1,15 @@
 <script>
   import { redirect, isActive } from "@roxi/routify";
   import { fade } from "svelte/transition";
-  import { session, application, fetch, initialApplication } from "@store";
+  import {
+    session,
+    application,
+    fetch,
+    initialApplication,
+    githubRepositories,
+    githubInstallations,
+    activePage,
+  } from "@store";
 
   import Login from "./Login.svelte";
   import Loading from "../../Loading.svelte";
@@ -15,8 +23,6 @@
   };
 
   let branches = [];
-  let repositories = [];
-
   function dashify(str, options) {
     if (typeof str !== "string") return str;
     return str
@@ -29,8 +35,8 @@
 
   async function loadBranches() {
     loading.branches = true;
-    if ($isActive("/application/new")) $application.repository.branch = null;
-    const selectedRepository = repositories.find(
+    if ($activePage.new) $application.repository.branch = null;
+    const selectedRepository = $githubRepositories.find(
       r => r.id === $application.repository.id,
     );
 
@@ -54,6 +60,23 @@
   }
 
   async function loadGithub() {
+    if ($githubRepositories.length > 0) {
+      $application.github.installation.id = $githubInstallations.id;
+      $application.github.app.id = $githubInstallations.app_id;
+      const foundRepositoryOnGithub = $githubRepositories.find(
+        r =>
+          r.full_name ===
+          `${$application.repository.organization}/${$application.repository.name}`,
+      );
+
+      if (foundRepositoryOnGithub) {
+        $application.repository.id = foundRepositoryOnGithub.id;
+        $application.repository.organization = foundRepositoryOnGithub.owner.login;
+        $application.repository.name = foundRepositoryOnGithub.name;
+        // await loadBranches();
+      }
+      return;
+    }
     loading.github = true;
     try {
       const { installations } = await $fetch(
@@ -64,6 +87,7 @@
       }
       $application.github.installation.id = installations[0].id;
       $application.github.app.id = installations[0].app_id;
+      $githubInstallations = installations[0];
 
       let page = 1;
       let userRepos = 0;
@@ -72,21 +96,20 @@
         page,
       );
 
-      repositories = repositories.concat(data.repositories);
+      $githubRepositories = $githubRepositories.concat(data.repositories);
       userRepos = data.total_count;
 
-      if (userRepos > repositories.length) {
-        while (userRepos > repositories.length) {
+      if (userRepos > $githubRepositories.length) {
+        while (userRepos > $githubRepositories.length) {
           page = page + 1;
           const repos = await getGithubRepos(
             $application.github.installation.id,
             page,
           );
-          repositories = repositories.concat(repos.repositories);
+          $githubRepositories = $githubRepositories.concat(repos.repositories);
         }
       }
-
-      const foundRepositoryOnGithub = repositories.find(
+      const foundRepositoryOnGithub = $githubRepositories.find(
         r =>
           r.full_name ===
           `${$application.repository.organization}/${$application.repository.name}`,
@@ -120,7 +143,7 @@
       if (newWindow.closed) {
         clearInterval(timer);
         loading.github = true;
-        if (!$isActive("/application/new")) {
+        if (!$activePage.new) {
           try {
             const config = await $fetch(`/api/v1/config`, {
               body: {
@@ -137,28 +160,46 @@
           $application = JSON.parse(JSON.stringify(initialApplication));
         }
         branches = [];
-        repositories = [];
+        $githubRepositories = [];
         await loadGithub();
       }
     }, 100);
   }
 </script>
 
-{#if !$isActive("/application/new")}
+{#if !$activePage.new}
   <div class="min-h-full text-white">
     <div
       class="py-5 text-left px-6 text-3xl tracking-tight font-bold flex items-center"
     >
+      {$application.publish.domain
+        ? `${$application.publish.domain}${
+            $application.publish.path !== "/" ? $application.publish.path : ""
+          }`
+        : "example.com"}
       <a
         target="_blank"
-        class="text-green-500 hover:underline cursor-pointer px-2"
+        class="icon mx-2"
         href="{'https://' +
           $application.publish.domain +
           $application.publish.path}"
-        >{$application.publish.domain
-          ? `${$application.publish.domain}${$application.publish.path !== '/' ? $application.publish.path : ''}`
-          : "<yourdomain>"}</a
       >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-6 w-6"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+          ></path>
+        </svg></a
+      >
+
       <a
         target="_blank"
         class="icon"
@@ -180,7 +221,7 @@
       >
     </div>
   </div>
-{:else if $isActive("/application/new")}
+{:else if $activePage.new}
   <div class="min-h-full text-white">
     <div
       class="py-5 text-left px-6 text-3xl tracking-tight font-bold flex items-center"
@@ -205,11 +246,10 @@
           in:fade="{{ duration: 100 }}"
         >
           <Repositories
-            bind:repositories
             on:loadBranches="{loadBranches}"
             on:modifyGithubAppConfig="{modifyGithubAppConfig}"
           />
-          {#if $application.repository.organization !== "new"}
+          {#if $application.repository.organization}
             <Branches loading="{loading.branches}" branches="{branches}" />
           {/if}
 

@@ -34,7 +34,7 @@
   <div class="text-left max-w-5xl mx-auto px-6" in:fade="{{ duration: 100 }}">
     <div class="pb-2 pt-5 space-y-4">
       <div class="flex space-x-5 items-center">
-        <div class="text-2xl font-bold py-4 border-gradient">General</div>
+        <div class="text-2xl font-bold border-gradient">General</div>
         <div class="flex-1"></div>
         <Tooltip
           position="bottom"
@@ -48,7 +48,7 @@
         </Tooltip>
       </div>
 
-      <div class="flex items-center">
+      <div class="flex items-center pt-4">
         <div class="font-bold w-64 text-warmGray-400">Domain</div>
         <input class="w-full" value="{service.config.baseURL}" disabled />
       </div>
@@ -64,8 +64,8 @@
         <div class="font-bold w-64 text-warmGray-400">Password</div>
         <PasswordField value="{service.config.userPassword}" />
       </div>
-      <div class="text-2xl font-bold py-4 border-gradient w-32">PostgreSQL</div>
-      <div class="flex items-center">
+      <div class="text-2xl font-bold pt-4 border-gradient w-32">PostgreSQL</div>
+      <div class="flex items-center pt-4">
         <div class="font-bold w-64 text-warmGray-400">Username</div>
         <input class="w-full" value="{service.config.generateEnvsPostgres.POSTGRESQL_USERNAME}" disabled />
       </div>

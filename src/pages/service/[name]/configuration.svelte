@@ -61,7 +61,7 @@
   <div class="space-y-2 max-w-4xl mx-auto px-6" in:fade="{{ duration: 100 }}">
     <div class="block text-center py-4">
       {#if name === "plausible"}
-        <Plausible {service}/>
+        <Plausible service="{service}" />
       {/if}
     </div>
   </div>

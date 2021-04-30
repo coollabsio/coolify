@@ -66,7 +66,6 @@ module.exports = async function (fastify) {
       if (!defaultDatabaseName) defaultDatabaseName = nickname
 
       reply.code(201).send({ message: 'Deploying.' })
-      // TODO: Persistent volume, custom inputs
       const deployId = cuid()
       const configuration = {
         general: {

@@ -1,11 +1,10 @@
 <script>
   export let loading, branches;
-  import { isActive } from "@roxi/routify";
-  import { application } from "@store";
+  import { application, activePage } from "@store";
   import Select from "svelte-select";
 
   const selectedValue =
-    !$isActive("/application/new") && $application.repository.branch
+    $activePage.application !== "new" && $application.repository.branch;
 
   function handleSelect(event) {
     $application.repository.branch = null;
@@ -36,10 +35,10 @@
         selectedValue="{selectedValue}"
         isClearable="{false}"
         items="{branches.map(b => ({ label: b.name, value: b.name }))}"
-        showIndicator="{$isActive('/application/new')}"
+        showIndicator="{$activePage.new}"
         noOptionsMessage="No branches found"
         placeholder="Select a branch"
-        isDisabled="{!$isActive('/application/new')}"
+        isDisabled="{!$activePage.new}"
       />
     </div>
   </div>

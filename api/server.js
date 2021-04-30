@@ -1,12 +1,11 @@
 require('dotenv').config()
 const fs = require('fs')
 const util = require('util')
-const axios = require('axios')
 const mongoose = require('mongoose')
 const path = require('path')
 const { saveServerLog } = require('./libs/logging')
 const { execShellAsync } = require('./libs/common')
-const { purgeImagesContainers, cleanupStuckedDeploymentsInDB } = require('./libs/applications/cleanup')
+const { cleanupStuckedDeploymentsInDB } = require('./libs/applications/cleanup')
 const fastify = require('fastify')({
   trustProxy: true,
   logger: {

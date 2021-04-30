@@ -1,8 +1,7 @@
 <script>
-  import { params, goto, isActive, redirect, url } from "@roxi/routify";
+  import { params, redirect } from "@roxi/routify";
   import { fetch, newService, initialNewService } from "@store";
   import { toast } from "@zerodevx/svelte-toast";
-  import Tooltip from "../../../../components/Tooltip/Tooltip.svelte";
   import { onDestroy } from "svelte";
   import Loading from "../../../../components/Loading.svelte";
   $: type = $params.type;

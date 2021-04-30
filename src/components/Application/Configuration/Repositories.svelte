@@ -1,43 +1,42 @@
 <script>
   import { createEventDispatcher } from "svelte";
-  import { isActive } from "@roxi/routify";
-  import { application } from "@store";
+  import { application, githubRepositories, activePage } from "@store";
   import Select from "svelte-select";
-
   function handleSelect(event) {
+    $application.build.pack = 'static'
     $application.repository.id = parseInt(event.detail.value, 10);
     dispatch("loadBranches");
   }
 
-  export let repositories;
-  let items = repositories.map(repo => ({
+  let items = $githubRepositories.map(repo => ({
     label: `${repo.owner.login}/${repo.name}`,
     value: repo.id.toString(),
   }));
 
   const selectedValue =
-    !$isActive("/application/new") &&
+    !$activePage.new &&
     `${$application.repository.organization}/${$application.repository.name}`;
 
   const dispatch = createEventDispatcher();
   const modifyGithubAppConfig = () => dispatch("modifyGithubAppConfig");
 </script>
 
-<div class="grid grid-cols-1">
-  {#if repositories.length !== 0}
+<div class="grid grid-cols-1 pt-4">
+  {#if $githubRepositories.length !== 0}
     <label for="repository">Organization / Repository</label>
     <div class="grid grid-cols-3 ">
       <div class="repository-select-search col-span-2">
         <Select
+          isFocused="true"
           containerClasses="w-full border-none bg-transparent"
           on:select="{handleSelect}"
           selectedValue="{selectedValue}"
           isClearable="{false}"
           items="{items}"
-          showIndicator="{$isActive('/application/new')}"
+          showIndicator="{$activePage.new}"
           noOptionsMessage="No Repositories found"
           placeholder="Select a Repository"
-          isDisabled="{!$isActive('/application/new')}"
+          isDisabled="{!$activePage.new}"
         />
       </div>
       <button

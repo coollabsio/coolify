@@ -10,11 +10,11 @@ const buildImageNodeDocker = (configuration) => {
     `RUN ${configuration.build.command.build}`
   ].join('\n')
 }
-async function buildImage (configuration) {
+async function buildImage (configuration, cacheBuild) {
   await fs.writeFile(`${configuration.general.workdir}/Dockerfile`, buildImageNodeDocker(configuration))
   const stream = await docker.engine.buildImage(
     { src: ['.'], context: configuration.general.workdir },
-    { t: `${configuration.build.container.name}:${configuration.build.container.tag}` }
+    { t: `${configuration.build.container.name}:${cacheBuild ? `${configuration.build.container.tag}-cache` : configuration.build.container.tag}` }
   )
   await streamEvents(stream, configuration)
 }

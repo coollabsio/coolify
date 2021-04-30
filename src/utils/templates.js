@@ -4,23 +4,29 @@ const defaultBuildAndDeploy = {
 }
 
 const templates = {
+  svelte: {
+    pack: 'svelte',
+    ...defaultBuildAndDeploy,
+    directory: 'public',
+    name: 'Svelte'
+  },
   next: {
-    pack: 'nodejs',
+    pack: 'nextjs',
     ...defaultBuildAndDeploy,
     port: 3000,
-    name: 'Next.js'
+    name: 'NextJS'
   },
   nuxt: {
-    pack: 'nodejs',
+    pack: 'nuxtjs',
     ...defaultBuildAndDeploy,
     port: 3000,
-    name: 'Nuxt'
+    name: 'NuxtJS'
   },
   'react-scripts': {
-    pack: 'static',
+    pack: 'react',
     ...defaultBuildAndDeploy,
     directory: 'build',
-    name: 'Create React'
+    name: 'React'
   },
   'parcel-bundler': {
     pack: 'static',
@@ -29,22 +35,22 @@ const templates = {
     name: 'Parcel'
   },
   '@vue/cli-service': {
-    pack: 'static',
+    pack: 'vuejs',
     ...defaultBuildAndDeploy,
     directory: 'dist',
-    name: 'Vue CLI'
+    name: 'Vue'
   },
   gatsby: {
-    pack: 'static',
+    pack: 'gatsby',
     ...defaultBuildAndDeploy,
     directory: 'public',
     name: 'Gatsby'
   },
   'preact-cli': {
-    pack: 'static',
+    pack: 'react',
     ...defaultBuildAndDeploy,
     directory: 'build',
-    name: 'Preact CLI'
+    name: 'Preact'
   }
 }
 
