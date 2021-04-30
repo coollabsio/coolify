@@ -107,7 +107,6 @@
           $githubRepositories = $githubRepositories.concat(repos.repositories);
         }
       }
-      // $githubRepositories = repositories;
       const foundRepositoryOnGithub = $githubRepositories.find(
         r =>
           r.full_name ===
@@ -234,7 +233,7 @@
   {#if !$session.githubAppToken}
     <Login />
   {:else}
-    {#await $githubRepositories.length === 0 && loadGithub()}
+    {#await loadGithub()}
       <Loading github githubLoadingText="Loading repositories..." />
     {:then}
       {#if loading.github}

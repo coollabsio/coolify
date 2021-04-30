@@ -1,13 +1,15 @@
 const jwt = require('jsonwebtoken')
 const axios = require('axios')
-const { execShellAsync, cleanupTmp } = require('../../common')
+const { execShellAsync } = require('../../common')
 
 module.exports = async function (configuration) {
   try {
     const { workdir } = configuration.general
     const { organization, name, branch } = configuration.repository
     const github = configuration.github
-
+    if (!github.installation.id || !github.app.id) {
+      throw new Error('Github installation ID is invalid.')
+    }
     const githubPrivateKey = process.env.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, '\n').replace(/"/g, '')
 
     const payload = {

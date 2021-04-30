@@ -201,6 +201,7 @@
       <div class="grid grid-flow-row">
         <label for="Domain" class="">Domain</label>
         <input
+          class="border-2"
           class:placeholder-red-500="{$application.publish.domain == null ||
             $application.publish.domain == ''}"
           class:border-red-500="{$application.publish.domain == null ||
@@ -225,7 +226,6 @@
         />
       </div>
     </div>
-    <!-- {JSON.stringify(buildpacks[$application.build.pack])} -->
     <label
       for="Port"
       class:text-warmGray-800="{!buildpacks[$application.build.pack].port
