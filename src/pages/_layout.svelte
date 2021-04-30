@@ -40,6 +40,7 @@
 
     if (path.match(/\/application\/.*\/logs/)) {
       $activePage.application = "logs";
+      $activePage.new = false;
     } else if (path === "/application/new") {
       $activePage.application = "configuration";
       $activePage.new = true;

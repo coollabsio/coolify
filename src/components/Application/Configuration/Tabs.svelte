@@ -8,8 +8,49 @@
   import Secrets from "./ActiveTab/Secrets.svelte";
   import Loading from "../../Loading.svelte";
 
-  let loading = false;
-  onMount(async () => {
+  let activeTab = {
+    general: true,
+    buildStep: false,
+    secrets: false,
+  };
+  function activateTab(tab) {
+    if (activeTab.hasOwnProperty(tab)) {
+      activeTab = {
+        general: false,
+        buildStep: false,
+        secrets: false,
+      };
+      activeTab[tab] = true;
+    }
+  }
+  async function load() {
+    const found = $deployments?.applications?.deployed.find(deployment => {
+      if (
+        deployment.configuration.repository.organization ===
+          $application.repository.organization &&
+        deployment.configuration.repository.name ===
+          $application.repository.name &&
+        deployment.configuration.repository.branch ===
+          $application.repository.branch
+      ) {
+        return deployment;
+      }
+    });
+    if (found) {
+      $application = { ...found.configuration };
+      if ($activePage.new) {
+        $activePage.new = false;
+        toast.push(
+          "This repository & branch is already defined. Redirecting...",
+        );
+        $redirect(`/application/:organization/:name/:branch/configuration`, {
+          name: $application.repository.name,
+          organization: $application.repository.organization,
+          branch: $application.repository.branch,
+        });
+      }
+      return;
+    }
     if (!$activePage.new) {
       const config = await $fetch(`/api/v1/config`, {
         body: {
@@ -19,30 +60,7 @@
         },
       });
       $application = { ...config };
-      $redirect(`/application/:organization/:name/:branch/configuration`, {
-        name: $application.repository.name,
-        organization: $application.repository.organization,
-        branch: $application.repository.branch,
-      });
     } else {
-      loading = true;
-      $deployments?.applications?.deployed.find(configuration => {
-        if (
-          configuration?.repository?.organization ===
-            $application.repository.organization &&
-          configuration?.repository?.name === $application.repository.name &&
-          configuration?.repository?.branch === $application.repository.branch
-        ) {
-          $redirect(`/application/:organization/:name/:branch/configuration`, {
-            name: $application.repository.name,
-            organization: $application.repository.organization,
-            branch: $application.repository.branch,
-          });
-          toast.push(
-            "This repository & branch is already defined. Redirecting...",
-          );
-        }
-      });
       try {
         const dir = await $fetch(
           `https://api.github.com/repos/${$application.repository.organization}/${$application.repository.name}/contents/?ref=${$application.repository.branch}`,
@@ -96,28 +114,12 @@
         // Nothing detected
       }
     }
-    loading = false;
-  });
-  let activeTab = {
-    general: true,
-    buildStep: false,
-    secrets: false,
-  };
-  function activateTab(tab) {
-    if (activeTab.hasOwnProperty(tab)) {
-      activeTab = {
-        general: false,
-        buildStep: false,
-        secrets: false,
-      };
-      activeTab[tab] = true;
-    }
   }
 </script>
 
-{#if loading}
+{#await load()}
   <Loading github githubLoadingText="Scanning repository..." />
-{:else}
+{:then}
   <div class="block text-center py-8">
     <nav
       class="flex space-x-4 justify-center font-bold text-md text-white"
@@ -128,14 +130,14 @@
         class:text-green-500="{activeTab.general}"
         class="px-3 py-2 cursor-pointer hover:bg-warmGray-700 rounded-lg transition duration-100"
       >
-      General
+        General
       </div>
       <div
         on:click="{() => activateTab('secrets')}"
         class:text-green-500="{activeTab.secrets}"
         class="px-3 py-2 cursor-pointer hover:bg-warmGray-700 rounded-lg transition duration-100"
       >
-      Secrets
+        Secrets
       </div>
     </nav>
   </div>
@@ -148,4 +150,4 @@
       {/if}
     </div>
   </div>
-{/if}
+{/await}

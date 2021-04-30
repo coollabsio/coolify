@@ -35,7 +35,7 @@
 
   async function loadBranches() {
     loading.branches = true;
-    if ($isActive("/application/new")) $application.repository.branch = null;
+    if ($activePage.new) $application.repository.branch = null;
     const selectedRepository = $githubRepositories.find(
       r => r.id === $application.repository.id,
     );
@@ -71,7 +71,9 @@
 
       if (foundRepositoryOnGithub) {
         $application.repository.id = foundRepositoryOnGithub.id;
-        await loadBranches();
+        $application.repository.organization = foundRepositoryOnGithub.owner.login;
+        $application.repository.name = foundRepositoryOnGithub.name;
+        // await loadBranches();
       }
       return;
     }
@@ -233,7 +235,7 @@
   {#if !$session.githubAppToken}
     <Login />
   {:else}
-    {#await loadGithub()}
+    {#await $githubRepositories.length === 0 && loadGithub()}
       <Loading github githubLoadingText="Loading repositories..." />
     {:then}
       {#if loading.github}
