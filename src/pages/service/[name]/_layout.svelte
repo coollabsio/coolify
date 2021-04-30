@@ -1,5 +1,5 @@
 <script>
-  import { params, goto, isActive, redirect, url } from "@roxi/routify";
+  import { params, goto, isActive, redirect } from "@roxi/routify";
   import { fetch } from "@store";
   import { toast } from "@zerodevx/svelte-toast";
   import Tooltip from "../../../components/Tooltip/Tooltip.svelte";

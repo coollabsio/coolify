@@ -1,11 +1,5 @@
 <script>
-  import {
-    params,
-    goto,
-    redirect,
-    isActive,
-    afterPageLoad,
-  } from "@roxi/routify";
+  import { params, goto, redirect, afterPageLoad,isActive  } from "@roxi/routify";
   import {
     application,
     fetch,
@@ -14,30 +8,34 @@
     deployments,
     activePage,
   } from "@store";
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy } from "svelte";
   import Loading from "../../components/Loading.svelte";
   import { toast } from "@zerodevx/svelte-toast";
   import Tooltip from "../../components/Tooltip/Tooltip.svelte";
-
   $afterPageLoad(page => {
     if (
       page.path === "/application/:organization/:name/:branch/logs/:deployId" ||
       page.path === "/application/:organization/:name/:branch/logs/index"
     ) {
-      $activePage = "logs";
+      $activePage.application = "logs";
     } else if (page.path === "/application/new") {
+      console.log(page.path)
       page.path === "/application/:organization/:name/:branch/configuration"
-        ? ($activePage = "configuration")
-        : ($activePage = "new");
+        ? ($activePage.application = "configuration")
+        : ($activePage.application = "new");
+    } else if (
+      page.path === "/application/:organization/:name/:branch/configuration"
+    ) {
+      $activePage.application = "configuration";
     } else {
-      $activePage = null;
+      $activePage.application = null;
     }
   });
 
   $application.repository.organization = $params.organization;
   $application.repository.name = $params.name;
   $application.repository.branch = $params.branch;
-  
+
   async function setConfiguration() {
     try {
       const config = await $fetch(`/api/v1/config`, {
@@ -55,7 +53,8 @@
     }
   }
   async function loadConfiguration() {
-    if ($activePage !== "new") {
+    // isActive needed here!
+    if (!$isActive("/application/new")) {
       if ($deployments.length === 0) {
         await setConfiguration();
       } else {
@@ -138,7 +137,7 @@
           $application.publish.domain === null}"
         class:hover:bg-green-500="{$application.publish.domain}"
         class:bg-green-600="{$application.publish.domain}"
-        class:hover:bg-transparent="{$activePage == 'new'}"
+        class:hover:bg-transparent="{$activePage.application === 'new'}"
         class:text-warmGray-700="{$application.publish.domain === '' ||
           $application.publish.domain === null}"
         class="icon"
@@ -167,18 +166,18 @@
       <button
         disabled="{$application.publish.domain === '' ||
           $application.publish.domain === null ||
-          $activePage === 'new'}"
+          $activePage.application === 'new'}"
         class:cursor-not-allowed="{$application.publish.domain === '' ||
           $application.publish.domain === null ||
-          $activePage === 'new'}"
+          $activePage.application === 'new'}"
         class:hover:text-red-500="{$application.publish.domain &&
-          $activePage !== 'new'}"
+          $activePage.application !== 'new'}"
         class:hover:bg-warmGray-700="{$application.publish.domain &&
-          $activePage !== 'new'}"
-        class:hover:bg-transparent="{$activePage === 'new'}"
+          $activePage.application !== 'new'}"
+        class:hover:bg-transparent="{$activePage.application === 'new'}"
         class:text-warmGray-700="{$application.publish.domain === '' ||
           $application.publish.domain === null ||
-          $activePage === 'new'}"
+          $activePage.application === 'new'}"
         class="icon"
         on:click="{removeApplication}"
       >
@@ -202,13 +201,13 @@
     <Tooltip position="bottom" label="Logs">
       <button
         class="icon"
-        class:text-warmGray-700="{$activePage === 'new'}"
-        disabled="{$activePage === 'new'}"
-        class:hover:text-blue-400="{$activePage !== 'new'}"
-        class:hover:bg-transparent="{$activePage === 'new'}"
-        class:cursor-not-allowed="{$activePage === 'new'}"
-        class:text-blue-400="{$activePage === 'logs'}"
-        class:bg-warmGray-700="{$activePage === 'logs'}"
+        class:text-warmGray-700="{$activePage.application === 'new'}"
+        disabled="{$activePage.application === 'new'}"
+        class:hover:text-blue-400="{$activePage.application !== 'new'}"
+        class:hover:bg-transparent="{$activePage.application === 'new'}"
+        class:cursor-not-allowed="{$activePage.application === 'new'}"
+        class:text-blue-400="{$activePage.application === 'logs'}"
+        class:bg-warmGray-700="{$activePage.application === 'logs'}"
         on:click="{() =>
           $goto(
             `/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/logs`,
@@ -233,9 +232,9 @@
     <Tooltip position="bottom-left" label="Configuration">
       <button
         class="icon hover:text-yellow-400"
-        disabled="{$isActive(`/application/new`)}"
-        class:text-yellow-400="{$activePage === 'configuration'}"
-        class:bg-warmGray-700="{$activePage === 'configuration'}"
+        disabled="{$activePage.application === 'new'}"
+        class:text-yellow-400="{$activePage.application === 'configuration' || $activePage.application === 'new'}"
+        class:bg-warmGray-700="{$activePage.application === 'configuration' || $activePage.application === 'new'}"
         on:click="{() =>
           $goto(
             `/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/configuration`,

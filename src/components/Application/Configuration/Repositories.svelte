@@ -1,7 +1,6 @@
 <script>
   import { createEventDispatcher } from "svelte";
-  import { isActive } from "@roxi/routify";
-  import { application, githubRepositories } from "@store";
+  import { application, githubRepositories, activePage } from "@store";
   import Select from "svelte-select";
   function handleSelect(event) {
     $application.repository.id = parseInt(event.detail.value, 10);
@@ -14,7 +13,7 @@
   }));
 
   const selectedValue =
-    !$isActive("/application/new") &&
+    $activePage.application !== "new" &&
     `${$application.repository.organization}/${$application.repository.name}`;
 
   const dispatch = createEventDispatcher();
@@ -27,16 +26,16 @@
     <div class="grid grid-cols-3 ">
       <div class="repository-select-search col-span-2">
         <Select
-          isFocused=true
+          isFocused="true"
           containerClasses="w-full border-none bg-transparent"
           on:select="{handleSelect}"
           selectedValue="{selectedValue}"
           isClearable="{false}"
           items="{items}"
-          showIndicator="{$isActive('/application/new')}"
+          showIndicator="{$activePage.application === 'new'}"
           noOptionsMessage="No Repositories found"
           placeholder="Select a Repository"
-          isDisabled="{!$isActive('/application/new')}"
+          isDisabled="{$activePage.application !== 'new'}"
         />
       </div>
       <button

@@ -1,5 +1,5 @@
 <script>
-  import { isActive, redirect, goto } from "@roxi/routify/runtime";
+  import { isActive, goto } from "@roxi/routify/runtime";
   import { fade } from "svelte/transition";
 </script>
 

@@ -7,10 +7,10 @@ async function purgeImagesContainers (configuration, deleteAll = false) {
   await execShellAsync('docker container prune -f')
   if (deleteAll) {
     const IDsToDelete = (await execShellAsync(`docker images ls --filter=reference='${name}' --format '{{json .ID }}'`)).trim().replace(/"/g, '').split('\n')
-    if (IDsToDelete.length > 0) for (const id of IDsToDelete) await execShellAsync(`docker rmi -f ${id}`)
+    if (IDsToDelete.length > 0) await execShellAsync(`docker rmi -f ${IDsToDelete.toString().replace(',', ' ')}`)
   } else {
     const IDsToDelete = (await execShellAsync(`docker images ls --filter=reference='${name}' --filter=before='${name}:${tag}' --format '{{json .ID }}'`)).trim().replace(/"/g, '').split('\n')
-    if (IDsToDelete.length > 1) for (const id of IDsToDelete) await execShellAsync(`docker rmi -f ${id}`)
+    if (IDsToDelete.length > 1) await execShellAsync(`docker rmi -f ${IDsToDelete.toString().replace(',', ' ')}`)
   }
   await execShellAsync('docker image prune -f')
 }

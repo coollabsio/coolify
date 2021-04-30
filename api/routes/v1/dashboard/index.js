@@ -1,27 +1,10 @@
 const { docker } = require('../../../libs/docker')
-const Deployment = require('../../../models/Deployment')
 const ServerLog = require('../../../models/Logs/Server')
 const { saveServerLog } = require('../../../libs/logging')
 
 module.exports = async function (fastify) {
   fastify.get('/', async (request, reply) => {
     try {
-      const latestDeployments = await Deployment.aggregate([
-        {
-          $sort: { createdAt: -1 }
-        },
-        {
-          $group:
-          {
-            _id: {
-              repoId: '$repoId',
-              branch: '$branch'
-            },
-            createdAt: { $last: '$createdAt' },
-            progress: { $first: '$progress' }
-          }
-        }
-      ])
       const serverLogs = await ServerLog.find()
       const dockerServices = await docker.engine.listServices()
       let applications = dockerServices.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application' && r.Spec.Labels.configuration)

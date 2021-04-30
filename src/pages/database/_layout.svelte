@@ -1,11 +1,11 @@
 <script>
-  import { params, goto, isActive, redirect, url } from "@roxi/routify";
+  import { params, goto, isActive, redirect } from "@roxi/routify";
   import { fetch, database, initialDatabase } from "@store";
   import { toast } from "@zerodevx/svelte-toast";
   import { onDestroy } from "svelte";
-import Tooltip from "../../components/Tooltip/Tooltip.svelte";
+  import Tooltip from "../../components/Tooltip/Tooltip.svelte";
 
-  $: name = $params.name
+  $: name = $params.name;
 
   onDestroy(() => {
     $database = JSON.parse(JSON.stringify(initialDatabase));
@@ -24,43 +24,38 @@ import Tooltip from "../../components/Tooltip/Tooltip.svelte";
   <nav
     class="flex text-white justify-end items-center m-4 fixed right-0 top-0 space-x-4"
   >
-  <Tooltip position="bottom" label="Delete" >
-    <button
-      title="Delete"
-      class="icon hover:text-red-500"
-      on:click="{removeDB}"
-    >
-      <svg
-        class="w-6"
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
+    <Tooltip position="bottom" label="Delete">
+      <button
+        title="Delete"
+        class="icon hover:text-red-500"
+        on:click="{removeDB}"
       >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-        ></path>
-      </svg>
-    </button>
-  </Tooltip>
+        <svg
+          class="w-6"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+          ></path>
+        </svg>
+      </button>
+    </Tooltip>
     <div class="border border-warmGray-700 h-8"></div>
-    <Tooltip position="bottom-left" label="Configuration" >
+    <Tooltip position="bottom-left" label="Configuration">
       <button
         class="icon hover:text-yellow-400"
         disabled="{$isActive(`/database/new`)}"
-        class:text-yellow-400="{$isActive(
-          `/database/${name}/configuration`,
-        ) || $isActive(`/application/new`)}"
-        class:bg-warmGray-700="{$isActive(
-          `/database/${name}/configuration`,
-        ) || $isActive(`/database/new`)}"
-        on:click="{() =>
-          $goto(
-            `/database/${name}/configuration`,
-          )}"
+        class:text-yellow-400="{$isActive(`/database/${name}/configuration`) ||
+          $isActive(`/application/new`)}"
+        class:bg-warmGray-700="{$isActive(`/database/${name}/configuration`) ||
+          $isActive(`/database/new`)}"
+        on:click="{() => $goto(`/database/${name}/configuration`)}"
       >
         <svg
           class="w-6"

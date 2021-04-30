@@ -1,5 +1,5 @@
 <script>
-  import { redirect } from "@roxi/routify";
+  import { redirect,isActive } from "@roxi/routify";
   import { fade } from "svelte/transition";
   import {
     session,
@@ -35,7 +35,7 @@
 
   async function loadBranches() {
     loading.branches = true;
-    if ($activePage === 'new') $application.repository.branch = null;
+    if ($isActive('/application/new')) $application.repository.branch = null;
     const selectedRepository = $githubRepositories.find(
       r => r.id === $application.repository.id,
     );
@@ -141,7 +141,7 @@
       if (newWindow.closed) {
         clearInterval(timer);
         loading.github = true;
-        if ($activePage !== 'new') {
+        if ($activePage.application !== 'new') {
           try {
             const config = await $fetch(`/api/v1/config`, {
               body: {
@@ -164,8 +164,7 @@
     }, 100);
   }
 </script>
-
-{#if $activePage !== 'new'}
+{#if $activePage.application !== 'new' && $activePage.application}
   <div class="min-h-full text-white">
     <div
       class="py-5 text-left px-6 text-3xl tracking-tight font-bold flex items-center"
@@ -174,7 +173,7 @@
         ? `${$application.publish.domain}${
             $application.publish.path !== "/" ? $application.publish.path : ""
           }`
-        : "<yourdomain>"}
+        : "example.com"}
       <a
         target="_blank"
         class="icon mx-2"
@@ -219,7 +218,7 @@
       >
     </div>
   </div>
-{:else if $activePage === 'new'}
+{:else if $activePage.application === 'new'}
   <div class="min-h-full text-white">
     <div
       class="py-5 text-left px-6 text-3xl tracking-tight font-bold flex items-center"

@@ -1,16 +1,16 @@
 <script>
-  import { redirect, isActive } from "@roxi/routify";
+  import { redirect } from "@roxi/routify";
   import { onMount } from "svelte";
   import { toast } from "@zerodevx/svelte-toast";
   import templates from "../../../utils/templates";
-  import { application, fetch, deployments } from "@store";
+  import { application, fetch, deployments, activePage } from "@store";
   import General from "./ActiveTab/General.svelte";
   import Secrets from "./ActiveTab/Secrets.svelte";
   import Loading from "../../Loading.svelte";
 
   let loading = false;
   onMount(async () => {
-    if (!$isActive("/application/new")) {
+    if ($activePage.application !== 'new') {
       const config = await $fetch(`/api/v1/config`, {
         body: {
           name: $application.repository.name,

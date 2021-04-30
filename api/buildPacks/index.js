@@ -1,4 +1,4 @@
-const static = require('./static')
+const Static = require('./static')
 const react = require('./react')
 const nextjs = require('./nextjs')
 const nuxtjs = require('./nuxtjs')
@@ -10,4 +10,4 @@ const php = require('./php')
 const docker = require('./docker')
 const rust = require('./rust')
 
-module.exports = { static, nodejs, php, docker, rust, react, vuejs, nextjs, nuxtjs, svelte, gatsby }
+module.exports = { static: Static, nodejs, php, docker, rust, react, vuejs, nextjs, nuxtjs, svelte, gatsby }

@@ -1,5 +1,5 @@
 const { docker } = require('../../../libs/docker')
-const { execShellAsync } = require('../../../libs/common')
+const { execShellAsync, delay } = require('../../../libs/common')
 const ApplicationLog = require('../../../models/Logs/Application')
 const Deployment = require('../../../models/Deployment')
 const { purgeImagesContainers } = require('../../../libs/applications/cleanup')
@@ -26,6 +26,7 @@ module.exports = async function (fastify) {
         }
         await execShellAsync(`docker stack rm ${found.build.container.name}`)
         reply.code(200).send({ organization, name, branch })
+        await delay(10000)
         await purgeImagesContainers(found, true)
       } else {
         reply.code(500).send({ message: 'Nothing to do.' })
