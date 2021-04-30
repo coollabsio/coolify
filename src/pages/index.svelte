@@ -52,10 +52,10 @@
       </h2>
       <div class="text-center py-10">
         {#if !$loggedIn}
-          <button class="text-white bg-warmGray-700 hover:bg-warmGray-600 rounded p-2 px-10 font-bold" on:click="{login}">Login with Github</button
+          <button class="text-white bg-warmGray-800 hover:bg-warmGray-700 rounded p-2 px-10 font-bold" on:click="{login}">Login with Github</button
           >
         {:else}
-          <button class="text-white bg-warmGray-700 hover:bg-warmGray-600 rounded p-2 px-10 font-bold" on:click="{() => $goto('/dashboard/applications')}"
+          <button class="text-white bg-warmGray-800 hover:bg-warmGray-700 rounded p-2 px-10 font-bold" on:click="{() => $goto('/dashboard/applications')}"
             >Get Started</button
           >
         {/if}
