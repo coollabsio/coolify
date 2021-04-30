@@ -1,5 +1,5 @@
 <script>
-  import { params, goto, redirect, afterPageLoad,isActive  } from "@roxi/routify";
+  import { params, goto, redirect, isActive } from "@roxi/routify";
   import {
     application,
     fetch,
@@ -12,25 +12,6 @@
   import Loading from "../../components/Loading.svelte";
   import { toast } from "@zerodevx/svelte-toast";
   import Tooltip from "../../components/Tooltip/Tooltip.svelte";
-  $afterPageLoad(page => {
-    if (
-      page.path === "/application/:organization/:name/:branch/logs/:deployId" ||
-      page.path === "/application/:organization/:name/:branch/logs/index"
-    ) {
-      $activePage.application = "logs";
-    } else if (page.path === "/application/new") {
-      console.log(page.path)
-      page.path === "/application/:organization/:name/:branch/configuration"
-        ? ($activePage.application = "configuration")
-        : ($activePage.application = "new");
-    } else if (
-      page.path === "/application/:organization/:name/:branch/configuration"
-    ) {
-      $activePage.application = "configuration";
-    } else {
-      $activePage.application = null;
-    }
-  });
 
   $application.repository.organization = $params.organization;
   $application.repository.name = $params.name;
@@ -54,7 +35,7 @@
   }
   async function loadConfiguration() {
     // isActive needed here!
-    if (!$isActive("/application/new")) {
+    if (!$activePage.new) {
       if ($deployments.length === 0) {
         await setConfiguration();
       } else {
@@ -138,7 +119,7 @@
           $application.publish.domain === null}"
         class:hover:bg-green-500="{$application.publish.domain}"
         class:bg-green-600="{$application.publish.domain}"
-        class:hover:bg-transparent="{$activePage.application === 'new'}"
+        class:hover:bg-transparent="{$activePage.new}"
         class:text-warmGray-700="{$application.publish.domain === '' ||
           $application.publish.domain === null}"
         class="icon"
@@ -167,18 +148,18 @@
       <button
         disabled="{$application.publish.domain === '' ||
           $application.publish.domain === null ||
-          $activePage.application === 'new'}"
+          $activePage.new}"
         class:cursor-not-allowed="{$application.publish.domain === '' ||
           $application.publish.domain === null ||
-          $activePage.application === 'new'}"
+          $activePage.new}"
         class:hover:text-red-500="{$application.publish.domain &&
-          $activePage.application !== 'new'}"
+          !$activePage.new}"
         class:hover:bg-warmGray-700="{$application.publish.domain &&
-          $activePage.application !== 'new'}"
-        class:hover:bg-transparent="{$activePage.application === 'new'}"
+          !$activePage.new}"
+        class:hover:bg-transparent="{$activePage.new}"
         class:text-warmGray-700="{$application.publish.domain === '' ||
           $application.publish.domain === null ||
-          $activePage.application === 'new'}"
+          $activePage.new}"
         class="icon"
         on:click="{removeApplication}"
       >
@@ -202,11 +183,11 @@
     <Tooltip position="bottom" label="Logs">
       <button
         class="icon"
-        class:text-warmGray-700="{$activePage.application === 'new'}"
-        disabled="{$activePage.application === 'new'}"
-        class:hover:text-blue-400="{$activePage.application !== 'new'}"
-        class:hover:bg-transparent="{$activePage.application === 'new'}"
-        class:cursor-not-allowed="{$activePage.application === 'new'}"
+        class:text-warmGray-700="{$activePage.new}"
+        disabled="{$activePage.new}"
+        class:hover:text-blue-400="{!$activePage.new}"
+        class:hover:bg-transparent="{$activePage.new}"
+        class:cursor-not-allowed="{$activePage.new}"
         class:text-blue-400="{$activePage.application === 'logs'}"
         class:bg-warmGray-700="{$activePage.application === 'logs'}"
         on:click="{() =>
@@ -233,9 +214,9 @@
     <Tooltip position="bottom-left" label="Configuration">
       <button
         class="icon hover:text-yellow-400"
-        disabled="{$activePage.application === 'new'}"
-        class:text-yellow-400="{$activePage.application === 'configuration' || $activePage.application === 'new'}"
-        class:bg-warmGray-700="{$activePage.application === 'configuration' || $activePage.application === 'new'}"
+        disabled="{$activePage.new}"
+        class:text-yellow-400="{$activePage.application === 'configuration' || $activePage.new}"
+        class:bg-warmGray-700="{$activePage.application === 'configuration' || $activePage.new}"
         on:click="{() =>
           $goto(
             `/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/configuration`,

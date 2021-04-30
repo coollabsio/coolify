@@ -5,7 +5,7 @@
 </style>
 
 <script>
-  import { goto, route, afterPageLoad } from "@roxi/routify/runtime";
+  import { goto, route, isChangingPage } from "@roxi/routify/runtime";
   import { loggedIn, session, fetch, deployments, activePage } from "@store";
   import { toast } from "@zerodevx/svelte-toast";
   import { onMount } from "svelte";
@@ -24,29 +24,32 @@
       ? "main"
       : "next";
 
-  $afterPageLoad(page => {
-    if (
-      page.path === "/dashboard/applications" ||
-      page.path.match(/\/application/)
-    ) {
+  $: if ($isChangingPage) {
+    const path = window.location.pathname;
+    if (path === "/dashboard/applications" || path.match(/\/application/)) {
       $activePage.mainmenu = "applications";
-    } else if (
-      page.path === "/dashboard/databases" ||
-      page.path.match(/\/database/)
-    ) {
+    } else if (path === "/dashboard/databases" || path.match(/\/database/)) {
       $activePage.mainmenu = "databases";
-    } else if (
-      page.path === "/dashboard/services" ||
-      page.path.match(/\/service/)
-    ) {
+    } else if (path === "/dashboard/services" || path.match(/\/service/)) {
       $activePage.mainmenu = "services";
-    } else if (page.path === "/settings") {
+    } else if (path === "/settings") {
       $activePage.mainmenu = "settings";
     } else {
       $activePage.mainmenu = null;
     }
-  });
 
+    if (path.match(/\/application\/.*\/logs/)) {
+      $activePage.application = "logs";
+    } else if (path === "/application/new") {
+      $activePage.application = "configuration";
+      $activePage.new = true;
+    } else if (path.match(/\/application\/.*\/configuration/)) {
+      $activePage.application = "configuration";
+      $activePage.new = false;
+    } else {
+      $activePage.application = null;
+    }
+  }
   onMount(async () => {
     if ($session.token) {
       upgradeAvailable = await checkUpgrade();

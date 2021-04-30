@@ -10,7 +10,7 @@
 
   let loading = false;
   onMount(async () => {
-    if ($activePage.application !== 'new') {
+    if (!$activePage.new) {
       const config = await $fetch(`/api/v1/config`, {
         body: {
           name: $application.repository.name,

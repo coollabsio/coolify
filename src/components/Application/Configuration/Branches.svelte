@@ -35,10 +35,10 @@
         selectedValue="{selectedValue}"
         isClearable="{false}"
         items="{branches.map(b => ({ label: b.name, value: b.name }))}"
-        showIndicator="{$activePage.application === 'new'}"
+        showIndicator="{$activePage.new}"
         noOptionsMessage="No branches found"
         placeholder="Select a branch"
-        isDisabled="{$activePage.application !== 'new'}"
+        isDisabled="{!$activePage.new}"
       />
     </div>
   </div>

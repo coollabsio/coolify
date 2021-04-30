@@ -14,7 +14,7 @@
   }));
 
   const selectedValue =
-    $activePage.application !== "new" &&
+    !$activePage.new &&
     `${$application.repository.organization}/${$application.repository.name}`;
 
   const dispatch = createEventDispatcher();
@@ -33,10 +33,10 @@
           selectedValue="{selectedValue}"
           isClearable="{false}"
           items="{items}"
-          showIndicator="{$activePage.application === 'new'}"
+          showIndicator="{$activePage.new}"
           noOptionsMessage="No Repositories found"
           placeholder="Select a Repository"
-          isDisabled="{$activePage.application !== 'new'}"
+          isDisabled="{!$activePage.new}"
         />
       </div>
       <button

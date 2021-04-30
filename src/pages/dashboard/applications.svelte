@@ -5,7 +5,7 @@
 
   function switchTo(application) {
     const { branch, name, organization } = application;
-    $goto(`/application/:organization/:name/:branch`, {
+    $goto(`/application/:organization/:name/:branch/configuration`, {
       name,
       organization,
       branch,

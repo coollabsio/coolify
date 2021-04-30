@@ -1,5 +1,5 @@
 <script>
-  import { redirect,isActive } from "@roxi/routify";
+  import { redirect, isActive } from "@roxi/routify";
   import { fade } from "svelte/transition";
   import {
     session,
@@ -8,9 +8,9 @@
     initialApplication,
     githubRepositories,
     githubInstallations,
-    activePage
+    activePage,
   } from "@store";
-  
+
   import Login from "./Login.svelte";
   import Loading from "../../Loading.svelte";
   import Repositories from "./Repositories.svelte";
@@ -35,7 +35,7 @@
 
   async function loadBranches() {
     loading.branches = true;
-    if ($isActive('/application/new')) $application.repository.branch = null;
+    if ($isActive("/application/new")) $application.repository.branch = null;
     const selectedRepository = $githubRepositories.find(
       r => r.id === $application.repository.id,
     );
@@ -141,7 +141,7 @@
       if (newWindow.closed) {
         clearInterval(timer);
         loading.github = true;
-        if ($activePage.application !== 'new') {
+        if (!$activePage.new) {
           try {
             const config = await $fetch(`/api/v1/config`, {
               body: {
@@ -164,7 +164,8 @@
     }, 100);
   }
 </script>
-{#if $activePage.application && $activePage.application !== 'new'}
+
+{#if !$activePage.new}
   <div class="min-h-full text-white">
     <div
       class="py-5 text-left px-6 text-3xl tracking-tight font-bold flex items-center"
@@ -218,7 +219,7 @@
       >
     </div>
   </div>
-{:else if $activePage.application === 'new'}
+{:else if $activePage.new}
   <div class="min-h-full text-white">
     <div
       class="py-5 text-left px-6 text-3xl tracking-tight font-bold flex items-center"

@@ -80,6 +80,7 @@ export const fetch = writable(
 )
 export const activePage = writable({
   application: null,
+  new: false,
   mainmenu: null
 })
 export const session = writable(sessionStore)
