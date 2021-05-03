@@ -1,0 +1,4 @@
+.svelte/**
+static/**
+build/**
+node_modules/**

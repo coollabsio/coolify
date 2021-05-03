@@ -1,64 +1,38 @@
+# create-svelte
 
-# Coolify
+Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/master/packages/create-svelte);
 
-An open-source, hassle-free, self-hostable Heroku & Netlify alternative.
+## Creating a project
 
-## Demo
-
-[Small video](https://cdn.coollabs.io/assets/coolify/video/coolify.webm)
-
-  
-## Installation 
-
-Installation is automated with the following command:
+If you're seeing this, you've probably already done this step. Congrats!
 
 ```bash
-/bin/bash -c "$(curl -fsSL https://get.coollabs.io/coolify/install.sh)"
+# create a new project in the current directory
+npm init svelte@next
+
+# create a new project in my-app
+npm init svelte@next my-app
 ```
 
-  
-## Features
-You can deploy any of the following applications, databases and services easily.
+> Note: the `@next` is temporary
 
-(constantly growing lists)
+## Developing
 
-### Applications
-With Github integration
+Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
 
-- Static sites
-- NodeJS
-- VueJS
-- NuxtJS
-- React/Preact
-- NextJS
-- Gatsby
-- Svelte
-- PHP
-- Rust 
-- or any custom dockerfile
+```bash
+npm run dev
 
-### Databases
-- MongoDB
-- MySQL
-- PostgreSQL
-- CouchDB
+# or start the server and open the app in a new browser tab
+npm run dev -- --open
+```
 
-### Services
-- [Plausible Analytics](https://plausible.io)
+## Building
 
-  
-## Support
+Before creating a production version of your app, install an [adapter](https://kit.svelte.dev/docs#adapters) for your target environment. Then:
 
-- Twitter: [@andrasbacsai](https://twitter.com/andrasbacsai)
-- Telegram: [@andrasbacsai](https://t.me/andrasbacsai)
-- Email: [andras@coollabs.io](mailto:andras@coollabs.io)
-- Discord: [Invitation](https://discord.com/invite/bvS3WhR)
+```bash
+npm run build
+```
 
-## Roadmap
-[See the Roadmap here](https://github.com/coollabsio/coolify/projects/1)
-  
-## License
-
-This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. Please see the [LICENSE](/LICENSE) file in our repository for the full text.
-
-  
+> You can preview the built app with `npm run preview`, regardless of whether you installed an adapter. This should _not_ be used to serve your app in production.

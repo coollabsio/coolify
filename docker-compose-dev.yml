@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  proxy:
+    image: traefik:v2.4
+    hostname: coollabs-proxy
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: host
+    command:
+      - --api.insecure=true
+      - --api.dashboard=true
+      - --api.debug=true
+      - --log.level=ERROR
+      - --providers.docker=true
+      - --providers.docker.swarmMode=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=coollabs
+      - --providers.docker.swarmModeRefreshSeconds=1s
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - coollabs
+    deploy:
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        - 'traefik.enable=true'
+        - 'traefik.http.routers.api.entrypoints=websecure'
+        - 'traefik.http.routers.api.service=api@internal'
+        - 'traefik.http.routers.api.middlewares=auth'
+        - 'traefik.http.services.traefik.loadbalancer.server.port=80'
+
+        # Global redirect www to non-www
+        - 'traefik.http.routers.www-catchall.rule=hostregexp(`{host:www.(.+)}`)'
+        - 'traefik.http.routers.www-catchall.entrypoints=web'
+        - 'traefik.http.routers.www-catchall.middlewares=redirect-www-to-nonwww'
+        - "traefik.http.middlewares.redirect-www-to-nonwww.redirectregex.regex=^http://(?:www\\.)?(.+)"
+        - 'traefik.http.middlewares.redirect-www-to-nonwww.redirectregex.replacement=http://$${1}'
+  coolify:
+    build:
+      context: .
+      dockerfile: Dockerfile-dev
+    hostname: coollabs-coolify
+    env_file:
+      - .env
+    ports:
+      - '3000:3000'
+      - '23456:23456'
+    networks:
+      - coollabs
+    command: 'pnpm dev'
+    volumes:
+      - .:/usr/src/app
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      replicas: 1
+  mongodb:
+    image: bitnami/mongodb:4.4
+    hostname: coollabs-mongodb
+    environment:
+      - MONGODB_ROOT_PASSWORD=8fb9444556db74ca93
+      - MONGODB_USERNAME=b107331eeb7d
+      - MONGODB_PASSWORD=b861ef98ec960526be
+      - MONGODB_DATABASE=coolify
+    volumes:
+      - coollabs-mongodb-data:/bitnami/mongodb
+    networks:
+      - coollabs
+
+volumes:
+  coollabs-mongodb-data:
+    external: true
+
+networks:
+  coollabs:
+    driver: overlay
+    name: coollabs
+    external: true

@@ -2,3 +2,4 @@ node_modules
 dist
 .routify
 .pnpm-store
+.svelte

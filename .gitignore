@@ -1,11 +1,6 @@
-.vscode
-.idea
+.DS_Store
 node_modules
-dist
-dist-ssr
-.routify
+/.svelte
+/build
+/functions
 .env
-yarn-error.log
-api/development/console.log
-.pnpm-debug.log
-.pnpm-store
