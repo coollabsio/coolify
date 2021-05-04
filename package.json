@@ -4,7 +4,7 @@
 	"version": "1.0.11",
 	"license": "AGPL-3.0",
 	"scripts": {
-		"dev:docker": "docker-compose -f docker-compose-dev.yml up --force-recreate",
+		"dev:docker": "docker-compose -f docker-compose-dev.yml up --force-recreate --build",
 		"dev": "svelte-kit dev --host 0.0.0.0",
 		"build": "svelte-kit build",
 		"preview": "svelte-kit preview",
@@ -35,6 +35,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@zerodevx/svelte-toast": "^0.2.2",
 		"cookie": "^0.4.1",
 		"cuid": "^2.1.8",
 		"dockerode": "^3.3.0",

@@ -4,3 +4,5 @@ node_modules
 /build
 /functions
 .env
+.pnpm-store
+.pnpm-debug.log

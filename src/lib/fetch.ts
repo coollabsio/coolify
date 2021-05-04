@@ -1,8 +1,11 @@
+import { toast } from "@zerodevx/svelte-toast";
+import { browser} from '$app/env';
+
 export async function request(
 	url,
 	{
 		session,
-		fetch,
+		fetch = window.fetch,
 		method,
 		body,
 		...customConfig
@@ -18,7 +21,6 @@ export async function request(
 	});
 
 	const config: any = {
-		cache: 'no-cache',
 		method: method || (body ? 'POST' : 'GET'),
 		...customConfig,
 		headers: {
@@ -52,19 +54,22 @@ export async function request(
 		}
 	} else {
 		if (response.status === 401) {
+			browser && toast.push('Unauthorized')
 			return Promise.reject({
-				code: response.status,
+				status: response.status,
 				error: 'Unauthorized'
 			});
 		} else if (response.status >= 500) {
-			const error = (await response.json()).message;
+			const error = (await response.json()).error;
+			browser && toast.push(error)
 			return Promise.reject({
-				code: response.status,
+				status: response.status,
 				error: error || 'Oops, something is not okay. Are you okay?'
 			});
 		} else {
+			browser && toast.push(response.statusText)
 			return Promise.reject({
-				code: response.status,
+				status: response.status,
 				error: response.statusText
 			});
 		}

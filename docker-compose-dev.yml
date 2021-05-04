@@ -67,8 +67,9 @@ services:
       - '23456:23456'
     networks:
       - coollabs
-    command: 'pnpm dev'
+    command: bash -c 'pnpm install && pnpm dev'
     volumes:
+      - coollabs-pnpm-store:/usr/src/app/.pnpm-store
       - .:/usr/src/app
       - /var/run/docker.sock:/var/run/docker.sock:ro
     deploy:
@@ -91,8 +92,8 @@ services:
       - coollabs
 
 volumes:
-  coollabs-mongodb-data:
-    external: true
+  coollabs-mongodb-data: {}
+  coollabs-pnpm-store: {}
 
 networks:
   coollabs:
