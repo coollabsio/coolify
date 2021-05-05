@@ -1,35 +1,48 @@
-import { toast } from "@zerodevx/svelte-toast";
-import { browser} from '$app/env';
+import { toast } from '@zerodevx/svelte-toast';
+import { browser } from '$app/env';
 
 export async function request(
 	url,
+	session,
 	{
-		session,
-		fetch = window.fetch,
 		method,
 		body,
-		...customConfig
-	}: { session: any; fetch: any; method?: string; body?: any; [key: string]: Object }
+		customHeaders
+	}: {
+		url?: string;
+		session?: any;
+		fetch?: any;
+		method?: string;
+		body?: any;
+		customHeaders?: Object;
+	} = {}
 ) {
-	let headers = { 'Content-type': 'application/json; charset=UTF-8' };
-	if (method === 'DELETE') {
-		delete headers['Content-type'];
+	let fetch;
+	if (browser) {
+		fetch = window.fetch
+	} else {
+		fetch = session.fetch
 	}
-	const isGithub = url.match(/api.github.com/);
-	headers = Object.assign(headers, {
-		Authorization: isGithub && `token ${session.ghToken}`
-	});
-
+	let headers = { 'content-type': 'application/json; charset=UTF-8' };
+	if (method === 'DELETE') {
+		delete headers['content-type'];
+	}
+	if (url.match(/api.github.com/)) {
+		headers = Object.assign(headers, {
+			Authorization: `token ${session.ghToken}`
+		});
+	}
 	const config: any = {
 		method: method || (body ? 'POST' : 'GET'),
-		...customConfig,
 		headers: {
 			...headers,
-			...customConfig.headers
+			...customHeaders
 		}
 	};
+	if (body) {
+		config.body = JSON.stringify(body)
+	}
 	const response = await fetch(url, config);
-	// console.log(response)
 	if (response.status >= 200 && response.status <= 299) {
 		if (response.headers.get('content-type').match(/application\/json/)) {
 			return await response.json();
@@ -54,20 +67,20 @@ export async function request(
 		}
 	} else {
 		if (response.status === 401) {
-			browser && toast.push('Unauthorized')
+			browser && toast.push('Unauthorized');
 			return Promise.reject({
 				status: response.status,
 				error: 'Unauthorized'
 			});
 		} else if (response.status >= 500) {
 			const error = (await response.json()).error;
-			browser && toast.push(error)
+			browser && toast.push(error);
 			return Promise.reject({
 				status: response.status,
 				error: error || 'Oops, something is not okay. Are you okay?'
 			});
 		} else {
-			browser && toast.push(response.statusText)
+			browser && toast.push(response.statusText);
 			return Promise.reject({
 				status: response.status,
 				error: response.statusText

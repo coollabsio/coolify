@@ -1,13 +1,9 @@
-export function checkAuth({ session, path }) {
+export function checkAuth({ session }) {
 	if (!session.isLoggedIn) {
 		return {
 			status: 302,
 			redirect: '/'
 		};
 	}
-	return {
-		props: {
-			path
-		}
-	}
+
 }

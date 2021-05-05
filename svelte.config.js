@@ -1,11 +1,10 @@
-require('dotenv-extended').load();
-const preprocess = require('svelte-preprocess');
-const path = require('path');
+import dotEnvExtended from 'dotenv-extended';
+dotEnvExtended.load();
+import preprocess from 'svelte-preprocess';
+import path from 'path';
 
 /** @type {import('@sveltejs/kit').Config} */
-module.exports = {
-	// Consult https://github.com/sveltejs/svelte-preprocess
-	// for more information about preprocessors
+export default {
 	preprocess: [
 		preprocess({
 			postcss: true
@@ -13,7 +12,6 @@ module.exports = {
 	],
 
 	kit: {
-		// hydrate the <div id="svelte"> element in src/app.html
 		target: '#svelte',
 		hostHeader: 'X-Forwarded-Host',
 		floc: true,
@@ -25,6 +23,7 @@ module.exports = {
 			},
 			resolve: {
 				alias: {
+					$components: path.resolve('./src/components/'),
 					$store: path.resolve('./src/store/index.ts'),
 					$api: path.resolve('./src/routes/api/_index.ts'),
 					$models: path.resolve('./src/models/')

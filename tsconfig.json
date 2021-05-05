@@ -26,7 +26,8 @@
 			"$lib/*": ["src/lib/*"],
 			"$store": ["src/store/index.ts"],
 			"$api": ["src/routes/api/_index.ts"],
-			"$models/*": ["src/models/*"]
+			"$models/*": ["src/models/*"],
+			"$components/*": ["src/components/*"]
 		}
 	},
 	"include": ["src/**/*.d.ts", "src/**/*.js", "src/**/*.ts", "src/**/*.svelte"]

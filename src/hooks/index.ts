@@ -24,18 +24,11 @@ async function connectMongoDB() {
 }
 if (!db) connectMongoDB();
 
-export async function getContext({ headers }) {
+export function getSession({ headers }) {
 	const { coolToken, ghToken } = cookie.parse(headers.cookie || '');
 	return {
 		isLoggedIn: coolToken ? true : false,
 		coolToken: coolToken || null,
 		ghToken: ghToken || null
-	};
-}
-
-export function getSession({ context }) {
-	return {
-		isLoggedIn: context.isLoggedIn,
-		coolToken: context.coolToken
 	};
 }
