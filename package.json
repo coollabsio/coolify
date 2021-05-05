@@ -9,6 +9,7 @@
 		"build": "TAILWIND_MODE=build svelte-kit build",
 		"preview": "svelte-kit preview",
 		"start": "svelte-kit preview",
+		"start:db":"docker run --name mongodb -ti -p 27017:27017 -e MONGODB_ROOT_PASSWORD=developmentPassword4db  -e MONGODB_USERNAME=supercooldbuser -e MONGODB_PASSWORD=developmentPassword4db -e MONGODB_DATABASE=coolify-prod bitnami/mongodb:4.4",
 		"lint": "prettier --check . && eslint --ignore-path .gitignore .",
 		"format": "prettier --write ."
 	},
