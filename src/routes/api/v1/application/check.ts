@@ -26,16 +26,17 @@ export async function post(request: Request) {
         if (DOMAIN === configuration.publish.domain) foundDomain = true
         if (foundDomain) {
             return {
-                status: 500,
+                status: 200,
                 body: {
-                    error: 'Domain already in use.'
+                    success: false,
+                    message: 'Domain already in use.'
                 }
             }
 
         }
         return {
             status: 200,
-            body: { message: 'OK' }
+            body: { success: true, message: 'OK' }
         }
     } catch (error) {
         await saveServerLog(error)

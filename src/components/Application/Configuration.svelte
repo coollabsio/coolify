@@ -20,7 +20,7 @@
 			c.configuration.repository.organization === $page.params.organization &&
 			c.configuration.repository.name === $page.params.name
 	)?.configuration;
-	console.log(found);
+
 	if (found) {
 		$application = found;
 	} else {

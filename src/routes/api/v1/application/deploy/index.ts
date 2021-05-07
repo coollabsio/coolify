@@ -25,7 +25,6 @@ export async function post(request: Request) {
             }
         }
         const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
-        // console.log(request.body)
         configuration = setDefaultConfiguration(request.body)
 
         if (!configuration) {
@@ -37,14 +36,14 @@ export async function post(request: Request) {
             }
         }
         await cloneRepository(configuration)
-        console.log(configuration)
         const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment({ services, configuration })
         if (foundService && !forceUpdate && !imageChanged && !configChanged) {
             cleanupTmp(configuration.general.workdir)
             return {
-                status: 500,
+                status: 200,
                 body: {
-                    error: 'Nothing changed, no need to redeploy.'
+                    success: false,
+                    message: 'Nothing changed, no need to redeploy.'
                 }
             }
         }
@@ -60,11 +59,12 @@ export async function post(request: Request) {
             return {
                 status: 200,
                 body: {
+                    success: false,
                     message: 'Already in the queue.'
                 }
             }
         }
-        await queueAndBuild(configuration, imageChanged)
+        queueAndBuild(configuration, imageChanged)
         return {
             status: 200,
             body: {
@@ -72,10 +72,11 @@ export async function post(request: Request) {
             }
         }
     } catch (error) {
+        console.log(error)
         return {
             status: 500,
             body: {
-                error: 'Invalid request'
+                error
             }
         }
 

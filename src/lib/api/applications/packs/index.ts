@@ -10,4 +10,4 @@ import nextjs from './nextjs'
 import gatsby from './gatsby'
 import docker from './docker'
 
-exports = { vuejs, svelte, static: Static, rust, react, php, nuxtjs, nodejs, nextjs, gatsby, docker }
+export { vuejs, svelte, Static as static, rust, react, php, nuxtjs, nodejs, nextjs, gatsby, docker }

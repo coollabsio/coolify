@@ -59,7 +59,9 @@ export async function get(request: Request) {
 		).values()
 	];
 	return {
+		status: 200,
 		body: {
+			success: true,
 			serverLogs,
 			applications: {
 				deployed: applications

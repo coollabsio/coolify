@@ -6,7 +6,6 @@ export default async function (configuration) {
     const { id, organization, name, branch } = configuration.repository
     const { domain } = configuration.publish
     const deployId = configuration.general.deployId
-  
     const execute = packs[configuration.build.pack]
     if (execute) {
       await Deployment.findOneAndUpdate(

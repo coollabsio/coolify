@@ -10,6 +10,6 @@ export async function post(request: Request) {
                 `ghToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`
             ]
         },
-        body: {}
+        body: { success: true }
     };
 }

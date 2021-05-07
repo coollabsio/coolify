@@ -3,6 +3,7 @@ import { docker } from "$lib/docker"
 import { saveAppLog } from "./logging"
 import { promises as fs } from 'fs'
 import { deleteSameDeployments } from "./cleanup"
+import yaml from 'js-yaml'
 
 export default async function (configuration, imageChanged) {
     const generateEnvs = {}

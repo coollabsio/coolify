@@ -54,13 +54,17 @@ export async function get(request: Request) {
 				if (!settings && registeredUsers > 0) {
 					return {
 						status: 500,
-						body: 'Registration disabled, enable it in settings.'
+						body: {
+							error:'Registration disabled, enable it in settings.'
+						}
 					};
 				} else {
 					if (!settings.allowRegistration) {
 						return {
 							status: 500,
-							body: 'You are not allowed here!'
+							body: {
+								error: 'You are not allowed here!'
+							}
 						};
 					} else {
 						const newUser = new User({
@@ -75,7 +79,9 @@ export async function get(request: Request) {
 							console.log(e);
 							return {
 								status: 500,
-								body: e
+								body: {
+									error: e
+								}
 							};
 						}
 					}

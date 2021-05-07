@@ -38,13 +38,13 @@
 			$application.general.deployId = deployId;
 			$initConf = JSON.parse(JSON.stringify($application));
 			toast.push('Application deployment queued.');
-			// goto(
-			// 	`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/logs/${$application.general.deployId}`,
-			// 	{ replaceState: true }
-			// );
+			goto(
+				`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/logs/${$application.general.deployId}`,
+				{ replaceState: true }
+			);
 		} catch (error) {
-			console.log(error);
-			toast.push(error.error || error || 'Ooops something went wrong.');
+			// console.log(error);
+			// toast.push(error.error || error || 'Ooops something went wrong.');
 		}
 	}
 </script>
@@ -121,8 +121,8 @@
 			class:hover:text-blue-400={$page.path !== '/application/new'}
 			class:hover:bg-transparent={$page.path === '/application/new'}
 			class:cursor-not-allowed={$page.path === '/application/new'}
-			class:text-blue-400={$page.path === 'logs'}
-			class:bg-warmGray-700={$page.path === 'logs'}
+			class:text-blue-400={$page.path.endsWith('logs')}
+			class:bg-warmGray-700={$page.path.endsWith('logs')}
 			on:click={() =>
 				goto(
 					`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/logs`

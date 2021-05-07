@@ -45,7 +45,15 @@ export async function request(
 	const response = await fetch(url, config);
 	if (response.status >= 200 && response.status <= 299) {
 		if (response.headers.get('content-type').match(/application\/json/)) {
-			return await response.json();
+			const json = await response.json();
+			if (json?.success === false) {
+				browser && toast.push(json.message);
+				return Promise.reject({
+					status: response.status,
+					error: json.message
+				});
+			}
+			return json
 		} else if (response.headers.get('content-type').match(/text\/plain/)) {
 			return await response.text();
 		} else if (response.headers.get('content-type').match(/multipart\/form-data/)) {

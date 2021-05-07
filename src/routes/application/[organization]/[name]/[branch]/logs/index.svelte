@@ -33,10 +33,12 @@
 		await loadDeploymentLogs();
 	}
 	async function loadDeploymentLogs() {
-		deployments = await request(
-			`/api/v1/application/deploy/logs?repoId=${$application.repository.id}&branch=${$application.repository.branch}&page=${page}`,
-			$session
-		);
+		deployments = (
+			await request(
+				`/api/v1/application/deploy/logs?repoId=${$application.repository.id}&branch=${$application.repository.branch}&page=${page}`,
+				$session
+			)
+		).logs;
 	}
 	async function loadApplicationLogs() {
 		logs = (
@@ -70,46 +72,48 @@
 				{/if}
 			</div>
 			<div>
-				<div class="font-bold text-left pb-2  text-xl w-300">Deployment logs</div>
+				<div class="font-bold text-left pb-2 text-xl w-300">Deployment logs</div>
 				{#if deployments.length > 0}
-					{#each deployments as deployment}
-						<div
-							in:fade={{ duration: 100 }}
-							class="flex space-x-4 text-md py-4 hover:shadow  mx-auto cursor-pointer transition-all duration-100 border-l-4 border-transparent rounded hover:bg-warmGray-700"
-							class:hover:border-green-500={deployment.progress === 'done'}
-							class:border-yellow-300={deployment.progress !== 'done' &&
-								deployment.progress !== 'failed'}
-							class:bg-warmGray-800={deployment.progress !== 'done' &&
-								deployment.progress !== 'failed'}
-							class:hover:bg-red-200={deployment.progress === 'failed'}
-							class:hover:border-red-500={deployment.progress === 'failed'}
-							on:click={() => goto(`./${deployment.deployId}`)}
-						>
-							<div class="font-bold text-sm px-3 flex justify-center items-center">
-								{deployment.branch}
-							</div>
-							<div class="flex-1" />
-							<div class="px-3 w-48">
-								<div
-									class="text-xs"
-									title={new Intl.DateTimeFormat('default', dateOptions).format(
-										new Date(deployment.createdAt)
-									)}
-								>
-									{deployment.since}
+					<div class="space-y-2">
+						{#each deployments as deployment}
+							<div
+								in:fade={{ duration: 100 }}
+								class="flex space-x-4 text-md py-4 hover:shadow mx-auto cursor-pointer transition-all duration-100 border-l-4 border-transparent rounded hover:bg-warmGray-700"
+								class:hover:border-green-500={deployment.progress === 'done'}
+								class:border-yellow-300={deployment.progress !== 'done' &&
+									deployment.progress !== 'failed'}
+								class:bg-warmGray-800={deployment.progress !== 'done' &&
+									deployment.progress !== 'failed'}
+								class:hover:bg-red-200={deployment.progress === 'failed'}
+								class:hover:border-red-500={deployment.progress === 'failed'}
+								on:click={() => goto(`./${deployment.deployId}`)}
+							>
+								<div class="font-bold text-sm px-3 flex justify-center items-center">
+									{deployment.branch}
 								</div>
-								{#if deployment.progress === 'done'}
-									<div class="text-xs">
-										Deployed in <span class="font-bold">{deployment.took}s</span>
+								<div class="flex-1" />
+								<div class="px-3 w-48">
+									<div
+										class="text-xs"
+										title={new Intl.DateTimeFormat('default', dateOptions).format(
+											new Date(deployment.createdAt)
+										)}
+									>
+										{deployment.since}
 									</div>
-								{:else if deployment.progress === 'failed'}
-									<div class="text-xs text-red-500">Failed</div>
-								{:else}
-									<div class="text-xs">Deploying...</div>
-								{/if}
+									{#if deployment.progress === 'done'}
+										<div class="text-xs">
+											Deployed in <span class="font-bold">{deployment.took}s</span>
+										</div>
+									{:else if deployment.progress === 'failed'}
+										<div class="text-xs text-red-500">Failed</div>
+									{:else}
+										<div class="text-xs">Deploying...</div>
+									{/if}
+								</div>
 							</div>
-						</div>
-					{/each}
+						{/each}
+					</div>
 					<button
 						class="text-xs bg-green-600 hover:bg-green-500 p-1 rounded text-white px-2 font-medium my-6"
 						on:click={loadMoreDeploymentLogs}>Show more</button
