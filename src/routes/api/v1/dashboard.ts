@@ -1,6 +1,7 @@
+import { docker } from '$lib/docker';
 import LogsServer from '$models/Logs/Server';
 import type { Request } from '@sveltejs/kit';
-import { docker } from '$lib/docker';
+
 
 export async function get(request: Request) {
 	const serverLogs = await LogsServer.find();

@@ -3,11 +3,7 @@ import { docker } from '$lib/docker';
 import type { Request } from '@sveltejs/kit';
 
 export async function post(request: Request) {
-
-    console.log('API')
-  
-
-    const { name, organization, branch }:any  = request.body || {}
+    const { name, organization, branch }:any = request.body || {}
     if (name && organization && branch) {
         const services = await docker.engine.listServices()
         const applications = services.filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')

@@ -59,12 +59,16 @@ export type Application = {
 	},
 }
 export type Dashboard = {
-	applications?: {
+	applications: {
 		deployed: [{
 			configuration: Application
 			UpdatedAt: any
-		}]
+		}] | []
 
 	}
 
+}
+export type GithubInstallations = {
+	id: Number;
+	app_id: Number
 }

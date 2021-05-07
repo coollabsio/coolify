@@ -84,10 +84,10 @@ body {
 	@apply bg-gray-500 !important;
 }
 .icon {
-	@apply text-white rounded p-2 transition duration-100 !important;
+	@apply text-white rounded p-2 transition duration-100;
 }
 .icon:hover {
-	@apply bg-warmGray-700 !important;
+	@apply bg-warmGray-700;
 }
 input {
 	@apply text-sm rounded py-2 px-6 font-bold bg-warmGray-800 text-white transition duration-150 outline-none border border-transparent !important;
@@ -134,4 +134,8 @@ button {
 
 .repository-select-search .selectedItem {
 	@apply text-white relative cursor-pointer font-bold text-sm flex items-center !important;
+}
+.selectContainer{
+  background: transparent !important;
+  @apply border-0 !important;
 }

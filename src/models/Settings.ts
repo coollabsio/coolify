@@ -14,4 +14,4 @@ const SettingsSchema = new Schema({
 
 SettingsSchema.set('timestamps', true);
 
-export default mongoose.model('Settings', SettingsSchema);
+export default mongoose.model('settings', SettingsSchema);

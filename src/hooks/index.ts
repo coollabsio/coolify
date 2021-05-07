@@ -5,6 +5,7 @@ let db = null;
 async function connectMongoDB() {
 	const { MONGODB_USER, MONGODB_PASSWORD, MONGODB_HOST, MONGODB_PORT, MONGODB_DB } = process.env;
 	try {
+		console.log()
 		if (process.env.NODE_ENV === 'production') {
 			await mongoose.connect(
 				`mongodb://${MONGODB_USER}:${MONGODB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT}/${MONGODB_DB}?authSource=${MONGODB_DB}&readPreference=primary&ssl=false`,
@@ -12,7 +13,7 @@ async function connectMongoDB() {
 			);
 		} else {
 			await mongoose.connect(
-				'mongodb://b107331eeb7d:b861ef98ec960526be@mongodb:27017/coolify?&readPreference=primary&ssl=false',
+				'mongodb://supercooldbuser:developmentPassword4db@localhost:27017/coolify?&readPreference=primary&ssl=false',
 				{ useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false }
 			);
 		}

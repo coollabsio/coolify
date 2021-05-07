@@ -1,9 +1,11 @@
-import type { Application, Dashboard, DateTimeFormatOptions } from 'src/global';
+import type { Application, Dashboard, DateTimeFormatOptions, GithubInstallations } from 'src/global';
 import { writable, derived, readable, Writable } from 'svelte/store';
 
-
-
-export const dashboard = writable<Dashboard>({});
+export const dashboard = writable<Dashboard>({
+	applications: {
+		deployed: []
+	}
+});
 export const dateOptions: DateTimeFormatOptions = {
 	year: 'numeric',
 	month: 'short',
@@ -15,7 +17,53 @@ export const dateOptions: DateTimeFormatOptions = {
 };
 
 export const githubRepositories = writable([])
+export const githubInstallations = writable<GithubInstallations>([])
 export const application = writable<Application>({
+	github: {
+		installation: {
+			id: null
+		},
+		app: {
+			id: null
+		}
+	},
+	repository: {
+		id: null,
+		organization: 'new',
+		name: 'start',
+		branch: null
+	},
+	general: {
+		deployId: null,
+		nickname: null,
+		workdir: null
+	},
+	build: {
+		pack: 'static',
+		directory: null,
+		command: {
+			build: null,
+			installation: null
+		},
+		container: {
+			name: null,
+			tag: null,
+			baseSHA: null
+		}
+	},
+	publish: {
+		directory: null,
+		domain: null,
+		path: '/',
+		port: null,
+		secrets: []
+	}
+})
+
+
+export const initConf = writable({})
+
+export const initialApplication = {
 	github: {
 	  installation: {
 		id: null
@@ -26,8 +74,8 @@ export const application = writable<Application>({
 	},
 	repository: {
 	  id: null,
-	  organization: 'new',
-	  name: 'start',
+	  organization: null,
+	  name: null,
 	  branch: null
 	},
 	general: {
@@ -44,8 +92,7 @@ export const application = writable<Application>({
 	  },
 	  container: {
 		name: null,
-		tag: null,
-		baseSHA: null
+		tag: null
 	  }
 	},
 	publish: {
@@ -55,4 +102,4 @@ export const application = writable<Application>({
 	  port: null,
 	  secrets: []
 	}
-  })
+  }

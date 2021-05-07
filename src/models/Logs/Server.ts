@@ -20,4 +20,4 @@ const LogsServerSchema = new Schema({
 
 LogsServerSchema.set('timestamps', { createdAt: 'createdAt', updatedAt: false });
 
-export default mongoose.model('LogsServer', LogsServerSchema);
+export default mongoose.model('logs-server', LogsServerSchema);

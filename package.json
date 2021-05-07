@@ -4,12 +4,12 @@
 	"version": "1.0.11",
 	"license": "AGPL-3.0",
 	"scripts": {
-		"dev:docker": "docker-compose -f docker-compose-dev.yml up --force-recreate --build",
+		"dev:docker:start": "docker-compose -f docker-compose-dev.yml up -d",
+		"dev:docker:stop": "docker-compose -f docker-compose-dev.yml down",
 		"dev": "TAILWIND_MODE=watch svelte-kit dev --host 0.0.0.0",
 		"build": "TAILWIND_MODE=build svelte-kit build",
 		"preview": "svelte-kit preview",
 		"start": "svelte-kit preview",
-		"start:db":"docker run --name mongodb -ti -p 27017:27017 -e MONGODB_ROOT_PASSWORD=developmentPassword4db  -e MONGODB_USERNAME=supercooldbuser -e MONGODB_PASSWORD=developmentPassword4db -e MONGODB_DATABASE=coolify-prod bitnami/mongodb:4.4",
 		"lint": "prettier --check . && eslint --ignore-path .gitignore .",
 		"format": "prettier --write ."
 	},
@@ -37,12 +37,18 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@iarna/toml": "^2.2.5",
 		"@zerodevx/svelte-toast": "^0.3.0",
 		"compare-versions": "^3.6.0",
 		"cookie": "^0.4.1",
 		"cuid": "^2.1.8",
+		"dayjs": "^1.10.4",
 		"dockerode": "^3.3.0",
+		"js-yaml": "^4.1.0",
 		"jsonwebtoken": "^8.5.1",
-		"mongoose": "^5.12.7"
+		"mongoose": "^5.12.7",
+		"shelljs": "^0.8.4",
+		"svelte-select": "^3.17.0",
+		"unique-names-generator": "^4.4.0"
 	}
 }

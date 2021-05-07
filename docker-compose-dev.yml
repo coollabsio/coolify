@@ -55,36 +55,19 @@ services:
         - 'traefik.http.routers.www-catchall.middlewares=redirect-www-to-nonwww'
         - "traefik.http.middlewares.redirect-www-to-nonwww.redirectregex.regex=^http://(?:www\\.)?(.+)"
         - 'traefik.http.middlewares.redirect-www-to-nonwww.redirectregex.replacement=http://$${1}'
-  coolify:
-    build:
-      context: .
-      dockerfile: Dockerfile-dev
-    hostname: coollabs-coolify
-    env_file:
-      - .env
-    ports:
-      - '3000:3000'
-      - '23456:23456'
-    networks:
-      - coollabs
-    command: bash -c 'pnpm install && pnpm dev'
-    volumes:
-      - coollabs-pnpm-store:/usr/src/app/.pnpm-store
-      - .:/usr/src/app
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    deploy:
-      update_config:
-        parallelism: 1
-        delay: 10s
-        order: start-first
-      replicas: 1
   mongodb:
     image: bitnami/mongodb:4.4
     hostname: coollabs-mongodb
+    ports:
+      - target: 27017
+        published: 27017
+        protocol: tcp
+        mode: host
     environment:
-      - MONGODB_ROOT_PASSWORD=8fb9444556db74ca93
-      - MONGODB_USERNAME=b107331eeb7d
-      - MONGODB_PASSWORD=b861ef98ec960526be
+      - MONGODB_DISABLE_SYSTEM_LOG=true
+      - MONGODB_ROOT_PASSWORD=developmentPassword4db
+      - MONGODB_USERNAME=supercooldbuser
+      - MONGODB_PASSWORD=developmentPassword4db
       - MONGODB_DATABASE=coolify
     volumes:
       - coollabs-mongodb-data:/bitnami/mongodb
@@ -93,7 +76,6 @@ services:
 
 volumes:
   coollabs-mongodb-data: {}
-  coollabs-pnpm-store: {}
 
 networks:
   coollabs:

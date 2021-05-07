@@ -19,7 +19,6 @@ export async function get(request: Request) {
 				{ headers: { accept: 'application/json' } }
 			)
 		).json();
-
 		const { avatar_url, id } = await (await githubAPI(request, '/user', access_token)).body;
 		const email = (await githubAPI(request, '/user/emails', access_token)).body.filter(
 			(e) => e.primary

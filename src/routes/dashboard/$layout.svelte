@@ -1,4 +1,4 @@
-<script>
+<script lang='ts'>
 	import { request } from '$lib/fetch';
 	import { dashboard } from '$store';
 	import { onDestroy, onMount } from 'svelte';
