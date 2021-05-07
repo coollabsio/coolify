@@ -12,7 +12,6 @@
 	import Tabs from '$components/Application/Tabs.svelte';
 	import Repositories from '$components/Application/Repositories.svelte';
 	import Login from './Login.svelte';
-	import { GITHUB_APP_NAME } from '$lib/Env.svelte';
 	let loading = {
 		github: false,
 		branches: false
@@ -118,7 +117,9 @@
 			const left = screen.width / 2 - 1020 / 2;
 			const top = screen.height / 2 - 618 / 2;
 			const newWindow = open(
-				`https://github.com/apps/${dashify(GITHUB_APP_NAME)}/installations/new`,
+				`https://github.com/apps/${dashify(
+					import.meta.env.VITE_GITHUB_APP_NAME
+				)}/installations/new`,
 				'Install App',
 				'resizable=1, scrollbars=1, fullscreen=0, height=1000, width=1020,top=' +
 					top +
