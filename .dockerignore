@@ -3,6 +3,5 @@ node_modules
 /.svelte
 /build
 /functions
-.env
 .pnpm-store
 .pnpm-debug.log
