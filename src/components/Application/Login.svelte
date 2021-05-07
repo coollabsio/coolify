@@ -20,7 +20,7 @@
 				clearInterval(timer);
 				const ghToken = new URL(newWindow.document.URL).searchParams.get('ghToken');
 				if (ghToken) {
-					$session.githubAppToken = ghToken;
+					$session.ghToken = ghToken;
                     location.reload()
 				}
 			}

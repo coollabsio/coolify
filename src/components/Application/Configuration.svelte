@@ -36,9 +36,9 @@
 	let branches = [];
 	let relogin = false;
 
-	onMount(async () => {
-		await loadGithubRepositories();
-	});
+	// onMount(async () => {
+	// 	await loadGithubRepositories();
+	// });
 	function dashify(str: string, options?: any) {
 		if (typeof str !== 'string') return str;
 		return str
@@ -75,11 +75,11 @@
 					const coolToken = new URL(newWindow.document.URL).searchParams.get('coolToken');
 					const ghToken = new URL(newWindow.document.URL).searchParams.get('ghToken');
 					if (ghToken) {
-						$session.githubAppToken = ghToken;
+						$session.ghToken = ghToken;
 					}
 					if (coolToken) {
 						$session.isLoggedIn = true;
-						$session.token = coolToken;
+						$session.coolToken = coolToken;
 					}
 					await loadGithubRepositories();
 				}

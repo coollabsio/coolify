@@ -16,14 +16,14 @@ export async function post(request: Request) {
     const { coolToken } = cookie.parse(request.headers.cookie || '');
 
     try {
-        if (!await verifyUserId(coolToken)) {
-            return {
-                status: 500,
-                body: {
-                    error: 'Unauthorized.'
-                }
-            }
-        }
+        // if (!await verifyUserId(coolToken)) {
+        //     return {
+        //         status: 401,
+        //         body: {
+        //             error: 'Unauthorized.'
+        //         }
+        //     }
+        // }
         const services = (await docker.engine.listServices()).filter(r => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application')
         configuration = setDefaultConfiguration(request.body)
 

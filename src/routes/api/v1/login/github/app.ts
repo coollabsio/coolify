@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 import User from '$models/User';
 import Settings from '$models/Settings';
 import cuid from 'cuid';
-import jwt from 'jsonwebtoken';
+import jsonwebtoken from 'jsonwebtoken';
 
 export async function get(request: Request) {
 	const code = request.query.get('code');
@@ -88,7 +88,7 @@ export async function get(request: Request) {
 				}
 			}
 		}
-		const coolToken = jwt.sign({}, JWT_SIGN_KEY, {
+		const coolToken = jsonwebtoken.sign({}, JWT_SIGN_KEY, {
 			expiresIn: 15778800,
 			algorithm: 'HS256',
 			audience: 'coolLabs',

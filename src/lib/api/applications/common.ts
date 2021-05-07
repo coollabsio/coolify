@@ -7,12 +7,12 @@ export async function verifyUserId(token) {
     const verify = jsonwebtoken.verify(token, JWT_SIGN_KEY)
     const found = await User.findOne({ uid: verify.jti })
     if (found) {
-      return true
+      return Promise.resolve(true)
     } else {
-      return false
+      return Promise.reject(false);
     }
   } catch (error) {
     console.log(error)
-    return false
+    return Promise.reject(false);
   }
 }

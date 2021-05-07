@@ -1,3 +1,4 @@
+import { verifyUserId } from '$lib/api/applications/common';
 import * as cookie from 'cookie';
 import mongoose from 'mongoose';
 
@@ -5,7 +6,6 @@ let db = null;
 async function connectMongoDB() {
 	const { MONGODB_USER, MONGODB_PASSWORD, MONGODB_HOST, MONGODB_PORT, MONGODB_DB } = process.env;
 	try {
-		console.log()
 		if (process.env.NODE_ENV === 'production') {
 			await mongoose.connect(
 				`mongodb://${MONGODB_USER}:${MONGODB_PASSWORD}@${MONGODB_HOST}:${MONGODB_PORT}/${MONGODB_DB}?authSource=${MONGODB_DB}&readPreference=primary&ssl=false`,
@@ -25,6 +25,45 @@ async function connectMongoDB() {
 }
 if (!db) connectMongoDB();
 
+export async function handle({ request, render }) {
+	const response = await render(request);
+	const { coolToken } = cookie.parse(request.headers.cookie || '');
+	if (coolToken) {
+		try {
+			await verifyUserId(coolToken)
+			console.log('user OK')
+			return {
+				...response,
+			}
+		} catch (error) {
+			return {
+				...response,
+				headers: {
+					location: '/',
+					'set-cookie': [
+						`coolToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+						`ghToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+					]
+				},
+			}
+		}
+	}
+	return {
+		...response
+	}
+
+	// const response = await render(request);
+	// return {
+	// 	...response,
+	// 	headers: {
+	// 		location:'/',
+	// 		'set-cookie': [
+	// 			`coolToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+	// 			`ghToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+	// 		]
+	// 	},
+	// }
+}
 export function getSession({ headers }) {
 	const { coolToken, ghToken } = cookie.parse(headers.cookie || '');
 	return {

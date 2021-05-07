@@ -1,7 +1,6 @@
 <script>
 	import { goto } from '$app/navigation';
 	import { session } from '$app/stores';
-
 	function login() {
 		const left = screen.width / 2 - 1020 / 2;
 		const top = screen.height / 2 - 618 / 2;
@@ -21,16 +20,12 @@
 				clearInterval(timer);
 				const coolToken = new URL(newWindow.document.URL).searchParams.get('coolToken');
 				const ghToken = new URL(newWindow.document.URL).searchParams.get('ghToken');
-				const ghRefreshToken = new URL(newWindow.document.URL).searchParams.get('ghToken');
-				if (ghRefreshToken) {
-					$session.ghRefreshToken = ghRefreshToken;
-				}
 				if (ghToken) {
-					$session.githubAppToken = ghToken;
+					$session.ghToken = ghToken;
 				}
 				if (coolToken) {
 					$session.isLoggedIn = true;
-					$session.token = coolToken;
+					$session.coolToken = coolToken;
 					goto('/dashboard/applications');
 				}
 			}
