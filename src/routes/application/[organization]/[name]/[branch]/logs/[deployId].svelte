@@ -5,6 +5,7 @@
 	import { request } from '$lib/fetch';
 	import { page, session } from '$app/stores';
 	import { goto } from '$app/navigation';
+import { browser } from '$app/env';
 
 	let loadLogsInterval;
 	let logs = [];
@@ -26,7 +27,7 @@
 				clearInterval(loadLogsInterval);
 			}
 		} catch (error) {
-			goto('/dashboard', { replaceState: true });
+			browser && goto('/dashboard', { replaceState: true });
 		}
 	}
 	onDestroy(() => {

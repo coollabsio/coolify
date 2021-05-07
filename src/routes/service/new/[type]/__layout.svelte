@@ -1,4 +1,6 @@
 <script>
+	import { browser } from '$app/env';
+
 	import { goto } from '$app/navigation';
 
 	import { page, session } from '$app/stores';
@@ -12,12 +14,14 @@
 	async function checkService() {
 		try {
 			await request(`/api/v1/services/${$page.params.type}`, $session);
-			goto(`/dashboard/services`, { replaceState: true });
-			toast.push(
-				`${
-					$page.params.type === 'plausible' ? 'Plausible Analytics' : $page.params.type
-				} already deployed.`
-			);
+			if (browser) {
+				goto(`/dashboard/services`, { replaceState: true });
+				toast.push(
+					`${
+						$page.params.type === 'plausible' ? 'Plausible Analytics' : $page.params.type
+					} already deployed.`
+				);
+			}
 		} catch (error) {
 			//
 		}

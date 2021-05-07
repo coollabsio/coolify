@@ -18,7 +18,7 @@ export default {
 		hostHeader: 'X-Forwarded-Host',
 		floc: true,
 		prerender: {
-			enabled: false,
+			enabled: false
 		},
 		vite: {
 			server: {

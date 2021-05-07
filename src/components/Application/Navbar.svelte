@@ -6,6 +6,7 @@
 	import { request } from '$lib/fetch';
 	import { page, session } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { browser } from '$app/env';
 	async function removeApplication() {
 		await request(`/api/v1/application/remove`, $session, {
 			body: {
@@ -15,9 +16,9 @@
 			}
 		});
 
-		toast.push('Application removed.');
+		browser && toast.push('Application removed.');
 		$application = JSON.parse(JSON.stringify(initialApplication));
-		goto(`/dashboard/applications`, { replaceState: true });
+		browser && goto(`/dashboard/applications`, { replaceState: true });
 	}
 
 	onDestroy(() => {
@@ -26,7 +27,7 @@
 
 	async function deploy() {
 		try {
-			toast.push('Checking configuration.');
+			browser && toast.push('Checking configuration.');
 			await request(`/api/v1/application/check`, $session, {
 				body: $application
 			});
@@ -37,11 +38,13 @@
 			$application.build.container.name = name;
 			$application.general.deployId = deployId;
 			$initConf = JSON.parse(JSON.stringify($application));
-			toast.push('Application deployment queued.');
-			goto(
-				`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/logs/${$application.general.deployId}`,
-				{ replaceState: true }
-			);
+			if (browser) {
+				toast.push('Application deployment queued.');
+				goto(
+					`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/logs/${$application.general.deployId}`,
+					{ replaceState: true }
+				);
+			}
 		} catch (error) {
 			// console.log(error);
 			// toast.push(error.error || error || 'Ooops something went wrong.');

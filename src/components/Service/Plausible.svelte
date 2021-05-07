@@ -6,6 +6,7 @@
 	import { request } from '$lib/fetch';
 	import { page, session } from '$app/stores';
 	import PasswordField from '$components/PasswordField.svelte';
+import { browser } from '$app/env';
 	export let service;
 	let loading = false;
 	async function activate() {
@@ -15,10 +16,10 @@
 				method: 'PATCH',
 				body: {}
 			});
-			toast.push(`All users are activated for Plausible.`);
+			browser && toast.push(`All users are activated for Plausible.`);
 		} catch (error) {
 			console.log(error);
-			toast.push(`Ooops, there was an error activating users for Plausible?!`);
+			browser && toast.push(`Ooops, there was an error activating users for Plausible?!`);
 		} finally {
 			loading = false;
 		}

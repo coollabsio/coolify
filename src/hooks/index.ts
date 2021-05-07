@@ -11,7 +11,7 @@ process.on('SIGINT', function () {
 	});
 });
 
-let db
+let db;
 async function connectMongoDB() {
 	const { MONGODB_USER, MONGODB_PASSWORD, MONGODB_HOST, MONGODB_PORT, MONGODB_DB } = process.env;
 	try {
@@ -38,20 +38,18 @@ export async function handle({ request, render }) {
 	const { coolToken, ghToken } = cookie.parse(request.headers.cookie || '');
 	if (coolToken) {
 		try {
-			await verifyUserId(coolToken)
-			request.locals.isLoggedIn = true
-			request.locals.ghToken = ghToken
-			request.locals.coolToken = coolToken
+			await verifyUserId(coolToken);
+			request.locals.isLoggedIn = true;
+			request.locals.ghToken = ghToken;
+			request.locals.coolToken = coolToken;
 		} catch (error) {
-			request.locals.isLoggedIn = false
-			request.locals.ghToken = null
-			request.locals.coolToken = null
+			request.locals.isLoggedIn = false;
+			request.locals.ghToken = null;
+			request.locals.coolToken = null;
 			return {
 				status: 200,
 				headers: {
-					'set-cookie': [
-						...deleteCookies
-					]
+					'set-cookie': [...deleteCookies]
 				}
 			};
 		}
@@ -77,18 +75,17 @@ export async function handle({ request, render }) {
 			} else {
 				return {
 					...response
-				}
+				};
 			}
 		}
-
 	}
 	const response = await render(request);
 	return {
 		...response
-	}
+	};
 }
 export function getSession(request) {
-	const { coolToken, ghToken } = request.locals
+	const { coolToken, ghToken } = request.locals;
 	return {
 		isLoggedIn: coolToken ? true : false,
 		coolToken: coolToken,

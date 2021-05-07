@@ -1,4 +1,10 @@
-import type { Application, Dashboard, Database, DateTimeFormatOptions, GithubInstallations } from 'src/global';
+import type {
+	Application,
+	Dashboard,
+	Database,
+	DateTimeFormatOptions,
+	GithubInstallations
+} from 'src/global';
 import { writable, derived, readable, Writable } from 'svelte/store';
 
 export const dashboard = writable<Dashboard>({
@@ -22,8 +28,8 @@ export const dateOptions: DateTimeFormatOptions = {
 	hour12: false
 };
 
-export const githubRepositories = writable([])
-export const githubInstallations = writable<GithubInstallations>([])
+export const githubRepositories = writable([]);
+export const githubInstallations = writable<GithubInstallations>([]);
 export const application = writable<Application>({
 	github: {
 		installation: {
@@ -64,9 +70,9 @@ export const application = writable<Application>({
 		port: null,
 		secrets: []
 	}
-})
+});
 
-export const initConf = writable({})
+export const initConf = writable({});
 
 export const initialApplication: Application = {
 	github: {
@@ -108,42 +114,41 @@ export const initialApplication: Application = {
 		port: null,
 		secrets: []
 	}
-}
+};
 export const initialDatabase: Database = {
 	config: {
-	  general: {
-		workdir: null,
-		deployId: null,
-		nickname: null,
-		type: null
-	  },
-	  database: {
-		username: null,
-		passwords: [],
-		defaultDatabaseName: null
-	  },
-	  deploy: {
-		name: null
-	  }
+		general: {
+			workdir: null,
+			deployId: null,
+			nickname: null,
+			type: null
+		},
+		database: {
+			username: null,
+			passwords: [],
+			defaultDatabaseName: null
+		},
+		deploy: {
+			name: null
+		}
 	},
 	envs: {}
-  }
+};
 export const database = writable<Database>({
 	config: {},
 	envs: []
-})
+});
 export const newService = writable({
 	email: null,
 	userName: 'admin',
 	userPassword: null,
 	userPasswordAgain: null,
 	baseURL: null
-  })
+});
 export const initialNewService = {
 	email: null,
 	userName: 'admin',
 	userPassword: null,
 	userPasswordAgain: null,
 	baseURL: null
-  }
-  
+};

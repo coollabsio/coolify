@@ -9,6 +9,7 @@
 	import { goto } from '$app/navigation';
 	import { page, session } from '$app/stores';
 	import { request } from '$lib/fetch';
+	import { browser } from '$app/env';
 
 	let activeTab = {
 		general: true,
@@ -38,11 +39,13 @@
 		if (found) {
 			$application = { ...found.configuration };
 			if ($page.path === '/application/new') {
-				toast.push('This repository & branch is already defined. Redirecting...');
-				goto(
-					`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/configuration`,
-					{ replaceState: true }
-				);
+				if (browser) {
+					toast.push('This repository & branch is already defined. Redirecting...');
+					goto(
+						`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/configuration`,
+						{ replaceState: true }
+					);
+				}
 			}
 			return;
 		}
@@ -86,15 +89,15 @@
 							if (packageJsonContent.scripts.hasOwnProperty('build') && config.build) {
 								$application.build.command.build = config.build;
 							}
-							toast.push(`${config.name} detected. Default values set.`);
+							browser && toast.push(`${config.name} detected. Default values set.`);
 						}
 					});
 				} else if (CargoToml) {
 					$application.build.pack = 'rust';
-					toast.push(`Rust language detected. Default values set.`);
+					browser && toast.push(`Rust language detected. Default values set.`);
 				} else if (Dockerfile) {
 					$application.build.pack = 'docker';
-					toast.push('Custom Dockerfile found. Build pack set to docker.');
+					browser && toast.push('Custom Dockerfile found. Build pack set to docker.');
 				}
 			} catch (error) {
 				// Nothing detected

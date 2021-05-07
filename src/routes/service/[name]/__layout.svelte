@@ -1,19 +1,22 @@
 <script>
+	import { browser } from '$app/env';
+
 	import { goto } from '$app/navigation';
 
 	import { page, session } from '$app/stores';
-import Tooltip from '$components/Tooltip.svelte';
+	import Tooltip from '$components/Tooltip.svelte';
 	import { request } from '$lib/fetch';
 
 	import { toast } from '@zerodevx/svelte-toast';
-
 
 	async function removeService() {
 		await request(`/api/v1/services/${$page.params.name}`, $session, {
 			method: 'DELETE'
 		});
-		toast.push('Service removed.');
-		goto(`/dashboard/services`, { replaceState: true });
+		if (browser) {
+			toast.push('Service removed.');
+			goto(`/dashboard/services`, { replaceState: true });
+		}
 	}
 </script>
 

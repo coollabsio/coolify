@@ -1,4 +1,6 @@
 <script>
+import { browser } from '$app/env';
+
 	import { goto } from '$app/navigation';
 	import { session } from '$app/stores';
 import { GITHUB_APP_CLIENTID } from '$lib/Env.svelte';
@@ -27,7 +29,7 @@ import { GITHUB_APP_CLIENTID } from '$lib/Env.svelte';
 				if (coolToken) {
 					$session.isLoggedIn = true;
 					$session.coolToken = coolToken;
-					goto('/dashboard/applications');
+					browser && goto('/dashboard/applications');
 				}
 			}
 		}, 100);

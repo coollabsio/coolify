@@ -84,7 +84,7 @@
 			await request('/api/v1/upgrade', $session);
 			upgradeDone = true;
 		} catch (error) {
-			toast.push(
+			browser && toast.push(
 				'Something happened during update. Ooops. Automatic error reporting will happen soon.'
 			);
 		}

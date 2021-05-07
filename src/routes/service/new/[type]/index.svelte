@@ -8,6 +8,7 @@
 	import { goto } from '$app/navigation';
 	import Loading from '$components/Loading.svelte';
 	import TooltipInfo from '$components/TooltipInfo.svelte';
+	import { browser } from '$app/env';
 
 	$: deployable =
 		$newService.baseURL === '' ||
@@ -29,14 +30,16 @@
 			await request(`/api/v1/services/deploy/${$page.params.type}`, $session, {
 				body: payload
 			});
-			toast.push(
-				'Service deployment queued.<br><br><br>It could take 2-5 minutes to be ready, be patient and grab a coffee/tea!',
-				{ duration: 4000 }
-			);
-			goto(`/dashboard/services`, { replaceState: true });
+			if (browser) {
+				toast.push(
+					'Service deployment queued.<br><br><br>It could take 2-5 minutes to be ready, be patient and grab a coffee/tea!',
+					{ duration: 4000 }
+				);
+				goto(`/dashboard/services`, { replaceState: true });
+			}
 		} catch (error) {
 			console.log(error);
-			toast.push('Oops something went wrong. See console.log.');
+			browser && toast.push('Oops something went wrong. See console.log.');
 		} finally {
 			loading = false;
 		}

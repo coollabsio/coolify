@@ -7,13 +7,14 @@
 	import { goto } from '$app/navigation';
 	import Loading from '$components/Loading.svelte';
 	import Plausible from '$components/Service/Plausible.svelte';
+	import { browser } from '$app/env';
 	let service = {};
 	async function loadServiceConfig() {
 		if ($page.params.name) {
 			try {
 				service = await request(`/api/v1/services/${$page.params.name}`, $session);
 			} catch (error) {
-				toast.push(`Cannot find service ${$page.params.name}?!`);
+				browser && toast.push(`Cannot find service ${$page.params.name}?!`);
 				goto(`/dashboard/services`, { replaceState: true });
 			}
 		}
@@ -24,10 +25,10 @@
 				method: 'PATCH',
 				body: {}
 			});
-			toast.push(`All users are activated for Plausible.`);
+			browser && toast.push(`All users are activated for Plausible.`);
 		} catch (error) {
 			console.log(error);
-			toast.push(`Ooops, there was an error activating users for Plausible?!`);
+			browser && toast.push(`Ooops, there was an error activating users for Plausible?!`);
 		}
 	}
 </script>

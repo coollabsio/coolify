@@ -19,9 +19,9 @@ export async function request(
 ) {
 	let fetch;
 	if (browser) {
-		fetch = window.fetch
+		fetch = window.fetch;
 	} else {
-		fetch = session.fetch
+		fetch = session.fetch;
 	}
 	let headers = { 'content-type': 'application/json; charset=UTF-8' };
 	if (method === 'DELETE') {
@@ -40,7 +40,7 @@ export async function request(
 		}
 	};
 	if (body) {
-		config.body = JSON.stringify(body)
+		config.body = JSON.stringify(body);
 	}
 	const response = await fetch(url, config);
 	if (response.status >= 200 && response.status <= 299) {
@@ -53,7 +53,7 @@ export async function request(
 					error: json.message
 				});
 			}
-			return json
+			return json;
 		} else if (response.headers.get('content-type').match(/text\/plain/)) {
 			return await response.text();
 		} else if (response.headers.get('content-type').match(/multipart\/form-data/)) {

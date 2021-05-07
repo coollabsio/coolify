@@ -13,7 +13,7 @@
 	import { browser } from '$app/env';
 
 	async function loadDatabaseConfig() {
-		if (browser && $page.params.name) {
+		if ($page.params.name) {
 			try {
 				$database = await request(`/api/v1/databases/${$page.params.name}`, $session);
 			} catch (error) {

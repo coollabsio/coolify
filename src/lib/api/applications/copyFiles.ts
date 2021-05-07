@@ -1,22 +1,25 @@
-import { promises as fs } from 'fs'
+import { promises as fs } from 'fs';
 export default async function (configuration) {
-    const staticDeployments = ['react', 'vuejs', 'static', 'svelte', 'gatsby']
-    try {
-        // TODO: Write full .dockerignore for all deployments!!
-        if (configuration.build.pack === 'php') {
-            await fs.writeFile(`${configuration.general.workdir}/.htaccess`, `
+	const staticDeployments = ['react', 'vuejs', 'static', 'svelte', 'gatsby'];
+	try {
+		// TODO: Write full .dockerignore for all deployments!!
+		if (configuration.build.pack === 'php') {
+			await fs.writeFile(
+				`${configuration.general.workdir}/.htaccess`,
+				`
         RewriteEngine On
         RewriteBase /
         RewriteCond %{REQUEST_FILENAME} !-d
         RewriteCond %{REQUEST_FILENAME} !-f
         RewriteRule ^(.+)$ index.php [QSA,L]
-        `)
-        }
-        // await fs.writeFile(`${configuration.general.workdir}/.dockerignore`, 'node_modules')
-        if (staticDeployments.includes(configuration.build.pack)) {
-            await fs.writeFile(
-                `${configuration.general.workdir}/nginx.conf`,
-                `user  nginx;
+        `
+			);
+		}
+		// await fs.writeFile(`${configuration.general.workdir}/.dockerignore`, 'node_modules')
+		if (staticDeployments.includes(configuration.build.pack)) {
+			await fs.writeFile(
+				`${configuration.general.workdir}/nginx.conf`,
+				`user  nginx;
             worker_processes  auto;
             
             error_log  /var/log/nginx/error.log warn;
@@ -57,10 +60,10 @@ export default async function (configuration) {
             
             }
             `
-            )
-        }
-    } catch (error) {
-        console.log(error)
-        throw new Error(error)
-    }
+			);
+		}
+	} catch (error) {
+		console.log(error);
+		throw new Error(error);
+	}
 }

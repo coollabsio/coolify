@@ -1,4 +1,6 @@
 <script>
+	import { browser } from '$app/env';
+
 	import { goto } from '$app/navigation';
 	import { page, session } from '$app/stores';
 	import Tooltip from '$components/Tooltip.svelte';
@@ -15,8 +17,10 @@
 		await request(`/api/v1/databases/${$page.params.name}`, $session, {
 			method: 'DELETE'
 		});
-		toast.push('Database removed.');
-		goto(`/dashboard/databases`, { replaceState: true });
+		if (browser) {
+			toast.push('Database removed.');
+			goto(`/dashboard/databases`, { replaceState: true });
+		}
 	}
 </script>
 

@@ -8,6 +8,7 @@
 	import { page, session } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { request } from '$lib/fetch';
+	import { browser } from '$app/env';
 
 	let type;
 	let defaultDatabaseName;
@@ -21,8 +22,10 @@
 				}
 			});
 
-			toast.push('Database deployment queued.');
-			goto(`/dashboard/databases`, { replaceState: true });
+			if (browser) {
+				toast.push('Database deployment queued.');
+				goto(`/dashboard/databases`, { replaceState: true });
+			}
 		} catch (error) {
 			console.log(error);
 		}

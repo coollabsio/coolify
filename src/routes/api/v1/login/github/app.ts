@@ -13,8 +13,7 @@ export async function get(request: Request) {
 		let uid = cuid();
 		const { access_token } = await (
 			await fetch(
-				`https://github.com/login/oauth/access_token?client_id=${VITE_GITHUB_APP_CLIENTID
-				}&client_secret=${GITHUB_APP_CLIENT_SECRET}&code=${code}`,
+				`https://github.com/login/oauth/access_token?client_id=${VITE_GITHUB_APP_CLIENTID}&client_secret=${GITHUB_APP_CLIENT_SECRET}&code=${code}`,
 				{ headers: { accept: 'application/json' } }
 			)
 		).json();
