@@ -87,8 +87,7 @@
 				$application.publish.domain === null ||
 				$page.path === '/application/new'}
 			class:hover:text-red-500={$application.publish.domain && $page.path !== '/application/new'}
-			class:hover:bg-warmGray-700={$application.publish.domain &&
-				$page.path !== '/application/new'}
+			class:hover:bg-warmGray-700={$application.publish.domain && $page.path !== '/application/new'}
 			class:hover:bg-transparent={$page.path === '/application/new'}
 			class:text-warmGray-700={$application.publish.domain === '' ||
 				$application.publish.domain === null ||
@@ -121,8 +120,8 @@
 			class:hover:text-blue-400={$page.path !== '/application/new'}
 			class:hover:bg-transparent={$page.path === '/application/new'}
 			class:cursor-not-allowed={$page.path === '/application/new'}
-			class:text-blue-400={$page.path.endsWith('logs')}
-			class:bg-warmGray-700={$page.path.endsWith('logs')}
+			class:text-blue-400={/logs\/*/.test($page.path)}
+			class:bg-warmGray-700={/logs\/*/.test($page.path)}
 			on:click={() =>
 				goto(
 					`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/logs`
@@ -148,8 +147,10 @@
 		<button
 			class="icon hover:text-yellow-400"
 			disabled={$page.path === '/application/new'}
-			class:text-yellow-400={$page.path.endsWith("configuration") || $page.path === '/application/new'}
-			class:bg-warmGray-700={$page.path.endsWith("configuration") || $page.path === '/application/new'}
+			class:text-yellow-400={$page.path.endsWith('configuration') ||
+				$page.path === '/application/new'}
+			class:bg-warmGray-700={$page.path.endsWith('configuration') ||
+				$page.path === '/application/new'}
 			on:click={() =>
 				goto(
 					`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/configuration`

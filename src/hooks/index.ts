@@ -1,8 +1,15 @@
-import { verifyUserId } from '$lib/api/applications/common';
+import { publicPages, deleteCookies, verifyUserId } from '$lib/api/common';
 import * as cookie from 'cookie';
 import mongoose from 'mongoose';
 
-let db = null;
+process.on('SIGINT', function () {
+	mongoose.connection.close(function () {
+		console.log('Mongoose default connection disconnected through app termination');
+		process.exit(0);
+	});
+});
+
+let db
 async function connectMongoDB() {
 	const { MONGODB_USER, MONGODB_PASSWORD, MONGODB_HOST, MONGODB_PORT, MONGODB_DB } = process.env;
 	try {
@@ -26,49 +33,63 @@ async function connectMongoDB() {
 if (!db) connectMongoDB();
 
 export async function handle({ request, render }) {
-	const response = await render(request);
-	const { coolToken } = cookie.parse(request.headers.cookie || '');
+	const { coolToken, ghToken } = cookie.parse(request.headers.cookie || '');
 	if (coolToken) {
 		try {
 			await verifyUserId(coolToken)
-			console.log('user OK')
-			return {
-				...response,
-			}
+			request.locals.isLoggedIn = true
+			request.locals.ghToken = ghToken
+			request.locals.coolToken = coolToken
 		} catch (error) {
+			request.locals.isLoggedIn = false
+			request.locals.ghToken = null
+			request.locals.coolToken = null
 			return {
-				...response,
+				status: 200,
 				headers: {
-					location: '/',
 					'set-cookie': [
-						`coolToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`,
-						`ghToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+						...deleteCookies
 					]
-				},
+				}
+			};
+		}
+	} else {
+		const cookies = cookie.parse(request.headers.cookie || '');
+		if (Object.keys(cookies).length === 0 && !publicPages.includes(request.path)) {
+			return {
+				status: 301,
+				headers: {
+					location: '/'
+				}
+			};
+		} else {
+			const response = await render(request);
+			if (!publicPages.includes(request.path)) {
+				return {
+					...response,
+					headers: {
+						...response.headers,
+						'set-cookie': [...deleteCookies]
+					}
+				};
+			} else {
+				return {
+					...response
+				}
 			}
 		}
+
 	}
+	const response = await render(request);
 	return {
 		...response
 	}
-
-	// const response = await render(request);
-	// return {
-	// 	...response,
-	// 	headers: {
-	// 		location:'/',
-	// 		'set-cookie': [
-	// 			`coolToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`,
-	// 			`ghToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`
-	// 		]
-	// 	},
-	// }
 }
-export function getSession({ headers }) {
-	const { coolToken, ghToken } = cookie.parse(headers.cookie || '');
+export function getSession(request) {
+	const { coolToken, ghToken } = request.locals
 	return {
 		isLoggedIn: coolToken ? true : false,
-		coolToken: coolToken || null,
-		ghToken: ghToken || null
+		coolToken: coolToken,
+		ghToken: ghToken
 	};
 }

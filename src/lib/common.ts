@@ -1,4 +1,5 @@
 import shell from 'shelljs'
+
 export function execShellAsync(cmd, opts = {}) {
     try {
         return new Promise(function (resolve, reject) {

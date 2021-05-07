@@ -86,7 +86,7 @@
 									deployment.progress !== 'failed'}
 								class:hover:bg-red-200={deployment.progress === 'failed'}
 								class:hover:border-red-500={deployment.progress === 'failed'}
-								on:click={() => goto(`./${deployment.deployId}`)}
+								on:click={() => goto(`./logs/${deployment.deployId}`)}
 							>
 								<div class="font-bold text-sm px-3 flex justify-center items-center">
 									{deployment.branch}

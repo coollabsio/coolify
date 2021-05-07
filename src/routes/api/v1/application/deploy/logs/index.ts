@@ -1,9 +1,9 @@
 
 
 import type { Request } from '@sveltejs/kit';
-import * as dayjs from 'dayjs'
-import * as utc from 'dayjs/plugin/utc'
-import * as relativeTime from 'dayjs/plugin/relativeTime'
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc.js'
+import relativeTime from 'dayjs/plugin/relativeTime.js'
 import Deployment from '$models/Logs/Deployment';
 dayjs.extend(utc)
 dayjs.extend(relativeTime)

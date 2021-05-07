@@ -30,8 +30,7 @@
 	</button>
 </div>
 <div in:fade={{ duration: 100 }}>
-
-	{#if $dashboard.applications.deployed.length > 0}
+	{#if $dashboard?.applications?.deployed.length > 0}
 		<div class="px-4 mx-auto py-5 z-auto">
 			<div class="flex items-center justify-center flex-wrap">
 				{#each $dashboard.applications.deployed as application}

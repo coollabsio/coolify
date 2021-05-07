@@ -1,5 +1,7 @@
 
 import Dockerode from 'dockerode'
+import { saveAppLog } from './api/applications/logging'
+
 const { DOCKER_ENGINE, DOCKER_NETWORK } = process.env
 export const docker = {
     engine: new Dockerode({
@@ -16,10 +18,10 @@ export async function streamEvents(stream, configuration) {
         }
         function onProgress(event) {
             if (event.error) {
-                // saveAppLog(event.error, configuration, true)
+                saveAppLog(event.error, configuration, true)
                 reject(event.error)
             } else if (event.stream) {
-                // saveAppLog(event.stream, configuration)
+                saveAppLog(event.stream, configuration)
             }
         }
     })

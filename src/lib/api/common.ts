@@ -1,6 +1,12 @@
 import User from '$models/User'
 import jsonwebtoken from 'jsonwebtoken'
 
+export const publicPages = ['/', '/api/v1/login/github/app'];
+export const deleteCookies = [
+    `coolToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+    `ghToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+]
+
 export async function verifyUserId(token) {
   const { JWT_SIGN_KEY } = process.env
   try {

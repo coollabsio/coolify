@@ -1,5 +1,6 @@
 
-import { verifyUserId } from '$lib/api/applications/common';
+
+import { deleteCookies, verifyUserId } from '$lib/api/common';
 import type { Request } from '@sveltejs/kit';
 import * as cookie from 'cookie';
 
@@ -15,11 +16,8 @@ export async function post(request: Request) {
         return {
             status: 301,
             headers: {
-                location:'/',
-                'set-cookie': [
-                    `coolToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`,
-                    `ghToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`
-                ]
+                location: '/',
+                'set-cookie': [...deleteCookies]
             },
             body: { error: 'Unauthorized' }
         };
