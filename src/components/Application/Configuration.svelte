@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { request } from '$lib/fetch';
-	import { page, session } from '$app/stores';
-	import { dashboard, githubRepositories, application, githubInstallations } from '$store';
-	import { onMount } from 'svelte';
+	import { session } from '$app/stores';
+	import { githubRepositories, application, githubInstallations } from '$store';
 
 	import { fade } from 'svelte/transition';
 	import Loading from '$components/Loading.svelte';
@@ -13,32 +12,13 @@
 	import Tabs from '$components/Application/Tabs.svelte';
 	import Repositories from '$components/Application/Repositories.svelte';
 	import Login from './Login.svelte';
-
-	const found = $dashboard.applications.deployed.find(
-		(c) =>
-			c.configuration.repository.branch === $page.params.branch &&
-			c.configuration.repository.organization === $page.params.organization &&
-			c.configuration.repository.name === $page.params.name
-	)?.configuration;
-
-	if (found) {
-		$application = found;
-	} else {
-		if ($page.path !== '/application/new') {
-			goto('/dashboard/applications', { replaceState: true });
-		}
-	}
-
+	import { GITHUB_APP_NAME } from '$lib/Env.svelte';
 	let loading = {
 		github: false,
 		branches: false
 	};
 	let branches = [];
 	let relogin = false;
-
-	// onMount(async () => {
-	// 	await loadGithubRepositories();
-	// });
 	function dashify(str: string, options?: any) {
 		if (typeof str !== 'string') return str;
 		return str
@@ -53,38 +33,6 @@
 			`https://api.github.com/user/installations/${id}/repositories?per_page=100&page=${page}`,
 			$session
 		);
-	}
-	async function refreshTokens() {
-		if (browser) {
-			const left = screen.width / 2 - 1020 / 2;
-			const top = screen.height / 2 - 618 / 2;
-			const newWindow = open(
-				`https://github.com/login/oauth/authorize?client_id=${
-					import.meta.env.VITE_GITHUB_APP_CLIENTID
-				}`,
-				'Authenticate',
-				'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
-					top +
-					', left=' +
-					left +
-					', toolbar=0, menubar=0, status=0'
-			);
-			const timer = setInterval(async () => {
-				if (newWindow.closed) {
-					clearInterval(timer);
-					const coolToken = new URL(newWindow.document.URL).searchParams.get('coolToken');
-					const ghToken = new URL(newWindow.document.URL).searchParams.get('ghToken');
-					if (ghToken) {
-						$session.ghToken = ghToken;
-					}
-					if (coolToken) {
-						$session.isLoggedIn = true;
-						$session.coolToken = coolToken;
-					}
-					await loadGithubRepositories();
-				}
-			}, 100);
-		}
 	}
 	async function loadGithubRepositories() {
 		if ($githubRepositories.length > 0) {
@@ -170,9 +118,7 @@
 			const left = screen.width / 2 - 1020 / 2;
 			const top = screen.height / 2 - 618 / 2;
 			const newWindow = open(
-				`https://github.com/apps/${dashify(
-					import.meta.env.VITE_GITHUB_APP_NAME
-				)}/installations/new`,
+				`https://github.com/apps/${dashify(GITHUB_APP_NAME)}/installations/new`,
 				'Install App',
 				'resizable=1, scrollbars=1, fullscreen=0, height=1000, width=1020,top=' +
 					top +
@@ -195,7 +141,7 @@
 						});
 						$application = { ...config };
 					} catch (error) {
-						goto('/dashboard/applications', { replaceState: true });
+						browser && goto('/dashboard/applications', { replaceState: true });
 					}
 
 					branches = [];

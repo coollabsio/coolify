@@ -6,6 +6,24 @@ export const deleteCookies = [
     `coolToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`,
     `ghToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`
 ]
+export const baseServiceConfiguration = {
+  replicas: 1,
+  restart_policy: {
+      condition: 'any',
+      max_attempts: 6
+  },
+  update_config: {
+      parallelism: 1,
+      delay: '10s',
+      order: 'start-first'
+  },
+  rollback_config: {
+      parallelism: 1,
+      delay: '10s',
+      order: 'start-first',
+      failure_action: 'rollback'
+  }
+}
 
 export async function verifyUserId(token) {
   const { JWT_SIGN_KEY } = process.env
@@ -21,4 +39,11 @@ export async function verifyUserId(token) {
     console.log(error)
     return Promise.reject(false);
   }
+}
+export function delay (t) {
+  return new Promise(function (resolve) {
+    setTimeout(function () {
+      resolve('OK')
+    }, t)
+  })
 }

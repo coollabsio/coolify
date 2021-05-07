@@ -8,13 +8,12 @@ import jsonwebtoken from 'jsonwebtoken';
 
 export async function get(request: Request) {
 	const code = request.query.get('code');
-	const { GITHUB_APP_CLIENT_SECRET, JWT_SIGN_KEY } = process.env;
+	const { GITHUB_APP_CLIENT_SECRET, JWT_SIGN_KEY, VITE_GITHUB_APP_CLIENTID } = process.env;
 	try {
 		let uid = cuid();
 		const { access_token } = await (
 			await fetch(
-				`https://github.com/login/oauth/access_token?client_id=${
-					import.meta.env.VITE_GITHUB_APP_CLIENTID
+				`https://github.com/login/oauth/access_token?client_id=${VITE_GITHUB_APP_CLIENTID
 				}&client_secret=${GITHUB_APP_CLIENT_SECRET}&code=${code}`,
 				{ headers: { accept: 'application/json' } }
 			)
@@ -55,7 +54,7 @@ export async function get(request: Request) {
 					return {
 						status: 500,
 						body: {
-							error:'Registration disabled, enable it in settings.'
+							error: 'Registration disabled, enable it in settings.'
 						}
 					};
 				} else {

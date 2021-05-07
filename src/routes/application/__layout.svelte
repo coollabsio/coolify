@@ -4,9 +4,10 @@
 	import Loading from '$components/Loading.svelte';
 	import { toast } from '@zerodevx/svelte-toast';
 	import Navbar from '$components/Application/Navbar.svelte';
-	import { getStores, navigating, page, session } from '$app/stores';
+	import {  page, session } from '$app/stores';
 	import { request } from '$lib/fetch';
 	import { goto } from '$app/navigation';
+	import { browser } from '$app/env';
 
 	$application.repository.organization = $page.params.organization;
 	$application.repository.name = $page.params.name;
@@ -24,8 +25,7 @@
 			$application = { ...config };
 			$initConf = JSON.parse(JSON.stringify($application));
 		} catch (error) {
-			toast.push('Configuration not found.');
-			goto('/dashboard/applications');
+			browser && goto('/dashboard/applications');
 		}
 	}
 	async function loadConfiguration() {

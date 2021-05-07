@@ -2,7 +2,8 @@ lockfileVersion: 5.3
 
 specifiers:
   '@iarna/toml': ^2.2.5
-  '@sveltejs/kit': 1.0.0-next.99
+  '@sveltejs/adapter-node': ^1.0.0-next.19
+  '@sveltejs/kit': 1.0.0-next.102
   '@types/dockerode': ^3.2.3
   '@typescript-eslint/eslint-plugin': ^4.22.1
   '@typescript-eslint/parser': ^4.22.1
@@ -18,6 +19,7 @@ specifiers:
   eslint: ^7.25.0
   eslint-config-prettier: ^8.3.0
   eslint-plugin-svelte3: ^3.2.0
+  generate-password: ^1.6.0
   js-yaml: ^4.1.0
   jsonwebtoken: ^8.5.1
   mongoose: ^5.12.7
@@ -43,6 +45,7 @@ dependencies:
   cuid: 2.1.8
   dayjs: 1.10.4
   dockerode: 3.3.0
+  generate-password: 1.6.0
   js-yaml: 4.1.0
   jsonwebtoken: 8.5.1
   mongoose: 5.12.7
@@ -51,7 +54,8 @@ dependencies:
   unique-names-generator: 4.4.0
 
 devDependencies:
-  '@sveltejs/kit': 1.0.0-next.99_svelte@3.38.2+vite@2.2.4
+  '@sveltejs/adapter-node': 1.0.0-next.19
+  '@sveltejs/kit': 1.0.0-next.102_svelte@3.38.2
   '@types/dockerode': 3.2.3
   '@typescript-eslint/eslint-plugin': 4.22.1_f2cf9a191be19a59b06aad4f4e4a9af1
   '@typescript-eslint/parser': 4.22.1_eslint@7.25.0+typescript@4.2.4
@@ -150,13 +154,16 @@ packages:
       picomatch: 2.2.3
     dev: true
 
-  /@sveltejs/kit/1.0.0-next.99_svelte@3.38.2+vite@2.2.4:
-    resolution: {integrity: sha512-eLVo8/fE6DrNFRCx4fLU2MKolVhMPHlBkhA04kpsNaojC6PW9kW9w7DEpeK5WCYYzxhirvmABsUyw37pQfjZVA==}
+  /@sveltejs/adapter-node/1.0.0-next.19:
+    resolution: {integrity: sha512-8QXOm0x9xiRGNZl9H0VplhIRVk14tO67bHDihxpUuOG3gFYxsNvdISC0wrvdGHOOINDUj4K2pdSn8LEjPrml/A==}
+    dev: true
+
+  /@sveltejs/kit/1.0.0-next.102_svelte@3.38.2:
+    resolution: {integrity: sha512-zLCPiKguhN3LjOTnAqudYm9uhkc3O1ELAV8SkXvs1O/a7hWSMFlbuF0aWXE8g6f79aCKjihd29RrdFkLnaZrog==}
     engines: {node: '>= 12.17.0'}
     hasBin: true
     peerDependencies:
-      svelte: ^3.34.0
-      vite: ^2.2.3
+      svelte: ^3.38.2
     dependencies:
       '@sveltejs/vite-plugin-svelte': 1.0.0-next.9_svelte@3.38.2+vite@2.2.4
       cheap-watch: 1.0.3
@@ -1284,6 +1291,10 @@ packages:
   /functional-red-black-tree/1.0.1:
     resolution: {integrity: sha1-GwqzvVU7Kg1jmdKcDj6gslIHgyc=}
     dev: true
+
+  /generate-password/1.6.0:
+    resolution: {integrity: sha512-YUJTQkApkLT/fru0QdYWP0lVZdPKhF5kXCP24sgI4gR/vFMJFopCj5t1+9FAKIYcML/nxzx2PMkA1ymO1FC+tQ==}
+    dev: false
 
   /glob-base/0.3.0:
     resolution: {integrity: sha1-27Fk9iIbHAscz4Kuoyi0l98Oo8Q=}

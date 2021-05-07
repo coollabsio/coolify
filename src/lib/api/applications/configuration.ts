@@ -3,24 +3,8 @@ import crypto from 'crypto'
 import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-generator'
 import { execShellAsync } from '$lib/common'
 import { docker } from '$lib/docker'
-const baseServiceConfiguration = {
-    replicas: 1,
-    restart_policy: {
-        condition: 'any',
-        max_attempts: 6
-    },
-    update_config: {
-        parallelism: 1,
-        delay: '10s',
-        order: 'start-first'
-    },
-    rollback_config: {
-        parallelism: 1,
-        delay: '10s',
-        order: 'start-first',
-        failure_action: 'rollback'
-    }
-}
+import { baseServiceConfiguration } from '../common'
+
 function getUniq() {
     return uniqueNamesGenerator({ dictionaries: [adjectives, animals, colors], length: 2 })
 }

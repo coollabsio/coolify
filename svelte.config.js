@@ -2,7 +2,7 @@ import dotEnvExtended from 'dotenv-extended';
 dotEnvExtended.load();
 import preprocess from 'svelte-preprocess';
 import path from 'path';
-
+import adapter from '@sveltejs/adapter-node';
 /** @type {import('@sveltejs/kit').Config} */
 export default {
 	preprocess: [
@@ -10,11 +10,16 @@ export default {
 			postcss: true
 		})
 	],
-
 	kit: {
+		adapter: adapter({
+			out: 'build'
+		}),
 		target: '#svelte',
 		hostHeader: 'X-Forwarded-Host',
 		floc: true,
+		prerender: {
+			enabled: false,
+		},
 		vite: {
 			server: {
 				hmr: {

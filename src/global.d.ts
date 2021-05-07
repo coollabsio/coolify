@@ -58,7 +58,38 @@ export type Application = {
 		secrets: Array<Object>
 	},
 }
+export type Database = {
+	config: {
+		general: {
+			deployId: String;
+			nickname: String;
+			workdir: String;
+			type: String
+		},
+		database: {
+			usernames: Array;
+			passwords: Array;
+			defaultDatabaseName: String;
+		},
+		deploy: {
+			name: String;
+		}
+	} | {},
+	envs: Array
+
+
+}
 export type Dashboard = {
+	databases: {
+		deployed: [{
+			configuration: Database
+		}] | []
+	}
+	services: {
+		deployed: [{
+			configuration: any
+		}] | []
+	}
 	applications: {
 		deployed: [{
 			configuration: Application

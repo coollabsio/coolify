@@ -6,15 +6,16 @@
 	"scripts": {
 		"dev:docker:start": "docker-compose -f docker-compose-dev.yml up -d",
 		"dev:docker:stop": "docker-compose -f docker-compose-dev.yml down",
-		"dev": "TAILWIND_MODE=watch svelte-kit dev --host 0.0.0.0",
-		"build": "TAILWIND_MODE=build svelte-kit build",
+		"dev": "TAILWIND_MODE=watch NODE_ENV=development svelte-kit dev --host 0.0.0.0",
+		"build": "TAILWIND_MODE=build NODE_ENV=production svelte-kit build",
 		"preview": "svelte-kit preview",
 		"start": "svelte-kit preview",
 		"lint": "prettier --check . && eslint --ignore-path .gitignore .",
 		"format": "prettier --write ."
 	},
 	"devDependencies": {
-		"@sveltejs/kit": "1.0.0-next.99",
+		"@sveltejs/adapter-node": "^1.0.0-next.19",
+		"@sveltejs/kit": "1.0.0-next.102",
 		"@types/dockerode": "^3.2.3",
 		"@typescript-eslint/eslint-plugin": "^4.22.1",
 		"@typescript-eslint/parser": "^4.22.1",
@@ -44,6 +45,7 @@
 		"cuid": "^2.1.8",
 		"dayjs": "^1.10.4",
 		"dockerode": "^3.3.0",
+		"generate-password": "^1.6.0",
 		"js-yaml": "^4.1.0",
 		"jsonwebtoken": "^8.5.1",
 		"mongoose": "^5.12.7",

@@ -9,46 +9,31 @@
 		if (!publicPages.includes(path)) {
 			if (!session.session.isLoggedIn) {
 				return {
-						status: 301,
-						redirect: '/',
-						props: {
-							path: session.page.path
-						}
-					};
+					status: 301,
+					redirect: '/'
+				};
 			}
-			return {
-				props: {
-					path: session.page.path,
-					initDashboard: await request('/api/v1/dashboard', session)
-				}
-			};
+			return {};
 		}
 		if (!publicPages.includes(path)) {
 			return {
 				status: 301,
 				redirect: '/',
-				props: {
-					path: session.page.path
-				}
-			};
-		} else {
-			return {
-				props: {
-					path: session.page.path
-				}
 			};
 		}
+			return {};
+	
 	}
 </script>
 
 <script lang="ts">
 	import '../app.postcss';
-	export let path;
+
 	export let initDashboard;
 	import { onMount } from 'svelte';
 	import { SvelteToast } from '@zerodevx/svelte-toast';
 	import { goto } from '$app/navigation';
-	import { session } from '$app/stores';
+	import { page, session } from '$app/stores';
 	import { toast } from '@zerodevx/svelte-toast';
 	import Tooltip from '$components/Tooltip.svelte';
 	import compareVersions from 'compare-versions';
@@ -121,7 +106,7 @@
 
 <SvelteToast {options} />
 
-{#if showAck && path !== '/bye' && path !== '/'}
+{#if showAck && $page.path !== '/bye' && $page.path !== '/'}
 	<div class="p-2 fixed top-0 right-0 z-50 w-64 m-2 rounded border-gradient-full bg-black">
 		<div class="text-white text-xs space-y-2 text-justify font-medium">
 			<div>We implemented an automatic error reporting feature, which is enabled by default.</div>
@@ -139,21 +124,23 @@
 		</div>
 	</div>
 {/if}
-<main class:main={path !== '/bye' && path !== '/'}>
-	{#if path !== '/' && path !== '/bye'}
+<main class:main={$page.path !== '/bye' && $page.path !== '/'}>
+	{#if $page.path !== '/' && $page.path !== '/bye'}
 		<nav class="w-16 bg-warmGray-800 text-white top-0 left-0 fixed min-w-4rem min-h-screen">
 			<div
 				class="flex flex-col w-full h-screen items-center transition-all duration-100"
-				class:border-green-500={path === '/dashboard/applications'}
-				class:border-purple-500={path === '/dashboard/databases'}
+				class:border-green-500={$page.path === '/dashboard/applications'}
+				class:border-purple-500={$page.path === '/dashboard/databases'}
 			>
 				<img class="w-10 pt-4 pb-4" src="/favicon.png" alt="coolLabs logo" />
 				<Tooltip position="right" label="Applications">
 					<div
 						class="p-2 hover:bg-warmGray-700 rounded hover:text-green-500 mt-4 transition-all duration-100 cursor-pointer"
 						on:click={() => goto('/dashboard/applications')}
-						class:text-green-500={path === '/dashboard/applications'}
-						class:bg-warmGray-700={path === '/dashboard/applications'}
+						class:text-green-500={$page.path === '/dashboard/applications' ||
+							$page.path.startsWith('/application')}
+						class:bg-warmGray-700={$page.path === '/dashboard/applications' ||
+							$page.path.startsWith('/application')}
 					>
 						<svg
 							class="w-8"
@@ -187,8 +174,8 @@
 					<div
 						class="p-2 hover:bg-warmGray-700 rounded hover:text-purple-500 my-4 transition-all duration-100 cursor-pointer"
 						on:click={() => goto('/dashboard/databases')}
-						class:text-purple-500={path === '/dashboard/databases'}
-						class:bg-warmGray-700={path === '/dashboard/databases'}
+						class:text-purple-500={$page.path === '/dashboard/databases' || $page.path.startsWith('/database')}
+						class:bg-warmGray-700={$page.path === '/dashboard/databases' || $page.path.startsWith('/database')}
 					>
 						<svg
 							class="w-8"
@@ -209,8 +196,8 @@
 				<Tooltip position="right" label="Services">
 					<div
 						class="p-2 hover:bg-warmGray-700 rounded hover:text-blue-500 transition-all duration-100 cursor-pointer"
-						class:text-blue-500={path === '/dashboard/services'}
-						class:bg-warmGray-700={path === '/dashboard/services'}
+						class:text-blue-500={$page.path === '/dashboard/services' || $page.path.startsWith('/service')}
+						class:bg-warmGray-700={$page.path === '/dashboard/services' || $page.path.startsWith('/service')}
 						on:click={() => goto('/dashboard/services')}
 					>
 						<svg
@@ -233,8 +220,8 @@
 				<Tooltip position="right" label="Settings">
 					<button
 						class="p-2 hover:bg-warmGray-700 rounded hover:text-yellow-500 transition-all duration-100 cursor-pointer"
-						class:text-yellow-500={path === '/dashboard/settings'}
-						class:bg-warmGray-700={path === '/dashboard/settings'}
+						class:text-yellow-500={$page.path === '/settings'}
+						class:bg-warmGray-700={$page.path === '/settings'}
 						on:click={() => goto('/settings')}
 					>
 						<svg
@@ -289,7 +276,7 @@
 	{/if}
 	<slot />
 </main>
-{#if upgradeAvailable && path !== '/bye' && path !== '/'}
+{#if upgradeAvailable && $page.path !== '/bye' && $page.path !== '/'}
 	<footer
 		class="fixed bottom-0 right-0 p-4 px-6 w-auto rounded-tl text-white  hover:scale-110 transform transition duration-100"
 	>

@@ -1,12 +1,13 @@
 <script>
 	import { goto } from '$app/navigation';
 	import { session } from '$app/stores';
+import { GITHUB_APP_CLIENTID } from '$lib/Env.svelte';
 	function login() {
 		const left = screen.width / 2 - 1020 / 2;
 		const top = screen.height / 2 - 618 / 2;
 		const newWindow = open(
 			`https://github.com/login/oauth/authorize?client_id=${
-				import.meta.env.VITE_GITHUB_APP_CLIENTID
+				GITHUB_APP_CLIENTID
 			}`,
 			'Authenticate',
 			'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +

@@ -1,8 +1,14 @@
-import type { Application, Dashboard, DateTimeFormatOptions, GithubInstallations } from 'src/global';
+import type { Application, Dashboard, Database, DateTimeFormatOptions, GithubInstallations } from 'src/global';
 import { writable, derived, readable, Writable } from 'svelte/store';
 
 export const dashboard = writable<Dashboard>({
+	databases: {
+		deployed: []
+	},
 	applications: {
+		deployed: []
+	},
+	services: {
 		deployed: []
 	}
 });
@@ -60,46 +66,84 @@ export const application = writable<Application>({
 	}
 })
 
-
 export const initConf = writable({})
 
-export const initialApplication = {
+export const initialApplication: Application = {
 	github: {
-	  installation: {
-		id: null
-	  },
-	  app: {
-		id: null
-	  }
+		installation: {
+			id: null
+		},
+		app: {
+			id: null
+		}
 	},
 	repository: {
-	  id: null,
-	  organization: null,
-	  name: null,
-	  branch: null
+		id: null,
+		organization: null,
+		name: null,
+		branch: null
 	},
 	general: {
-	  deployId: null,
-	  nickname: null,
-	  workdir: null
+		deployId: null,
+		nickname: null,
+		workdir: null
 	},
 	build: {
-	  pack: 'static',
-	  directory: null,
-	  command: {
-		build: null,
-		installation: null
-	  },
-	  container: {
-		name: null,
-		tag: null
-	  }
+		pack: 'static',
+		directory: null,
+		command: {
+			build: null,
+			installation: null
+		},
+		container: {
+			name: null,
+			tag: null,
+			baseSHA: null
+		}
 	},
 	publish: {
-	  directory: null,
-	  domain: null,
-	  path: '/',
-	  port: null,
-	  secrets: []
+		directory: null,
+		domain: null,
+		path: '/',
+		port: null,
+		secrets: []
 	}
+}
+export const initialDatabase: Database = {
+	config: {
+	  general: {
+		workdir: null,
+		deployId: null,
+		nickname: null,
+		type: null
+	  },
+	  database: {
+		username: null,
+		passwords: [],
+		defaultDatabaseName: null
+	  },
+	  deploy: {
+		name: null
+	  }
+	},
+	envs: {}
   }
+export const database = writable<Database>({
+	config: {},
+	envs: []
+})
+export const newService = writable({
+	email: null,
+	userName: 'admin',
+	userPassword: null,
+	userPasswordAgain: null,
+	baseURL: null
+  })
+export const initialNewService = {
+	email: null,
+	userName: 'admin',
+	userPassword: null,
+	userPasswordAgain: null,
+	baseURL: null
+  }
+  

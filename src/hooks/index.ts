@@ -1,3 +1,5 @@
+import dotEnvExtended from 'dotenv-extended';
+dotEnvExtended.load();
 import { publicPages, deleteCookies, verifyUserId } from '$lib/api/common';
 import * as cookie from 'cookie';
 import mongoose from 'mongoose';
