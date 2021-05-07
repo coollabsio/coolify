@@ -29,6 +29,7 @@
 	}
 
 	onMount(async () => {
+		await loadDashboard();
 		loadDashboardInterval = setInterval(async () => {
 			await loadDashboard();
 		}, 2000);
