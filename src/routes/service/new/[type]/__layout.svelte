@@ -14,7 +14,7 @@
 	async function checkService() {
 		try {
 			const data = await request(`/api/v1/services/${$page.params.type}`, $session);
-			if (data?.message !== 'Not found') {
+			if (!data?.success) {
 				if (browser) {
 					goto(`/dashboard/services`, { replaceState: true });
 					toast.push(

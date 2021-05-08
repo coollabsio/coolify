@@ -19,6 +19,7 @@ export async function get(request: Request) {
 			return {
 				status: 302,
 				body: {
+					success: true,
 					...payload
 				}
 			};
@@ -26,7 +27,7 @@ export async function get(request: Request) {
 			return {
 				status: 200,
 				body: {
-					success: true,
+					success: false,
 					message: 'Not found'
 				}
 			};

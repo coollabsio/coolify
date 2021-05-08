@@ -11,13 +11,11 @@ export async function get(request: Request) {
             allowRegistration: false,
             ...settings._doc
         }
-        // TODO: Should do better
         return {
             status: 200,
             body: {
                 ...payload
             }
-
         }
     } catch (error) {
         await saveServerLog(error)
