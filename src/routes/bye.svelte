@@ -4,8 +4,9 @@
 		setTimeout(()=> {
 			window.close();
 		}, 1000)
-		
 	}
 </script>
 
-<div class="text-3xl font-bold">Succesfully logged in!</div>
+<div class="flex w-full h-screen justify-center items-center">
+	<div  class="text-3xl font-bold">Succesfully logged in! 🎉</div>
+</div>

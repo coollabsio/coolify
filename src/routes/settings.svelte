@@ -11,18 +11,26 @@
 	};
 
 	async function loadSettings() {
-		const { allowRegistration, sendErrors } = await request(`/api/v1/settings`, $session);
-		settings.allowRegistration = allowRegistration;
-		settings.sendErrors = sendErrors;
+		try {
+			const { allowRegistration, sendErrors } = await request(`/api/v1/settings`, $session);
+			settings.allowRegistration = allowRegistration;
+			settings.sendErrors = sendErrors;
+		} catch (error) {
+			console.log(error);
+		}
 	}
 	async function changeSettings(value) {
-		settings[value] = !settings[value];
-		await request(`/api/v1/settings`, $session, {
-			body: {
-				...settings
-			}
-		});
-		browser && toast.push('Configuration saved.');
+		try {
+			settings[value] = !settings[value];
+			await request(`/api/v1/settings`, $session, {
+				body: {
+					...settings
+				}
+			});
+			browser && toast.push('Configuration saved.');
+		} catch (error) {
+			console.log(error);
+		}
 	}
 </script>
 
