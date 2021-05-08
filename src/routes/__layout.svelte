@@ -132,7 +132,8 @@
 				class:border-green-500={$page.path === '/dashboard/applications'}
 				class:border-purple-500={$page.path === '/dashboard/databases'}
 			>
-				<img class="w-10 pt-4 pb-4" src="/favicon.png" alt="coolLabs logo" />
+				<div class="w-10 pt-4 pb-4"><imgsrc="/favicon.png" alt="coolLabs logo" /></div>
+
 				<Tooltip position="right" label="Applications">
 					<div
 						class="p-2 hover:bg-warmGray-700 rounded hover:text-green-500 mt-4 transition-all duration-100 cursor-pointer"
