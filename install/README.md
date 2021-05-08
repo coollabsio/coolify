@@ -1,6 +1,6 @@
 Some of the files are here for backwards compatibility.
 
-I will do things after 2 months: 
+I will do things after 2 months:
 
 - rm ./install.js and ./update.js
 - rm ../install.sh

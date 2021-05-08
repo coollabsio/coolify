@@ -44,27 +44,27 @@ services:
         constraints:
           - node.role == manager
       labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.api.entrypoints=websecure"
-        - "traefik.http.routers.api.service=api@internal"
-        - "traefik.http.routers.api.middlewares=auth"
-        - "traefik.http.services.traefik.loadbalancer.server.port=80"
-        - "traefik.http.services.traefik.loadbalancer.server.port=443"
+        - 'traefik.enable=true'
+        - 'traefik.http.routers.api.entrypoints=websecure'
+        - 'traefik.http.routers.api.service=api@internal'
+        - 'traefik.http.routers.api.middlewares=auth'
+        - 'traefik.http.services.traefik.loadbalancer.server.port=80'
+        - 'traefik.http.services.traefik.loadbalancer.server.port=443'
 
         # Global redirect www to non-www
-        - "traefik.http.routers.www-catchall.rule=hostregexp(`{host:www.(.+)}`)"
-        - "traefik.http.routers.www-catchall.entrypoints=web"
-        - "traefik.http.routers.www-catchall.middlewares=redirect-www-to-nonwww"
+        - 'traefik.http.routers.www-catchall.rule=hostregexp(`{host:www.(.+)}`)'
+        - 'traefik.http.routers.www-catchall.entrypoints=web'
+        - 'traefik.http.routers.www-catchall.middlewares=redirect-www-to-nonwww'
         - "traefik.http.middlewares.redirect-www-to-nonwww.redirectregex.regex=^http://(?:www\\.)?(.+)"
-        - "traefik.http.middlewares.redirect-www-to-nonwww.redirectregex.replacement=http://$$$${1}"
+        - 'traefik.http.middlewares.redirect-www-to-nonwww.redirectregex.replacement=http://$$$${1}'
 
         # Global redirect http to https
-        - "traefik.http.routers.http-catchall.rule=hostregexp(`{host:.+}`)"
-        - "traefik.http.routers.http-catchall.entrypoints=web"
-        - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
+        - 'traefik.http.routers.http-catchall.rule=hostregexp(`{host:.+}`)'
+        - 'traefik.http.routers.http-catchall.entrypoints=web'
+        - 'traefik.http.routers.http-catchall.middlewares=redirect-to-https'
 
-        - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-        - "traefik.http.middlewares.global-compress.compress=true"
+        - 'traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https'
+        - 'traefik.http.middlewares.global-compress.compress=true'
 
   coolify:
     image: coolify
@@ -73,7 +73,7 @@ services:
       - .env
     networks:
       - ${DOCKER_NETWORK}
-    command: "yarn start"
+    command: 'yarn start'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     deploy:
@@ -83,16 +83,15 @@ services:
         order: start-first
       replicas: 1
       labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.coolify.entrypoints=websecure"
-        - "traefik.http.routers.coolify.tls.certresolver=letsencrypt"
-        - "traefik.http.routers.coolify.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)"
-        - "traefik.http.services.coolify.loadbalancer.server.port=3000"
-        - "traefik.http.routers.coolify.middlewares=global-compress"
-      
+        - 'traefik.enable=true'
+        - 'traefik.http.routers.coolify.entrypoints=websecure'
+        - 'traefik.http.routers.coolify.tls.certresolver=letsencrypt'
+        - 'traefik.http.routers.coolify.rule=Host(`${DOMAIN}`) && PathPrefix(`/`)'
+        - 'traefik.http.services.coolify.loadbalancer.server.port=3000'
+        - 'traefik.http.routers.coolify.middlewares=global-compress'
+
 networks:
   ${DOCKER_NETWORK}:
     driver: overlay
     name: ${DOCKER_NETWORK}
     external: true
-

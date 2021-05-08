@@ -132,7 +132,7 @@
 				class:border-green-500={$page.path === '/dashboard/applications'}
 				class:border-purple-500={$page.path === '/dashboard/databases'}
 			>
-				<div class="w-10 pt-4 pb-4"><imgsrc="/favicon.png" alt="coolLabs logo" /></div>
+				<div class="w-10 pt-4 pb-4"><img src="/favicon.png" alt="coolLabs logo" /></div>
 
 				<Tooltip position="right" label="Applications">
 					<div
