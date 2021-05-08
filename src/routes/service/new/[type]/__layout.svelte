@@ -13,14 +13,16 @@
 
 	async function checkService() {
 		try {
-			await request(`/api/v1/services/${$page.params.type}`, $session);
-			if (browser) {
-				goto(`/dashboard/services`, { replaceState: true });
-				toast.push(
-					`${
-						$page.params.type === 'plausible' ? 'Plausible Analytics' : $page.params.type
-					} already deployed.`
-				);
+			const data = await request(`/api/v1/services/${$page.params.type}`, $session);
+			if (data?.message !== 'Not found') {
+				if (browser) {
+					goto(`/dashboard/services`, { replaceState: true });
+					toast.push(
+						`${
+							$page.params.type === 'plausible' ? 'Plausible Analytics' : $page.params.type
+						} already deployed.`
+					);
+				}
 			}
 		} catch (error) {
 			//

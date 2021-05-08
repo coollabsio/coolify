@@ -17,16 +17,17 @@ export async function get(request: Request) {
 				config: JSON.parse(service.Spec.Labels.configuration)
 			};
 			return {
-				status: 200,
+				status: 302,
 				body: {
 					...payload
 				}
 			};
 		} else {
 			return {
-				status: 500,
+				status: 200,
 				body: {
-					error: 'No service found?'
+					success: true,
+					message: 'Not found'
 				}
 			};
 		}
@@ -35,7 +36,8 @@ export async function get(request: Request) {
 		return {
 			status: 500,
 			body: {
-				error: 'No service found?'
+				success: false,
+				error
 			}
 		};
 	}

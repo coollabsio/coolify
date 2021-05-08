@@ -18,11 +18,10 @@
 		if (!publicPages.includes(path)) {
 			return {
 				status: 301,
-				redirect: '/',
+				redirect: '/'
 			};
 		}
-			return {};
-	
+		return {};
 	}
 </script>
 
@@ -84,9 +83,10 @@
 			await request('/api/v1/upgrade', $session);
 			upgradeDone = true;
 		} catch (error) {
-			browser && toast.push(
-				'Something happened during update. Ooops. Automatic error reporting will happen soon.'
-			);
+			browser &&
+				toast.push(
+					'Something happened during update. Ooops. Automatic error reporting will happen soon.'
+				);
 		}
 	}
 	async function logout() {
@@ -174,8 +174,10 @@
 					<div
 						class="p-2 hover:bg-warmGray-700 rounded hover:text-purple-500 my-4 transition-all duration-100 cursor-pointer"
 						on:click={() => goto('/dashboard/databases')}
-						class:text-purple-500={$page.path === '/dashboard/databases' || $page.path.startsWith('/database')}
-						class:bg-warmGray-700={$page.path === '/dashboard/databases' || $page.path.startsWith('/database')}
+						class:text-purple-500={$page.path === '/dashboard/databases' ||
+							$page.path.startsWith('/database')}
+						class:bg-warmGray-700={$page.path === '/dashboard/databases' ||
+							$page.path.startsWith('/database')}
 					>
 						<svg
 							class="w-8"
@@ -196,8 +198,10 @@
 				<Tooltip position="right" label="Services">
 					<div
 						class="p-2 hover:bg-warmGray-700 rounded hover:text-blue-500 transition-all duration-100 cursor-pointer"
-						class:text-blue-500={$page.path === '/dashboard/services' || $page.path.startsWith('/service')}
-						class:bg-warmGray-700={$page.path === '/dashboard/services' || $page.path.startsWith('/service')}
+						class:text-blue-500={$page.path === '/dashboard/services' ||
+							$page.path.startsWith('/service')}
+						class:bg-warmGray-700={$page.path === '/dashboard/services' ||
+							$page.path.startsWith('/service')}
 						on:click={() => goto('/dashboard/services')}
 					>
 						<svg
@@ -266,11 +270,13 @@
 						>
 					</button>
 				</Tooltip>
-				<div
+				<a
+					href={`https://github.com/coollabsio/coolify/releases/tag/v${packageJson.version}`}
+					target="_blank"
 					class="cursor-pointer text-xs font-bold text-warmGray-400 py-2 hover:bg-warmGray-700 w-full text-center"
 				>
 					{packageJson.version}
-				</div>
+				</a>
 			</div>
 		</nav>
 	{/if}
