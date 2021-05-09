@@ -90,7 +90,7 @@
 		}
 	}
 	onMount(() => {
-		domainInput.focus();
+		if(!$application.publish.domain) domainInput.focus();
 	});
 </script>
 
