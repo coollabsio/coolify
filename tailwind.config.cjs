@@ -7,30 +7,34 @@ const svelteClassColonExtractor = (content) => {
 };
 module.exports = {
 	mode: 'jit',
-	purge: {
-		enabled: process.env.NODE_ENV === 'production',
-		content: ['./src/**/*.svelte', './src/**/*.html', './src/**/*.css', './index.html'],
-		preserveHtmlElements: true,
-		options: {
-			safelist: [
-				/svelte-/,
-				'border-green-500',
-				'border-yellow-300',
-				'border-red-500',
-				'hover:border-green-500',
-				'hover:border-red-200',
-				'hover:bg-red-200',
-				'hover:bg-warmGray-900',
-				'hover:bg-transparent'
-			],
-			defaultExtractor: (content) => {
-				// WARNING: tailwindExtractor is internal tailwind api
-				// if this breaks after a tailwind update, report to svite repo
-				return [...tailwindExtractor(content), ...svelteClassColonExtractor(content)];
-			},
-			keyframes: false
-		}
-	},
+	purge: [
+		'./**/*.html',
+		'./src/**/*.{js,jsx,ts,tsx,svelte}'
+	],
+	// purge: {
+	// 	enabled: process.env.NODE_ENV === 'production',
+	// 	content: ['./src/**/*.svelte', './src/**/*.html', './src/**/*.css', './index.html'],
+	// 	preserveHtmlElements: true,
+	// 	options: {
+	// 		safelist: [
+	// 			/svelte-/,
+	// 			'border-green-500',
+	// 			'border-yellow-300',
+	// 			'border-red-500',
+	// 			'hover:border-green-500',
+	// 			'hover:border-red-200',
+	// 			'hover:bg-red-200',
+	// 			'hover:bg-warmGray-900',
+	// 			'hover:bg-transparent'
+	// 		],
+	// 		defaultExtractor: (content) => {
+	// 			// WARNING: tailwindExtractor is internal tailwind api
+	// 			// if this breaks after a tailwind update, report to svite repo
+	// 			return [...tailwindExtractor(content), ...svelteClassColonExtractor(content)];
+	// 		},
+	// 		keyframes: false
+	// 	}
+	// },
 	important: true,
 	theme: {
 		extend: {
