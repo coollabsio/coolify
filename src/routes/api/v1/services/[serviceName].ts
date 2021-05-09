@@ -17,7 +17,7 @@ export async function get(request: Request) {
 				config: JSON.parse(service.Spec.Labels.configuration)
 			};
 			return {
-				status: 302,
+				status: 200,
 				body: {
 					success: true,
 					...payload
