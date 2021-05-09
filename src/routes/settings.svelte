@@ -2,7 +2,7 @@
 	import { browser } from '$app/env';
 	import { session } from '$app/stores';
 	import Loading from '$components/Loading.svelte';
-	import { request } from '$lib/fetch';
+	import { request } from '$lib/request';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { fade } from 'svelte/transition';
 	let settings = {

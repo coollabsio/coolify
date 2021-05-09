@@ -7,7 +7,7 @@
 	import CouchDb from './SVGs/CouchDb.svelte';
 	import { page, session } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { request } from '$lib/fetch';
+	import { request } from '$lib/request';
 	import { browser } from '$app/env';
 
 	let type;

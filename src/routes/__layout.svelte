@@ -1,6 +1,6 @@
 <script context="module" lang="ts">
 	const publicPages = ['/', '/api/v1/login/github/app'];
-	import { request } from '$lib/fetch';
+	import { request } from '$lib/request';
 	/**
 	 * @type {import('@sveltejs/kit').Load}
 	 */
@@ -91,6 +91,7 @@
 	}
 	async function logout() {
 		await request('/api/v1/logout', $session, { body: {} });
+		localStorage.removeItem('token')
 		location.reload();
 	}
 	function reloadInAMin() {

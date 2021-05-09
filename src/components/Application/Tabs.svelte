@@ -8,7 +8,7 @@
 	import Loading from '$components/Loading.svelte';
 	import { goto } from '$app/navigation';
 	import { page, session } from '$app/stores';
-	import { request } from '$lib/fetch';
+	import { request } from '$lib/request';
 	import { browser } from '$app/env';
 
 	let activeTab = {

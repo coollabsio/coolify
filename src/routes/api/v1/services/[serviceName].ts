@@ -28,6 +28,7 @@ export async function get(request: Request) {
 				status: 200,
 				body: {
 					success: false,
+					showToast: false,
 					message: 'Not found'
 				}
 			};

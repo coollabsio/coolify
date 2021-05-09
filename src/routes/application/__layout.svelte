@@ -5,7 +5,7 @@
 	import { toast } from '@zerodevx/svelte-toast';
 	import Navbar from '$components/Application/Navbar.svelte';
 	import {  page, session } from '$app/stores';
-	import { request } from '$lib/fetch';
+	import { request } from '$lib/request';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/env';
 

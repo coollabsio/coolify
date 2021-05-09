@@ -47,7 +47,7 @@ export async function request(
 		if (response.headers.get('content-type').match(/application\/json/)) {
 			const json = await response.json();
 			if (json?.success === false) {
-				browser && toast.push(json.message);
+				browser && json.showToast !== false && toast.push(json.message);
 				return Promise.reject({
 					status: response.status,
 					error: json.message

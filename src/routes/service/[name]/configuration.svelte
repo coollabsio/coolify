@@ -3,7 +3,7 @@
 	import { toast } from '@zerodevx/svelte-toast';
 
 	import { page, session } from '$app/stores';
-	import { request } from '$lib/fetch';
+	import { request } from '$lib/request';
 	import { goto } from '$app/navigation';
 	import Loading from '$components/Loading.svelte';
 	import Plausible from '$components/Service/Plausible.svelte';
