@@ -25,14 +25,14 @@ services:
       - --providers.docker=true
       - --providers.docker.swarmMode=true
       - --providers.docker.exposedbydefault=false
-      - --providers.docker.network=${DOCKER_NETWORK}
+      - --providers.docker.network=coollabs
       - --providers.docker.swarmModeRefreshSeconds=1s
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
-      - ${DOCKER_NETWORK}
+      - coollabs
     deploy:
       update_config:
         parallelism: 1
@@ -48,25 +48,37 @@ services:
         - 'traefik.http.routers.api.service=api@internal'
         - 'traefik.http.routers.api.middlewares=auth'
         - 'traefik.http.services.traefik.loadbalancer.server.port=80'
-        - 'traefik.http.services.traefik.loadbalancer.server.port=443'
 
         # Global redirect www to non-www
         - 'traefik.http.routers.www-catchall.rule=hostregexp(`{host:www.(.+)}`)'
         - 'traefik.http.routers.www-catchall.entrypoints=web'
         - 'traefik.http.routers.www-catchall.middlewares=redirect-www-to-nonwww'
         - "traefik.http.middlewares.redirect-www-to-nonwww.redirectregex.regex=^http://(?:www\\.)?(.+)"
-        - 'traefik.http.middlewares.redirect-www-to-nonwww.redirectregex.replacement=http://$$$${1}'
+        - 'traefik.http.middlewares.redirect-www-to-nonwww.redirectregex.replacement=http://$${1}'
+  mongodb:
+    image: bitnami/mongodb:4.4
+    hostname: coollabs-mongodb
+    ports:
+      - target: 27017
+        published: 27017
+        protocol: tcp
+        mode: host
+    environment:
+      - MONGODB_DISABLE_SYSTEM_LOG=true
+      - MONGODB_ROOT_PASSWORD=developmentPassword4db
+      - MONGODB_USERNAME=supercooldbuser
+      - MONGODB_PASSWORD=developmentPassword4db
+      - MONGODB_DATABASE=coolify
+    volumes:
+      - coollabs-mongodb-data:/bitnami/mongodb
+    networks:
+      - coollabs
 
-        # Global redirect http to https
-        - 'traefik.http.routers.http-catchall.rule=hostregexp(`{host:.+}`)'
-        - 'traefik.http.routers.http-catchall.entrypoints=web'
-        - 'traefik.http.routers.http-catchall.middlewares=redirect-to-https'
-
-        - 'traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https'
-        - 'traefik.http.middlewares.global-compress.compress=true'
+volumes:
+  coollabs-mongodb-data: {}
 
 networks:
-  ${DOCKER_NETWORK}:
+  coollabs:
     driver: overlay
-    name: ${DOCKER_NETWORK}
+    name: coollabs
     external: true

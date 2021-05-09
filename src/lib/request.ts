@@ -14,7 +14,7 @@ export async function request(
 		fetch?: any;
 		method?: string;
 		body?: any;
-		customHeaders?: Object;
+		customHeaders?: Record<string, unknown>;
 	} = {}
 ) {
 	let fetch;

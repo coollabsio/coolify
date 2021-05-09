@@ -14,7 +14,8 @@ function getUniq() {
 
 export async function post(request: Request) {
 	try {
-		let { type, defaultDatabaseName } = request.body;
+		const { type } = request.body;
+		let { defaultDatabaseName } = request.body;
 		const passwords = generator.generateMultiple(2, {
 			length: 24,
 			numbers: true,

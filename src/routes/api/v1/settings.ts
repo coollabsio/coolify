@@ -5,7 +5,7 @@ const applicationName = 'coolify';
 
 export async function get(request: Request) {
 	try {
-		let settings = await Settings.findOne({ applicationName }).select('-_id -__v');
+		const settings = await Settings.findOne({ applicationName }).select('-_id -__v');
 		const payload = {
 			applicationName,
 			allowRegistration: false,

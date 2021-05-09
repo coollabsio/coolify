@@ -20,63 +20,63 @@ export type DateTimeFormatOptions = {
 export type Application = {
 	github: {
 		installation: {
-			id: Number;
+			id: number;
 		};
 		app: {
-			id: Number;
+			id: number;
 		};
 	};
 	repository: {
-		id: Number;
-		organization: String;
-		name: String;
-		branch: String;
+		id: number;
+		organization: string;
+		name: string;
+		branch: string;
 	};
 	general: {
-		deployId: String;
-		nickname: String;
-		workdir: String;
+		deployId: string;
+		nickname: string;
+		workdir: string;
 	};
 	build: {
-		pack: String;
-		directory: String;
+		pack: string;
+		directory: string;
 		command: {
-			build: String | null;
-			installation: String;
+			build: string | null;
+			installation: string;
 		};
 		container: {
-			name: String;
-			tag: String;
-			baseSHA: String;
+			name: string;
+			tag: string;
+			baseSHA: string;
 		};
 	};
 	publish: {
-		directory: String;
-		domain: String;
-		path: String;
-		port: Number;
-		secrets: Array<Object>;
+		directory: string;
+		domain: string;
+		path: string;
+		port: number;
+		secrets: Array<Record<string, unknown>>;
 	};
 };
 export type Database = {
 	config:
 		| {
 				general: {
-					deployId: String;
-					nickname: String;
-					workdir: String;
-					type: String;
+					deployId: string;
+					nickname: string;
+					workdir: string;
+					type: string;
 				};
 				database: {
 					usernames: Array;
 					passwords: Array;
-					defaultDatabaseName: String;
+					defaultDatabaseName: string;
 				};
 				deploy: {
-					name: String;
+					name: string;
 				};
 		  }
-		| {};
+		| Record<string, unknown>;
 	envs: Array;
 };
 export type Dashboard = {
@@ -110,6 +110,6 @@ export type Dashboard = {
 	};
 };
 export type GithubInstallations = {
-	id: Number;
-	app_id: Number;
+	id: number;
+	app_id: number;
 };

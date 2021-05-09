@@ -3,7 +3,7 @@ const { Schema } = mongoose;
 export interface ISettings extends Document {
 	applicationName: string;
 	allowRegistration: string;
-	sendErrors: Boolean;
+	sendErrors: boolean;
 }
 
 const SettingsSchema = new Schema({

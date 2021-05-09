@@ -1,5 +1,4 @@
 <script>
-	import { onMount } from 'svelte';
 	import { toast } from '@zerodevx/svelte-toast';
 	import templates from '$lib/templates';
 	import { application, dashboard } from '$store';

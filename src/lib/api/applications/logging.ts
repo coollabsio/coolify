@@ -12,7 +12,7 @@ const patterns = [
 	'(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-ntqry=><~]))'
 ].join('|');
 
-export async function saveAppLog(event, configuration, isError?: Boolean) {
+export async function saveAppLog(event, configuration, isError?: boolean) {
 	try {
 		const deployId = configuration.general.deployId;
 		const repoId = configuration.repository.id;

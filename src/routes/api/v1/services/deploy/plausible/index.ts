@@ -7,7 +7,8 @@ import { docker } from '$lib/docker';
 import { baseServiceConfiguration } from '$lib/api/common';
 
 export async function post(request: Request) {
-	let { email, userName, userPassword, baseURL } = request.body;
+	const { email, userName, userPassword } = request.body;
+	let { baseURL } = request.body;
 	const traefikURL = baseURL;
 	baseURL = `https://${baseURL}`;
 	const deployId = 'plausible';

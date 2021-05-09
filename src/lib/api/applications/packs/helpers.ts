@@ -11,7 +11,7 @@ const buildImageNodeDocker = (configuration) => {
 		`RUN ${configuration.build.command.build}`
 	].join('\n');
 };
-export async function buildImage(configuration, cacheBuild?: Boolean) {
+export async function buildImage(configuration, cacheBuild?: boolean) {
 	await fs.writeFile(
 		`${configuration.general.workdir}/Dockerfile`,
 		buildImageNodeDocker(configuration)
