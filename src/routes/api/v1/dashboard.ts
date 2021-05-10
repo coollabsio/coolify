@@ -1,4 +1,4 @@
-import { docker } from '$lib/docker';
+import { docker } from '$lib/api/docker';
 import LogsServer from '$models/Logs/Server';
 import type { Request } from '@sveltejs/kit';
 

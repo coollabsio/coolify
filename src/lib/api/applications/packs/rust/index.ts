@@ -1,7 +1,7 @@
-import { execShellAsync } from '$lib/common';
-import { docker, streamEvents } from '$lib/docker';
+import { docker, streamEvents } from '$lib/api/docker';
 import { promises as fs } from 'fs';
 import TOML from '@iarna/toml';
+import { execShellAsync } from '$lib/api/common';
 
 const publishRustDocker = (configuration, custom) => {
 	return [

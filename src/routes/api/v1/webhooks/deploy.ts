@@ -1,10 +1,10 @@
 import type { Request } from '@sveltejs/kit';
 import crypto from 'crypto';
 import Deployment from '$models/Logs/Deployment';
-import { docker } from '$lib/docker';
+import { docker } from '$lib/api/docker';
 import { precheckDeployment, setDefaultConfiguration } from '$lib/api/applications/configuration';
 import cloneRepository from '$lib/api/applications/cloneRepository';
-import { cleanupTmp } from '$lib/common';
+import { cleanupTmp } from '$lib/api/common';
 import queueAndBuild from '$lib/api/applications/queueAndBuild';
 export async function post(request: Request) {
 	let configuration;

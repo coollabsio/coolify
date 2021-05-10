@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { page, session } from '$app/stores';
 	import Tooltip from '$components/Tooltip.svelte';
-	import { request } from '$lib/request';
+	import { request } from '$lib/api/request';
 	import { database, initialDatabase } from '$store';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { onDestroy } from 'svelte';

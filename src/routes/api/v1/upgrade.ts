@@ -1,5 +1,5 @@
 import { saveServerLog } from '$lib/api/applications/logging';
-import { execShellAsync } from '$lib/common';
+import { execShellAsync } from '$lib/api/common';
 import type { Request } from '@sveltejs/kit';
 
 export async function get(request: Request) {

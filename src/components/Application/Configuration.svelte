@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { request } from '$lib/request';
+	import { request } from '$lib/api/request';
 	import { session } from '$app/stores';
 	import { githubRepositories, application, githubInstallations } from '$store';
 
@@ -11,7 +11,7 @@
 	import Branches from '$components/Application/Branches.svelte';
 	import Tabs from '$components/Application/Tabs.svelte';
 	import Repositories from '$components/Application/Repositories.svelte';
-	import Login from './Login.svelte';
+	import Login from '$components/Application/Login.svelte';
 	let loading = {
 		github: false,
 		branches: false
@@ -152,6 +152,7 @@
 			}, 100);
 		}
 	}
+
 </script>
 
 <div in:fade={{ duration: 100 }}>

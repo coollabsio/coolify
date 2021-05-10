@@ -4,7 +4,7 @@
 	import { toast } from '@zerodevx/svelte-toast';
 	import { newService } from '$store';
 	import { page, session } from '$app/stores';
-	import { request } from '$lib/request';
+	import { request } from '$lib/api/request';
 	import { goto } from '$app/navigation';
 	import Loading from '$components/Loading.svelte';
 	import TooltipInfo from '$components/TooltipInfo.svelte';

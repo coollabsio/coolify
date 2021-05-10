@@ -1,9 +1,8 @@
-import { execShellAsync } from '$lib/common';
 import { purgeImagesContainers } from '$lib/api/applications/cleanup';
-import { delay } from '$lib/api/common';
-import { docker } from '$lib/docker';
+import { docker } from '$lib/api/docker';
 import Deployment from '$models/Logs/Deployment';
 import ApplicationLog from '$models/Logs/Application';
+import { delay, execShellAsync } from '$lib/api/common';
 
 async function call(found) {
 	await delay(10000);

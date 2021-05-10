@@ -5,7 +5,7 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import Loading from '$components/Loading.svelte';
-	import { request } from '$lib/request';
+	import { request } from '$lib/api/request';
 	import { session } from '$app/stores';
 	import { goto } from '$app/navigation';
 

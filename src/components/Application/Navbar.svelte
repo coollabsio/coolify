@@ -3,7 +3,7 @@
 	import { onDestroy } from 'svelte';
 	import { toast } from '@zerodevx/svelte-toast';
 	import Tooltip from '$components/Tooltip.svelte';
-	import { request } from '$lib/request';
+	import { request } from '$lib/api/request';
 	import { page, session } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/env';

@@ -1,10 +1,10 @@
-import { cleanupTmp, execShellAsync } from '$lib/common';
 import type { Request } from '@sveltejs/kit';
 import generator from 'generate-password';
 import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
-import { docker } from '$lib/docker';
-import { baseServiceConfiguration } from '$lib/api/common';
+import { docker } from '$lib/api/docker';
+import { baseServiceConfiguration } from '$lib/api/applications/common';
+import { cleanupTmp, execShellAsync } from '$lib/api/common';
 
 export async function post(request: Request) {
 	const { email, userName, userPassword } = request.body;

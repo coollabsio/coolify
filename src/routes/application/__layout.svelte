@@ -2,12 +2,11 @@
 	import { application, initialApplication, initConf, dashboard } from '$store';
 	import { onDestroy } from 'svelte';
 	import Loading from '$components/Loading.svelte';
-	import { toast } from '@zerodevx/svelte-toast';
 	import Navbar from '$components/Application/Navbar.svelte';
-	import {  page, session } from '$app/stores';
-	import { request } from '$lib/request';
+	import { page, session } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/env';
+	import { request } from '$lib/api/request';
 
 	$application.repository.organization = $page.params.organization;
 	$application.repository.name = $page.params.name;
@@ -58,6 +57,7 @@
 	onDestroy(() => {
 		$application = JSON.parse(JSON.stringify(initialApplication));
 	});
+
 </script>
 
 {#await loadConfiguration()}

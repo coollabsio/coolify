@@ -5,7 +5,7 @@
 
 	import { page, session } from '$app/stores';
 	import Tooltip from '$components/Tooltip.svelte';
-	import { request } from '$lib/request';
+	import { request } from '$lib/api/request';
 
 	import { toast } from '@zerodevx/svelte-toast';
 

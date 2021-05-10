@@ -1,5 +1,5 @@
-import { execShellAsync } from '$lib/common';
 import jsonwebtoken from 'jsonwebtoken';
+import { execShellAsync } from '../common';
 
 export default async function (configuration) {
 	try {

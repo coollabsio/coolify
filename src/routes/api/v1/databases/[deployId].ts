@@ -1,5 +1,5 @@
-import { execShellAsync } from '$lib/common';
-import { docker } from '$lib/docker';
+import { execShellAsync } from '$lib/api/common';
+import { docker } from '$lib/api/docker';
 import type { Request } from '@sveltejs/kit';
 
 export async function del(request: Request) {

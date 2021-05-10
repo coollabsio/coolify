@@ -1,5 +1,5 @@
 import Dockerode from 'dockerode';
-import { saveAppLog } from './api/applications/logging';
+import { saveAppLog } from './applications/logging';
 
 const { DOCKER_ENGINE, DOCKER_NETWORK } = process.env;
 export const docker = {

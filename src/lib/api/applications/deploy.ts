@@ -1,9 +1,9 @@
-import { execShellAsync } from '$lib/common';
-import { docker } from '$lib/docker';
+import { docker } from '$lib/api/docker';
 import { saveAppLog } from './logging';
 import { promises as fs } from 'fs';
 import { deleteSameDeployments } from './cleanup';
 import yaml from 'js-yaml';
+import { execShellAsync } from '../common';
 
 export default async function (configuration, imageChanged) {
 	const generateEnvs = {};

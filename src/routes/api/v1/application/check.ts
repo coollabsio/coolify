@@ -1,6 +1,6 @@
 import { setDefaultConfiguration } from '$lib/api/applications/configuration';
 import { saveServerLog } from '$lib/api/applications/logging';
-import { docker } from '$lib/docker';
+import { docker } from '$lib/api/docker';
 import type { Request } from '@sveltejs/kit';
 
 export async function post(request: Request) {

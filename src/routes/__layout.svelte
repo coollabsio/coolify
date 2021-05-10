@@ -1,6 +1,6 @@
 <script context="module" lang="ts">
 	const publicPages = ['/', '/api/v1/login/github/app'];
-	import { request } from '$lib/request';
+	import { request } from '$lib/api/request';
 	/**
 	 * @type {import('@sveltejs/kit').Load}
 	 */

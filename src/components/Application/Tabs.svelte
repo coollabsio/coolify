@@ -1,13 +1,13 @@
 <script>
 	import { toast } from '@zerodevx/svelte-toast';
-	import templates from '$lib/templates';
+	import templates from '$lib/api/applications/templates';
 	import { application, dashboard } from '$store';
 	import General from '$components/Application/ActiveTab/General.svelte';
 	import Secrets from '$components/Application/ActiveTab/Secrets.svelte';
 	import Loading from '$components/Loading.svelte';
 	import { goto } from '$app/navigation';
 	import { page, session } from '$app/stores';
-	import { request } from '$lib/request';
+	import { request } from '$lib/api/request';
 	import { browser } from '$app/env';
 
 	let activeTab = {

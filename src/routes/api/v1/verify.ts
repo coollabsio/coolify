@@ -1,4 +1,5 @@
-import { deleteCookies, verifyUserId } from '$lib/api/common';
+import { deleteCookies } from '$lib/api/common';
+import { verifyUserId } from '$lib/api/common';
 import type { Request } from '@sveltejs/kit';
 import * as cookie from 'cookie';
 

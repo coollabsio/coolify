@@ -1,4 +1,4 @@
-import { docker, streamEvents } from '$lib/docker';
+import { docker, streamEvents } from '$lib/api/docker';
 import { promises as fs } from 'fs';
 import { buildImage } from '../helpers';
 //  `HEALTHCHECK --timeout=10s --start-period=10s --interval=5s CMD curl -I -s -f http://localhost:${configuration.publish.port}${configuration.publish.path} || exit 1`,

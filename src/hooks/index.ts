@@ -1,8 +1,9 @@
 import dotEnvExtended from 'dotenv-extended';
 dotEnvExtended.load();
-import { publicPages, deleteCookies, verifyUserId } from '$lib/api/common';
+import { publicPages, deleteCookies } from '$lib/api/common';
 import * as cookie from 'cookie';
 import mongoose from 'mongoose';
+import { verifyUserId } from '$lib/api/common';
 
 process.on('SIGINT', function () {
 	mongoose.connection.close(function () {

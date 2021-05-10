@@ -1,5 +1,5 @@
 <script context="module" lang="ts">
-	import { request } from '$lib/request';
+	import { request } from '$lib/api/request';
 	/**
 	 * @type {import('@sveltejs/kit').Load}
 	 */

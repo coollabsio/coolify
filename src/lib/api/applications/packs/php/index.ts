@@ -1,4 +1,4 @@
-import { docker, streamEvents } from '$lib/docker';
+import { docker, streamEvents } from '$lib/api/docker';
 import { promises as fs } from 'fs';
 //   'HEALTHCHECK --timeout=10s --start-period=10s --interval=5s CMD curl -I -s -f http://localhost/ || exit 1',
 const publishPHPDocker = (configuration) => {

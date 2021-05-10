@@ -1,5 +1,5 @@
-import { execShellAsync } from '$lib/common';
-import { docker } from '$lib/docker';
+import { docker } from '$lib/api/docker';
+import { execShellAsync } from '../common';
 
 export async function deleteSameDeployments(configuration) {
 	await (

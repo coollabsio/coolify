@@ -1,4 +1,4 @@
-import { execShellAsync } from '$lib/common';
+import { execShellAsync } from '$lib/api/common';
 import type { Request } from '@sveltejs/kit';
 
 export async function patch(request: Request) {
