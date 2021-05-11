@@ -1,12 +1,11 @@
-import { deleteCookies } from '$lib/api/common';
-import type { Request } from '@sveltejs/kit';
 
-export async function post(request: Request) {
+import type { Request } from '@sveltejs/kit';
+export async function del(request: Request) {
+	request.locals.session.destroy = true;
+
 	return {
-		status: 200,
-		headers: {
-			'set-cookie': [...deleteCookies]
+		body: {
+			ok: true,
 		},
-		body: { success: true }
 	};
 }

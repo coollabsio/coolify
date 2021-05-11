@@ -3,8 +3,12 @@
 
 	import { goto } from '$app/navigation';
 	import { session } from '$app/stores';
+	import { request } from '$lib/api/request';
 
-	function login() {
+	async function logout() {
+		await request('/api/v1/logout', $session, { body: {}, method: 'DELETE' });
+	}
+	async function login() {
 		const left = screen.width / 2 - 1020 / 2;
 		const top = screen.height / 2 - 618 / 2;
 		const newWindow = open(
@@ -21,19 +25,11 @@
 		const timer = setInterval(() => {
 			if (newWindow.closed) {
 				clearInterval(timer);
-				const coolToken = new URL(newWindow.document.URL).searchParams.get('coolToken');
-				const ghToken = new URL(newWindow.document.URL).searchParams.get('ghToken');
-				if (ghToken) {
-					$session.ghToken = ghToken;
-				}
-				if (coolToken) {
-					$session.isLoggedIn = true;
-					$session.coolToken = coolToken;
-					browser && goto('/dashboard/applications');
-				}
+				browser && location.reload()
 			}
 		}, 100);
 	}
+
 </script>
 
 <div class="flex justify-center items-center h-screen w-full bg-warmGray-900">
@@ -62,6 +58,7 @@
 					>
 				{/if}
 			</div>
+			<button on:click={logout}>Logout</button>
 		</div>
 	</div>
 </div>

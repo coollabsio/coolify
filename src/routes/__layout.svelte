@@ -1,5 +1,5 @@
 <script context="module" lang="ts">
-	const publicPages = ['/', '/api/v1/login/github/app'];
+	import { publicPages } from '$lib/consts';
 	import { request } from '$lib/api/request';
 	/**
 	 * @type {import('@sveltejs/kit').Load}
@@ -23,11 +23,11 @@
 		}
 		return {};
 	}
+
 </script>
 
 <script lang="ts">
 	import '../app.postcss';
-
 	export let initDashboard;
 	import { onMount } from 'svelte';
 	import { SvelteToast } from '@zerodevx/svelte-toast';
@@ -90,8 +90,7 @@
 		}
 	}
 	async function logout() {
-		await request('/api/v1/logout', $session, { body: {} });
-		localStorage.removeItem('token')
+		await request('/api/v1/logout', $session, { body: {}, method: 'DELETE' });
 		location.reload();
 	}
 	function reloadInAMin() {
@@ -103,11 +102,12 @@
 		localStorage.setItem('automaticErrorReportsAck', 'true');
 		showAck = false;
 	}
+
 </script>
 
 <SvelteToast {options} />
 
-{#if showAck && $page.path !== '/bye' && $page.path !== '/'}
+{#if showAck && $page.path !== '/success' && $page.path !== '/'}
 	<div class="p-2 fixed top-0 right-0 z-50 w-64 m-2 rounded border-gradient-full bg-black">
 		<div class="text-white text-xs space-y-2 text-justify font-medium">
 			<div>We implemented an automatic error reporting feature, which is enabled by default.</div>
@@ -125,8 +125,8 @@
 		</div>
 	</div>
 {/if}
-<main class:main={$page.path !== '/bye' && $page.path !== '/'}>
-	{#if $page.path !== '/' && $page.path !== '/bye'}
+<main class:main={$page.path !== '/success' && $page.path !== '/'}>
+	{#if $page.path !== '/' && $page.path !== '/success'}
 		<nav class="w-16 bg-warmGray-800 text-white top-0 left-0 fixed min-w-4rem min-h-screen">
 			<div
 				class="flex flex-col w-full h-screen items-center transition-all duration-100"
@@ -284,7 +284,7 @@
 	{/if}
 	<slot />
 </main>
-{#if upgradeAvailable && $page.path !== '/bye' && $page.path !== '/'}
+{#if upgradeAvailable && $page.path !== '/success' && $page.path !== '/'}
 	<footer
 		class="fixed bottom-0 right-0 p-4 px-6 w-auto rounded-tl text-white  hover:scale-110 transform transition duration-100"
 	>

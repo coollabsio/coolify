@@ -51,6 +51,7 @@
 		"jsonwebtoken": "^8.5.1",
 		"mongoose": "^5.12.7",
 		"shelljs": "^0.8.4",
+		"svelte-kit-cookie-session": "^0.4.3",
 		"svelte-select": "^3.17.0",
 		"unique-names-generator": "^4.5.0"
 	}

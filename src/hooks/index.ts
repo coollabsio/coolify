@@ -1,9 +1,9 @@
 import dotEnvExtended from 'dotenv-extended';
 dotEnvExtended.load();
-import { publicPages, deleteCookies } from '$lib/api/common';
-import * as cookie from 'cookie';
+import { publicPages } from '$lib/consts';
 import mongoose from 'mongoose';
 import { verifyUserId } from '$lib/api/common';
+import { initializeSession } from "svelte-kit-cookie-session";
 
 process.on('SIGINT', function () {
 	mongoose.connection.close(function () {
@@ -36,60 +36,46 @@ async function connectMongoDB() {
 if (!db) connectMongoDB();
 
 export async function handle({ request, render }) {
-	const { coolToken, ghToken } = cookie.parse(request.headers.cookie || '');
-	if (coolToken) {
+	const { SECRETS_ENCRYPTION_KEY } = process.env
+	const session = initializeSession(request.headers, {
+		secret: SECRETS_ENCRYPTION_KEY,
+		cookie: { path: "/" },
+	});
+	request.locals.session = session
+	if (session?.data?.coolToken) {
 		try {
-			await verifyUserId(coolToken);
-			request.locals.isLoggedIn = true;
-			request.locals.ghToken = ghToken;
-			request.locals.coolToken = coolToken;
+			await verifyUserId(session.data.coolToken);
+			request.locals.session = session;
 		} catch (error) {
-			request.locals.isLoggedIn = false;
-			request.locals.ghToken = null;
-			request.locals.coolToken = null;
-			return {
-				status: 200,
-				headers: {
-					'set-cookie': [...deleteCookies]
-				}
-			};
+			request.locals.session.destroy = true;
 		}
-	} else {
-		const cookies = cookie.parse(request.headers.cookie || '');
-		if (Object.keys(cookies).length === 0 && !publicPages.includes(request.path)) {
+	}
+	const response = await render(request);
+	if (!session["set-cookie"]) {
+		if (!session?.data?.coolToken && !publicPages.includes(request.path)) {
 			return {
 				status: 301,
 				headers: {
 					location: '/'
 				}
 			};
-		} else {
-			const response = await render(request);
-			if (!publicPages.includes(request.path)) {
-				return {
-					...response,
-					headers: {
-						...response.headers,
-						'set-cookie': [...deleteCookies]
-					}
-				};
-			} else {
-				return {
-					...response
-				};
-			}
 		}
+		return response;
 	}
-	const response = await render(request);
 	return {
-		...response
+		...response,
+		headers: {
+			...response.headers,
+			...session,
+		},
 	};
 }
 export function getSession(request) {
-	const { coolToken, ghToken } = request.locals;
+	const { data } = request.locals.session;
 	return {
-		isLoggedIn: coolToken ? true : false,
-		coolToken: coolToken,
-		ghToken: ghToken
+		isLoggedIn: data && Object.keys(data).length !== 0 ? true : false,
+		expires: data.expires,
+		coolToken: data.coolToken,
+		ghToken: data.ghToken
 	};
 }

@@ -2,11 +2,11 @@ import shell from 'shelljs';
 import User from '$models/User';
 import jsonwebtoken from 'jsonwebtoken';
 
-export const publicPages = ['/', '/api/v1/login/github/app', '/api/v1/webhooks/deploy'];
-export const deleteCookies = [
-	`coolToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`,
-	`ghToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`
-];
+
+// export const deleteCookies = [
+// 	`coolToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+// 	`ghToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+// ];
 
 export function execShellAsync(cmd, opts = {}) {
 	try {
