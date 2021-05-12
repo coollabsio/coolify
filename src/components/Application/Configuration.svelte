@@ -33,8 +33,8 @@
 			$session
 		);
 	}
-	async function loadGithubRepositories() {
-		if ($githubRepositories.length > 0) {
+	async function loadGithubRepositories(force) {
+		if ($githubRepositories.length > 0 && !force) {
 			$application.github.installation.id = $githubInstallations.id;
 			$application.github.app.id = $githubInstallations.app_id;
 			const foundRepositoryOnGithub = $githubRepositories.find(
@@ -132,22 +132,24 @@
 					clearInterval(timer);
 					loading.github = true;
 
-					try {
-						const config = await request(`/api/v1/application/config`, $session, {
-							body: {
-								name: $application.repository.name,
-								organization: $application.repository.organization,
-								branch: $application.repository.branch
-							}
-						});
-						$application = { ...config };
-					} catch (error) {
-						browser && goto('/dashboard/applications', { replaceState: true });
+					if ($application.repository.name) {
+						try {
+							const config = await request(`/api/v1/application/config`, $session, {
+								body: {
+									name: $application.repository.name,
+									organization: $application.repository.organization,
+									branch: $application.repository.branch
+								}
+							});
+							$application = { ...config };
+						} catch (error) {
+							browser && goto('/dashboard/applications', { replaceState: true });
+						}
 					}
 
 					branches = [];
 					$githubRepositories = [];
-					await loadGithubRepositories();
+					await loadGithubRepositories(true);
 				}
 			}, 100);
 		}
@@ -159,7 +161,7 @@
 	{#if relogin}
 		<Login />
 	{:else}
-		{#await loadGithubRepositories()}
+		{#await loadGithubRepositories(false)}
 			<Loading github githubLoadingText="Loading repositories..." />
 		{:then}
 			{#if loading.github}

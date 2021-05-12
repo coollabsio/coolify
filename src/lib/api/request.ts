@@ -27,13 +27,15 @@ export async function request(
 	if (method === 'DELETE') {
 		delete headers['content-type'];
 	}
-	if (url.match(/api.github.com/)) {
+	const isGithub = url.match(/api.github.com/)
+	if (isGithub) {
 		headers = Object.assign(headers, {
 			Authorization: `token ${session.ghToken}`
 		});
 	}
 	const config: any = {
 		method: method || (body ? 'POST' : 'GET'),
+		cache: isGithub ? 'no-cache' : 'default',
 		headers: {
 			...headers,
 			...customHeaders
