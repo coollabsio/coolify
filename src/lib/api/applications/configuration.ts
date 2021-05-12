@@ -25,10 +25,10 @@ export function setDefaultConfiguration(configuration) {
 	if (!configuration.publish.path) configuration.publish.path = '/';
 	if (!configuration.publish.port) {
 		if (
-			configuration.build.pack === 'nodejs' &&
-			configuration.build.pack === 'vuejs' &&
-			configuration.build.pack === 'nuxtjs' &&
-			configuration.build.pack === 'rust' &&
+			configuration.build.pack === 'nodejs' ||
+			configuration.build.pack === 'vuejs' ||
+			configuration.build.pack === 'nuxtjs' ||
+			configuration.build.pack === 'rust' ||
 			configuration.build.pack === 'nextjs'
 		) {
 			configuration.publish.port = 3000;
@@ -36,7 +36,7 @@ export function setDefaultConfiguration(configuration) {
 			configuration.publish.port = 80;
 		}
 	}
-
+	console.log(configuration.publish.port);
 	if (!configuration.build.directory) configuration.build.directory = '';
 	if (configuration.build.directory.startsWith('/'))
 		configuration.build.directory = configuration.build.directory.replace('/', '');

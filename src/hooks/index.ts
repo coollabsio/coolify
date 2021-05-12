@@ -3,7 +3,7 @@ dotEnvExtended.load();
 import { publicPages } from '$lib/consts';
 import mongoose from 'mongoose';
 import { verifyUserId } from '$lib/api/common';
-import { initializeSession } from "svelte-kit-cookie-session";
+import { initializeSession } from 'svelte-kit-cookie-session';
 
 process.on('SIGINT', function () {
 	mongoose.connection.close(function () {
@@ -35,12 +35,12 @@ async function connectMongoDB() {
 if (mongoose.connection.readyState !== 1) connectMongoDB();
 
 export async function handle({ request, render }) {
-	const { SECRETS_ENCRYPTION_KEY } = process.env
+	const { SECRETS_ENCRYPTION_KEY } = process.env;
 	const session = initializeSession(request.headers, {
 		secret: SECRETS_ENCRYPTION_KEY,
-		cookie: { path: "/" },
+		cookie: { path: '/' }
 	});
-	request.locals.session = session
+	request.locals.session = session;
 	if (session?.data?.coolToken) {
 		try {
 			await verifyUserId(session.data.coolToken);
@@ -50,7 +50,7 @@ export async function handle({ request, render }) {
 		}
 	}
 	const response = await render(request);
-	if (!session["set-cookie"]) {
+	if (!session['set-cookie']) {
 		if (!session?.data?.coolToken && !publicPages.includes(request.path)) {
 			return {
 				status: 301,
@@ -65,8 +65,8 @@ export async function handle({ request, render }) {
 		...response,
 		headers: {
 			...response.headers,
-			...session,
-		},
+			...session
+		}
 	};
 }
 export function getSession(request) {

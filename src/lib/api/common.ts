@@ -2,12 +2,6 @@ import shell from 'shelljs';
 import User from '$models/User';
 import jsonwebtoken from 'jsonwebtoken';
 
-
-// export const deleteCookies = [
-// 	`coolToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`,
-// 	`ghToken=deleted; Path=/; HttpOnly; expires=Thu, 01 Jan 1970 00:00:00 GMT`
-// ];
-
 export function execShellAsync(cmd, opts = {}) {
 	try {
 		return new Promise(function (resolve, reject) {

@@ -27,7 +27,7 @@ export async function request(
 	if (method === 'DELETE') {
 		delete headers['content-type'];
 	}
-	const isGithub = url.match(/api.github.com/)
+	const isGithub = url.match(/api.github.com/);
 	if (isGithub) {
 		headers = Object.assign(headers, {
 			Authorization: `token ${session.ghToken}`
@@ -61,10 +61,10 @@ export async function request(
 		} else if (response.headers.get('content-type').match(/multipart\/form-data/)) {
 			return await response.formData();
 		} else {
-			console.log(response)
+			console.log(response);
 			if (response.headers.get('content-disposition')) {
 				const blob = await response.blob();
-				console.log(blob)
+				console.log(blob);
 				const link = document.createElement('a');
 				link.href = URL.createObjectURL(blob);
 				link.download = response.headers.get('content-disposition').split('=')[1] || 'backup.gz';
