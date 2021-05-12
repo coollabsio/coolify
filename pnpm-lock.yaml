@@ -2165,7 +2165,7 @@ packages:
       postcss: ^8.1.13
     dependencies:
       postcss: 8.2.14
-      postcss-selector-parser: 6.0.5
+      postcss-selector-parser: 6.0.6
     dev: true
 
   /postcss-normalize-charset/5.0.0_postcss@8.2.14:
@@ -2313,6 +2313,14 @@ packages:
       util-deprecate: 1.0.2
     dev: true
 
+  /postcss-selector-parser/6.0.6:
+    resolution: {integrity: sha512-9LXrvaaX3+mcv5xkg5kFwqSzSH1JIObIx51PrndZwlmznwXRfxMddDvo9gve3gVR8ZTKgoFDdWkbRFmEhT4PMg==}
+    engines: {node: '>=4'}
+    dependencies:
+      cssesc: 3.0.0
+      util-deprecate: 1.0.2
+    dev: true
+
   /postcss-svgo/5.0.0_postcss@8.2.14:
     resolution: {integrity: sha512-M3/VS4sFI1Yp9g0bPL+xzzCNz5iLdRUztoFaugMit5a8sMfkVzzhwqbsOlD8IFFymCdJDmXmh31waYHWw1K4BA==}
     engines: {node: ^10 || ^12 || >=14.0}
@@ -2434,7 +2442,7 @@ packages:
       commander: 6.2.1
       glob: 7.1.7
       postcss: 8.2.15
-      postcss-selector-parser: 6.0.5
+      postcss-selector-parser: 6.0.6
     dev: true
 
   /queue-microtask/1.2.3:
@@ -2903,7 +2911,7 @@ packages:
       postcss-functions: 3.0.0
       postcss-js: 3.0.3
       postcss-nested: 5.0.5_postcss@8.2.14
-      postcss-selector-parser: 6.0.5
+      postcss-selector-parser: 6.0.6
       postcss-value-parser: 4.1.0
       pretty-hrtime: 1.0.3
       quick-lru: 5.1.1

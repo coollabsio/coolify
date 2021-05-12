@@ -12,7 +12,6 @@ process.on('SIGINT', function () {
 	});
 });
 
-let db;
 async function connectMongoDB() {
 	const { MONGODB_USER, MONGODB_PASSWORD, MONGODB_HOST, MONGODB_PORT, MONGODB_DB } = process.env;
 	try {
@@ -27,13 +26,13 @@ async function connectMongoDB() {
 				{ useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false }
 			);
 		}
-		db = true;
 		console.log('Connected to mongodb.');
 	} catch (error) {
 		console.log(error);
 	}
 }
-if (!db) connectMongoDB();
+
+if (mongoose.connection.readyState !== 1) connectMongoDB();
 
 export async function handle({ request, render }) {
 	const { SECRETS_ENCRYPTION_KEY } = process.env
