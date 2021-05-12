@@ -1,6 +1,4 @@
 <script>
-	import { session } from '$app/stores';
-
 	function login() {
 		const left = screen.width / 2 - 1020 / 2;
 		const top = screen.height / 2 - 618 / 2;
