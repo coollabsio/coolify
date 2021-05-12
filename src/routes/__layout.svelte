@@ -58,6 +58,7 @@
 	};
 	onMount(async () => {
 		upgradeAvailable = await checkUpgrade();
+		browser && localStorage.removeItem('token')
 		if (!localStorage.getItem('automaticErrorReportsAck')) {
 			showAck = true;
 			if (latest?.coolify[branch]?.settings?.sendErrors) {
