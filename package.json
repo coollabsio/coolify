@@ -1,7 +1,7 @@
 {
 	"name": "coolify",
 	"description": "An open-source, hassle-free, self-hostable Heroku & Netlify alternative.",
-	"version": "1.0.11",
+	"version": "1.0.12",
 	"license": "AGPL-3.0",
 	"scripts": {
 		"dev:docker:start": "docker-compose -f docker-compose-dev.yml up -d",
