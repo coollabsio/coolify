@@ -18,11 +18,7 @@
 		const timer = setInterval(() => {
 			if (newWindow.closed) {
 				clearInterval(timer);
-				const ghToken = new URL(newWindow.document.URL).searchParams.get('ghToken');
-				if (ghToken) {
-					$session.ghToken = ghToken;
-                    location.reload()
-				}
+				location.reload()
 			}
 		}, 100);
 	}
