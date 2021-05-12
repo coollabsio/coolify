@@ -5,9 +5,6 @@
 	import { session } from '$app/stores';
 	import { request } from '$lib/api/request';
 
-	async function logout() {
-		await request('/api/v1/logout', $session, { body: {}, method: 'DELETE' });
-	}
 	async function login() {
 		const left = screen.width / 2 - 1020 / 2;
 		const top = screen.height / 2 - 618 / 2;
@@ -58,7 +55,6 @@
 					>
 				{/if}
 			</div>
-			<button on:click={logout}>Logout</button>
 		</div>
 	</div>
 </div>

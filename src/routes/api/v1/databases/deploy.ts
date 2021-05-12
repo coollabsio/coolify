@@ -145,7 +145,7 @@ export async function post(request: Request) {
 		return {
 			status: 201,
 			body: {
-				message: 'Deployed'
+				message: 'Deployed.'
 			}
 		};
 	} catch (error) {

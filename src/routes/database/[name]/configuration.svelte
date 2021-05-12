@@ -11,7 +11,22 @@
 	import Loading from '$components/Loading.svelte';
 	import PasswordField from '$components/PasswordField.svelte';
 	import { browser } from '$app/env';
+	import { toast } from '@zerodevx/svelte-toast';
 
+	async function backup() {
+		try {
+			await request(`/api/v1/databases/${$page.params.name}/backup`, $session, {body: {}});
+
+			browser && toast.push(`Successfully created backup.`);
+		} catch (error) {
+			console.log(error);
+			if (error.code === 501) {
+				browser && toast.push(error.error);
+			} else {
+				browser && toast.push(`Error occured during database backup!`);
+			}
+		}
+	}
 	async function loadDatabaseConfig() {
 		if ($page.params.name) {
 			try {
@@ -23,6 +38,7 @@
 			browser && goto(`/dashboard/databases`, { replaceState: true });
 		}
 	}
+
 </script>
 
 {#await loadDatabaseConfig()}
@@ -81,5 +97,14 @@
 				<PasswordField value={$database.envs.MONGODB_ROOT_PASSWORD} />
 			</div>
 		{/if}
+		<div class="pb-2 pt-5 space-y-4">
+			<div class="text-2xl font-bold border-gradient w-32">Backup</div>
+			<div class="pt-4">
+				<button
+					class="button hover:bg-warmGray-700 bg-warmGray-800 rounded p-2 font-bold "
+					on:click={backup}>Download database backup</button
+				>
+			</div>
+		</div>
 	</div>
 {/await}

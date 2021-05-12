@@ -4,8 +4,8 @@
 	"version": "1.0.11",
 	"license": "AGPL-3.0",
 	"scripts": {
-		"dev:docker:start": "docker-compose -f install/docker-compose-dev.yml up -d",
-		"dev:docker:stop": "docker-compose -f install/docker-compose-dev.yml down",
+		"dev:docker:start": "docker-compose -f docker-compose-dev.yml up -d",
+		"dev:docker:stop": "docker-compose -f docker-compose-dev.yml down",
 		"dev": "NODE_ENV=development svelte-kit dev --host 0.0.0.0",
 		"build": "NODE_ENV=production svelte-kit build",
 		"preview": "svelte-kit preview",
