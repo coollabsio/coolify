@@ -70,5 +70,22 @@ export async function post(request: Request) {
 				error
 			}
 		};
+	} finally {
+		await Deployment.findOneAndUpdate(
+			{
+				repoId: configuration.repository.id,
+				branch: configuration.repository.branch,
+				organization: configuration.repository.organization,
+				name: configuration.repository.name,
+				domain: configuration.publish.domain,
+			},
+			{
+				repoId: configuration.repository.id,
+				branch: configuration.repository.branch,
+				organization: configuration.repository.organization,
+				name: configuration.repository.name,
+				domain: configuration.publish.domain, progress: 'done'
+			}
+		);
 	}
 }
