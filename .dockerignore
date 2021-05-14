@@ -1,4 +1,7 @@
+.DS_Store
 node_modules
-dist
-.routify
+/.svelte
+/build
+/functions
 .pnpm-store
+.pnpm-debug.log

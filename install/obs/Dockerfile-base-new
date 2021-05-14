@@ -1,4 +1,0 @@
-FROM coolify-base-nodejs
-WORKDIR /usr/src/app
-COPY . .
-RUN pnpm install

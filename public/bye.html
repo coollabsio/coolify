@@ -1,3 +1,0 @@
-<script>
-    window.close();
-</script>
