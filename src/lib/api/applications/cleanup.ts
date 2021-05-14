@@ -1,4 +1,5 @@
 import { docker } from '$lib/api/docker';
+import Deployment from '$models/Logs/Deployment'
 import { execShellAsync } from '../common';
 
 export async function deleteSameDeployments(configuration) {
@@ -17,6 +18,13 @@ export async function deleteSameDeployments(configuration) {
 		});
 }
 
+export async function cleanupStuckedDeploymentsInDB () {
+	// Cleanup stucked deployments.
+	await Deployment.updateMany(
+	  { progress: { $in: ['queued', 'inprogress'] } },
+	  { progress: 'failed' }
+	)
+  }
 export async function purgeImagesContainers(configuration, deleteAll = false) {
 	const { name, tag } = configuration.build.container;
 	await execShellAsync('docker container prune -f');

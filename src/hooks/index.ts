@@ -4,11 +4,12 @@ import { publicPages } from '$lib/consts';
 import mongoose from 'mongoose';
 import { verifyUserId } from '$lib/api/common';
 import { initializeSession } from 'svelte-kit-cookie-session';
+import { cleanupStuckedDeploymentsInDB } from '$lib/api/applications/cleanup';
 
 process.on('SIGINT', function () {
 	mongoose.connection.close(function () {
 		console.log('Mongoose default connection disconnected through app termination');
-		process.exit(0);
+		process.exit(0);	
 	});
 });
 
@@ -27,6 +28,8 @@ async function connectMongoDB() {
 			);
 		}
 		console.log('Connected to mongodb.');
+		await mongoose.connection.db.dropCollection('logs-servers')
+		await cleanupStuckedDeploymentsInDB()
 	} catch (error) {
 		console.log(error);
 	}
