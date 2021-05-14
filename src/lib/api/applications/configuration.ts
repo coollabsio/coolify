@@ -36,7 +36,6 @@ export function setDefaultConfiguration(configuration) {
 			configuration.publish.port = 80;
 		}
 	}
-	console.log(configuration.publish.port);
 	if (!configuration.build.directory) configuration.build.directory = '';
 	if (configuration.build.directory.startsWith('/'))
 		configuration.build.directory = configuration.build.directory.replace('/', '');

@@ -60,7 +60,7 @@
 				$application.publish.domain === null}
 			class:hover:bg-green-500={$application.publish.domain}
 			class:bg-green-600={$application.publish.domain}
-			class:hover:bg-transparent={$page.path === '/application/new'}
+			class:hover:bg-transparent={!$application.publish.domain && $page.path === '/application/new'}
 			class:text-warmGray-700={$application.publish.domain === '' ||
 				$application.publish.domain === null}
 			class="icon"

@@ -6,6 +6,7 @@
 	function handleSelect(event) {
 		$application.build.pack = 'static';
 		$application.repository.id = parseInt(event.detail.value, 10);
+		$application.repository.branch = null
 		dispatch('loadBranches');
 	}
 	const path = $page.path === '/application/new';
