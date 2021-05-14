@@ -64,13 +64,6 @@ export async function post(request: Request) {
 			}
 		};
 	} catch (error) {
-		return {
-			status: 500,
-			body: {
-				error
-			}
-		};
-	} finally {
 		await Deployment.findOneAndUpdate(
 			{
 				repoId: configuration.repository.id,
@@ -84,8 +77,14 @@ export async function post(request: Request) {
 				branch: configuration.repository.branch,
 				organization: configuration.repository.organization,
 				name: configuration.repository.name,
-				domain: configuration.publish.domain, progress: 'done'
+				domain: configuration.publish.domain, progress: 'failed'
 			}
 		);
+		return {
+			status: 500,
+			body: {
+				error
+			}
+		};
 	}
 }
