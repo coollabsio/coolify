@@ -1,5 +1,5 @@
 import { docker } from '$lib/api/docker';
-import Deployment from '$models/Logs/Deployment'
+import Deployment from '$models/Logs/Deployment';
 import { execShellAsync } from '../common';
 
 export async function deleteSameDeployments(configuration) {
@@ -18,36 +18,40 @@ export async function deleteSameDeployments(configuration) {
 		});
 }
 
-export async function cleanupStuckedDeploymentsInDB () {
+export async function cleanupStuckedDeploymentsInDB() {
 	// Cleanup stucked deployments.
 	await Deployment.updateMany(
-	  { progress: { $in: ['queued', 'inprogress'] } },
-	  { progress: 'failed' }
-	)
-  }
+		{ progress: { $in: ['queued', 'inprogress'] } },
+		{ progress: 'failed' }
+	);
+}
 export async function purgeImagesContainers(configuration, deleteAll = false) {
 	const { name, tag } = configuration.build.container;
-	await execShellAsync('docker container prune -f');
-	if (deleteAll) {
-		const IDsToDelete = (
-			await execShellAsync(`docker images ls --filter=reference='${name}' --format '{{json .ID }}'`)
-		)
-			.trim()
-			.replace(/"/g, '')
-			.split('\n');
-		if (IDsToDelete.length > 0)
-			await execShellAsync(`docker rmi -f ${IDsToDelete.toString().replace(',', ' ')}`);
-	} else {
-		const IDsToDelete = (
-			await execShellAsync(
-				`docker images ls --filter=reference='${name}' --filter=before='${name}:${tag}' --format '{{json .ID }}'`
+	try {
+		await execShellAsync('docker container prune -f');
+		if (deleteAll) {
+			const IDsToDelete = (
+				await execShellAsync(
+					`docker images ls --filter=reference='${name}' --format '{{json .ID }}'`
+				)
 			)
-		)
-			.trim()
-			.replace(/"/g, '')
-			.split('\n');
-		if (IDsToDelete.length > 1)
-			await execShellAsync(`docker rmi -f ${IDsToDelete.toString().replace(',', ' ')}`);
+				.trim()
+				.replace(/"/g, '')
+				.split('\n');
+			if (IDsToDelete.length > 0) await execShellAsync(`docker rmi -f ${IDsToDelete.join(' ')}`);
+		} else {
+			const IDsToDelete = (
+				await execShellAsync(
+					`docker images ls --filter=reference='${name}' --filter=before='${name}:${tag}' --format '{{json .ID }}'`
+				)
+			)
+				.trim()
+				.replace(/"/g, '')
+				.split('\n');
+			if (IDsToDelete.length > 1) await execShellAsync(`docker rmi -f ${IDsToDelete.join(' ')}`);
+		}
+		await execShellAsync('docker image prune -f');
+	} catch (error) {
+		console.log(error);
 	}
-	await execShellAsync('docker image prune -f');
 }

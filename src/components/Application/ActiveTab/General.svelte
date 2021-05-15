@@ -9,77 +9,96 @@
 				active: false,
 				number: 80
 			},
-			build: true
+			build: true,
+			start: false
 		},
 		nodejs: {
 			port: {
 				active: true,
 				number: 3000
 			},
-			build: true
+			build: true,
+			start: true
+		},
+		nestjs: {
+			port: {
+				active: true,
+				number: 3000
+			},
+			build: true,
+			start: true
 		},
 		vuejs: {
 			port: {
 				active: false,
 				number: 80
 			},
-			build: true
+			build: true,
+			start: false
 		},
 		nuxtjs: {
 			port: {
 				active: true,
 				number: 3000
 			},
-			build: true
+			build: true,
+			start: true
 		},
 		react: {
 			port: {
 				active: false,
 				number: 80
 			},
-			build: true
+			build: true,
+			start: false
 		},
 		nextjs: {
 			port: {
 				active: true,
 				number: 3000
 			},
-			build: true
+			build: true,
+			start: true
 		},
 		gatsby: {
 			port: {
 				active: true,
 				number: 3000
 			},
-			build: true
+			build: true,
+			start: false
 		},
 		svelte: {
 			port: {
 				active: false,
 				number: 80
 			},
-			build: true
+			build: true,
+			start: false
 		},
 		php: {
 			port: {
 				active: false,
 				number: 80
 			},
-			build: false
+			build: false,
+			start: false
 		},
 		rust: {
 			port: {
 				active: true,
 				number: 3000
 			},
-			build: false
+			build: false,
+			start: false
 		},
 		docker: {
 			port: {
 				active: true,
 				number: 3000
 			},
-			build: false
+			build: false,
+			start: false
 		}
 	};
 	function selectBuildPack(event) {
@@ -90,8 +109,9 @@
 		}
 	}
 	onMount(() => {
-		if(!$application.publish.domain) domainInput.focus();
+		if (!$application.publish.domain) domainInput.focus();
 	});
+
 </script>
 
 <div>
@@ -177,6 +197,14 @@
 				on:click={selectBuildPack}
 			>
 				Rust
+			</div>
+			<div
+				class={$application.build.pack === 'nestjs'
+					? 'buildpack bg-red-500'
+					: 'buildpack hover:border-red-500'}
+				on:click={selectBuildPack}
+			>
+				NestJS
 			</div>
 			<div
 				class={$application.build.pack === 'docker'
@@ -267,7 +295,7 @@
 					for="installCommand"
 					class:text-warmGray-800={!buildpacks[$application.build.pack].build}
 					>Install Command <TooltipInfo
-						label="Command to run for installing dependencies. eg: yarn install."
+						label="Command to run for installing dependencies. eg: yarn install"
 					/>
 				</label>
 
@@ -300,6 +328,22 @@
 					bind:value={$application.build.command.build}
 					placeholder="eg: yarn build"
 				/>
+				<label
+					for="startCommand"
+					class:text-warmGray-800={!buildpacks[$application.build.pack].start}
+					>Start Command <TooltipInfo label="Command to start the application. eg: yarn start" /></label
+				>
+				<input
+					class="mb-6"
+					class:bg-warmGray-900={!buildpacks[$application.build.pack].start}
+					class:text-warmGray-900={!buildpacks[$application.build.pack].start}
+					class:placeholder-warmGray-800={!buildpacks[$application.build.pack].start}
+					class:hover:bg-warmGray-900={!buildpacks[$application.build.pack].start}
+					class:cursor-not-allowed={!buildpacks[$application.build.pack].start}
+					id="startcommand"
+					bind:value={$application.build.command.start}
+					placeholder="eg: yarn start"
+				/>
 			</div>
 		</div>
 	</div>
@@ -309,4 +353,5 @@
 	.buildpack {
 		@apply px-6 py-2 mx-2 my-2 bg-warmGray-800 w-48 ease-in-out transform hover:scale-105 text-center rounded border-2 border-transparent border-dashed cursor-pointer transition duration-100;
 	}
+
 </style>

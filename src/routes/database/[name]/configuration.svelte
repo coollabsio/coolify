@@ -1,7 +1,7 @@
 <script>
 	import { database } from '$store';
 	import { page, session } from '$app/stores';
-	import { request } from '$lib/api/request';
+	import { request } from '$lib/request';
 	import { fade } from 'svelte/transition';
 	import { goto } from '$app/navigation';
 	import MongoDb from '$components/Database/SVGs/MongoDb.svelte';

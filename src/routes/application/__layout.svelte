@@ -6,7 +6,7 @@
 	import { page, session } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/env';
-	import { request } from '$lib/api/request';
+	import { request } from '$lib/request';
 
 	$application.repository.organization = $page.params.organization;
 	$application.repository.name = $page.params.name;

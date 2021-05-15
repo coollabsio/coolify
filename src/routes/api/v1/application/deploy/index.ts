@@ -70,14 +70,15 @@ export async function post(request: Request) {
 				branch: configuration.repository.branch,
 				organization: configuration.repository.organization,
 				name: configuration.repository.name,
-				domain: configuration.publish.domain,
+				domain: configuration.publish.domain
 			},
 			{
 				repoId: configuration.repository.id,
 				branch: configuration.repository.branch,
 				organization: configuration.repository.organization,
 				name: configuration.repository.name,
-				domain: configuration.publish.domain, progress: 'failed'
+				domain: configuration.publish.domain,
+				progress: 'failed'
 			}
 		);
 		return {

@@ -1,13 +1,13 @@
 <script>
 	import { toast } from '@zerodevx/svelte-toast';
-	import templates from '$lib/api/applications/templates';
+	import templates from '$lib/api/applications/packs/templates';
 	import { application, dashboard } from '$store';
 	import General from '$components/Application/ActiveTab/General.svelte';
 	import Secrets from '$components/Application/ActiveTab/Secrets.svelte';
 	import Loading from '$components/Loading.svelte';
 	import { goto } from '$app/navigation';
 	import { page, session } from '$app/stores';
-	import { request } from '$lib/api/request';
+	import { request } from '$lib/request';
 	import { browser } from '$app/env';
 
 	let activeTab = {
@@ -80,10 +80,18 @@
 						if (checkPackageJSONContents(dep)) {
 							const config = templates[dep];
 							$application.build.pack = config.pack;
-							if (config.installation)
+							if (config.installation) {
 								$application.build.command.installation = config.installation;
-							if (config.port) $application.publish.port = config.port;
-							if (config.directory) $application.publish.directory = config.directory;
+							}
+							if (config.start) {
+								$application.build.command.start = config.start;
+							}
+							if (config.port) {
+								$application.publish.port = config.port;
+							}
+							if (config.directory) {
+								$application.publish.directory = config.directory;
+							}
 
 							if (packageJsonContent.scripts.hasOwnProperty('build') && config.build) {
 								$application.build.command.build = config.build;

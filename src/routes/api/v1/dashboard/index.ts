@@ -3,7 +3,7 @@ import LogsServer from '$models/Logs/Server';
 import type { Request } from '@sveltejs/kit';
 
 export async function get(request: Request) {
-	const serverLogs = await LogsServer.find();
+	// const serverLogs = await LogsServer.find();
 	const dockerServices = await docker.engine.listServices();
 	let applications: any = dockerServices.filter(
 		(r) =>
@@ -61,7 +61,6 @@ export async function get(request: Request) {
 		status: 200,
 		body: {
 			success: true,
-			serverLogs,
 			applications: {
 				deployed: applications
 			},

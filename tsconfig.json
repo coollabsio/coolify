@@ -26,7 +26,7 @@
 		"paths": {
 			"$lib/*": ["src/lib/*"],
 			"$store": ["src/store/index.ts"],
-			"$api": ["src/routes/api/_index.ts"],
+			"$api/*": ["src/routes/api/*"],
 			"$models/*": ["src/models/*"],
 			"$components/*": ["src/components/*"]
 		}

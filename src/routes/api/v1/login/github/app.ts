@@ -1,10 +1,10 @@
-import { githubAPI } from '$api';
 import type { Request } from '@sveltejs/kit';
 import mongoose from 'mongoose';
 import User from '$models/User';
 import Settings from '$models/Settings';
 import cuid from 'cuid';
 import jsonwebtoken from 'jsonwebtoken';
+import { githubAPI } from '$lib/api/github';
 
 export async function get(request: Request) {
 	const code = request.query.get('code');
@@ -17,7 +17,7 @@ export async function get(request: Request) {
 				{ headers: { accept: 'application/json' } }
 			)
 		).json();
-		const { avatar_url, id } = await (await githubAPI(request, '/user', access_token)).body;
+		const { avatar_url } = await (await githubAPI(request, '/user', access_token)).body;
 		const email = (await githubAPI(request, '/user/emails', access_token)).body.filter(
 			(e) => e.primary
 		)[0].email;

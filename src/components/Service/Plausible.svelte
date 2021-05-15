@@ -3,7 +3,7 @@
 	import { toast } from '@zerodevx/svelte-toast';
 	import Loading from '../Loading.svelte';
 	import Tooltip from '$components/Tooltip.svelte';
-	import { request } from '$lib/api/request';
+	import { request } from '$lib/request';
 	import { page, session } from '$app/stores';
 	import PasswordField from '$components/PasswordField.svelte';
 import { browser } from '$app/env';

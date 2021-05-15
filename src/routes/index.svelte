@@ -3,7 +3,7 @@
 
 	import { goto } from '$app/navigation';
 	import { session } from '$app/stores';
-	import { request } from '$lib/api/request';
+	import { request } from '$lib/request';
 
 	async function login() {
 		const left = screen.width / 2 - 1020 / 2;
