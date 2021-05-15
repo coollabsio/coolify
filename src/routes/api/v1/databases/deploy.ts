@@ -96,6 +96,12 @@ export async function post(request: Request) {
 					hard: 262144
 				}
 			};
+		} else if (type === 'redis') {
+			image = 'bitnami/redis';
+			volume = `${configuration.general.deployId}-${type}-data:/bitnami/redis/data`;
+			generateEnvs = {
+				REDIS_PASSWORD: passwords[0]
+			};
 		}
 
 		const stack = {
