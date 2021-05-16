@@ -13,7 +13,7 @@ const publishNodejsDocker = (configuration) => {
       RUN ${configuration.build.command.installation}
       COPY ./${configuration.build.directory} ./`,
 		`EXPOSE ${configuration.publish.port}`,
-		'CMD [ "yarn", "start" ]'
+		`CMD ${configuration.build.command.start}`
 	].join('\n');
 };
 

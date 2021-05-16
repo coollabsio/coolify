@@ -1,9 +1,25 @@
 import { docker } from '$lib/api/docker';
+import Configuration from '$models/Configuration';
 import type { Request } from '@sveltejs/kit';
 
 export async function post(request: Request) {
 	const { name, organization, branch }: any = request.body || {};
 	if (name && organization && branch) {
+		const configurationFound = await Configuration.findOne({
+			'repository.name': name,
+			'repository.organization': organization,
+			'repository.branch': branch,
+		}).lean()
+		if (configurationFound) {
+			return {
+				status: 200,
+				body: {
+					success: true,
+					...configurationFound
+				}
+			};
+		}
+
 		const services = await docker.engine.listServices();
 		const applications = services.filter(
 			(r) => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application'
@@ -38,13 +54,12 @@ export async function post(request: Request) {
 					...JSON.parse(found.Spec.Labels.configuration)
 				}
 			};
-		} else {
-			return {
-				status: 500,
-				body: {
-					error: 'No configuration found.'
-				}
-			};
 		}
+		return {
+			status: 500,
+			body: {
+				error: 'No configuration found.'
+			}
+		};
 	}
 }

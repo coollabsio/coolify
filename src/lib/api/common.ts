@@ -1,13 +1,17 @@
 import shell from 'shelljs';
 import User from '$models/User';
 import jsonwebtoken from 'jsonwebtoken';
+import { saveServerLog } from './applications/logging';
 
 export function execShellAsync(cmd, opts = {}) {
 	try {
 		return new Promise(function (resolve, reject) {
 			shell.config.silent = true;
-			shell.exec(cmd, opts, function (code, stdout, stderr) {
-				if (code !== 0) return reject(new Error(stderr));
+			shell.exec(cmd, opts, async function (code, stdout, stderr) {
+				if (code !== 0) {
+					await saveServerLog({ message: JSON.stringify({ cmd, opts, code, stdout, stderr }) })
+					return reject(new Error(stderr));
+				}
 				return resolve(stdout);
 			});
 		});

@@ -7,6 +7,7 @@ import php from './php';
 import nuxtjs from './nuxtjs';
 import nodejs from './nodejs';
 import nextjs from './nextjs';
+import nestjs from './nestjs';
 import gatsby from './gatsby';
 import docker from './docker';
 
@@ -20,6 +21,7 @@ export {
 	nuxtjs,
 	nodejs,
 	nextjs,
+	nestjs,
 	gatsby,
 	docker
 };

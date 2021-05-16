@@ -1,6 +1,7 @@
 const defaultBuildAndDeploy = {
 	installation: 'yarn install',
-	build: 'yarn build'
+	build: 'yarn build',
+	start: 'yarn start'
 };
 
 const templates = {
@@ -9,6 +10,13 @@ const templates = {
 		...defaultBuildAndDeploy,
 		directory: 'public',
 		name: 'Svelte'
+	},
+	'@nestjs/core': {
+		pack: 'nestjs',
+		...defaultBuildAndDeploy,
+		start: 'yarn start:prod',
+		port: 3000,
+		name: 'NestJS'
 	},
 	next: {
 		pack: 'nextjs',

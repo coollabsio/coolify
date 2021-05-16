@@ -14,4 +14,4 @@ const DeploymentSchema = new Schema({
 
 DeploymentSchema.set('timestamps', true);
 
-export default mongoose.model('deployment', DeploymentSchema);
+export default mongoose.models['deployment'] || mongoose.model('deployment', DeploymentSchema);

@@ -1,6 +1,6 @@
 import type { Request } from '@sveltejs/kit';
-import ApplicationLog from '$models/Logs/Application';
-import Deployment from '$models/Logs/Deployment';
+import ApplicationLog from '$models/ApplicationLog';
+import Deployment from '$models/Deployment';
 import dayjs from 'dayjs';
 
 export async function get(request: Request) {
@@ -24,11 +24,11 @@ export async function get(request: Request) {
 				...finalLogs
 			}
 		};
-	} catch (e) {
+	} catch (error) {
 		return {
 			status: 500,
 			body: {
-				error: e
+				error: error.message || error
 			}
 		};
 	}

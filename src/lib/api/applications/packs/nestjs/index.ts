@@ -16,8 +16,9 @@ const publishNodejsDocker = (configuration) => {
 		`CMD ${configuration.build.command.start}`
 	].join('\n');
 };
+
 export default async function (configuration) {
-	await buildImage(configuration);
+	if (configuration.build.command.build) await buildImage(configuration, false, true);
 	await fs.writeFile(
 		`${configuration.general.workdir}/Dockerfile`,
 		publishNodejsDocker(configuration)

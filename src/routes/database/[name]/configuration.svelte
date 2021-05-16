@@ -1,7 +1,7 @@
 <script>
 	import { database } from '$store';
 	import { page, session } from '$app/stores';
-	import { request } from '$lib/api/request';
+	import { request } from '$lib/request';
 	import { fade } from 'svelte/transition';
 	import { goto } from '$app/navigation';
 	import MongoDb from '$components/Database/SVGs/MongoDb.svelte';
@@ -12,10 +12,11 @@
 	import PasswordField from '$components/PasswordField.svelte';
 	import { browser } from '$app/env';
 	import { toast } from '@zerodevx/svelte-toast';
+	import Redis from '$components/Database/SVGs/Redis.svelte';
 
 	async function backup() {
 		try {
-			await request(`/api/v1/databases/${$page.params.name}/backup`, $session, {body: {}});
+			await request(`/api/v1/databases/${$page.params.name}/backup`, $session, { body: {} });
 
 			browser && toast.push(`Successfully created backup.`);
 		} catch (error) {
@@ -56,6 +57,8 @@
 					<Mysql customClass="w-8 h-8" />
 				{:else if $database.config.general.type === 'couchdb'}
 					<CouchDb customClass="w-8 h-8 fill-current text-red-600" />
+				{:else if $database.config.general.type === 'redis'}
+					<Redis customClass="w-8 h-8" />
 				{/if}
 			</div>
 		</div>
@@ -64,7 +67,9 @@
 		<div class="pb-2 pt-5 space-y-4">
 			<div class="text-2xl font-bold border-gradient w-32">Database</div>
 			<div class="flex items-center pt-4">
-				<div class="font-bold w-64 text-warmGray-400">Connection string</div>
+				{#if $database.config.general.type !== 'redis'}
+					<div class="font-bold w-64 text-warmGray-400">Connection string</div>
+				{/if}
 				{#if $database.config.general.type === 'mongodb'}
 					<PasswordField
 						value={`mongodb://${$database.envs.MONGODB_USERNAME}:${$database.envs.MONGODB_PASSWORD}@${$database.config.general.deployId}:27017/${$database.envs.MONGODB_DATABASE}`}
@@ -95,6 +100,12 @@
 			<div class="flex items-center">
 				<div class="font-bold w-64 text-warmGray-400">Root password</div>
 				<PasswordField value={$database.envs.MONGODB_ROOT_PASSWORD} />
+			</div>
+		{/if}
+		{#if $database.config.general.type === 'redis'}
+			<div class="flex items-center">
+				<div class="font-bold w-64 text-warmGray-400">Redis password</div>
+				<PasswordField value={$database.envs.REDIS_PASSWORD} />
 			</div>
 		{/if}
 		<div class="pb-2 pt-5 space-y-4">

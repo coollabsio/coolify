@@ -7,6 +7,8 @@
 	import Mysql from '$components/Database/SVGs/Mysql.svelte';
 	import { dashboard } from '$store';
 	import { fade } from 'svelte/transition';
+	import Redis from '$components/Database/SVGs/Redis.svelte';
+
 </script>
 
 <div class="py-5 text-left px-6 text-3xl tracking-tight font-bold flex items-center">
@@ -56,6 +58,10 @@
 									<CouchDb
 										customClass="w-10 h-10 fill-current text-red-600 absolute top-0 left-0 -m-4"
 									/>
+								{:else if database.configuration.general.type == 'redis'}
+									<Redis
+										customClass="w-10 h-10  absolute top-0 left-0 -m-4"
+									/>
 								{:else if database.configuration.general.type == 'clickhouse'}
 									<Clickhouse
 										customClass="w-10 h-10 fill-current text-red-600 absolute top-0 left-0 -m-4"
@@ -79,4 +85,3 @@
 		<div class="text-2xl font-bold text-center">No databases found</div>
 	{/if}
 </div>
-

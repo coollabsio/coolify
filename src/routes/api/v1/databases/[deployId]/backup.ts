@@ -100,6 +100,31 @@ export async function post(request: Request) {
 					body: fs.readFileSync(`${fullfilename}`)
 				};
 			}
+		} else if (type === 'redis') {
+			if (databaseService) {
+				const password = configuration.database.passwords[0];
+				const databaseName = configuration.database.defaultDatabaseName;
+				const filename = `${databaseName}_${now.getTime()}.rdb`;
+				const fullfilename = `${tmpdir}/${filename}`;
+				await execShellAsync(
+					`docker exec -i ${containerID} /bin/bash -c "redis-cli --pass ${password} save"`
+				);
+				await execShellAsync(
+					`docker cp ${containerID}:/bitnami/redis/data/dump.rdb ${fullfilename}`
+				);
+				await execShellAsync(
+					`docker exec -i ${containerID} /bin/bash -c "rm -f /bitnami/redis/data/dump.rdb"`
+				);
+				return {
+					status: 200,
+					headers: {
+						'Content-Type': 'application/octet-stream',
+						'Content-Transfer-Encoding': 'binary',
+						'Content-Disposition': `attachment; filename=${filename}`
+					},
+					body: fs.readFileSync(`${fullfilename}`)
+				};
+			}
 		}
 		return {
 			status: 501,
@@ -108,12 +133,11 @@ export async function post(request: Request) {
 			}
 		};
 	} catch (error) {
-		console.log(error);
 		await saveServerLog(error);
 		return {
 			status: 500,
 			body: {
-				error
+				error: error.message || error
 			}
 		};
 	} finally {

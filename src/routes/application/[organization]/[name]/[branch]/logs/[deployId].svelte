@@ -2,7 +2,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import Loading from '$components/Loading.svelte';
-	import { request } from '$lib/api/request';
+	import { request } from '$lib/request';
 	import { page, session } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/env';

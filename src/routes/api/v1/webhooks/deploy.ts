@@ -1,6 +1,6 @@
 import type { Request } from '@sveltejs/kit';
 import crypto from 'crypto';
-import Deployment from '$models/Logs/Deployment';
+import Deployment from '$models/Deployment';
 import { docker } from '$lib/api/docker';
 import { precheckDeployment, setDefaultConfiguration } from '$lib/api/applications/configuration';
 import cloneRepository from '$lib/api/applications/cloneRepository';
@@ -106,7 +106,7 @@ export async function post(request: Request) {
 		return {
 			status: 500,
 			body: {
-				error
+				error: error.message || error
 			}
 		};
 	}

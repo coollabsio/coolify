@@ -1,8 +1,9 @@
 import Settings from '$models/Settings';
-import ServerLog from '$models/Logs/Server';
-import ApplicationLog from '$models/Logs/Application';
+import ServerLog from '$models/ServerLog';
+import ApplicationLog from '$models/ApplicationLog';
 import dayjs from 'dayjs';
 import { version } from '../../../../package.json';
+
 
 function generateTimestamp() {
 	return `${dayjs().format('YYYY-MM-DD HH:mm:ss.SSS')} `;

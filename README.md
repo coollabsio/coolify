@@ -1,4 +1,3 @@
-
 # Coolify
 
 An open-source, hassle-free, self-hostable Heroku & Netlify alternative.
@@ -7,8 +6,7 @@ An open-source, hassle-free, self-hostable Heroku & Netlify alternative.
 
 [Small video](https://cdn.coollabs.io/assets/coolify/video/coolify.webm)
 
-  
-## Installation 
+## Installation
 
 Installation is automated with the following command:
 
@@ -16,37 +14,41 @@ Installation is automated with the following command:
 /bin/bash -c "$(curl -fsSL https://get.coollabs.io/coolify/install.sh)"
 ```
 
-  
 ## Features
+
 You can deploy any of the following applications, databases and services easily.
 
 (constantly growing lists)
 
 ### Applications
+
 With Github integration
 
 - Static sites
 - NodeJS
 - VueJS
 - NuxtJS
+- NextJS
 - React/Preact
 - NextJS
 - Gatsby
 - Svelte
 - PHP
-- Rust 
+- Rust
 - or any custom dockerfile
 
 ### Databases
+
 - MongoDB
 - MySQL
 - PostgreSQL
 - CouchDB
+- Redis
 
 ### Services
+
 - [Plausible Analytics](https://plausible.io)
 
-  
 ## Support
 
 - Twitter: [@andrasbacsai](https://twitter.com/andrasbacsai)
@@ -55,10 +57,9 @@ With Github integration
 - Discord: [Invitation](https://discord.com/invite/bvS3WhR)
 
 ## Roadmap
+
 [See the Roadmap here](https://github.com/coollabsio/coolify/projects/1)
-  
+
 ## License
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. Please see the [LICENSE](/LICENSE) file in our repository for the full text.
-
-  

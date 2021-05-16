@@ -43,6 +43,7 @@ export type Application = {
 		command: {
 			build: string | null;
 			installation: string;
+			start: string;
 		};
 		container: {
 			name: string;

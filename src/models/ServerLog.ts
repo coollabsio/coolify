@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { version } from '../../../package.json';
+import { version } from '../../package.json'
 const { Schema, Document } = mongoose;
 
 // export interface ILogsServer extends Document {
@@ -20,4 +20,4 @@ const LogsServerSchema = new Schema({
 
 LogsServerSchema.set('timestamps', { createdAt: 'createdAt', updatedAt: false });
 
-export default mongoose.model('logs-server', LogsServerSchema);
+export default mongoose.models['logs-server'] || mongoose.model('logs-server', LogsServerSchema);

@@ -1,4 +1,4 @@
-import Deployment from '$models/Logs/Deployment';
+import Deployment from '$models/Deployment';
 import { saveAppLog } from './logging';
 import * as packs from './packs';
 

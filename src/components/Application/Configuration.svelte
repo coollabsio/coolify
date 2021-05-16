@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { request } from '$lib/api/request';
+	import { request } from '$lib/request';
 	import { session } from '$app/stores';
 	import { githubRepositories, application, githubInstallations } from '$store';
 

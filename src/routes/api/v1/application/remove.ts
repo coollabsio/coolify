@@ -1,8 +1,9 @@
 import { purgeImagesContainers } from '$lib/api/applications/cleanup';
 import { docker } from '$lib/api/docker';
-import Deployment from '$models/Logs/Deployment';
-import ApplicationLog from '$models/Logs/Application';
+import Deployment from '$models/Deployment';
+import ApplicationLog from '$models/ApplicationLog';
 import { delay, execShellAsync } from '$lib/api/common';
+import Configuration from '$models/Configuration';
 
 async function call(found) {
 	await delay(10000);
@@ -26,6 +27,11 @@ export async function post(request: Request) {
 				return null;
 			});
 		if (found) {
+			await Configuration.findOneAndRemove({
+				'repository.name': name,
+				'repository.organization': organization,
+				'repository.branch': branch,
+			})
 			const deploys = await Deployment.find({ organization, branch, name });
 			for (const deploy of deploys) {
 				await ApplicationLog.deleteMany({ deployId: deploy.deployId });

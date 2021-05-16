@@ -22,7 +22,7 @@ export async function get(request: Request) {
 		return {
 			status: 500,
 			body: {
-				error
+				error: error.message || error
 			}
 		};
 	}
@@ -45,7 +45,7 @@ export async function post(request: Request) {
 		return {
 			status: 500,
 			body: {
-				error
+				error: error.message || error
 			}
 		};
 	}
