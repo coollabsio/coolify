@@ -28,10 +28,14 @@ async function connectMongoDB() {
 			);
 		}
 		console.log('Connected to mongodb.');
-		await mongoose.connection.db.dropCollection('logs-servers');
 		await cleanupStuckedDeploymentsInDB();
 	} catch (error) {
 		console.log(error);
+	}
+	try {
+		await mongoose.connection.db.dropCollection('logs-servers');
+	} catch (error) {
+		//
 	}
 }
 

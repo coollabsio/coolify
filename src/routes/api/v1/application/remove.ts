@@ -1,7 +1,7 @@
 import { purgeImagesContainers } from '$lib/api/applications/cleanup';
 import { docker } from '$lib/api/docker';
-import Deployment from '$models/Logs/Deployment';
-import ApplicationLog from '$models/Logs/Application';
+import Deployment from '$models/Deployment';
+import ApplicationLog from '$models/ApplicationLog';
 import { delay, execShellAsync } from '$lib/api/common';
 
 async function call(found) {

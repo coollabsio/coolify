@@ -1,6 +1,6 @@
 import type { Request } from '@sveltejs/kit';
-import ApplicationLog from '$models/Logs/Application';
-import Deployment from '$models/Logs/Deployment';
+import ApplicationLog from '$models/ApplicationLog';
+import Deployment from '$models/Deployment';
 import dayjs from 'dayjs';
 
 export async function get(request: Request) {

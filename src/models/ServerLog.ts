@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { version } from '../../../package.json';
+import { version } from '../../package.json'
 const { Schema, Document } = mongoose;
 
 // export interface ILogsServer extends Document {

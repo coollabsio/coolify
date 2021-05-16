@@ -1,4 +1,4 @@
-import Deployment from '$models/Logs/Deployment';
+import Deployment from '$models/Deployment';
 import dayjs from 'dayjs';
 import buildContainer from './buildContainer';
 import { updateServiceLabels } from './configuration';

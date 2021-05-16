@@ -2,7 +2,7 @@ import type { Request } from '@sveltejs/kit';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import relativeTime from 'dayjs/plugin/relativeTime.js';
-import Deployment from '$models/Logs/Deployment';
+import Deployment from '$models/Deployment';
 dayjs.extend(utc);
 dayjs.extend(relativeTime);
 export async function get(request: Request) {

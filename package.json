@@ -31,7 +31,7 @@
 		"prettier-plugin-svelte": "^2.3.0",
 		"svelte": "^3.38.2",
 		"svelte-preprocess": "^4.7.3",
-		"tailwindcss": "canary",
+		"tailwindcss": "2.2.0-canary.8",
 		"tslib": "^2.2.0",
 		"typescript": "^4.2.4",
 		"vite": "^2.3.2"

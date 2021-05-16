@@ -28,6 +28,7 @@ With Github integration
 - NodeJS
 - VueJS
 - NuxtJS
+- NextJS
 - React/Preact
 - NextJS
 - Gatsby
@@ -42,6 +43,7 @@ With Github integration
 - MySQL
 - PostgreSQL
 - CouchDB
+- Redis
 
 ### Services
 

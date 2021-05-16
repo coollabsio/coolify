@@ -1,5 +1,5 @@
 import { docker } from '$lib/api/docker';
-import Deployment from '$models/Logs/Deployment';
+import Deployment from '$models/Deployment';
 import { execShellAsync } from '../common';
 
 export async function deleteSameDeployments(configuration) {
@@ -29,6 +29,10 @@ export async function purgeImagesContainers(configuration, deleteAll = false) {
 	const { name, tag } = configuration.build.container;
 	try {
 		await execShellAsync('docker container prune -f');
+	} catch (error) {
+		//
+	}
+	try {
 		if (deleteAll) {
 			const IDsToDelete = (
 				await execShellAsync(
@@ -50,8 +54,13 @@ export async function purgeImagesContainers(configuration, deleteAll = false) {
 				.split('\n');
 			if (IDsToDelete.length > 1) await execShellAsync(`docker rmi -f ${IDsToDelete.join(' ')}`);
 		}
-		await execShellAsync('docker image prune -f');
+
 	} catch (error) {
 		console.log(error);
+	}
+	try {
+		await execShellAsync('docker image prune -f');
+	} catch (error) {
+		//
 	}
 }
