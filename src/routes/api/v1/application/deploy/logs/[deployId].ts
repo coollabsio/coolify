@@ -24,11 +24,11 @@ export async function get(request: Request) {
 				...finalLogs
 			}
 		};
-	} catch (e) {
+	} catch (error) {
 		return {
 			status: 500,
 			body: {
-				error: e
+				error: error.message || error
 			}
 		};
 	}

@@ -1,5 +1,4 @@
 import { docker } from '$lib/api/docker';
-import Deployment from '$models/Deployment';
 import type { Request } from '@sveltejs/kit';
 
 export async function get(request: Request) {

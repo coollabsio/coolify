@@ -34,12 +34,11 @@ export async function get(request: Request) {
 			};
 		}
 	} catch (error) {
-		console.log(error);
 		return {
 			status: 500,
 			body: {
 				success: false,
-				error
+				error: error.message || error
 			}
 		};
 	}

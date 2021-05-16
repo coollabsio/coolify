@@ -61,7 +61,6 @@ export async function request(
 		} else if (response.headers.get('content-type').match(/multipart\/form-data/)) {
 			return await response.formData();
 		} else {
-			console.log(response);
 			if (response.headers.get('content-disposition')) {
 				const blob = await response.blob();
 				console.log(blob);
@@ -86,10 +85,10 @@ export async function request(
 			});
 		} else if (response.status >= 500) {
 			const error = (await response.json()).error;
-			browser && toast.push(error);
+			browser && toast.push(error.message || error);
 			return Promise.reject({
 				status: response.status,
-				error: error || 'Oops, something is not okay. Are you okay?'
+				error: error.message || error || 'Oops, something is not okay. Are you okay?'
 			});
 		} else {
 			browser && toast.push(response.statusText);

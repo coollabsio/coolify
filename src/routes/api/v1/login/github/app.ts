@@ -41,11 +41,10 @@ export async function get(request: Request) {
 				try {
 					await newUser.save();
 					await defaultSettings.save();
-				} catch (e) {
-					console.log(e);
+				} catch (error) {
 					return {
 						status: 500,
-						body: e
+						error: error.message || error
 					};
 				}
 			} else {
@@ -73,12 +72,11 @@ export async function get(request: Request) {
 						});
 						try {
 							await newUser.save();
-						} catch (e) {
-							console.log(e);
+						} catch (error) {
 							return {
 								status: 500,
 								body: {
-									error: e
+									error: error.message || error
 								}
 							};
 						}
@@ -103,8 +101,6 @@ export async function get(request: Request) {
 			}
 		};
 	} catch (error) {
-		console.log('error happened');
-		console.log(error);
-		return { status: 500, body: { ...error } };
+		return { status: 500, body: { error: error.message || error } };
 	}
 }

@@ -10,7 +10,6 @@ export async function get(request: Request) {
 		const repoId = request.query.get('repoId');
 		const branch = request.query.get('branch');
 		const page = request.query.get('page');
-
 		const onePage = 5;
 		const show = Number(page) * onePage || 5;
 		const deploy: any = await Deployment.find({ repoId, branch })
@@ -20,12 +19,9 @@ export async function get(request: Request) {
 
 		const finalLogs = deploy.map((d) => {
 			const finalLogs = { ...d._doc };
-
 			const updatedAt = dayjs(d.updatedAt).utc();
-
 			finalLogs.took = updatedAt.diff(dayjs(d.createdAt)) / 1000;
 			finalLogs.since = updatedAt.fromNow();
-
 			return finalLogs;
 		});
 		return {
@@ -36,11 +32,10 @@ export async function get(request: Request) {
 			}
 		};
 	} catch (error) {
-		console.log(error);
 		return {
 			status: 500,
 			body: {
-				error
+				error: error.message || error
 			}
 		};
 	}

@@ -133,12 +133,11 @@ export async function post(request: Request) {
 			}
 		};
 	} catch (error) {
-		console.log(error);
 		await saveServerLog(error);
 		return {
 			status: 500,
 			body: {
-				error
+				error: error.message || error
 			}
 		};
 	} finally {
