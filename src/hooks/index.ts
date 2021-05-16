@@ -5,6 +5,8 @@ import mongoose from 'mongoose';
 import { verifyUserId } from '$lib/api/common';
 import { initializeSession } from 'svelte-kit-cookie-session';
 import { cleanupStuckedDeploymentsInDB } from '$lib/api/applications/cleanup';
+import { docker } from '$lib/api/docker';
+import Configuration from '$models/Configuration';
 
 process.on('SIGINT', function () {
 	mongoose.connection.close(function () {
@@ -14,6 +16,7 @@ process.on('SIGINT', function () {
 });
 
 async function connectMongoDB() {
+	// TODO: Save configurations on start?
 	const { MONGODB_USER, MONGODB_PASSWORD, MONGODB_HOST, MONGODB_PORT, MONGODB_DB } = process.env;
 	try {
 		if (process.env.NODE_ENV === 'production') {
@@ -28,18 +31,65 @@ async function connectMongoDB() {
 			);
 		}
 		console.log('Connected to mongodb.');
-		await cleanupStuckedDeploymentsInDB();
+
 	} catch (error) {
 		console.log(error);
 	}
+
+}
+
+(async () => {
+	console.log(mongoose.connection.readyState)
+	if (mongoose.connection.readyState !== 1) await connectMongoDB();
 	try {
 		await mongoose.connection.db.dropCollection('logs-servers');
 	} catch (error) {
 		//
 	}
-}
+	try {
+		await cleanupStuckedDeploymentsInDB();
+	} catch (error) {
+		console.log(error)
+	}
+	try {
+		const dockerServices = await docker.engine.listServices();
+		let applications: any = dockerServices.filter(
+			(r) =>
+				r.Spec.Labels.managedBy === 'coolify' &&
+				r.Spec.Labels.type === 'application' &&
+				r.Spec.Labels.configuration
+		);
+		applications = applications.map((r) => {
+			if (JSON.parse(r.Spec.Labels.configuration)) {
+				return {
+					configuration: JSON.parse(r.Spec.Labels.configuration),
+					UpdatedAt: r.UpdatedAt
+				};
+			}
+			return {};
+		});
+		applications = [
+			...new Map(
+				applications.map((item) => [
+					item.configuration.publish.domain + item.configuration.publish.path,
+					item
+				])
+			).values()
+		];
+		for (const application of applications) {
+			await Configuration.findOneAndUpdate({
+				'repository.name': application.configuration.repository.name,
+				'repository.organization': application.configuration.repository.organization,
+				'repository.branch': application.configuration.repository.branch,
+			}, {
+				...application.configuration
+			}, { upsert: true })
+		}
+	} catch (error) {
+		console.log(error)
+	}
+})()
 
-if (mongoose.connection.readyState !== 1) connectMongoDB();
 
 export async function handle({ request, render }) {
 	const { SECRETS_ENCRYPTION_KEY } = process.env;

@@ -1,3 +1,4 @@
+
 import Deployment from '$models/Deployment';
 import dayjs from 'dayjs';
 import buildContainer from './buildContainer';
@@ -9,17 +10,8 @@ import { saveAppLog } from './logging';
 export default async function (configuration, imageChanged) {
 	const { id, organization, name, branch } = configuration.repository;
 	const { domain } = configuration.publish;
-	const { deployId, nickname } = configuration.general;
+	const { deployId} = configuration.general;
 	try {
-		await new Deployment({
-			repoId: id,
-			branch,
-			deployId,
-			domain,
-			organization,
-			name,
-			nickname
-		}).save();
 		await saveAppLog(`${dayjs().format('YYYY-MM-DD HH:mm:ss.SSS')} Queued.`, configuration);
 		await copyFiles(configuration);
 		await buildContainer(configuration);

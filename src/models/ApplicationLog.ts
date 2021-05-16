@@ -8,4 +8,4 @@ const ApplicationLogsSchema = new Schema({
 
 ApplicationLogsSchema.set('timestamps', true);
 
-export default mongoose.model('logs-application', ApplicationLogsSchema);
+export default mongoose.models['logs-application'] || mongoose.model('logs-application', ApplicationLogsSchema);
