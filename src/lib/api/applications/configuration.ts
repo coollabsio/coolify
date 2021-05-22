@@ -29,7 +29,8 @@ export function setDefaultConfiguration(configuration) {
 			configuration.build.pack === 'vuejs' ||
 			configuration.build.pack === 'nuxtjs' ||
 			configuration.build.pack === 'rust' ||
-			configuration.build.pack === 'nextjs'
+			configuration.build.pack === 'nextjs' ||
+			configuration.build.pack === 'nestjs'
 		) {
 			configuration.publish.port = 3000;
 		} else if (configuration.build.pack === 'python') {
@@ -49,6 +50,15 @@ export function setDefaultConfiguration(configuration) {
 	if (configuration.build.pack === 'static' || configuration.build.pack === 'nodejs') {
 		if (!configuration.build.command.installation)
 			configuration.build.command.installation = 'yarn install';
+	}
+	if (
+		configuration.build.pack === 'nodejs' ||
+		configuration.build.pack === 'vuejs' ||
+		configuration.build.pack === 'nuxtjs' ||
+		configuration.build.pack === 'nextjs' ||
+		configuration.build.pack === 'nestjs'
+	) {
+		if (!configuration.build.command.start) configuration.build.command.start = 'yarn start'
 	}
 	if (configuration.build.pack === 'python') {
 		if (!configuration.build.command.python.module) configuration.build.command.python.module = 'main'
