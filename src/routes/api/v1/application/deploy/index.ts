@@ -77,7 +77,7 @@ export async function post(request: Request) {
 
 		queueAndBuild(configuration, imageChanged);
 		return {
-			status: 200,
+			status: 201,
 			body: {
 				message: 'Deployment queued.',
 				nickname: configuration.general.nickname,

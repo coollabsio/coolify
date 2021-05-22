@@ -6,6 +6,7 @@ import { precheckDeployment, setDefaultConfiguration } from '$lib/api/applicatio
 import cloneRepository from '$lib/api/applications/cloneRepository';
 import { cleanupTmp } from '$lib/api/common';
 import queueAndBuild from '$lib/api/applications/queueAndBuild';
+import Configuration from '$models/Configuration';
 export async function post(request: Request) {
 	let configuration;
 	const { GITHUP_APP_WEBHOOK_SECRET } = process.env;
@@ -92,6 +93,27 @@ export async function post(request: Request) {
 				}
 			};
 		}
+		const { id, organization, name, branch } = configuration.repository;
+		const { domain } = configuration.publish;
+		const { deployId, nickname } = configuration.general;
+		await new Deployment({
+			repoId: id,
+			branch,
+			deployId,
+			domain,
+			organization,
+			name,
+			nickname
+		}).save();
+		await Configuration.findOneAndUpdate({
+			'repository.id': id,
+			'repository.organization': organization,
+			'repository.name': name,
+			'repository.branch': branch,
+		},
+			{ ...configuration },
+			{ upsert: true, new: true })
+
 		queueAndBuild(configuration, imageChanged);
 		return {
 			status: 201,
@@ -103,6 +125,23 @@ export async function post(request: Request) {
 			}
 		};
 	} catch (error) {
+		await Deployment.findOneAndUpdate(
+			{
+				repoId: configuration.repository.id,
+				branch: configuration.repository.branch,
+				organization: configuration.repository.organization,
+				name: configuration.repository.name,
+				domain: configuration.publish.domain
+			},
+			{
+				repoId: configuration.repository.id,
+				branch: configuration.repository.branch,
+				organization: configuration.repository.organization,
+				name: configuration.repository.name,
+				domain: configuration.publish.domain,
+				progress: 'failed'
+			}
+		);
 		return {
 			status: 500,
 			body: {
