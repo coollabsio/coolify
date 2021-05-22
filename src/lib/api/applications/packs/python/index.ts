@@ -6,9 +6,9 @@ const publishPython = (configuration) => {
 		'FROM python:3-alpine',
 		'WORKDIR /usr/src/app',
 		'RUN pip install gunicorn',
-		'COPY requirements.txt ./',
-		'RUN pip install --no-cache-dir -r requirements.txt',
-		'COPY . .',
+		`COPY ./${configuration.build.directory}/requirements.txt ./`,
+		`RUN pip install --no-cache-dir -r ./${configuration.build.directory}/requirements.txt`,
+		`COPY ./${configuration.build.directory}/ .`,
 		`EXPOSE ${configuration.publish.port}`,
 		`CMD gunicorn -w=4 ${configuration.build.command.python.module}:${configuration.build.command.python.instance}`
 	].join('\n');
