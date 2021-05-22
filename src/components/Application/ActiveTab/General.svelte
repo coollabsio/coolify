@@ -99,6 +99,15 @@
 			},
 			build: false,
 			start: false
+		},
+		python: {
+			port: {
+				active: true,
+				number: 4000
+			},
+			build: false,
+			start: false,
+			custom: true
 		}
 	};
 	function selectBuildPack(event) {
@@ -214,6 +223,14 @@
 			>
 				Docker
 			</div>
+			<div
+				class={$application.build.pack === 'python'
+					? 'buildpack bg-green-500'
+					: 'buildpack hover:border-green-500'}
+				on:click={selectBuildPack}
+			>
+				Python
+			</div>
 		</div>
 	</div>
 	<div class="text-2xl font-bold border-gradient w-52">General settings</div>
@@ -282,68 +299,95 @@
 		</div>
 	</div>
 	<div
-		class="text-2xl font-bold  w-40"
-		class:border-gradient={buildpacks[$application.build.pack].build}
-		class:text-warmGray-800={!buildpacks[$application.build.pack].build}
+		class="text-2xl font-bold w-40 border-gradient"
 	>
 		Commands
 	</div>
 	<div class=" max-w-2xl md:mx-auto mx-6 justify-center items-center pt-10 pb-32">
 		<div class="grid grid-flow-col gap-2 items-center">
 			<div class="grid grid-flow-row">
-				<label
-					for="installCommand"
-					class:text-warmGray-800={!buildpacks[$application.build.pack].build}
-					>Install Command <TooltipInfo
-						label="Command to run for installing dependencies. eg: yarn install"
+				{#if $application.build.pack === 'python'}
+					<label for="ModulePackageName"
+						>Module/Package Name<TooltipInfo
+							label="The module/package name to start (eg: the entry filename [main], without the py extension. See gunicorn.org for more details)"
+						/>
+					</label>
+
+					<input
+						class="mb-6"
+						id="ModulePackageName"
+						bind:value={$application.build.command.python.module}
+						placeholder="main"
+					/>
+					<label for="ApplicationInstance"
+					>Application Instance<TooltipInfo
+						label="The instance name (the main function name. See gunicorn.org for more details)"
 					/>
 				</label>
 
 				<input
 					class="mb-6"
-					class:bg-warmGray-900={!buildpacks[$application.build.pack].build}
-					class:text-warmGray-900={!buildpacks[$application.build.pack].build}
-					class:placeholder-warmGray-800={!buildpacks[$application.build.pack].build}
-					class:hover:bg-warmGray-900={!buildpacks[$application.build.pack].build}
-					class:cursor-not-allowed={!buildpacks[$application.build.pack].build}
-					id="installCommand"
-					bind:value={$application.build.command.installation}
-					placeholder="eg: yarn install"
+					id="ApplicationInstance"
+					bind:value={$application.build.command.python.instance}
+					placeholder="app"
 				/>
-				<label
-					for="buildCommand"
-					class:text-warmGray-800={!buildpacks[$application.build.pack].build}
-					>Build Command <TooltipInfo
-						label="Command to run for building your application. If empty, no build phase initiated in the deploy process."
-					/></label
-				>
-				<input
-					class="mb-6"
-					class:bg-warmGray-900={!buildpacks[$application.build.pack].build}
-					class:text-warmGray-900={!buildpacks[$application.build.pack].build}
-					class:placeholder-warmGray-800={!buildpacks[$application.build.pack].build}
-					class:hover:bg-warmGray-900={!buildpacks[$application.build.pack].build}
-					class:cursor-not-allowed={!buildpacks[$application.build.pack].build}
-					id="buildCommand"
-					bind:value={$application.build.command.build}
-					placeholder="eg: yarn build"
-				/>
-				<label
-					for="startCommand"
-					class:text-warmGray-800={!buildpacks[$application.build.pack].start}
-					>Start Command <TooltipInfo label="Command to start the application. eg: yarn start" /></label
-				>
-				<input
-					class="mb-6"
-					class:bg-warmGray-900={!buildpacks[$application.build.pack].start}
-					class:text-warmGray-900={!buildpacks[$application.build.pack].start}
-					class:placeholder-warmGray-800={!buildpacks[$application.build.pack].start}
-					class:hover:bg-warmGray-900={!buildpacks[$application.build.pack].start}
-					class:cursor-not-allowed={!buildpacks[$application.build.pack].start}
-					id="startcommand"
-					bind:value={$application.build.command.start}
-					placeholder="eg: yarn start"
-				/>
+				{:else}
+					<label
+						for="installCommand"
+						class:text-warmGray-800={!buildpacks[$application.build.pack].build}
+						>Install Command <TooltipInfo
+							label="Command to run for installing dependencies. eg: yarn install"
+						/>
+					</label>
+
+					<input
+						class="mb-6"
+						class:bg-warmGray-900={!buildpacks[$application.build.pack].build}
+						class:text-warmGray-900={!buildpacks[$application.build.pack].build}
+						class:placeholder-warmGray-800={!buildpacks[$application.build.pack].build}
+						class:hover:bg-warmGray-900={!buildpacks[$application.build.pack].build}
+						class:cursor-not-allowed={!buildpacks[$application.build.pack].build}
+						id="installCommand"
+						bind:value={$application.build.command.installation}
+						placeholder="eg: yarn install"
+					/>
+					<label
+						for="buildCommand"
+						class:text-warmGray-800={!buildpacks[$application.build.pack].build}
+						>Build Command <TooltipInfo
+							label="Command to run for building your application. If empty, no build phase initiated in the deploy process."
+						/></label
+					>
+					<input
+						class="mb-6"
+						class:bg-warmGray-900={!buildpacks[$application.build.pack].build}
+						class:text-warmGray-900={!buildpacks[$application.build.pack].build}
+						class:placeholder-warmGray-800={!buildpacks[$application.build.pack].build}
+						class:hover:bg-warmGray-900={!buildpacks[$application.build.pack].build}
+						class:cursor-not-allowed={!buildpacks[$application.build.pack].build}
+						id="buildCommand"
+						bind:value={$application.build.command.build}
+						placeholder="eg: yarn build"
+					/>
+					<label
+						for="startCommand"
+						class:text-warmGray-800={!buildpacks[$application.build.pack].start}
+						>Start Command <TooltipInfo
+							label="Command to start the application. eg: yarn start"
+						/></label
+					>
+					<input
+						class="mb-6"
+						class:bg-warmGray-900={!buildpacks[$application.build.pack].start}
+						class:text-warmGray-900={!buildpacks[$application.build.pack].start}
+						class:placeholder-warmGray-800={!buildpacks[$application.build.pack].start}
+						class:hover:bg-warmGray-900={!buildpacks[$application.build.pack].start}
+						class:cursor-not-allowed={!buildpacks[$application.build.pack].start}
+						id="startcommand"
+						bind:value={$application.build.command.start}
+						placeholder="eg: yarn start"
+					/>
+				{/if}
 			</div>
 		</div>
 	</div>

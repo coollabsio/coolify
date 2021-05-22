@@ -29,9 +29,12 @@ export function setDefaultConfiguration(configuration) {
 			configuration.build.pack === 'vuejs' ||
 			configuration.build.pack === 'nuxtjs' ||
 			configuration.build.pack === 'rust' ||
-			configuration.build.pack === 'nextjs'
+			configuration.build.pack === 'nextjs' ||
+			configuration.build.pack === 'nestjs'
 		) {
 			configuration.publish.port = 3000;
+		} else if (configuration.build.pack === 'python') {
+			configuration.publish.port = 4000;
 		} else {
 			configuration.publish.port = 80;
 		}
@@ -47,6 +50,19 @@ export function setDefaultConfiguration(configuration) {
 	if (configuration.build.pack === 'static' || configuration.build.pack === 'nodejs') {
 		if (!configuration.build.command.installation)
 			configuration.build.command.installation = 'yarn install';
+	}
+	if (
+		configuration.build.pack === 'nodejs' ||
+		configuration.build.pack === 'vuejs' ||
+		configuration.build.pack === 'nuxtjs' ||
+		configuration.build.pack === 'nextjs' ||
+		configuration.build.pack === 'nestjs'
+	) {
+		if (!configuration.build.command.start) configuration.build.command.start = 'yarn start'
+	}
+	if (configuration.build.pack === 'python') {
+		if (!configuration.build.command.python.module) configuration.build.command.python.module = 'main'
+		if (!configuration.build.command.python.instance) configuration.build.command.python.instance = 'app'
 	}
 
 	configuration.build.container.baseSHA = crypto
@@ -103,9 +119,9 @@ export async function precheckDeployment({ services, configuration }) {
 				// If only the configuration changed
 				if (
 					JSON.stringify(runningWithoutContainer.build) !==
-						JSON.stringify(configurationWithoutContainer.build) ||
+					JSON.stringify(configurationWithoutContainer.build) ||
 					JSON.stringify(runningWithoutContainer.publish) !==
-						JSON.stringify(configurationWithoutContainer.publish)
+					JSON.stringify(configurationWithoutContainer.publish)
 				)
 					configChanged = true;
 				// If only the image changed
@@ -148,8 +164,7 @@ export async function updateServiceLabels(configuration) {
 		await execShellAsync(
 			`docker service update --label-add configuration='${JSON.stringify(
 				Labels
-			)}' --label-add com.docker.stack.image='${configuration.build.container.name}:${
-				configuration.build.container.tag
+			)}' --label-add com.docker.stack.image='${configuration.build.container.name}:${configuration.build.container.tag
 			}' ${ID}`
 		);
 	}

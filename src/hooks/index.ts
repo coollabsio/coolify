@@ -39,7 +39,6 @@ async function connectMongoDB() {
 }
 
 (async () => {
-	console.log(mongoose.connection.readyState)
 	if (mongoose.connection.readyState !== 1) await connectMongoDB();
 	try {
 		await mongoose.connection.db.dropCollection('logs-servers');

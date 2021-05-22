@@ -8,7 +8,7 @@ const publishPHPDocker = (configuration) => {
 		'WORKDIR /usr/src/app',
 		`COPY ./${configuration.build.directory} /var/www/html`,
 		'EXPOSE 80',
-		' CMD ["apache2-foreground"]'
+		'CMD ["apache2-foreground"]'
 	].join('\n');
 };
 

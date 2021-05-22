@@ -27,6 +27,11 @@ const ConfigurationSchema = new Schema({
 			build: { type: String },
 			installation: { type: String },
 			start: { type: String },
+			python: {
+				module: { type: String },
+				instance: { type: String },
+			}
+
 		},
 		container: {
 			name: { type: String, required: true },
