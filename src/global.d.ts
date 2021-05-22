@@ -44,6 +44,11 @@ export type Application = {
 			build: string | null;
 			installation: string;
 			start: string;
+			python: {
+				module?: string;
+				instance?: string;
+			}
+
 		};
 		container: {
 			name: string;

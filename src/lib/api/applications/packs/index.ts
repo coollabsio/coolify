@@ -10,6 +10,7 @@ import nextjs from './nextjs';
 import nestjs from './nestjs';
 import gatsby from './gatsby';
 import docker from './docker';
+import python from './python';
 
 export {
 	vuejs,
@@ -23,5 +24,6 @@ export {
 	nextjs,
 	nestjs,
 	gatsby,
-	docker
+	docker,
+	python
 };

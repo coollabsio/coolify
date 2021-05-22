@@ -5,7 +5,7 @@ import type {
 	DateTimeFormatOptions,
 	GithubInstallations
 } from 'src/global';
-import { writable, derived, readable, Writable } from 'svelte/store';
+import { writable } from 'svelte/store';
 
 export const dashboard = writable<Dashboard>({
 	databases: {
@@ -55,7 +55,12 @@ export const application = writable<Application>({
 		directory: null,
 		command: {
 			build: null,
-			installation: null
+			installation: null,
+			start: null,
+			python: {
+				module: null,
+				instance: null
+			}
 		},
 		container: {
 			name: null,
@@ -99,7 +104,12 @@ export const initialApplication: Application = {
 		directory: null,
 		command: {
 			build: null,
-			installation: null
+			installation: null,
+			start: null,
+			python: {
+				module: null,
+				instance: null
+			}
 		},
 		container: {
 			name: null,

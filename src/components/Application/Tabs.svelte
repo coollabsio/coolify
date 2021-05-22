@@ -66,7 +66,7 @@
 				const packageJson = dir.find((f) => f.type === 'file' && f.name === 'package.json');
 				const Dockerfile = dir.find((f) => f.type === 'file' && f.name === 'Dockerfile');
 				const CargoToml = dir.find((f) => f.type === 'file' && f.name === 'Cargo.toml');
-
+				const requirementsTXT = dir.find((f) => f.type === 'file' && f.name === 'requirements.txt');
 				if (packageJson) {
 					const { content } = await request(packageJson.git_url, $session);
 					const packageJsonContent = JSON.parse(atob(content));
@@ -102,10 +102,13 @@
 				} else if (CargoToml) {
 					$application.build.pack = 'rust';
 					browser && toast.push(`Rust language detected. Default values set.`);
+				} else if (requirementsTXT) {
+					$application.build.pack = 'python'
+					browser && toast.push('Python language detected. Default values set.');
 				} else if (Dockerfile) {
 					$application.build.pack = 'docker';
 					browser && toast.push('Custom Dockerfile found. Build pack set to docker.');
-				}
+				} 
 			} catch (error) {
 				// Nothing detected
 			}
