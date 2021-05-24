@@ -65,8 +65,7 @@ export default async function (configuration, imageChanged) {
 		await execShellAsync(
 			`docker service update --image ${configuration.build.container.name}:${configuration.build.container.tag} ${configuration.build.container.name}_${configuration.build.container.name}`
 		);
-		await delay(10000)
-		await execShellAsync(`docker container prune --filter=reference='${configuration.build.container.name}'`)
+		await execShellAsync(`docker container prune -f --filter=reference='${configuration.build.container.name}'`)
 	} else {
 		// console.log('new deployment or force deployment or config changed')
 		await deleteSameDeployments(configuration);
