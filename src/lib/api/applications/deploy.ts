@@ -3,7 +3,7 @@ import { saveAppLog } from './logging';
 import { promises as fs } from 'fs';
 import { deleteSameDeployments } from './cleanup';
 import yaml from 'js-yaml';
-import { execShellAsync } from '../common';
+import { delay, execShellAsync } from '../common';
 
 export default async function (configuration, imageChanged) {
 	const generateEnvs = {};
@@ -60,10 +60,13 @@ export default async function (configuration, imageChanged) {
 	await saveAppLog('### Publishing.', configuration);
 	await fs.writeFile(`${configuration.general.workdir}/stack.yml`, yaml.dump(stack));
 	if (imageChanged) {
+
 		// console.log('image changed')
 		await execShellAsync(
 			`docker service update --image ${configuration.build.container.name}:${configuration.build.container.tag} ${configuration.build.container.name}_${configuration.build.container.name}`
 		);
+		await delay(10000)
+		await execShellAsync(`docker container prune --filter=reference='${configuration.build.container.name}'`)
 	} else {
 		// console.log('new deployment or force deployment or config changed')
 		await deleteSameDeployments(configuration);
