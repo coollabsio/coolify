@@ -25,6 +25,7 @@
 			}
 		});
 
+		// $prApplication = configuration.filter((c) => c.repository.pullRequest && c.repository.pullRequest !== 0);
 		$prApplication = configuration.filter((c) => c.repository.pullRequest !== 0);
 	}
 	async function removePR(prConfiguration) {
@@ -48,6 +49,7 @@
 				}
 			});
 
+			// $prApplication = configuration.filter((c) => c.repository.pullRequest && c.repository.pullRequest !== 0);
 			$prApplication = configuration.filter((c) => c.repository.pullRequest !== 0);
 		}
 	}

@@ -21,7 +21,8 @@ export function setDefaultConfiguration(configuration) {
 	configuration.general.nickname = nickname;
 	configuration.general.deployId = deployId;
 	configuration.general.workdir = `/tmp/${deployId}`;
-	if (configuration.general.isPreviewDeploymentEnabled && configuration.repository.pullRequest !== 0) {
+	// if (configuration.general.isPreviewDeploymentEnabled && configuration.repository.pullRequest && configuration.repository.pullRequest !== 0) {
+		if (configuration.general.isPreviewDeploymentEnabled && configuration.repository.pullRequest !== 0) {
 		configuration.build.container.name = `pr${configuration.repository.pullRequest}-${sha256.slice(0, 8)}`
 		configuration.publish.domain = `pr${configuration.repository.pullRequest}.${configuration.publish.domain}`
 	}
@@ -137,6 +138,7 @@ export async function precheckDeployment(configuration) {
 				if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true;
 				// If build pack changed, forceUpdate the service
 				if (running.build.pack !== configuration.build.pack) forceUpdate = true;
+				// if (configuration.general.isPreviewDeploymentEnabled && configuration.repository.pullRequest && configuration.repository.pullRequest !== 0) forceUpdate = true
 				if (configuration.general.isPreviewDeploymentEnabled && configuration.repository.pullRequest !== 0) forceUpdate = true
 			}
 		}

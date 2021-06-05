@@ -13,12 +13,7 @@ export async function post(request: Request) {
 			'repository.name': name,
 			'repository.organization': organization,
 			'repository.branch': branch
-		}, { $set: { 'general.isPreviewDeploymentEnabled': isPreviewDeploymentEnabled } }, { new: true }).lean()
-
-		delete configuration?._id
-		delete configuration?.__v
-		delete configuration?.createdAt
-		delete configuration?.updatedAt
+		}, { $set: { 'general.isPreviewDeploymentEnabled': isPreviewDeploymentEnabled, 'repository.pullRequest': 0 } }, { new: true }).select('-_id -__v -createdAt -updatedAt')
 
 		await updateServiceLabels(configuration);
 		if (!isPreviewDeploymentEnabled) {
@@ -29,6 +24,7 @@ export async function post(request: Request) {
 				JSON.parse(r.Spec.Labels.configuration).repository.organization === organization &&
 				JSON.parse(r.Spec.Labels.configuration).repository.name === name &&
 				JSON.parse(r.Spec.Labels.configuration).repository.branch === branch  &&
+				// JSON.parse(r.Spec.Labels.configuration).repository.pullRequest &&
 				JSON.parse(r.Spec.Labels.configuration).repository.pullRequest !== 0
 				)
 			

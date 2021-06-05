@@ -9,7 +9,7 @@ export async function post(request: Request) {
 			'repository.name': name,
 			'repository.organization': organization,
 			'repository.branch': branch
-		}).lean()
+		})
 
 		if (configurationFound) {
 			return {

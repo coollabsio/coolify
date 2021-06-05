@@ -25,7 +25,8 @@ export async function post(request: Request) {
 			return JSON.parse(r.Spec.Labels.configuration)
 		})
 		const shouldDeleteMe = allServicesForRepository.find(f => f.publish.domain === domain)
-		if (shouldDeleteMe.repository.pullRequest === 0) {
+		// if (shouldDeleteMe.repository.pullRequest === 0 || !shouldDeleteMe.repository.pullRequest) {
+			if (shouldDeleteMe.repository.pullRequest === 0) {
 			for (const delMe of allServicesForRepository) {
 				const { name, organization, branch } = delMe.repository
 				const { domain } = delMe.publish
