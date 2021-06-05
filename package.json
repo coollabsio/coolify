@@ -14,8 +14,8 @@
 		"format": "prettier --write ."
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-node": "^1.0.0-next.20",
-		"@sveltejs/kit": "1.0.0-next.107",
+		"@sveltejs/adapter-node": "^1.0.0-next.24",
+		"@sveltejs/kit": "1.0.0-next.113",
 		"@types/dockerode": "^3.2.3",
 		"@typescript-eslint/eslint-plugin": "^4.23.0",
 		"@typescript-eslint/parser": "^4.23.0",

@@ -1,11 +1,10 @@
 <script>
+	import { VITE_GITHUB_APP_NAME } from '$lib/consts';
 	import { application, isPullRequestPermissionsGranted } from '$store';
 	import { onMount } from 'svelte';
 	import TooltipInfo from '$components/TooltipInfo.svelte';
 	import { request } from '$lib/request';
 	import { page, session } from '$app/stores';
-	import Loading from '$components/Loading.svelte';
-	import Tooltip from '$components/Tooltip.svelte';
 	import { browser } from '$app/env';
 
 	let domainInput;
@@ -167,18 +166,11 @@
 	}
 	async function openGithub() {
 		if (browser) {
-			const config = await request(
-				`https://api.github.com/apps/${import.meta.env.VITE_GITHUB_APP_NAME}`,
-				$session
-			);
+			const config = await request(`https://api.github.com/apps/${VITE_GITHUB_APP_NAME}`, $session);
 
-			let url = `https://github.com/settings/apps/${
-				import.meta.env.VITE_GITHUB_APP_NAME
-			}/permissions`;
+			let url = `https://github.com/settings/apps/${VITE_GITHUB_APP_NAME}/permissions`;
 			if (config.owner.type === 'Organization') {
-				url = `https://github.com/organizations/${config.owner.login}/settings/apps/${
-					import.meta.env.VITE_GITHUB_APP_NAME
-				}/permissions`;
+				url = `https://github.com/organizations/${config.owner.login}/settings/apps/${VITE_GITHUB_APP_NAME}/permissions`;
 			}
 
 			const left = screen.width / 2 - 1020 / 2;

@@ -90,7 +90,7 @@ async function connectMongoDB() {
 })()
 
 
-export async function handle({ request, render }) {
+export async function handle({ request, resolve }) {
 	const { SECRETS_ENCRYPTION_KEY } = process.env;
 	const session = initializeSession(request.headers, {
 		secret: SECRETS_ENCRYPTION_KEY,
@@ -105,7 +105,7 @@ export async function handle({ request, render }) {
 			request.locals.session.destroy = true;
 		}
 	}
-	const response = await render(request);
+	const response = await resolve(request);
 	if (!session['set-cookie']) {
 		if (!session?.data?.coolToken && !publicPages.includes(request.path)) {
 			return {
