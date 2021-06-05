@@ -1,5 +1,5 @@
 <script>
-	import { application, initialApplication, initConf, dashboard } from '$store';
+	import { application, initialApplication, initConf, dashboard, prApplication } from '$store';
 	import { onDestroy } from 'svelte';
 	import Loading from '$components/Loading.svelte';
 	import Navbar from '$components/Application/Navbar.svelte';
@@ -14,15 +14,16 @@
 
 	async function setConfiguration() {
 		try {
-			const config = await request(`/api/v1/application/config`, $session, {
+			const { configuration } = await request(`/api/v1/application/config`, $session, {
 				body: {
 					name: $application.repository.name,
 					organization: $application.repository.organization,
 					branch: $application.repository.branch
 				}
 			});
-			$application = { ...config };
-			$initConf = JSON.parse(JSON.stringify($application));
+			$prApplication = configuration.filter((c) => c.repository.pullRequest !== 0);
+			$application = configuration.find((c) => c.repository.pullRequest === 0);
+			if (!$application) browser && goto('/dashboard/applications');
 		} catch (error) {
 			browser && goto('/dashboard/applications');
 		}

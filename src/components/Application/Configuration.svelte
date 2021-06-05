@@ -2,7 +2,14 @@
 	import { goto } from '$app/navigation';
 	import { request } from '$lib/request';
 	import { session } from '$app/stores';
-	import { githubRepositories, application, githubInstallations } from '$store';
+	import {
+		githubRepositories,
+		application,
+		githubInstallations,
+		prApplication,
+		initConf,
+		isPullRequestPermissionsGranted
+	} from '$store';
 
 	import { fade } from 'svelte/transition';
 	import Loading from '$components/Loading.svelte';
@@ -18,6 +25,7 @@
 	};
 	let branches = [];
 	let relogin = false;
+	let permissions = {};
 	function dashify(str: string, options?: any) {
 		if (typeof str !== 'string') return str;
 		return str
@@ -110,8 +118,17 @@
 			$session
 		);
 		loading.branches = false;
+		await loadPermissions();
 	}
-
+	async function loadPermissions() {
+		const config = await request(
+			`https://api.github.com/apps/${import.meta.env.VITE_GITHUB_APP_NAME}`,
+			$session
+		);
+		if (config.permissions['pull_requests'] && config.events.includes('pull_request')) {
+			$isPullRequestPermissionsGranted = true;
+		}
+	}
 	async function modifyGithubAppConfig() {
 		if (browser) {
 			const left = screen.width / 2 - 1020 / 2;
@@ -128,20 +145,23 @@
 					', toolbar=0, menubar=0, status=0'
 			);
 			const timer = setInterval(async () => {
-				if (newWindow.closed) {
+				if (newWindow?.closed) {
 					clearInterval(timer);
 					loading.github = true;
 
 					if ($application.repository.name) {
 						try {
-							const config = await request(`/api/v1/application/config`, $session, {
+							const { configuration } = await request(`/api/v1/application/config`, $session, {
 								body: {
 									name: $application.repository.name,
 									organization: $application.repository.organization,
 									branch: $application.repository.branch
 								}
 							});
-							$application = { ...config };
+
+							$prApplication = configuration.filter((c) => c.repository.pullRequest !== 0);
+							$application = configuration.find((c) => c.repository.pullRequest === 0);
+							$initConf = JSON.parse(JSON.stringify($application));
 						} catch (error) {
 							browser && goto('/dashboard/applications', { replaceState: true });
 						}

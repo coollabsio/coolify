@@ -4,8 +4,8 @@ import { execShellAsync } from '../common';
 export default async function (configuration) {
 	try {
 		const { GITHUB_APP_PRIVATE_KEY } = process.env;
-		const { workdir } = configuration.general;
-		const { organization, name, branch } = configuration.repository;
+		const { workdir, isPreviewDeploymentEnabled } = configuration.general;
+		const { organization, name, branch, pullRequest } = configuration.repository;
 		const github = configuration.github;
 		if (!github.installation.id || !github.app.id) {
 			throw new Error('Github installation ID is invalid.');
@@ -37,8 +37,11 @@ export default async function (configuration) {
 		await execShellAsync(
 			`mkdir -p ${workdir} && git clone -q -b ${branch} https://x-access-token:${token}@github.com/${organization}/${name}.git ${workdir}/`
 		);
+		if (isPreviewDeploymentEnabled && pullRequest !== 0) {
+			await execShellAsync(`cd ${workdir} && git pull origin pull/${pullRequest}/head`)
+		}
 		configuration.build.container.tag = (
-			await execShellAsync(`cd ${configuration.general.workdir}/ && git rev-parse HEAD`)
+			await execShellAsync(`cd ${workdir}/ && git rev-parse HEAD`)
 		)
 			.replace('\n', '')
 			.slice(0, 7);

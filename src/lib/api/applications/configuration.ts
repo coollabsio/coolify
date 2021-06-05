@@ -10,7 +10,7 @@ function getUniq() {
 }
 
 export function setDefaultConfiguration(configuration) {
-	const nickname = getUniq();
+	const nickname = configuration.general.nickname || getUniq();
 	const deployId = cuid();
 
 	const shaBase = JSON.stringify({ repository: configuration.repository });
@@ -21,7 +21,10 @@ export function setDefaultConfiguration(configuration) {
 	configuration.general.nickname = nickname;
 	configuration.general.deployId = deployId;
 	configuration.general.workdir = `/tmp/${deployId}`;
-
+	if (configuration.general.isPreviewDeploymentEnabled && configuration.repository.pullRequest !== 0) {
+		configuration.build.container.name = `pr${configuration.repository.pullRequest}-${sha256.slice(0, 8)}`
+		configuration.publish.domain = `pr${configuration.repository.pullRequest}.${configuration.publish.domain}`
+	}
 	if (!configuration.publish.path) configuration.publish.path = '/';
 	if (!configuration.publish.port) {
 		if (
@@ -74,7 +77,10 @@ export function setDefaultConfiguration(configuration) {
 	return configuration;
 }
 
-export async function precheckDeployment({ services, configuration }) {
+export async function precheckDeployment(configuration) {
+	const services = (await docker.engine.listServices()).filter(
+		(r) => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application'
+	);
 	let foundService = false;
 	let configChanged = false;
 	let imageChanged = false;
@@ -110,6 +116,7 @@ export async function precheckDeployment({ services, configuration }) {
 				if (isError.length > 0) forceUpdate = true;
 				foundService = true;
 
+
 				const runningWithoutContainer = JSON.parse(JSON.stringify(running));
 				delete runningWithoutContainer.build.container;
 
@@ -121,13 +128,16 @@ export async function precheckDeployment({ services, configuration }) {
 					JSON.stringify(runningWithoutContainer.build) !==
 					JSON.stringify(configurationWithoutContainer.build) ||
 					JSON.stringify(runningWithoutContainer.publish) !==
-					JSON.stringify(configurationWithoutContainer.publish)
+					JSON.stringify(configurationWithoutContainer.publish) ||
+					JSON.stringify(runningWithoutContainer.general.isPreviewDeploymentEnabled) !==
+					JSON.stringify(configurationWithoutContainer.general.isPreviewDeploymentEnabled)
 				)
 					configChanged = true;
 				// If only the image changed
 				if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true;
 				// If build pack changed, forceUpdate the service
 				if (running.build.pack !== configuration.build.pack) forceUpdate = true;
+				if (configuration.general.isPreviewDeploymentEnabled && configuration.repository.pullRequest !== 0) forceUpdate = true
 			}
 		}
 	}
@@ -152,7 +162,8 @@ export async function updateServiceLabels(configuration) {
 		const config = JSON.parse(s.Spec.Labels.configuration);
 		if (
 			config.repository.id === configuration.repository.id &&
-			config.repository.branch === configuration.repository.branch
+			config.repository.branch === configuration.repository.branch && 
+			config.repository.pullRequest === configuration.repository.pullRequest
 		) {
 			return config;
 		}

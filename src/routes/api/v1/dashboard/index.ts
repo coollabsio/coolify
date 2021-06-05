@@ -22,14 +22,27 @@ export async function get(request: Request) {
 			r.Spec.Labels.configuration
 	);
 	applications = applications.map((r) => {
-		if (JSON.parse(r.Spec.Labels.configuration)) {
+		const configuration = JSON.parse(r.Spec.Labels.configuration)
+		if (configuration) {
+			const found = applications.find(a => {
+				const conf = JSON.parse(a.Spec.Labels.configuration)
+				if (
+					conf.repository.id === configuration.repository.id &&
+					conf.repository.branch === configuration.repository.branch &&
+					conf.repository.pullRequest !== 0
+				) {
+					return true
+				}
+			})
 			return {
-				configuration: JSON.parse(r.Spec.Labels.configuration),
+				configuration,
+				prBuilds: found ? true : false,
 				UpdatedAt: r.UpdatedAt
 			};
 		}
 		return {};
 	});
+
 	databases = databases.map((r) => {
 		if (JSON.parse(r.Spec.Labels.configuration)) {
 			return {
@@ -49,12 +62,15 @@ export async function get(request: Request) {
 	});
 	applications = [
 		...new Map(
-			applications.map((item) => [
-				item.configuration.publish.domain + item.configuration.publish.path,
-				item
-			])
+			applications
+				.filter(f => f.configuration.repository.pullRequest === 0)
+				.map((item) => [
+					item.configuration.repository.id + item.configuration.repository.branch,
+					item
+				])
 		).values()
 	];
+
 	return {
 		status: 200,
 		body: {

@@ -48,7 +48,8 @@ export const application = writable<Application>({
 	general: {
 		deployId: null,
 		nickname: null,
-		workdir: null
+		workdir: null,
+		isPreviewDeploymentEnabled: false
 	},
 	build: {
 		pack: 'static',
@@ -76,6 +77,7 @@ export const application = writable<Application>({
 		secrets: []
 	}
 });
+export const prApplication = writable([])
 
 export const initConf = writable({});
 
@@ -92,12 +94,14 @@ export const initialApplication: Application = {
 		id: null,
 		organization: null,
 		name: null,
-		branch: null
+		branch: null,
+		pullRequest: 0
 	},
 	general: {
 		deployId: null,
 		nickname: null,
-		workdir: null
+		workdir: null,
+		isPreviewDeploymentEnabled: false
 	},
 	build: {
 		pack: 'static',
@@ -162,3 +166,5 @@ export const initialNewService = {
 	userPasswordAgain: null,
 	baseURL: null
 };
+
+export const isPullRequestPermissionsGranted = writable(false)

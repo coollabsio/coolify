@@ -14,11 +14,13 @@ const ConfigurationSchema = new Schema({
 		organization: { type: String, required: true },
 		name: { type: String, required: true },
 		branch: { type: String, required: true },
+		pullRequest: { type: Number, required: true, default: 0 },
 	},
 	general: {
 		deployId: { type: String, required: true },
 		nickname: { type: String, required: true },
 		workdir: { type: String, required: true },
+		isPreviewDeploymentEnabled: { type: Boolean, required: true, default: false },
 	},
 	build: {
 		pack: { type: String, required: true },

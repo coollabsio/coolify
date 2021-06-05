@@ -11,6 +11,7 @@ export default async function (configuration, imageChanged) {
 		generateEnvs[secret.name] = secret.value;
 	}
 	const containerName = configuration.build.container.name;
+	const containerTag = configuration.build.container.tag;
 
 	// Only save SHA256 of it in the configuration label
 	const baseServiceConfiguration = configuration.baseServiceConfiguration;
@@ -20,7 +21,7 @@ export default async function (configuration, imageChanged) {
 		version: '3.8',
 		services: {
 			[containerName]: {
-				image: `${configuration.build.container.name}:${configuration.build.container.tag}`,
+				image: `${containerName}:${containerTag}`,
 				networks: [`${docker.network}`],
 				environment: generateEnvs,
 				deploy: {
@@ -31,21 +32,21 @@ export default async function (configuration, imageChanged) {
 						'configuration=' + JSON.stringify(configuration),
 						'traefik.enable=true',
 						'traefik.http.services.' +
-							configuration.build.container.name +
+							containerName +
 							`.loadbalancer.server.port=${configuration.publish.port}`,
-						'traefik.http.routers.' + configuration.build.container.name + '.entrypoints=websecure',
+						'traefik.http.routers.' + containerName + '.entrypoints=websecure',
 						'traefik.http.routers.' +
-							configuration.build.container.name +
+							containerName +
 							'.rule=Host(`' +
 							configuration.publish.domain +
 							'`) && PathPrefix(`' +
 							configuration.publish.path +
 							'`)',
 						'traefik.http.routers.' +
-							configuration.build.container.name +
+							containerName +
 							'.tls.certresolver=letsencrypt',
 						'traefik.http.routers.' +
-							configuration.build.container.name +
+							containerName +
 							'.middlewares=global-compress'
 					]
 				}
@@ -60,12 +61,11 @@ export default async function (configuration, imageChanged) {
 	await saveAppLog('### Publishing.', configuration);
 	await fs.writeFile(`${configuration.general.workdir}/stack.yml`, yaml.dump(stack));
 	if (imageChanged) {
-
 		// console.log('image changed')
 		await execShellAsync(
-			`docker service update --image ${configuration.build.container.name}:${configuration.build.container.tag} ${configuration.build.container.name}_${configuration.build.container.name}`
+			`docker service update --image ${containerName}:${containerTag} ${containerName}_${containerName}`
 		);
-		await execShellAsync(`docker container prune -f --filter=reference='${configuration.build.container.name}'`)
+		await execShellAsync(`docker container prune -f --filter=reference='${containerName}'`)
 	} else {
 		// console.log('new deployment or force deployment or config changed')
 		await deleteSameDeployments(configuration);

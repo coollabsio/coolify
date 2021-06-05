@@ -4,11 +4,15 @@ import Deployment from '$models/Deployment';
 import { docker } from '$lib/api/docker';
 import { precheckDeployment, setDefaultConfiguration } from '$lib/api/applications/configuration';
 import cloneRepository from '$lib/api/applications/cloneRepository';
-import { cleanupTmp } from '$lib/api/common';
+import { cleanupTmp, execShellAsync } from '$lib/api/common';
 import queueAndBuild from '$lib/api/applications/queueAndBuild';
 import Configuration from '$models/Configuration';
+import ApplicationLog from '$models/ApplicationLog';
 export async function post(request: Request) {
 	let configuration;
+	const allowedGithubEvents = ['push', 'pull_request']
+	const allowedPRActions = ['opened', 'synchronize', 'closed']
+	const githubEvent = request.headers['x-github-event']
 	const { GITHUP_APP_WEBHOOK_SECRET } = process.env;
 	const hmac = crypto.createHmac('sha256', GITHUP_APP_WEBHOOK_SECRET);
 	const digest = Buffer.from(
@@ -20,38 +24,73 @@ export async function post(request: Request) {
 		return {
 			status: 500,
 			body: {
-				error: 'Invalid request'
+				error: 'Invalid request.'
 			}
 		};
 	}
 
-	if (request.headers['x-github-event'] !== 'push') {
+	if (!allowedGithubEvents.includes(githubEvent)) {
 		return {
 			status: 500,
 			body: {
-				error: 'Not a push event.'
+				error: 'Event not allowed.'
 			}
 		};
 	}
+
 	try {
 		const services = (await docker.engine.listServices()).filter(
 			(r) => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application'
 		);
+		if (githubEvent === 'push') {
+			configuration = services.find((r) => {
+				if (request.body.ref.startsWith('refs')) {
+					const branch = request.body.ref.split('/')[2];
+					if (
+						JSON.parse(r.Spec.Labels.configuration).repository.id === request.body.repository.id &&
+						JSON.parse(r.Spec.Labels.configuration).repository.branch === branch
+					) {
+						return r;
+					}
+				}
 
-		configuration = services.find((r) => {
-			if (request.body.ref.startsWith('refs')) {
-				const branch = request.body.ref.split('/')[2];
+				return null;
+			});
+		} else if (githubEvent === 'pull_request') {
+			configuration = services.find((r) => {
 				if (
 					JSON.parse(r.Spec.Labels.configuration).repository.id === request.body.repository.id &&
-					JSON.parse(r.Spec.Labels.configuration).repository.branch === branch
+					JSON.parse(r.Spec.Labels.configuration).repository.branch === request.body['pull_request'].base.ref
 				) {
 					return r;
 				}
-			}
 
-			return null;
-		});
-		configuration = setDefaultConfiguration(JSON.parse(configuration.Spec.Labels.configuration));
+				return null;
+			});
+		}
+		const jsonConfiguration = JSON.parse(configuration.Spec.Labels.configuration)
+
+		if (githubEvent === 'pull_request') {
+			if (!allowedPRActions.includes(request.body.action)){
+				return {
+					status: 500,
+					body: {
+						error: 'PR action is not allowed.'
+					}
+				};
+			}
+			if (jsonConfiguration.general.isPreviewDeploymentEnabled) {
+				jsonConfiguration.repository.pullRequest = request.body.number
+			} else {
+				return {
+					status: 500,
+					body: {
+						error: 'PR deployments are not enabled.'
+					}
+				};
+			}
+		}
+		configuration = setDefaultConfiguration(jsonConfiguration);
 
 		if (!configuration) {
 			return {
@@ -61,11 +100,33 @@ export async function post(request: Request) {
 				}
 			};
 		}
+		const { id, organization, name, branch, pullRequest } = configuration.repository;
+		const { domain } = configuration.publish;
+		const { deployId, nickname } = configuration.general;
+		if (request.body.action === 'closed') {
+			const deploys = await Deployment.find({ organization, branch, name, domain });
+			for (const deploy of deploys) {
+				await ApplicationLog.deleteMany({ deployId: deploy.deployId });
+				await Deployment.deleteMany({ deployId: deploy.deployId });
+			}
+			await Configuration.findOneAndRemove({
+				'repository.id': id,
+				'repository.organization': organization,
+				'repository.name': name,
+				'repository.branch': branch,
+				'repository.pullRequest': pullRequest
+			})
+			await execShellAsync(`docker stack rm ${configuration.build.container.name}`);
+			return {
+				status: 200,
+				body: {
+					success: true,
+					message: 'Removed'
+				}
+			};
+		}
 		await cloneRepository(configuration);
-		const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment({
-			services,
-			configuration
-		});
+		const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment(configuration);
 		if (foundService && !forceUpdate && !imageChanged && !configChanged) {
 			cleanupTmp(configuration.general.workdir);
 			return {
@@ -76,6 +137,7 @@ export async function post(request: Request) {
 				}
 			};
 		}
+
 		const alreadyQueued = await Deployment.find({
 			repoId: configuration.repository.id,
 			branch: configuration.repository.branch,
@@ -93,9 +155,7 @@ export async function post(request: Request) {
 				}
 			};
 		}
-		const { id, organization, name, branch } = configuration.repository;
-		const { domain } = configuration.publish;
-		const { deployId, nickname } = configuration.general;
+
 		await new Deployment({
 			repoId: id,
 			branch,
@@ -105,14 +165,28 @@ export async function post(request: Request) {
 			name,
 			nickname
 		}).save();
-		await Configuration.findOneAndUpdate({
-			'repository.id': id,
-			'repository.organization': organization,
-			'repository.name': name,
-			'repository.branch': branch,
-		},
-			{ ...configuration },
-			{ upsert: true, new: true })
+
+		if (githubEvent === 'pull_request') {
+			await Configuration.findOneAndUpdate({
+				'repository.id': id,
+				'repository.organization': organization,
+				'repository.name': name,
+				'repository.branch': branch,
+				'repository.pullRequest': pullRequest
+			},
+				{ ...configuration },
+				{ upsert: true, new: true })
+		} else {
+			await Configuration.findOneAndUpdate({
+				'repository.id': id,
+				'repository.organization': organization,
+				'repository.name': name,
+				'repository.branch': branch,
+				'repository.pullRequest': 0
+			},
+				{ ...configuration },
+				{ upsert: true, new: true })
+		}
 
 		queueAndBuild(configuration, imageChanged);
 		return {
@@ -125,6 +199,8 @@ export async function post(request: Request) {
 			}
 		};
 	} catch (error) {
+		console.log(error)
+		cleanupTmp(configuration.general.workdir);
 		await Deployment.findOneAndUpdate(
 			{
 				repoId: configuration.repository.id,

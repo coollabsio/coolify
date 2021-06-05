@@ -82,7 +82,7 @@ async function connectMongoDB() {
 				'repository.branch': application.configuration.repository.branch,
 			}, {
 				...application.configuration
-			}, { upsert: true })
+			}, { upsert: true, new: true })
 		}
 	} catch (error) {
 		console.log(error)

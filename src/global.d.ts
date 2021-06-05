@@ -31,11 +31,13 @@ export type Application = {
 		organization: string;
 		name: string;
 		branch: string;
+		pullRequest: number;
 	};
 	general: {
 		deployId: string;
 		nickname: string;
 		workdir: string;
+		isPreviewDeploymentEnabled: boolean;
 	};
 	build: {
 		pack: string;
