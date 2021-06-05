@@ -29,7 +29,7 @@ export async function get(request: Request) {
 				if (
 					conf.repository.id === configuration.repository.id &&
 					conf.repository.branch === configuration.repository.branch &&
-					conf.repository.pullRequest !== 0
+					conf.repository.pullRequest && conf.repository.pullRequest !== 0
 				) {
 					return true
 				}
