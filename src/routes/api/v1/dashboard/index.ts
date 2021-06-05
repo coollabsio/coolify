@@ -60,10 +60,11 @@ export async function get(request: Request) {
 		}
 		return {};
 	});
+	console.log(applications)
 	applications = [
 		...new Map(
 			applications
-				.filter(f => f.configuration.repository.pullRequest === 0)
+				.filter(f => f.configuration.repository.pullRequest === 0 || !f.configuration.repository.pullRequest)
 				.map((item) => [
 					item.configuration.repository.id + item.configuration.repository.branch,
 					item
