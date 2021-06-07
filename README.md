@@ -54,7 +54,7 @@ With Github integration
 - Twitter: [@andrasbacsai](https://twitter.com/andrasbacsai)
 - Telegram: [@andrasbacsai](https://t.me/andrasbacsai)
 - Email: [andras@coollabs.io](mailto:andras@coollabs.io)
-- Discord: [Invitation](https://discord.com/invite/bvS3WhR)
+- Discord: [Invitation](https://discord.gg/xhBCC7eGKw)
 
 ## Roadmap
 

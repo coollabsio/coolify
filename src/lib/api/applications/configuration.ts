@@ -28,7 +28,6 @@ export function setDefaultConfiguration(configuration) {
 	if (!configuration.publish.port) {
 		if (
 			configuration.build.pack === 'nodejs' ||
-			configuration.build.pack === 'vuejs' ||
 			configuration.build.pack === 'nuxtjs' ||
 			configuration.build.pack === 'rust' ||
 			configuration.build.pack === 'nextjs' ||
