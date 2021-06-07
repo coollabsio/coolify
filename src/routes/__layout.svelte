@@ -306,7 +306,7 @@
 				>
 			{:else}
 				<button
-					class="opacity-50 tracking-tight font-bold text-xs rounded px-2 cursor-not-allowed animate-wiggle"
+					class="opacity-50 tracking-tight font-bold text-xs rounded px-2 cursor-not-allowed"
 					disabled={upgradeDisabled}>Upgrading. It could take a while, please wait...</button
 				>
 			{/if}
