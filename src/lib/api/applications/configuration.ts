@@ -21,10 +21,9 @@ export function setDefaultConfiguration(configuration) {
 	configuration.general.nickname = nickname;
 	configuration.general.deployId = deployId;
 	configuration.general.workdir = `/tmp/${deployId}`;
-	// if (configuration.general.isPreviewDeploymentEnabled && configuration.repository.pullRequest && configuration.repository.pullRequest !== 0) {
-		if (configuration.general.isPreviewDeploymentEnabled && configuration.repository.pullRequest !== 0) {
-		configuration.build.container.name = `pr${configuration.repository.pullRequest}-${sha256.slice(0, 8)}`
-		configuration.publish.domain = `pr${configuration.repository.pullRequest}.${configuration.publish.domain}`
+		if (configuration.general.isPreviewDeploymentEnabled && configuration.general.pullRequest !== 0) {
+		configuration.build.container.name = `pr${configuration.general.pullRequest}-${sha256.slice(0, 8)}`
+		configuration.publish.domain = `pr${configuration.general.pullRequest}.${configuration.publish.domain}`
 	}
 	if (!configuration.publish.path) configuration.publish.path = '/';
 	if (!configuration.publish.port) {
@@ -138,8 +137,7 @@ export async function precheckDeployment(configuration) {
 				if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true;
 				// If build pack changed, forceUpdate the service
 				if (running.build.pack !== configuration.build.pack) forceUpdate = true;
-				// if (configuration.general.isPreviewDeploymentEnabled && configuration.repository.pullRequest && configuration.repository.pullRequest !== 0) forceUpdate = true
-				if (configuration.general.isPreviewDeploymentEnabled && configuration.repository.pullRequest !== 0) forceUpdate = true
+				if (configuration.general.isPreviewDeploymentEnabled && configuration.general.pullRequest !== 0) forceUpdate = true
 			}
 		}
 	}
@@ -166,7 +164,7 @@ export async function updateServiceLabels(configuration) {
 	// 	if (
 	// 		config.repository.id === configuration.repository.id &&
 	// 		config.repository.branch === configuration.repository.branch && 
-	// 		config.repository.pullRequest === configuration.repository.pullRequest
+	// 		config.general.pullRequest === configuration.general.pullRequest
 	// 	) {
 	// 		return config;
 	// 	}

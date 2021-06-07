@@ -50,21 +50,6 @@
 			return;
 		}
 		if ($page.path === '/application/new') {
-			// 	const { configuration } = await request(`/api/v1/application/config`, $session, {
-			// 		body: {
-			// 			name: $application.repository.name,
-			// 			organization: $application.repository.organization,
-			// 			branch: $application.repository.branch
-			// 		}
-			// 	});
-			// 	$prApplication = configuration.filter((c) => c.repository.pullRequest !== 0);
-			// 	for (const config of configuration) {
-			// 		if (config.repository.pullRequest === 0) {
-			// 			$application = { ...config };
-			// 			$initConf = JSON.parse(JSON.stringify($application));
-			// 		}
-			// 	}
-			// } else {
 			try {
 				const dir = await request(
 					`https://api.github.com/repos/${$application.repository.organization}/${$application.repository.name}/contents/?ref=${$application.repository.branch}`,

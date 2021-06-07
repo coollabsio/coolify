@@ -61,13 +61,15 @@ export default async function (configuration, imageChanged) {
 	await saveAppLog('### Publishing.', configuration);
 	await fs.writeFile(`${configuration.general.workdir}/stack.yml`, yaml.dump(stack));
 	if (imageChanged) {
-		// console.log('image changed')
+		console.log(`${containerName}:${containerTag} ${containerName}_${containerName}`)
 		await execShellAsync(
 			`docker service update --image ${containerName}:${containerTag} ${containerName}_${containerName}`
 		);
+		console.log('image changed')
 		await execShellAsync(`docker container prune -f --filter=reference='${containerName}'`)
+		console.log('image changed')
 	} else {
-		// console.log('new deployment or force deployment or config changed')
+		console.log('new deployment or force deployment or config changed')
 		await deleteSameDeployments(configuration);
 		await execShellAsync(
 			`cat ${configuration.general.workdir}/stack.yml | docker stack deploy --prune -c - ${containerName}`

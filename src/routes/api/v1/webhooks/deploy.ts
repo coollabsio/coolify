@@ -72,7 +72,7 @@ export async function post(request: Request) {
 						}
 					};
 				}
-				configuration.repository.pullRequest = request.body.number
+				configuration.general.pullRequest = request.body.number
 			}
 		}
 		if (!configuration) {
@@ -99,7 +99,7 @@ export async function post(request: Request) {
 				'repository.organization': organization,
 				'repository.name': name,
 				'repository.branch': branch,
-				'repository.pullRequest': pullRequest
+				'general.pullRequest': pullRequest
 			})
 			await execShellAsync(`docker stack rm ${configuration.build.container.name}`);
 			return {
@@ -157,7 +157,7 @@ export async function post(request: Request) {
 				'repository.organization': organization,
 				'repository.name': name,
 				'repository.branch': branch,
-				'repository.pullRequest': pullRequest
+				'general.pullRequest': pullRequest
 			},
 				{ ...configuration },
 				{ upsert: true, new: true })
@@ -167,7 +167,7 @@ export async function post(request: Request) {
 				'repository.organization': organization,
 				'repository.name': name,
 				'repository.branch': branch,
-				'repository.pullRequest': { '$in': [null, 0] }
+				'general.pullRequest': { '$in': [null, 0] }
 			},
 				{ ...configuration },
 				{ upsert: true, new: true })

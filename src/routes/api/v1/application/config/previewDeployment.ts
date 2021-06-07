@@ -13,14 +13,14 @@ export async function post(request: Request) {
 			'repository.name': name,
 			'repository.organization': organization,
 			'repository.branch': branch
-		}, { $set: { 'general.isPreviewDeploymentEnabled': isPreviewDeploymentEnabled, 'repository.pullRequest': 0 } }, { new: true }).select('-_id -__v -createdAt -updatedAt')
+		}, { $set: { 'general.isPreviewDeploymentEnabled': isPreviewDeploymentEnabled, 'general.pullRequest': 0 } }, { new: true }).select('-_id -__v -createdAt -updatedAt')
 		await updateServiceLabels(configuration);
 		if (!isPreviewDeploymentEnabled) {
 			const found = await Configuration.find({
 				'repository.name': name,
 				'repository.organization': organization,
 				'repository.branch': branch,
-				'repository.pullRequest': { '$ne': 0 }
+				'general.pullRequest': { '$ne': 0 }
 			})
 			for (const prDeployment of found) {
 				await Configuration.findOneAndRemove({

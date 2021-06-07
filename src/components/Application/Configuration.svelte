@@ -159,14 +159,8 @@
 								}
 							});
 
-							$prApplication = configuration.filter((c) => c.repository.pullRequest !== 0);
-							$application = configuration.find((c) => c.repository.pullRequest === 0);
-							// $prApplication = configuration.filter(
-							// 	(c) => c.repository.pullRequest && c.repository.pullRequest !== 0
-							// );
-							// $application = configuration.find(
-							// 	(c) => !c.repository.pullRequest || c.repository.pullRequest === 0
-							// );
+							$prApplication = configuration.filter((c) => c.general.pullRequest !== 0);
+							$application = configuration.find((c) => c.general.pullRequest === 0);
 							$initConf = JSON.parse(JSON.stringify($application));
 						} catch (error) {
 							browser && goto('/dashboard/applications', { replaceState: true });

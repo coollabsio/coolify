@@ -21,14 +21,8 @@
 					branch: $application.repository.branch
 				}
 			});
-			$prApplication = configuration.filter((c) => c.repository.pullRequest !== 0);
-			$application = configuration.find((c) => c.repository.pullRequest === 0);
-			// $prApplication = configuration.filter(
-			// 	(c) => c.repository.pullRequest && c.repository.pullRequest !== 0
-			// );
-			// $application = configuration.find(
-			// 	(c) => !c.repository.pullRequest || c.repository.pullRequest === 0
-			// );
+			$prApplication = configuration.filter((c) => c.general.pullRequest !== 0);
+			$application = configuration.find((c) => c.general.pullRequest === 0);
 			if (!$application) browser && goto('/dashboard/applications');
 		} catch (error) {
 			browser && goto('/dashboard/applications');

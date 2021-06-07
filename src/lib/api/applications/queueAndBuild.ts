@@ -20,6 +20,7 @@ export default async function (configuration, imageChanged) {
 			{ repoId: id, branch, deployId, organization, name, domain },
 			{ repoId: id, branch, deployId, organization, name, domain, progress: 'done' }
 		);
+
 		await updateServiceLabels(configuration);
 	} catch (error) {
 		await Deployment.findOneAndUpdate(
