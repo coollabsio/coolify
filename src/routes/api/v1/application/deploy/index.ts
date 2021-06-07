@@ -65,7 +65,7 @@ export async function post(request: Request) {
 			'repository.organization': organization,
 			'repository.name': name,
 			'repository.branch': branch,
-			'general.pullRequest': 0,
+			'general.pullRequest': { '$in': [null, 0] },
 		},
 			{ ...configuration },
 			{ upsert: true, new: true })
