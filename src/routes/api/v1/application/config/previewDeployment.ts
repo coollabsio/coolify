@@ -14,7 +14,6 @@ export async function post(request: Request) {
 			'repository.organization': organization,
 			'repository.branch': branch
 		}, { $set: { 'general.isPreviewDeploymentEnabled': isPreviewDeploymentEnabled, 'general.pullRequest': 0 } }, { new: true }).select('-_id -__v -createdAt -updatedAt')
-		await updateServiceLabels(configuration);
 		if (!isPreviewDeploymentEnabled) {
 			const found = await Configuration.find({
 				'repository.name': name,
@@ -45,6 +44,7 @@ export async function post(request: Request) {
 				}
 			};
 		}
+		updateServiceLabels(configuration);
 		return {
 			status: 200,
 			body: {
