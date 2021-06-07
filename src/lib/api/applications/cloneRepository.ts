@@ -37,8 +37,8 @@ export default async function (configuration) {
 		await execShellAsync(
 			`mkdir -p ${workdir} && git clone -q -b ${branch} https://x-access-token:${token}@github.com/${organization}/${name}.git ${workdir}/`
 		);
-		// if (isPreviewDeploymentEnabled && pullRequest && pullRequest !== 0) {
-			if (isPreviewDeploymentEnabled && pullRequest !== 0) {
+
+		if (isPreviewDeploymentEnabled && pullRequest && pullRequest !== 0) {
 			await execShellAsync(`cd ${workdir} && git pull origin pull/${pullRequest}/head`)
 		}
 		configuration.build.container.tag = (
