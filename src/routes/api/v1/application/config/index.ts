@@ -5,17 +5,17 @@ import type { Request } from '@sveltejs/kit';
 export async function post(request: Request) {
 	const { name, organization, branch }: any = request.body || {};
 	if (name && organization && branch) {
-		const configurationFound = await Configuration.findOne({
+		const configurationFound = await Configuration.find({
 			'repository.name': name,
 			'repository.organization': organization,
-			'repository.branch': branch,
-		}).lean()
+			'repository.branch': branch
+		}).select('-_id -__v -createdAt -updatedAt')
+
 		if (configurationFound) {
 			return {
 				status: 200,
 				body: {
-					success: true,
-					...configurationFound
+					configuration: [...configurationFound]
 				}
 			};
 		}
@@ -46,6 +46,7 @@ export async function post(request: Request) {
 			}
 			return null;
 		});
+
 		if (found) {
 			return {
 				status: 200,

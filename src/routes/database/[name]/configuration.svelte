@@ -67,9 +67,7 @@
 		<div class="pb-2 pt-5 space-y-4">
 			<div class="text-2xl font-bold border-gradient w-32">Database</div>
 			<div class="flex items-center pt-4">
-				{#if $database.config.general.type !== 'redis'}
-					<div class="font-bold w-64 text-warmGray-400">Connection string</div>
-				{/if}
+				<div class="font-bold w-64 text-warmGray-400">Connection string</div>
 				{#if $database.config.general.type === 'mongodb'}
 					<PasswordField
 						value={`mongodb://${$database.envs.MONGODB_USERNAME}:${$database.envs.MONGODB_PASSWORD}@${$database.config.general.deployId}:27017/${$database.envs.MONGODB_DATABASE}`}
@@ -85,6 +83,10 @@
 				{:else if $database.config.general.type === 'couchdb'}
 					<PasswordField
 						value={`http://${$database.envs.COUCHDB_USER}:${$database.envs.COUCHDB_PASSWORD}@${$database.config.general.deployId}:5984`}
+					/>
+				{:else if $database.config.general.type === 'redis'}
+					<PasswordField
+						value={`redis://${$database.envs.REDIS_PASSWORD}@${$database.config.general.deployId}:6379`}
 					/>
 				{:else if $database.config.general.type === 'clickhouse'}
 					<!-- {JSON.stringify($database)} -->

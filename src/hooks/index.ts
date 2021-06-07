@@ -80,9 +80,10 @@ async function connectMongoDB() {
 				'repository.name': application.configuration.repository.name,
 				'repository.organization': application.configuration.repository.organization,
 				'repository.branch': application.configuration.repository.branch,
+				'publish.domain': application.configuration.publish.domain
 			}, {
 				...application.configuration
-			}, { upsert: true })
+			}, { upsert: true, new: true })
 		}
 	} catch (error) {
 		console.log(error)
@@ -90,12 +91,24 @@ async function connectMongoDB() {
 })()
 
 
-export async function handle({ request, render }) {
+export async function handle({ request, resolve }) {
 	const { SECRETS_ENCRYPTION_KEY } = process.env;
-	const session = initializeSession(request.headers, {
-		secret: SECRETS_ENCRYPTION_KEY,
-		cookie: { path: '/' }
-	});
+	let session;
+	try {
+		session = initializeSession(request.headers, {
+			secret: SECRETS_ENCRYPTION_KEY,
+			cookie: { path: '/' }
+		});
+	} catch(error) {
+		return {
+			status: 302,
+			headers: {
+				'set-cookie': 'kit.session=deleted;path=/;expires=Wed, 21 Oct 2015 07:28:00 GMT',
+				location: '/'
+			}
+		};
+	}
+
 	request.locals.session = session;
 	if (session?.data?.coolToken) {
 		try {
@@ -105,7 +118,7 @@ export async function handle({ request, render }) {
 			request.locals.session.destroy = true;
 		}
 	}
-	const response = await render(request);
+	const response = await resolve(request);
 	if (!session['set-cookie']) {
 		if (!session?.data?.coolToken && !publicPages.includes(request.path)) {
 			return {

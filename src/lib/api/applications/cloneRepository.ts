@@ -4,7 +4,7 @@ import { execShellAsync } from '../common';
 export default async function (configuration) {
 	try {
 		const { GITHUB_APP_PRIVATE_KEY } = process.env;
-		const { workdir } = configuration.general;
+		const { workdir, isPreviewDeploymentEnabled, pullRequest } = configuration.general;
 		const { organization, name, branch } = configuration.repository;
 		const github = configuration.github;
 		if (!github.installation.id || !github.app.id) {
@@ -37,8 +37,12 @@ export default async function (configuration) {
 		await execShellAsync(
 			`mkdir -p ${workdir} && git clone -q -b ${branch} https://x-access-token:${token}@github.com/${organization}/${name}.git ${workdir}/`
 		);
+
+		if (isPreviewDeploymentEnabled && pullRequest && pullRequest !== 0) {
+			await execShellAsync(`cd ${workdir} && git fetch origin pull/${pullRequest}/head:pull_${pullRequest} && git checkout pull_${pullRequest}`)
+		}
 		configuration.build.container.tag = (
-			await execShellAsync(`cd ${configuration.general.workdir}/ && git rev-parse HEAD`)
+			await execShellAsync(`cd ${workdir}/ && git rev-parse HEAD`)
 		)
 			.replace('\n', '')
 			.slice(0, 7);

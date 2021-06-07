@@ -1,7 +1,7 @@
 <script>
 	import { toast } from '@zerodevx/svelte-toast';
 	import templates from '$lib/api/applications/packs/templates';
-	import { application, dashboard } from '$store';
+	import { application, dashboard, initConf, prApplication } from '$store';
 	import General from '$components/Application/ActiveTab/General.svelte';
 	import Secrets from '$components/Application/ActiveTab/Secrets.svelte';
 	import Loading from '$components/Loading.svelte';
@@ -9,17 +9,18 @@
 	import { page, session } from '$app/stores';
 	import { request } from '$lib/request';
 	import { browser } from '$app/env';
+	import PullRequests from './ActiveTab/PullRequests.svelte';
 
 	let activeTab = {
 		general: true,
-		buildStep: false,
-		secrets: false
+		secrets: false,
+		pullRequests: false
 	};
 	function activateTab(tab) {
 		if (activeTab.hasOwnProperty(tab)) {
 			activeTab = {
 				general: false,
-				buildStep: false,
+				pullRequests: false,
 				secrets: false
 			};
 			activeTab[tab] = true;
@@ -48,16 +49,7 @@
 			}
 			return;
 		}
-		if ($page.path !== '/application/new') {
-			const config = await request(`/api/v1/application/config`, $session, {
-				body: {
-					name: $application.repository.name,
-					organization: $application.repository.organization,
-					branch: $application.repository.branch
-				}
-			});
-			$application = { ...config };
-		} else {
+		if ($page.path === '/application/new') {
 			try {
 				const dir = await request(
 					`https://api.github.com/repos/${$application.repository.organization}/${$application.repository.name}/contents/?ref=${$application.repository.branch}`,
@@ -103,17 +95,18 @@
 					$application.build.pack = 'rust';
 					browser && toast.push(`Rust language detected. Default values set.`);
 				} else if (requirementsTXT) {
-					$application.build.pack = 'python'
+					$application.build.pack = 'python';
 					browser && toast.push('Python language detected. Default values set.');
 				} else if (Dockerfile) {
 					$application.build.pack = 'docker';
 					browser && toast.push('Custom Dockerfile found. Build pack set to docker.');
-				} 
+				}
 			} catch (error) {
 				// Nothing detected
 			}
 		}
 	}
+
 </script>
 
 {#await load()}
@@ -135,6 +128,15 @@
 			>
 				Secrets
 			</div>
+			{#if $application.general.isPreviewDeploymentEnabled}
+				<div
+					on:click={() => activateTab('pullRequests')}
+					class:text-green-500={activeTab.pullRequests}
+					class="px-3 py-2 cursor-pointer hover:bg-warmGray-700 rounded-lg transition duration-100"
+				>
+					Pull Requests
+				</div>
+			{/if}
 		</nav>
 	</div>
 	<div class="max-w-4xl mx-auto">
@@ -143,6 +145,8 @@
 				<General />
 			{:else if activeTab.secrets}
 				<Secrets />
+			{:else if activeTab.pullRequests && $page.path !== '/application/new'}
+				<PullRequests />
 			{/if}
 		</div>
 	</div>

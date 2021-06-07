@@ -36,6 +36,8 @@ export type Application = {
 		deployId: string;
 		nickname: string;
 		workdir: string;
+		isPreviewDeploymentEnabled: boolean;
+		pullRequest: number;
 	};
 	build: {
 		pack: string;

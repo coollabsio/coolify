@@ -10,9 +10,8 @@ function getUniq() {
 }
 
 export function setDefaultConfiguration(configuration) {
-	const nickname = getUniq();
+	const nickname = configuration.general.nickname || getUniq();
 	const deployId = cuid();
-
 	const shaBase = JSON.stringify({ repository: configuration.repository });
 	const sha256 = crypto.createHash('sha256').update(shaBase).digest('hex');
 
@@ -21,12 +20,14 @@ export function setDefaultConfiguration(configuration) {
 	configuration.general.nickname = nickname;
 	configuration.general.deployId = deployId;
 	configuration.general.workdir = `/tmp/${deployId}`;
-
+	if (configuration.general.isPreviewDeploymentEnabled && configuration.general.pullRequest !== 0) {
+		configuration.build.container.name = `pr${configuration.general.pullRequest}-${sha256.slice(0, 8)}`
+		configuration.publish.domain = `pr${configuration.general.pullRequest}.${configuration.publish.domain}`
+	}
 	if (!configuration.publish.path) configuration.publish.path = '/';
 	if (!configuration.publish.port) {
 		if (
 			configuration.build.pack === 'nodejs' ||
-			configuration.build.pack === 'vuejs' ||
 			configuration.build.pack === 'nuxtjs' ||
 			configuration.build.pack === 'rust' ||
 			configuration.build.pack === 'nextjs' ||
@@ -74,20 +75,23 @@ export function setDefaultConfiguration(configuration) {
 	return configuration;
 }
 
-export async function precheckDeployment({ services, configuration }) {
+export async function precheckDeployment(configuration) {
+	const services = (await docker.engine.listServices()).filter(
+		(r) => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application' && JSON.parse(r.Spec.Labels.configuration).publish.domain === configuration.publish.domain
+	);
 	let foundService = false;
 	let configChanged = false;
 	let imageChanged = false;
-
 	let forceUpdate = false;
-
 	for (const service of services) {
 		const running = JSON.parse(service.Spec.Labels.configuration);
 		if (running) {
+
 			if (
 				running.repository.id === configuration.repository.id &&
 				running.repository.branch === configuration.repository.branch
 			) {
+				foundService = true;
 				// Base service configuration changed
 				if (
 					!running.build.container.baseSHA ||
@@ -107,9 +111,32 @@ export async function precheckDeployment({ services, configuration }) {
 						(n) =>
 							n.DesiredState !== 'Running' && n.Image.split(':')[1] === running.build.container.tag
 					);
-				if (isError.length > 0) forceUpdate = true;
-				foundService = true;
+				if (isError.length > 0) {
+					forceUpdate = true;
+				}
 
+				const compareObjects = (a, b) => {
+					if (a === b) return true;
+				   
+					if (typeof a != 'object' || typeof b != 'object' || a == null || b == null) return false;
+				   
+					let keysA = Object.keys(a), keysB = Object.keys(b);
+				   
+					if (keysA.length != keysB.length) return false;
+				   
+					for (let key of keysA) {
+					  if (!keysB.includes(key)) return false;
+				   
+					  if (typeof a[key] === 'function' || typeof b[key] === 'function') {
+						if (a[key].toString() != b[key].toString()) return false;
+					  } else {
+						if (!compareObjects(a[key], b[key])) return false;
+					  }
+					}
+				   
+					return true;
+				   }
+				   
 				const runningWithoutContainer = JSON.parse(JSON.stringify(running));
 				delete runningWithoutContainer.build.container;
 
@@ -118,16 +145,19 @@ export async function precheckDeployment({ services, configuration }) {
 
 				// If only the configuration changed
 				if (
-					JSON.stringify(runningWithoutContainer.build) !==
-					JSON.stringify(configurationWithoutContainer.build) ||
-					JSON.stringify(runningWithoutContainer.publish) !==
-					JSON.stringify(configurationWithoutContainer.publish)
-				)
+					!compareObjects(runningWithoutContainer.build,configurationWithoutContainer.build) ||
+					!compareObjects(runningWithoutContainer.publish,configurationWithoutContainer.publish) ||
+					runningWithoutContainer.general.isPreviewDeploymentEnabled !==
+					configurationWithoutContainer.general.isPreviewDeploymentEnabled
+				){
 					configChanged = true;
+				}
+			
 				// If only the image changed
 				if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true;
 				// If build pack changed, forceUpdate the service
 				if (running.build.pack !== configuration.build.pack) forceUpdate = true;
+				if (configuration.general.isPreviewDeploymentEnabled && configuration.general.pullRequest !== 0) forceUpdate = true
 			}
 		}
 	}
@@ -144,28 +174,5 @@ export async function precheckDeployment({ services, configuration }) {
 }
 
 export async function updateServiceLabels(configuration) {
-	// In case of any failure during deployment, still update the current configuration.
-	const services = (await docker.engine.listServices()).filter(
-		(r) => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application'
-	);
-	const found = services.find((s) => {
-		const config = JSON.parse(s.Spec.Labels.configuration);
-		if (
-			config.repository.id === configuration.repository.id &&
-			config.repository.branch === configuration.repository.branch
-		) {
-			return config;
-		}
-		return null;
-	});
-	if (found) {
-		const { ID } = found;
-		const Labels = { ...JSON.parse(found.Spec.Labels.configuration), ...configuration };
-		await execShellAsync(
-			`docker service update --label-add configuration='${JSON.stringify(
-				Labels
-			)}' --label-add com.docker.stack.image='${configuration.build.container.name}:${configuration.build.container.tag
-			}' ${ID}`
-		);
-	}
+	return await execShellAsync(`docker service update --label-add configuration='${JSON.stringify(configuration)}' ${configuration.build.container.name}_${configuration.build.container.name}`)
 }

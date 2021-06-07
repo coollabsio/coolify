@@ -4,11 +4,16 @@ import Deployment from '$models/Deployment';
 import { docker } from '$lib/api/docker';
 import { precheckDeployment, setDefaultConfiguration } from '$lib/api/applications/configuration';
 import cloneRepository from '$lib/api/applications/cloneRepository';
-import { cleanupTmp } from '$lib/api/common';
+import { cleanupTmp, execShellAsync } from '$lib/api/common';
 import queueAndBuild from '$lib/api/applications/queueAndBuild';
 import Configuration from '$models/Configuration';
+import ApplicationLog from '$models/ApplicationLog';
+import { cleanupStuckedDeploymentsInDB } from '$lib/api/applications/cleanup';
 export async function post(request: Request) {
 	let configuration;
+	const allowedGithubEvents = ['push', 'pull_request']
+	const allowedPRActions = ['opened', , 'reopened', 'synchronize', 'closed']
+	const githubEvent = request.headers['x-github-event']
 	const { GITHUP_APP_WEBHOOK_SECRET } = process.env;
 	const hmac = crypto.createHmac('sha256', GITHUP_APP_WEBHOOK_SECRET);
 	const digest = Buffer.from(
@@ -20,52 +25,92 @@ export async function post(request: Request) {
 		return {
 			status: 500,
 			body: {
-				error: 'Invalid request'
+				error: 'Invalid request.'
 			}
 		};
 	}
 
-	if (request.headers['x-github-event'] !== 'push') {
+	if (!allowedGithubEvents.includes(githubEvent)) {
 		return {
 			status: 500,
 			body: {
-				error: 'Not a push event.'
+				error: 'Event not allowed.'
 			}
 		};
 	}
+
 	try {
-		const services = (await docker.engine.listServices()).filter(
-			(r) => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application'
-		);
-
-		configuration = services.find((r) => {
-			if (request.body.ref.startsWith('refs')) {
-				const branch = request.body.ref.split('/')[2];
-				if (
-					JSON.parse(r.Spec.Labels.configuration).repository.id === request.body.repository.id &&
-					JSON.parse(r.Spec.Labels.configuration).repository.branch === branch
-				) {
-					return r;
+		const applications = await Configuration.find({
+			'repository.id': request.body.repository.id,
+		}).select('-_id -__v -createdAt -updatedAt')
+		if (githubEvent === 'push') {
+			configuration = applications.find((r) => {
+				if (request.body.ref.startsWith('refs')) {
+					if (r.repository.branch === request.body.ref.split('/')[2]) {
+						return r;
+					}
 				}
+				return null;
+			});
+		} else if (githubEvent === 'pull_request') {
+			if (!allowedPRActions.includes(request.body.action)) {
+				return {
+					status: 500,
+					body: {
+						error: 'PR action is not allowed.'
+					}
+				};
 			}
-
-			return null;
-		});
-		configuration = setDefaultConfiguration(JSON.parse(configuration.Spec.Labels.configuration));
-
+			configuration = applications.find((r) => r.repository.branch === request.body['pull_request'].base.ref);
+			if (configuration) {
+				if (!configuration.general.isPreviewDeploymentEnabled) {
+					return {
+						status: 500,
+						body: {
+							error: 'PR deployments are not enabled.'
+						}
+					};
+				}
+				configuration.general.pullRequest = request.body.number
+			}
+		}
 		if (!configuration) {
 			return {
 				status: 500,
 				body: {
-					error: 'Whaaat?'
+					error: 'No configuration found.'
+				}
+			};
+		}
+		configuration = setDefaultConfiguration(configuration);
+		const { id, organization, name, branch } = configuration.repository;
+		const { domain } = configuration.publish;
+		const { deployId, nickname, pullRequest } = configuration.general;
+
+		if (request.body.action === 'closed') {
+			const deploys = await Deployment.find({ organization, branch, name, domain });
+			for (const deploy of deploys) {
+				await ApplicationLog.deleteMany({ deployId: deploy.deployId });
+				await Deployment.deleteMany({ deployId: deploy.deployId });
+			}
+			await Configuration.findOneAndRemove({
+				'repository.id': id,
+				'repository.organization': organization,
+				'repository.name': name,
+				'repository.branch': branch,
+				'general.pullRequest': pullRequest
+			})
+			await execShellAsync(`docker stack rm ${configuration.build.container.name}`);
+			return {
+				status: 200,
+				body: {
+					success: true,
+					message: 'Removed'
 				}
 			};
 		}
 		await cloneRepository(configuration);
-		const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment({
-			services,
-			configuration
-		});
+		const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment(configuration);
 		if (foundService && !forceUpdate && !imageChanged && !configChanged) {
 			cleanupTmp(configuration.general.workdir);
 			return {
@@ -77,11 +122,11 @@ export async function post(request: Request) {
 			};
 		}
 		const alreadyQueued = await Deployment.find({
-			repoId: configuration.repository.id,
-			branch: configuration.repository.branch,
-			organization: configuration.repository.organization,
-			name: configuration.repository.name,
-			domain: configuration.publish.domain,
+			repoId: id,
+			branch: branch,
+			organization: organization,
+			name: name,
+			domain: domain,
 			progress: { $in: ['queued', 'inprogress'] }
 		});
 		if (alreadyQueued.length > 0) {
@@ -93,9 +138,7 @@ export async function post(request: Request) {
 				}
 			};
 		}
-		const { id, organization, name, branch } = configuration.repository;
-		const { domain } = configuration.publish;
-		const { deployId, nickname } = configuration.general;
+
 		await new Deployment({
 			repoId: id,
 			branch,
@@ -105,14 +148,29 @@ export async function post(request: Request) {
 			name,
 			nickname
 		}).save();
-		await Configuration.findOneAndUpdate({
-			'repository.id': id,
-			'repository.organization': organization,
-			'repository.name': name,
-			'repository.branch': branch,
-		},
-			{ ...configuration },
-			{ upsert: true, new: true })
+
+
+		if (githubEvent === 'pull_request') {
+			await Configuration.findOneAndUpdate({
+				'repository.id': id,
+				'repository.organization': organization,
+				'repository.name': name,
+				'repository.branch': branch,
+				'general.pullRequest': pullRequest
+			},
+				{ ...configuration },
+				{ upsert: true, new: true })
+		} else {
+			await Configuration.findOneAndUpdate({
+				'repository.id': id,
+				'repository.organization': organization,
+				'repository.name': name,
+				'repository.branch': branch,
+				'general.pullRequest': { '$in': [null, 0] }
+			},
+				{ ...configuration },
+				{ upsert: true, new: true })
+		}
 
 		queueAndBuild(configuration, imageChanged);
 		return {
@@ -125,28 +183,40 @@ export async function post(request: Request) {
 			}
 		};
 	} catch (error) {
-		await Deployment.findOneAndUpdate(
-			{
-				repoId: configuration.repository.id,
-				branch: configuration.repository.branch,
-				organization: configuration.repository.organization,
-				name: configuration.repository.name,
-				domain: configuration.publish.domain
-			},
-			{
-				repoId: configuration.repository.id,
-				branch: configuration.repository.branch,
-				organization: configuration.repository.organization,
-				name: configuration.repository.name,
-				domain: configuration.publish.domain,
-				progress: 'failed'
-			}
-		);
+		console.log(error)
+		// console.log(configuration)
+		if (configuration) {
+			cleanupTmp(configuration.general.workdir);
+			await Deployment.findOneAndUpdate(
+				{
+					repoId: configuration.repository.id,
+					branch: configuration.repository.branch,
+					organization: configuration.repository.organization,
+					name: configuration.repository.name,
+					domain: configuration.publish.domain
+				},
+				{
+					repoId: configuration.repository.id,
+					branch: configuration.repository.branch,
+					organization: configuration.repository.organization,
+					name: configuration.repository.name,
+					domain: configuration.publish.domain,
+					progress: 'failed'
+				}
+			);
+		}
+
 		return {
 			status: 500,
 			body: {
 				error: error.message || error
 			}
 		};
+	} finally {
+		try {
+			await cleanupStuckedDeploymentsInDB();
+		} catch (error) {
+			console.log(error)
+		}
 	}
 }

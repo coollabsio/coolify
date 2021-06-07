@@ -10,7 +10,7 @@ import { saveAppLog } from './logging';
 export default async function (configuration, imageChanged) {
 	const { id, organization, name, branch } = configuration.repository;
 	const { domain } = configuration.publish;
-	const { deployId} = configuration.general;
+	const { deployId } = configuration.general;
 	try {
 		await saveAppLog(`${dayjs().format('YYYY-MM-DD HH:mm:ss.SSS')} Queued.`, configuration);
 		await copyFiles(configuration);
@@ -20,6 +20,7 @@ export default async function (configuration, imageChanged) {
 			{ repoId: id, branch, deployId, organization, name, domain },
 			{ repoId: id, branch, deployId, organization, name, domain, progress: 'done' }
 		);
+
 		await updateServiceLabels(configuration);
 	} catch (error) {
 		await Deployment.findOneAndUpdate(

@@ -8,17 +8,23 @@
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/env';
 	async function removeApplication() {
-		await request(`/api/v1/application/remove`, $session, {
-			body: {
-				organization: $application.repository.organization,
-				name: $application.repository.name,
-				branch: $application.repository.branch
-			}
-		});
+		const result = window.confirm(
+			"Are you sure? It will delete all deployments, including PR's - it's NOT reversible!"
+		);
+		if (result) {
+			await request(`/api/v1/application/remove`, $session, {
+				body: {
+					organization: $application.repository.organization,
+					name: $application.repository.name,
+					branch: $application.repository.branch,
+					domain: $application.publish.domain
+				}
+			});
 
-		browser && toast.push('Application removed.');
-		$application = JSON.parse(JSON.stringify(initialApplication));
-		browser && goto(`/dashboard/applications`, { replaceState: true });
+			browser && toast.push('Application removed.');
+			$application = JSON.parse(JSON.stringify(initialApplication));
+			browser && goto(`/dashboard/applications`, { replaceState: true });
+		}
 	}
 
 	onDestroy(() => {
@@ -50,6 +56,7 @@
 			// toast.push(error.error || error || 'Ooops something went wrong.');
 		}
 	}
+
 </script>
 
 <nav class="flex text-white justify-end items-center m-4 fixed right-0 top-0 space-x-4 z-50">

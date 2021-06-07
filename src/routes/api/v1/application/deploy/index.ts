@@ -1,32 +1,24 @@
 import type { Request } from '@sveltejs/kit';
 import Deployment from '$models/Deployment';
-import { docker } from '$lib/api/docker';
 import { precheckDeployment, setDefaultConfiguration } from '$lib/api/applications/configuration';
 import cloneRepository from '$lib/api/applications/cloneRepository';
 import { cleanupTmp } from '$lib/api/common';
 import queueAndBuild from '$lib/api/applications/queueAndBuild';
 import Configuration from '$models/Configuration';
-export async function post(request: Request) {
-	let configuration;
-	try {
-		const services = (await docker.engine.listServices()).filter(
-			(r) => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application'
-		);
-		configuration = setDefaultConfiguration(request.body);
 
-		if (!configuration) {
-			return {
-				status: 500,
-				body: {
-					error: 'Whaaat?'
-				}
-			};
-		}
+export async function post(request: Request) {
+	const configuration = setDefaultConfiguration(request.body);
+	if (!configuration) {
+		return {
+			status: 500,
+			body: {
+				error: 'Whaaat?'
+			}
+		};
+	}
+	try {
 		await cloneRepository(configuration);
-		const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment({
-			services,
-			configuration
-		});
+		const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment(configuration);
 		if (foundService && !forceUpdate && !imageChanged && !configChanged) {
 			cleanupTmp(configuration.general.workdir);
 			return {
@@ -56,7 +48,8 @@ export async function post(request: Request) {
 		}
 		const { id, organization, name, branch } = configuration.repository;
 		const { domain } = configuration.publish;
-		const { deployId, nickname } = configuration.general;
+		const { deployId, nickname, pullRequest } = configuration.general;
+
 		await new Deployment({
 			repoId: id,
 			branch,
@@ -66,11 +59,13 @@ export async function post(request: Request) {
 			name,
 			nickname
 		}).save();
+
 		await Configuration.findOneAndUpdate({
 			'repository.id': id,
 			'repository.organization': organization,
 			'repository.name': name,
 			'repository.branch': branch,
+			'general.pullRequest': 0,
 		},
 			{ ...configuration },
 			{ upsert: true, new: true })
@@ -86,6 +81,7 @@ export async function post(request: Request) {
 			}
 		};
 	} catch (error) {
+		console.log(error)
 		await Deployment.findOneAndUpdate(
 			{
 				repoId: configuration.repository.id,

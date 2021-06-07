@@ -84,13 +84,15 @@
 									deployment.progress !== 'failed'}
 								class:bg-warmGray-800={deployment.progress !== 'done' &&
 									deployment.progress !== 'failed'}
-								class:hover:bg-red-200={deployment.progress === 'failed'}
 								class:hover:border-red-500={deployment.progress === 'failed'}
 								on:click={() => goto(`./logs/${deployment.deployId}`)}
 							>
-								<div class="font-bold text-sm px-3 flex justify-center items-center">
-									{deployment.branch}
+							<div class="flex space-x-2 px-2">
+								<div class="font-bold text-sm flex justify-center items-center">
+									{deployment.branch} 
 								</div>
+								<div class="font-bold text-xs flex justify-center items-center text-warmGray-500">{deployment.isPr ? 'PR' : ''}</div>
+							</div>
 								<div class="flex-1" />
 								<div class="px-3 w-48">
 									<div

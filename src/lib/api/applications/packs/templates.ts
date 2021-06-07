@@ -46,6 +46,7 @@ const templates = {
 		pack: 'vuejs',
 		...defaultBuildAndDeploy,
 		directory: 'dist',
+		port: 80,
 		name: 'Vue'
 	},
 	gatsby: {

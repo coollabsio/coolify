@@ -20,7 +20,7 @@
 				', toolbar=0, menubar=0, status=0'
 		);
 		const timer = setInterval(() => {
-			if (newWindow.closed) {
+			if (newWindow?.closed) {
 				clearInterval(timer);
 				browser && location.reload()
 			}

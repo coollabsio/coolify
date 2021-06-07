@@ -1,14 +1,9 @@
 import { docker } from '$lib/api/docker';
 import type { Request } from '@sveltejs/kit';
-
+import Configuration from '$models/Configuration'
 export async function get(request: Request) {
+	// Should update this to get data from mongodb and update db with the currently running services on start!
 	const dockerServices = await docker.engine.listServices();
-	let applications: any = dockerServices.filter(
-		(r) =>
-			r.Spec.Labels.managedBy === 'coolify' &&
-			r.Spec.Labels.type === 'application' &&
-			r.Spec.Labels.configuration
-	);
 	let databases: any = dockerServices.filter(
 		(r) =>
 			r.Spec.Labels.managedBy === 'coolify' &&
@@ -21,15 +16,6 @@ export async function get(request: Request) {
 			r.Spec.Labels.type === 'service' &&
 			r.Spec.Labels.configuration
 	);
-	applications = applications.map((r) => {
-		if (JSON.parse(r.Spec.Labels.configuration)) {
-			return {
-				configuration: JSON.parse(r.Spec.Labels.configuration),
-				UpdatedAt: r.UpdatedAt
-			};
-		}
-		return {};
-	});
 	databases = databases.map((r) => {
 		if (JSON.parse(r.Spec.Labels.configuration)) {
 			return {
@@ -47,14 +33,23 @@ export async function get(request: Request) {
 		}
 		return {};
 	});
-	applications = [
-		...new Map(
-			applications.map((item) => [
-				item.configuration.publish.domain + item.configuration.publish.path,
-				item
-			])
-		).values()
-	];
+	const configurations = await Configuration.find({
+		'general.pullRequest': { '$in': [null, 0] }
+	}).select('-_id -__v -createdAt')
+	const applications = []
+	for (const configuration of configurations) {
+		const foundPRDeployments = await Configuration.find({
+			'repository.id': configuration.repository.id,
+			'repository.branch': configuration.repository.branch,
+			'general.pullRequest': { '$ne': 0 }
+		}).select('-_id -__v -createdAt')
+		const payload = {
+			configuration,
+			UpdatedAt: configuration.updatedAt,
+			prBuilds: foundPRDeployments.length > 0 ? true : false,
+		}
+		applications.push(payload)
+	}
 	return {
 		status: 200,
 		body: {

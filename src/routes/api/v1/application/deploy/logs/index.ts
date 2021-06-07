@@ -16,12 +16,12 @@ export async function get(request: Request) {
 			.select('-_id -__v -repoId')
 			.sort({ createdAt: 'desc' })
 			.limit(show);
-
 		const finalLogs = deploy.map((d) => {
 			const finalLogs = { ...d._doc };
 			const updatedAt = dayjs(d.updatedAt).utc();
 			finalLogs.took = updatedAt.diff(dayjs(d.createdAt)) / 1000;
 			finalLogs.since = updatedAt.fromNow();
+			finalLogs.isPr = d.domain.startsWith('pr')
 			return finalLogs;
 		});
 		return {

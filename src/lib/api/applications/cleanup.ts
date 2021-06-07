@@ -11,7 +11,8 @@ export async function deleteSameDeployments(configuration) {
 			const running = JSON.parse(s.Spec.Labels.configuration);
 			if (
 				running.repository.id === configuration.repository.id &&
-				running.repository.branch === configuration.repository.branch
+				running.repository.branch === configuration.repository.branch && 
+				running.publish.domain === configuration.publish.domain
 			) {
 				await execShellAsync(`docker stack rm ${s.Spec.Labels['com.docker.stack.namespace']}`);
 			}

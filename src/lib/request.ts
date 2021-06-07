@@ -63,7 +63,6 @@ export async function request(
 		} else {
 			if (response.headers.get('content-disposition')) {
 				const blob = await response.blob();
-				console.log(blob);
 				const link = document.createElement('a');
 				link.href = URL.createObjectURL(blob);
 				link.download = response.headers.get('content-disposition').split('=')[1] || 'backup.gz';
