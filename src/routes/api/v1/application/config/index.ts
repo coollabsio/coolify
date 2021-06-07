@@ -9,7 +9,7 @@ export async function post(request: Request) {
 			'repository.name': name,
 			'repository.organization': organization,
 			'repository.branch': branch
-		})
+		}).select('-_id -__v -createdAt -updatedAt')
 
 		if (configurationFound) {
 			return {

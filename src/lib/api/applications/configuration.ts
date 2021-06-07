@@ -90,6 +90,7 @@ export async function precheckDeployment(configuration) {
 	for (const service of services) {
 		const running = JSON.parse(service.Spec.Labels.configuration);
 		if (running) {
+
 			if (
 				running.repository.id === configuration.repository.id &&
 				running.repository.branch === configuration.repository.branch
@@ -116,7 +117,28 @@ export async function precheckDeployment(configuration) {
 				if (isError.length > 0) forceUpdate = true;
 				foundService = true;
 
-
+				const compareObjects = (a, b) => {
+					if (a === b) return true;
+				   
+					if (typeof a != 'object' || typeof b != 'object' || a == null || b == null) return false;
+				   
+					let keysA = Object.keys(a), keysB = Object.keys(b);
+				   
+					if (keysA.length != keysB.length) return false;
+				   
+					for (let key of keysA) {
+					  if (!keysB.includes(key)) return false;
+				   
+					  if (typeof a[key] === 'function' || typeof b[key] === 'function') {
+						if (a[key].toString() != b[key].toString()) return false;
+					  } else {
+						if (!compareObjects(a[key], b[key])) return false;
+					  }
+					}
+				   
+					return true;
+				   }
+				   
 				const runningWithoutContainer = JSON.parse(JSON.stringify(running));
 				delete runningWithoutContainer.build.container;
 
@@ -125,10 +147,8 @@ export async function precheckDeployment(configuration) {
 
 				// If only the configuration changed
 				if (
-					JSON.stringify(runningWithoutContainer.build) !==
-					JSON.stringify(configurationWithoutContainer.build) ||
-					JSON.stringify(runningWithoutContainer.publish) !==
-					JSON.stringify(configurationWithoutContainer.publish) ||
+					!compareObjects(runningWithoutContainer.build,configurationWithoutContainer.build) ||
+					!compareObjects(runningWithoutContainer.publish,configurationWithoutContainer.publish) ||
 					JSON.stringify(runningWithoutContainer.general.isPreviewDeploymentEnabled) !==
 					JSON.stringify(configurationWithoutContainer.general.isPreviewDeploymentEnabled)
 				)
