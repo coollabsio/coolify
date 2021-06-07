@@ -84,7 +84,6 @@
 									deployment.progress !== 'failed'}
 								class:bg-warmGray-800={deployment.progress !== 'done' &&
 									deployment.progress !== 'failed'}
-								class:hover:bg-red-200={deployment.progress === 'failed'}
 								class:hover:border-red-500={deployment.progress === 'failed'}
 								on:click={() => goto(`./logs/${deployment.deployId}`)}
 							>

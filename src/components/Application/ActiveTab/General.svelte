@@ -378,7 +378,7 @@
 								</span>
 							</button>
 							{#if loading.previewDeployment}
-								<div class="absolute left-0 bottom-0 -mb-4 -ml-2 text-xs font-bold">Loading...</div>
+								<div class="absolute left-0 bottom-0 -mb-4 -ml-2 text-xs font-bold">{$application.general.isPreviewDeploymentEnabled ? 'Enabling...' : 'Disabling...' }</div>
 							{/if}
 						</div>
 					{:else}

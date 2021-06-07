@@ -48,7 +48,7 @@ export async function post(request: Request) {
 		}
 		const { id, organization, name, branch } = configuration.repository;
 		const { domain } = configuration.publish;
-		const { deployId, nickname } = configuration.general;
+		const { deployId, nickname, pullRequest } = configuration.general;
 
 		await new Deployment({
 			repoId: id,
@@ -65,7 +65,7 @@ export async function post(request: Request) {
 			'repository.organization': organization,
 			'repository.name': name,
 			'repository.branch': branch,
-			'publish.domain': domain,
+			'general.pullRequest': 0,
 		},
 			{ ...configuration },
 			{ upsert: true, new: true })
