@@ -73,7 +73,11 @@ export default async function (configuration, imageChanged) {
 			`cat ${configuration.general.workdir}/stack.yml | docker stack deploy --prune -c - ${containerName}`
 		);
 	}
-	await delay(10000);
-	await purgeImagesContainers(configuration, true);
+	async function purgeImagesAsync(found) {
+		await delay(10000);
+		await purgeImagesContainers(found, true);
+	}
+	purgeImagesAsync(configuration)
+
 	await saveAppLog('### Published done!', configuration);
 }
