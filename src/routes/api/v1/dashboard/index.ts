@@ -36,7 +36,6 @@ export async function get(request: Request) {
 	const configurations = await Configuration.find({
 		'repository.pullRequest': { '$in': [null, 0] }
 	}).select('-_id -__v -createdAt')
-	console.log(configurations)
 	const applications = []
 	for (const configuration of configurations) {
 		const foundPRDeployments = await Configuration.find({
