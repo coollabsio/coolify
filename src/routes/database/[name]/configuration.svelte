@@ -86,7 +86,7 @@
 					/>
 				{:else if $database.config.general.type === 'redis'}
 					<PasswordField
-						value={`redis://${$database.config.password[0]}@${$database.config.general.deployId}:6379`}
+						value={`redis://${$database.envs.REDIS_PASSWORD}@${$database.config.general.deployId}:6379`}
 					/>
 				{:else if $database.config.general.type === 'clickhouse'}
 					<!-- {JSON.stringify($database)} -->
