@@ -34,14 +34,15 @@ export async function get(request: Request) {
 		return {};
 	});
 	const configurations = await Configuration.find({
-		'repository.pullRequest': 0
+		'repository.pullRequest': { '$in': [null, 0] }
 	}).select('-_id -__v -createdAt')
+	console.log(configurations)
 	const applications = []
 	for (const configuration of configurations) {
 		const foundPRDeployments = await Configuration.find({
-			'repository.id':configuration.repository.id,
-			'repository.branch':configuration.repository.branch,
-			'repository.pullRequest': {'$ne': 0}
+			'repository.id': configuration.repository.id,
+			'repository.branch': configuration.repository.branch,
+			'repository.pullRequest': { '$ne': 0 }
 		}).select('-_id -__v -createdAt')
 		const payload = {
 			configuration,

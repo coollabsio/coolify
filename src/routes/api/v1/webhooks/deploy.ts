@@ -169,7 +169,7 @@ export async function post(request: Request) {
 				'repository.organization': organization,
 				'repository.name': name,
 				'repository.branch': branch,
-				'repository.pullRequest': 0
+				'repository.pullRequest': { '$in': [null, 0] }
 			},
 				{ ...configuration },
 				{ upsert: true, new: true })
