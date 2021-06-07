@@ -12,7 +12,6 @@ function getUniq() {
 export function setDefaultConfiguration(configuration) {
 	const nickname = configuration.general.nickname || getUniq();
 	const deployId = cuid();
-
 	const shaBase = JSON.stringify({ repository: configuration.repository });
 	const sha256 = crypto.createHash('sha256').update(shaBase).digest('hex');
 

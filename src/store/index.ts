@@ -49,7 +49,8 @@ export const application = writable<Application>({
 		deployId: null,
 		nickname: null,
 		workdir: null,
-		isPreviewDeploymentEnabled: false
+		isPreviewDeploymentEnabled: false,
+		pullRequest: 0
 	},
 	build: {
 		pack: 'static',
@@ -94,14 +95,14 @@ export const initialApplication: Application = {
 		id: null,
 		organization: null,
 		name: null,
-		branch: null,
-		pullRequest: 0
+		branch: null
 	},
 	general: {
 		deployId: null,
 		nickname: null,
 		workdir: null,
-		isPreviewDeploymentEnabled: false
+		isPreviewDeploymentEnabled: false,
+		pullRequest: 0
 	},
 	build: {
 		pack: 'static',
