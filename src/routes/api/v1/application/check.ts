@@ -9,6 +9,7 @@ export async function post(request: Request) {
 		const { DOMAIN } = process.env;
 		const configuration = setDefaultConfiguration(request.body);
 		const configurationFound = await Configuration.find({
+			'repository.id': { '$ne': configuration.repository.id },
 			'publish.domain': configuration.publish.domain
 		})
 		if (configurationFound.length > 0 || configuration.publish.domain === DOMAIN) {
