@@ -144,6 +144,7 @@
 			loading.previewDeployment = true;
 			$application.general.isPreviewDeploymentEnabled =
 				!$application.general.isPreviewDeploymentEnabled;
+			$application.general.pullRequest = 0;
 			if ($page.path !== '/application/new') {
 				const config = await request(`/api/v1/application/config/previewDeployment`, $session, {
 					body: {

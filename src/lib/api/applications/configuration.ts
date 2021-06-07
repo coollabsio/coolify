@@ -21,7 +21,7 @@ export function setDefaultConfiguration(configuration) {
 	configuration.general.nickname = nickname;
 	configuration.general.deployId = deployId;
 	configuration.general.workdir = `/tmp/${deployId}`;
-		if (configuration.general.isPreviewDeploymentEnabled && configuration.general.pullRequest !== 0) {
+	if (configuration.general.isPreviewDeploymentEnabled && configuration.general.pullRequest !== 0) {
 		configuration.build.container.name = `pr${configuration.general.pullRequest}-${sha256.slice(0, 8)}`
 		configuration.publish.domain = `pr${configuration.general.pullRequest}.${configuration.publish.domain}`
 	}
