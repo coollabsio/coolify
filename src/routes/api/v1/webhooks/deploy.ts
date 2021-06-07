@@ -12,7 +12,7 @@ import { cleanupStuckedDeploymentsInDB } from '$lib/api/applications/cleanup';
 export async function post(request: Request) {
 	let configuration;
 	const allowedGithubEvents = ['push', 'pull_request']
-	const allowedPRActions = ['opened', ,'reopened', 'synchronize', 'closed']
+	const allowedPRActions = ['opened', , 'reopened', 'synchronize', 'closed']
 	const githubEvent = request.headers['x-github-event']
 	const { GITHUP_APP_WEBHOOK_SECRET } = process.env;
 	const hmac = crypto.createHmac('sha256', GITHUP_APP_WEBHOOK_SECRET);
@@ -84,9 +84,9 @@ export async function post(request: Request) {
 			};
 		}
 		configuration = setDefaultConfiguration(configuration);
-		const { id, organization, name, branch, pullRequest } = configuration.repository;
+		const { id, organization, name, branch } = configuration.repository;
 		const { domain } = configuration.publish;
-		const { deployId, nickname } = configuration.general;
+		const { deployId, nickname, pullRequest } = configuration.general;
 
 		if (request.body.action === 'closed') {
 			const deploys = await Deployment.find({ organization, branch, name, domain });
@@ -206,7 +206,7 @@ export async function post(request: Request) {
 				}
 			);
 		}
-		
+
 		return {
 			status: 500,
 			body: {

@@ -4,8 +4,8 @@ import { execShellAsync } from '../common';
 export default async function (configuration) {
 	try {
 		const { GITHUB_APP_PRIVATE_KEY } = process.env;
-		const { workdir, isPreviewDeploymentEnabled } = configuration.general;
-		const { organization, name, branch, pullRequest } = configuration.repository;
+		const { workdir, isPreviewDeploymentEnabled, pullRequest } = configuration.general;
+		const { organization, name, branch } = configuration.repository;
 		const github = configuration.github;
 		if (!github.installation.id || !github.app.id) {
 			throw new Error('Github installation ID is invalid.');

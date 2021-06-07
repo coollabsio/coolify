@@ -19,7 +19,7 @@ export async function post(request: Request) {
 		})
 		if (configurationFound) {
 			const id = configurationFound._id
-			if (configurationFound?.repository?.pullRequest === 0) {
+			if (configurationFound?.general?.pullRequest === 0) {
 				// Main deployment deletion request; deleting main + PRs
 				const allConfiguration = await Configuration.find({
 					'repository.name': name,
