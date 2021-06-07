@@ -80,6 +80,7 @@ async function connectMongoDB() {
 				'repository.name': application.configuration.repository.name,
 				'repository.organization': application.configuration.repository.organization,
 				'repository.branch': application.configuration.repository.branch,
+				'publish.domain': application.configuration.publish.domain
 			}, {
 				...application.configuration
 			}, { upsert: true, new: true })

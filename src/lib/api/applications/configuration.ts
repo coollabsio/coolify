@@ -156,29 +156,30 @@ export async function precheckDeployment(configuration) {
 }
 
 export async function updateServiceLabels(configuration) {
+	return await execShellAsync(`docker service update --label-add configuration='${JSON.stringify(configuration)}' ${configuration.build.container.name}_${configuration.build.container.name}`)
 	// In case of any failure during deployment, still update the current configuration.
-	const services = (await docker.engine.listServices()).filter(
-		(r) => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application'
-	);
-	const found = services.find((s) => {
-		const config = JSON.parse(s.Spec.Labels.configuration);
-		if (
-			config.repository.id === configuration.repository.id &&
-			config.repository.branch === configuration.repository.branch && 
-			config.repository.pullRequest === configuration.repository.pullRequest
-		) {
-			return config;
-		}
-		return null;
-	});
-	if (found) {
-		const { ID } = found;
-		const Labels = { ...JSON.parse(found.Spec.Labels.configuration), ...configuration };
-		await execShellAsync(
-			`docker service update --label-add configuration='${JSON.stringify(
-				Labels
-			)}' --label-add com.docker.stack.image='${configuration.build.container.name}:${configuration.build.container.tag
-			}' ${ID}`
-		);
-	}
+	// const services = (await docker.engine.listServices()).filter(
+	// 	(r) => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application'
+	// );
+	// const found = services.find((s) => {
+	// 	const config = JSON.parse(s.Spec.Labels.configuration);
+	// 	if (
+	// 		config.repository.id === configuration.repository.id &&
+	// 		config.repository.branch === configuration.repository.branch && 
+	// 		config.repository.pullRequest === configuration.repository.pullRequest
+	// 	) {
+	// 		return config;
+	// 	}
+	// 	return null;
+	// });
+	// if (found) {
+	// 	const { ID } = found;
+	// 	const Labels = { ...JSON.parse(found.Spec.Labels.configuration), ...configuration };
+	// 	await execShellAsync(
+	// 		`docker service update --label-add configuration='${JSON.stringify(
+	// 			Labels
+	// 		)}' --label-add com.docker.stack.image='${configuration.build.container.name}:${configuration.build.container.tag
+	// 		}' ${ID}`
+	// 	);
+	// }
 }

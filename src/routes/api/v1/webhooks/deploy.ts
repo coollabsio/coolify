@@ -8,6 +8,7 @@ import { cleanupTmp, execShellAsync } from '$lib/api/common';
 import queueAndBuild from '$lib/api/applications/queueAndBuild';
 import Configuration from '$models/Configuration';
 import ApplicationLog from '$models/ApplicationLog';
+import { cleanupStuckedDeploymentsInDB } from '$lib/api/applications/cleanup';
 export async function post(request: Request) {
 	let configuration;
 	const allowedGithubEvents = ['push', 'pull_request']
@@ -39,39 +40,21 @@ export async function post(request: Request) {
 	}
 
 	try {
-		const services = (await docker.engine.listServices()).filter(
-			(r) => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application'
-		);
+		const applications = await Configuration.find({
+			'repository.id': request.body.repository.id,
+		}).select('-_id -__v')
+
 		if (githubEvent === 'push') {
-			configuration = services.find((r) => {
+			configuration = applications.find((r) => {
 				if (request.body.ref.startsWith('refs')) {
-					const branch = request.body.ref.split('/')[2];
-					if (
-						JSON.parse(r.Spec.Labels.configuration).repository.id === request.body.repository.id &&
-						JSON.parse(r.Spec.Labels.configuration).repository.branch === branch
-					) {
+					if (r.repository.branch === request.body.ref.split('/')[2]) {
 						return r;
 					}
 				}
-
 				return null;
 			});
 		} else if (githubEvent === 'pull_request') {
-			configuration = services.find((r) => {
-				if (
-					JSON.parse(r.Spec.Labels.configuration).repository.id === request.body.repository.id &&
-					JSON.parse(r.Spec.Labels.configuration).repository.branch === request.body['pull_request'].base.ref
-				) {
-					return r;
-				}
-
-				return null;
-			});
-		}
-		const jsonConfiguration = JSON.parse(configuration.Spec.Labels.configuration)
-
-		if (githubEvent === 'pull_request') {
-			if (!allowedPRActions.includes(request.body.action)){
+			if (!allowedPRActions.includes(request.body.action)) {
 				return {
 					status: 500,
 					body: {
@@ -79,18 +62,20 @@ export async function post(request: Request) {
 					}
 				};
 			}
-			if (jsonConfiguration.general.isPreviewDeploymentEnabled) {
-				jsonConfiguration.repository.pullRequest = request.body.number
-			} else {
-				return {
-					status: 500,
-					body: {
-						error: 'PR deployments are not enabled.'
-					}
-				};
+			configuration = applications.find((r) => r.repository.branch === request.body['pull_request'].base.ref);
+			if (configuration) {
+				if (!configuration.general.isPreviewDeploymentEnabled) {
+					return {
+						status: 500,
+						body: {
+							error: 'PR deployments are not enabled.'
+						}
+					};
+				}
+				configuration.repository.pullRequest = request.body.number
 			}
 		}
-		configuration = setDefaultConfiguration(jsonConfiguration);
+		configuration = setDefaultConfiguration(configuration);
 
 		if (!configuration) {
 			return {
@@ -100,9 +85,11 @@ export async function post(request: Request) {
 				}
 			};
 		}
+
 		const { id, organization, name, branch, pullRequest } = configuration.repository;
 		const { domain } = configuration.publish;
 		const { deployId, nickname } = configuration.general;
+
 		if (request.body.action === 'closed') {
 			const deploys = await Deployment.find({ organization, branch, name, domain });
 			for (const deploy of deploys) {
@@ -137,13 +124,12 @@ export async function post(request: Request) {
 				}
 			};
 		}
-
 		const alreadyQueued = await Deployment.find({
-			repoId: configuration.repository.id,
-			branch: configuration.repository.branch,
-			organization: configuration.repository.organization,
-			name: configuration.repository.name,
-			domain: configuration.publish.domain,
+			repoId: id,
+			branch: branch,
+			organization: organization,
+			name: name,
+			domain: domain,
 			progress: { $in: ['queued', 'inprogress'] }
 		});
 		if (alreadyQueued.length > 0) {
@@ -165,6 +151,7 @@ export async function post(request: Request) {
 			name,
 			nickname
 		}).save();
+
 
 		if (githubEvent === 'pull_request') {
 			await Configuration.findOneAndUpdate({
@@ -224,5 +211,11 @@ export async function post(request: Request) {
 				error: error.message || error
 			}
 		};
+	} finally {
+		try {
+			await cleanupStuckedDeploymentsInDB();
+		} catch (error) {
+			console.log(error)
+		}
 	}
 }
