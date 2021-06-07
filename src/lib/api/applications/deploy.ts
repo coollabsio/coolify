@@ -42,12 +42,8 @@ export default async function (configuration, imageChanged) {
 							'`) && PathPrefix(`' +
 							configuration.publish.path +
 							'`)',
-						'traefik.http.routers.' +
-							containerName +
-							'.tls.certresolver=letsencrypt',
-						'traefik.http.routers.' +
-							containerName +
-							'.middlewares=global-compress'
+						'traefik.http.routers.' + containerName + '.tls.certresolver=letsencrypt',
+						'traefik.http.routers.' + containerName + '.middlewares=global-compress'
 					]
 				}
 			}
@@ -76,7 +72,7 @@ export default async function (configuration, imageChanged) {
 		await delay(10000);
 		await purgeImagesContainers(found, true);
 	}
-	purgeImagesAsync(configuration)
+	purgeImagesAsync(configuration);
 
 	await saveAppLog('### Published done!', configuration);
 }

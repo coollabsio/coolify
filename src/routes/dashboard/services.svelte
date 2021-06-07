@@ -49,6 +49,15 @@
 										/>
 										<div class="text-white font-bold">Plausible Analytics</div>
 									</div>
+									{:else if service.serviceName == 'nocodb'}
+									<div>
+										<img
+											alt="nocodedb"
+											class="w-10 absolute top-0 left-0 -m-6"
+											src="https://cdn.coollabs.io/assets/coolify/services/nocodb/nocodb.png"
+										/>
+										<div class="text-white font-bold">NocoDB</div>
+									</div>
 								{/if}
 							</div>
 						</div>

@@ -92,7 +92,9 @@ body {
 input {
 	@apply text-sm rounded py-2 px-6 font-bold bg-warmGray-800 text-white transition duration-150 outline-none border border-transparent !important;
 }
-input:hover {
+input:hover,
+input:focus-visible,
+input:focus {
 	@apply bg-warmGray-700 !important;
 }
 textarea {
@@ -107,6 +109,7 @@ select {
 select:hover {
 	@apply bg-warmGray-700 !important;
 }
+
 label {
 	@apply text-left text-base font-bold text-warmGray-400 !important;
 }
@@ -115,6 +118,11 @@ button {
 }
 .button {
 	@apply rounded text-sm font-bold transition-all duration-100 !important;
+}
+
+.button:focus-visible,
+.button:focus {
+	@apply bg-warmGray-700 !important;
 }
 .h-271 {
 	min-height: 271px !important;

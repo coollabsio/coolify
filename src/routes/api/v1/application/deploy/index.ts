@@ -18,7 +18,9 @@ export async function post(request: Request) {
 	}
 	try {
 		await cloneRepository(configuration);
-		const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment(configuration);
+		const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment(
+			configuration
+		);
 		if (foundService && !forceUpdate && !imageChanged && !configChanged) {
 			cleanupTmp(configuration.general.workdir);
 			return {
@@ -60,15 +62,17 @@ export async function post(request: Request) {
 			nickname
 		}).save();
 
-		await Configuration.findOneAndUpdate({
-			'repository.id': id,
-			'repository.organization': organization,
-			'repository.name': name,
-			'repository.branch': branch,
-			'general.pullRequest': { '$in': [null, 0] },
-		},
+		await Configuration.findOneAndUpdate(
+			{
+				'repository.id': id,
+				'repository.organization': organization,
+				'repository.name': name,
+				'repository.branch': branch,
+				'general.pullRequest': { $in: [null, 0] }
+			},
 			{ ...configuration },
-			{ upsert: true, new: true })
+			{ upsert: true, new: true }
+		);
 
 		queueAndBuild(configuration, imageChanged);
 		return {
@@ -81,7 +85,7 @@ export async function post(request: Request) {
 			}
 		};
 	} catch (error) {
-		console.log(error)
+		console.log(error);
 		await Deployment.findOneAndUpdate(
 			{
 				repoId: configuration.repository.id,

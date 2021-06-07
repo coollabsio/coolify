@@ -78,7 +78,7 @@ export const application = writable<Application>({
 		secrets: []
 	}
 });
-export const prApplication = writable([])
+export const prApplication = writable([]);
 
 export const initConf = writable({});
 
@@ -168,4 +168,4 @@ export const initialNewService = {
 	baseURL: null
 };
 
-export const isPullRequestPermissionsGranted = writable(false)
+export const isPullRequestPermissionsGranted = writable(false);

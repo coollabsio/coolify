@@ -4,7 +4,6 @@ import ApplicationLog from '$models/ApplicationLog';
 import dayjs from 'dayjs';
 import { version } from '../../../../package.json';
 
-
 function generateTimestamp() {
 	return `${dayjs().format('YYYY-MM-DD HH:mm:ss.SSS')} `;
 }

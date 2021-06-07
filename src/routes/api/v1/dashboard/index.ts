@@ -1,6 +1,6 @@
 import { docker } from '$lib/api/docker';
 import type { Request } from '@sveltejs/kit';
-import Configuration from '$models/Configuration'
+import Configuration from '$models/Configuration';
 export async function get(request: Request) {
 	// Should update this to get data from mongodb and update db with the currently running services on start!
 	const dockerServices = await docker.engine.listServices();
@@ -34,21 +34,21 @@ export async function get(request: Request) {
 		return {};
 	});
 	const configurations = await Configuration.find({
-		'general.pullRequest': { '$in': [null, 0] }
-	}).select('-_id -__v -createdAt')
-	const applications = []
+		'general.pullRequest': { $in: [null, 0] }
+	}).select('-_id -__v -createdAt');
+	const applications = [];
 	for (const configuration of configurations) {
 		const foundPRDeployments = await Configuration.find({
 			'repository.id': configuration.repository.id,
 			'repository.branch': configuration.repository.branch,
-			'general.pullRequest': { '$ne': 0 }
-		}).select('-_id -__v -createdAt')
+			'general.pullRequest': { $ne: 0 }
+		}).select('-_id -__v -createdAt');
 		const payload = {
 			configuration,
 			UpdatedAt: configuration.updatedAt,
-			prBuilds: foundPRDeployments.length > 0 ? true : false,
-		}
-		applications.push(payload)
+			prBuilds: foundPRDeployments.length > 0 ? true : false
+		};
+		applications.push(payload);
 	}
 	return {
 		status: 200,

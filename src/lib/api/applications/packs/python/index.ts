@@ -15,10 +15,7 @@ const publishPython = (configuration) => {
 };
 
 export default async function (configuration) {
-	await fs.writeFile(
-		`${configuration.general.workdir}/Dockerfile`,
-		publishPython(configuration)
-	);
+	await fs.writeFile(`${configuration.general.workdir}/Dockerfile`, publishPython(configuration));
 	const stream = await docker.engine.buildImage(
 		{ src: ['.'], context: configuration.general.workdir },
 		{ t: `${configuration.build.container.name}:${configuration.build.container.tag}` }

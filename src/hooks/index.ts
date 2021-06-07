@@ -31,11 +31,9 @@ async function connectMongoDB() {
 			);
 		}
 		console.log('Connected to mongodb.');
-
 	} catch (error) {
 		console.log(error);
 	}
-
 }
 
 (async () => {
@@ -48,7 +46,7 @@ async function connectMongoDB() {
 	try {
 		await cleanupStuckedDeploymentsInDB();
 	} catch (error) {
-		console.log(error)
+		console.log(error);
 	}
 	try {
 		const dockerServices = await docker.engine.listServices();
@@ -76,20 +74,23 @@ async function connectMongoDB() {
 			).values()
 		];
 		for (const application of applications) {
-			await Configuration.findOneAndUpdate({
-				'repository.name': application.configuration.repository.name,
-				'repository.organization': application.configuration.repository.organization,
-				'repository.branch': application.configuration.repository.branch,
-				'publish.domain': application.configuration.publish.domain
-			}, {
-				...application.configuration
-			}, { upsert: true, new: true })
+			await Configuration.findOneAndUpdate(
+				{
+					'repository.name': application.configuration.repository.name,
+					'repository.organization': application.configuration.repository.organization,
+					'repository.branch': application.configuration.repository.branch,
+					'publish.domain': application.configuration.publish.domain
+				},
+				{
+					...application.configuration
+				},
+				{ upsert: true, new: true }
+			);
 		}
 	} catch (error) {
-		console.log(error)
+		console.log(error);
 	}
-})()
-
+})();
 
 export async function handle({ request, resolve }) {
 	const { SECRETS_ENCRYPTION_KEY } = process.env;
@@ -99,7 +100,7 @@ export async function handle({ request, resolve }) {
 			secret: SECRETS_ENCRYPTION_KEY,
 			cookie: { path: '/' }
 		});
-	} catch(error) {
+	} catch (error) {
 		return {
 			status: 302,
 			headers: {

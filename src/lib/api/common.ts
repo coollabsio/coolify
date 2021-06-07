@@ -9,7 +9,7 @@ export function execShellAsync(cmd, opts = {}) {
 			shell.config.silent = true;
 			shell.exec(cmd, opts, async function (code, stdout, stderr) {
 				if (code !== 0) {
-					await saveServerLog({ message: JSON.stringify({ cmd, opts, code, stdout, stderr }) })
+					await saveServerLog({ message: JSON.stringify({ cmd, opts, code, stdout, stderr }) });
 					return reject(new Error(stderr));
 				}
 				return resolve(stdout);

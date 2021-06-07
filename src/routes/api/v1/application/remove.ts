@@ -16,25 +16,25 @@ export async function post(request: Request) {
 			'repository.name': name,
 			'repository.branch': branch,
 			'publish.domain': domain
-		})
+		});
 		if (configurationFound) {
-			const id = configurationFound._id
+			const id = configurationFound._id;
 			if (configurationFound?.general?.pullRequest === 0) {
 				// Main deployment deletion request; deleting main + PRs
 				const allConfiguration = await Configuration.find({
 					'repository.name': name,
 					'repository.organization': organization,
-					'repository.branch': branch,
-				})
+					'repository.branch': branch
+				});
 				for (const config of allConfiguration) {
 					await Configuration.findOneAndRemove({
 						'repository.name': config.repository.name,
 						'repository.organization': config.repository.organization,
-						'repository.branch': config.repository.branch,
-					})
+						'repository.branch': config.repository.branch
+					});
 					await execShellAsync(`docker stack rm ${config.build.container.name}`);
 				}
-				const deploys = await Deployment.find({ organization, branch, name })
+				const deploys = await Deployment.find({ organization, branch, name });
 				for (const deploy of deploys) {
 					await ApplicationLog.deleteMany({ deployId: deploy.deployId });
 					await Deployment.deleteMany({ deployId: deploy.deployId });
@@ -43,9 +43,9 @@ export async function post(request: Request) {
 				purgeImagesAsync(configurationFound);
 			} else {
 				// Delete only PRs
-				await Configuration.findByIdAndRemove(id)
+				await Configuration.findByIdAndRemove(id);
 				await execShellAsync(`docker stack rm ${configurationFound.build.container.name}`);
-				const deploys = await Deployment.find({ organization, branch, name, domain })
+				const deploys = await Deployment.find({ organization, branch, name, domain });
 				for (const deploy of deploys) {
 					await ApplicationLog.deleteMany({ deployId: deploy.deployId });
 					await Deployment.deleteMany({ deployId: deploy.deployId });
@@ -63,7 +63,7 @@ export async function post(request: Request) {
 			}
 		};
 	} catch (error) {
-		console.log(error)
+		console.log(error);
 		return {
 			status: 500,
 			error: {

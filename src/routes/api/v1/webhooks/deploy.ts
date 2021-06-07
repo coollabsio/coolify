@@ -11,9 +11,9 @@ import ApplicationLog from '$models/ApplicationLog';
 import { cleanupStuckedDeploymentsInDB } from '$lib/api/applications/cleanup';
 export async function post(request: Request) {
 	let configuration;
-	const allowedGithubEvents = ['push', 'pull_request']
-	const allowedPRActions = ['opened', , 'reopened', 'synchronize', 'closed']
-	const githubEvent = request.headers['x-github-event']
+	const allowedGithubEvents = ['push', 'pull_request'];
+	const allowedPRActions = ['opened', 'reopened', 'synchronize', 'closed'];
+	const githubEvent = request.headers['x-github-event'];
 	const { GITHUP_APP_WEBHOOK_SECRET } = process.env;
 	const hmac = crypto.createHmac('sha256', GITHUP_APP_WEBHOOK_SECRET);
 	const digest = Buffer.from(
@@ -41,8 +41,8 @@ export async function post(request: Request) {
 
 	try {
 		const applications = await Configuration.find({
-			'repository.id': request.body.repository.id,
-		}).select('-_id -__v -createdAt -updatedAt')
+			'repository.id': request.body.repository.id
+		}).select('-_id -__v -createdAt -updatedAt');
 		if (githubEvent === 'push') {
 			configuration = applications.find((r) => {
 				if (request.body.ref.startsWith('refs')) {
@@ -61,7 +61,9 @@ export async function post(request: Request) {
 					}
 				};
 			}
-			configuration = applications.find((r) => r.repository.branch === request.body['pull_request'].base.ref);
+			configuration = applications.find(
+				(r) => r.repository.branch === request.body['pull_request'].base.ref
+			);
 			if (configuration) {
 				if (!configuration.general.isPreviewDeploymentEnabled) {
 					return {
@@ -71,7 +73,7 @@ export async function post(request: Request) {
 						}
 					};
 				}
-				configuration.general.pullRequest = request.body.number
+				configuration.general.pullRequest = request.body.number;
 			}
 		}
 		if (!configuration) {
@@ -99,7 +101,7 @@ export async function post(request: Request) {
 				'repository.name': name,
 				'repository.branch': branch,
 				'general.pullRequest': pullRequest
-			})
+			});
 			await execShellAsync(`docker stack rm ${configuration.build.container.name}`);
 			return {
 				status: 200,
@@ -110,7 +112,9 @@ export async function post(request: Request) {
 			};
 		}
 		await cloneRepository(configuration);
-		const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment(configuration);
+		const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment(
+			configuration
+		);
 		if (foundService && !forceUpdate && !imageChanged && !configChanged) {
 			cleanupTmp(configuration.general.workdir);
 			return {
@@ -149,27 +153,30 @@ export async function post(request: Request) {
 			nickname
 		}).save();
 
-
 		if (githubEvent === 'pull_request') {
-			await Configuration.findOneAndUpdate({
-				'repository.id': id,
-				'repository.organization': organization,
-				'repository.name': name,
-				'repository.branch': branch,
-				'general.pullRequest': pullRequest
-			},
+			await Configuration.findOneAndUpdate(
+				{
+					'repository.id': id,
+					'repository.organization': organization,
+					'repository.name': name,
+					'repository.branch': branch,
+					'general.pullRequest': pullRequest
+				},
 				{ ...configuration },
-				{ upsert: true, new: true })
+				{ upsert: true, new: true }
+			);
 		} else {
-			await Configuration.findOneAndUpdate({
-				'repository.id': id,
-				'repository.organization': organization,
-				'repository.name': name,
-				'repository.branch': branch,
-				'general.pullRequest': { '$in': [null, 0] }
-			},
+			await Configuration.findOneAndUpdate(
+				{
+					'repository.id': id,
+					'repository.organization': organization,
+					'repository.name': name,
+					'repository.branch': branch,
+					'general.pullRequest': { $in: [null, 0] }
+				},
 				{ ...configuration },
-				{ upsert: true, new: true })
+				{ upsert: true, new: true }
+			);
 		}
 
 		queueAndBuild(configuration, imageChanged);
@@ -183,7 +190,7 @@ export async function post(request: Request) {
 			}
 		};
 	} catch (error) {
-		console.log(error)
+		console.log(error);
 		// console.log(configuration)
 		if (configuration) {
 			cleanupTmp(configuration.general.workdir);
@@ -216,7 +223,7 @@ export async function post(request: Request) {
 		try {
 			await cleanupStuckedDeploymentsInDB();
 		} catch (error) {
-			console.log(error)
+			console.log(error);
 		}
 	}
 }

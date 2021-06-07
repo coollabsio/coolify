@@ -1,7 +1,6 @@
 <script>
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-
 	import { fade } from 'svelte/transition';
 </script>
 
@@ -14,7 +13,7 @@
 	{#if $page.path === '/service/new'}
 		<div class="flex justify-center space-x-4 font-bold pb-6">
 			<div
-				class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-500 p-2 rounded bg-warmGray-800"
+				class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-500 p-2 rounded bg-warmGray-800 w-48"
 				on:click={() => goto('/service/new/plausible')}
 			>
 				<img
@@ -23,6 +22,18 @@
 					src="https://cdn.coollabs.io/assets/coolify/services/plausible/logo_sm.png"
 				/>
 				<div class="text-white">Plausible Analytics</div>
+			</div>
+			<div
+				class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-white p-2 rounded bg-warmGray-800 w-48"
+				on:click={() => goto('/service/new/nocodb')}
+			>
+				<img
+					alt="nocodb logo"
+					class="w-14 mx-auto pb-2"
+					src="https://cdn.coollabs.io/assets/coolify/services/nocodb/nocodb.png"
+				/>
+				<div class="flex-1" />
+				<div class="text-white">NocoDB</div>
 			</div>
 		</div>
 	{/if}

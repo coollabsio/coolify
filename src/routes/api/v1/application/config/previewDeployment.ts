@@ -9,26 +9,40 @@ import type { Request } from '@sveltejs/kit';
 export async function post(request: Request) {
 	const { name, organization, branch, isPreviewDeploymentEnabled }: any = request.body || {};
 	if (name && organization && branch) {
-		const configuration = await Configuration.findOneAndUpdate({
-			'repository.name': name,
-			'repository.organization': organization,
-			'repository.branch': branch
-		}, { $set: { 'general.isPreviewDeploymentEnabled': isPreviewDeploymentEnabled, 'general.pullRequest': 0 } }, { new: true }).select('-_id -__v -createdAt -updatedAt')
+		const configuration = await Configuration.findOneAndUpdate(
+			{
+				'repository.name': name,
+				'repository.organization': organization,
+				'repository.branch': branch
+			},
+			{
+				$set: {
+					'general.isPreviewDeploymentEnabled': isPreviewDeploymentEnabled,
+					'general.pullRequest': 0
+				}
+			},
+			{ new: true }
+		).select('-_id -__v -createdAt -updatedAt');
 		if (!isPreviewDeploymentEnabled) {
 			const found = await Configuration.find({
 				'repository.name': name,
 				'repository.organization': organization,
 				'repository.branch': branch,
-				'general.pullRequest': { '$ne': 0 }
-			})
+				'general.pullRequest': { $ne: 0 }
+			});
 			for (const prDeployment of found) {
 				await Configuration.findOneAndRemove({
 					'repository.name': name,
 					'repository.organization': organization,
 					'repository.branch': branch,
 					'publish.domain': prDeployment.publish.domain
-				})
-				const deploys = await Deployment.find({ organization, branch, name, domain: prDeployment.publish.domain });
+				});
+				const deploys = await Deployment.find({
+					organization,
+					branch,
+					name,
+					domain: prDeployment.publish.domain
+				});
 				for (const deploy of deploys) {
 					await ApplicationLog.deleteMany({ deployId: deploy.deployId });
 					await Deployment.deleteMany({ deployId: deploy.deployId });
@@ -51,7 +65,6 @@ export async function post(request: Request) {
 				success: true
 			}
 		};
-
 	}
 	return {
 		status: 500,

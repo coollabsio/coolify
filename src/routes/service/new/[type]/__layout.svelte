@@ -14,13 +14,11 @@
 	async function checkService() {
 		try {
 			const data = await request(`/api/v1/services/${$page.params.type}`, $session);
-			if (!data?.success) {
+			if (data?.success) {
 				if (browser) {
-					goto(`/dashboard/services`, { replaceState: true });
+					goto(`/service/${$page.params.type}/configuration`, { replaceState: true });
 					toast.push(
-						`${
-							$page.params.type === 'plausible' ? 'Plausible Analytics' : $page.params.type
-						} already deployed.`
+						`Service already deployed.`
 					);
 				}
 			}
