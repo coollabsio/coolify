@@ -1,7 +1,7 @@
 import { docker } from '$lib/api/docker';
 import { saveAppLog } from './logging';
 import { promises as fs } from 'fs';
-import { deleteSameDeployments } from './cleanup';
+import { deleteSameDeployments, purgeImagesContainers } from './cleanup';
 import yaml from 'js-yaml';
 import { delay, execShellAsync } from '../common';
 
@@ -73,6 +73,7 @@ export default async function (configuration, imageChanged) {
 			`cat ${configuration.general.workdir}/stack.yml | docker stack deploy --prune -c - ${containerName}`
 		);
 	}
-
+	await delay(10000);
+	await purgeImagesContainers(configuration, true);
 	await saveAppLog('### Published done!', configuration);
 }
