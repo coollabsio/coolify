@@ -93,10 +93,22 @@ async function connectMongoDB() {
 
 export async function handle({ request, resolve }) {
 	const { SECRETS_ENCRYPTION_KEY } = process.env;
-	const session = initializeSession(request.headers, {
-		secret: SECRETS_ENCRYPTION_KEY,
-		cookie: { path: '/' }
-	});
+	let session;
+	try {
+		session = initializeSession(request.headers, {
+			secret: SECRETS_ENCRYPTION_KEY,
+			cookie: { path: '/' }
+		});
+	} catch(error) {
+		return {
+			status: 302,
+			headers: {
+				'set-cookie': 'kit.session=deleted;path=/;expires=Wed, 21 Oct 2015 07:28:00 GMT',
+				location: '/'
+			}
+		};
+	}
+
 	request.locals.session = session;
 	if (session?.data?.coolToken) {
 		try {
