@@ -39,7 +39,9 @@ export default async function (configuration) {
 		);
 
 		if (isPreviewDeploymentEnabled && pullRequest && pullRequest !== 0) {
-			await execShellAsync(`cd ${workdir} && git fetch origin pull/${pullRequest}/head:pull_${pullRequest} && git checkout pull_${pullRequest}`)
+			await execShellAsync(
+				`cd ${workdir} && git fetch origin pull/${pullRequest}/head:pull_${pullRequest} && git checkout pull_${pullRequest}`
+			);
 		}
 		configuration.build.container.tag = (
 			await execShellAsync(`cd ${workdir}/ && git rev-parse HEAD`)

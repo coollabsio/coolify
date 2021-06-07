@@ -20,7 +20,7 @@ const ConfigurationSchema = new Schema({
 		nickname: { type: String, required: true },
 		workdir: { type: String, required: true },
 		isPreviewDeploymentEnabled: { type: Boolean, required: true, default: false },
-		pullRequest: { type: Number, required: true, default: 0 },
+		pullRequest: { type: Number, required: true, default: 0 }
 	},
 	build: {
 		pack: { type: String, required: true },
@@ -31,25 +31,25 @@ const ConfigurationSchema = new Schema({
 			start: { type: String },
 			python: {
 				module: { type: String },
-				instance: { type: String },
+				instance: { type: String }
 			}
-
 		},
 		container: {
 			name: { type: String, required: true },
 			tag: { type: String, required: true },
-			baseSHA: { type: String, required: true },
-		},
+			baseSHA: { type: String, required: true }
+		}
 	},
 	publish: {
 		directory: { type: String },
 		domain: { type: String, required: true },
 		path: { type: String },
 		port: { type: Number },
-		secrets: { type: Array },
+		secrets: { type: Array }
 	}
 });
 
 ConfigurationSchema.set('timestamps', true);
 
-export default mongoose.models['configuration'] || mongoose.model('configuration', ConfigurationSchema);
+export default mongoose.models['configuration'] ||
+	mongoose.model('configuration', ConfigurationSchema);

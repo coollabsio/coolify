@@ -16,7 +16,7 @@ export async function get(request: Request) {
 			body: { success: true, logs }
 		};
 	} catch (error) {
-		console.log(error)
+		console.log(error);
 		await saveServerLog(error);
 		return {
 			status: 500,

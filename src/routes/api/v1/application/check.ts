@@ -9,9 +9,9 @@ export async function post(request: Request) {
 		const { DOMAIN } = process.env;
 		const configuration = setDefaultConfiguration(request.body);
 		const configurationFound = await Configuration.find({
-			'repository.id': { '$ne': configuration.repository.id },
+			'repository.id': { $ne: configuration.repository.id },
 			'publish.domain': configuration.publish.domain
-		}).select('-_id -__v -createdAt -updatedAt')
+		}).select('-_id -__v -createdAt -updatedAt');
 		if (configurationFound.length > 0 || configuration.publish.domain === DOMAIN) {
 			return {
 				status: 200,
@@ -24,7 +24,7 @@ export async function post(request: Request) {
 		return {
 			status: 200,
 			body: { success: true, message: 'OK' }
-		}
+		};
 	} catch (error) {
 		await saveServerLog(error);
 		return {

@@ -49,8 +49,7 @@ export type Application = {
 			python: {
 				module?: string;
 				instance?: string;
-			}
-
+			};
 		};
 		container: {
 			name: string;

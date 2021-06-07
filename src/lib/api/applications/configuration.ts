@@ -21,8 +21,11 @@ export function setDefaultConfiguration(configuration) {
 	configuration.general.deployId = deployId;
 	configuration.general.workdir = `/tmp/${deployId}`;
 	if (configuration.general.isPreviewDeploymentEnabled && configuration.general.pullRequest !== 0) {
-		configuration.build.container.name = `pr${configuration.general.pullRequest}-${sha256.slice(0, 8)}`
-		configuration.publish.domain = `pr${configuration.general.pullRequest}.${configuration.publish.domain}`
+		configuration.build.container.name = `pr${configuration.general.pullRequest}-${sha256.slice(
+			0,
+			8
+		)}`;
+		configuration.publish.domain = `pr${configuration.general.pullRequest}.${configuration.publish.domain}`;
 	}
 	if (!configuration.publish.path) configuration.publish.path = '/';
 	if (!configuration.publish.port) {
@@ -59,11 +62,13 @@ export function setDefaultConfiguration(configuration) {
 		configuration.build.pack === 'nextjs' ||
 		configuration.build.pack === 'nestjs'
 	) {
-		if (!configuration.build.command.start) configuration.build.command.start = 'yarn start'
+		if (!configuration.build.command.start) configuration.build.command.start = 'yarn start';
 	}
 	if (configuration.build.pack === 'python') {
-		if (!configuration.build.command.python.module) configuration.build.command.python.module = 'main'
-		if (!configuration.build.command.python.instance) configuration.build.command.python.instance = 'app'
+		if (!configuration.build.command.python.module)
+			configuration.build.command.python.module = 'main';
+		if (!configuration.build.command.python.instance)
+			configuration.build.command.python.instance = 'app';
 	}
 
 	configuration.build.container.baseSHA = crypto
@@ -77,7 +82,10 @@ export function setDefaultConfiguration(configuration) {
 
 export async function precheckDeployment(configuration) {
 	const services = (await docker.engine.listServices()).filter(
-		(r) => r.Spec.Labels.managedBy === 'coolify' && r.Spec.Labels.type === 'application' && JSON.parse(r.Spec.Labels.configuration).publish.domain === configuration.publish.domain
+		(r) =>
+			r.Spec.Labels.managedBy === 'coolify' &&
+			r.Spec.Labels.type === 'application' &&
+			JSON.parse(r.Spec.Labels.configuration).publish.domain === configuration.publish.domain
 	);
 	let foundService = false;
 	let configChanged = false;
@@ -86,7 +94,6 @@ export async function precheckDeployment(configuration) {
 	for (const service of services) {
 		const running = JSON.parse(service.Spec.Labels.configuration);
 		if (running) {
-
 			if (
 				running.repository.id === configuration.repository.id &&
 				running.repository.branch === configuration.repository.branch
@@ -117,26 +124,27 @@ export async function precheckDeployment(configuration) {
 
 				const compareObjects = (a, b) => {
 					if (a === b) return true;
-				   
+
 					if (typeof a != 'object' || typeof b != 'object' || a == null || b == null) return false;
-				   
-					let keysA = Object.keys(a), keysB = Object.keys(b);
-				   
+
+					const keysA = Object.keys(a),
+						keysB = Object.keys(b);
+
 					if (keysA.length != keysB.length) return false;
-				   
-					for (let key of keysA) {
-					  if (!keysB.includes(key)) return false;
-				   
-					  if (typeof a[key] === 'function' || typeof b[key] === 'function') {
-						if (a[key].toString() != b[key].toString()) return false;
-					  } else {
-						if (!compareObjects(a[key], b[key])) return false;
-					  }
+
+					for (const key of keysA) {
+						if (!keysB.includes(key)) return false;
+
+						if (typeof a[key] === 'function' || typeof b[key] === 'function') {
+							if (a[key].toString() != b[key].toString()) return false;
+						} else {
+							if (!compareObjects(a[key], b[key])) return false;
+						}
 					}
-				   
+
 					return true;
-				   }
-				   
+				};
+
 				const runningWithoutContainer = JSON.parse(JSON.stringify(running));
 				delete runningWithoutContainer.build.container;
 
@@ -145,19 +153,23 @@ export async function precheckDeployment(configuration) {
 
 				// If only the configuration changed
 				if (
-					!compareObjects(runningWithoutContainer.build,configurationWithoutContainer.build) ||
-					!compareObjects(runningWithoutContainer.publish,configurationWithoutContainer.publish) ||
+					!compareObjects(runningWithoutContainer.build, configurationWithoutContainer.build) ||
+					!compareObjects(runningWithoutContainer.publish, configurationWithoutContainer.publish) ||
 					runningWithoutContainer.general.isPreviewDeploymentEnabled !==
-					configurationWithoutContainer.general.isPreviewDeploymentEnabled
-				){
+						configurationWithoutContainer.general.isPreviewDeploymentEnabled
+				) {
 					configChanged = true;
 				}
-			
+
 				// If only the image changed
 				if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true;
 				// If build pack changed, forceUpdate the service
 				if (running.build.pack !== configuration.build.pack) forceUpdate = true;
-				if (configuration.general.isPreviewDeploymentEnabled && configuration.general.pullRequest !== 0) forceUpdate = true
+				if (
+					configuration.general.isPreviewDeploymentEnabled &&
+					configuration.general.pullRequest !== 0
+				)
+					forceUpdate = true;
 			}
 		}
 	}
@@ -174,5 +186,9 @@ export async function precheckDeployment(configuration) {
 }
 
 export async function updateServiceLabels(configuration) {
-	return await execShellAsync(`docker service update --label-add configuration='${JSON.stringify(configuration)}' ${configuration.build.container.name}_${configuration.build.container.name}`)
+	return await execShellAsync(
+		`docker service update --label-add configuration='${JSON.stringify(configuration)}' ${
+			configuration.build.container.name
+		}_${configuration.build.container.name}`
+	);
 }

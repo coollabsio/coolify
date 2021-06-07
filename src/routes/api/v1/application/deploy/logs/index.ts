@@ -21,7 +21,7 @@ export async function get(request: Request) {
 			const updatedAt = dayjs(d.updatedAt).utc();
 			finalLogs.took = updatedAt.diff(dayjs(d.createdAt)) / 1000;
 			finalLogs.since = updatedAt.fromNow();
-			finalLogs.isPr = d.domain.startsWith('pr')
+			finalLogs.isPr = d.domain.startsWith('pr');
 			return finalLogs;
 		});
 		return {
