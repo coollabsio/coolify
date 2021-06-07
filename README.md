@@ -16,7 +16,8 @@ Installation is automated with the following command:
 
 ## Features
 
-You can deploy any of the following applications, databases and services easily.
+- Deploy Pull Request automatically, so you can review them quickly!
+- You can deploy any of the following applications, databases and services easily.
 
 (constantly growing lists)
 
@@ -48,6 +49,7 @@ With Github integration
 ### Services
 
 - [Plausible Analytics](https://plausible.io)
+- [NocoDB](https://nocodb.com)
 
 ## Support
 
