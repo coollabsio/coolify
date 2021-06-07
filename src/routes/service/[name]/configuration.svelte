@@ -14,23 +14,14 @@
 			try {
 				service = await request(`/api/v1/services/${$page.params.name}`, $session);
 			} catch (error) {
-				browser && toast.push(`Cannot find service ${$page.params.name}?!`);
-				goto(`/dashboard/services`, { replaceState: true });
+				if (browser) {
+					toast.push(`Cannot find service ${$page.params.name}?!`);
+					goto(`/dashboard/services`, { replaceState: true });
+				}
 			}
 		}
 	}
-	async function activate() {
-		try {
-			await request(`/api/v1/services/deploy/${$page.params.name}/activate`, $session, {
-				method: 'PATCH',
-				body: {}
-			});
-			browser && toast.push(`All users are activated for Plausible.`);
-		} catch (error) {
-			console.log(error);
-			browser && toast.push(`Ooops, there was an error activating users for Plausible?!`);
-		}
-	}
+
 </script>
 
 {#await loadServiceConfig()}
@@ -38,7 +29,12 @@
 {:then}
 	<div class="min-h-full text-white">
 		<div class="py-5 text-left px-6 text-3xl tracking-tight font-bold flex items-center">
-			<div>{$page.params.name === 'plausible' ? 'Plausible Analytics' : $page.params.name}</div>
+			{#if $page.params.name === 'plausible'}
+				<div>Plausible Analytics</div>
+			{:else if $page.params.name === 'nocodb'}
+				<div>NocoDB</div>
+			{/if}
+
 			<div class="px-4">
 				{#if $page.params.name === 'plausible'}
 					<img
@@ -46,37 +42,38 @@
 						class="w-6 mx-auto"
 						src="https://cdn.coollabs.io/assets/coolify/services/plausible/logo_sm.png"
 					/>
+				{:else if $page.params.name === 'nocodb'}
+					<img
+						alt="nocodb logo"
+						class="w-8 mx-auto"
+						src="https://cdn.coollabs.io/assets/coolify/services/nocodb/nocodb.png"
+					/>
 				{/if}
 			</div>
-			<a
-			target="_blank"
-			class="icon mx-2"
-			href={service.config.baseURL}
-		>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="h-6 w-6"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke="currentColor"
+			<a target="_blank" class="icon mx-2" href={service.config.baseURL}>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-6 w-6"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+					/>
+				</svg></a
 			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					stroke-width="2"
-					d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-				/>
-			</svg></a
-		>
-
-
-
 		</div>
 	</div>
 	<div class="space-y-2 max-w-4xl mx-auto px-6" in:fade={{ duration: 100 }}>
 		<div class="block text-center py-4">
 			{#if $page.params.name === 'plausible'}
 				<Plausible {service} />
+			{:else if $page.params.name === 'nocodb'}
+				<div class="font-bold">Nothing to show here. Enjoy using NocoDB!</div>
 			{/if}
 		</div>
 	</div>

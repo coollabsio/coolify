@@ -10,7 +10,7 @@
 	import TooltipInfo from '$components/TooltipInfo.svelte';
 	import { browser } from '$app/env';
 
-	$: deployable =
+	$: deployablePlausible =
 		$newService.baseURL === '' ||
 		$newService.baseURL === null ||
 		$newService.email === '' ||
@@ -22,7 +22,7 @@
 		$newService.userPassword.length <= 6 ||
 		$newService.userPassword !== $newService.userPasswordAgain;
 	let loading = false;
-	async function deploy() {
+	async function deployPlausible() {
 		try {
 			loading = true;
 			const payload = $newService;
@@ -44,6 +44,30 @@
 			loading = false;
 		}
 	}
+	async function deployNocodb() {
+
+		try {
+			loading = true;
+			await request(`/api/v1/services/deploy/${$page.params.type}`, $session, {
+				body: {
+					baseURL: $newService.baseURL
+				}
+			});
+			if (browser) {
+				toast.push(
+					'Service deployment queued.<br><br><br>It could take 2-5 minutes to be ready, be patient and grab a coffee/tea!',
+					{ duration: 4000 }
+				);
+				goto(`/dashboard/services`, { replaceState: true });
+			}
+		} catch (error) {
+			console.log(error);
+			browser && toast.push('Oops something went wrong. See console.log.');
+		} finally {
+			loading = false;
+		}
+	}
+
 </script>
 
 <div class="min-h-full text-white">
@@ -51,18 +75,20 @@
 		Deploy new
 		{#if $page.params.type === 'plausible'}
 			<span class="text-blue-500 px-2 capitalize">Plausible Analytics</span>
+		{:else if $page.params.type === 'nocodb'}
+			<span class="text-blue-500 px-2 capitalize">NocoDB</span>
 		{/if}
 	</div>
 </div>
 {#if loading}
 	<Loading />
-{:else}
+{:else if $page.params.type === 'plausible'}
 	<div class="space-y-2 max-w-4xl mx-auto px-6 flex-col text-center" in:fade={{ duration: 100 }}>
 		<div class="grid grid-flow-row">
 			<label for="Domain"
 				>Domain <TooltipInfo
 					position="right"
-					label={`You will have your Plausible instance at here.`}
+					label={`You could reach your Plausible Analytics instance here.`}
 				/></label
 			>
 			<input
@@ -114,15 +140,39 @@
 			/>
 		</div>
 		<button
-			disabled={deployable}
-			class:cursor-not-allowed={deployable}
-			class:bg-blue-500={!deployable}
-			class:hover:bg-blue-400={!deployable}
-			class:hover:bg-transparent={deployable}
-			class:text-warmGray-700={deployable}
-			class:text-white={!deployable}
+			disabled={deployablePlausible}
+			class:cursor-not-allowed={deployablePlausible}
+			class:bg-blue-500={!deployablePlausible}
+			class:hover:bg-blue-400={!deployablePlausible}
+			class:hover:bg-transparent={deployablePlausible}
+			class:text-warmGray-700={deployablePlausible}
+			class:text-white={!deployablePlausible}
 			class="button p-2"
-			on:click={deploy}
+			on:click={deployPlausible}
+		>
+			Deploy
+		</button>
+	</div>
+{:else if $page.params.type === 'nocodb'}
+	<div class="space-y-2 max-w-xl mx-auto px-6 flex-col text-center" in:fade={{ duration: 100 }}>
+		<div class="grid grid-flow-row pb-5">
+			<label for="Domain"
+				>Domain <TooltipInfo
+					position="right"
+					label={`You could reach your NocoDB instance here.`}
+				/></label
+			>
+			<input
+				id="Domain"
+				class:border-red-500={$newService.baseURL == null || $newService.baseURL == ''}
+				bind:value={$newService.baseURL}
+				placeholder="nocodb.coollabs.io"
+			/>
+		</div>
+
+		<button
+			class="button p-2 w-64 bg-blue-500 hover:bg-blue-400 text-white"
+			on:click={deployNocodb}
 		>
 			Deploy
 		</button>

@@ -18,9 +18,7 @@
 				if (browser) {
 					goto(`/dashboard/services`, { replaceState: true });
 					toast.push(
-						`${
-							$page.params.type === 'plausible' ? 'Plausible Analytics' : $page.params.type
-						} already deployed.`
+						`Service already deployed.`
 					);
 				}
 			}

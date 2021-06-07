@@ -4,6 +4,7 @@ import type { Request } from '@sveltejs/kit';
 
 export async function get(request: Request) {
 	const { serviceName } = request.params;
+
 	try {
 		const service = (await docker.engine.listServices()).find(
 			(r) =>
