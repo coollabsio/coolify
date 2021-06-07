@@ -43,7 +43,7 @@ export async function post(request: Request) {
 		const applications = await Configuration.find({
 			'repository.id': request.body.repository.id,
 		}).select('-_id -__v')
-
+		// console.log(applications)
 		if (githubEvent === 'push') {
 			configuration = applications.find((r) => {
 				if (request.body.ref.startsWith('refs')) {
@@ -75,17 +75,15 @@ export async function post(request: Request) {
 				configuration.repository.pullRequest = request.body.number
 			}
 		}
-		configuration = setDefaultConfiguration(configuration);
-
 		if (!configuration) {
 			return {
 				status: 500,
 				body: {
-					error: 'Whaaat?'
+					error: 'No configuration found.'
 				}
 			};
 		}
-
+		configuration = setDefaultConfiguration(configuration);
 		const { id, organization, name, branch, pullRequest } = configuration.repository;
 		const { domain } = configuration.publish;
 		const { deployId, nickname } = configuration.general;
@@ -187,24 +185,28 @@ export async function post(request: Request) {
 		};
 	} catch (error) {
 		console.log(error)
-		cleanupTmp(configuration.general.workdir);
-		await Deployment.findOneAndUpdate(
-			{
-				repoId: configuration.repository.id,
-				branch: configuration.repository.branch,
-				organization: configuration.repository.organization,
-				name: configuration.repository.name,
-				domain: configuration.publish.domain
-			},
-			{
-				repoId: configuration.repository.id,
-				branch: configuration.repository.branch,
-				organization: configuration.repository.organization,
-				name: configuration.repository.name,
-				domain: configuration.publish.domain,
-				progress: 'failed'
-			}
-		);
+		// console.log(configuration)
+		if (configuration) {
+			cleanupTmp(configuration.general.workdir);
+			await Deployment.findOneAndUpdate(
+				{
+					repoId: configuration.repository.id,
+					branch: configuration.repository.branch,
+					organization: configuration.repository.organization,
+					name: configuration.repository.name,
+					domain: configuration.publish.domain
+				},
+				{
+					repoId: configuration.repository.id,
+					branch: configuration.repository.branch,
+					organization: configuration.repository.organization,
+					name: configuration.repository.name,
+					domain: configuration.publish.domain,
+					progress: 'failed'
+				}
+			);
+		}
+		
 		return {
 			status: 500,
 			body: {
