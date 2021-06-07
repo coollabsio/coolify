@@ -42,7 +42,7 @@ export async function post(request: Request) {
 	try {
 		const applications = await Configuration.find({
 			'repository.id': request.body.repository.id,
-		}).select('-_id -__v')
+		}).select('-_id -__v -createdAt -updatedAt')
 		if (githubEvent === 'push') {
 			configuration = applications.find((r) => {
 				if (request.body.ref.startsWith('refs')) {
