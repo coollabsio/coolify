@@ -67,7 +67,10 @@
 				console.log(error);
 				return false;
 			}
-			if (installations.length === 0) return
+			if (installations.length === 0) {
+				loading.github = false;
+				return false;
+			}
 			$application.github.installation.id = installations[0].id;
 			$application.github.app.id = installations[0].app_id;
 			$githubInstallations = installations[0];
