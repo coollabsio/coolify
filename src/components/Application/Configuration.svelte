@@ -68,7 +68,7 @@
 				return false;
 			}
 			if (installations.length === 0) {
-				relogin = true;
+				loading.github = false;
 				return false;
 			}
 			$application.github.installation.id = installations[0].id;
