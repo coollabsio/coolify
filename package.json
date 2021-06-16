@@ -21,7 +21,6 @@
 		"@typescript-eslint/parser": "^4.26.1",
 		"autoprefixer": "^10.2.6",
 		"cssnano": "^5.0.5",
-		"dotenv-extended": "^2.9.0",
 		"eslint": "^7.28.0",
 		"eslint-config-prettier": "^8.3.0",
 		"eslint-plugin-svelte3": "^3.2.0",
@@ -38,6 +37,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"dotenv-extended": "^2.9.0",
 		"@iarna/toml": "^2.2.5",
 		"@zerodevx/svelte-toast": "^0.3.0",
 		"commander": "^7.2.0",
