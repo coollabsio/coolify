@@ -21,6 +21,8 @@
 		$newService.userPassword === null ||
 		$newService.userPassword.length <= 6 ||
 		$newService.userPassword !== $newService.userPasswordAgain;
+
+	$: deployableNocoDB = $newService.baseURL === '' || $newService.baseURL === null;
 	let loading = false;
 	async function deployPlausible() {
 		try {
@@ -45,7 +47,6 @@
 		}
 	}
 	async function deployNocodb() {
-
 		try {
 			loading = true;
 			await request(`/api/v1/services/deploy/${$page.params.type}`, $session, {
@@ -163,6 +164,13 @@
 				/></label
 			>
 			<input
+				disabled={deployableNocoDB}
+				class:cursor-not-allowed={deployableNocoDB}
+				class:bg-blue-500={!deployableNocoDB}
+				class:hover:bg-blue-400={!deployableNocoDB}
+				class:hover:bg-transparent={deployableNocoDB}
+				class:text-warmGray-700={deployableNocoDB}
+				class:text-white={!deployableNocoDB}
 				id="Domain"
 				class:border-red-500={$newService.baseURL == null || $newService.baseURL == ''}
 				bind:value={$newService.baseURL}
