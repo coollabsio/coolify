@@ -1,5 +1,6 @@
 import type { Request } from '@sveltejs/kit';
 import yaml from 'js-yaml';
+import generator from 'generate-password';
 import { promises as fs } from 'fs';
 import { docker } from '$lib/api/docker';
 import { baseServiceConfiguration } from '$lib/api/applications/common';
@@ -11,6 +12,14 @@ export async function post(request: Request) {
 	baseURL = `https://${baseURL}`;
 	const workdir = '/tmp/minio';
 	const deployId = 'minio';
+	const secrets = [
+		{ name: 'MINIO_ROOT_USER', value: generator.generate({ length: 12, numbers: true, strict: true }) },
+		{ name: 'MINIO_ROOT_PASSWORD', value: generator.generate({ length: 24, numbers: true, strict: true }) }
+
+	];
+	const generateEnvsMinIO = {};
+	for (const secret of secrets) generateEnvsMinIO[secret.name] = secret.value;
+
 	const stack = {
 		version: '3.8',
 		services: {
@@ -18,6 +27,7 @@ export async function post(request: Request) {
 				image: 'minio/minio',
 				command: 'server /data',
 				networks: [`${docker.network}`],
+				environment: generateEnvsMinIO,
 				volumes: [`${deployId}-minio-data:/data`],
 				deploy: {
 					...baseServiceConfiguration,
@@ -26,17 +36,18 @@ export async function post(request: Request) {
 						'type=service',
 						'serviceName=minio',
 						'configuration=' +
-							JSON.stringify({
-								baseURL
-							}),
+						JSON.stringify({
+							baseURL,
+							generateEnvsMinIO
+						}),
 						'traefik.enable=true',
 						'traefik.http.services.' + deployId + '.loadbalancer.server.port=9000',
 						'traefik.http.routers.' + deployId + '.entrypoints=websecure',
 						'traefik.http.routers.' +
-							deployId +
-							'.rule=Host(`' +
-							traefikURL +
-							'`) && PathPrefix(`/`)',
+						deployId +
+						'.rule=Host(`' +
+						traefikURL +
+						'`) && PathPrefix(`/`)',
 						'traefik.http.routers.' + deployId + '.tls.certresolver=letsencrypt',
 						'traefik.http.routers.' + deployId + '.middlewares=global-compress'
 					]
