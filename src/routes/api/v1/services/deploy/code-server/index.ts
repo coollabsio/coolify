@@ -11,13 +11,22 @@ export async function post(request: Request) {
 	baseURL = `https://${baseURL}`;
 	const workdir = '/tmp/code-server';
 	const deployId = 'code-server';
+	const environment = [
+		{ name: 'DOCKER_USER', value: 'root' }
+
+	];
+	const generateEnvsCodeServer = {};
+	for (const env of environment) generateEnvsCodeServer[env.name] = env.value;
+
 	const stack = {
 		version: '3.8',
 		services: {
 			[deployId]: {
 				image: 'codercom/code-server',
+				command: 'code-server --disable-telemetry',
 				networks: [`${docker.network}`],
 				volumes: [`${deployId}-code-server-data:/home/coder`],
+				environment: generateEnvsCodeServer,
 				deploy: {
 					...baseServiceConfiguration,
 					labels: [
