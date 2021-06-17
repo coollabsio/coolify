@@ -24,6 +24,7 @@
 
 	$: deployableNocoDB = $newService.baseURL === '' || $newService.baseURL === null;
 	$: deployableCodeServer = $newService.baseURL === '' || $newService.baseURL === null;
+	$: deployableMinIO = $newService.baseURL === '' || $newService.baseURL === null;
 
 	let loading = false;
 	async function deployPlausible() {
@@ -92,6 +93,28 @@
 			loading = false;
 		}
 	}
+	async function deployMinIO() {
+		try {
+			loading = true;
+			await request(`/api/v1/services/deploy/${$page.params.type}`, $session, {
+				body: {
+					baseURL: $newService.baseURL
+				}
+			});
+			if (browser) {
+				toast.push(
+					'Service deployment queued.<br><br><br>It could take 2-5 minutes to be ready, be patient and grab a coffee/tea!',
+					{ duration: 4000 }
+				);
+				goto(`/dashboard/services`, { replaceState: true });
+			}
+		} catch (error) {
+			console.log(error);
+			browser && toast.push('Oops something went wrong. See console.log.');
+		} finally {
+			loading = false;
+		}
+	}
 
 </script>
 
@@ -102,8 +125,10 @@
 			<span class="text-blue-500 px-2 capitalize">Plausible Analytics</span>
 		{:else if $page.params.type === 'nocodb'}
 			<span class="text-blue-500 px-2 capitalize">NocoDB</span>
-			{:else if $page.params.type === 'code-server'}
+		{:else if $page.params.type === 'code-server'}
 			<span class="text-blue-500 px-2 capitalize">VSCode Server</span>
+		{:else if $page.params.type === 'minio'}
+			<span class="text-blue-500 px-2 capitalize">MinIO</span>
 		{/if}
 	</div>
 </div>
@@ -238,6 +263,37 @@
 			class:text-white={!deployableCodeServer}
 			class="button p-2 w-64 bg-blue-500 hover:bg-blue-400 text-white"
 			on:click={deployCodeServer}
+		>
+			Deploy
+		</button>
+	</div>
+{:else if $page.params.type === 'minio'}
+	<div class="space-y-2 max-w-xl mx-auto px-6 flex-col text-center" in:fade={{ duration: 100 }}>
+		<div class="grid grid-flow-row pb-5">
+			<label for="Domain"
+				>Domain <TooltipInfo
+					position="right"
+					label={`You could reach your MinIO instance here.`}
+				/></label
+			>
+			<input
+				id="Domain"
+				class:border-red-500={$newService.baseURL == null || $newService.baseURL == ''}
+				bind:value={$newService.baseURL}
+				placeholder="minio.coollabs.io"
+			/>
+		</div>
+
+		<button
+			disabled={deployableMinIO}
+			class:cursor-not-allowed={deployableMinIO}
+			class:bg-blue-500={!deployableMinIO}
+			class:hover:bg-blue-400={!deployableMinIO}
+			class:hover:bg-transparent={deployableMinIO}
+			class:text-warmGray-700={deployableMinIO}
+			class:text-white={!deployableMinIO}
+			class="button p-2 w-64 bg-blue-500 hover:bg-blue-400 text-white"
+			on:click={deployMinIO}
 		>
 			Deploy
 		</button>

@@ -66,6 +66,16 @@
 
 										<div class="text-white font-bold">VSCode Server</div>
 									</div>
+									{:else if service.serviceName == 'minio'}
+									<div>
+										<img
+											alt="minio"
+											class="w-7 absolute top-0 left-0 -my-7 -mx-3"
+											src="https://cdn.coollabs.io/assets/coolify/services/minio/MINIO_Bird.png"
+										/>
+
+										<div class="text-white font-bold">MinIO</div>
+									</div>
 								{/if}
 							</div>
 						</div>

@@ -36,6 +36,8 @@
 				<div>NocoDB</div>
 			{:else if $page.params.name === 'code-server'}
 				<div>VSCode Server</div>
+			{:else if $page.params.name === 'minio'}
+				<div>MinIO</div>
 			{/if}
 
 			<div class="px-4">
@@ -67,6 +69,12 @@
 							fill="#3c99d4"
 						/>
 					</svg>
+				{:else if $page.params.name === 'minio'}
+					<img
+						alt="minio logo"
+						class="w-7 mx-auto"
+						src="https://cdn.coollabs.io/assets/coolify/services/minio/MINIO_Bird.png"
+					/>
 				{/if}
 			</div>
 			<a target="_blank" class="icon mx-2" href={service.config.baseURL}>
@@ -95,6 +103,8 @@
 				<div class="font-bold">Nothing to show here. Enjoy using NocoDB!</div>
 			{:else if $page.params.name === 'code-server'}
 				<CodeServer {service} />
+			{:else if $page.params.name === 'minio'}
+				<div class="font-bold">Nothing to show here. Enjoy using MinIO!</div>
 			{/if}
 		</div>
 	</div>
