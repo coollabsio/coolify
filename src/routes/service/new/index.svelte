@@ -14,7 +14,7 @@
 	{#if $page.path === '/service/new'}
 		<div class="flex justify-center space-x-4 font-bold pb-6">
 			<div
-				class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-500 p-2 rounded bg-warmGray-800 w-48"
+				class="text-center flex-col items-center cursor-pointer ease-in-out  hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-500 p-2 rounded bg-warmGray-800 w-48"
 				on:click={() => goto('/service/new/plausible')}
 			>
 				<img
@@ -25,7 +25,7 @@
 				<div class="text-white">Plausible Analytics</div>
 			</div>
 			<div
-				class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-white p-2 rounded bg-warmGray-800 w-48"
+				class="text-center flex-col items-center cursor-pointer ease-in-out  hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-white p-2 rounded bg-warmGray-800 w-48"
 				on:click={() => goto('/service/new/nocodb')}
 			>
 				<img
@@ -37,7 +37,7 @@
 				<div class="text-white">NocoDB</div>
 			</div>
 			<div
-				class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-green-500 p-2 rounded bg-warmGray-800 w-48"
+				class="text-center flex-col items-center cursor-pointer ease-in-out  hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-green-500 p-2 rounded bg-warmGray-800 w-48"
 				on:click={() => goto('/service/new/code-server')}
 			>
 				<svg class="w-14 mx-auto pb-2" viewBox="0 0 128 128">
@@ -59,7 +59,7 @@
 				<div class="text-white">VSCode Server</div>
 			</div>
 			<div
-				class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-red-500 p-2 rounded bg-warmGray-800 w-48"
+				class="text-center flex-col items-center cursor-pointer ease-in-out  hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-red-500 p-2 rounded bg-warmGray-800 w-48"
 				on:click={() => goto('/service/new/minio')}
 			>
 				<img

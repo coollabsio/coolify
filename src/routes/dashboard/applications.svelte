@@ -37,7 +37,7 @@
 				{#each $dashboard.applications.deployed as application}
 					<div class="px-4 pb-4">
 						<div
-							class="relative rounded-xl p-6 bg-warmGray-800 border-2 border-dashed border-transparent hover:border-green-500 text-white shadow-md cursor-pointer ease-in-out transform hover:scale-105 duration-100 group"
+							class="relative rounded-xl p-6 bg-warmGray-800 border-2 border-dashed border-transparent hover:border-green-500 text-white shadow-md cursor-pointer ease-in-out hover:scale-105 duration-100 group"
 							on:click={() => {
 								goto(
 									`/application/${application.configuration.repository.organization}/${application.configuration.repository.name}/${application.configuration.repository.branch}/configuration`

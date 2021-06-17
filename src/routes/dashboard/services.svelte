@@ -37,7 +37,7 @@
 						on:click={() => goto(`/service/${service.serviceName}/configuration`)}
 					>
 						<div
-							class="relative rounded-xl p-6 bg-warmGray-800 border-2 border-dashed border-transparent hover:border-blue-500 text-white shadow-md cursor-pointer ease-in-out transform hover:scale-105 duration-100 group"
+							class="relative rounded-xl p-6 bg-warmGray-800 border-2 border-dashed border-transparent hover:border-blue-500 text-white shadow-md cursor-pointer ease-in-out hover:scale-105 duration-100 group"
 						>
 							<div class="flex items-center">
 								{#if service.serviceName == 'plausible'}

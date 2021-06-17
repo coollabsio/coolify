@@ -101,6 +101,7 @@ export async function handle({ request, resolve }) {
 			cookie: { path: '/' }
 		});
 	} catch (error) {
+		console.log(error)
 		return {
 			status: 302,
 			headers: {
