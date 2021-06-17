@@ -1,8 +1,6 @@
 <script>
 	import { browser } from '$app/env';
-
 	import { goto } from '$app/navigation';
-
 	import { page, session } from '$app/stores';
 	import Loading from '$components/Loading.svelte';
 	import { request } from '$lib/request';

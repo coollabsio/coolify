@@ -24,7 +24,7 @@
 
 <div class="text-center text-white">
 	<div class="text-2xl font-bold text-center pb-4">Choose your Git provider</div>
-	<button on:click={login} class="hover:scale-110 transform duration-100 transition">
+	<button on:click={login} class="hover:scale-110 duration-100 transition">
 		<svg
 			class="w-16"
 			xmlns="http://www.w3.org/2000/svg"

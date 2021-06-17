@@ -6,7 +6,7 @@
 	import { request } from '$lib/request';
 	import { page, session } from '$app/stores';
 	import PasswordField from '$components/PasswordField.svelte';
-import { browser } from '$app/env';
+	import { browser } from '$app/env';
 	export let service;
 	let loading = false;
 	async function activate() {
@@ -24,6 +24,7 @@ import { browser } from '$app/env';
 			loading = false;
 		}
 	}
+
 </script>
 
 {#if loading}

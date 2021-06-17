@@ -287,7 +287,7 @@
 </main>
 {#if upgradeAvailable && $page.path !== '/success' && $page.path !== '/'}
 	<footer
-		class="fixed bottom-0 right-0 p-4 px-6 w-auto rounded-tl text-white  hover:scale-110 transform transition duration-100"
+		class="fixed bottom-0 right-0 p-4 px-6 w-auto rounded-tl text-white  hover:scale-110  transition duration-100"
 	>
 		<div class="flex items-center">
 			<div />

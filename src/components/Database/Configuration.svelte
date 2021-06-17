@@ -45,7 +45,7 @@
 		{#if $page.path === '/database/new'}
 			<div class="flex justify-center space-x-4 font-bold pb-6">
 				<div
-					class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-green-600 p-2 rounded bg-warmGray-800 w-32"
+					class="text-center flex-col items-center cursor-pointer ease-in-out  hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-green-600 p-2 rounded bg-warmGray-800 w-32"
 					class:border-green-600={type === 'mongodb'}
 					on:click={() => (type = 'mongodb')}
 				>
@@ -55,7 +55,7 @@
 					<div class="text-white">MongoDB</div>
 				</div>
 				<div
-					class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-red-600 p-2 rounded bg-warmGray-800 w-32"
+					class="text-center flex-col items-center cursor-pointer ease-in-out  hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-red-600 p-2 rounded bg-warmGray-800 w-32"
 					class:border-red-600={type === 'couchdb'}
 					on:click={() => (type = 'couchdb')}
 				>
@@ -65,7 +65,7 @@
 					<div class="text-white">Couchdb</div>
 				</div>
 				<div
-					class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-600 p-2 rounded bg-warmGray-800 w-32"
+					class="text-center flex-col items-center cursor-pointer ease-in-out  hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-600 p-2 rounded bg-warmGray-800 w-32"
 					class:border-blue-600={type === 'postgresql'}
 					on:click={() => (type = 'postgresql')}
 				>
@@ -75,7 +75,7 @@
 					<div class="text-white">PostgreSQL</div>
 				</div>
 				<div
-					class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-orange-600 p-2 rounded bg-warmGray-800 w-32"
+					class="text-center flex-col items-center cursor-pointer ease-in-out  hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-orange-600 p-2 rounded bg-warmGray-800 w-32"
 					class:border-orange-600={type === 'mysql'}
 					on:click={() => (type = 'mysql')}
 				>
@@ -85,7 +85,7 @@
 					<div class="text-white">MySQL</div>
 				</div>
 				<div
-					class="text-center flex-col items-center cursor-pointer ease-in-out transform hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-red-600 p-2 rounded bg-warmGray-800 w-32"
+					class="text-center flex-col items-center cursor-pointer ease-in-out  hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-red-600 p-2 rounded bg-warmGray-800 w-32"
 					class:border-red-600={type === 'redis'}
 					on:click={() => (type = 'redis')}
 				>

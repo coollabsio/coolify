@@ -339,7 +339,7 @@
 							>
 								<span class="sr-only">Use setting</span>
 								<span
-									class="pointer-events-none relative inline-block h-5 w-5 rounded-full bg-white shadow transform transition ease-in-out duration-200"
+									class="pointer-events-none relative inline-block h-5 w-5 rounded-full bg-white shadow transition ease-in-out duration-200"
 									class:translate-x-5={$application.general.isPreviewDeploymentEnabled}
 									class:translate-x-0={!$application.general.isPreviewDeploymentEnabled}
 								>
@@ -588,7 +588,7 @@
 
 <style lang="postcss">
 	.buildpack {
-		@apply px-6 py-2 mx-2 my-2 bg-warmGray-800 w-48 ease-in-out transform hover:scale-105 text-center rounded border-2 border-transparent border-dashed cursor-pointer transition duration-100;
+		@apply px-6 py-2 mx-2 my-2 bg-warmGray-800 w-48 ease-in-out hover:scale-105 text-center rounded border-2 border-transparent border-dashed cursor-pointer transition duration-100;
 	}
 
 </style>

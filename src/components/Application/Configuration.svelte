@@ -122,7 +122,7 @@
 	}
 	async function loadPermissions() {
 		const config = await request(
-			`https://api.github.com/apps/${import.meta.env.VITE_GITHUB_APP_NAME}`,
+			`https://api.github.com/apps/${dashify(import.meta.env.VITE_GITHUB_APP_NAME)}`,
 			$session
 		);
 		if (config.permissions['pull_requests'] && config.events.includes('pull_request')) {
