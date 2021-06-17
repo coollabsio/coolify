@@ -9,6 +9,7 @@
 	import Plausible from '$components/Service/Plausible.svelte';
 	import { browser } from '$app/env';
 	import CodeServer from '$components/Service/CodeServer.svelte';
+	import MinIo from '$components/Service/MinIO.svelte';
 	let service = {};
 	async function loadServiceConfig() {
 		if ($page.params.name) {
@@ -104,7 +105,7 @@
 			{:else if $page.params.name === 'code-server'}
 				<CodeServer {service} />
 			{:else if $page.params.name === 'minio'}
-				<div class="font-bold">Nothing to show here. Enjoy using MinIO!</div>
+				<MinIo {service} />
 			{/if}
 		</div>
 	</div>
