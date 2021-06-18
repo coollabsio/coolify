@@ -48,10 +48,12 @@ With Github integration
 
 ### Services
 
+- [WordPress](https://wordpress.org)
 - [Plausible Analytics](https://plausible.io)
 - [NocoDB](https://nocodb.com)
 - [VSCode Server](https://github.com/cdr/code-server)
 - [MinIO](https://min.io)
+
 
 ## Support
 

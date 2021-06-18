@@ -1,7 +1,7 @@
 {
 	"name": "coolify",
 	"description": "An open-source, hassle-free, self-hostable Heroku & Netlify alternative.",
-	"version": "1.0.19",
+	"version": "1.0.20",
 	"license": "AGPL-3.0",
 	"scripts": {
 		"dev:docker:start": "docker-compose -f docker-compose-dev.yml up -d",
@@ -37,7 +37,6 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"dotenv-extended": "^2.9.0",
 		"@iarna/toml": "^2.2.5",
 		"@zerodevx/svelte-toast": "^0.3.0",
 		"commander": "^7.2.0",
@@ -46,6 +45,7 @@
 		"cuid": "^2.1.8",
 		"dayjs": "^1.10.5",
 		"dockerode": "^3.3.0",
+		"dotenv-extended": "^2.9.0",
 		"generate-password": "^1.6.0",
 		"js-yaml": "^4.1.0",
 		"jsonwebtoken": "^8.5.1",
@@ -53,6 +53,7 @@
 		"shelljs": "^0.8.4",
 		"svelte-kit-cookie-session": "^1.0.6",
 		"svelte-select": "^3.17.0",
+		"systeminformation": "^5.7.7",
 		"unique-names-generator": "^4.5.0"
 	}
 }

@@ -53,12 +53,13 @@
 	let upgradeDisabled = false;
 	let upgradeDone = false;
 	let showAck = false;
+	let globalFeatureFlag = browser && localStorage.getItem('globalFeatureFlag')
 	const options = {
 		duration: 2000
 	};
 	onMount(async () => {
 		upgradeAvailable = await checkUpgrade();
-		browser && localStorage.removeItem('token')
+		browser && localStorage.removeItem('token');
 		if (!localStorage.getItem('automaticErrorReportsAck')) {
 			showAck = true;
 			if (latest?.coolify[branch]?.settings?.sendErrors) {
@@ -224,6 +225,31 @@
 					</div>
 				</Tooltip>
 				<div class="flex-1" />
+				{#if globalFeatureFlag}
+				<Tooltip position="right" label="Server(s)">
+					<div
+						class="p-2 hover:bg-warmGray-700 rounded hover:text-red-500 mb-4 transition-all duration-100 cursor-pointer"
+						on:click={() => goto('/servers')}
+						class:text-red-500={$page.path === '/servers' || $page.path.startsWith('/servers')}
+						class:bg-warmGray-700={$page.path === '/servers' || $page.path.startsWith('/servers')}
+					>
+						<svg
+							class="w-8"
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"
+							/>
+						</svg>
+					</div>
+				</Tooltip>
+				{/if}
 				<Tooltip position="right" label="Settings">
 					<button
 						class="p-2 hover:bg-warmGray-700 rounded hover:text-yellow-500 transition-all duration-100 cursor-pointer"
