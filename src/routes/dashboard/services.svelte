@@ -106,7 +106,7 @@
 										/>
 									</svg>
 									<div class="text-white font-bold text-center">
-										Wordpress<span class="flex text-xs items-center justify-center text-warmGray-300"
+										Wordpress<span class="flex text-xs items-center justify-center text-warmGray-300  group-hover:text-white"
 											>({service.configuration.baseURL.replace('https://', '')})</span
 										>
 									</div>
