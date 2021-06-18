@@ -1,10 +1,9 @@
 <script>
 	import { browser } from '$app/env';
-
 	import { goto } from '$app/navigation';
 	import { session } from '$app/stores';
-	import { request } from '$lib/request';
-
+	
+	browser && $session.isLoggedIn && goto('/dashboard/applications')
 	async function login() {
 		const left = screen.width / 2 - 1020 / 2;
 		const top = screen.height / 2 - 618 / 2;
