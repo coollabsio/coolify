@@ -10,11 +10,11 @@
 		Select a service
 	</div>
 </div>
-<div class="text-center space-y-2 max-w-4xl mx-auto px-6" in:fade={{ duration: 100 }}>
+<div class="text-center space-y-2 max-w-7xl mx-auto px-6" in:fade={{ duration: 100 }}>
 	{#if $page.path === '/service/new'}
-		<div class="flex justify-center space-x-4 font-bold pb-6">
+		<div class="flex justify-center  font-bold pb-6 flex-wrap">
 			<div
-				class="text-center flex-col items-center cursor-pointer ease-in-out  hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-500 p-2 rounded bg-warmGray-800 w-48"
+				class="text-center flex-col items-center cursor-pointer ease-in-out hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-500 p-2 m-2 rounded bg-warmGray-800 w-48"
 				on:click={() => goto('/service/new/plausible')}
 			>
 				<img
@@ -25,7 +25,7 @@
 				<div class="text-white">Plausible Analytics</div>
 			</div>
 			<div
-				class="text-center flex-col items-center cursor-pointer ease-in-out  hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-500 p-2 rounded bg-warmGray-800 w-48"
+				class="text-center flex-col items-center cursor-pointer ease-in-out hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-500 p-2 m-2 rounded bg-warmGray-800 w-48"
 				on:click={() => goto('/service/new/nocodb')}
 			>
 				<img
@@ -37,7 +37,7 @@
 				<div class="text-white">NocoDB</div>
 			</div>
 			<div
-				class="text-center flex-col items-center cursor-pointer ease-in-out  hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-500 p-2 rounded bg-warmGray-800 w-48"
+				class="text-center flex-col items-center cursor-pointer ease-in-out hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-500 p-2 m-2 rounded bg-warmGray-800 w-48"
 				on:click={() => goto('/service/new/code-server')}
 			>
 				<svg class="w-14 mx-auto pb-2" viewBox="0 0 128 128">
@@ -59,7 +59,7 @@
 				<div class="text-white">VSCode Server</div>
 			</div>
 			<div
-				class="text-center flex-col items-center cursor-pointer ease-in-out  hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-500 p-2 rounded bg-warmGray-800 w-48"
+				class="text-center flex-col items-center cursor-pointer ease-in-out hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-500 p-2 m-2 rounded bg-warmGray-800 w-48"
 				on:click={() => goto('/service/new/minio')}
 			>
 				<img
@@ -71,7 +71,7 @@
 				<div class="text-white">MinIO</div>
 			</div>
 			<div
-			class="text-center flex-col items-center cursor-pointer ease-in-out  hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-500 p-2 rounded bg-warmGray-800 w-48"
+			class="text-center flex-col items-center cursor-pointer ease-in-out hover:scale-105 duration-100 border-2 border-dashed border-transparent hover:border-blue-500 p-2 m-2 rounded bg-warmGray-800 w-48"
 			on:click={() => goto('/service/new/wordpress')}
 		>
 		<svg class="w-14 mx-auto pb-2" viewBox="0 0 128 128">

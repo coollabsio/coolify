@@ -44,6 +44,7 @@ export async function post(request: Request) {
             { name: 'WORDPRESS_DB_USER', value: database.user },
             { name: 'WORDPRESS_DB_PASSWORD', value: database.password },
             { name: 'WORDPRESS_DB_NAME', value: database.name },
+            { name: 'WORDPRESS_TABLE_PREFIX', value: database.tablePrefix },
             { name: 'WORDPRESS_CONFIG_EXTRA', value: wordpressExtraConfiguration }
         ]
     }
@@ -126,9 +127,10 @@ export async function post(request: Request) {
                         labels: [
                             'managedBy=coolify',
                             'type=service',
-                            'serviceName=wordpress',
+                            'serviceName=' + deployId,
                             'configuration=' +
                             JSON.stringify({
+                                deployId,
                                 baseURL,
                                 generateEnvsWordpress
                             }),

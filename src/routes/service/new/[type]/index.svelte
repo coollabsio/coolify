@@ -159,7 +159,7 @@
 {#if loading}
 	<Loading />
 {:else if $page.params.type === 'plausible'}
-	<div class="space-y-2 max-w-4xl mx-auto px-6 flex-col text-center" in:fade={{ duration: 100 }}>
+	<div class="space-y-2 max-w-xl mx-auto px-6 flex-col text-center" in:fade={{ duration: 100 }}>
 		<div class="grid grid-flow-row">
 			<label for="Domain"
 				>Domain <TooltipInfo
