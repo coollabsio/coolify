@@ -167,5 +167,17 @@ export const initialNewService = {
 	userPasswordAgain: null,
 	baseURL: null
 };
+export const newWordpressService = writable({
+	baseURL: null,
+	remoteDB: false,
+	database: {
+		host: null,
+		name: 'wordpress',
+		user: null,
+		password: null,
+		tablePrefix: 'wordpress'
+	},
+	wordpressExtraConfiguration: null
+});
 
 export const isPullRequestPermissionsGranted = writable(false);

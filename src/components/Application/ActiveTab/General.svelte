@@ -339,7 +339,7 @@
 							>
 								<span class="sr-only">Use setting</span>
 								<span
-									class="pointer-events-none relative inline-block h-5 w-5 rounded-full bg-white shadow transition ease-in-out duration-200"
+									class="pointer-events-none relative inline-block h-5 w-5 rounded-full bg-white shadow transition ease-in-out duration-200 transform"
 									class:translate-x-5={$application.general.isPreviewDeploymentEnabled}
 									class:translate-x-0={!$application.general.isPreviewDeploymentEnabled}
 								>

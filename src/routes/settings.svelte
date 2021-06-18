@@ -83,7 +83,7 @@
 							>
 								<span class="sr-only">Use setting</span>
 								<span
-									class="pointer-events-none relative inline-block h-5 w-5 rounded-full bg-white shadow transition ease-in-out duration-200"
+									class="pointer-events-none relative inline-block h-5 w-5 rounded-full bg-white shadow transition ease-in-out duration-200 transform"
 									class:translate-x-5={settings?.allowRegistration}
 									class:translate-x-0={!settings?.allowRegistration}
 								>
@@ -143,7 +143,7 @@
 							>
 								<span class="sr-only">Use setting</span>
 								<span
-									class="pointer-events-none relative inline-block h-5 w-5 rounded-full bg-white shadow transition ease-in-out duration-200"
+									class="pointer-events-none relative inline-block h-5 w-5 rounded-full bg-white shadow transition ease-in-out duration-200 transform"
 									class:translate-x-5={settings?.sendErrors}
 									class:translate-x-0={!settings?.sendErrors}
 								>
