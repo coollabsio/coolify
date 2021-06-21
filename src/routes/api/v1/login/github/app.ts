@@ -33,7 +33,8 @@ export async function get(request: Request) {
 					_id: new mongoose.Types.ObjectId(),
 					email,
 					avatar: avatar_url,
-					uid
+					uid,
+					type: 'github'
 				});
 				const defaultSettings = new Settings({
 					_id: new mongoose.Types.ObjectId()
@@ -68,7 +69,8 @@ export async function get(request: Request) {
 							_id: new mongoose.Types.ObjectId(),
 							email,
 							avatar: avatar_url,
-							uid
+							uid,
+							type: 'github'
 						});
 						try {
 							await newUser.save();

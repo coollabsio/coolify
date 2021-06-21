@@ -1,3 +1,18 @@
+<script context="module" lang="ts">
+	/**
+	 * @type {import('@sveltejs/kit').Load}
+	 */
+	export async function load(session) {
+		if (!browser && !process.env.VITE_GITHUB_APP_CLIENTID) {
+			return {
+				status: 301,
+				redirect: '/dashboard/services'
+			};
+		}
+		return {};
+	}
+</script>
+
 <script>
 	import { goto } from '$app/navigation';
 	import MongoDb from '$components/Database/SVGs/MongoDb.svelte';
@@ -8,7 +23,7 @@
 	import { dashboard } from '$store';
 	import { fade } from 'svelte/transition';
 	import Redis from '$components/Database/SVGs/Redis.svelte';
-
+	import { browser } from '$app/env';
 </script>
 
 <div class="py-5 text-left px-6 text-3xl tracking-tight font-bold flex items-center">
@@ -59,9 +74,7 @@
 										customClass="w-10 h-10 fill-current text-red-600 absolute top-0 left-0 -m-4"
 									/>
 								{:else if database.configuration.general.type == 'redis'}
-									<Redis
-										customClass="w-10 h-10  absolute top-0 left-0 -m-4"
-									/>
+									<Redis customClass="w-10 h-10  absolute top-0 left-0 -m-4" />
 								{:else if database.configuration.general.type == 'clickhouse'}
 									<Clickhouse
 										customClass="w-10 h-10 fill-current text-red-600 absolute top-0 left-0 -m-4"

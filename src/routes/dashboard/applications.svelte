@@ -1,8 +1,28 @@
+<script context="module" lang="ts">
+	import { request } from '$lib/request';
+	/**
+	 * @type {import('@sveltejs/kit').Load}
+	 */
+	export async function load(session) {
+		if (!browser && !process.env.VITE_GITHUB_APP_CLIENTID) {
+			return {
+				status: 301,
+				redirect: '/dashboard/services'
+			};
+		}
+		return {
+			props: {
+				initDashboard: await request('/api/v1/dashboard', session)
+			}
+		};
+	}
+</script>
+
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { dashboard, dateOptions } from '$store';
+	import { dashboard, dateOptions, settings } from '$store';
 	import { fade } from 'svelte/transition';
-
+	import { browser } from '$app/env';
 </script>
 
 <div
