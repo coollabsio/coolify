@@ -160,7 +160,6 @@ export async function post(request: Request) {
             },
         };
     }
-    console.log(stack)
     await execShellAsync(`mkdir -p ${workdir}`);
     await fs.writeFile(`${workdir}/stack.yml`, yaml.dump(stack));
     await execShellAsync(`docker stack rm ${deployId}`);

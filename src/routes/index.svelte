@@ -42,6 +42,7 @@
 			});
 			toast.push(message);
 			setTimeout(() => {
+				// WHY need to navigate to / to get cookies?!
 				browser && window.location.replace('/')
 			}, 1000);
 		} catch (error) {
@@ -68,7 +69,6 @@
 				<Loading fullscreen={false} />
 			{:else}
 				<div class="text-center py-10 max-w-7xl">
-					{$session.isLoggedIn}
 					{#if !$session.isLoggedIn}
 						{#if $settings.clientId}
 							<button
