@@ -112,6 +112,7 @@ export async function handle({ request, resolve }) {
 	}
 
 	request.locals.session = session;
+	console.log(session.data)
 	if (session?.data?.coolToken) {
 		try {
 			await verifyUserId(session.data.coolToken);
@@ -142,10 +143,11 @@ export async function handle({ request, resolve }) {
 }
 export function getSession(request) {
 	const { data } = request.locals.session;
+	console.log(data)
 	return {
 		isLoggedIn: data && Object.keys(data).length !== 0 ? true : false,
 		expires: data.expires,
 		coolToken: data.coolToken,
-		ghToken: data.ghToken
+		ghToken: data.ghToken || null
 	};
 }
