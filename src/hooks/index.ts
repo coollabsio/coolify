@@ -98,7 +98,7 @@ export async function handle({ request, resolve }) {
 	try {
 		session = initializeSession(request.headers, {
 			secret: SECRETS_ENCRYPTION_KEY,
-			cookie: { path: '' }
+			cookie: { path: '/', secure: true }
 		});
 	} catch (error) {
 		console.log(error)
@@ -112,7 +112,6 @@ export async function handle({ request, resolve }) {
 	}
 
 	request.locals.session = session;
-
 	if (session?.data?.coolToken) {
 		try {
 			await verifyUserId(session.data.coolToken);
@@ -143,7 +142,6 @@ export async function handle({ request, resolve }) {
 }
 export function getSession(request) {
 	const { data } = request.locals.session;
-	console.log(data)
 	return {
 		isLoggedIn: data && Object.keys(data).length !== 0 ? true : false,
 		expires: data.expires,
