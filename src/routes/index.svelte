@@ -63,7 +63,7 @@
 				& <span class="text-green-400">Netlify</span> alternative
 			</h2>
 			{#if loading}
-				<Loading fullscreen={false}/>
+				<Loading fullscreen={false} />
 			{:else}
 				<div class="text-center py-10 max-w-7xl">
 					{#if !$session.isLoggedIn}
@@ -100,7 +100,9 @@
 					{:else}
 						<button
 							class="text-white bg-warmGray-800 hover:bg-warmGray-700 rounded p-2 px-10 font-bold"
-							on:click={() => goto('/dashboard/applications')}>Get Started</button
+							on:click={() =>
+								$settings.clientId ? goto('/dashboard/applications') : goto('/dashboard/services')}
+							>Get Started</button
 						>
 					{/if}
 				</div>
