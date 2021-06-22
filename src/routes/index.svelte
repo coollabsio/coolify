@@ -40,11 +40,11 @@
 					password
 				}
 			});
-		} catch (error) {
-			browser && toast.push(error.error || error || 'Ooops something went wrong.');
-		} finally {
-			browser && location.reload();
 			loading = false;
+			browser && location.reload();
+		} catch (error) {
+			loading = false;
+			browser && toast.push(error.error || error || 'Ooops something went wrong.');
 		}
 	}
 </script>
