@@ -98,7 +98,7 @@ export async function handle({ request, resolve }) {
 	try {
 		session = initializeSession(request.headers, {
 			secret: SECRETS_ENCRYPTION_KEY,
-			cookie: { path: '/' }
+			cookie: { path: '' }
 		});
 	} catch (error) {
 		console.log(error)
@@ -112,7 +112,7 @@ export async function handle({ request, resolve }) {
 	}
 
 	request.locals.session = session;
-	console.log(session.data)
+
 	if (session?.data?.coolToken) {
 		try {
 			await verifyUserId(session.data.coolToken);
