@@ -42,7 +42,7 @@
 			});
 			toast.push(message);
 			setTimeout(() => {
-				browser && location.reload();
+				browser && window.location.replace('/')
 			}, 1000);
 		} catch (error) {
 			loading = false;
