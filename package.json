@@ -50,6 +50,7 @@
 		"generate-password": "^1.6.0",
 		"js-yaml": "^4.1.0",
 		"jsonwebtoken": "^8.5.1",
+		"microtip": "^0.2.2",
 		"mongoose": "^5.12.13",
 		"shelljs": "^0.8.4",
 		"svelte-kit-cookie-session": "^1.0.6",

@@ -24,6 +24,7 @@ specifiers:
   generate-password: ^1.6.0
   js-yaml: ^4.1.0
   jsonwebtoken: ^8.5.1
+  microtip: ^0.2.2
   mongoose: ^5.12.13
   postcss: ^8.3.0
   postcss-load-config: ^3.0.1
@@ -55,6 +56,7 @@ dependencies:
   generate-password: 1.6.0
   js-yaml: 4.1.0
   jsonwebtoken: 8.5.1
+  microtip: 0.2.2
   mongoose: 5.12.13
   shelljs: 0.8.4
   svelte-kit-cookie-session: 1.0.6
@@ -1869,6 +1871,10 @@ packages:
       braces: 3.0.2
       picomatch: 2.3.0
     dev: true
+
+  /microtip/0.2.2:
+    resolution: {integrity: sha512-oah38eH5vSHVFP6yXjbKWOYt92mav++0j3zh844h1vhOscqEg7Rf4agDEIwUTFCcAPPdlhYUQMe6eZfHgD+4oQ==}
+    dev: false
 
   /min-indent/1.0.1:
     resolution: {integrity: sha512-I9jwMn07Sy/IwOj3zVkVik2JTvgpaykDZEigL6Rx6N9LbMywwUSMtxET+7lVoDLLd3O3IXwJwvuuns8UB/HeAg==}

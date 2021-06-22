@@ -26,6 +26,7 @@
 </script>
 
 <script lang="ts">
+	import 'microtip/microtip.css';
 	import '../app.postcss';
 	export let initDashboard;
 	import { onMount } from 'svelte';
