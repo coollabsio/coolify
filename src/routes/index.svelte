@@ -40,10 +40,10 @@
 					password
 				}
 			});
-			browser && location.reload();
 		} catch (error) {
 			browser && toast.push(error.error || error || 'Ooops something went wrong.');
 		} finally {
+			browser && location.reload();
 			loading = false;
 		}
 	}
