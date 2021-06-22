@@ -94,7 +94,9 @@ export async function post(request: Request) {
         request.locals.session.data = { coolToken, ghToken: null };
         return {
             status: 200,
-            body: {}
+            body: {
+                message: "Successfully logged in."
+            }
         };
     } catch (error) {
         return { status: 500, body: { error: error.message || error } };

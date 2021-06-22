@@ -34,12 +34,13 @@
 	async function loginWithEmail() {
 		try {
 			loading = true;
-			await request('/api/v1/login/email', $session, {
+			const { message } = await request('/api/v1/login/email', $session, {
 				body: {
 					email,
 					password
 				}
 			});
+			toast.push(message);
 			setTimeout(() => {
 				browser && location.reload();
 			}, 1000);
@@ -67,6 +68,7 @@
 				<Loading fullscreen={false} />
 			{:else}
 				<div class="text-center py-10 max-w-7xl">
+					{$session.isLoggedIn}
 					{#if !$session.isLoggedIn}
 						{#if $settings.clientId}
 							<button
