@@ -1,3 +1,18 @@
+<script context="module" lang="ts">
+	/**
+	 * @type {import('@sveltejs/kit').Load}
+	 */
+	export async function load(session) {
+		if (!browser && !process.env.VITE_GITHUB_APP_CLIENTID) {
+			return {
+				status: 301,
+				redirect: '/dashboard/services'
+			};
+		}
+		return {};
+	}
+</script>
+
 <script>
 	import { application, initialApplication, initConf, dashboard, prApplication } from '$store';
 	import { onDestroy } from 'svelte';
@@ -58,7 +73,6 @@
 	onDestroy(() => {
 		$application = JSON.parse(JSON.stringify(initialApplication));
 	});
-
 </script>
 
 {#await loadConfiguration()}

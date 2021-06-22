@@ -1,10 +1,15 @@
 <script>
 	import { browser } from '$app/env';
-
 	import { goto } from '$app/navigation';
 	import { session } from '$app/stores';
+	import { toast } from '@zerodevx/svelte-toast';
+	import PasswordField from '$components/PasswordField.svelte';
 	import { request } from '$lib/request';
-
+	import { settings } from '$store';
+	import Loading from '$components/Loading.svelte';
+	let loading = false;
+	let email = null;
+	let password = null;
 	async function login() {
 		const left = screen.width / 2 - 1020 / 2;
 		const top = screen.height / 2 - 618 / 2;
@@ -22,11 +27,26 @@
 		const timer = setInterval(() => {
 			if (newWindow?.closed) {
 				clearInterval(timer);
-				browser && location.reload()
+				browser && location.reload();
 			}
 		}, 100);
 	}
-
+	async function loginWithEmail() {
+		try {
+			loading = true;
+			await request('/api/v1/login/email', $session, {
+				body: {
+					email,
+					password
+				}
+			});
+			browser && location.reload();
+		} catch (error) {
+			browser && toast.push(error.error || error || 'Ooops something went wrong.');
+		} finally {
+			loading = false;
+		}
+	}
 </script>
 
 <div class="flex justify-center items-center h-screen w-full bg-warmGray-900">
@@ -37,24 +57,54 @@
 			>
 				<span class="border-gradient">Coolify</span>
 			</p>
-			<h2 class="text-2xl md:text-3xl font-extrabold text-white">
+			<h2 class="text-2xl md:text-3xl font-extrabold text-white py-10">
 				An open-source, hassle-free, self-hostable<br />
 				<span class="text-indigo-400">Heroku</span>
 				& <span class="text-green-400">Netlify</span> alternative
 			</h2>
-			<div class="text-center py-10">
-				{#if !$session.isLoggedIn}
-					<button
-						class="text-white bg-warmGray-800 hover:bg-warmGray-700 rounded p-2 px-10 font-bold"
-						on:click={login}>Login with Github</button
-					>
-				{:else}
-					<button
-						class="text-white bg-warmGray-800 hover:bg-warmGray-700 rounded p-2 px-10 font-bold"
-						on:click={() => goto('/dashboard/applications')}>Get Started</button
-					>
-				{/if}
-			</div>
+			{#if loading}
+				<Loading fullscreen={false}/>
+			{:else}
+				<div class="text-center py-10 max-w-7xl">
+					{#if !$session.isLoggedIn}
+						{#if $settings.clientId}
+							<button
+								class="text-white bg-warmGray-800 hover:bg-warmGray-700 rounded p-2 px-10 font-bold"
+								on:click={login}>Login with GitHub</button
+							>
+						{:else}
+							<div>
+								<div class="grid grid-flow-row gap-2 items-center pb-6">
+									<div class="grid grid-flow-row">
+										<label for="Email" class="">Email address</label>
+										<input
+											class="border-2"
+											id="Email"
+											bind:value={email}
+											placeholder="hi@coollabs.io"
+										/>
+									</div>
+									<div class="grid grid-flow-row">
+										<label for="Password" class="">Password</label>
+										<PasswordField bind:value={password} isEditable />
+									</div>
+								</div>
+								<div class="space-x-4 pt-10">
+									<button
+										class="text-white bg-warmGray-800 hover:bg-warmGray-700 rounded p-2 px-10 font-bold"
+										on:click={loginWithEmail}>Login with Email</button
+									>
+								</div>
+							</div>
+						{/if}
+					{:else}
+						<button
+							class="text-white bg-warmGray-800 hover:bg-warmGray-700 rounded p-2 px-10 font-bold"
+							on:click={() => goto('/dashboard/applications')}>Get Started</button
+						>
+					{/if}
+				</div>
+			{/if}
 		</div>
 	</div>
 </div>

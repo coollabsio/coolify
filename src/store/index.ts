@@ -6,7 +6,9 @@ import type {
 	GithubInstallations
 } from 'src/global';
 import { writable } from 'svelte/store';
-
+export const settings = writable({
+	clientId: null
+})
 export const dashboard = writable<Dashboard>({
 	databases: {
 		deployed: []

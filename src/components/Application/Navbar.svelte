@@ -52,8 +52,7 @@
 				);
 			}
 		} catch (error) {
-			// console.log(error);
-			// toast.push(error.error || error || 'Ooops something went wrong.');
+			browser && toast.push(error.error || error || 'Ooops something went wrong.');
 		}
 	}
 
