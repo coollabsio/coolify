@@ -27,7 +27,8 @@
 		const timer = setInterval(() => {
 			if (newWindow?.closed) {
 				clearInterval(timer);
-				browser && location.reload();
+								// WHY need to navigate to / to get cookies?!
+				browser && window.location.replace('/')
 			}
 		}, 100);
 	}
