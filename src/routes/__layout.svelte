@@ -38,7 +38,7 @@
 	import packageJson from '../../package.json';
 	import { dashboard, settings } from '$store';
 	import { browser } from '$app/env';
-	$settings.clientId = import.meta.env.VITE_GITHUB_APP_CLIENTID || null;
+	$settings.clientId = import.meta.env.VITE_GITHUB_APP_CLIENTID !== 'null' ? import.meta.env.VITE_GITHUB_APP_CLIENTID : null
 	$dashboard = initDashboard;
 	const branch =
 		process.env.NODE_ENV === 'production' &&
@@ -135,7 +135,6 @@
 				class:border-purple-500={$page.path === '/dashboard/databases'}
 			>
 				<div class="w-10 pt-4 pb-4"><img src="/favicon.png" alt="coolLabs logo" /></div>
-
 				{#if $settings.clientId}
 					<Tooltip position="right" label="Applications">
 						<div
