@@ -40,8 +40,9 @@
 					password
 				}
 			});
-			loading = false;
-			browser && location.reload();
+			setTimeout(() => {
+				browser && location.reload();
+			}, 1000);
 		} catch (error) {
 			loading = false;
 			browser && toast.push(error.error || error || 'Ooops something went wrong.');
