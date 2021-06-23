@@ -124,7 +124,7 @@ export async function handle({ request, resolve }) {
 	if (!session['set-cookie']) {
 		if (!session?.data?.coolToken && !publicPages.includes(request.path)) {
 			return {
-				status: 301,
+				status: 302,
 				headers: {
 					location: '/'
 				}
