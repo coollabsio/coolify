@@ -54,7 +54,6 @@ With Github integration
 - [VSCode Server](https://github.com/cdr/code-server)
 - [MinIO](https://min.io)
 
-
 ## Support
 
 - Twitter: [@andrasbacsai](https://twitter.com/andrasbacsai)

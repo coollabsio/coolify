@@ -9,7 +9,7 @@
 		if (!publicPages.includes(path)) {
 			if (!session.session.isLoggedIn) {
 				return {
-					status: 301,
+					status: 302,
 					redirect: '/'
 				};
 			}
@@ -17,7 +17,7 @@
 		}
 		if (!publicPages.includes(path)) {
 			return {
-				status: 301,
+				status: 302,
 				redirect: '/'
 			};
 		}
@@ -26,6 +26,7 @@
 </script>
 
 <script lang="ts">
+	import 'microtip/microtip.css';
 	import '../app.postcss';
 	export let initDashboard;
 	import { onMount } from 'svelte';

@@ -70,9 +70,9 @@ export default async function (configuration, imageChanged) {
 	}
 	async function purgeImagesAsync(found) {
 		await delay(10000);
-		await purgeImagesContainers(found, true);
+		await purgeImagesContainers(found);
 	}
-	purgeImagesAsync(configuration);
+	//purgeImagesAsync(configuration);
 
 	await saveAppLog('### Published done!', configuration);
 }
