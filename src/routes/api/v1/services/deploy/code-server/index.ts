@@ -59,8 +59,8 @@ export async function post(request: Request) {
 		volumes: {
 			[`${deployId}-code-server-data`]: {
 				external: true
-			},
-		},
+			}
+		}
 	};
 	await execShellAsync(`mkdir -p ${workdir}`);
 	await fs.writeFile(`${workdir}/stack.yml`, yaml.dump(stack));
