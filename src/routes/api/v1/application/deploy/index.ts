@@ -21,16 +21,16 @@ export async function post(request: Request) {
 		const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment(
 			configuration
 		);
-		if (foundService && !forceUpdate && !imageChanged && !configChanged) {
-			cleanupTmp(configuration.general.workdir);
-			return {
-				status: 200,
-				body: {
-					success: false,
-					message: 'Nothing changed, no need to redeploy.'
-				}
-			};
-		}
+		// if (foundService && !forceUpdate && !imageChanged && !configChanged) {
+		// 	cleanupTmp(configuration.general.workdir);
+		// 	return {
+		// 		status: 200,
+		// 		body: {
+		// 			success: false,
+		// 			message: 'Nothing changed, no need to redeploy.'
+		// 		}
+		// 	};
+		// }
 		const alreadyQueued = await Deployment.find({
 			repoId: configuration.repository.id,
 			branch: configuration.repository.branch,

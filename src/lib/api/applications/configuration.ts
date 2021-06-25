@@ -4,7 +4,7 @@ import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-
 import { docker } from '$lib/api/docker';
 import { baseServiceConfiguration } from './common';
 import { execShellAsync } from '../common';
-
+import { promises as fs } from 'fs';
 function getUniq() {
 	return uniqueNamesGenerator({ dictionaries: [adjectives, animals, colors], length: 2 });
 }

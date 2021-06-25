@@ -4,11 +4,13 @@
 	 * @type {import('@sveltejs/kit').Load}
 	 */
 	export async function load(session) {
-		if (!browser && !process.env.VITE_GITHUB_APP_CLIENTID) {
-			return {
-				status: 302,
-				redirect: '/dashboard/services'
-			};
+		if (!browser) {
+			if (!import.meta.env.VITE_GITHUB_APP_CLIENTID) {
+				return {
+					status: 301,
+					redirect: '/dashboard/services'
+				};
+			}
 		}
 		return {
 			props: {

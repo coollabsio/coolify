@@ -103,7 +103,7 @@ export async function handle({ request, resolve }) {
 	} catch (error) {
 		console.log(error);
 		return {
-			status: 302,
+			status: 301,
 			headers: {
 				'set-cookie': 'kit.session=deleted;path=/;expires=Wed, 21 Oct 2015 07:28:00 GMT',
 				location: '/'
@@ -124,7 +124,7 @@ export async function handle({ request, resolve }) {
 	if (!session['set-cookie']) {
 		if (!session?.data?.coolToken && !publicPages.includes(request.path)) {
 			return {
-				status: 302,
+				status: 301,
 				headers: {
 					location: '/'
 				}

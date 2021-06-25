@@ -5,7 +5,7 @@
 	export async function load(session) {
 		if (!browser && !process.env.VITE_GITHUB_APP_CLIENTID) {
 			return {
-				status: 302,
+				status: 301,
 				redirect: '/dashboard/services'
 			};
 		}

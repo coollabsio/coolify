@@ -9,7 +9,7 @@
 		if (!publicPages.includes(path)) {
 			if (!session.session.isLoggedIn) {
 				return {
-					status: 302,
+					status: 301,
 					redirect: '/'
 				};
 			}
@@ -17,7 +17,7 @@
 		}
 		if (!publicPages.includes(path)) {
 			return {
-				status: 302,
+				status: 301,
 				redirect: '/'
 			};
 		}
