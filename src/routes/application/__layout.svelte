@@ -3,18 +3,20 @@
 	 * @type {import('@sveltejs/kit').Load}
 	 */
 	export async function load(session) {
-		if (!browser && !process.env.VITE_GITHUB_APP_CLIENTID) {
-			return {
-				status: 301,
-				redirect: '/dashboard/services'
-			};
+		if (!browser) {
+			if (!import.meta.env.VITE_GITHUB_APP_CLIENTID) {
+				return {
+					status: 302,
+					redirect: '/dashboard/services'
+				};
+			}
 		}
 		return {};
 	}
 </script>
 
 <script>
-	import { application, initialApplication, initConf, dashboard, prApplication } from '$store';
+	import { application, initialApplication, initConf, dashboard, prApplication, originalDomain } from '$store';
 	import { onDestroy } from 'svelte';
 	import Loading from '$components/Loading.svelte';
 	import Navbar from '$components/Application/Navbar.svelte';
@@ -23,17 +25,12 @@
 	import { browser } from '$app/env';
 	import { request } from '$lib/request';
 
-	$application.repository.organization = $page.params.organization;
-	$application.repository.name = $page.params.name;
-	$application.repository.branch = $page.params.branch;
-
+	$application.publish.domain = $page.params.domain;
 	async function setConfiguration() {
 		try {
 			const { configuration } = await request(`/api/v1/application/config`, $session, {
 				body: {
-					name: $application.repository.name,
-					organization: $application.repository.organization,
-					branch: $application.repository.branch
+					domain: $application.publish.domain
 				}
 			});
 			$prApplication = configuration.filter((c) => c.general.pullRequest !== 0);
@@ -49,12 +46,8 @@
 				await setConfiguration();
 			} else {
 				const found = $dashboard.applications.deployed.find((app) => {
-					const { organization, name, branch } = app.configuration.repository;
-					if (
-						organization === $application.repository.organization &&
-						name === $application.repository.name &&
-						branch === $application.repository.branch
-					) {
+					const { domain } = app.configuration.publish;
+					if (domain === $application.publish.domain) {
 						return app;
 					}
 				});
@@ -65,6 +58,8 @@
 					await setConfiguration();
 				}
 			}
+			$originalDomain = $application.publish.domain
+
 		} else {
 			$application = JSON.parse(JSON.stringify(initialApplication));
 		}

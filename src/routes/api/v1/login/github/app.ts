@@ -97,7 +97,7 @@ export async function get(request: Request) {
 		});
 		request.locals.session.data = { coolToken, ghToken: access_token };
 		return {
-			status: 301,
+			status: 302,
 			headers: {
 				location: `/success`
 			}

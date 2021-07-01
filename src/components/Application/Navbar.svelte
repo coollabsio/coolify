@@ -1,5 +1,5 @@
 <script>
-	import { application, initialApplication, initConf } from '$store';
+	import { application, initialApplication, initConf, originalDomain } from '$store';
 	import { onDestroy } from 'svelte';
 	import { toast } from '@zerodevx/svelte-toast';
 	import Tooltip from '$components/Tooltip.svelte';
@@ -32,30 +32,61 @@
 	});
 
 	async function deploy() {
-		try {
-			browser && toast.push('Checking configuration.');
-			await request(`/api/v1/application/check`, $session, {
-				body: $application
-			});
-			const { nickname, name, deployId } = await request(`/api/v1/application/deploy`, $session, {
-				body: $application
-			});
-			$application.general.nickname = nickname;
-			$application.build.container.name = name;
-			$application.general.deployId = deployId;
-			$initConf = JSON.parse(JSON.stringify($application));
-			if (browser) {
-				toast.push('Application deployment queued.');
-				goto(
-					`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/logs/${$application.general.deployId}`,
-					{ replaceState: true }
+		if ($page.path === '/application/new') {
+			try {
+				browser && toast.push('Checking configuration.');
+				await request(`/api/v1/application/check/new`, $session, {
+					body: $application
+				});
+				const { nickname, name, deployId } = await request(
+					`/api/v1/application/deploy/new`,
+					$session,
+					{
+						body: $application
+					}
 				);
+				$application.general.nickname = nickname;
+				$application.build.container.name = name;
+				$application.general.deployId = deployId;
+				$initConf = JSON.parse(JSON.stringify($application));
+				if (browser) {
+					toast.push('Application deployment queued.');
+					goto(
+						`/application/${$application.publish.domain}/logs/${$application.general.deployId}`,
+						{ replaceState: true }
+					);
+				}
+			} catch (error) {
+				browser && toast.push(error.error || error || 'Ooops something went wrong.');
 			}
-		} catch (error) {
-			browser && toast.push(error.error || error || 'Ooops something went wrong.');
+		} else {
+			try {
+				browser && toast.push('Checking configuration.');
+				await request(`/api/v1/application/check`, $session, {
+					body: $application
+				});
+				const { nickname, name, deployId } = await request(`/api/v1/application/deploy`, $session, {
+					body: {
+						configuration: $application,
+						originalDomain: $originalDomain
+					}
+				});
+				$application.general.nickname = nickname;
+				$application.build.container.name = name;
+				$application.general.deployId = deployId;
+				$initConf = JSON.parse(JSON.stringify($application));
+				if (browser) {
+					toast.push('Application deployment queued.');
+					goto(
+						`/application/${$application.publish.domain}/logs/${$application.general.deployId}`,
+						{ replaceState: true }
+					);
+				}
+			} catch (error) {
+				browser && toast.push(error.error || error || 'Ooops something went wrong.');
+			}
 		}
 	}
-
 </script>
 
 <nav class="flex text-white justify-end items-center m-4 fixed right-0 top-0 space-x-4 z-50">
@@ -133,7 +164,7 @@
 			class:bg-warmGray-700={/logs\/*/.test($page.path)}
 			on:click={() =>
 				goto(
-					`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/logs`
+					`/application/${$application.publish.domain}/logs`
 				)}
 		>
 			<svg
@@ -162,7 +193,7 @@
 				$page.path === '/application/new'}
 			on:click={() =>
 				goto(
-					`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/configuration`
+					`/application/${$application.publish.domain}/configuration`
 				)}
 		>
 			<svg

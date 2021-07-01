@@ -5,6 +5,7 @@ import { docker } from '$lib/api/docker';
 import { baseServiceConfiguration } from './common';
 import { execShellAsync } from '../common';
 import { promises as fs } from 'fs';
+import Configuration from '$models/Configuration';
 function getUniq() {
 	return uniqueNamesGenerator({ dictionaries: [adjectives, animals, colors], length: 2 });
 }
@@ -12,7 +13,7 @@ function getUniq() {
 export function setDefaultConfiguration(configuration) {
 	const nickname = configuration.general.nickname || getUniq();
 	const deployId = cuid();
-	const shaBase = JSON.stringify({ repository: configuration.repository });
+	const shaBase = JSON.stringify({ repository: configuration.repository, domain: configuration.publish.domain });
 	const sha256 = crypto.createHash('sha256').update(shaBase).digest('hex');
 
 	configuration.build.container.name = sha256.slice(0, 15);
@@ -80,35 +81,37 @@ export function setDefaultConfiguration(configuration) {
 	return configuration;
 }
 
-export async function precheckDeployment(configuration) {
-	const services = (await docker.engine.listServices()).filter(
-		(r) =>
-			r.Spec.Labels.managedBy === 'coolify' &&
-			r.Spec.Labels.type === 'application' &&
-			JSON.parse(r.Spec.Labels.configuration).publish.domain === configuration.publish.domain
-	);
+export async function precheckDeployment(configuration, originalDomain) {
+	const services = await Configuration.find({
+		'publish.domain': originalDomain
+	}).select('-_id -__v -createdAt -updatedAt');
+	// const services = (await docker.engine.listServices()).filter(
+	// 	(r) =>
+	// 		r.Spec.Labels.managedBy === 'coolify' &&
+	// 		r.Spec.Labels.type === 'application' &&
+	// 		JSON.parse(r.Spec.Labels.configuration).publish.domain === configuration.publish.domain
+	// );
 	let foundService = false;
 	let configChanged = false;
 	let imageChanged = false;
 	let forceUpdate = false;
 	for (const service of services) {
-		const running = JSON.parse(service.Spec.Labels.configuration);
-		if (running) {
+		// const running = JSON.parse(service.Spec.Labels.configuration);
 			if (
-				running.repository.id === configuration.repository.id &&
-				running.repository.branch === configuration.repository.branch
+				service.repository.id === configuration.repository.id &&
+				service.repository.branch === configuration.repository.branch
 			) {
 				foundService = true;
 				// Base service configuration changed
 				if (
-					!running.build.container.baseSHA ||
-					running.build.container.baseSHA !== configuration.build.container.baseSHA
+					!service.build.container.baseSHA ||
+					service.build.container.baseSHA !== configuration.build.container.baseSHA
 				) {
 					forceUpdate = true;
 				}
 				// If the deployment is in error state, forceUpdate
 				const state = await execShellAsync(
-					`docker stack ps ${running.build.container.name} --format '{{ json . }}'`
+					`docker stack ps ${service.build.container.name} --format '{{ json . }}'`
 				);
 				const isError = state
 					.split('\n')
@@ -116,7 +119,7 @@ export async function precheckDeployment(configuration) {
 					.map((s) => JSON.parse(s))
 					.filter(
 						(n) =>
-							n.DesiredState !== 'Running' && n.Image.split(':')[1] === running.build.container.tag
+							n.DesiredState !== 'Running' && n.Image.split(':')[1] === service.build.container.tag
 					);
 				if (isError.length > 0) {
 					forceUpdate = true;
@@ -145,7 +148,7 @@ export async function precheckDeployment(configuration) {
 					return true;
 				};
 
-				const runningWithoutContainer = JSON.parse(JSON.stringify(running));
+				const runningWithoutContainer = JSON.parse(JSON.stringify(service));
 				delete runningWithoutContainer.build.container;
 
 				const configurationWithoutContainer = JSON.parse(JSON.stringify(configuration));
@@ -162,16 +165,16 @@ export async function precheckDeployment(configuration) {
 				}
 
 				// If only the image changed
-				if (running.build.container.tag !== configuration.build.container.tag) imageChanged = true;
+				if (service.build.container.tag !== configuration.build.container.tag) imageChanged = true;
 				// If build pack changed, forceUpdate the service
-				if (running.build.pack !== configuration.build.pack) forceUpdate = true;
+				if (service.build.pack !== configuration.build.pack) forceUpdate = true;
 				if (
 					configuration.general.isPreviewDeploymentEnabled &&
 					configuration.general.pullRequest !== 0
 				)
 					forceUpdate = true;
 			}
-		}
+		
 	}
 	if (forceUpdate) {
 		imageChanged = false;

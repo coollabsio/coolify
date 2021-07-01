@@ -19,9 +19,7 @@
 	async function getPRDeployments() {
 		const { configuration } = await request(`/api/v1/application/config`, $session, {
 			body: {
-				name: $application.repository.name,
-				organization: $application.repository.organization,
-				branch: $application.repository.branch
+				domain: $application.publish.domain
 			}
 		});
 		$prApplication = configuration.filter((c) => c.general.pullRequest !== 0);
@@ -49,7 +47,6 @@
 			$prApplication = configuration.filter((c) => c.general.pullRequest !== 0);
 		}
 	}
-
 </script>
 
 <div class="text-2xl font-bold border-gradient w-48">Pull Requests</div>

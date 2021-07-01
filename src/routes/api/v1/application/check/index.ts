@@ -1,6 +1,5 @@
 import { setDefaultConfiguration } from '$lib/api/applications/configuration';
 import { saveServerLog } from '$lib/api/applications/logging';
-import { docker } from '$lib/api/docker';
 import Configuration from '$models/Configuration';
 import type { Request } from '@sveltejs/kit';
 

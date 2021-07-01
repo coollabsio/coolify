@@ -4,10 +4,6 @@ import ApplicationLog from '$models/ApplicationLog';
 import { delay, execShellAsync } from '$lib/api/common';
 import Configuration from '$models/Configuration';
 
-async function purgeImagesAsync(found) {
-	await delay(10000);
-	await purgeImagesContainers(found, true);
-}
 export async function post(request: Request) {
 	const { organization, name, branch, domain } = request.body;
 	try {
@@ -24,13 +20,15 @@ export async function post(request: Request) {
 				const allConfiguration = await Configuration.find({
 					'repository.name': name,
 					'repository.organization': organization,
-					'repository.branch': branch
+					'repository.branch': branch,
+					'publish.domain': domain
 				});
 				for (const config of allConfiguration) {
 					await Configuration.findOneAndRemove({
 						'repository.name': config.repository.name,
 						'repository.organization': config.repository.organization,
-						'repository.branch': config.repository.branch
+						'repository.branch': config.repository.branch,
+						'publish.domain': config.publish.domain
 					});
 					await execShellAsync(`docker stack rm ${config.build.container.name}`);
 				}
@@ -39,8 +37,6 @@ export async function post(request: Request) {
 					await ApplicationLog.deleteMany({ deployId: deploy.deployId });
 					await Deployment.deleteMany({ deployId: deploy.deployId });
 				}
-
-				purgeImagesAsync(configurationFound);
 			} else {
 				// Delete only PRs
 				await Configuration.findByIdAndRemove(id);
@@ -50,7 +46,6 @@ export async function post(request: Request) {
 					await ApplicationLog.deleteMany({ deployId: deploy.deployId });
 					await Deployment.deleteMany({ deployId: deploy.deployId });
 				}
-				purgeImagesAsync(configurationFound);
 			}
 		}
 

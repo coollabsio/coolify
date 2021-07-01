@@ -1,8 +1,8 @@
 import { docker } from '$lib/api/docker';
 import Deployment from '$models/Deployment';
 import { execShellAsync } from '../common';
-
-export async function deleteSameDeployments(configuration) {
+import crypto from 'crypto';
+export async function deleteSameDeployments(configuration, originalDomain = null) {
 	await (
 		await docker.engine.listServices()
 	)
@@ -12,7 +12,7 @@ export async function deleteSameDeployments(configuration) {
 			if (
 				running.repository.id === configuration.repository.id &&
 				running.repository.branch === configuration.repository.branch &&
-				running.publish.domain === configuration.publish.domain
+				running.publish.domain === originalDomain || configuration.publish.domain
 			) {
 				await execShellAsync(`docker stack rm ${s.Spec.Labels['com.docker.stack.namespace']}`);
 			}
@@ -26,8 +26,14 @@ export async function cleanupStuckedDeploymentsInDB() {
 		{ progress: 'failed' }
 	);
 }
-export async function purgeImagesContainers(configuration, deleteAll = false) {
-	const { name, tag } = configuration.build.container;
+export async function purgeImagesContainers(configuration, deleteAll = false, originalDomain) {
+	const shaBase = JSON.stringify({ repository: configuration.repository, domain: originalDomain });
+	const sha256 = crypto.createHash('sha256').update(shaBase).digest('hex');
+	const name = sha256.slice(0, 15)
+	const { tag } = configuration.build.container;
+	if (originalDomain !== configuration.publish.domain) {
+		deleteAll = true
+	}
 	try {
 		await execShellAsync('docker container prune -f');
 	} catch (error) {

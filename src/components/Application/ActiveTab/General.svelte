@@ -1,6 +1,6 @@
 <script>
 	import { VITE_GITHUB_APP_NAME } from '$lib/consts';
-	import { application, isPullRequestPermissionsGranted } from '$store';
+	import { application, isPullRequestPermissionsGranted, originalDomain } from '$store';
 	import { onMount } from 'svelte';
 	import TooltipInfo from '$components/TooltipInfo.svelte';
 	import { request } from '$lib/request';
@@ -194,7 +194,12 @@
 		}
 	}
 	onMount(() => {
-		if (!$application.publish.domain) domainInput.focus();
+		if (!$application.publish.domain) {
+			domainInput.focus();
+		} else {
+			$originalDomain = $application.publish.domain
+		}
+
 	});
 
 </script>
