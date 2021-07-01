@@ -26,14 +26,8 @@ export async function cleanupStuckedDeploymentsInDB() {
 		{ progress: 'failed' }
 	);
 }
-export async function purgeImagesContainers(configuration, deleteAll = false, originalDomain) {
-	const shaBase = JSON.stringify({ repository: configuration.repository, domain: originalDomain });
-	const sha256 = crypto.createHash('sha256').update(shaBase).digest('hex');
-	const name = sha256.slice(0, 15)
-	const { tag } = configuration.build.container;
-	if (originalDomain !== configuration.publish.domain) {
-		deleteAll = true
-	}
+export async function purgeImagesContainers(configuration, deleteAll = false) {
+	const { name, tag } = configuration.build.container;
 	try {
 		await execShellAsync('docker container prune -f');
 	} catch (error) {

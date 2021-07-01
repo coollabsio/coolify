@@ -9,15 +9,12 @@
 	import { browser } from '$app/env';
 	async function removeApplication() {
 		const result = window.confirm(
-			"Are you sure? It will delete all deployments, including PR's - it's NOT reversible!"
+			"DANGER ZONE! It will delete all deployments, including PR's. It's NOT reversible! Are you sure?"
 		);
 		if (result) {
 			await request(`/api/v1/application/remove`, $session, {
 				body: {
-					organization: $application.repository.organization,
-					name: $application.repository.name,
-					branch: $application.repository.branch,
-					domain: $application.publish.domain
+					nickname: $application.general.nickname
 				}
 			});
 
@@ -32,59 +29,26 @@
 	});
 
 	async function deploy() {
-		if ($page.path === '/application/new') {
-			try {
-				browser && toast.push('Checking configuration.');
-				await request(`/api/v1/application/check/new`, $session, {
-					body: $application
+		try {
+			browser && toast.push('Checking configuration.');
+			await request(`/api/v1/application/check`, $session, {
+				body: $application
+			});
+			const { nickname, name, deployId } = await request(`/api/v1/application/deploy`, $session, {
+				body: $application
+			});
+			$application.general.nickname = nickname;
+			$application.build.container.name = name;
+			$application.general.deployId = deployId;
+			$initConf = JSON.parse(JSON.stringify($application));
+			if (browser) {
+				toast.push('Application deployment queued.');
+				goto(`/application/${$application.general.nickname}/logs/${$application.general.deployId}`, {
+					replaceState: true
 				});
-				const { nickname, name, deployId } = await request(
-					`/api/v1/application/deploy/new`,
-					$session,
-					{
-						body: $application
-					}
-				);
-				$application.general.nickname = nickname;
-				$application.build.container.name = name;
-				$application.general.deployId = deployId;
-				$initConf = JSON.parse(JSON.stringify($application));
-				if (browser) {
-					toast.push('Application deployment queued.');
-					goto(
-						`/application/${$application.publish.domain}/logs/${$application.general.deployId}`,
-						{ replaceState: true }
-					);
-				}
-			} catch (error) {
-				browser && toast.push(error.error || error || 'Ooops something went wrong.');
 			}
-		} else {
-			try {
-				browser && toast.push('Checking configuration.');
-				await request(`/api/v1/application/check`, $session, {
-					body: $application
-				});
-				const { nickname, name, deployId } = await request(`/api/v1/application/deploy`, $session, {
-					body: {
-						configuration: $application,
-						originalDomain: $originalDomain
-					}
-				});
-				$application.general.nickname = nickname;
-				$application.build.container.name = name;
-				$application.general.deployId = deployId;
-				$initConf = JSON.parse(JSON.stringify($application));
-				if (browser) {
-					toast.push('Application deployment queued.');
-					goto(
-						`/application/${$application.publish.domain}/logs/${$application.general.deployId}`,
-						{ replaceState: true }
-					);
-				}
-			} catch (error) {
-				browser && toast.push(error.error || error || 'Ooops something went wrong.');
-			}
+		} catch (error) {
+			// browser && toast.push(error.error || error || 'Ooops something went wrong.');
 		}
 	}
 </script>
@@ -162,10 +126,7 @@
 			class:cursor-not-allowed={$page.path === '/application/new'}
 			class:text-blue-400={/logs\/*/.test($page.path)}
 			class:bg-warmGray-700={/logs\/*/.test($page.path)}
-			on:click={() =>
-				goto(
-					`/application/${$application.publish.domain}/logs`
-				)}
+			on:click={() => goto(`/application/${$application.general.nickname}/logs`)}
 		>
 			<svg
 				class="w-6"
@@ -191,10 +152,7 @@
 				$page.path === '/application/new'}
 			class:bg-warmGray-700={$page.path.endsWith('configuration') ||
 				$page.path === '/application/new'}
-			on:click={() =>
-				goto(
-					`/application/${$application.publish.domain}/configuration`
-				)}
+			on:click={() => goto(`/application/${$application.general.nickname}/configuration`)}
 		>
 			<svg
 				class="w-6"

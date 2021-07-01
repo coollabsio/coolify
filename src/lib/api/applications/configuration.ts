@@ -13,7 +13,7 @@ function getUniq() {
 export function setDefaultConfiguration(configuration) {
 	const nickname = configuration.general.nickname || getUniq();
 	const deployId = cuid();
-	const shaBase = JSON.stringify({ repository: configuration.repository, domain: configuration.publish.domain });
+	const shaBase = JSON.stringify({ path: configuration.publish.path, domain: configuration.publish.domain });
 	const sha256 = crypto.createHash('sha256').update(shaBase).digest('hex');
 
 	configuration.build.container.name = sha256.slice(0, 15);
@@ -52,7 +52,7 @@ export function setDefaultConfiguration(configuration) {
 	if (configuration.publish.directory.startsWith('/'))
 		configuration.publish.directory = configuration.publish.directory.replace('/', '');
 
-	if (configuration.build.pack === 'static' || configuration.build.pack === 'nodejs') {
+	if (configuration.build.pack === 'nodejs') {
 		if (!configuration.build.command.installation)
 			configuration.build.command.installation = 'yarn install';
 	}
@@ -81,10 +81,11 @@ export function setDefaultConfiguration(configuration) {
 	return configuration;
 }
 
-export async function precheckDeployment(configuration, originalDomain) {
+export async function precheckDeployment(configuration) {
 	const services = await Configuration.find({
-		'publish.domain': originalDomain
-	}).select('-_id -__v -createdAt -updatedAt');
+		'publish.domain': configuration.publish.domain,
+		'publish.path': configuration.publish.path
+	})
 	// const services = (await docker.engine.listServices()).filter(
 	// 	(r) =>
 	// 		r.Spec.Labels.managedBy === 'coolify' &&

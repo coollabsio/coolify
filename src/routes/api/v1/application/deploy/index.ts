@@ -5,10 +5,11 @@ import cloneRepository from '$lib/api/applications/cloneRepository';
 import { cleanupTmp } from '$lib/api/common';
 import queueAndBuild from '$lib/api/applications/queueAndBuild';
 import Configuration from '$models/Configuration';
+import preChecks from '$lib/api/applications/preChecks';
+import preTasks from '$lib/api/applications/preTasks';
 
 export async function post(request: Request) {
-	const {originalDomain} = request.body
-	const configuration = setDefaultConfiguration(request.body.configuration);
+	const configuration = setDefaultConfiguration(request.body);
 	if (!configuration) {
 		return {
 			status: 500,
@@ -19,11 +20,8 @@ export async function post(request: Request) {
 	}
 	try {
 		await cloneRepository(configuration);
-		const { foundService, imageChanged, configChanged, forceUpdate } = await precheckDeployment(
-			configuration,
-			originalDomain
-		);
-		if (foundService && !forceUpdate && !imageChanged && !configChanged) {
+		const nextStep = await preChecks(configuration);
+		if (nextStep === 0) {
 			cleanupTmp(configuration.general.workdir);
 			return {
 				status: 200,
@@ -33,51 +31,9 @@ export async function post(request: Request) {
 				}
 			};
 		}
-		const alreadyQueued = await Deployment.find({
-			repoId: configuration.repository.id,
-			branch: configuration.repository.branch,
-			organization: configuration.repository.organization,
-			name: configuration.repository.name,
-			domain: configuration.publish.domain,
-			progress: { $in: ['queued', 'inprogress'] }
-		});
-		if (alreadyQueued.length > 0) {
-			return {
-				status: 200,
-				body: {
-					success: false,
-					message: 'Already in the queue.'
-				}
-			};
-		}
-		const { id, organization, name, branch } = configuration.repository;
-		const { domain } = configuration.publish;
-		const { deployId, nickname } = configuration.general;
+		await preTasks(configuration)
 
-		await new Deployment({
-			repoId: id,
-			branch,
-			deployId,
-			domain,
-			organization,
-			name,
-			nickname
-		}).save();
-
-		await Configuration.findOneAndUpdate(
-			{
-				'publish.domain': originalDomain,
-				'repository.id': id,
-				'repository.organization': organization,
-				'repository.name': name,
-				'repository.branch': branch,
-				'general.pullRequest': { $in: [null, 0] }
-			},
-			{ ...configuration },
-			{ upsert: true, new: true }
-		);
-
-		queueAndBuild(configuration, imageChanged, originalDomain);
+		queueAndBuild(configuration, nextStep);
 		return {
 			status: 201,
 			body: {
@@ -89,23 +45,7 @@ export async function post(request: Request) {
 		};
 	} catch (error) {
 		console.log(error);
-		await Deployment.findOneAndUpdate(
-			{
-				repoId: configuration.repository.id,
-				branch: configuration.repository.branch,
-				organization: configuration.repository.organization,
-				name: configuration.repository.name,
-				domain: configuration.publish.domain
-			},
-			{
-				repoId: configuration.repository.id,
-				branch: configuration.repository.branch,
-				organization: configuration.repository.organization,
-				name: configuration.repository.name,
-				domain: configuration.publish.domain,
-				progress: 'failed'
-			}
-		);
+		await Deployment.findOneAndUpdate({ nickname: configuration.general.nickname }, { $set: { progress: 'failed' } });
 		return {
 			status: 500,
 			body: {

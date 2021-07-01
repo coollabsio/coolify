@@ -7,16 +7,16 @@ export async function post(request: Request) {
 	try {
 		const { DOMAIN } = process.env;
 		const configuration = setDefaultConfiguration(request.body);
-		const configurationFound = await Configuration.find({
-			'repository.id': { $ne: configuration.repository.id },
+		const sameDomainAndPath = await Configuration.find({
+			'publish.path': configuration.publish.path,
 			'publish.domain': configuration.publish.domain
 		}).select('-_id -__v -createdAt -updatedAt');
-		if (configurationFound.length > 0 || configuration.publish.domain === DOMAIN) {
+		if (sameDomainAndPath.length > 1 || configuration.publish.domain === DOMAIN) {
 			return {
 				status: 200,
 				body: {
 					success: false,
-					message: 'Domain already in use.'
+					message: 'Domain/path are already in use.'
 				}
 			};
 		}

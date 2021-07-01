@@ -39,6 +39,7 @@ export async function post(request: Request) {
 		};
 	}
 
+	// TODO: Monorepo support here. Find all configurations by id and update all deployments! Tough! 
 	try {
 		const applications = await Configuration.find({
 			'repository.id': request.body.repository.id

@@ -25,12 +25,12 @@
 	import { browser } from '$app/env';
 	import { request } from '$lib/request';
 
-	$application.publish.domain = $page.params.domain;
+	$application.general.nickname = $page.params.nickname;
 	async function setConfiguration() {
 		try {
 			const { configuration } = await request(`/api/v1/application/config`, $session, {
 				body: {
-					domain: $application.publish.domain
+					nickname: $application.general.nickname
 				}
 			});
 			$prApplication = configuration.filter((c) => c.general.pullRequest !== 0);

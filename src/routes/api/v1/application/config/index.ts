@@ -3,12 +3,11 @@ import Configuration from '$models/Configuration';
 import type { Request } from '@sveltejs/kit';
 
 export async function post(request: Request) {
-	const { domain }: any = request.body || {};
-	if (domain) {
+	const { nickname }: any = request.body || {};
+	if (nickname) {
 		const configurationFound = await Configuration.find({
-			'publish.domain': domain
+			'general.nickname': nickname
 		}).select('-_id -__v -createdAt -updatedAt');
-
 		if (configurationFound) {
 			return {
 				status: 200,
@@ -27,7 +26,7 @@ export async function post(request: Request) {
 				? JSON.parse(r.Spec.Labels.configuration)
 				: null;
 
-			if (configuration.publish.domain === domain) return r;
+			if (configuration.general.nickname === nickname) return r;
 			return null;
 		});
 

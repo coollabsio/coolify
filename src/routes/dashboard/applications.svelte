@@ -25,6 +25,7 @@
 	import { dashboard, dateOptions, settings } from '$store';
 	import { fade } from 'svelte/transition';
 	import { browser } from '$app/env';
+	import { dashify } from '$lib/common';
 </script>
 
 <div
@@ -61,9 +62,7 @@
 						<div
 							class="relative rounded-xl p-6 bg-warmGray-800 border-2 border-dashed border-transparent hover:border-green-500 text-white shadow-md cursor-pointer ease-in-out hover:scale-105 duration-100 group"
 							on:click={() => {
-								goto(
-									`/application/${application.configuration.publish.domain}/configuration`
-								);
+								goto(`/application/${application.configuration.general.nickname}/configuration`);
 							}}
 						>
 							<div class="flex items-center">

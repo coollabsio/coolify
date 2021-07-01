@@ -5,7 +5,7 @@ import { deleteSameDeployments, purgeImagesContainers } from './cleanup';
 import yaml from 'js-yaml';
 import { delay, execShellAsync } from '../common';
 
-export default async function (configuration, imageChanged, originalDomain) {
+export default async function (configuration, nextStep) {
 	const generateEnvs = {};
 	for (const secret of configuration.publish.secrets) {
 		generateEnvs[secret.name] = secret.value;
@@ -56,19 +56,19 @@ export default async function (configuration, imageChanged, originalDomain) {
 	};
 	await saveAppLog('### Publishing.', configuration);
 	await fs.writeFile(`${configuration.general.workdir}/stack.yml`, yaml.dump(stack));
-	if (imageChanged) {
+	if (nextStep === 2) {
 		// console.log('image changed')
 		await execShellAsync(
 			`docker service update --image ${containerName}:${containerTag} ${containerName}_${containerName}`
 		);
 	} else {
 		// console.log('new deployment or force deployment or config changed')
-		if (originalDomain !== configuration.publish.domain) {
-			await deleteSameDeployments(configuration, originalDomain);
-		} else {
-			await deleteSameDeployments(configuration);
-		}
-		
+		// if (originalDomain !== configuration.publish.domain) {
+		// 	await deleteSameDeployments(configuration, originalDomain);
+		// } else {
+		// 	await deleteSameDeployments(configuration);
+		// }
+		// await deleteSameDeployments(configuration);
 		await execShellAsync(
 			`cat ${configuration.general.workdir}/stack.yml | docker stack deploy --prune -c - ${containerName}`
 		);
