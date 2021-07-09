@@ -1,6 +1,9 @@
-require('dotenv').config();
-const { program } = require('commander');
-const shell = require('shelljs');
+import dotEnvExtended from 'dotenv-extended';
+import { program } from 'commander';
+import shell from'shelljs';
+
+dotEnvExtended.load();
+
 const user = shell.exec('whoami', { silent: true }).stdout.replace('\n', '');
 
 program.version('0.0.1');
