@@ -64,7 +64,7 @@ export default async function (configuration) {
             currentConfigurationCompare.general.isPreviewDeploymentEnabled !==
             configurationCompare.general.isPreviewDeploymentEnabled
         ) {
-            return 2
+            return 1
         }
 
         if (currentConfiguration.build.container.tag !== configuration.build.container.tag) {
