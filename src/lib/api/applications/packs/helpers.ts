@@ -17,9 +17,15 @@ export async function buildImage(configuration, cacheBuild?: boolean, prodBuild?
 	// TODO: Edit secrets
 	// TODO: Add secret from .env file / json
 	const generateEnvs = [];
+	const dotEnv = []
 	for (const secret of configuration.publish.secrets) {
+		dotEnv.push(`${secret.name}=${secret.value}`)
 		if (secret.isBuild) generateEnvs.push(`ENV ${secret.name}=${secret.value}`)
 	}
+	await fs.writeFile(
+		`${configuration.general.workdir}/.env`,
+		dotEnv.join('\n')
+	)
 	await fs.writeFile(
 		`${configuration.general.workdir}/Dockerfile`,
 		buildImageNodeDocker(configuration, prodBuild, generateEnvs)
@@ -28,8 +34,8 @@ export async function buildImage(configuration, cacheBuild?: boolean, prodBuild?
 		{ src: ['.'], context: configuration.general.workdir },
 		{
 			t: `${configuration.build.container.name}:${cacheBuild
-					? `${configuration.build.container.tag}-cache`
-					: configuration.build.container.tag
+				? `${configuration.build.container.tag}-cache`
+				: configuration.build.container.tag
 				}`
 		}
 	);
