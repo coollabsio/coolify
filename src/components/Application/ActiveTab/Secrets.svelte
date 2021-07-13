@@ -10,7 +10,6 @@
 	let foundSecret = null;
 	async function saveSecret() {
 		if (secret.name && secret.value) {
-			console.log($application.publish.secrets);
 			const found = $application.publish.secrets.find((s) => s.name === secret.name);
 			if (!found) {
 				$application.publish.secrets = [

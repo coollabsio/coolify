@@ -10,8 +10,6 @@ export async function post(request: Request) {
 	let { baseURL, remoteDB, database, wordpressExtraConfiguration } = request.body;
 	const traefikURL = baseURL;
 	baseURL = `https://${baseURL}`;
-	console.log({ baseURL, remoteDB, database, wordpressExtraConfiguration });
-
 	const workdir = '/tmp/wordpress';
 	const deployId = `wp-${generator.generate({ length: 5, numbers: true, strict: true })}`;
 	const defaultDatabaseName = generator.generate({ length: 12, numbers: true, strict: true });
