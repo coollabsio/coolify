@@ -21,20 +21,25 @@ export default async function (configuration) {
         }
 
         // If the deployment is in error state, forceUpdate
-        const state = await execShellAsync(
-            `docker stack ps ${currentConfiguration.build.container.name} --format '{{ json . }}'`
-        );
-        const isError = state
-            .split('\n')
-            .filter((n) => n)
-            .map((s) => JSON.parse(s))
-            .filter(
-                (n) =>
-                    n.DesiredState !== 'Running' && n.Image.split(':')[1] === currentConfiguration.build.container.tag
+        try {
+            const state = await execShellAsync(
+                `docker stack ps ${currentConfiguration.build.container.name} --format '{{ json . }}'`
             );
-        if (isError.length > 0) {
-            return 1
+            const isError = state
+                .split('\n')
+                .filter((n) => n)
+                .map((s) => JSON.parse(s))
+                .filter(
+                    (n) =>
+                        n.DesiredState !== 'Running' && n.Image.split(':')[1] === currentConfiguration.build.container.tag
+                );
+            if (isError.length > 0) {
+                return 1
+            }
+        } catch(error) {
+           console.log(error)
         }
+
 
         // If previewDeployments enabled
         if (
