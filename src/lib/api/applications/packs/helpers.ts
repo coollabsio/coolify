@@ -39,5 +39,5 @@ export async function buildImage(configuration, cacheBuild?: boolean, prodBuild?
 				}`
 		}
 	);
-	if (generateEnvs.length === 0) await streamEvents(stream, configuration);
+	await streamEvents(stream, configuration);
 }
