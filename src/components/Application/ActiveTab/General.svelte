@@ -1,6 +1,6 @@
 <script>
 	import { VITE_GITHUB_APP_NAME } from '$lib/consts';
-	import { application, isPullRequestPermissionsGranted } from '$store';
+	import { application, isPullRequestPermissionsGranted, originalDomain } from '$store';
 	import { onMount } from 'svelte';
 	import TooltipInfo from '$components/TooltipInfo.svelte';
 	import { request } from '$lib/request';
@@ -122,7 +122,7 @@
 	async function setPreviewDeployment() {
 		if ($application.general.isPreviewDeploymentEnabled) {
 			const result = window.confirm(
-				"Are you sure? It will delete all PR deployments - it's NOT reversible!"
+				"DANGER ZONE! It will delete all PR deployments. It's NOT reversible! Are you sure?"
 			);
 			if (result) {
 				loading.previewDeployment = true;
@@ -194,9 +194,12 @@
 		}
 	}
 	onMount(() => {
-		if (!$application.publish.domain) domainInput.focus();
+		if (!$application.publish.domain) {
+			domainInput.focus();
+		} else {
+			$originalDomain = $application.publish.domain;
+		}
 	});
-
 </script>
 
 <div>
@@ -378,7 +381,9 @@
 								</span>
 							</button>
 							{#if loading.previewDeployment}
-								<div class="absolute left-0 bottom-0 -mb-4 -ml-2 text-xs font-bold">{$application.general.isPreviewDeploymentEnabled ? 'Enabling...' : 'Disabling...' }</div>
+								<div class="absolute left-0 bottom-0 -mb-4 -ml-2 text-xs font-bold">
+									{$application.general.isPreviewDeploymentEnabled ? 'Enabling...' : 'Disabling...'}
+								</div>
 							{/if}
 						</div>
 					{:else}
@@ -438,6 +443,10 @@
 				<input
 					bind:this={domainInput}
 					class="border-2"
+					disabled={$page.path !== '/application/new'}
+					class:cursor-not-allowed={$page.path !== '/application/new'}
+					class:bg-warmGray-900={$page.path !== '/application/new'}
+					class:hover:bg-warmGray-900={$page.path !== '/application/new'}
 					class:placeholder-red-500={$application.publish.domain == null ||
 						$application.publish.domain == ''}
 					class:border-red-500={$application.publish.domain == null ||
@@ -455,7 +464,15 @@
 						}/api`}
 					/></label
 				>
-				<input id="Path" bind:value={$application.publish.path} placeholder="/" />
+				<input
+					id="Path"
+					bind:value={$application.publish.path}
+					disabled={$page.path !== '/application/new'}
+					class:cursor-not-allowed={$page.path !== '/application/new'}
+					class:bg-warmGray-900={$page.path !== '/application/new'}
+					class:hover:bg-warmGray-900={$page.path !== '/application/new'}
+					placeholder="/"
+				/>
 			</div>
 		</div>
 		<label for="Port" class:text-warmGray-800={!buildpacks[$application.build.pack].port.active}
@@ -590,5 +607,4 @@
 	.buildpack {
 		@apply px-6 py-2 mx-2 my-2 bg-warmGray-800 w-48 ease-in-out hover:scale-105 text-center rounded border-2 border-transparent border-dashed cursor-pointer transition duration-100;
 	}
-
 </style>

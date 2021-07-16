@@ -45,7 +45,11 @@ const ConfigurationSchema = new Schema({
 		domain: { type: String, required: true },
 		path: { type: String },
 		port: { type: Number },
-		secrets: { type: Array }
+		secrets: [{
+			name: { type: String },
+			value: { type: String },
+			isBuild: { type: Boolean, default: false },
+		}]
 	}
 });
 

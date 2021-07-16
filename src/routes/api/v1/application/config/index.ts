@@ -3,14 +3,11 @@ import Configuration from '$models/Configuration';
 import type { Request } from '@sveltejs/kit';
 
 export async function post(request: Request) {
-	const { name, organization, branch }: any = request.body || {};
-	if (name && organization && branch) {
+	const { nickname }: any = request.body || {};
+	if (nickname) {
 		const configurationFound = await Configuration.find({
-			'repository.name': name,
-			'repository.organization': organization,
-			'repository.branch': branch
+			'general.nickname': nickname
 		}).select('-_id -__v -createdAt -updatedAt');
-
 		if (configurationFound) {
 			return {
 				status: 200,
@@ -28,22 +25,8 @@ export async function post(request: Request) {
 			const configuration = r.Spec.Labels.configuration
 				? JSON.parse(r.Spec.Labels.configuration)
 				: null;
-			if (branch) {
-				if (
-					configuration.repository.name === name &&
-					configuration.repository.organization === organization &&
-					configuration.repository.branch === branch
-				) {
-					return r;
-				}
-			} else {
-				if (
-					configuration.repository.name === name &&
-					configuration.repository.organization === organization
-				) {
-					return r;
-				}
-			}
+
+			if (configuration.general.nickname === nickname) return r;
 			return null;
 		});
 

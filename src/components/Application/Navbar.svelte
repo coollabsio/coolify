@@ -1,5 +1,5 @@
 <script>
-	import { application, initialApplication, initConf } from '$store';
+	import { application, initialApplication, initConf, originalDomain } from '$store';
 	import { onDestroy } from 'svelte';
 	import { toast } from '@zerodevx/svelte-toast';
 	import Tooltip from '$components/Tooltip.svelte';
@@ -9,15 +9,12 @@
 	import { browser } from '$app/env';
 	async function removeApplication() {
 		const result = window.confirm(
-			"Are you sure? It will delete all deployments, including PR's - it's NOT reversible!"
+			"DANGER ZONE! It will delete all deployments, including PR's. It's NOT reversible! Are you sure?"
 		);
 		if (result) {
 			await request(`/api/v1/application/remove`, $session, {
 				body: {
-					organization: $application.repository.organization,
-					name: $application.repository.name,
-					branch: $application.repository.branch,
-					domain: $application.publish.domain
+					nickname: $application.general.nickname
 				}
 			});
 
@@ -46,16 +43,14 @@
 			$initConf = JSON.parse(JSON.stringify($application));
 			if (browser) {
 				toast.push('Application deployment queued.');
-				goto(
-					`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/logs/${$application.general.deployId}`,
-					{ replaceState: true }
-				);
+				goto(`/application/${$application.general.nickname}/logs/${$application.general.deployId}`, {
+					replaceState: true
+				});
 			}
 		} catch (error) {
-			browser && toast.push(error.error || error || 'Ooops something went wrong.');
+			// browser && toast.push(error.error || error || 'Ooops something went wrong.');
 		}
 	}
-
 </script>
 
 <nav class="flex text-white justify-end items-center m-4 fixed right-0 top-0 space-x-4 z-50">
@@ -131,10 +126,7 @@
 			class:cursor-not-allowed={$page.path === '/application/new'}
 			class:text-blue-400={/logs\/*/.test($page.path)}
 			class:bg-warmGray-700={/logs\/*/.test($page.path)}
-			on:click={() =>
-				goto(
-					`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/logs`
-				)}
+			on:click={() => goto(`/application/${$application.general.nickname}/logs`)}
 		>
 			<svg
 				class="w-6"
@@ -160,10 +152,7 @@
 				$page.path === '/application/new'}
 			class:bg-warmGray-700={$page.path.endsWith('configuration') ||
 				$page.path === '/application/new'}
-			on:click={() =>
-				goto(
-					`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/configuration`
-				)}
+			on:click={() => goto(`/application/${$application.general.nickname}/configuration`)}
 		>
 			<svg
 				class="w-6"

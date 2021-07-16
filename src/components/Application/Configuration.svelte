@@ -19,6 +19,7 @@
 	import Tabs from '$components/Application/Tabs.svelte';
 	import Repositories from '$components/Application/Repositories.svelte';
 	import Login from '$components/Application/Login.svelte';
+import { dashify } from '$lib/common';
 	let loading = {
 		github: false,
 		branches: false
@@ -26,15 +27,7 @@
 	let branches = [];
 	let relogin = false;
 	let permissions = {};
-	function dashify(str: string, options?: any) {
-		if (typeof str !== 'string') return str;
-		return str
-			.trim()
-			.replace(/\W/g, (m) => (/[À-ž]/.test(m) ? m : '-'))
-			.replace(/^-+|-+$/g, '')
-			.replace(/-{2,}/g, (m) => (options && options.condense ? '-' : m))
-			.toLowerCase();
-	}
+
 	async function getGithubRepos(id, page) {
 		return await request(
 			`https://api.github.com/user/installations/${id}/repositories?per_page=100&page=${page}`,
@@ -174,7 +167,6 @@
 			}, 100);
 		}
 	}
-
 </script>
 
 <div in:fade={{ duration: 100 }}>

@@ -27,28 +27,6 @@
 		}
 	}
 	async function load() {
-		const found = $dashboard?.applications?.deployed.find((deployment) => {
-			if (
-				deployment.configuration.repository.organization === $application.repository.organization &&
-				deployment.configuration.repository.name === $application.repository.name &&
-				deployment.configuration.repository.branch === $application.repository.branch
-			) {
-				return deployment;
-			}
-		});
-		if (found) {
-			$application = { ...found.configuration };
-			if ($page.path === '/application/new') {
-				if (browser) {
-					toast.push('This repository & branch is already defined. Redirecting...');
-					goto(
-						`/application/${$application.repository.organization}/${$application.repository.name}/${$application.repository.branch}/configuration`,
-						{ replaceState: true }
-					);
-				}
-			}
-			return;
-		}
 		if ($page.path === '/application/new') {
 			try {
 				const dir = await request(

@@ -32,6 +32,7 @@ export const dateOptions: DateTimeFormatOptions = {
 
 export const githubRepositories = writable([]);
 export const githubInstallations = writable<GithubInstallations>([]);
+export const originalDomain = writable(null)
 export const application = writable<Application>({
 	github: {
 		installation: {
@@ -81,9 +82,7 @@ export const application = writable<Application>({
 	}
 });
 export const prApplication = writable([]);
-
 export const initConf = writable({});
-
 export const initialApplication: Application = {
 	github: {
 		installation: {
@@ -181,5 +180,4 @@ export const newWordpressService = writable({
 	},
 	wordpressExtraConfiguration: null
 });
-
 export const isPullRequestPermissionsGranted = writable(false);

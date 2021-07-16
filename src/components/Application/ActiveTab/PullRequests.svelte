@@ -19,37 +19,29 @@
 	async function getPRDeployments() {
 		const { configuration } = await request(`/api/v1/application/config`, $session, {
 			body: {
-				name: $application.repository.name,
-				organization: $application.repository.organization,
-				branch: $application.repository.branch
+				nickname: $application.general.nickname
 			}
 		});
 		$prApplication = configuration.filter((c) => c.general.pullRequest !== 0);
 	}
 	async function removePR(prConfiguration) {
-		const result = window.confirm("Are you sure? It's NOT reversible!");
+		const result = window.confirm("DANGER ZONE! It's NOT reversible! Are you sure?");
 		if (result) {
 			await request(`/api/v1/application/remove`, $session, {
 				body: {
-					organization: prConfiguration.repository.organization,
-					name: prConfiguration.repository.name,
-					branch: prConfiguration.repository.branch,
-					domain: prConfiguration.publish.domain
+					nickname: prConfiguration.general.nickname
 				}
 			});
 
 			browser && toast.push('PR deployment removed.');
 			const { configuration } = await request(`/api/v1/application/config`, $session, {
 				body: {
-					name: prConfiguration.repository.name,
-					organization: prConfiguration.repository.organization,
-					branch: prConfiguration.repository.branch
+					nickname: prConfiguration.general.nickname
 				}
 			});
 			$prApplication = configuration.filter((c) => c.general.pullRequest !== 0);
 		}
 	}
-
 </script>
 
 <div class="text-2xl font-bold border-gradient w-48">Pull Requests</div>
