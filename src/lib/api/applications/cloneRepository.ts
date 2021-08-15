@@ -35,7 +35,7 @@ export default async function (configuration) {
 			)
 		).json();
 		await execShellAsync(
-			`mkdir -p ${workdir} && git clone -q -b ${branch} https://x-access-token:${token}@github.com/${organization}/${name}.git ${workdir}/`
+			`mkdir -p ${workdir} && git clone -q -b ${branch} https://x-access-token:${token}@github.com/${organization}/${name}.git ${workdir}/ && cd ${workdir} && git submodule update --init --recursive && cd ..`
 		);
 
 		if (isPreviewDeploymentEnabled && pullRequest && pullRequest !== 0) {
