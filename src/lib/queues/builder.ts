@@ -164,7 +164,8 @@ export default async function (job) {
     await completeTransaction(transactionId)
     saveBuildLog({ line: 'HAPROXY - Transaction done.', buildId, applicationId })
   } catch (error) {
-    console.log(error.response.body)
+    console.log(error)
+    throw new Error(error)
   }
 
 

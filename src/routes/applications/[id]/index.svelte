@@ -64,7 +64,6 @@
 			result: async () => {
 				setTimeout(() => {
 					loading = false;
-					window.location.reload();
 				}, 300);
 			},
 			pending: async () => {
@@ -76,7 +75,12 @@
 	>
 		<div class="flex space-x-2 h-8 items-center">
 			<div class="font-bold text-xl text-white">Configuration</div>
-			<button type="submit" class="bg-green-700 hover:bg-green-600 " disabled={loading}>Save</button>
+			<button
+				type="submit"
+				class=" hover:bg-green-600"
+				class:bg-green-700={!loading}
+				disabled={loading}>Save</button
+			>
 		</div>
 		<div class="grid grid-cols-3 items-center">
 			<label for="gitSource">Git Source</label>

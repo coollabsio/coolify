@@ -307,9 +307,9 @@ export async function configureApplication({ id, domain, port, installCommand, b
     }
 }
 
-export async function listLogs({ buildId }) {
+export async function listLogs({ buildId, last = 0 }) {
     try {
-        const body = await prisma.buildLog.findMany({ where: { buildId }, orderBy: { time: 'asc' } })
+        const body = await prisma.buildLog.findMany({ where: { buildId, time: { gt: last } }, orderBy: { time: 'asc' } })
         return [...body]
     } catch (e) {
         return PrismaErrorHandler(e)

@@ -56,7 +56,9 @@
 				}
 			}
 		);
-
+		if (!response.ok) {
+			throw new Error('Git Source not configured.');
+		}
 		const data = await response.json();
 		token = data.token;
 	}
@@ -116,68 +118,73 @@
 	<div class="text-2xl tracking-tight mr-4">Configure Repository / Branch</div>
 </div>
 <div class="flex flex-wrap justify-center">
-	<form
-		action="/applications/{id}/configuration/repository.json"
-		method="post"
-		use:enhance={{
-			result: async () => {
-				window.location.assign(from || `/applications/${id}/configuration/buildpack`);
-			}
-		}}
-	>
-		<div>
-			{#if loading.repositories}
-				<select name="repository" disabled class="w-96">
-					<option selected value="">Loading repositories...</option>
-				</select>
-			{:else}
-				<select
-					name="repository"
-					class="w-96"
-					bind:value={selected.repository}
-					on:change={loadBranches}
-				>
-					<option value="" disabled selected>Please select a repository</option>
-					{#each repositories as repository}
-						<option value={repository.full_name}>{repository.name}</option>
-					{/each}
-				</select>
-			{/if}
-			{#if loading.branches}
-				<select name="branch" disabled class="w-96">
-					<option selected value="">Loading branches...</option>
-				</select>
-			{:else}
-				<select
-					name="branch"
-					class="w-96"
-					disabled={!selected.repository}
-					bind:value={selected.branch}
-					on:change={isBranchAlreadyUsed}
-				>
-					{#if !selected.repository}
-						<option value="" disabled selected>Select a repository first</option>
-					{:else}
-						<option value="" disabled selected>Please select a branch</option>
-					{/if}
+	{#if repositories.length === 0}
+		<div class="flex-col text-center">
+			<div class="pb-4">No repositories configured for your Git Application.</div>
+			<a href={`/sources/${application.gitSource.id}`}><button>Configure it now</button></a>
+		</div>
+	{:else}
+		<form
+			action="/applications/{id}/configuration/repository.json"
+			method="post"
+			use:enhance={{
+				result: async () => {
+					window.location.assign(from || `/applications/${id}/configuration/buildpack`);
+				}
+			}}
+		>
+			<div>
+				{#if loading.repositories}
+					<select name="repository" disabled class="w-96">
+						<option selected value="">Loading repositories...</option>
+					</select>
+				{:else}
+					<select
+						name="repository"
+						class="w-96"
+						bind:value={selected.repository}
+						on:change={loadBranches}
+					>
+						<option value="" disabled selected>Please select a repository</option>
+						{#each repositories as repository}
+							<option value={repository.full_name}>{repository.name}</option>
+						{/each}
+					</select>
+				{/if}
+				{#if loading.branches}
+					<select name="branch" disabled class="w-96">
+						<option selected value="">Loading branches...</option>
+					</select>
+				{:else}
+					<select
+						name="branch"
+						class="w-96"
+						disabled={!selected.repository}
+						bind:value={selected.branch}
+						on:change={isBranchAlreadyUsed}
+					>
+						{#if !selected.repository}
+							<option value="" disabled selected>Select a repository first</option>
+						{:else}
+							<option value="" disabled selected>Please select a branch</option>
+						{/if}
 
-					{#each branches as branch}
-						<option value={branch.name}>{branch.name}</option>
-					{/each}
-				</select>
-			{/if}
-		</div>
-		<div class="w-full text-center pt-5">
-			<button class="w-32" type="submit"  disabled={!showSave}
-				>Save</button
-			>
-			<button
-				><a
-					class="w-32 no-underline"
-					href="https://github.com/apps/{application.gitSource.githubApp.name}/installations/new"
-					>Modify Repositories</a
-				></button
-			>
-		</div>
-	</form>
+						{#each branches as branch}
+							<option value={branch.name}>{branch.name}</option>
+						{/each}
+					</select>
+				{/if}
+			</div>
+			<div class="w-full text-center pt-5">
+				<button class="w-32" type="submit" disabled={!showSave}>Save</button>
+				<button
+					><a
+						class="w-32 no-underline"
+						href="https://github.com/apps/{application.gitSource.githubApp.name}/installations/new"
+						>Modify Repositories</a
+					></button
+				>
+			</div>
+		</form>
+	{/if}
 </div>

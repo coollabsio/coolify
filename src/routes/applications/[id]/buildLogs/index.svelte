@@ -29,7 +29,50 @@
 	export let application;
 	export let logs;
 	import { page } from '$app/stores';
+
 	const { id } = $page.params;
+	const buildId = $page.query.get('buildId');
+
+	async function queryLogs(build) {
+		logs = [];
+		const res = await fetch(`/applications/${id}/buildLogs.json?buildId=${build.id}`);
+		if (res.ok) {
+			const data = await res.json();
+			builds = data.builds;
+			logs = logs.concat(data.logs);
+		}
+		let interval;
+		if (build.status === 'running') {
+			interval = setInterval(async () => {
+				const last = logs[logs.length - 1].time;
+				const res = await fetch(
+					`/applications/${id}/buildLogs.json?buildId=${build.id}&last=${last}`
+				);
+				if (res.ok) {
+					const data = await res.json();
+					logs = logs.concat(data.logs);
+					builds = data.builds;
+					if (data.status !== 'running') clearInterval(interval);
+				}
+			}, 1000);
+		}
+	}
+
+	// if (buildId) {
+	// 	const interval = setInterval(async () => {
+	// 		const lastTime = logs[logs.length - 1];
+	// 		console.log(builds);
+	// 		const res = await fetch(`/applications/${id}/buildLogs.json?buildId=${buildId}`);
+	// 		if (res.ok) {
+	// 			const data = await res.json();
+	// 			if (data.status === 'running') {
+	// 				logs = data.logs;
+	// 			} else {
+	// 				clearInterval(interval);
+	// 			}
+	// 		}
+	// 	}, 1000);
+	// }
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
@@ -38,13 +81,12 @@
 <div class="flex flex-row px-10 justify-start">
 	<div class="min-w-[16rem] space-y-2">
 		{#each builds as build (build.id)}
-			<a
-				sveltekit:prefetch
-				href="/applications/{id}/buildLogs?buildId={build.id}"
+			<div
+				on:click={() => queryLogs(build)}
 				class="flex py-4 cursor-pointer transition-all duration-100 border-l-2 hover:shadow-xl no-underline hover:bg-coolgray-400 border-transparent"
-				class:hover:border-red-500={build.status === 'failed'}
-				class:hover:border-green-500={build.status === 'success'}
-				class:hover:border-yellow-500={build.status === 'inprogress'}
+				class:border-red-500={build.status === 'failed'}
+				class:border-green-500={build.status === 'success'}
+				class:border-yellow-500={build.status === 'inprogress'}
 			>
 				<div class="flex space-x-2 px-2">
 					<div class="font-bold text-sm flex justify-center items-center">
@@ -56,17 +98,17 @@
 					<div class="font-bold">{build.status}</div>
 					<div class="text-xs">{build.createdAt}</div>
 				</div>
-			</a>
+			</div>
 		{/each}
 	</div>
-	<div class="px-4 w-full">
-		{#if logs.length > 0}
+	{#if logs.length > 0}
+		<div class="px-4 w-full">
 			<pre
 				class=" w-full leading-4 text-left text-sm font-semibold tracking-tighter rounded bg-coolgray-200 p-6 whitespace-pre-wrap">
 				{#each logs as log}
 					{log.line + '\n'}
 				{/each}
 			</pre>
-		{/if}
-	</div>
+		</div>
+	{/if}
 </div>
