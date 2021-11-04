@@ -1,9 +1,7 @@
-/node_modules
-/.svelte
-/.svelte-kit
-/.pnpm-store
-/build
-/functions
-.env
 .DS_Store
-.pnpm-debug.log
+node_modules
+/build
+/.svelte-kit
+/package
+.env
+/prisma/dev.db

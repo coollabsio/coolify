@@ -1,7 +1,0 @@
-.DS_Store
-node_modules
-/.svelte
-/build
-/functions
-.pnpm-store
-.pnpm-debug.log

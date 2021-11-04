@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id       String        @id @default(cuid())
+  uid      String        @unique
+  email    String        @unique
+  type     String
+  password String?
+  teams    TeamsOnUser[]
+}
+
+model Team {
+  id     String        @id @default(cuid())
+  teamId String
+  name   String?
+  users  TeamsOnUser[]
+}
+
+model TeamsOnUser {
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  team       Team     @relation(fields: [teamId], references: [id])
+  teamId     String
+  assignedAt DateTime @default(now())
+  assignedBy String
+
+  @@id([userId, teamId])
+}
+
+model Application {
+  id                  String             @id @default(cuid())
+  name                String             @unique
+  domain              String?            @unique
+  oldDomain           String?
+  repository          String?
+  branch              String?
+  buildPack           String?
+  port                Int?
+  installCommand      String?
+  buildCommand        String?
+  startCommand        String?
+  configHash          String?
+  baseDirectory       String?
+  publishDirectory    String?
+  forceSsl            Boolean?           @default(false)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  destinationDockerId String?
+  destinationDocker   DestinationDocker? @relation(fields: [destinationDockerId], references: [id])
+  gitSourceId         String?
+  gitSource           GitSource?         @relation(fields: [gitSourceId], references: [id])
+}
+
+model BuildLog {
+  id            String  @id @default(cuid())
+  applicationId String?
+  buildId       String
+  line          String
+  time          Int
+}
+
+model Build {
+  id                  String   @id @default(cuid())
+  applicationId       String?
+  destinationDockerId String?
+  gitSourceId         String?
+  githubAppId         String?
+  commit              String?
+  status              String?  @default("queued")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model DestinationDocker {
+  id          String        @id @default(cuid())
+  name        String?       @unique
+  engine      String?
+  network     String?       @default("coollabs")
+  isSwarm     Boolean?      @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  application Application[]
+}
+
+model GitSource {
+  id           String        @id @default(cuid())
+  name         String?       @unique
+  type         String?
+  apiUrl       String?
+  htmlUrl      String?
+  organization String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  githubAppId  String?       @unique
+  githubApp    GithubApp?    @relation(fields: [githubAppId], references: [id])
+  application  Application[]
+}
+
+model GithubApp {
+  id             String     @id @default(cuid())
+  name           String?    @unique
+  appId          Int?
+  installationId Int?
+  clientId       String?
+  clientSecret   String?
+  webhookSecret  String?
+  privateKey     String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  gitSource      GitSource?
+}
