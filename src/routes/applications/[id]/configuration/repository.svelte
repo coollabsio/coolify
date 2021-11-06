@@ -118,7 +118,7 @@
 	<div class="text-2xl tracking-tight mr-4">Configure Repository / Branch</div>
 </div>
 <div class="flex flex-wrap justify-center">
-	{#if repositories.length === 0}
+	{#if repositories.length === 0 && loading.repositories === false}
 		<div class="flex-col text-center">
 			<div class="pb-4">No repositories configured for your Git Application.</div>
 			<a href={`/sources/${application.gitSource.id}`}><button>Configure it now</button></a>
@@ -175,11 +175,17 @@
 					</select>
 				{/if}
 			</div>
-			<div class="w-full text-center pt-5">
-				<button class="w-32" type="submit" disabled={!showSave}>Save</button>
+			<div class="pt-5 flex-col flex justify-center items-center space-y-4">
 				<button
+					class="w-40"
+					type="submit"
+					disabled={!showSave}
+					class:bg-orange-600={showSave}
+					class:hover:bg-orange-500={showSave}>Save</button
+				>
+				<button class="w-40"
 					><a
-						class="w-32 no-underline"
+						class="no-underline"
 						href="https://github.com/apps/{application.gitSource.githubApp.name}/installations/new"
 						>Modify Repositories</a
 					></button

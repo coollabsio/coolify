@@ -70,7 +70,7 @@
 			use:enhance={{
 				result: async (res) => {
 					const { buildId } = await res.json();
-					goto(`/applications/${id}/buildLogs?buildId=${buildId}`);
+					window.location.replace(`/applications/${id}/logs?buildId=${buildId}`)
 				}
 			}}
 		>
@@ -104,6 +104,63 @@
 			>
 		</form>
 	{/if}
+	<div class="border border-warmGray-700 h-8" />
+	<a
+		href="/applications/{id}"
+		sveltekit:prefetch
+		class="hover:text-yellow-500 rounded"
+		class:text-yellow-500={$page.path === `/applications/${id}`}
+		class:bg-coolgray-500={$page.path === `/applications/${id}`}
+	>
+		<button
+			title="Configuration"
+			class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
+			data-tooltip="Configuration"
+		>
+			<svg
+				class="w-6 h-6"
+				fill="none"
+				stroke="currentColor"
+				viewBox="0 0 24 24"
+				xmlns="http://www.w3.org/2000/svg"
+				><path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+				/></svg
+			></button
+		></a
+	>
+	<a
+		href="/applications/{id}/logs"
+		sveltekit:prefetch
+		class="hover:text-sky-500 rounded"
+		class:text-sky-500={$page.path === `/applications/${id}/logs`}
+		class:bg-coolgray-500={$page.path === `/applications/${id}/logs`}
+	>
+		<button
+			title="Logs"
+			class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500 "
+			data-tooltip="Logs"
+		>
+			<svg
+				class="w-6 h-6"
+				fill="none"
+				stroke="currentColor"
+				viewBox="0 0 24 24"
+				xmlns="http://www.w3.org/2000/svg"
+				><path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+				/></svg
+			></button
+		></a
+	>
+
+	<div class="border border-warmGray-700 h-8" />
 	<form
 		action="/applications/{id}/delete.json"
 		method="post"

@@ -9,7 +9,7 @@ body {
 	@apply text-sm text-warmGray-300 bg-coolblack overflow-x-hidden min-h-screen;
 }
 
-main {
+main, .main {
 	width: calc(100% - 4rem);
 	margin-left: 4rem;
 }

@@ -1,0 +1,1 @@
+export const asyncSleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));

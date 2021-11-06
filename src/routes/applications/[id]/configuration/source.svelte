@@ -77,7 +77,7 @@
 						}}
 					>
 						<input class="hidden" name="gitSourceId" value={source.id} />
-						<button type="submit" class="box-selection hover:border-orange-500 text-xl"
+						<button type="submit" class="box-selection border-orange-500 text-xl"
 							>{source.name}</button
 						>
 					</form>

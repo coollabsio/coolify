@@ -51,7 +51,7 @@
 			{#each sources as source}
 				<a href="/sources/{source.id}" class="no-underline p-2">
 					<div class="box-selection border-orange-500">
-						<div class="font-bold text-xl text-center pb-4 truncate">{source.name}</div>
+						<div class="font-bold text-xl text-center truncate">{source.name}</div>
 					</div>
 				</a>
 			{/each}

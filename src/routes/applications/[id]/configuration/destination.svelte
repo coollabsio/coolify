@@ -77,7 +77,7 @@
 						}}
 					>
 						<input class="hidden" name="destinationId" value={destination.id} />
-						<button type="submit" class="box-selection hover:border-sky-500 text-xl"
+						<button type="submit" class="box-selection border-sky-500 text-xl"
 							>{destination.name}</button
 						>
 					</form>
