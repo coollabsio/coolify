@@ -1,4 +1,4 @@
-<div class="lds-ripple absolute right-0 top-0 m-2">
+<div class="lds-ripple absolute left-0">
 	<div />
 	<div />
 </div>
@@ -7,6 +7,7 @@
 	.lds-ripple {
 		display: inline-block;
 		position: relative;
+		top: -18px;
 		width: 40px;
 		height: 40px;
 	}
