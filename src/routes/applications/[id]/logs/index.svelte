@@ -1,7 +1,7 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ fetch, page, stuff }) => {
-		let url = `/applications/${page.params.id}/logs.json`;
+		let url = `/applications/${page.params.id}/logs.json?skip=0`;
 		const res = await fetch(url);
 		if (res.ok) {
 			return {
@@ -22,35 +22,71 @@
 <script lang="ts">
 	import BuildLog from '$lib/components/BuildLog.svelte';
 	import { page } from '$app/stores';
-
+	import { dateOptions } from '$lib/components/common';
 	export let builds;
 	export let application;
+	export let buildCount;
 
-    let buildId;
+	let buildId;
 	$: buildId;
 
-	let preselectedBuildId = $page.query.get('buildId');
-    if (preselectedBuildId) buildId = preselectedBuildId
+	let skip = 0;
+	let noMoreBuilds = buildCount >= skip;
+	const { id } = $page.params;
 
-	function updateBuildStatus({ detail }) {
+	let preselectedBuildId = $page.query.get('buildId');
+	if (preselectedBuildId) buildId = preselectedBuildId;
+
+	async function updateBuildStatus({ detail }) {
 		const { status } = detail;
-		builds = builds.filter((build) => {
-			if (build.id === buildId) build.status = status;
-			return build;
-		});
+		if (status !== 'running') {
+			let url = `/applications/${id}/logs.json?buildId=${buildId}`;
+			const res = await fetch(url);
+			if (res.ok) {
+				const data = await res.json();
+				builds = builds.filter((build) => {
+					if (build.id === data.builds[0].id) {
+						build.status = data.builds[0].status;
+						build.took = data.builds[0].took;
+						build.since = data.builds[0].since;
+					}
+					return build;
+				});
+			}
+		} else {
+			builds = builds.filter((build) => {
+				if (build.id === buildId) build.status = status;
+				return build;
+			});
+		}
+	}
+	async function loadMoreBuilds() {
+		if (buildCount >= skip) {
+			skip = skip + 5;
+			let url = `/applications/${id}/logs.json?skip=${skip}`;
+			const res = await fetch(url);
+			if (res.ok) {
+				const data = await res.json();
+				builds = builds.concat(data.builds);
+			}
+		} else {
+			noMoreBuilds = true;
+		}
 	}
 </script>
-
 
 <div class="font-bold flex space-x-1 py-5 px-6">
 	<div class="text-2xl tracking-tight mr-4">Build logs of {application.domain}</div>
 </div>
-<div class="flex flex-row px-10 justify-start pt-6">
+<div class="flex flex-row px-10 justify-start pt-6 space-x-2 ">
 	<div class="min-w-[16rem] space-y-2">
 		{#each builds as build (build.id)}
 			<div
+				data-tooltip={new Intl.DateTimeFormat('default', dateOptions).format(
+					new Date(build.createdAt)
+				) + `\n${build.status}`}
 				on:click={() => (buildId = build.id)}
-				class="flex py-4 cursor-pointer transition-all duration-100 border-l-2 hover:shadow-xl no-underline hover:bg-coolgray-400 border-transparent"
+				class="flex py-4 cursor-pointer transition-all duration-100 border-l-2 hover:shadow-xl no-underline hover:bg-coolgray-400 border-transparent tooltip-top rounded-r"
 				class:bg-coolgray-400={buildId === build.id}
 				class:border-red-500={build.status === 'failed'}
 				class:border-green-500={build.status === 'success'}
@@ -62,17 +98,31 @@
 					</div>
 				</div>
 				<div class="flex-1" />
-				<div class="px-3 w-48">
-					<div class="font-bold">{build.status}</div>
-					<div class="text-xs">{build.createdAt}</div>
+
+				<div class="w-48 text-center text-xs">
+					{#if build.status === 'running'}
+						<div class="font-bold">Running</div>
+					{:else}
+						<div>{build.since}</div>
+						<div>Deployed in <span class="font-bold">{build.took}s</span></div>
+					{/if}
 				</div>
 			</div>
 		{/each}
+		{#if buildCount > 0}
+			<button class="w-full" disabled={noMoreBuilds} on:click={loadMoreBuilds}
+				>{noMoreBuilds ? 'No more builds available' : 'Load More'}</button
+			>
+		{/if}
 	</div>
-
-	{#if buildId}
-		{#key buildId}
-			<svelte:component this={BuildLog} {buildId} on:updateBuildStatus={updateBuildStatus} />
-		{/key}
-	{/if}
+	<div class="flex-1">
+		{#if buildId}
+			{#key buildId}
+				<svelte:component this={BuildLog} {buildId} on:updateBuildStatus={updateBuildStatus} />
+			{/key}
+		{/if}
+	</div>
 </div>
+{#if buildCount === 0}
+	<div class="text-center font-bold text-xl">No build logs found</div>
+{/if}

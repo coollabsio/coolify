@@ -12,6 +12,7 @@ specifiers:
   bcrypt: ^5.0.1
   bullmq: ^1.51.1
   cuid: ^2.1.8
+  dayjs: ^1.10.7
   dockerode: ^3.3.1
   dotenv-extended: ^2.9.0
   eslint: ^7.32.0
@@ -37,6 +38,7 @@ dependencies:
   bcrypt: 5.0.1
   bullmq: 1.51.1
   cuid: 2.1.8
+  dayjs: 1.10.7
   dockerode: 3.3.1
   dotenv-extended: 2.9.0
   got: 11.8.2
@@ -916,6 +918,10 @@ packages:
 
   /cuid/2.1.8:
     resolution: {integrity: sha512-xiEMER6E7TlTPnDxrM4eRiC6TRgjNX9xzEZ5U/Se2YJKr7Mq4pJn/2XEHjl3STcSh96GmkHPcBXLES8M29wyyg==}
+    dev: false
+
+  /dayjs/1.10.7:
+    resolution: {integrity: sha512-P6twpd70BcPK34K26uJ1KT3wlhpuOAPoMwJzpsIWUxHZ7wpmbdZL/hQqBDfz7hGurYSa5PhzdhDHtt319hL3ig==}
     dev: false
 
   /debug/4.3.2:

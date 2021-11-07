@@ -296,12 +296,11 @@ export async function configureApplication({ id, domain, port, installCommand, b
     try {
         let application = await prisma.application.findUnique({ where: { id } })
         if (application.domain !== domain && !application.oldDomain) {
-            await prisma.application.update({ where: { id }, data: { domain, oldDomain: application.domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory } })
+            application = await prisma.application.update({ where: { id }, data: { domain, oldDomain: application.domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory } })
         } else {
-            await prisma.application.update({ where: { id }, data: { domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory } })
+            application = await prisma.application.update({ where: { id }, data: { domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory } })
         }
-
-        return { status: 201 }
+        return { status: 201, body: { application } }
     } catch (e) {
         return PrismaErrorHandler(e)
     }

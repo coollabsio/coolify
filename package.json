@@ -43,6 +43,7 @@
 		"bcrypt": "^5.0.1",
 		"bullmq": "^1.51.1",
 		"cuid": "^2.1.8",
+		"dayjs": "^1.10.7",
 		"dockerode": "^3.3.1",
 		"dotenv-extended": "^2.9.0",
 		"got": "^11.8.2",

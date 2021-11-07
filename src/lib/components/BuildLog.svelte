@@ -20,10 +20,8 @@
 			`/applications/${id}/logs/build.json?buildId=${buildId}&sequence=${sequence}`
 		);
 		if (response.ok) {
-			
 			let { logs: responseLogs, status } = await response.json();
-			currentStatus = status
-			dispatch('updateBuildStatus', { status });
+			currentStatus = status;
 			logs = logs.concat(responseLogs);
 			loading = false;
 			while (status === 'running') {
@@ -34,16 +32,16 @@
 				if (res.ok) {
 					const data = await res.json();
 					status = data.status;
-					currentStatus = status
+					currentStatus = status;
 					logs = logs.concat(data.logs);
-
-					dispatch('updateBuildStatus', { status: data.status });
+					dispatch('updateBuildStatus', { status });
 					await asyncSleep(1000);
 				}
 			}
 		}
 	}
 	onMount(async () => {
+		window.scrollTo(0,0)
 		await streamLogs();
 	});
 </script>
@@ -51,18 +49,14 @@
 {#if loading}
 	<Loading />
 {:else}
-	<div class="w-full pl-4 relative">
+
 		{#if currentStatus === 'running'}
-		<LoadingLogs/>
+			<LoadingLogs />
 		{/if}
 		<pre
-			class="w-full leading-4 text-left text-sm font-semibold tracking-tighter rounded bg-coolgray-200 p-6 whitespace-pre-wrap ">
-
-        {#each logs as log}
-            <div>{log.line + '\n'}</div>
-        {/each}
-
-
-    </pre>
-	</div>
+			class="w-full leading-4 text-left text-sm font-semibold tracking-tighter rounded bg-black p-6 whitespace-pre-wrap">
+			{#each logs as log}
+				<div>{log.line + '\n'}</div>
+			{/each}
+    	</pre>
 {/if}

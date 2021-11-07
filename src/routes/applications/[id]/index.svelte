@@ -61,10 +61,14 @@
 	<form
 		action="/applications/{id}.json"
 		use:enhance={{
-			result: async () => {
+			result: async (res) => {
+				// const data = await res.json();
 				setTimeout(() => {
 					loading = false;
-				}, 300);
+					//TODO: This is not okay
+					window.location.reload();
+					// application = data.application
+				}, 500);
 			},
 			pending: async () => {
 				loading = true;
@@ -77,8 +81,8 @@
 			<div class="font-bold text-xl text-white">Configuration</div>
 			<button
 				type="submit"
-				class=" hover:bg-green-600"
 				class:bg-green-700={!loading}
+				class:hover:bg-green-600={!loading}
 				disabled={loading}>Save</button
 			>
 		</div>

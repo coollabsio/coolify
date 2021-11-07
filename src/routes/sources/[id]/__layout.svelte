@@ -30,12 +30,14 @@
 
 <script>
 	export let source;
-	async function deleteSource(source) {
-		const sure = confirm(`Are you sure you would like to delete '${source.name}'?`);
+	import { page } from '$app/stores';
+	const { id } = $page.params;
+
+	async function deleteSource(name) {
+		const sure = confirm(`Are you sure you would like to delete '${name}'?`);
 		if (sure) {
-			await fetch(`/sources/${source.id}.json`, {
-				method: 'delete',
-				body: JSON.stringify({ id: source.id })
+			await fetch(`/sources/${id}.json`, {
+				method: 'delete'
 			});
 			window.location.assign('/sources');
 		}
@@ -44,7 +46,7 @@
 
 <nav class="nav-side">
 	<button
-		on:click={() => deleteSource(source)}
+		on:click={() => deleteSource(source.name)}
 		title="Delete Git Source"
 		type="submit"
 		class="icons bg-transparent hover:text-red-500 tooltip-bottom text-sm"
