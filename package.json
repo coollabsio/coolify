@@ -4,7 +4,7 @@
 	"version": "2.0.0-alpha",
 	"license": "AGPL-3.0",
 	"scripts": {
-		"dev": "svelte-kit dev --host 0.0.0.0",
+		"dev": "docker-compose -f docker-compose-dev.yml up -d && svelte-kit dev --host 0.0.0.0",
 		"build": "svelte-kit build",
 		"preview": "svelte-kit preview",
 		"check": "svelte-check --tsconfig ./tsconfig.json",
@@ -12,7 +12,7 @@
 		"lint": "prettier --ignore-path .gitignore --check --plugin-search-dir=. . && eslint --ignore-path .gitignore .",
 		"format": "prettier --ignore-path .gitignore --write --plugin-search-dir=. .",
 		"db:generate": "prisma generate",
-		"db:push": "prisma db push"
+		"db:push": "prisma db push && prisma generate"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-node": "^1.0.0-next.55",
@@ -28,7 +28,7 @@
 		"postcss": "^8.3.11",
 		"prettier": "^2.4.1",
 		"prettier-plugin-svelte": "^2.4.0",
-		"prisma": "3.4.0",
+		"prisma": "3.4.2",
 		"svelte": "^3.42.6",
 		"svelte-check": "^2.2.6",
 		"svelte-preprocess": "^4.9.4",
@@ -39,7 +39,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@prisma/client": "3.4.0",
+		"@prisma/client": "3.4.2",
 		"bcrypt": "^5.0.1",
 		"bullmq": "^1.51.1",
 		"cuid": "^2.1.8",

@@ -10,7 +10,7 @@ export const get: RequestHandler = async (request) => {
 }
 
 export const del: RequestHandler = async (request) => {
-    const { id } = JSON.parse(request.body.toString())
+    const { id } = request.params
     return {
         body: {
             source: await db.removeSource({ id })
@@ -18,3 +18,16 @@ export const del: RequestHandler = async (request) => {
     };
 }
 
+export const post: RequestHandler<Locals, FormData> = async (request) => {
+    console.log('asd')
+    const { id } = request.params
+    const name = request.body.get('name')
+    const groupName = request.body.get('groupName') || null
+    const appId = request.body.get('appId')
+    const appSecret = request.body.get('appSecret')
+    return {
+        body: {
+            source: await db.addSource({ id, name, groupName, appId, appSecret })
+        }
+    };
+}

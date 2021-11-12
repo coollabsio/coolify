@@ -29,7 +29,7 @@
 <script lang="ts">
 	export let destination: Prisma.DestinationDocker;
 	import type Prisma from '@prisma/client';
-	import NewDestination from '$lib/components/NewDestination.svelte';
+	import NewDestination from '$lib/components/destinations/NewDestination.svelte';
 
 </script>
 

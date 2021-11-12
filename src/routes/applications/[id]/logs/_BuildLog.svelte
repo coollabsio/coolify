@@ -5,10 +5,10 @@
 	const dispatch = createEventDispatcher();
 
 	import { page } from '$app/stores';
-	import { asyncSleep } from './common';
+	import { asyncSleep } from '$lib/components/common';
 
-	import Loading from './Loading.svelte';
-	import LoadingLogs from './LoadingLogs.svelte';
+	import Loading from '$lib/components/Loading.svelte';
+	import LoadingLogs from './_Loading.svelte';
 
 	let logs = [];
 	let loading = true;
@@ -41,7 +41,7 @@
 		}
 	}
 	onMount(async () => {
-		window.scrollTo(0,0)
+		window.scrollTo(0, 0);
 		await streamLogs();
 	});
 </script>
@@ -49,7 +49,7 @@
 {#if loading}
 	<Loading />
 {:else}
-
+	<div class="relative">
 		{#if currentStatus === 'running'}
 			<LoadingLogs />
 		{/if}
@@ -59,4 +59,5 @@
 				<div>{log.line + '\n'}</div>
 			{/each}
     	</pre>
+	</div>
 {/if}

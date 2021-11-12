@@ -1,5 +1,5 @@
 <script>
-	import NewDestination from '$lib/components/NewDestination.svelte';
+	import NewDestination from '$lib/components/destinations/NewDestination.svelte';
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">

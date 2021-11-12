@@ -163,8 +163,17 @@ export async function removeSource({ id }) {
 
 export async function getSource({ id }) {
     try {
-        const body = await prisma.gitSource.findUnique({ where: { id }, include: { githubApp: true } })
+        const body = await prisma.gitSource.findUnique({ where: { id }, include: { githubApp: true, gitlabApp: true } })
         return { ...body }
+    } catch (e) {
+        return PrismaErrorHandler(e)
+    }
+}
+export async function addSource({ id, appId, name, groupName, appSecret }) {
+    try {
+        const encrptedAppSecret = encrypt(appSecret)
+        const source = await prisma.gitlabApp.create({ data: { appId, name, groupName, appSecret: encrptedAppSecret, gitSource: { connect: { id } } } })
+        return { status: 201, body: { id: source.id } }
     } catch (e) {
         return PrismaErrorHandler(e)
     }

@@ -20,9 +20,11 @@
 </script>
 
 <script lang="ts">
-	import BuildLog from '$lib/components/BuildLog.svelte';
 	import { page } from '$app/stores';
 	import { dateOptions } from '$lib/components/common';
+	
+	import BuildLog from './_BuildLog.svelte';
+
 	export let builds;
 	export let application;
 	export let buildCount;
@@ -31,7 +33,7 @@
 	$: buildId;
 
 	let skip = 0;
-	let noMoreBuilds = buildCount >= skip;
+	let noMoreBuilds = buildCount <= skip;
 	const { id } = $page.params;
 
 	let preselectedBuildId = $page.query.get('buildId');
@@ -63,6 +65,7 @@
 	async function loadMoreBuilds() {
 		if (buildCount >= skip) {
 			skip = skip + 5;
+			noMoreBuilds = buildCount >= skip;
 			let url = `/applications/${id}/logs.json?skip=${skip}`;
 			const res = await fetch(url);
 			if (res.ok) {
@@ -76,7 +79,7 @@
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Build logs of {application.domain}</div>
+	<div class="text-2xl tracking-tight mr-4">Build logs of <a href="http://{application.domain}" target="_blank">{application.domain}</a></div>
 </div>
 <div class="flex flex-row px-10 justify-start pt-6 space-x-2 ">
 	<div class="min-w-[16rem] space-y-2">

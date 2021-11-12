@@ -90,17 +90,21 @@ model DestinationDocker {
 }
 
 model GitSource {
-  id           String        @id @default(cuid())
-  name         String?       @unique
+  id           String   @id @default(cuid())
+  name         String?  @unique
   type         String?
   apiUrl       String?
   htmlUrl      String?
   organization String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  githubAppId  String?       @unique
-  githubApp    GithubApp?    @relation(fields: [githubAppId], references: [id])
-  application  Application[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  githubAppId String?       @unique
+  githubApp   GithubApp?    @relation(fields: [githubAppId], references: [id])
+  application Application[]
+
+  gitlabAppId String?    @unique
+  gitlabApp   GitlabApp? @relation(fields: [gitlabAppId], references: [id])
 }
 
 model GithubApp {
@@ -115,4 +119,15 @@ model GithubApp {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
   gitSource      GitSource?
+}
+
+model GitlabApp {
+  id            String     @id @default(cuid())
+  name          String?    @unique
+  groupName     String?    @unique
+  appId         String?
+  appSecret     String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  gitSource     GitSource?
 }

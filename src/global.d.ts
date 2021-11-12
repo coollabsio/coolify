@@ -33,6 +33,7 @@ interface NewGitSource {
     htmlUrl: string,
     apiUrl: string,
     organization?: string
+    applicationType?: string
 }
 
 type RawHaproxyConfiguration = {

@@ -11,16 +11,6 @@ const config = {
 		vite: {
 			optimizeDeps: {
 				exclude: ['svelte-kit-cookie-session'],
-			},
-			server: {
-				watch: {
-					usePolling: true
-				},
-				hmr: {
-					host: 'localhost',
-					port: 3000,
-					protocol: 'ws'
-				}
 			}
 		}
 	}
