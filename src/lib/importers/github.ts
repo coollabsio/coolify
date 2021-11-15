@@ -6,7 +6,7 @@ import * as db from '$lib/database'
 export default async function ({ applicationId, workdir, githubAppId, repository, branch, buildId }): Promise<string> {
     try {
         saveBuildLog({ line: 'Importer started.', buildId, applicationId })
-        const { privateKey, appId, installationId } = await db.prisma.githubApp.findUnique({ where: { id: githubAppId } })
+        const { privateKey, appId, installationId } = await db.getUniqueGithubApp({ githubAppId })
         const githubPrivateKey = privateKey.replace(/\\n/g, '\n').replace(/"/g, '');
 
         const payload = {

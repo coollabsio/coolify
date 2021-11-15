@@ -34,82 +34,6 @@ function PrismaErrorHandler(e) {
     return payload
 }
 
-
-prisma.$use(async (params, next) => {
-    // Create DB methods
-    if (params.model === 'GithubApp') {
-        if (params.action === 'create') {
-            const { clientSecret, webhookSecret, privateKey } = params.args.data
-            params.args.data.clientSecret = encrypt(clientSecret)
-            params.args.data.webhookSecret = encrypt(webhookSecret)
-            params.args.data.privateKey = encrypt(privateKey)
-        }
-    }
-    let result = await next(params)
-
-    // Query DB methods
-    if (params.args?.include?.githubApp && result?.githubApp) {
-        if (params.action === 'findUnique' || params.action === 'findFirst') {
-            const { clientSecret, webhookSecret, privateKey } = result.githubApp
-            result.githubApp.clientSecret = decrypt(clientSecret)
-            result.githubApp.webhookSecret = decrypt(webhookSecret)
-            result.githubApp.privateKey = decrypt(privateKey)
-        }
-        if (params.action === 'findMany') {
-            result = result.map(r => {
-                if (r.githubApp) {
-                    const { clientSecret, webhookSecret, privateKey } = r.githubApp
-                    r.githubApp.clientSecret = decrypt(clientSecret)
-                    r.githubApp.webhookSecret = decrypt(webhookSecret)
-                    r.githubApp.privateKey = decrypt(privateKey)
-                }
-                return r
-            })
-        }
-    }
-    if (params.args?.include?.gitSource?.include?.githubApp && result?.gitSource?.githubApp) {
-        if (params.action === 'findUnique' || params.action === 'findFirst') {
-            const { clientSecret, webhookSecret, privateKey } = result.gitSource.githubApp
-            result.gitSource.githubApp.clientSecret = decrypt(clientSecret)
-            result.gitSource.githubApp.webhookSecret = decrypt(webhookSecret)
-            result.gitSource.githubApp.privateKey = decrypt(privateKey)
-        }
-        if (params.action === 'findMany') {
-            result = result.map(r => {
-                if (r.gitSource.githubApp) {
-                    const { clientSecret, webhookSecret, privateKey } = r.gitSource.githubApp
-                    r.gitSource.githubApp.clientSecret = decrypt(clientSecret)
-                    r.gitSource.githubApp.webhookSecret = decrypt(webhookSecret)
-                    r.gitSource.githubApp.privateKey = decrypt(privateKey)
-                }
-                return r
-            })
-        }
-    }
-    if (params.model === 'GithubApp') {
-        if (params.action === 'findUnique' || params.action === 'findFirst') {
-            const { clientSecret, webhookSecret, privateKey } = result
-            result.clientSecret = decrypt(clientSecret)
-            result.webhookSecret = decrypt(webhookSecret)
-            result.privateKey = decrypt(privateKey)
-        }
-        if (params.action === 'findMany') {
-            result = result.map(r => {
-                const { clientSecret, webhookSecret, privateKey } = r
-                r.clientSecret = decrypt(clientSecret)
-                r.webhookSecret = decrypt(webhookSecret)
-                r.privateKey = decrypt(privateKey)
-                return r
-            })
-        }
-    }
-    return result
-})
-
-
-
-
-
 // DB functions
 export async function listApplications() {
     return await prisma.application.findMany()
@@ -126,7 +50,10 @@ export async function newApplication({ name }) {
 
 export async function getApplication({ id }) {
     try {
-        const body = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true, gitSource: { include: { githubApp: true } } } })
+        let body = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true, gitSource: { include: { githubApp: true } } } })
+        if (body.gitSource.githubApp?.clientSecret) body.gitSource.githubApp.clientSecret = decrypt(body.gitSource.githubApp.clientSecret)
+        if (body.gitSource.githubApp?.webhookSecret) body.gitSource.githubApp.webhookSecret = decrypt(body.gitSource.githubApp.webhookSecret)
+        if (body.gitSource.githubApp?.privateKey) body.gitSource.githubApp.privateKey = decrypt(body.gitSource.githubApp.privateKey)
         return { ...body }
     } catch (e) {
         return PrismaErrorHandler(e)
@@ -163,7 +90,12 @@ export async function removeSource({ id }) {
 
 export async function getSource({ id }) {
     try {
-        const body = await prisma.gitSource.findUnique({ where: { id }, include: { githubApp: true, gitlabApp: true } })
+        let body = await prisma.gitSource.findUnique({ where: { id }, include: { githubApp: true, gitlabApp: true } })
+        if (body?.githubApp?.clientSecret) body.githubApp.clientSecret = decrypt(body.githubApp.clientSecret)
+        if (body?.githubApp?.webhookSecret) body.githubApp.webhookSecret = decrypt(body.githubApp.webhookSecret)
+        if (body?.githubApp?.privateKey) body.githubApp.privateKey = decrypt(body.githubApp.privateKey)
+
+        if (body?.gitlabApp?.appSecret) body.gitlabApp.appSecret = decrypt(body.gitlabApp.appSecret)
         return { ...body }
     } catch (e) {
         return PrismaErrorHandler(e)
@@ -382,4 +314,15 @@ export async function login({ email, password }) {
             token
         }
     }
+}
+
+export async function getUniqueGithubApp({ githubAppId }) {
+    try {
+        let body = await prisma.githubApp.findUnique({ where: { id: githubAppId } })
+        if (body.privateKey) body.privateKey = decrypt(body.privateKey)
+        return { ...body }
+    } catch (e) {
+        return PrismaErrorHandler(e)
+    }
+
 }
