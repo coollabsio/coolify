@@ -3,6 +3,9 @@ interface Locals {
     session: {
         data: {
             token?: string;
+            uid?: string;
+            teams?: string[];
+            expires?: string;
         }
     }
 }

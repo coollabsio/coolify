@@ -50,10 +50,16 @@ export async function newApplication({ name }) {
 
 export async function getApplication({ id }) {
     try {
-        let body = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true, gitSource: { include: { githubApp: true } } } })
-        if (body.gitSource.githubApp?.clientSecret) body.gitSource.githubApp.clientSecret = decrypt(body.gitSource.githubApp.clientSecret)
-        if (body.gitSource.githubApp?.webhookSecret) body.gitSource.githubApp.webhookSecret = decrypt(body.gitSource.githubApp.webhookSecret)
-        if (body.gitSource.githubApp?.privateKey) body.gitSource.githubApp.privateKey = decrypt(body.gitSource.githubApp.privateKey)
+        let body = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } } } })
+
+
+        if (body.gitSource?.githubApp?.clientSecret) body.gitSource.githubApp.clientSecret = decrypt(body.gitSource.githubApp.clientSecret)
+        if (body.gitSource?.githubApp?.webhookSecret) body.gitSource.githubApp.webhookSecret = decrypt(body.gitSource.githubApp.webhookSecret)
+        if (body.gitSource?.githubApp?.privateKey) body.gitSource.githubApp.privateKey = decrypt(body.gitSource.githubApp.privateKey)
+
+
+        if (body?.gitSource?.gitlabApp?.appSecret) body.gitSource.gitlabApp.appSecret = decrypt(body.gitSource.gitlabApp.appSecret)
+
         return { ...body }
     } catch (e) {
         return PrismaErrorHandler(e)
@@ -203,9 +209,10 @@ export async function addInstallation({ gitSourceId, installation_id }) {
     }
 }
 
-export async function isBranchAlreadyUsed({ repository, branch }) {
+export async function isBranchAlreadyUsed({ repository, branch, id }) {
     try {
-        const found = await prisma.application.findFirst({ where: { branch, repository } })
+        const application = await prisma.application.findUnique({ where: { id }, include: { gitSource: true } })
+        const found = await prisma.application.findFirst({ where: { branch, repository, gitSource: { type: application.gitSource.type } } })
         if (found) {
             return { status: 200 }
         }
@@ -215,7 +222,7 @@ export async function isBranchAlreadyUsed({ repository, branch }) {
     }
 }
 
-export async function configureRepository({ id, repository, branch }) {
+export async function configureGitRepository({ id, repository, branch }) {
     try {
         await prisma.application.update({ where: { id }, data: { repository, branch } })
         return { status: 201 }
@@ -309,6 +316,7 @@ export async function login({ email, password }) {
     return {
         status: 200,
         body: {
+            isLoggedIn: true,
             uid,
             teams,
             token

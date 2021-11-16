@@ -4,27 +4,37 @@ import type { RequestHandler } from '@sveltejs/kit';
 import jsonwebtoken from 'jsonwebtoken'
 export const get: RequestHandler = async (request) => {
     let githubToken = null;
+    let gitlabToken = null;
     const { id } = request.params
     const application = await db.getApplication({ id })
+
     if (application.status) {
         return {
             ...application
         };
     }
-    if (application?.gitSource?.githubApp) {
-        const payload = {
-            iat: Math.round(new Date().getTime() / 1000),
-            exp: Math.round(new Date().getTime() / 1000 + 60),
-            iss: application.gitSource.githubApp.appId,
+    if (application.gitSource?.type === 'github') {
+        if (application?.gitSource?.githubApp) {
+            const payload = {
+                iat: Math.round(new Date().getTime() / 1000),
+                exp: Math.round(new Date().getTime() / 1000 + 60),
+                iss: application.gitSource.githubApp.appId,
+            }
+            githubToken = jsonwebtoken.sign(payload, application.gitSource.githubApp.privateKey, {
+                algorithm: 'RS256',
+            })
         }
-        githubToken = jsonwebtoken.sign(payload, application.gitSource.githubApp.privateKey, {
-            algorithm: 'RS256',
-        })
+    } else if (application.gitSource?.type === 'gitlab') {
+        if (request.headers.cookie) {
+            gitlabToken = request.headers.cookie?.split(';').map(s => s.trim()).find(s => s.startsWith('gitlabToken='))?.split('=')[1]
+        }
     }
+
 
     return {
         body: {
             githubToken,
+            gitlabToken,
             application
         }
     };
