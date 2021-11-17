@@ -9,7 +9,7 @@
 				redirect: '/login'
 			};
 		}
-		console.log(session)
+		// console.log(session)
 		return {};
 	};
 </script>

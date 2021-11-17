@@ -6,6 +6,7 @@
 	import { onMount } from 'svelte';
 
 	import { enhance } from '$lib/form';
+	import { goto } from '$app/navigation';
 
 	const { id } = $page.params;
 	const from = $page.query.get('from');
@@ -175,20 +176,100 @@
 		showSave = true;
 	}
 	async function save() {
+		let deployKeys = [];
+		let deployKeyId = application.gitSource.gitlabApp.deployKeyId;
+		const deployKeyUrl = `${apiUrl}/v4/projects/${selected.project.id}/deploy_keys`;
+		const updateDeployKeyIdUrl = `/applications/${id}/configuration/deploykey.json`;
+		const sshkeyUrl = `/applications/${id}/configuration/sshkey.json`;
+
+		if (!deployKeyId) {
+			let response = await fetch(deployKeyUrl, {
+				method: 'GET',
+				headers: {
+					Authorization: `Bearer ${gitlabToken}`
+				}
+			});
+			if (response.ok) {
+				deployKeys = await response.json();
+			}
+			deployKeyId = deployKeys.find((key) => key.title === 'coolify-deploy-key');
+			console.log({ deployKeyId });
+			if (deployKeyId) {
+				const form = new FormData();
+				form.append('deployKeyId', deployKeyId.id);
+
+				let response = await fetch(updateDeployKeyIdUrl, {
+					method: 'POST',
+					body: form
+				});
+				if (!response.ok) {
+					throw new Error(response.statusText);
+				}
+			} else {
+				response = await fetch(sshkeyUrl, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						accept: 'application/json'
+					},
+					body: JSON.stringify({})
+				});
+				if (!response.ok) {
+					throw new Error(response.statusText);
+				}
+				const { publicKey } = await response.json();
+
+				// const deployKeyForm = new FormData();
+				// deployKeyForm.append('title', 'coolify-deploy-key');
+				// deployKeyForm.append('key', publicKey);
+				// deployKeyForm.append('can_push', 'false');
+				
+				response = await fetch(deployKeyUrl, {
+					method: 'POST',
+					body: JSON.stringify({
+						title: 'coolify-deploy-key',
+						key: publicKey,
+						can_push: false
+					}),
+					headers: {
+						Authorization: `Bearer ${gitlabToken}`,
+						'Content-Type': 'application/json'
+					}
+				});
+				if (!response.ok) {
+					throw new Error(response.statusText);
+				}
+				const { id } = await response.json();
+
+				const form = new FormData();
+				form.append('deployKeyId', id);
+
+				response = await fetch(updateDeployKeyIdUrl, {
+					method: 'POST',
+					body: form
+				});
+				if (!response.ok) {
+					throw new Error(response.statusText);
+				}
+			}
+		}
+		// TODO : check webhook https://gitlab.com/api/v4/projects/7260661/hooks
+
 		const url = `/applications/${id}/configuration/repository.json`;
 		const form = new FormData();
 		form.append('repository', `${selected.group.full_path}/${selected.project.name}`);
 		form.append('branch', selected.branch.name);
+		form.append('projectId', selected.project.id);
 
-		const res = await fetch(url, {
+		const response = await fetch(url, {
 			method: 'POST',
 			headers: {
 				accept: 'application/json'
 			},
 			body: form
 		});
-		if (res.ok) {
-			console.log(await res.json());
+		if (response.ok) {
+			goto(from || `/applications/${id}/configuration/buildpack`);
 			return;
 		}
 	}

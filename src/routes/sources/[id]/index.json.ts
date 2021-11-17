@@ -19,7 +19,7 @@ export const del: RequestHandler = async (request) => {
 }
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
-    console.log('asd')
+    // TODO: Do we really need groupName?
     const { id } = request.params
     const name = request.body.get('name')
     const groupName = request.body.get('groupName') || null

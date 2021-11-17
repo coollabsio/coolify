@@ -17,10 +17,10 @@
 	function newApp() {
 		switch (payload.applicationType) {
 			case 'user':
-				window.location.assign(`${source.htmlUrl}/-/profile/applications`);
+				window.open(`${source.htmlUrl}/-/profile/applications`);
 				break;
 			case 'group':
-				window.location.assign(
+				window.open(
 					`${source.htmlUrl}/groups/${payload.groupName}/-/settings/applications`
 				);
 				break;
@@ -37,7 +37,7 @@
 </script>
 
 <div class="flex flex-col justify-center pb-8">
-	{#if !source.gitlabApp.appId}
+	{#if !source.gitlabApp?.appId}
 		<form
 			class="grid grid-flow-row gap-2 py-4"
 			bind:this={formEl}

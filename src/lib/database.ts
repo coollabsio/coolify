@@ -5,6 +5,9 @@ import { decrypt, encrypt } from './crypto'
 import bcrypt from 'bcrypt';
 import jsonwebtoken from 'jsonwebtoken'
 import cuid from 'cuid';
+import { asyncExecShell } from './common';
+import { generateKeyPair } from 'crypto';
+import forge from 'node-forge'
 
 const { SECRET_KEY } = process.env;
 const secretKey = SECRET_KEY;
@@ -33,7 +36,19 @@ function PrismaErrorHandler(e) {
     console.error(e)
     return payload
 }
-
+async function generateSshKeyPair(): Promise<{ publicKey: string, privateKey: string }> {
+    return await new Promise(async (resolve, reject) => {
+        forge.pki.rsa.generateKeyPair({ bits: 4096, workers: -1 }, function (err, keys) {
+            if (keys) {
+                resolve({
+                    publicKey: forge.ssh.publicKeyToOpenSSH(keys.publicKey),
+                    privateKey: forge.ssh.privateKeyToOpenSSH(keys.privateKey)
+                })
+            }
+            else { reject(keys) }
+        });
+    })
+}
 // DB functions
 export async function listApplications() {
     return await prisma.application.findMany()
@@ -68,7 +83,7 @@ export async function getApplication({ id }) {
 
 export async function listSources() {
     try {
-        const body = await prisma.gitSource.findMany({ include: { githubApp: true } })
+        const body = await prisma.gitSource.findMany({ include: { githubApp: true, gitlabApp: true } })
         return [...body]
     } catch (e) {
         return PrismaErrorHandler(e)
@@ -222,9 +237,9 @@ export async function isBranchAlreadyUsed({ repository, branch, id }) {
     }
 }
 
-export async function configureGitRepository({ id, repository, branch }) {
+export async function configureGitRepository({ id, repository, branch, projectId }) {
     try {
-        await prisma.application.update({ where: { id }, data: { repository, branch } })
+        await prisma.application.update({ where: { id }, data: { repository, branch, projectId } })
         return { status: 201 }
     } catch (e) {
         return PrismaErrorHandler(e)
@@ -334,3 +349,32 @@ export async function getUniqueGithubApp({ githubAppId }) {
     }
 
 }
+
+export async function updateDeployKey({ id, deployKeyId }) {
+    try {
+        const application = await prisma.application.findUnique({ where: { id }, include: { gitSource: { include: { gitlabApp: true } } } })
+        await prisma.gitlabApp.update({ where: { id: application.gitSource.gitlabApp.id }, data: { deployKeyId } })
+        return { status: 201 }
+    } catch (e) {
+        return PrismaErrorHandler(e)
+    }
+
+}
+export async function generateSshKey({ id }) {
+    try {
+        const application = await prisma.application.findUnique({ where: { id }, include: { gitSource: { include: { gitlabApp: true } } } })
+        if (!application.gitSource?.gitlabApp?.privateSshKey) {
+            const keys = await generateSshKeyPair()
+            const encryptedPrivateKey = encrypt(keys.privateKey)
+            await prisma.gitlabApp.update({ where: { id: application.gitSource.gitlabApp.id }, data: { privateSshKey: encryptedPrivateKey } })
+            return { status: 201, body: { publicKey: keys.publicKey } }
+        } else {
+            return { status: 200 }
+        }
+
+    } catch (e) {
+        return PrismaErrorHandler(e)
+    }
+
+}
+

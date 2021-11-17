@@ -6,13 +6,14 @@ import { dockerInstance } from '../docker'
 import { asyncExecShell, saveBuildLog } from '../common'
 import { completeTransaction, getNextTransactionId, haproxyInstance } from '../haproxy'
 import * as db from '$lib/database'
+import { decrypt } from '$lib/crypto'
 
 export default async function (job) {
   /*
     Edge cases:
     1 - Change build pack and redeploy, what should happen?
   */
-  let { id: applicationId, repository, branch, buildPack, destinationDocker, gitSource, build_id: buildId, configHash, port, installCommand, buildCommand, startCommand, domain, oldDomain, baseDirectory, publishDirectory } = job.data
+  let { id: applicationId, repository, branch, buildPack, destinationDocker, gitSource, build_id: buildId, configHash, port, installCommand, buildCommand, startCommand, domain, oldDomain, baseDirectory, publishDirectory, projectId } = job.data
 
   const destinationSwarm = null
   const kubernetes = null
@@ -27,7 +28,8 @@ export default async function (job) {
       applicationId,
       destinationDockerId: destinationDocker.id,
       gitSourceId: gitSource.id,
-      githubAppId: gitSource.githubApp.id,
+      githubAppId: gitSource.githubApp?.id,
+      gitlabAppId: gitSource.gitlabApp?.id,
       status: 'running',
     }
   })
@@ -44,7 +46,18 @@ export default async function (job) {
   if (buildPack === 'static') {
     port = 80
   }
-  const commit = await importers[gitSource.type]({ applicationId, workdir, githubAppId: gitSource.githubApp.id, repository, branch, buildId: build.id })
+  const commit = await importers[gitSource.type]({
+    applicationId, workdir,
+    githubAppId: gitSource.githubApp?.id,
+    gitlabAppId: gitSource.gitlabApp?.id,
+    repository,
+    branch,
+    buildId: build.id,
+    apiUrl: gitSource.apiUrl,
+    projectId,
+    deployKeyId: gitSource.gitlabApp?.deployKeyId,
+    privateSshKey: decrypt(gitSource.gitlabApp.privateSshKey)
+  })
 
   await db.prisma.build.update({ where: { id: build.id }, data: { commit } })
 

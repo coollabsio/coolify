@@ -13,6 +13,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { id } = request.params
     const repository = request.body.get('repository') || null
     const branch = request.body.get('branch') || null
-    
-    return await db.configureGitRepository({ id, repository, branch })
+    const projectId = Number(request.body.get('projectId')) || null
+
+    return await db.configureGitRepository({ id, repository, branch, projectId })
 }

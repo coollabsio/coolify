@@ -5,6 +5,8 @@
 	"license": "AGPL-3.0",
 	"scripts": {
 		"dev": "docker-compose -f docker-compose-dev.yml up -d && svelte-kit dev --host 0.0.0.0",
+		"dev:stop": "docker-compose -f docker-compose-dev.yml down",
+		"dev:logs": "docker-compose -f docker-compose-dev.yml logs -f --tail 10",
 		"build": "svelte-kit build",
 		"preview": "svelte-kit preview",
 		"check": "svelte-check --tsconfig ./tsconfig.json",
@@ -20,6 +22,7 @@
 		"@sveltejs/kit": "^1.0.0-next.191",
 		"@types/bcrypt": "^5.0.0",
 		"@types/js-cookie": "^3.0.1",
+		"@types/node-forge": "^0.10.10",
 		"@typescript-eslint/eslint-plugin": "^4.31.1",
 		"@typescript-eslint/parser": "^4.31.1",
 		"autoprefixer": "^10.4.0",
@@ -29,7 +32,7 @@
 		"postcss": "^8.3.11",
 		"prettier": "^2.4.1",
 		"prettier-plugin-svelte": "^2.4.0",
-		"prisma": "3.4.2",
+		"prisma": "3.5.0",
 		"svelte": "^3.42.6",
 		"svelte-check": "^2.2.6",
 		"svelte-preprocess": "^4.9.4",
@@ -40,7 +43,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@prisma/client": "3.4.2",
+		"@prisma/client": "3.5.0",
 		"bcrypt": "^5.0.1",
 		"bullmq": "^1.51.1",
 		"cuid": "^2.1.8",
@@ -50,6 +53,7 @@
 		"got": "^11.8.2",
 		"js-cookie": "^3.0.1",
 		"jsonwebtoken": "^8.5.1",
+		"node-forge": "^0.10.0",
 		"svelte-kit-cookie-session": "^1.3.3"
 	},
 	"prisma": {

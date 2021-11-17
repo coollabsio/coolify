@@ -78,7 +78,7 @@
 	}
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
+<div class="font-bold flex space-x-1 py-6 px-6">
 	<div class="text-2xl tracking-tight mr-4">Build logs of <a href="http://{application.domain}" target="_blank">{application.domain}</a></div>
 </div>
 <div class="flex flex-row px-10 justify-start pt-6 space-x-2 ">
@@ -107,7 +107,7 @@
 						<div class="font-bold">Running</div>
 					{:else}
 						<div>{build.since}</div>
-						<div>Deployed in <span class="font-bold">{build.took}s</span></div>
+						<div>Finished in <span class="font-bold">{build.took}s</span></div>
 					{/if}
 				</div>
 			</div>

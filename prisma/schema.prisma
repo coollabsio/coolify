@@ -42,6 +42,7 @@ model Application {
   repository          String?
   branch              String?
   buildPack           String?
+  projectId           Int?
   port                Int?
   installCommand      String?
   buildCommand        String?
@@ -72,6 +73,7 @@ model Build {
   destinationDockerId String?
   gitSourceId         String?
   githubAppId         String?
+  gitlabAppId         String?
   commit              String?
   status              String?  @default("queued")
   createdAt           DateTime @default(now())
@@ -125,6 +127,8 @@ model GitlabApp {
   id            String     @id @default(cuid())
   name          String?    @unique
   groupName     String?    @unique
+  deployKeyId   Int?
+  privateSshKey String?
   appId         String?
   appSecret     String?
   createdAt     DateTime   @default(now())
