@@ -7,6 +7,7 @@
 		"dev": "docker-compose -f docker-compose-dev.yml up -d && svelte-kit dev --host 0.0.0.0",
 		"dev:stop": "docker-compose -f docker-compose-dev.yml down",
 		"dev:logs": "docker-compose -f docker-compose-dev.yml logs -f --tail 10",
+		"start":"npx prisma migrate deploy && npx prisma generate && node build",
 		"build": "svelte-kit build",
 		"preview": "svelte-kit preview",
 		"check": "svelte-check --tsconfig ./tsconfig.json",

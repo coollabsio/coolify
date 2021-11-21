@@ -3,12 +3,9 @@ dotEnvExtended.load();
 import type { GetSession } from "@sveltejs/kit";
 import { handleSession } from "svelte-kit-cookie-session";
 
-const { SECRET_KEY } = process.env;
-const secretKey = SECRET_KEY;
-
 export const handle = handleSession(
     {
-        secret: secretKey,
+        secret: process.env['SECRET_KEY'],
         expires: 30
     },
     async function ({ request, resolve }) {

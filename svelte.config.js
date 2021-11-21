@@ -6,6 +6,9 @@ const config = {
 	kit: {
 		target: '#svelte',
 		adapter: adapter(),
+		prerender: {
+            enabled: false,
+        },
 		hostHeader: 'X-Forwarded-Host',
 		floc: true,
 		vite: {
