@@ -4,10 +4,10 @@
 		let configurationPhase = null;
 		if (!application.gitSourceId) {
 			configurationPhase = 'source';
-		} else if (!application.destinationDockerId) {
-			configurationPhase = 'destination';
 		} else if (!application.repository && !application.branch) {
 			configurationPhase = 'repository';
+		} else if (!application.destinationDockerId) {
+			configurationPhase = 'destination';
 		} else if (!application.buildPack) {
 			configurationPhase = 'buildpack';
 		}

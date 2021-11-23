@@ -5,8 +5,6 @@ import { decrypt, encrypt } from './crypto'
 import bcrypt from 'bcrypt';
 import jsonwebtoken from 'jsonwebtoken'
 import cuid from 'cuid';
-import { asyncExecShell } from './common';
-import { generateKeyPair } from 'crypto';
 import forge from 'node-forge'
 
 const { SECRET_KEY } = process.env;
@@ -18,8 +16,17 @@ if (!dev) {
     PrismaClient = ProdPrisma.PrismaClient
     P = ProdPrisma.Prisma
 }
-
-export const prisma = new PrismaClient()
+let prismaOptions = {}
+if (dev) {
+    prismaOptions = {
+        errorFormat: 'pretty',
+        log: [{
+            emit: 'event',
+            level: 'query',
+        }]
+    }
+}
+export const prisma = new PrismaClient(prismaOptions)
 
 function PrismaErrorHandler(e) {
     const payload = {
@@ -101,8 +108,10 @@ export async function newSource({ name, type, htmlUrl, apiUrl, organization }) {
 export async function removeSource({ id }) {
     try {
         // TODO: Disconnect application with this sourceId! Maybe not needed?
-        const source = await prisma.gitSource.delete({ where: { id }, include: { githubApp: true } })
-        await prisma.githubApp.delete({ where: { id: source.githubAppId } })
+        const source = await prisma.gitSource.delete({ where: { id }, include: { githubApp: true, gitlabApp: true } })
+        console.log(source)
+        if (source.githubAppId) await prisma.githubApp.delete({ where: { id: source.githubAppId } })
+        if (source.gitlabAppId) await prisma.gitlabApp.delete({ where: { id: source.gitlabAppId } })
         return { status: 200 }
     } catch (e) {
         return PrismaErrorHandler(e)

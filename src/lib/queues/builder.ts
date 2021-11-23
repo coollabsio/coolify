@@ -35,8 +35,8 @@ export default async function (job) {
   })
 
   const workdir = `/tmp/build-sources/${repository}/${build.id}`
+  const repodir = `/tmp/build-sources/${repository}/`
   await asyncExecShell(`mkdir -p ${workdir}`)
-  console.log(workdir)
   // TODO: Separate logic
   if (buildPack === 'node') {
     if (!port) port = 3000
@@ -47,7 +47,9 @@ export default async function (job) {
     port = 80
   }
   const commit = await importers[gitSource.type]({
-    applicationId, workdir,
+    applicationId, 
+    workdir, 
+    repodir,
     githubAppId: gitSource.githubApp?.id,
     gitlabAppId: gitSource.gitlabApp?.id,
     repository,
@@ -55,10 +57,9 @@ export default async function (job) {
     buildId: build.id,
     apiUrl: gitSource.apiUrl,
     projectId,
-    deployKeyId: gitSource.gitlabApp?.deployKeyId,
-    privateSshKey: decrypt(gitSource.gitlabApp.privateSshKey)
+    deployKeyId: gitSource.gitlabApp?.deployKeyId || null,
+    privateSshKey: decrypt(gitSource.gitlabApp?.privateSshKey) || null
   })
-
   await db.prisma.build.update({ where: { id: build.id }, data: { commit } })
 
   const currentHash = crypto.createHash('sha256').update(JSON.stringify({ buildPack, port, installCommand, buildCommand, startCommand })).digest('hex')

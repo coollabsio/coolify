@@ -87,7 +87,7 @@
 			use:enhance={{
 				result: async (res) => {
 					const { id } = await res.json();
-					console.log(id);
+					window.location.reload()
 				}
 			}}
 			class="grid grid-flow-row gap-2 py-4 pt-10"

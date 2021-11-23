@@ -1,11 +1,10 @@
 <script lang="ts">
 	export let buildId;
 
-	import { createEventDispatcher, onMount } from 'svelte';
+	import { createEventDispatcher, onDestroy, onMount } from 'svelte';
 	const dispatch = createEventDispatcher();
 
 	import { page } from '$app/stores';
-	import { asyncSleep } from '$lib/components/common';
 
 	import Loading from '$lib/components/Loading.svelte';
 	import LoadingLogs from './_Loading.svelte';
@@ -14,7 +13,7 @@
 	let loading = true;
 	let currentStatus;
 	const { id } = $page.params;
-
+	let streamInterval;
 	async function streamLogs(sequence = 0) {
 		const response = await fetch(
 			`/applications/${id}/logs/build.json?buildId=${buildId}&sequence=${sequence}`
@@ -24,7 +23,11 @@
 			currentStatus = status;
 			logs = logs.concat(responseLogs);
 			loading = false;
-			while (status === 'running') {
+			streamInterval = setInterval(async () => {
+				if (status !== 'running') {
+					clearInterval(streamInterval);
+					return;
+				}
 				const nextSequence = logs[logs.length - 1].time;
 				const res = await fetch(
 					`/applications/${id}/logs/build.json?buildId=${buildId}&sequence=${nextSequence}`
@@ -35,11 +38,13 @@
 					currentStatus = status;
 					logs = logs.concat(data.logs);
 					dispatch('updateBuildStatus', { status });
-					await asyncSleep(1000);
 				}
-			}
+			}, 1000);
 		}
 	}
+	onDestroy(() => {
+		clearInterval(streamInterval);
+	});
 	onMount(async () => {
 		window.scrollTo(0, 0);
 		await streamLogs();

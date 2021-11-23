@@ -55,7 +55,7 @@
 			><a href="http://{application.domain}" target="_blank">{application.domain}</a></span
 		>
 	{/if}
-	<a href="{application.gitSource.htmlUrl}/{application.repository}" target="_blank" class="w-10">
+	<a href="{application.gitSource.htmlUrl}/{application.repository}/tree/{application.branch}" target="_blank" class="w-10">
 		{#if application.gitSource.type === 'gitlab'}
 			<svg viewBox="0 0 128 128" class="icons">
 				<path
