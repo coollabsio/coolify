@@ -6,4 +6,5 @@ node_modules
 
 .env
 /db/*.db
+/db/*.db-journal
 /data/haproxy/haproxy.cfg
