@@ -20,7 +20,7 @@
 	"devDependencies": {
 		"@sveltejs/adapter-node": "^1.0.0-next.55",
 		"@sveltejs/adapter-static": "^1.0.0-next.21",
-		"@sveltejs/kit": "^1.0.0-next.191",
+		"@sveltejs/kit": "^1.0.0-next.201",
 		"@types/bcrypt": "^5.0.0",
 		"@types/js-cookie": "^3.0.1",
 		"@types/node-forge": "^0.10.10",
@@ -34,13 +34,13 @@
 		"prettier": "^2.4.1",
 		"prettier-plugin-svelte": "^2.4.0",
 		"prisma": "3.5.0",
-		"svelte": "^3.42.6",
-		"svelte-check": "^2.2.6",
-		"svelte-preprocess": "^4.9.4",
-		"tailwindcss": "^2.2.17",
+		"svelte": "^3.44.2",
+		"svelte-check": "^2.2.10",
+		"svelte-preprocess": "^4.9.8",
+		"tailwindcss": "^2.2.19",
 		"ts-node": "^10.4.0",
 		"tslib": "^2.3.1",
-		"typescript": "^4.4.3"
+		"typescript": "^4.5.2"
 	},
 	"type": "module",
 	"dependencies": {

@@ -1,24 +1,27 @@
 version: '3.8'
 
 services:
-  # postgres:
-  #   image: 'postgres:latest'
-  #   ports: 
-  #     - target: 5432
-  #       published: 5432
-  #       protocol: tcp
-  #       mode: host
-  #   networks:
-  #     - coollabs-dev
-  #   environment:
-  #     POSTGRES_PASSWORD: example
+  coolify:
+    image: coolify-v2
+    container_name: coolify
+    ports: 
+      - target: 3000
+        published: 3000
+        protocol: tcp
+        mode: host
+    volumes:
+      - './db:/app/db'
+    environment:
+      - APP_ID=${APP_ID}
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=${DATABASE_URL}
   haproxy: 
     image: 'haproxytech/haproxy-ubuntu:2.4'
     container_name: coolify-haproxy
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     networks:
-      - coollabs-dev
+      - coollabs
     volumes:
       - './data/haproxy/:/usr/local/etc/haproxy/'
     ports: 
@@ -44,15 +47,14 @@ services:
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
     networks:
-      - coollabs-dev
+      - coollabs
     ports:
       - target: 6379
         published: 6379
         protocol: tcp
-        mode: host
 
 networks:
-  coollabs-dev:
+  coollabs:
     driver: overlay
-    name: coollabs-dev
+    name: coollabs
     external: true

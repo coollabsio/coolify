@@ -3,5 +3,7 @@ node_modules
 /build
 /.svelte-kit
 /package
+
 .env
-/prisma/dev.db
+/db/*.db
+/data/haproxy/haproxy.cfg
