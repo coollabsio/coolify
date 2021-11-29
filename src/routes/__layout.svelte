@@ -18,6 +18,13 @@
 	import '../tailwind.css';
 	import { page, session } from '$app/stores';
 	let alpha = true;
+
+	async function logout() {
+		await fetch(`/logout.json`, {
+			method: 'delete'
+		});
+		window.location.reload();
+	}
 </script>
 
 {#if $session.token}
@@ -107,6 +114,7 @@
 				</a>
 				<div class="border-t border-warmGray-700" />
 				{#if alpha}
+					<!-- svelte-ignore a11y-invalid-attribute -->
 					<a
 						href="javascript:void(0)"
 						class="icons hover:bg-coolgray-200 text-warmGray-600 tooltip-right cursor-not-allowed"
@@ -127,6 +135,7 @@
 						>
 					</a>
 					<div class="border-t border-warmGray-700" />
+					<!-- svelte-ignore a11y-invalid-attribute -->
 					<a
 						href="javascript:void(0)"
 						class="icons hover:bg-coolgray-200 text-warmGray-600 tooltip-right cursor-not-allowed"
@@ -145,33 +154,6 @@
 								d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
 							/></svg
 						>
-					</a>
-					<div class="border-t border-warmGray-700" />
-					<a
-						href="javascript:void(0)"
-						class="icons hover:bg-coolgray-200 text-warmGray-600 tooltip-right cursor-not-allowed"
-						data-tooltip="Settings"
-					>
-						<svg
-							class=" w-8 h-8"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-							xmlns="http://www.w3.org/2000/svg"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-							/>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-							/>
-						</svg>
 					</a>
 				{:else}
 					<a
@@ -220,6 +202,39 @@
 						>
 					</a>
 					<div class="border-t border-warmGray-700" />
+				{/if}
+			</div>
+			<div class="flex-1" />
+			<div class="flex flex-col space-y-4 py-2">
+				{#if alpha}
+					<!-- svelte-ignore a11y-invalid-attribute -->
+					<a
+						href="javascript:void(0)"
+						class="icons hover:bg-coolgray-200 text-warmGray-600 tooltip-right cursor-not-allowed"
+						data-tooltip="Settings"
+					>
+						<svg
+							class=" w-8 h-8"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+							xmlns="http://www.w3.org/2000/svg"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+							/>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+							/>
+						</svg>
+					</a>
+				{:else}
 					<a
 						sveltekit:prefetch
 						href="/settings"
@@ -250,8 +265,26 @@
 						</svg>
 					</a>
 				{/if}
+				<div
+					class="icons hover:text-red-500 bg-coolgray-200 tooltip-right"
+					data-tooltip="Logout"
+					on:click={logout}
+				>
+					<svg
+						class="w-7 h-7 ml-1"
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline
+							points="16 17 21 12 16 7"
+						/><line x1="21" y1="12" x2="9" y2="12" /></svg
+					>
+				</div>
 			</div>
-			<div class="flex-1" />
 			<div
 				class="w-full text-warmGray-400 hover:bg-coolgray-200 hover:text-white text-center font-bold"
 			>

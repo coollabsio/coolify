@@ -3,10 +3,10 @@
 @tailwind utilities;
 
 html {
-	@apply h-full;
+	@apply h-full ;
 }
 body {
-	@apply text-sm text-warmGray-300 bg-coolblack overflow-x-hidden min-h-screen;
+	@apply text-sm text-white bg-coolblack overflow-x-hidden min-h-screen;
 }
 
 main, .main {
@@ -15,7 +15,7 @@ main, .main {
 }
 
 input {
-	@apply text-xs px-2  py-2 rounded bg-transparent border border-transparent bg-coolgray-200 text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500 placeholder-warmGray-600 w-96 ;
+	@apply text-xs px-2  py-2 rounded bg-transparent border border-transparent bg-coolgray-200 text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500 placeholder-warmGray-600 w-96;
 }
 
 select {
@@ -60,7 +60,13 @@ a {
 
 .border-gradient {
 	border-bottom: 2px solid transparent;
-	border-image: linear-gradient(
+	-o-border-image: linear-gradient(
+		0.25turn,
+		rgba(255, 249, 34),
+		rgba(255, 0, 128),
+		rgba(56, 2, 155, 0)
+	);
+	   border-image: linear-gradient(
 		0.25turn,
 		rgba(255, 249, 34),
 		rgba(255, 0, 128),
@@ -70,7 +76,13 @@ a {
 }
 .border-gradient-full {
 	border: 4px solid transparent;
-	border-image: linear-gradient(
+	-o-border-image: linear-gradient(
+		0.25turn,
+		rgba(255, 249, 34),
+		rgba(255, 0, 128),
+		rgba(56, 2, 155, 0)
+	);
+	   border-image: linear-gradient(
 		0.25turn,
 		rgba(255, 249, 34),
 		rgba(255, 0, 128),
@@ -97,14 +109,8 @@ a {
 	position: absolute;
 	visibility: hidden;
 	opacity: 0;
-	-webkit-transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out,
-		-webkit-transform 0.2s cubic-bezier(0.71, 1.7, 0.77, 1.24);
-	-moz-transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out,
-		-moz-transform 0.2s cubic-bezier(0.71, 1.7, 0.77, 1.24);
 	transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out,
 		transform 0.2s cubic-bezier(0.71, 1.7, 0.77, 1.24);
-	-webkit-transform: translate3d(0, 0, 0);
-	-moz-transform: translate3d(0, 0, 0);
 	transform: translate3d(0, 0, 0);
 	pointer-events: none;
 }
@@ -173,8 +179,6 @@ a {
 .tooltip-top:hover:after,
 .tooltip-top:focus:before,
 .tooltip-top:focus:after {
-	-webkit-transform: translateY(-12px);
-	-moz-transform: translateY(-12px);
 	transform: translateY(-12px);
 }
 
@@ -190,8 +194,6 @@ a {
 .tooltip-left:hover:after,
 .tooltip-left:focus:before,
 .tooltip-left:focus:after {
-	-webkit-transform: translateX(-12px);
-	-moz-transform: translateX(-12px);
 	transform: translateX(-12px);
 }
 
@@ -207,8 +209,6 @@ a {
 .tooltip-bottom:hover:after,
 .tooltip-bottom:focus:before,
 .tooltip-bottom:focus:after {
-	-webkit-transform: translateY(12px);
-	-moz-transform: translateY(12px);
 	transform: translateY(12px);
 }
 
@@ -223,8 +223,6 @@ a {
 .tooltip-right:hover:after,
 .tooltip-right:focus:before,
 .tooltip-right:focus:after {
-	-webkit-transform: translateX(12px);
-	-moz-transform: translateX(12px);
 	transform: translateX(12px);
 }
 
