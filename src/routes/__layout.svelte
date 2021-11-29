@@ -9,7 +9,7 @@
 				redirect: '/login'
 			};
 		}
-		// console.log(session)
+
 		return {};
 	};
 </script>
@@ -17,8 +17,25 @@
 <script>
 	import '../tailwind.css';
 	import { page, session } from '$app/stores';
+	import { browser } from '$app/env';
+	import { onMount } from 'svelte';
 	let alpha = true;
-
+	onMount(async () => {
+		if ($session.uid) {
+			const response = await fetch(`/login.json?uid=${$session.uid}`, {
+				method: 'GET',
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			});
+			if (!response.ok) {
+				await fetch(`/logout.json`, {
+					method: 'delete'
+				});
+				browser && window.location.reload();
+			}
+		}
+	});
 	async function logout() {
 		await fetch(`/logout.json`, {
 			method: 'delete'

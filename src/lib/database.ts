@@ -29,11 +29,16 @@ if (dev) {
 export const prisma = new PrismaClient(prismaOptions)
 
 function PrismaErrorHandler(e) {
+
     const payload = {
         status: 500,
         body: {
-            message: 'Ooops, something is not okay, are you okay?'
+            message: 'Ooops, something is not okay, are you okay?',
+            error: e.message
         }
+    }
+    if (e.name === 'NotFoundError') {
+        payload.status = 404
     }
     if (e instanceof P.PrismaClientKnownRequestError) {
         if (e.code === 'P2002') {
@@ -56,7 +61,16 @@ async function generateSshKeyPair(): Promise<{ publicKey: string, privateKey: st
         });
     })
 }
+
 // DB functions
+export async function getUser({ uid }) {
+    try {
+        await prisma.user.findUnique({ where: { uid }, rejectOnNotFound: true })
+        return { status: 200 }
+    } catch (e) {
+        return PrismaErrorHandler(e)
+    }
+}
 export async function listApplications() {
     return await prisma.application.findMany()
 }
@@ -109,7 +123,6 @@ export async function removeSource({ id }) {
     try {
         // TODO: Disconnect application with this sourceId! Maybe not needed?
         const source = await prisma.gitSource.delete({ where: { id }, include: { githubApp: true, gitlabApp: true } })
-        console.log(source)
         if (source.githubAppId) await prisma.githubApp.delete({ where: { id: source.githubAppId } })
         if (source.gitlabAppId) await prisma.gitlabApp.delete({ where: { id: source.gitlabAppId } })
         return { status: 200 }
@@ -289,7 +302,12 @@ export async function listLogs({ buildId, last = 0 }) {
 
 export async function login({ email, password }) {
     const saltRounds = 15;
+    const users = await prisma.user.count()
     const userFound = await prisma.user.findUnique({ where: { email }, include: { teams: { select: { assignedBy: true, assignedAt: true, teamId: true } } } })
+    
+    // Registration disabled if database is not seeded properly
+    const { value: isRegistrationEnabled = 'false' } = await prisma.setting.findUnique({ where: { name: 'isRegistrationEnabled' }, select: { value: true } }) || {}
+
     let uid = cuid()
     let teams = []
     if (userFound) {
@@ -307,6 +325,17 @@ export async function login({ email, password }) {
             teams = userFound.teams
         }
     } else {
+        // If registration disabled, return 403
+        if (isRegistrationEnabled === 'false') {
+            return {
+                status: 403,
+                body: {
+                    message: 'Registration disabled by administrator.'
+                }
+            }
+        }
+
+
         const hashedPassword = await bcrypt.hash(password, saltRounds)
         const user = await prisma.user.create({
             data: {
@@ -328,6 +357,11 @@ export async function login({ email, password }) {
         })
         teams = user.teams
     }
+    // Disable registration if we are registering the first user.
+    if (users === 0) {
+        await prisma.setting.update({ where: { name: 'isRegistrationEnabled' }, data: { value: 'false' } })
+    }
+
     const token = jsonwebtoken.sign({}, secretKey, {
         expiresIn: 15778800,
         algorithm: 'HS256',

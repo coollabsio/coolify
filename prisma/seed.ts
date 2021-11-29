@@ -4,11 +4,7 @@ const { PrismaClient } = Prisma;
 const prisma = new PrismaClient();
 
 async function main() {
-	// await prisma.application.create({
-	// 	data: {
-	// 		name: 'Banana',
-    //         domain: 'test.co'
-	// 	}
-	// });
+	// Create default settings
+	await prisma.setting.create({ data: { name: 'isRegistrationEnabled', value: 'true' } });
 }
 main();

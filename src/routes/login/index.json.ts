@@ -11,3 +11,14 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     }
     return response
 }
+
+export const get: RequestHandler<Locals, FormData> = async (request) => {
+    const uid = request.query.get('uid')
+    if (!uid) {
+        return {
+            status: 401
+        }
+    }
+    return await db.getUser({ uid })
+
+}
