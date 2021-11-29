@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   coolify:
-    image: coolify-v2
+    image: coolify:v2.0.0-alpha
     container_name: coolify
     ports: 
       - target: 3000
@@ -16,7 +16,7 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE_URL=${DATABASE_URL}
   haproxy: 
-    image: 'haproxytech/haproxy-ubuntu:2.4'
+    image: haproxytech/haproxy-ubuntu:2.4
     container_name: coolify-haproxy
     extra_hosts:
       - 'host.docker.internal:host-gateway'
@@ -42,7 +42,7 @@ services:
         protocol: tcp
         mode: host
   redis:
-    image: 'bitnami/redis:6.2'
+    image: bitnami/redis:6.2
     container_name: coolify-redis
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
