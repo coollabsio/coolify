@@ -8,3 +8,4 @@ node_modules
 /db/*.db
 /db/*.db-journal
 /data/haproxy/haproxy.cfg
+/data/haproxy/haproxy.cfg.lkg

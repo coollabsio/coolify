@@ -17,6 +17,7 @@
 <script>
 	import '../tailwind.css';
 	import { page, session } from '$app/stores';
+	let alpha = true;
 </script>
 
 {#if $session.token}
@@ -105,81 +106,150 @@
 					>
 				</a>
 				<div class="border-t border-warmGray-700" />
-				<a
-					sveltekit:prefetch
-					href="/databases"
-					class="icons hover:text-purple-500 bg-coolgray-200 tooltip-right"
-					class:text-purple-500={$page.path.startsWith('/databases')}
-					class:bg-coolgray-500={$page.path.startsWith('/databases')}
-					data-tooltip="Databases"
-				>
-					<svg
-						class="w-8 h-8"
-						fill="none"
-						stroke="currentColor"
-						viewBox="0 0 24 24"
-						xmlns="http://www.w3.org/2000/svg"
-						><path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
-						/></svg
+				{#if alpha}
+					<a
+						href="javascript:void(0)"
+						class="icons hover:bg-coolgray-200 text-warmGray-600 tooltip-right cursor-not-allowed"
+						data-tooltip="Databases"
 					>
-				</a>
-				<div class="border-t border-warmGray-700" />
-				<a
-					sveltekit:prefetch
-					href="/services"
-					class="icons hover:text-pink-500 bg-coolgray-200 tooltip-right"
-					class:text-pink-500={$page.path.startsWith('/services')}
-					class:bg-coolgray-500={$page.path.startsWith('/services')}
-					data-tooltip="Services"
-				>
-					<svg
-						class="w-8 h-8"
-						fill="none"
-						stroke="currentColor"
-						viewBox="0 0 24 24"
-						xmlns="http://www.w3.org/2000/svg"
-						><path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
-						/></svg
+						<svg
+							class="w-8 h-8"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+							xmlns="http://www.w3.org/2000/svg"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+							/></svg
+						>
+					</a>
+					<div class="border-t border-warmGray-700" />
+					<a
+						href="javascript:void(0)"
+						class="icons hover:bg-coolgray-200 text-warmGray-600 tooltip-right cursor-not-allowed"
+						data-tooltip="Services"
 					>
-				</a>
-				<div class="border-t border-warmGray-700" />
-				<a
-					sveltekit:prefetch
-					href="/settings"
-					class="icons hover:text-yellow-500 bg-coolgray-200 tooltip-right"
-					class:text-yellow-500={$page.path.startsWith('/settings')}
-					class:bg-coolgray-500={$page.path.startsWith('/settings')}
-					data-tooltip="Settings"
-				>
-					<svg
-						class=" w-8 h-8"
-						fill="none"
-						stroke="currentColor"
-						viewBox="0 0 24 24"
-						xmlns="http://www.w3.org/2000/svg"
+						<svg
+							class="w-8 h-8"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+							xmlns="http://www.w3.org/2000/svg"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
+							/></svg
+						>
+					</a>
+					<div class="border-t border-warmGray-700" />
+					<a
+						href="javascript:void(0)"
+						class="icons hover:bg-coolgray-200 text-warmGray-600 tooltip-right cursor-not-allowed"
+						data-tooltip="Settings"
 					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-						/>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-						/>
-					</svg>
-				</a>
+						<svg
+							class=" w-8 h-8"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+							xmlns="http://www.w3.org/2000/svg"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+							/>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+							/>
+						</svg>
+					</a>
+				{:else}
+					<a
+						sveltekit:prefetch
+						href="/databases"
+						class="icons hover:text-purple-500 bg-coolgray-200 tooltip-right"
+						class:text-purple-500={$page.path.startsWith('/databases')}
+						class:bg-coolgray-500={$page.path.startsWith('/databases')}
+						data-tooltip="Databases"
+					>
+						<svg
+							class="w-8 h-8"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+							xmlns="http://www.w3.org/2000/svg"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+							/></svg
+						>
+					</a>
+					<div class="border-t border-warmGray-700" />
+					<a
+						sveltekit:prefetch
+						href="/services"
+						class="icons hover:text-pink-500 bg-coolgray-200 tooltip-right"
+						class:text-pink-500={$page.path.startsWith('/services')}
+						class:bg-coolgray-500={$page.path.startsWith('/services')}
+						data-tooltip="Services"
+					>
+						<svg
+							class="w-8 h-8"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+							xmlns="http://www.w3.org/2000/svg"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
+							/></svg
+						>
+					</a>
+					<div class="border-t border-warmGray-700" />
+					<a
+						sveltekit:prefetch
+						href="/settings"
+						class="icons hover:text-yellow-500 bg-coolgray-200 tooltip-right"
+						class:text-yellow-500={$page.path.startsWith('/settings')}
+						class:bg-coolgray-500={$page.path.startsWith('/settings')}
+						data-tooltip="Settings"
+					>
+						<svg
+							class=" w-8 h-8"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+							xmlns="http://www.w3.org/2000/svg"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+							/>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+							/>
+						</svg>
+					</a>
+				{/if}
 			</div>
 			<div class="flex-1" />
 			<div
