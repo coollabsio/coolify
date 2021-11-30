@@ -57,7 +57,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { enhance, errorNotification } from '$lib/form';
-	import { asyncSleep } from '$lib/components/common';
 	import { appConfiguration } from '$lib/store';
 
 	export let application;

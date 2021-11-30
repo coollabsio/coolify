@@ -1,5 +1,7 @@
+import { selectTeam } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
+import type { Locals } from 'src/global';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     const email = request.body.get('email')
@@ -9,7 +11,13 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         const { body } = response
         request.locals.session.data = body
     }
-    return response
+    return {
+        ...response,
+        headers: {
+            ...response.headers,
+            'Set-Cookie': [`selectedTeam=${selectTeam(request)}`]
+        }
+    }
 }
 
 export const get: RequestHandler<Locals, FormData> = async (request) => {

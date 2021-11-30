@@ -41,12 +41,14 @@
 	}
 </script>
 
+{#if !update}
 <div class="flex-col text-center space-y-2 pb-10">
 	<div class="font-bold text-xl text-white">Predefined destinations</div>
 	<div class="flex space-x-2 justify-center">
 		<button class="w-32" on:click={() => setPredefined('localdocker')}>Local Docker</button>
 	</div>
 </div>
+{/if}
 <div class="flex justify-center pb-8">
 	<form
 		{action}

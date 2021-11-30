@@ -1,12 +1,18 @@
+import { selectTeam } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const get: RequestHandler = async () => {
+export const get: RequestHandler = async (request) => {
+	const teamId = selectTeam(request)
+	const applicationsCount = await (await db.listApplications(teamId)).length
+	const sourcesCount = await (await db.listSources(teamId)).length
+	const destinationsCount = await (await db.listDestinations(teamId)).length
+	
 	return {
 		body: {
-			applicationsCount: await (await db.listApplications()).length,
-			sourcesCount: await (await db.listSources()).length,
-			destinationsCount: await (await db.listDestinations()).length
+			applicationsCount,
+			sourcesCount,
+			destinationsCount
 		}
 	};
 }

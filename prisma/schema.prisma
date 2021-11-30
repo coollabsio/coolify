@@ -23,10 +23,14 @@ model User {
 }
 
 model Team {
-  id     String        @id @default(cuid())
-  teamId String
-  name   String?
-  users  TeamsOnUser[]
+  id                String                     @id @default(cuid())
+  users             TeamsOnUser[]
+  name              String?
+  applications      TeamsOnApplication[]
+  gitSources        TeamsOnGitSource[]
+  gitHubApps        TeamsOnGithubApp[]
+  gitLabApps        TeamsOnGitlabApp[]
+  destinationDocker TeamsOnDestinationDocker[]
 }
 
 model TeamsOnUser {
@@ -35,15 +39,65 @@ model TeamsOnUser {
   team       Team     @relation(fields: [teamId], references: [id])
   teamId     String
   assignedAt DateTime @default(now())
-  assignedBy String
 
   @@id([userId, teamId])
 }
 
+model TeamsOnApplication {
+  application   Application @relation(fields: [applicationId], references: [id])
+  applicationId String
+  team          Team        @relation(fields: [teamId], references: [id])
+  teamId        String
+  assignedAt    DateTime    @default(now())
+
+  @@id([applicationId, teamId])
+}
+
+model TeamsOnGitSource {
+  gitSource   GitSource @relation(fields: [gitSourceId], references: [id])
+  gitSourceId String
+  team        Team      @relation(fields: [teamId], references: [id])
+  teamId      String
+  assignedAt  DateTime  @default(now())
+
+  @@id([gitSourceId, teamId])
+}
+
+model TeamsOnGithubApp {
+  githubApp   GithubApp @relation(fields: [githubAppId], references: [id])
+  githubAppId String
+  team        Team      @relation(fields: [teamId], references: [id])
+  teamId      String
+  assignedAt  DateTime  @default(now())
+
+  @@id([githubAppId, teamId])
+}
+
+model TeamsOnGitlabApp {
+  gitlabApp   GitlabApp @relation(fields: [gitlabAppId], references: [id])
+  gitlabAppId String
+  team        Team      @relation(fields: [teamId], references: [id])
+  teamId      String
+  assignedAt  DateTime  @default(now())
+
+  @@id([gitlabAppId, teamId])
+}
+
+model TeamsOnDestinationDocker {
+  destinationDocker   DestinationDocker @relation(fields: [destinationDockerId], references: [id])
+  destinationDockerId String
+  team                Team              @relation(fields: [teamId], references: [id])
+  teamId              String
+  assignedAt          DateTime          @default(now())
+
+  @@id([destinationDockerId, teamId])
+}
+
 model Application {
-  id                  String             @id @default(cuid())
-  name                String             @unique
-  domain              String?            @unique
+  id                  String               @id @default(cuid())
+  teams               TeamsOnApplication[]
+  name                String               @unique
+  domain              String?              @unique
   oldDomain           String?
   repository          String?
   branch              String?
@@ -56,13 +110,13 @@ model Application {
   configHash          String?
   baseDirectory       String?
   publishDirectory    String?
-  forceSsl            Boolean?           @default(false)
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  forceSsl            Boolean?             @default(false)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
   destinationDockerId String?
-  destinationDocker   DestinationDocker? @relation(fields: [destinationDockerId], references: [id])
+  destinationDocker   DestinationDocker?   @relation(fields: [destinationDockerId], references: [id])
   gitSourceId         String?
-  gitSource           GitSource?         @relation(fields: [gitSourceId], references: [id])
+  gitSource           GitSource?           @relation(fields: [gitSourceId], references: [id])
 }
 
 model BuildLog {
@@ -87,58 +141,60 @@ model Build {
 }
 
 model DestinationDocker {
-  id          String        @id @default(cuid())
-  name        String?       @unique
+  id          String                     @id @default(cuid())
+  teams       TeamsOnDestinationDocker[]
+  name        String?                    @unique
   engine      String?
-  network     String?       @default("coollabs")
-  isSwarm     Boolean?      @default(false)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  network     String?                    @default("coollabs")
+  isSwarm     Boolean?                   @default(false)
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
   application Application[]
 }
 
 model GitSource {
-  id           String   @id @default(cuid())
-  name         String?  @unique
+  id           String             @id @default(cuid())
+  teams        TeamsOnGitSource[]
+  name         String?            @unique
   type         String?
   apiUrl       String?
   htmlUrl      String?
   organization String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  githubAppId String?       @unique
-  githubApp   GithubApp?    @relation(fields: [githubAppId], references: [id])
-  application Application[]
-
-  gitlabAppId String?    @unique
-  gitlabApp   GitlabApp? @relation(fields: [gitlabAppId], references: [id])
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  githubAppId  String?            @unique
+  githubApp    GithubApp?         @relation(fields: [githubAppId], references: [id])
+  application  Application[]
+  gitlabAppId  String?            @unique
+  gitlabApp    GitlabApp?         @relation(fields: [gitlabAppId], references: [id])
 }
 
 model GithubApp {
-  id             String     @id @default(cuid())
-  name           String?    @unique
+  id             String             @id @default(cuid())
+  teams          TeamsOnGithubApp[]
+  name           String?            @unique
   appId          Int?
   installationId Int?
   clientId       String?
   clientSecret   String?
   webhookSecret  String?
   privateKey     String?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
   gitSource      GitSource?
 }
 
 model GitlabApp {
-  id            String     @id @default(cuid())
-  name          String?    @unique
-  groupName     String?    @unique
+  id            String             @id @default(cuid())
+  teams         TeamsOnGitlabApp[]
+  name          String?            @unique
+  groupName     String?            @unique
   oauthId       Int?
   deployKeyId   Int?
   privateSshKey String?
   appId         String?
   appSecret     String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
   gitSource     GitSource?
 }

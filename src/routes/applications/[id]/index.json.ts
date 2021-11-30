@@ -1,12 +1,15 @@
+import { selectTeam } from '$lib/common';
 import * as db from '$lib/database';
-import type Prisma from '@prisma/client'
 import type { RequestHandler } from '@sveltejs/kit';
 import jsonwebtoken from 'jsonwebtoken'
+import type { Locals } from 'src/global';
+
 export const get: RequestHandler = async (request) => {
+    const teamId = selectTeam(request)
     let githubToken = null;
     let gitlabToken = null;
     const { id } = request.params
-    const application = await db.getApplication({ id })
+    const application = await db.getApplication({ id, teamId })
 
     if (application.status) {
         return {
@@ -42,6 +45,7 @@ export const get: RequestHandler = async (request) => {
 }
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
+    const teamId = selectTeam(request)
     const { id } = request.params
     const domain = request.body.get('domain') || null
     const port = Number(request.body.get('port')) || null
@@ -51,6 +55,6 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const baseDirectory = request.body.get('baseDirectory') || null
     const publishDirectory = request.body.get('publishDirectory') || null
 
-    return await db.configureApplication({ id, domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
+    return await db.configureApplication({ id, teamId, domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
 
 }

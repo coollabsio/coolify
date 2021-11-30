@@ -3,12 +3,15 @@ import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid'
 import crypto from 'crypto';
 import { buildQueue } from '$lib/queues';
+import { selectTeam } from '$lib/common';
+import type { Locals } from 'src/global';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
+    const teamId = selectTeam(request)
     const { id } = request.params
     try {
         const buildId = cuid()
-        const applicationFound = await db.getApplication({ id })
+        const applicationFound = await db.getApplication({ id, teamId })
         if (!applicationFound.configHash) {
             const configHash = crypto
                 .createHash('sha256')

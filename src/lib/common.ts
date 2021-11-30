@@ -8,3 +8,7 @@ export const asyncSleep = (delay) => new Promise((resolve) => setTimeout(resolve
 export const saveBuildLog = async ({ line, buildId, applicationId }) => {
     await buildLogQueue.add(buildId, { buildId, line, applicationId })
 }
+
+export const selectTeam = (request) => {
+    return request.headers.cookie?.split(';').map(s => s.trim()).find(s => s.startsWith('selectedTeam='))?.split('=')[1] || request.locals.session.data.teams[0].teamId
+}

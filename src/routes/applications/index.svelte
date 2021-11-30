@@ -1,5 +1,6 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
+	import type { Applications } from 'src/global';
 	export const load: Load = async ({ fetch }) => {
 		const url = '/applications.json';
 		const res = await fetch(url);
@@ -42,22 +43,27 @@
 	</a>
 </div>
 <div class="flex flex-wrap justify-center">
-	{#each applications as application}
-		<a href="/applications/{application.id}" class="no-underline p-2 ">
-			<div
-				class="box-selection"
-				class:border-yellow-500={!application.domain || !application.gitSourceId}
-				class:border-2={!application.domain || !application.gitSourceId}
-				class:text-black={!application.domain}
-				class:hover:border-green-500={application.buildPack === 'node'}
-				class:hover:border-red-500={application.buildPack === 'static'}
-			>
-				{#if !application.gitSourceId}
-					<div class="text-center font-bold text-red-500 -mt-5">Git Source not configured!</div>
-				{/if}
-				<div class="font-bold text-xl text-center pb-4 truncate">{application.name}</div>
-				<div class="text-center truncate">{application.domain || 'Not Configured'}</div>
-			</div>
-		</a>
-	{/each}
+	{#if !applications || applications.length === 0}
+		<div class="flex-col">
+			<div class="pb-2">No Applications found</div>
+		</div>
+	{:else}
+		{#each applications as application}
+			<a href="/applications/{application.id}" class="no-underline p-2 ">
+				<div
+					class="box-selection"
+					class:border-yellow-500={!application.domain || !application.gitSourceId}
+					class:border-2={!application.domain || !application.gitSourceId}
+					class:hover:border-green-500={application.buildPack === 'node'}
+					class:hover:border-red-500={application.buildPack === 'static'}
+				>
+					{#if !application.gitSourceId}
+						<div class="text-center font-bold text-red-500 -mt-5">Git Source not configured!</div>
+					{/if}
+					<div class="font-bold text-xl text-center pb-4 truncate">{application.name}</div>
+					<div class="text-center truncate">{application.domain || 'Not Configured'}</div>
+				</div>
+			</a>
+		{/each}
+	{/if}
 </div>

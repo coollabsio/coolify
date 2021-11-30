@@ -1,12 +1,14 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, page }) => {
+	export const load: Load = async ({ fetch, session }) => {
+		console.log(session)
 		const url = `/index.json`;
 		const res = await fetch(url);
 
 		if (res.ok) {
 			return {
 				props: {
+					teams: session.teams,
 					...(await res.json())
 				}
 			};
@@ -23,12 +25,14 @@
 	export let applicationsCount: number;
 	export let sourcesCount: number;
 	export let destinationsCount: number;
+	export let teams;
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
 	<div class="text-2xl tracking-tight mr-4">Dashboard</div>
 </div>
 
+{JSON.stringify(teams, null, 2)}
 <div class="mt-10 pb-12 sm:pb-16 tracking-tight">
 	<div class="relative">
 		<div class="absolute inset-0 h-1/2" />

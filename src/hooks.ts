@@ -10,7 +10,6 @@ export const handle = handleSession(
     },
     async function ({ request, resolve }) {
         const response = await resolve(request);
-
         if (!response.body || !response.headers) {
             return response;
         }
