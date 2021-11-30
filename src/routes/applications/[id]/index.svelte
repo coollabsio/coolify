@@ -176,13 +176,13 @@
 			<div class="col-span-2">
 				<a
 					href="/applications/{id}/configuration/buildpack?from=/applications/{id}"
-					class="no-underline"
+					class="no-underline "
 					><span class="arrow-right-applications">></span>
 					<input
 						value={$appConfiguration.configuration.buildPack}
 						id="buildPack"
 						disabled
-						class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
+						class="bg-transparent hover:bg-coolgray-500 cursor-pointer -ml-1"
 					/></a
 				>
 			</div>
