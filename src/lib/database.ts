@@ -144,10 +144,10 @@ export async function getSource({ id }) {
         return PrismaErrorHandler(e)
     }
 }
-export async function addSource({ id, appId, name, groupName, appSecret }) {
+export async function addSource({ id, appId, name, oauthId, groupName, appSecret }) {
     try {
         const encrptedAppSecret = encrypt(appSecret)
-        const source = await prisma.gitlabApp.create({ data: { appId, name, groupName, appSecret: encrptedAppSecret, gitSource: { connect: { id } } } })
+        const source = await prisma.gitlabApp.create({ data: { appId, name, oauthId, groupName, appSecret: encrptedAppSecret, gitSource: { connect: { id } } } })
         return { status: 201, body: { id: source.id } }
     } catch (e) {
         return PrismaErrorHandler(e)

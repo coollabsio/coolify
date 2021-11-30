@@ -36,10 +36,11 @@
 	import { onMount } from 'svelte';
 
 	import Explainer from '$lib/components/Explainer.svelte';
-
+	import { appConfiguration } from '$lib/store';
 	const { id } = $page.params;
 
-	let domainEl;
+	let domainEl: HTMLInputElement;
+
 	let loading = false;
 
 	onMount(() => {
@@ -48,15 +49,22 @@
 </script>
 
 <div class="font-bold flex space-x-1 p-5 text-2xl items-center">
-	<div class="tracking-tight">{application.name}</div>
-	{#if application.domain}
+	<div class="tracking-tight">{$appConfiguration.configuration.name}</div>
+	{#if $appConfiguration.configuration.domain}
 		<span class="px-1 arrow-right-applications">></span>
 		<span class="pr-2"
-			><a href="http://{application.domain}" target="_blank">{application.domain}</a></span
+			><a href="http://{$appConfiguration.configuration.domain}" target="_blank"
+				>{$appConfiguration.configuration.domain}</a
+			></span
 		>
 	{/if}
-	<a href="{application.gitSource.htmlUrl}/{application.repository}/tree/{application.branch}" target="_blank" class="w-10">
-		{#if application.gitSource.type === 'gitlab'}
+	<a
+		href="{$appConfiguration.configuration.gitSource.htmlUrl}/{$appConfiguration.configuration
+			.repository}/tree/{$appConfiguration.configuration.branch}"
+		target="_blank"
+		class="w-10"
+	>
+		{#if $appConfiguration.configuration.gitSource.type === 'gitlab'}
 			<svg viewBox="0 0 128 128" class="icons">
 				<path
 					fill="#FC6D26"
@@ -78,7 +86,7 @@
 					d="M119.58 50.663H87.145l13.94-42.902c.717-2.206 3.84-2.206 4.557 0l13.94 42.903z"
 				/>
 			</svg>
-		{:else if application.gitSource.type === 'github'}
+		{:else if $appConfiguration.configuration.gitSource.type === 'github'}
 			<svg viewBox="0 0 128 128" class="icons">
 				<g fill="#ffffff"
 					><path
@@ -99,13 +107,7 @@
 		action="/applications/{id}.json"
 		use:enhance={{
 			result: async (res) => {
-				// const data = await res.json();
-				setTimeout(() => {
-					loading = false;
-					//TODO: This is not okay
-					window.location.reload();
-					// application = data.application
-				}, 500);
+				loading = false;
 			},
 			pending: async () => {
 				loading = true;
@@ -120,7 +122,7 @@
 				type="submit"
 				class:bg-green-700={!loading}
 				class:hover:bg-green-600={!loading}
-				disabled={loading}>Save</button
+				disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
 			>
 		</div>
 		<div class="grid grid-cols-3 items-center">
@@ -130,7 +132,7 @@
 					href="/applications/{id}/configuration/source?from=/applications/{id}"
 					class="no-underline"
 					><span class="arrow-right-applications">></span><input
-						value={application.gitSource.name}
+						value={$appConfiguration.configuration.gitSource.name}
 						id="gitSource"
 						disabled
 						class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
@@ -145,7 +147,8 @@
 					href="/applications/{id}/configuration/repository?from=/applications/{id}"
 					class="no-underline"
 					><span class="arrow-right-applications">></span><input
-						value="{application.repository}/{application.branch}"
+						value="{$appConfiguration.configuration.repository}/{$appConfiguration.configuration
+							.branch}"
 						id="repository"
 						disabled
 						class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
@@ -160,7 +163,7 @@
 					href="/applications/{id}/configuration/destination?from=/applications/{id}"
 					class="no-underline"
 					><span class="arrow-right-applications">></span><input
-						value={application.destinationDocker.name}
+						value={$appConfiguration.configuration.destinationDocker.name}
 						id="destination"
 						disabled
 						class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
@@ -174,8 +177,9 @@
 				<a
 					href="/applications/{id}/configuration/buildpack?from=/applications/{id}"
 					class="no-underline"
-					><span class="arrow-right-applications">></span><input
-						value={application.buildPack}
+					><span class="arrow-right-applications">></span>
+					<input
+						value={$appConfiguration.configuration.buildPack}
 						id="buildPack"
 						disabled
 						class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
@@ -190,7 +194,7 @@
 					bind:this={domainEl}
 					name="domain"
 					id="domain"
-					value={application.domain || ''}
+					bind:value={$appConfiguration.configuration.domain}
 					pattern="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 					placeholder="eg: coollabs.io"
 					required
@@ -198,11 +202,16 @@
 			</div>
 		</div>
 
-		{#if application.buildPack !== 'static'}
+		{#if $appConfiguration.configuration.buildPack !== 'static'}
 			<div class="grid grid-cols-3 items-center">
 				<label for="port">Port</label>
 				<div class="col-span-2">
-					<input name="port" id="port" value={application.port || ''} placeholder="default: 3000" />
+					<input
+						name="port"
+						id="port"
+						bind:value={$appConfiguration.configuration.port}
+						placeholder="default: 3000"
+					/>
 				</div>
 			</div>
 		{/if}
@@ -213,7 +222,7 @@
 				<input
 					name="installCommand"
 					id="installCommand"
-					value={application.installCommand || ''}
+					bind:value={$appConfiguration.configuration.installCommand}
 					placeholder="default: yarn install"
 				/>
 			</div>
@@ -224,7 +233,7 @@
 				<input
 					name="buildCommand"
 					id="buildCommand"
-					value={application.buildCommand || ''}
+					bind:value={$appConfiguration.configuration.buildCommand}
 					placeholder="default: yarn build"
 				/>
 			</div>
@@ -235,7 +244,7 @@
 				<input
 					name="startCommand"
 					id="startCommand"
-					value={application.startCommand || ''}
+					bind:value={$appConfiguration.configuration.startCommand}
 					placeholder="default: yarn start"
 				/>
 			</div>
@@ -246,7 +255,7 @@
 				<input
 					name="baseDirectory"
 					id="baseDirectory"
-					value={application.baseDirectory || ''}
+					bind:value={$appConfiguration.configuration.baseDirectory}
 					placeholder="default: /"
 				/>
 				<Explainer
@@ -260,7 +269,7 @@
 				<input
 					name="publishDirectory"
 					id="publishDirectory"
-					value={application.publishDirectory || ''}
+					bind:value={$appConfiguration.configuration.publishDirectory}
 					placeholder="eg: dist or _site or public"
 				/>
 				<Explainer text="Directory containing all the assets for deployment." />

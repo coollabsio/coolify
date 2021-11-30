@@ -4,10 +4,12 @@ export function errorNotification(message) {
 export function enhance(
     form: HTMLFormElement,
     {
+        beforeSubmit,
         pending,
         error,
         result
     }: {
+        beforeSubmit?: () => Promise<void>,
         pending?: (data: FormData, form: HTMLFormElement) => void;
         error?: (res: Response, error: Error, form: HTMLFormElement) => void;
         result: (res: Response, form: HTMLFormElement) => void;
@@ -19,9 +21,9 @@ export function enhance(
         const token = (current_token = {});
 
         e.preventDefault();
-
         const body = new FormData(form);
 
+        if (beforeSubmit) await beforeSubmit()
         if (pending) pending(body, form);
 
         try {

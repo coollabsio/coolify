@@ -8,9 +8,9 @@ datasource db {
 }
 
 model Setting {
-  id        String @id @default(cuid())
-  name      String @unique
-  value     String
+  id    String @id @default(cuid())
+  name  String @unique
+  value String
 }
 
 model User {
@@ -133,6 +133,7 @@ model GitlabApp {
   id            String     @id @default(cuid())
   name          String?    @unique
   groupName     String?    @unique
+  oauthId       Int?
   deployKeyId   Int?
   privateSshKey String?
   appId         String?

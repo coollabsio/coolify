@@ -47,8 +47,8 @@ export default async function (job) {
     port = 80
   }
   const commit = await importers[gitSource.type]({
-    applicationId, 
-    workdir, 
+    applicationId,
+    workdir,
     repodir,
     githubAppId: gitSource.githubApp?.id,
     gitlabAppId: gitSource.gitlabApp?.id,
@@ -60,7 +60,11 @@ export default async function (job) {
     deployKeyId: gitSource.gitlabApp?.deployKeyId || null,
     privateSshKey: decrypt(gitSource.gitlabApp?.privateSshKey) || null
   })
-  await db.prisma.build.update({ where: { id: build.id }, data: { commit } })
+  try {
+    await db.prisma.build.update({ where: { id: build.id }, data: { commit } })
+  } catch (err) {
+    console.log(err)
+  }
 
   const currentHash = crypto.createHash('sha256').update(JSON.stringify({ buildPack, port, installCommand, buildCommand, startCommand })).digest('hex')
   if (configHash !== currentHash) {

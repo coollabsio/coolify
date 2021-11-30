@@ -22,12 +22,13 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     // TODO: Do we really need groupName?
     const { id } = request.params
     const name = request.body.get('name')
+    const oauthId = Number(request.body.get('oauthId'))
     const groupName = request.body.get('groupName') || null
     const appId = request.body.get('appId')
     const appSecret = request.body.get('appSecret')
     return {
         body: {
-            source: await db.addSource({ id, name, groupName, appId, appSecret })
+            source: await db.addSource({ id, name, oauthId, groupName, appId, appSecret })
         }
     };
 }

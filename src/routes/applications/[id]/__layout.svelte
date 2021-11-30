@@ -56,10 +56,14 @@
 
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { enhance } from '$lib/form';
+	import { enhance, errorNotification } from '$lib/form';
+	import { asyncSleep } from '$lib/components/common';
+	import { appConfiguration } from '$lib/store';
 
 	export let application;
 	const { id } = $page.params;
+
+	$appConfiguration.configuration = application;
 
 	async function deleteApplication(name) {
 		const sure = confirm(`Are you sure you would like to delete '${name}'?`);
@@ -75,10 +79,34 @@
 
 <nav class="nav-side">
 	{#if application.domain}
+		<!-- svelte-ignore missing-declaration -->
 		<form
 			action="/applications/{id}/deploy.json"
 			method="post"
 			use:enhance={{
+				beforeSubmit: async () => {
+					const form = new FormData();
+					form.append('domain', $appConfiguration.configuration.domain);
+					form.append('port', $appConfiguration?.configuration?.port?.toString() || '');
+					form.append('installCommand', $appConfiguration.configuration.installCommand || '');
+					form.append('buildCommand', $appConfiguration.configuration.buildCommand || '');
+					form.append('startCommand', $appConfiguration.configuration.startCommand || '');
+					form.append('baseDirectory', $appConfiguration.configuration.baseDirectory || '');
+					form.append('publishDirectory', $appConfiguration.configuration.publishDirectory || '');
+					const response = await fetch(`/applications/${id}.json`, {
+						method: 'POST',
+						headers: {
+							accept: 'application/json'
+						},
+						body: form
+					});
+					if (!response.ok) {
+						errorNotification(
+							`Application configuration '${$appConfiguration.configuration.name}' failed to update!`
+						);
+						throw new Error(await response.json());
+					}
+				},
 				result: async (res) => {
 					const { buildId } = await res.json();
 					window.location.replace(`/applications/${id}/logs?buildId=${buildId}`);

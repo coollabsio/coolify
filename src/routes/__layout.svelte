@@ -78,8 +78,10 @@
 					sveltekit:prefetch
 					href="/applications"
 					class="icons hover:text-green-500 bg-coolgray-200 tooltip-right"
-					class:text-green-500={$page.path.startsWith('/applications')}
-					class:bg-coolgray-500={$page.path.startsWith('/applications')}
+					class:text-green-500={$page.path.startsWith('/applications') ||
+						$page.path.startsWith('/new/application')}
+					class:bg-coolgray-500={$page.path.startsWith('/applications') ||
+						$page.path.startsWith('/new/application')}
 					data-tooltip="Applications"
 				>
 					<svg
@@ -101,8 +103,8 @@
 					sveltekit:prefetch
 					href="/sources"
 					class="icons hover:text-orange-500 bg-coolgray-200 tooltip-right"
-					class:text-orange-500={$page.path.startsWith('/sources')}
-					class:bg-coolgray-500={$page.path.startsWith('/sources')}
+					class:text-orange-500={$page.path.startsWith('/sources') || $page.path.startsWith('/new/source')}
+					class:bg-coolgray-500={$page.path.startsWith('/sources') || $page.path.startsWith('/new/source')}
 					data-tooltip="Git Sources"
 				>
 					<svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 fill-current" viewBox="0 0 24 24"
@@ -115,8 +117,8 @@
 					sveltekit:prefetch
 					href="/destinations"
 					class="icons hover:text-sky-500 bg-coolgray-200 tooltip-right"
-					class:text-sky-500={$page.path.startsWith('/destinations')}
-					class:bg-coolgray-500={$page.path.startsWith('/destinations')}
+					class:text-sky-500={$page.path.startsWith('/destinations') || $page.path.startsWith('/new/destination')}
+					class:bg-coolgray-500={$page.path.startsWith('/destinations') || $page.path.startsWith('/new/destination')}
 					data-tooltip="Destinations"
 				>
 					<svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 fill-current" viewBox="0 0 24 24"
