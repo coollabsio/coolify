@@ -72,12 +72,14 @@ export async function getUser({ uid }) {
     }
 }
 export async function listApplications(teamId) {
-    return await prisma.application.findMany({ where: { teams: { some: { teamId } } } })
+    return await prisma.application.findMany({ where: { teams: { some: { id: teamId } } } })
 }
 
 export async function newApplication({ name, teamId }) {
     try {
-        const app = await prisma.application.create({ data: { name, teamId } })
+        const app = await prisma.application.create({ data: { name, teams: { connect: { id: teamId } } } })
+        // const app = await prisma.team.update({ where: { id: teamId }, data: { applications: { create: { application: { create: { name } } } } } })
+        console.log(app)
         return { status: 201, body: { id: app.id } }
     } catch (e) {
         return PrismaErrorHandler(e)
@@ -86,8 +88,7 @@ export async function newApplication({ name, teamId }) {
 
 export async function getApplication({ id, teamId }) {
     try {
-        let body = await prisma.application.findFirst({ where: { id, teams: { some: { teamId } } }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } } }, rejectOnNotFound: true })
-        console.log(body)
+        let body = await prisma.application.findFirst({ where: { id, teams: { some: { id: teamId } } }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } } }, rejectOnNotFound: true })
 
         if (body.gitSource?.githubApp?.clientSecret) body.gitSource.githubApp.clientSecret = decrypt(body.gitSource.githubApp.clientSecret)
         if (body.gitSource?.githubApp?.webhookSecret) body.gitSource.githubApp.webhookSecret = decrypt(body.gitSource.githubApp.webhookSecret)
@@ -103,13 +104,14 @@ export async function getApplication({ id, teamId }) {
 }
 
 export async function listSources(teamId) {
-    return await prisma.gitSource.findMany({ where: { teams: { some: { teamId } } }, include: { githubApp: true, gitlabApp: true } })
+    return await prisma.gitSource.findMany({ where: {}, include: { githubApp: true, gitlabApp: true } })
 }
 
 export async function newSource({ name, teamId, type, htmlUrl, apiUrl, organization }) {
     try {
         const source = await prisma.gitSource.create({
             data: {
+                teams: { connect: { id: teamId } },
                 name,
                 type,
                 htmlUrl,
@@ -117,8 +119,6 @@ export async function newSource({ name, teamId, type, htmlUrl, apiUrl, organizat
                 organization
             }
         })
-        await prisma.gitSource.update({ where: { id: source.id }, data: { teams: { connectOrCreate: { where: { gitSourceId_teamId: { gitSourceId: source.id, teamId } }, create: { team: { connect: { id: teamId } } } } } } })
-
         return { status: 201, body: { id: source.id } }
     } catch (e) {
         return PrismaErrorHandler(e)
@@ -138,7 +138,7 @@ export async function removeSource({ id }) {
 
 export async function getSource({ id, teamId }) {
     try {
-        let body = await prisma.gitSource.findFirst({ where: { id, teams: { some: { teamId } } }, include: { githubApp: true, gitlabApp: true } })
+        let body = await prisma.gitSource.findFirst({ where: { id, teams: { some: { id: teamId } } }, include: { githubApp: true, gitlabApp: true } })
         if (body?.githubApp?.clientSecret) body.githubApp.clientSecret = decrypt(body.githubApp.clientSecret)
         if (body?.githubApp?.webhookSecret) body.githubApp.webhookSecret = decrypt(body.githubApp.webhookSecret)
         if (body?.githubApp?.privateKey) body.githubApp.privateKey = decrypt(body.githubApp.privateKey)
@@ -152,9 +152,7 @@ export async function getSource({ id, teamId }) {
 export async function addSource({ id, appId, teamId, name, oauthId, groupName, appSecret }) {
     try {
         const encrptedAppSecret = encrypt(appSecret)
-        const source = await prisma.gitlabApp.create({ data: { appId, name, oauthId, groupName, appSecret: encrptedAppSecret, gitSource: { connect: { id } } } })
-
-        await prisma.gitlabApp.update({ where: { id: source.id }, data: { teams: { connectOrCreate: { where: { gitlabAppId_teamId: { gitlabAppId: source.id, teamId } }, create: { team: { connect: { id: teamId } } } } } } })
+        const source = await prisma.gitlabApp.create({ data: { teams: { connect: { id: teamId } }, appId, name, oauthId, groupName, appSecret: encrptedAppSecret, gitSource: { connect: { id } } } })
         return { status: 201, body: { id: source.id } }
     } catch (e) {
         return PrismaErrorHandler(e)
@@ -171,7 +169,7 @@ export async function configureGitsource({ id, gitSourceId }) {
 }
 
 export async function listDestinations(teamId) {
-    return await prisma.destinationDocker.findMany({ where: { teams: { some: { teamId } } } })
+    return await prisma.destinationDocker.findMany({ where: {} })
 }
 
 export async function configureDestination({ id, destinationId }) {
@@ -305,8 +303,7 @@ export async function listLogs({ buildId, last = 0 }) {
 export async function login({ email, password }) {
     const saltRounds = 15;
     const users = await prisma.user.count()
-    const userFound = await prisma.user.findUnique({ where: { email }, include: { teams: { select: { assignedAt: true, teamId: true } } } })
-
+    const userFound = await prisma.user.findUnique({ where: { email }, include: { teams: true } })
     // Registration disabled if database is not seeded properly
     const { value: isRegistrationEnabled = 'false' } = await prisma.setting.findUnique({ where: { name: 'isRegistrationEnabled' }, select: { value: true } }) || {}
 
@@ -347,14 +344,10 @@ export async function login({ email, password }) {
                 type: 'email',
                 teams: {
                     create: {
-                        team: {
-                            create: {
-                                id: uid
-                            }
-                        }
+                        id: uid
                     }
                 }
-            }, include: { teams: { select: { assignedAt: true, teamId: true } } }
+            }, include: { teams: true }
         })
         teams = user.teams
     }

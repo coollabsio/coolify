@@ -7,7 +7,7 @@ export const del: RequestHandler<Locals, FormData> = async (request) => {
     const teamId = selectTeam(request)
     const { id } = request.params
     try {
-        await db.prisma.application.delete({ where: { id, teamId } })
+        await db.prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } })
         await db.prisma.buildLog.deleteMany({ where: { applicationId: id } })
         return {
             status: 200
