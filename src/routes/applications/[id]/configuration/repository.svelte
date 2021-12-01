@@ -27,7 +27,7 @@
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Configure Repository / Branch</div>
+	<div class="text-2xl tracking-tight mr-4">Select a Repository / Project</div>
 </div>
 <div class="flex flex-wrap justify-center">
 	{#if application.gitSource.type === 'github'}

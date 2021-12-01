@@ -61,7 +61,6 @@
 
 	export let application;
 	const { id } = $page.params;
-
 	$appConfiguration.configuration = application;
 
 	async function deleteApplication(name) {
@@ -115,9 +114,9 @@
 			<button
 				title="Deploy"
 				type="submit"
-				class:text-green-500={application.gitSource &&
-					application.repository &&
-					application.destinationDocker}
+				class:text-green-500={$appConfiguration.configuration.gitSource &&
+					$appConfiguration.configuration.repository &&
+					$appConfiguration.configuration.destinationDocker}
 				class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
 				data-tooltip="Queue for deployment"
 			>
@@ -201,7 +200,7 @@
 	{/if}
 
 	<button
-		on:click={() => deleteApplication(application.name)}
+		on:click={() => deleteApplication($appConfiguration.configuration.name)}
 		title="Delete application"
 		type="submit"
 		class="icons bg-transparent hover:text-red-500 tooltip-bottom text-sm"

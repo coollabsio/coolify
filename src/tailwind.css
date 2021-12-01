@@ -27,7 +27,7 @@ label {
 }
 
 button {
-	@apply rounded text-xs font-bold transition-all duration-100 outline-none hover:bg-coolgray-500 disabled:text-warmGray-600 disabled:cursor-not-allowed disabled:bg-coolblack bg-coolgray-200 p-2;
+	@apply transition-all duration-100 rounded text-xs font-medium outline-none hover:bg-coolgray-500 disabled:text-warmGray-600 disabled:cursor-not-allowed disabled:bg-coolblack bg-coolgray-200 px-4 p-1;
 }
 
 a {

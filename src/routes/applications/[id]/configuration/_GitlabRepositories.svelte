@@ -2,7 +2,6 @@
 	export let application;
 	export let gitlabToken;
 	import { page } from '$app/stores';
-	import Loading from '$lib/components/Loading.svelte';
 	import { onMount } from 'svelte';
 
 	import { enhance } from '$lib/form';
@@ -14,7 +13,8 @@
 	let loading = {
 		base: true,
 		projects: false,
-		branches: false
+		branches: false,
+		save: false
 	};
 
 	let htmlUrl = application.gitSource.htmlUrl;
@@ -35,7 +35,6 @@
 		if (!gitlabToken) {
 			getGitlabToken();
 		} else {
-			// TODO: Flow
 			// https://gitlab.com/api/v4/user
 			// https://gitlab.com/api/v4/groups?per_page=5000
 			// https://gitlab.com/api/v4/users/andrasbacsai/projects?min_access_level=40&page=1&per_page=25 or https://gitlab.com/api/v4/groups/3086145/projects?page=1&per_page=25
@@ -45,7 +44,7 @@
 			// https://gitlab.com/api/v4/projects/7260661/repository/files/package.json?ref=master
 
 			// https://gitlab.com/api/v4/projects/7260661/deploy_keys - Create deploy keys with ssh-keys?
-			// https://gitlab.com/api/v4/projects/7260661/hooks - set webhook for project
+			// TODO: this is not working!!!! https://gitlab.com/api/v4/projects/7260661/hooks - set webhook for project
 			loading.base = true;
 
 			let response = await fetch(`${apiUrl}/v4/user`, {
@@ -95,7 +94,7 @@
 		const timer = setInterval(() => {
 			if (newWindow?.closed) {
 				clearInterval(timer);
-				location.reload();
+				window.location.reload();
 			}
 		}, 100);
 	}
@@ -187,10 +186,9 @@
 			const deployKey = deployKeys.find((key) => key.title === 'coolify-deploy-key');
 			if (deployKey) {
 				return await saveDeployKey(updateDeployKeyIdUrl, deployKey.id);
-			} 
+			}
 		}
-		return 
-		
+		return;
 	}
 	async function saveDeployKey(updateDeployKeyIdUrl, deployKeyId) {
 		const form = new FormData();
@@ -240,6 +238,7 @@
 		return await saveDeployKey(updateDeployKeyIdUrl, id);
 	}
 	async function save() {
+		loading.save = true;
 		let deployKeyId = application.gitSource.gitlabApp.deployKeyId;
 		let privateSshKey = application.gitSource.gitlabApp.privateSshKey;
 
@@ -253,7 +252,7 @@
 				await checkSSHKey(sshkeyUrl, deployKeyUrl, updateDeployKeyIdUrl);
 			}
 		} catch (error) {
-			console.log(error)
+			console.log(error);
 			throw new Error(error);
 		}
 
@@ -273,6 +272,7 @@
 			body: form
 		});
 		if (response.ok) {
+			loading.save = false;
 			goto(from || `/applications/${id}/configuration/buildpack`);
 			return;
 		}
@@ -284,11 +284,15 @@
 	method="post"
 	use:enhance={{
 		result: async () => {
+			loading.save = false;
 			window.location.assign(from || `/applications/${id}/configuration/buildpack`);
+		},
+		pending: async () => {
+			loading.save = true;
 		}
 	}}
 >
-	<div>
+	<div class="px-4 flex xl:flex-row flex-col xl:space-x-2 space-y-2">
 		{#if loading.base}
 			<select name="group" disabled class="w-96">
 				<option selected value="">Loading groups...</option>
@@ -352,9 +356,10 @@
 			on:click|preventDefault={save}
 			class="w-40"
 			type="submit"
-			disabled={!showSave}
-			class:bg-orange-600={showSave}
-			class:hover:bg-orange-500={showSave}>Save</button
+			disabled={!showSave || loading.save}
+			class:bg-orange-600={showSave && !loading.save}
+			class:hover:bg-orange-500={showSave && !loading.save}
+			>{loading.save ? 'Saving...' : 'Save'}</button
 		>
 	</div>
 </form>

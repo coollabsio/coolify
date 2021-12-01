@@ -50,7 +50,7 @@
 <div class="flex justify-center">
 	{#if !destinations || destinations.length === 0}
 		<div class="flex-col">
-			<div class="pb-2">No Destination found</div>
+			<div class="text-center font-bold text-xl">No destination found</div>
 		</div>
 	{:else}
 		<div class="flex flex-wrap justify-center">

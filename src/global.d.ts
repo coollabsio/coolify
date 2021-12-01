@@ -1,6 +1,4 @@
 /// <reference types="@sveltejs/kit" />
-import type Prisma from '@prisma/client';
-
 interface Locals {
     session: {
         data: {
@@ -42,7 +40,7 @@ interface NewGitSource {
 }
 
 interface AppConfiguration {
-    configuration: Prisma.Application
+    configuration: any
 }
 
 type RawHaproxyConfiguration = {

@@ -4,7 +4,6 @@ import cuid from 'cuid'
 import crypto from 'crypto';
 import { buildQueue } from '$lib/queues';
 import { selectTeam } from '$lib/common';
-import type { Locals } from 'src/global';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     const teamId = selectTeam(request)

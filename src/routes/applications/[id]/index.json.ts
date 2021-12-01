@@ -2,7 +2,6 @@ import { selectTeam } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import jsonwebtoken from 'jsonwebtoken'
-import type { Locals } from 'src/global';
 
 export const get: RequestHandler = async (request) => {
     const teamId = selectTeam(request)

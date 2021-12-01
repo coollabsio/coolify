@@ -10,7 +10,7 @@ export const saveBuildLog = async ({ line, buildId, applicationId }) => {
 }
 
 export const selectTeam = (request) => {
-    let selectedTeam = request.headers.cookie?.split(';').map(s => s.trim()).find(s => s.startsWith('selectedTeam='))?.split('=')[1]
+    let selectedTeam = request.headers.cookie?.split(';').map(s => s.trim()).find(s => s.startsWith('selectedTeam='))?.split('=')[1] || ''
     if (!selectedTeam && request.locals.session.data?.teams?.length > 0) {
         selectedTeam = request.locals.session.data.teams[0].id
     }

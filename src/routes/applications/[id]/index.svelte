@@ -48,10 +48,10 @@
 	});
 </script>
 
-<div class="font-bold flex space-x-1 p-5 text-2xl items-center">
-	<div class="tracking-tight">{$appConfiguration.configuration.name}</div>
+<div class="font-bold flex space-x-1 p-5 px-6 text-2xl items-center">
+	<div class="tracking-tight truncate md:max-w-64 md:block hidden">{$appConfiguration.configuration.name}</div>
 	{#if $appConfiguration.configuration.domain}
-		<span class="px-1 arrow-right-applications">></span>
+		<span class="px-1 arrow-right-applications md:block hidden">></span>
 		<span class="pr-2"
 			><a href="http://{$appConfiguration.configuration.domain}" target="_blank"
 				>{$appConfiguration.configuration.domain}</a
@@ -102,12 +102,15 @@
 	</a>
 </div>
 
-<div class="flex justify-center px-3">
+<div class="flex justify-center px-6">
 	<form
 		action="/applications/{id}.json"
 		use:enhance={{
 			result: async (res) => {
-				loading = false;
+				setTimeout(() => {
+					loading = false;
+					window.location.reload();
+				}, 200);
 			},
 			pending: async () => {
 				loading = true;
@@ -120,8 +123,8 @@
 			<div class="font-bold text-xl text-white">Configuration</div>
 			<button
 				type="submit"
-				class:bg-green-700={!loading}
-				class:hover:bg-green-600={!loading}
+				class:bg-green-600={!loading}
+				class:hover:bg-green-500={!loading}
 				disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
 			>
 		</div>
@@ -194,7 +197,7 @@
 					bind:this={domainEl}
 					name="domain"
 					id="domain"
-					bind:value={$appConfiguration.configuration.domain}
+					value={$appConfiguration.configuration.domain}
 					pattern="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 					placeholder="eg: coollabs.io"
 					required
@@ -259,7 +262,7 @@
 					placeholder="default: /"
 				/>
 				<Explainer
-					text="Directory to use as the base of all commands. Could be useful with monorepos."
+					text="Directory to use as the base of all commands. <br> Could be useful with monorepos."
 				/>
 			</div>
 		</div>
@@ -270,9 +273,11 @@
 					name="publishDirectory"
 					id="publishDirectory"
 					bind:value={$appConfiguration.configuration.publishDirectory}
-					placeholder="eg: dist or _site or public"
+					placeholder=" default: /"
 				/>
-				<Explainer text="Directory containing all the assets for deployment." />
+				<Explainer
+					text="Directory containing all the assets for deployment. <br> For example: dist or _site or public"
+				/>
 			</div>
 		</div>
 	</form>

@@ -32,7 +32,6 @@
 	<div class="text-2xl tracking-tight mr-4">Dashboard</div>
 </div>
 
-{JSON.stringify(teams, null, 2)}
 <div class="mt-10 pb-12 sm:pb-16 tracking-tight">
 	<div class="relative">
 		<div class="absolute inset-0 h-1/2" />

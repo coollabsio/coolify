@@ -44,14 +44,23 @@
 <div class="flex justify-center">
 	{#if !sources || sources.length === 0}
 		<div class="flex-col">
-			<div class="pb-2">No Git Source found</div>
+			<div class="text-center font-bold text-xl">No git sources found</div>
 		</div>
 	{:else}
 		<div class="flex flex-wrap justify-center">
 			{#each sources as source}
 				<a href="/sources/{source.id}" class="no-underline p-2">
-					<div class="box-selection border-orange-500">
+					<div
+						class="box-selection"
+						class:border-red-500={!source.gitlabAppId}
+						class:border-orange-500={source.gitlabAppId}
+						class:border-0={!source.gitlabAppId}
+						class:border-l-4={!source.gitlabAppId}
+					>
 						<div class="font-bold text-xl text-center truncate">{source.name}</div>
+						{#if !source.gitlabAppId}
+							<div class="font-bold text-center text-xs truncate text-red-500">Not configured</div>
+						{/if}
 					</div>
 				</a>
 			{/each}

@@ -79,7 +79,7 @@
 </script>
 
 <div class="font-bold flex space-x-1 py-6 px-6">
-	<div class="text-2xl tracking-tight mr-4">Build logs of <a href="http://{application.domain}" target="_blank">{application.domain}</a></div>
+	<div class="text-2xl tracking-tight mr-4">Logs of <a href="http://{application.domain}" target="_blank">{application.domain}</a></div>
 </div>
 <div class="flex flex-row px-10 justify-start pt-6 space-x-2 ">
 	<div class="min-w-[16rem] space-y-2">
@@ -127,5 +127,5 @@
 	</div>
 </div>
 {#if buildCount === 0}
-	<div class="text-center font-bold text-xl">No build logs found</div>
+	<div class="text-center font-bold text-xl">No logs found</div>
 {/if}

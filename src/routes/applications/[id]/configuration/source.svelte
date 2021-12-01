@@ -39,7 +39,7 @@
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Configure Git Source</div>
+	<div class="text-2xl tracking-tight mr-4">Select a Git Source</div>
 </div>
 <div class="flex justify-center">
 	{#if !sources || sources.length === 0}
@@ -77,9 +77,19 @@
 						}}
 					>
 						<input class="hidden" name="gitSourceId" value={source.id} />
-						<button type="submit" class="box-selection border-orange-500 text-xl"
-							>{source.name}</button
-						>
+						<button
+							disabled={!source.gitlabAppId}
+							type="submit"
+							class="disabled:opacity-95 bg-coolgray-200 disabled:text-white box-selection border-orange-500"
+							class:border-red-500={!source.gitlabAppId}
+							class:border-0={!source.gitlabAppId}
+							class:border-l-4={!source.gitlabAppId}
+							>
+							<div class="font-bold text-xl text-center truncate">{source.name}</div>
+							{#if !source.gitlabAppId}
+								<div class="font-bold text-center text-xs truncate text-red-500">Not configured</div>
+							{/if}
+						</button>
 					</form>
 				</div>
 			{/each}

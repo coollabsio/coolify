@@ -72,14 +72,12 @@ export async function getUser({ uid }) {
     }
 }
 export async function listApplications(teamId) {
-    return await prisma.application.findMany({ where: { teams: { some: { id: teamId } } } })
+    return await prisma.application.findMany({ where: { teams: { every: { id: teamId } } } })
 }
 
 export async function newApplication({ name, teamId }) {
     try {
         const app = await prisma.application.create({ data: { name, teams: { connect: { id: teamId } } } })
-        // const app = await prisma.team.update({ where: { id: teamId }, data: { applications: { create: { application: { create: { name } } } } } })
-        console.log(app)
         return { status: 201, body: { id: app.id } }
     } catch (e) {
         return PrismaErrorHandler(e)
@@ -88,7 +86,7 @@ export async function newApplication({ name, teamId }) {
 
 export async function getApplication({ id, teamId }) {
     try {
-        let body = await prisma.application.findFirst({ where: { id, teams: { some: { id: teamId } } }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } } }, rejectOnNotFound: true })
+        let body = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } } }, rejectOnNotFound: true })
 
         if (body.gitSource?.githubApp?.clientSecret) body.gitSource.githubApp.clientSecret = decrypt(body.gitSource.githubApp.clientSecret)
         if (body.gitSource?.githubApp?.webhookSecret) body.gitSource.githubApp.webhookSecret = decrypt(body.gitSource.githubApp.webhookSecret)
@@ -104,7 +102,7 @@ export async function getApplication({ id, teamId }) {
 }
 
 export async function listSources(teamId) {
-    return await prisma.gitSource.findMany({ where: {}, include: { githubApp: true, gitlabApp: true } })
+    return await prisma.gitSource.findMany({ where: { teams: { every: { id: teamId } } }, include: { githubApp: true, gitlabApp: true } })
 }
 
 export async function newSource({ name, teamId, type, htmlUrl, apiUrl, organization }) {
@@ -138,7 +136,7 @@ export async function removeSource({ id }) {
 
 export async function getSource({ id, teamId }) {
     try {
-        let body = await prisma.gitSource.findFirst({ where: { id, teams: { some: { id: teamId } } }, include: { githubApp: true, gitlabApp: true } })
+        let body = await prisma.gitSource.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { githubApp: true, gitlabApp: true } })
         if (body?.githubApp?.clientSecret) body.githubApp.clientSecret = decrypt(body.githubApp.clientSecret)
         if (body?.githubApp?.webhookSecret) body.githubApp.webhookSecret = decrypt(body.githubApp.webhookSecret)
         if (body?.githubApp?.privateKey) body.githubApp.privateKey = decrypt(body.githubApp.privateKey)
@@ -169,7 +167,7 @@ export async function configureGitsource({ id, gitSourceId }) {
 }
 
 export async function listDestinations(teamId) {
-    return await prisma.destinationDocker.findMany({ where: {} })
+    return await prisma.destinationDocker.findMany({ where: { teams: { every: { id: teamId } } } })
 }
 
 export async function configureDestination({ id, destinationId }) {
@@ -192,7 +190,7 @@ export async function updateDestination({ id, name, isSwarm, engine, network }) 
 
 export async function newDestination({ name, teamId, isSwarm, engine, network }) {
     try {
-        const destination = await prisma.destinationDocker.create({ data: { name, teamId, isSwarm, engine, network } })
+        const destination = await prisma.destinationDocker.create({ data: { name, teams: { connect: { id: teamId } }, isSwarm, engine, network } })
         return {
             status: 201, body: { id: destination.id }
         }
@@ -211,7 +209,7 @@ export async function removeDestination({ id }) {
 
 export async function getDestination({ id, teamId }) {
     try {
-        const body = await prisma.destinationDocker.findFirst({ where: { id, teamId } })
+        const body = await prisma.destinationDocker.findFirst({ where: { id, teams: { every: { id: teamId } } } })
         return { ...body }
     } catch (e) {
         return PrismaErrorHandler(e)
@@ -279,7 +277,7 @@ export async function configureBuildPack({ id, buildPack }) {
 
 export async function configureApplication({ id, teamId, domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
     try {
-        let application = await prisma.application.findFirst({ where: { id, teamId } })
+        let application = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } } })
         if (application.domain !== domain && !application.oldDomain) {
             application = await prisma.application.update({ where: { id }, data: { domain, oldDomain: application.domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory } })
         } else {

@@ -23,7 +23,7 @@
 	>
 		<div class="flex flex-col items-center space-y-4">
 			<input name="name" placeholder="Application name" required bind:this={autofocus} />
-			<button type="submit">Create</button>
+			<button type="submit" class="bg-green-600 hover:bg-green-500">Save</button>
 		</div>
 	</form>
 </div>

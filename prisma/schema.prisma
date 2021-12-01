@@ -33,70 +33,10 @@ model Team {
   destinationDocker DestinationDocker[]
 }
 
-// model TeamsOnUser {
-//   user       User     @relation(fields: [userId], references: [id])
-//   userId     String
-//   team       Team     @relation(fields: [teamId], references: [id])
-//   teamId     String
-//   assignedAt DateTime @default(now())
-
-//   @@id([userId, teamId])
-// }
-
-// model TeamsOnApplication {
-//   application   Application @relation(fields: [applicationId], references: [id])
-//   applicationId String
-//   team          Team        @relation(fields: [teamId], references: [id])
-//   teamId        String
-//   assignedAt    DateTime    @default(now())
-
-//   @@id([applicationId, teamId])
-// }
-
-// model TeamsOnGitSource {
-//   gitSource   GitSource @relation(fields: [gitSourceId], references: [id])
-//   gitSourceId String
-//   team        Team      @relation(fields: [teamId], references: [id])
-//   teamId      String
-//   assignedAt  DateTime  @default(now())
-
-//   @@id([gitSourceId, teamId])
-// }
-
-// model TeamsOnGithubApp {
-//   githubApp   GithubApp @relation(fields: [githubAppId], references: [id])
-//   githubAppId String
-//   team        Team      @relation(fields: [teamId], references: [id])
-//   teamId      String
-//   assignedAt  DateTime  @default(now())
-
-//   @@id([githubAppId, teamId])
-// }
-
-// model TeamsOnGitlabApp {
-//   gitlabApp   GitlabApp @relation(fields: [gitlabAppId], references: [id])
-//   gitlabAppId String
-//   team        Team      @relation(fields: [teamId], references: [id])
-//   teamId      String
-//   assignedAt  DateTime  @default(now())
-
-//   @@id([gitlabAppId, teamId])
-// }
-
-// model TeamsOnDestinationDocker {
-//   destinationDocker   DestinationDocker @relation(fields: [destinationDockerId], references: [id])
-//   destinationDockerId String
-//   team                Team              @relation(fields: [teamId], references: [id])
-//   teamId              String
-//   assignedAt          DateTime          @default(now())
-
-//   @@id([destinationDockerId, teamId])
-// }
-
 model Application {
   id                  String             @id @default(cuid())
-  name                String             @unique
   domain              String?            @unique
+  name                String
   teams               Team[]
   oldDomain           String?
   repository          String?
@@ -142,10 +82,10 @@ model Build {
 
 model DestinationDocker {
   id          String        @id @default(cuid())
-  name        String?       @unique
+  network     String        @unique
+  name        String
   teams       Team[]
-  engine      String?
-  network     String?       @default("coollabs")
+  engine      String
   isSwarm     Boolean?      @default(false)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -154,7 +94,7 @@ model DestinationDocker {
 
 model GitSource {
   id           String        @id @default(cuid())
-  name         String?       @unique
+  name         String
   teams        Team[]
   type         String?
   apiUrl       String?
@@ -186,10 +126,9 @@ model GithubApp {
 
 model GitlabApp {
   id            String     @id @default(cuid())
-  name          String?    @unique
+  oauthId       Int        @unique
   groupName     String?    @unique
   teams         Team[]
-  oauthId       Int?
   deployKeyId   Int?
   privateSshKey String?
   appId         String?
