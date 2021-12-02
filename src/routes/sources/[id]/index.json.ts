@@ -1,8 +1,8 @@
-import { selectTeam } from '$lib/common';
+import { getTeam, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 export const get: RequestHandler = async (request) => {
-    const teamId = selectTeam(request)
+    const teamId = getTeam(request)
     const { id } = request.params
     return {
         body: {
@@ -12,6 +12,9 @@ export const get: RequestHandler = async (request) => {
 }
 
 export const del: RequestHandler = async (request) => {
+    const { status, body } = await getUserDetails(request);
+    if (status === 401) return { status, body }
+
     const { id } = request.params
     return {
         body: {
@@ -22,7 +25,10 @@ export const del: RequestHandler = async (request) => {
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     // TODO: Do we really need groupName?
-    const teamId = selectTeam(request)
+    const { status, body } = await getUserDetails(request);
+    if (status === 401) return { status, body }
+    
+    const teamId = getTeam(request)
     const { id } = request.params
     const name = request.body.get('name')
     const oauthId = Number(request.body.get('oauthId'))

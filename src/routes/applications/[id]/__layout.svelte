@@ -55,7 +55,7 @@
 </script>
 
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page, session } from '$app/stores';
 	import { enhance, errorNotification } from '$lib/form';
 	import { appConfiguration } from '$lib/store';
 
@@ -66,11 +66,16 @@
 	async function deleteApplication(name) {
 		const sure = confirm(`Are you sure you would like to delete '${name}'?`);
 		if (sure) {
-			await fetch(`/applications/${id}/delete.json`, {
+			const response = await fetch(`/applications/${id}/delete.json`, {
 				method: 'delete',
 				body: JSON.stringify({ id })
 			});
-			window.location.assign('/applications');
+			if (!response.ok) {
+				const { message } = await response.json();
+				errorNotification(message);
+			} else {
+				window.location.assign('/applications');
+			}
 		}
 	}
 </script>
@@ -114,11 +119,15 @@
 			<button
 				title="Deploy"
 				type="submit"
-				class:text-green-500={$appConfiguration.configuration.gitSource &&
+				disabled={$session.permission !== 'admin'}
+				class:text-green-500={$session.permission === 'admin' &&
+					$appConfiguration.configuration.gitSource &&
 					$appConfiguration.configuration.repository &&
 					$appConfiguration.configuration.destinationDocker}
-				class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-				data-tooltip="Queue for deployment"
+				class="icons bg-transparent tooltip-bottom text-sm "
+				data-tooltip={$session.permission === 'admin'
+					? 'Queue for deployment'
+					: 'You do not have permission to deploy.'}
 			>
 				<svg
 					class="w-6 h-6"
@@ -203,8 +212,12 @@
 		on:click={() => deleteApplication($appConfiguration.configuration.name)}
 		title="Delete application"
 		type="submit"
-		class="icons bg-transparent hover:text-red-500 tooltip-bottom text-sm"
-		data-tooltip="Delete application"
+		disabled={$session.permission !== 'admin'}
+		class:hover:text-red-500={$session.permission === 'admin'}
+		class="icons bg-transparent  tooltip-bottom text-sm"
+		data-tooltip={$session.permission === 'admin'
+			? 'Delete application'
+			: 'You do not have permission to delete this application'}
 		><svg
 			class="w-6 h-6"
 			fill="none"

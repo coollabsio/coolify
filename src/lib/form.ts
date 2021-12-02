@@ -5,14 +5,17 @@ export function enhance(
     form: HTMLFormElement,
     {
         beforeSubmit,
+        final,
         pending,
         error,
         result
     }: {
         beforeSubmit?: () => Promise<void>,
+        final?: () => Promise<void>,
         pending?: (data: FormData, form: HTMLFormElement) => void;
         error?: (res: Response, error: Error, form: HTMLFormElement) => void;
         result: (res: Response, form: HTMLFormElement) => void;
+        
     }
 ): { destroy: () => void } {
     let current_token: unknown;
@@ -52,6 +55,8 @@ export function enhance(
             } else {
                 throw e;
             }
+        } finally {
+            if (final) final()
         }
     }
 

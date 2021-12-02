@@ -31,7 +31,7 @@
 
 	import type Prisma from '@prisma/client';
 
-	import { page } from '$app/stores';
+	import { page, session } from '$app/stores';
 	import { enhance } from '$lib/form';
 	import { onMount } from 'svelte';
 
@@ -49,7 +49,9 @@
 </script>
 
 <div class="font-bold flex space-x-1 p-5 px-6 text-2xl items-center">
-	<div class="tracking-tight truncate md:max-w-64 md:block hidden">{$appConfiguration.configuration.name}</div>
+	<div class="tracking-tight truncate md:max-w-64 md:block hidden">
+		{$appConfiguration.configuration.name}
+	</div>
 	{#if $appConfiguration.configuration.domain}
 		<span class="px-1 arrow-right-applications md:block hidden">></span>
 		<span class="pr-2"
@@ -106,7 +108,7 @@
 	<form
 		action="/applications/{id}.json"
 		use:enhance={{
-			result: async (res) => {
+			result: async () => {
 				setTimeout(() => {
 					loading = false;
 					window.location.reload();
@@ -114,6 +116,9 @@
 			},
 			pending: async () => {
 				loading = true;
+			},
+			final: async () => {
+				loading = false;
 			}
 		}}
 		method="post"
@@ -121,18 +126,22 @@
 	>
 		<div class="flex space-x-2 h-8 items-center">
 			<div class="font-bold text-xl text-white">Configuration</div>
-			<button
-				type="submit"
-				class:bg-green-600={!loading}
-				class:hover:bg-green-500={!loading}
-				disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
-			>
+			{#if $session.permission === 'admin'}
+				<button
+					type="submit"
+					class:bg-green-600={!loading}
+					class:hover:bg-green-500={!loading}
+					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
+				>
+			{/if}
 		</div>
 		<div class="grid grid-cols-3 items-center">
 			<label for="gitSource">Git Source</label>
 			<div class="col-span-2">
 				<a
-					href="/applications/{id}/configuration/source?from=/applications/{id}"
+					href={$session.permission === 'admin'
+						? `/applications/${id}/configuration/source?from=/applications/${id}`
+						: ''}
 					class="no-underline"
 					><span class="arrow-right-applications">></span><input
 						value={$appConfiguration.configuration.gitSource.name}
@@ -147,7 +156,9 @@
 			<label for="repository">Git Repository</label>
 			<div class="col-span-2">
 				<a
-					href="/applications/{id}/configuration/repository?from=/applications/{id}"
+					href={$session.permission === 'admin'
+						? `/applications/${id}/configuration/repository?from=/applications/${id}`
+						: ''}
 					class="no-underline"
 					><span class="arrow-right-applications">></span><input
 						value="{$appConfiguration.configuration.repository}/{$appConfiguration.configuration
@@ -163,7 +174,9 @@
 			<label for="destination">Destination</label>
 			<div class="col-span-2">
 				<a
-					href="/applications/{id}/configuration/destination?from=/applications/{id}"
+					href={$session.permission === 'admin'
+						? `/applications/${id}/configuration/destination?from=/applications/${id}`
+						: ''}
 					class="no-underline"
 					><span class="arrow-right-applications">></span><input
 						value={$appConfiguration.configuration.destinationDocker.name}
@@ -178,7 +191,9 @@
 			<label for="buildPack">Build Pack</label>
 			<div class="col-span-2">
 				<a
-					href="/applications/{id}/configuration/buildpack?from=/applications/{id}"
+					href={$session.permission === 'admin'
+						? `/applications/${id}/configuration/buildpack?from=/applications/${id}`
+						: ''}
 					class="no-underline "
 					><span class="arrow-right-applications">></span>
 					<input
@@ -194,6 +209,7 @@
 			<label for="domain">Domain</label>
 			<div class="col-span-2 ">
 				<input
+					readonly={$session.permission !== 'admin'}
 					bind:this={domainEl}
 					name="domain"
 					id="domain"
@@ -210,6 +226,7 @@
 				<label for="port">Port</label>
 				<div class="col-span-2">
 					<input
+						readonly={$session.permission !== 'admin'}
 						name="port"
 						id="port"
 						bind:value={$appConfiguration.configuration.port}
@@ -223,6 +240,7 @@
 			<label for="installCommand">Install Command</label>
 			<div class="col-span-2">
 				<input
+					readonly={$session.permission !== 'admin'}
 					name="installCommand"
 					id="installCommand"
 					bind:value={$appConfiguration.configuration.installCommand}
@@ -234,6 +252,7 @@
 			<label for="buildCommand">Build Command</label>
 			<div class="col-span-2">
 				<input
+					readonly={$session.permission !== 'admin'}
 					name="buildCommand"
 					id="buildCommand"
 					bind:value={$appConfiguration.configuration.buildCommand}
@@ -245,6 +264,7 @@
 			<label for="startCommand" class="">Start Command</label>
 			<div class="col-span-2">
 				<input
+					readonly={$session.permission !== 'admin'}
 					name="startCommand"
 					id="startCommand"
 					bind:value={$appConfiguration.configuration.startCommand}
@@ -256,6 +276,7 @@
 			<label for="baseDirectory">Base Directory</label>
 			<div class="col-span-2">
 				<input
+					readonly={$session.permission !== 'admin'}
 					name="baseDirectory"
 					id="baseDirectory"
 					bind:value={$appConfiguration.configuration.baseDirectory}
@@ -270,6 +291,7 @@
 			<label for="publishDirectory">Publish Directory</label>
 			<div class="col-span-2">
 				<input
+					readonly={$session.permission !== 'admin'}
 					name="publishDirectory"
 					id="publishDirectory"
 					bind:value={$appConfiguration.configuration.publishDirectory}

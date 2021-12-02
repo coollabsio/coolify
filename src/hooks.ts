@@ -2,6 +2,7 @@ import dotEnvExtended from 'dotenv-extended';
 dotEnvExtended.load();
 import type { GetSession } from "@sveltejs/kit";
 import { handleSession } from "svelte-kit-cookie-session";
+import { getUserDetails, isTeamIdTokenAvailable } from '$lib/common';
 
 export const handle = handleSession(
     {
@@ -9,15 +10,45 @@ export const handle = handleSession(
         expires: 30
     },
     async function ({ request, resolve }) {
-        const response = await resolve(request);
-        if (!response.body || !response.headers) {
-            return response;
+        const isTeamIdTokenAvailableResult = isTeamIdTokenAvailable(request);
+
+        if (Object.keys(request.locals.session.data).length > 0) {
+            const { permission, teamId } = await getUserDetails(request, false);
+            request.locals.user = {
+                teamId,
+                permission
+            }
         }
-        return response;
+
+
+        const response = await resolve(request);
+
+        let responseWithCookie = response
+
+        if (isTeamIdTokenAvailableResult) {
+            responseWithCookie = {
+                ...response,
+                headers: {
+                    ...response.headers,
+                    'Set-Cookie': [`teamId=${isTeamIdTokenAvailableResult}`]
+                }
+            }
+        }
+        return responseWithCookie
+        // if (!response.body || !response.headers) {
+        //     return response;
+        // }
+        // return response;
     }
 );
 
 
 export const getSession: GetSession<Locals> = function (request) {
-    return request.locals.session.data;
+
+    const payload = {
+        uid: request.locals.session.data?.uid || null,
+        teamId: request.locals.user?.teamId || null,
+        permission: request.locals.user?.permission
+    }
+    return payload
 };

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page, session } from '$app/stores';
 	import { enhance } from '$lib/form';
 
 	let loading = false;
@@ -50,7 +50,7 @@
 		</div>
 	</div>
 {/if}
-<div class="flex justify-center pb-8">
+<div class="flex justify-center pb-8 px-6">
 	<form
 		{action}
 		method="post"
@@ -67,22 +67,32 @@
 			},
 			pending: async () => {
 				loading = true;
+			},
+			final: async () => {
+				loading = false;
 			}
 		}}
 	>
 		<div class="flex space-x-2 h-8 items-center">
 			<div class="font-bold text-xl text-white">Configuration</div>
-			<button
-				type="submit"
-				class:bg-sky-600={!loading}
-				class:hover:bg-sky-500={!loading}
-				disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
-			>
+			{#if $session.permission === 'admin'}
+				<button
+					type="submit"
+					class:bg-sky-600={!loading}
+					class:hover:bg-sky-500={!loading}
+					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
+				>
+			{/if}
 		</div>
 		<div class="grid grid-cols-3 items-center">
 			<label for="name">Name</label>
 			<div class="col-span-2">
-				<input name="name" placeholder="name" bind:value={payload.name} />
+				<input
+					readonly={$session.permission !== 'admin'}
+					name="name"
+					placeholder="name"
+					bind:value={payload.name}
+				/>
 			</div>
 		</div>
 		<!-- <div class="flex items-center">
@@ -94,13 +104,23 @@
 		<div class="grid grid-cols-3 items-center">
 			<label for="engine">Engine</label>
 			<div class="col-span-2">
-				<input name="engine" placeholder="/var/run/docker.sock" bind:value={payload.engine} />
+				<input
+					readonly={$session.permission !== 'admin'}
+					name="engine"
+					placeholder="/var/run/docker.sock"
+					bind:value={payload.engine}
+				/>
 			</div>
 		</div>
 		<div class="grid grid-cols-3 items-center">
 			<label for="network">Network</label>
 			<div class="col-span-2">
-				<input name="network" placeholder="default: coollabs" bind:value={payload.network} />
+				<input
+					readonly={$session.permission !== 'admin'}
+					name="network"
+					placeholder="default: coollabs"
+					bind:value={payload.network}
+				/>
 			</div>
 		</div>
 	</form>

@@ -41,7 +41,7 @@
 	<span class="px-1 arrow-right-applications">></span>
 	<span class="pr-2">{source.name}</span>
 </div>
-<div class="flex justify-center space-x-2">
+<div class="flex justify-center space-x-2 px-6">
 	{#if source.type === 'github'}
 		<Github {source} />
 	{:else if source.type === 'gitlab'}

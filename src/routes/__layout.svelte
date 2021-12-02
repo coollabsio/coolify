@@ -3,7 +3,7 @@
 	import { publicPaths } from '$lib/settings';
 
 	export const load: Load = async ({ fetch, page, session }) => {
-		if (!session.token && !publicPaths.includes(page.path)) {
+		if (!session.uid && !publicPaths.includes(page.path)) {
 			return {
 				status: 302,
 				redirect: '/login'
@@ -20,9 +20,10 @@
 	import { browser } from '$app/env';
 	import { onMount } from 'svelte';
 	let alpha = true;
+
 	onMount(async () => {
 		if ($session.uid) {
-			const response = await fetch(`/login.json?uid=${$session.uid}`, {
+			const response = await fetch(`/login.json`, {
 				method: 'GET',
 				headers: {
 					'Content-Type': 'application/json'
@@ -44,7 +45,7 @@
 	}
 </script>
 
-{#if $session.token}
+{#if $session.uid}
 	<nav class="nav-main">
 		<div class="flex flex-col w-full h-screen items-center transition-all duration-100">
 			<div class="w-10 h-10 my-4"><img src="/favicon.png" alt="coolLabs logo" /></div>

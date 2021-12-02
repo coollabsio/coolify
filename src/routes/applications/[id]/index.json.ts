@@ -1,10 +1,10 @@
-import { selectTeam } from '$lib/common';
+import { getTeam, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import jsonwebtoken from 'jsonwebtoken'
 
 export const get: RequestHandler = async (request) => {
-    const teamId = selectTeam(request)
+    const teamId = getTeam(request)
     let githubToken = null;
     let gitlabToken = null;
     const { id } = request.params
@@ -44,7 +44,9 @@ export const get: RequestHandler = async (request) => {
 }
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const teamId = selectTeam(request)
+    const { teamId, status, body } = await getUserDetails(request);
+    if (status === 401) return { status, body }
+
     const { id } = request.params
     const domain = request.body.get('domain') || null
     const port = Number(request.body.get('port')) || null

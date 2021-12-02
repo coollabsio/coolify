@@ -1,7 +1,6 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ fetch, session }) => {
-		console.log(session)
 		const url = `/index.json`;
 		const res = await fetch(url);
 

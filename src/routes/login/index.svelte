@@ -7,7 +7,7 @@
 	let loading = false;
 	let passwordEl;
 	let emailEl;
-	if (browser && $session.token) {
+	if (browser && $session.uid) {
 		goto('/');
 	}
 	onMount(() => {
@@ -16,7 +16,7 @@
 </script>
 
 <div class="h-screen flex flex-col justify-center items-center">
-	{#if $session.token}
+	{#if $session.uid}
 		<div class="flex justify-center px-4 text-xl font-bold">Already logged in...</div>
 	{:else}
 		<div class="flex justify-center px-4">

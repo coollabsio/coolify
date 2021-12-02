@@ -48,12 +48,12 @@
 		<button class="w-32" on:click={() => setPredefined('bitbucket')}>Bitbucket.com</button>
 	</div>
 </div>
-{#if $gitSourcePayload.type === 'github'}
-	<Github />
-{:else if $gitSourcePayload.type === 'gitlab'}
-	<Gitlab />
-{:else if $gitSourcePayload.type === 'bitbucket'}
-	<div class="text-center font-bold text-4xl py-10">Not implemented yet</div>
-{/if}
-
-
+<div class="px-6">
+	{#if $gitSourcePayload.type === 'github'}
+		<Github />
+	{:else if $gitSourcePayload.type === 'gitlab'}
+		<Gitlab />
+	{:else if $gitSourcePayload.type === 'bitbucket'}
+		<div class="text-center font-bold text-4xl py-10">Not implemented yet</div>
+	{/if}
+</div>

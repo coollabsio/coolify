@@ -1,7 +1,7 @@
 <script lang="ts">
 	export let source;
 	import Explainer from '$lib/components/Explainer.svelte';
-	import { enhance } from '$lib/form';
+	import { enhance, errorNotification } from '$lib/form';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	const { id } = $page.params;
@@ -16,7 +16,7 @@
 		applicationType: 'user'
 	};
 	onMount(() => {
-		oauthIdEl.focus();
+		oauthIdEl && oauthIdEl.focus();
 	});
 	async function checkOauthId() {
 		if (payload.oauthId) {
@@ -28,7 +28,7 @@
 			});
 			if (response.ok) {
 				payload.oauthId = '';
-				alert(
+				errorNotification(
 					'OAuthID is already used by another GitLab OAuth Application. Contact the administrator of that OAuth Application.'
 				);
 				oauthIdEl.focus();

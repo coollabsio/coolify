@@ -4,7 +4,7 @@
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 
-	import { enhance } from '$lib/form';
+	import { enhance, errorNotification } from '$lib/form';
 	import { goto } from '$app/navigation';
 
 	const { id } = $page.params;
@@ -169,7 +169,7 @@
 		const url = `/applications/${id}/configuration/repository.json?repository=${selected.project.name}&branch=${selected.branch.name}`;
 		const res = await fetch(url);
 		if (res.ok) {
-			alert('Branch already configured');
+			errorNotification('Branch already configured');
 			return;
 		}
 		showSave = true;

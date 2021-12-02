@@ -1,11 +1,11 @@
 import { session } from '$app/stores';
-import { selectTeam } from '$lib/common';
+import { getTeam } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import got from 'got';
 
 export const get: RequestHandler = async (request) => {
-    const teamId = selectTeam(request)
+    const teamId = getTeam(request)
     const tokenUrl = 'https://gitlab.com/oauth/token'
     const code = request.query.get('code')
     const state = request.query.get('state')

@@ -14,12 +14,21 @@ model Setting {
 }
 
 model User {
-  id       String  @id @default(cuid())
-  uid      String  @unique
-  email    String  @unique
-  type     String
-  password String?
-  teams    Team[]
+  id         String       @id @default(cuid()) @unique
+  email      String       @unique
+  type       String
+  password   String?
+  teams      Team[]
+  permission Permission[]
+}
+
+model Permission {
+  id         String @id @default(cuid())
+  user       User   @relation(fields: [userId], references: [id])
+  userId     String
+  team       Team   @relation(fields: [teamId], references: [id])
+  teamId     String
+  permission String
 }
 
 model Team {
@@ -31,6 +40,7 @@ model Team {
   gitHubApps        GithubApp[]
   gitLabApps        GitlabApp[]
   destinationDocker DestinationDocker[]
+  permission        Permission[]
 }
 
 model Application {

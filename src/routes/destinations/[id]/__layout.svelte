@@ -29,15 +29,23 @@
 </script>
 
 <script>
+	import { session } from '$app/stores';
+	import { errorNotification } from '$lib/form';
+
 	export let destination;
 	async function deleteDestination(destination) {
 		const sure = confirm(`Are you sure you would like to delete '${destination.name}'?`);
 		if (sure) {
-			await fetch(`/destinations/${destination.id}.json`, {
+			const response = await fetch(`/destinations/${destination.id}.json`, {
 				method: 'delete',
 				body: JSON.stringify({ id: destination.id })
 			});
-			window.location.assign('/destinations');
+			if (!response.ok) {
+				const { message } = await response.json();
+				errorNotification(message);
+			} else {
+				window.location.assign('/destinations');
+			}
 		}
 	}
 </script>
@@ -47,8 +55,12 @@
 		on:click={() => deleteDestination(destination)}
 		title="Delete Destination"
 		type="submit"
-		class="icons bg-transparent hover:text-red-500 tooltip-bottom text-sm"
-		data-tooltip="Delete Git Source"
+		disabled={$session.permission !== 'admin'}
+		class:hover:text-red-500={$session.permission === 'admin'}
+		class="icons bg-transparent tooltip-bottom text-sm"
+		data-tooltip={$session.permission === 'admin'
+			? 'Delete Git Source'
+			: 'You do not have permission to delete a Git Source'}
 		><svg
 			class="w-6 h-6"
 			fill="none"

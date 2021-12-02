@@ -63,9 +63,9 @@ async function generateSshKeyPair(): Promise<{ publicKey: string, privateKey: st
 }
 
 // DB functions
-export async function getUser({ uid }) {
+export async function getUser({ userId }) {
     try {
-        await prisma.user.findUnique({ where: { uid }, rejectOnNotFound: true })
+        await prisma.user.findUnique({ where: { id: userId }, rejectOnNotFound: true })
         return { status: 200 }
     } catch (e) {
         return PrismaErrorHandler(e)
@@ -318,7 +318,7 @@ export async function login({ email, password }) {
                     }
                 };
             }
-            uid = userFound.uid
+            uid = userFound.id
             teams = userFound.teams
         }
     } else {
@@ -336,15 +336,16 @@ export async function login({ email, password }) {
         const hashedPassword = await bcrypt.hash(password, saltRounds)
         const user = await prisma.user.create({
             data: {
+                id: uid,
                 email,
                 password: hashedPassword,
-                uid,
                 type: 'email',
                 teams: {
                     create: {
                         id: uid
                     }
-                }
+                },
+                permission: { create: { teamId: uid, permission: 'admin' } }
             }, include: { teams: true }
         })
         teams = user.teams
@@ -354,23 +355,24 @@ export async function login({ email, password }) {
         await prisma.setting.update({ where: { name: 'isRegistrationEnabled' }, data: { value: 'false' } })
     }
 
-    const token = jsonwebtoken.sign({}, secretKey, {
-        expiresIn: 15778800,
-        algorithm: 'HS256',
-        audience: 'coolify',
-        issuer: 'coolify',
-        jwtid: uid,
-        subject: `User:${uid}`,
-        notBefore: -1000
-    });
+    // const token = jsonwebtoken.sign({}, secretKey, {
+    //     expiresIn: 15778800,
+    //     algorithm: 'HS256',
+    //     audience: 'coolify',
+    //     issuer: 'coolify',
+    //     jwtid: uid,
+    //     subject: `User:${uid}`,
+    //     notBefore: -1000
+    // });
 
     return {
         status: 200,
+        headers: {
+            'Set-Cookie': `teamId=${uid}; HttpOnly; Path=/; Max-Age=15778800;`
+        },
         body: {
-            isLoggedIn: true,
             uid,
-            teams,
-            token
+            teamId: uid
         }
     }
 }

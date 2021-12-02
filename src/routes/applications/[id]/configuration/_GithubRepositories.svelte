@@ -1,9 +1,9 @@
 <script lang="ts">
 	export let githubToken;
 	export let application;
-    
+
 	import { page } from '$app/stores';
-	import { enhance } from '$lib/form';
+	import { enhance, errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
 
 	const { id } = $page.params;
@@ -43,14 +43,11 @@
 		token = data.token;
 	}
 	async function loadRepositoriesByPage(page = 0) {
-		const response = await fetch(
-			`${apiUrl}/installation/repositories?per_page=100&page=${page}`,
-			{
-				headers: {
-					Authorization: `token ${token}`
-				}
+		const response = await fetch(`${apiUrl}/installation/repositories?per_page=100&page=${page}`, {
+			headers: {
+				Authorization: `token ${token}`
 			}
-		);
+		});
 		return await response.json();
 	}
 	async function loadRepositories() {
@@ -83,7 +80,7 @@
 		const url = `/applications/${id}/configuration/repository.json?repository=${selected.repository}&branch=${selected.branch}`;
 		const res = await fetch(url);
 		if (res.ok) {
-			alert('Branch already configured');
+			errorNotification('Branch already configured');
 			return;
 		}
 		showSave = true;

@@ -30,16 +30,22 @@
 
 <script>
 	export let source;
-	import { page } from '$app/stores';
+	import { page, session } from '$app/stores';
+	import { errorNotification } from '$lib/form';
 	const { id } = $page.params;
 
 	async function deleteSource(name) {
 		const sure = confirm(`Are you sure you would like to delete '${name}'?`);
 		if (sure) {
-			await fetch(`/sources/${id}.json`, {
+			const response = await fetch(`/sources/${id}.json`, {
 				method: 'delete'
 			});
-			window.location.assign('/sources');
+			if (!response.ok) {
+				const { message } = await response.json();
+				errorNotification(message);
+			} else {
+				window.location.assign('/sources');
+			}
 		}
 	}
 </script>
@@ -49,8 +55,12 @@
 		on:click={() => deleteSource(source.name)}
 		title="Delete Git Source"
 		type="submit"
-		class="icons bg-transparent hover:text-red-500 tooltip-bottom text-sm"
-		data-tooltip="Delete Git Source"
+		disabled={$session.permission !== 'admin'}
+		class:hover:text-red-500={$session.permission === 'admin'}
+		class="icons bg-transparent tooltip-bottom text-sm"
+		data-tooltip={$session.permission === 'admin'
+			? 'Delete Git Source'
+			: 'You do not have permission to delete a Git Source'}
 		><svg
 			class="w-6 h-6"
 			fill="none"

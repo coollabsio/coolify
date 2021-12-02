@@ -1,8 +1,8 @@
-import { selectTeam } from '$lib/common';
+import { getTeam, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 export const get: RequestHandler = async (request) => {
-    const teamId = selectTeam(request)
+    const teamId = getTeam(request)
     const { id } = request.params
     return {
         body: {
@@ -11,6 +11,9 @@ export const get: RequestHandler = async (request) => {
     };
 }
 export const post: RequestHandler<Locals, FormData> = async (request) => {
+    const { teamId, status, body } = await getUserDetails(request);
+    if (status === 401) return { status, body }
+
     const { id } = request.params
     const name = request.body.get('name')
     const isSwarm = request.body.get('isSwarm')
@@ -24,7 +27,10 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 }
 
 export const del: RequestHandler = async (request) => {
-    const { id } = JSON.parse(request.body.toString())
+    const { teamId, status, body } = await getUserDetails(request);
+    if (status === 401) return { status, body }
+    
+    const { id } = request.params
     return {
         body: {
             destination: await db.removeDestination({ id })

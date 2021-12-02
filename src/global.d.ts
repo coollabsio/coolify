@@ -1,5 +1,9 @@
 /// <reference types="@sveltejs/kit" />
 interface Locals {
+    user: {
+        teamId: string;
+        permission: string;
+    }
     session: {
         data: {
             token?: string;

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { enhance } from '$lib/form';
+	import { enhance, errorNotification } from '$lib/form';
 
 	let payload = {
 		name: undefined,
@@ -34,7 +34,7 @@
 					network: 'coollabs'
 				};
 				break;
-			
+
 			default:
 				break;
 		}
@@ -47,12 +47,30 @@
 		<button class="w-32" on:click={() => setPredefined('localdocker')}>Local Docker</button>
 	</div>
 </div>
-<div class="flex justify-center pb-8">
+<div class="flex justify-center pb-8 px-6">
 	<form
 		{action}
 		method="post"
 		class="grid grid-flow-row gap-2 py-4"
 		use:enhance={{
+			beforeSubmit: async () => {
+				const form = new FormData();
+				form.append('network', payload.network);
+
+				const response = await fetch(`/new/destination/check.json`, {
+					method: 'POST',
+					headers: {
+						accept: 'application/json'
+					},
+					body: form
+				});
+				if (response.ok) {
+					errorNotification(
+						`Local Docker Engine with ${payload.network} is already configured.`
+					);
+					throw new Error(await response.json());
+				}
+			},
 			result: async (res) => {
 				if (!update) {
 					const { id } = await res.json();
