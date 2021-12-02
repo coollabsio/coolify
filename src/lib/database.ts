@@ -306,7 +306,13 @@ export async function login({ email, password }) {
     const { value: isRegistrationEnabled = 'false' } = await prisma.setting.findUnique({ where: { name: 'isRegistrationEnabled' }, select: { value: true } }) || {}
 
     let uid = cuid()
-    let teams = []
+    // Disable registration if we are registering the first user.
+    if (users === 0) {
+        await prisma.setting.update({ where: { name: 'isRegistrationEnabled' }, data: { value: 'false' } })
+        uid = '0'
+    }
+
+
     if (userFound) {
         if (userFound.type === 'email') {
             const passwordMatch = await bcrypt.compare(password, userFound.password)
@@ -319,7 +325,6 @@ export async function login({ email, password }) {
                 };
             }
             uid = userFound.id
-            teams = userFound.teams
         }
     } else {
         // If registration disabled, return 403
@@ -334,7 +339,7 @@ export async function login({ email, password }) {
 
 
         const hashedPassword = await bcrypt.hash(password, saltRounds)
-        const user = await prisma.user.create({
+        await prisma.user.create({
             data: {
                 id: uid,
                 email,
@@ -348,11 +353,6 @@ export async function login({ email, password }) {
                 permission: { create: { teamId: uid, permission: 'admin' } }
             }, include: { teams: true }
         })
-        teams = user.teams
-    }
-    // Disable registration if we are registering the first user.
-    if (users === 0) {
-        await prisma.setting.update({ where: { name: 'isRegistrationEnabled' }, data: { value: 'false' } })
     }
 
     // const token = jsonwebtoken.sign({}, secretKey, {

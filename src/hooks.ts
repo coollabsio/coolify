@@ -2,7 +2,7 @@ import dotEnvExtended from 'dotenv-extended';
 dotEnvExtended.load();
 import type { GetSession } from "@sveltejs/kit";
 import { handleSession } from "svelte-kit-cookie-session";
-import { getUserDetails, isTeamIdTokenAvailable } from '$lib/common';
+import { getUserDetails, isTeamIdTokenAvailable, sentry } from '$lib/common';
 
 export const handle = handleSession(
     {
@@ -52,3 +52,7 @@ export const getSession: GetSession<Locals> = function (request) {
     }
     return payload
 };
+
+export async function handleError({ error, request }) {
+    sentry.captureException(error, { request });
+}

@@ -59,18 +59,20 @@
 					data-tooltip="Dashboard"
 				>
 					<svg
-						class="w-8 h-8"
-						fill="none"
-						stroke="currentColor"
-						viewBox="0 0 24 24"
 						xmlns="http://www.w3.org/2000/svg"
+						class="h-8 w-8"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
 					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+							d="M19 8.71l-5.333 -4.148a2.666 2.666 0 0 0 -3.274 0l-5.334 4.148a2.665 2.665 0 0 0 -1.029 2.105v7.2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-7.2c0 -.823 -.38 -1.6 -1.03 -2.105"
 						/>
+						<path d="M16 15c-2.21 1.333 -5.792 1.333 -8 0" />
 					</svg>
 				</a>
 				<div class="border-t border-warmGray-700" />
@@ -86,54 +88,88 @@
 					data-tooltip="Applications"
 				>
 					<svg
-						class=" w-8 h-8"
-						fill="none"
-						stroke="currentColor"
-						viewBox="0 0 24 24"
 						xmlns="http://www.w3.org/2000/svg"
+						class="h-8 w-8"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentcolor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
 					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
-						/>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<rect x="4" y="4" width="6" height="6" rx="1" />
+						<rect x="4" y="14" width="6" height="6" rx="1" />
+						<rect x="14" y="14" width="6" height="6" rx="1" />
+						<line x1="14" y1="7" x2="20" y2="7" />
+						<line x1="17" y1="4" x2="17" y2="10" />
 					</svg>
 				</a>
 				<a
 					sveltekit:prefetch
 					href="/sources"
 					class="icons hover:text-orange-500 bg-coolgray-200 tooltip-right"
-					class:text-orange-500={$page.path.startsWith('/sources') || $page.path.startsWith('/new/source')}
-					class:bg-coolgray-500={$page.path.startsWith('/sources') || $page.path.startsWith('/new/source')}
+					class:text-orange-500={$page.path.startsWith('/sources') ||
+						$page.path.startsWith('/new/source')}
+					class:bg-coolgray-500={$page.path.startsWith('/sources') ||
+						$page.path.startsWith('/new/source')}
 					data-tooltip="Git Sources"
 				>
-					<svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 fill-current" viewBox="0 0 24 24"
-						><path
-							d="m21.62 11.108-8.731-8.729a1.292 1.292 0 0 0-1.823 0L9.257 4.19l2.299 2.3a1.532 1.532 0 0 1 1.939 1.95l2.214 2.217a1.53 1.53 0 0 1 1.583 2.531c-.599.6-1.566.6-2.166 0a1.536 1.536 0 0 1-.337-1.662l-2.074-2.063V14.9c.146.071.286.169.407.29a1.537 1.537 0 0 1 0 2.166 1.536 1.536 0 0 1-2.174 0 1.528 1.528 0 0 1 0-2.164c.152-.15.322-.264.504-.339v-5.49a1.529 1.529 0 0 1-.83-2.008l-2.26-2.271-5.987 5.982c-.5.504-.5 1.32 0 1.824l8.731 8.729a1.286 1.286 0 0 0 1.821 0l8.69-8.689a1.284 1.284 0 0 0 .003-1.822"
-						/></svg
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-8 w-8"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
 					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<circle cx="6" cy="6" r="2" />
+						<circle cx="18" cy="18" r="2" />
+						<path d="M11 6h5a2 2 0 0 1 2 2v8" />
+						<polyline points="14 9 11 6 14 3" />
+						<path d="M13 18h-5a2 2 0 0 1 -2 -2v-8" />
+						<polyline points="10 15 13 18 10 21" />
+					</svg>
 				</a>
 				<a
 					sveltekit:prefetch
 					href="/destinations"
 					class="icons hover:text-sky-500 bg-coolgray-200 tooltip-right"
-					class:text-sky-500={$page.path.startsWith('/destinations') || $page.path.startsWith('/new/destination')}
-					class:bg-coolgray-500={$page.path.startsWith('/destinations') || $page.path.startsWith('/new/destination')}
+					class:text-sky-500={$page.path.startsWith('/destinations') ||
+						$page.path.startsWith('/new/destination')}
+					class:bg-coolgray-500={$page.path.startsWith('/destinations') ||
+						$page.path.startsWith('/new/destination')}
 					data-tooltip="Destinations"
 				>
-					<svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 fill-current" viewBox="0 0 24 24"
-						><path
-							d="M20.17 9.82a4.76 4.76 0 0 0-.84.07 3.12 3.12 0 0 0-1.43-2.14l-.28-.16-.19.27a3.7 3.7 0 0 0-.51 1.19 2.84 2.84 0 0 0 .33 2.22 4.11 4.11 0 0 1-1.45.35H2.63a.63.63 0 0 0-.63.62 9.6 9.6 0 0 0 .58 3.39 5 5 0 0 0 2 2.6 8.86 8.86 0 0 0 4.42.95 13.27 13.27 0 0 0 2.42-.18 10.09 10.09 0 0 0 3.19-1.15A8.9 8.9 0 0 0 16.78 16a11.94 11.94 0 0 0 2.13-3.67h.19a3.08 3.08 0 0 0 2.23-.84 2.36 2.36 0 0 0 .59-.87l.08-.22-.2-.16a2.69 2.69 0 0 0-1.63-.42z"
-						/><path
-							d="M5.61 9.35H3.85a.16.16 0 0 0-.16.15v1.58a.16.16 0 0 0 .16.15h1.76a.16.16 0 0 0 .16-.15V9.5a.16.16 0 0 0-.16-.15zm2.44 0H6.28a.16.16 0 0 0-.16.15v1.58a.16.16 0 0 0 .16.15h1.77a.15.15 0 0 0 .15-.15V9.5a.15.15 0 0 0-.15-.15zm2.47 0H8.75a.15.15 0 0 0-.15.15v1.58a.15.15 0 0 0 .15.15h1.77a.15.15 0 0 0 .15-.15V9.5a.15.15 0 0 0-.15-.15zm.67 0a.15.15 0 0 0-.19.15v1.58a.15.15 0 0 0 .15.15H13a.15.15 0 0 0 .15-.15V9.5a.15.15 0 0 0-.15-.15zM6.28 7.09H8a.16.16 0 0 1 .16.16v1.56A.16.16 0 0 1 8 9H6.28a.15.15 0 0 1-.15-.15V7.24a.15.15 0 0 1 .15-.15zm2.47 0h1.77a.15.15 0 0 1 .15.15v1.57a.16.16 0 0 1-.16.16H8.75a.15.15 0 0 1-.15-.15V7.24a.15.15 0 0 1 .15-.15zm2.44 0H13a.15.15 0 0 1 .15.15v1.57A.15.15 0 0 1 13 9h-1.81a.16.16 0 0 1-.19-.19V7.24a.15.15 0 0 1 .19-.15z"
-						/><rect x="11.04" y="4.82" width="2.07" height="1.88" rx=".15" /><path
-							d="M13.65 9.35a.15.15 0 0 0-.15.15v1.58a.15.15 0 0 0 .15.15h1.77a.15.15 0 0 0 .15-.15V9.5a.15.15 0 0 0-.15-.15z"
-						/></svg
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-8 w-8"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
 					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path
+							d="M22 12.54c-1.804 -.345 -2.701 -1.08 -3.523 -2.94c-.487 .696 -1.102 1.568 -.92 2.4c.028 .238 -.32 1.002 -.557 1h-14c0 5.208 3.164 7 6.196 7c4.124 .022 7.828 -1.376 9.854 -5c1.146 -.101 2.296 -1.505 2.95 -2.46z"
+						/>
+						<path d="M5 10h3v3h-3z" />
+						<path d="M8 10h3v3h-3z" />
+						<path d="M11 10h3v3h-3z" />
+						<path d="M8 7h3v3h-3z" />
+						<path d="M11 7h3v3h-3z" />
+						<path d="M11 4h3v3h-3z" />
+						<path d="M4.571 18c1.5 0 2.047 -.074 2.958 -.78" />
+						<line x1="10" y1="16" x2="10" y2="16.01" />
+					</svg>
 				</a>
 				<div class="border-t border-warmGray-700" />
-				{#if alpha}
+				{#if !alpha}
 					<!-- svelte-ignore a11y-invalid-attribute -->
 					<a
 						href="javascript:void(0)"
@@ -141,18 +177,20 @@
 						data-tooltip="Databases"
 					>
 						<svg
-							class="w-8 h-8"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
 							xmlns="http://www.w3.org/2000/svg"
-							><path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
-							/></svg
+							class="h-8 w-8"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
 						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<ellipse cx="12" cy="6" rx="8" ry="3" />
+							<path d="M4 6v6a8 3 0 0 0 16 0v-6" />
+							<path d="M4 12v6a8 3 0 0 0 16 0v-6" />
+						</svg>
 					</a>
 					<div class="border-t border-warmGray-700" />
 					<!-- svelte-ignore a11y-invalid-attribute -->
@@ -162,18 +200,18 @@
 						data-tooltip="Services"
 					>
 						<svg
-							class="w-8 h-8"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
 							xmlns="http://www.w3.org/2000/svg"
-							><path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
-							/></svg
+							class="h-8 w-8"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
 						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-12" />
+						</svg>
 					</a>
 				{:else}
 					<a
@@ -185,18 +223,20 @@
 						data-tooltip="Databases"
 					>
 						<svg
-							class="w-8 h-8"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
 							xmlns="http://www.w3.org/2000/svg"
-							><path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
-							/></svg
+							class="h-8 w-8"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
 						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<ellipse cx="12" cy="6" rx="8" ry="3" />
+							<path d="M4 6v6a8 3 0 0 0 16 0v-6" />
+							<path d="M4 12v6a8 3 0 0 0 16 0v-6" />
+						</svg>
 					</a>
 					<div class="border-t border-warmGray-700" />
 					<a
@@ -208,53 +248,50 @@
 						data-tooltip="Services"
 					>
 						<svg
-							class="w-8 h-8"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
 							xmlns="http://www.w3.org/2000/svg"
-							><path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
-							/></svg
+							class="h-8 w-8"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
 						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-12" />
+						</svg>
 					</a>
 					<div class="border-t border-warmGray-700" />
 				{/if}
 			</div>
 			<div class="flex-1" />
 			<div class="flex flex-col space-y-4 py-2">
-				{#if alpha}
-					<!-- svelte-ignore a11y-invalid-attribute -->
-					<a
-						href="javascript:void(0)"
-						class="icons hover:bg-coolgray-200 text-warmGray-600 tooltip-right cursor-not-allowed"
-						data-tooltip="Settings"
+				<a
+					sveltekit:prefetch
+					href="/teams"
+					class="icons hover:text-cyan-500 bg-coolgray-200 tooltip-right"
+					class:text-cyan-500={$page.path.startsWith('/teams')}
+					class:bg-coolgray-500={$page.path.startsWith('/teams')}
+					data-tooltip="Teams"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-8 h-8"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
 					>
-						<svg
-							class=" w-8 h-8"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-							xmlns="http://www.w3.org/2000/svg"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-							/>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-							/>
-						</svg>
-					</a>
-				{:else}
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<circle cx="9" cy="7" r="4" />
+						<path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+						<path d="M16 3.13a4 4 0 0 1 0 7.75" />
+						<path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
+					</svg>
+				</a>
+				{#if $session.teamId === '0'}
 					<a
 						sveltekit:prefetch
 						href="/settings"
@@ -264,24 +301,20 @@
 						data-tooltip="Settings"
 					>
 						<svg
-							class=" w-8 h-8"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
 							xmlns="http://www.w3.org/2000/svg"
+							class="h-8 w-8"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
 						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+								d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"
 							/>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-							/>
+							<circle cx="12" cy="12" r="3" />
 						</svg>
 					</a>
 				{/if}
@@ -291,18 +324,21 @@
 					on:click={logout}
 				>
 					<svg
-						class="w-7 h-7 ml-1"
 						xmlns="http://www.w3.org/2000/svg"
+						class="w-7 h-7 ml-1"
 						viewBox="0 0 24 24"
-						fill="none"
+						stroke-width="1.5"
 						stroke="currentColor"
-						stroke-width="2"
+						fill="none"
 						stroke-linecap="round"
 						stroke-linejoin="round"
-						><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline
-							points="16 17 21 12 16 7"
-						/><line x1="21" y1="12" x2="9" y2="12" /></svg
 					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path
+							d="M14 8v-2a2 2 0 0 0 -2 -2h-7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2 -2v-2"
+						/>
+						<path d="M7 12h14l-3 -3m0 6l3 -3" />
+					</svg>
 				</div>
 			</div>
 			<div

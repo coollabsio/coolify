@@ -7,7 +7,6 @@
 		if (res.ok) {
 			return {
 				props: {
-					teams: session.teams,
 					...(await res.json())
 				}
 			};
@@ -24,7 +23,6 @@
 	export let applicationsCount: number;
 	export let sourcesCount: number;
 	export let destinationsCount: number;
-	export let teams;
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">

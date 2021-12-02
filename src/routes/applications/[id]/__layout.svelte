@@ -58,6 +58,7 @@
 	import { page, session } from '$app/stores';
 	import { enhance, errorNotification } from '$lib/form';
 	import { appConfiguration } from '$lib/store';
+	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 
 	export let application;
 	const { id } = $page.params;
@@ -130,23 +131,18 @@
 					: 'You do not have permission to deploy.'}
 			>
 				<svg
-					class="w-6 h-6"
-					fill="none"
-					stroke="currentColor"
-					viewBox="0 0 24 24"
 					xmlns="http://www.w3.org/2000/svg"
-					><path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-					/><path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-					/></svg
-				></button
+					class="w-6 h-6"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<path d="M7 4v16l13 -8z" />
+				</svg></button
 			>
 		</form>
 
@@ -164,18 +160,26 @@
 				data-tooltip="Configuration"
 			>
 				<svg
-					class="w-6 h-6"
-					fill="none"
-					stroke="currentColor"
-					viewBox="0 0 24 24"
 					xmlns="http://www.w3.org/2000/svg"
-					><path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
-					/></svg
-				></button
+					class="h-6 w-6"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<rect x="4" y="8" width="4" height="4" />
+					<line x1="6" y1="4" x2="6" y2="8" />
+					<line x1="6" y1="12" x2="6" y2="20" />
+					<rect x="10" y="14" width="4" height="4" />
+					<line x1="12" y1="4" x2="12" y2="14" />
+					<line x1="12" y1="18" x2="12" y2="20" />
+					<rect x="16" y="5" width="4" height="4" />
+					<line x1="18" y1="4" x2="18" y2="5" />
+					<line x1="18" y1="9" x2="18" y2="20" />
+				</svg></button
 			></a
 		>
 		<a
@@ -191,18 +195,22 @@
 				data-tooltip="Logs"
 			>
 				<svg
-					class="w-6 h-6"
-					fill="none"
-					stroke="currentColor"
-					viewBox="0 0 24 24"
 					xmlns="http://www.w3.org/2000/svg"
-					><path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-					/></svg
-				></button
+					class="h-6 w-6"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
+					<path d="M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
+					<line x1="3" y1="6" x2="3" y2="19" />
+					<line x1="12" y1="6" x2="12" y2="19" />
+					<line x1="21" y1="6" x2="21" y2="19" />
+				</svg></button
 			></a
 		>
 		<div class="border border-warmGray-700 h-8" />
@@ -218,20 +226,8 @@
 		data-tooltip={$session.permission === 'admin'
 			? 'Delete application'
 			: 'You do not have permission to delete this application'}
-		><svg
-			class="w-6 h-6"
-			fill="none"
-			stroke="currentColor"
-			viewBox="0 0 24 24"
-			xmlns="http://www.w3.org/2000/svg"
-		>
-			<path
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				stroke-width="2"
-				d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-			/>
-		</svg></button
 	>
+		<DeleteIcon />
+	</button>
 </nav>
 <slot />

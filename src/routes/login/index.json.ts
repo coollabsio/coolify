@@ -34,7 +34,6 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
 export const get: RequestHandler<Locals, FormData> = async (request) => {
     const { userId } = await getUserDetails(request, false)
-    
     if (!userId) {
         return {
             status: 401
