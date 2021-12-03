@@ -25,7 +25,7 @@
 	export let invitations;
 	import { page, session } from '$app/stores';
 	import Explainer from '$lib/components/Explainer.svelte';
-	import { errorNotification } from '$lib/form';
+	import { enhance, errorNotification } from '$lib/form';
 	const { id } = $page.params;
 
 	let invitation = {
@@ -125,7 +125,31 @@
 			/>
 		</div>
 	{/if}
-	<div class="font-bold flex space-x-1 py-5 px-6">
+	<form
+		action="/teams/{id}.json"
+		method="post"
+		use:enhance={{
+			result: async () => {
+				window.location.reload()
+			},
+			pending: async () => {},
+			final: async () => {}
+		}}
+	>
+		<div class="font-bold flex space-x-1 py-5 px-6">
+			<div class="text-xl tracking-tight mr-4">Settings</div>
+			<div class="text-center">
+				<button class="bg-green-600 hover:bg-green-500" type="submit">Save</button>
+			</div>
+		</div>
+
+		<div class="flex space-x-2 px-4 sm:px-6 mx-2 items-center">
+			<label for="name">Name</label>
+			<input id="name" name="name" placeholder="name" bind:value={team.name} />
+		</div>
+	</form>
+
+	<div class="font-bold flex space-x-1 py-5 px-6 pt-24">
 		<div class="text-xl tracking-tight mr-4">Members</div>
 	</div>
 	<div class="px-4 sm:px-6">
@@ -181,7 +205,7 @@
 	</div>
 </div>
 {#if $session.isAdmin}
-	<div class="max-w-2xl mx-auto pt-10">
+	<div class="max-w-2xl mx-auto pt-24">
 		<form on:submit|preventDefault={sendInvitation}>
 			<div class="font-bold flex space-x-1 py-5 px-6">
 				<div class="text-xl tracking-tight mr-4">Invite new member</div>

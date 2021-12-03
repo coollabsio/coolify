@@ -23,3 +23,15 @@ export const get: RequestHandler = async (request) => {
         }
     };
 }
+
+export const post: RequestHandler<Locals, FormData> = async (request) => {
+    const { status, body } = await getUserDetails(request);
+    if (status === 401) return { status, body }
+
+    const { id } = request.params
+    const name = request.body.get('name')
+    await db.prisma.team.update({ where: { id }, data: { name: { set: name } } })
+    return {
+        status: 200
+    }
+}
