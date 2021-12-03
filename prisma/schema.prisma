@@ -8,27 +8,33 @@ datasource db {
 }
 
 model Setting {
-  id    String @id @default(cuid())
-  name  String @unique
-  value String
+  id        String   @id @default(cuid())
+  name      String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model User {
-  id         String       @id @default(cuid()) @unique
+  id         String       @id @unique @default(cuid())
   email      String       @unique
   type       String
   password   String?
   teams      Team[]
   permission Permission[]
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
 }
 
 model Permission {
-  id         String @id @default(cuid())
-  user       User   @relation(fields: [userId], references: [id])
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id])
   userId     String
-  team       Team   @relation(fields: [teamId], references: [id])
+  team       Team     @relation(fields: [teamId], references: [id])
   teamId     String
   permission String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Team {
@@ -40,7 +46,19 @@ model Team {
   gitHubApps        GithubApp[]
   gitLabApps        GitlabApp[]
   destinationDocker DestinationDocker[]
-  permission        Permission[]
+  permissions       Permission[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+}
+
+model TeamInvitation {
+  id         String   @id @default(cuid())
+  uid        String
+  email      String
+  teamId     String
+  teamName   String
+  permission String
+  createdAt  DateTime @default(now())
 }
 
 model Application {

@@ -3,6 +3,7 @@ interface Locals {
     user: {
         teamId: string;
         permission: string;
+        isAdmin: boolean;
     }
     session: {
         data: {

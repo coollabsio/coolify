@@ -26,7 +26,7 @@
 
 <div class="font-bold flex space-x-1 py-5 px-6">
 	<div class="text-2xl tracking-tight mr-4">Git Sources</div>
-	{#if $session.permission === 'admin'}
+	{#if $session.isAdmin}
 		<a href="/new/source" sveltekit:prefetch class="add-icon bg-orange-600 hover:bg-orange-500">
 			<svg
 				class="w-6"

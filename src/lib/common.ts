@@ -18,8 +18,11 @@ export const saveBuildLog = async ({ line, buildId, applicationId }) => {
 }
 
 export const isTeamIdTokenAvailable = (request) => {
-    if (!request.headers.cookie?.split(';').map(s => s.trim()).find(s => s.startsWith('teamId='))?.split('=')[1]) {
+    const cookie = request.headers.cookie?.split(';').map(s => s.trim()).find(s => s.startsWith('teamId='))?.split('=')[1]
+    if (!cookie) {
         return getTeam(request)
+    } else {
+        return cookie
     }
 }
 
@@ -47,13 +50,14 @@ export const getUserDetails = async (request, isAdminRequired = true) => {
                 message: 'OK'
             }
         }
-        if (isAdminRequired && permission !== 'admin') {
+        if (isAdminRequired && permission !== 'admin' && permission !== 'owner') {
             payload.status = 401
             payload.body.message = 'You do not have permission to do this. \nAsk an admin to modify your permissions.'
         }
 
         return payload
     } catch (err) {
+        console.log(err)
         return {
             teamId: null,
             userId: null,

@@ -18,18 +18,6 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         }
     }
     return response
-    // if (response.body.defaultTeam) {
-    //     return {
-    //         ...response,
-    //         headers: {
-    //             ...response.headers,
-    //             'Set-Cookie': [`teamId=${response.body.defaultTeam}`]
-    //         }
-    //     }
-    // } else {
-    //     return response
-
-    // }
 }
 
 export const get: RequestHandler<Locals, FormData> = async (request) => {

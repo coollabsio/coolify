@@ -11,12 +11,12 @@ export const handle = handleSession(
     },
     async function ({ request, resolve }) {
         const isTeamIdTokenAvailableResult = isTeamIdTokenAvailable(request);
-
         if (Object.keys(request.locals.session.data).length > 0) {
             const { permission, teamId } = await getUserDetails(request, false);
             request.locals.user = {
                 teamId,
-                permission
+                permission,
+                isAdmin: permission === 'admin' || permission === 'owner'
             }
         }
 
@@ -25,12 +25,13 @@ export const handle = handleSession(
 
         let responseWithCookie = response
 
-        if (isTeamIdTokenAvailableResult) {
+        // This check needed for switching team with HttpOnly cookie (see /src/routes/index.json.ts)
+        if (isTeamIdTokenAvailableResult && request.path !== '/index.json' && request.method !== 'POST') {
             responseWithCookie = {
                 ...response,
                 headers: {
                     ...response.headers,
-                    'Set-Cookie': [`teamId=${isTeamIdTokenAvailableResult}`]
+                    'Set-Cookie': [`teamId=${isTeamIdTokenAvailableResult};  HttpOnly; Path=/; Max-Age=15778800;`]
                 }
             }
         }
@@ -44,11 +45,11 @@ export const handle = handleSession(
 
 
 export const getSession: GetSession<Locals> = function (request) {
-
     const payload = {
         uid: request.locals.session.data?.uid || null,
         teamId: request.locals.user?.teamId || null,
-        permission: request.locals.user?.permission
+        permission: request.locals.user?.permission,
+        isAdmin: request.locals.user?.isAdmin || false
     }
     return payload
 };

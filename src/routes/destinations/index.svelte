@@ -23,13 +23,12 @@
 	import type Prisma from '@prisma/client';
 
 	import { page, session } from '$app/stores';
-
 	export let destinations: Prisma.DestinationDocker[];
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
 	<div class="text-2xl tracking-tight mr-4">Destinations</div>
-	{#if $session.permission === 'admin'}
+	{#if $session.isAdmin}
 		<a href="/new/destination" class="add-icon bg-sky-600 hover:bg-sky-500">
 			<svg
 				class="w-6"

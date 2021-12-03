@@ -120,13 +120,13 @@
 			<button
 				title="Deploy"
 				type="submit"
-				disabled={$session.permission !== 'admin'}
-				class:text-green-500={$session.permission === 'admin' &&
+				disabled={!$session.isAdmin}
+				class:text-green-500={$session.isAdmin &&
 					$appConfiguration.configuration.gitSource &&
 					$appConfiguration.configuration.repository &&
 					$appConfiguration.configuration.destinationDocker}
 				class="icons bg-transparent tooltip-bottom text-sm "
-				data-tooltip={$session.permission === 'admin'
+				data-tooltip={$session.isAdmin
 					? 'Queue for deployment'
 					: 'You do not have permission to deploy.'}
 			>
@@ -220,10 +220,10 @@
 		on:click={() => deleteApplication($appConfiguration.configuration.name)}
 		title="Delete application"
 		type="submit"
-		disabled={$session.permission !== 'admin'}
-		class:hover:text-red-500={$session.permission === 'admin'}
+		disabled={!$session.isAdmin}
+		class:hover:text-red-500={$session.isAdmin}
 		class="icons bg-transparent  tooltip-bottom text-sm"
-		data-tooltip={$session.permission === 'admin'
+		data-tooltip={$session.isAdmin
 			? 'Delete application'
 			: 'You do not have permission to delete this application'}
 	>

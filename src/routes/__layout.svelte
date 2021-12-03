@@ -9,16 +9,34 @@
 				redirect: '/login'
 			};
 		}
+		if (!session.uid) {
+			return {};
+		}
+		const url = `/teams.json`;
+		const res = await fetch(url);
 
+		if (res.ok) {
+			return {
+				props: {
+					selectedTeamId: session.teamId,
+					...(await res.json())
+				}
+			};
+		}
 		return {};
 	};
 </script>
 
 <script>
+	export let teams;
+	export let selectedTeamId;
+
 	import '../tailwind.css';
 	import { page, session } from '$app/stores';
 	import { browser } from '$app/env';
 	import { onMount } from 'svelte';
+	import { errorNotification } from '$lib/form';
+
 	let alpha = true;
 
 	onMount(async () => {
@@ -41,6 +59,21 @@
 		await fetch(`/logout.json`, {
 			method: 'delete'
 		});
+		window.location.reload();
+	}
+	async function switchTeam() {
+		const form = new FormData();
+		form.append('cookie', 'teamId');
+		form.append('value', selectedTeamId);
+		const response = await fetch(`/index.json?from=${$page.path}`, {
+			method: 'post',
+			body: form
+		});
+		if (!response.ok) {
+			const { message } = await response.json();
+			errorNotification(message);
+			return;
+		}
 		window.location.reload();
 	}
 </script>
@@ -169,7 +202,7 @@
 					</svg>
 				</a>
 				<div class="border-t border-warmGray-700" />
-				{#if !alpha}
+				{#if alpha}
 					<!-- svelte-ignore a11y-invalid-attribute -->
 					<a
 						href="javascript:void(0)"
@@ -352,6 +385,16 @@
 			</div>
 		</div>
 	</nav>
+	<select
+		class="fixed right-0 bottom-0 p-2 px-4 m-2"
+		bind:value={selectedTeamId}
+		on:change={switchTeam}
+	>
+		<option value="" disabled selected>Switch to a different team...</option>
+		{#each teams as team}
+			<option value={team.teamId}>{team.team.name} - {team.permission}</option>
+		{/each}
+	</select>
 {/if}
 <main>
 	<slot />

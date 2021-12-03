@@ -56,10 +56,10 @@
 		on:click={() => deleteDestination(destination)}
 		title="Delete Destination"
 		type="submit"
-		disabled={$session.permission !== 'admin'}
-		class:hover:text-red-500={$session.permission === 'admin'}
+		disabled={!$session.isAdmin}
+		class:hover:text-red-500={$session.isAdmin}
 		class="icons bg-transparent tooltip-bottom text-sm"
-		data-tooltip={$session.permission === 'admin'
+		data-tooltip={$session.isAdmin
 			? 'Delete Git Source'
 			: 'You do not have permission to delete a Git Source'}><DeleteIcon /></button
 	>

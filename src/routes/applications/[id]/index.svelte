@@ -126,7 +126,7 @@
 	>
 		<div class="flex space-x-2 h-8 items-center">
 			<div class="font-bold text-xl text-white">Configuration</div>
-			{#if $session.permission === 'admin'}
+			{#if $session.isAdmin}
 				<button
 					type="submit"
 					class:bg-green-600={!loading}
@@ -139,7 +139,7 @@
 			<label for="gitSource">Git Source</label>
 			<div class="col-span-2">
 				<a
-					href={$session.permission === 'admin'
+					href={$session.isAdmin
 						? `/applications/${id}/configuration/source?from=/applications/${id}`
 						: ''}
 					class="no-underline"
@@ -156,7 +156,7 @@
 			<label for="repository">Git Repository</label>
 			<div class="col-span-2">
 				<a
-					href={$session.permission === 'admin'
+					href={$session.isAdmin
 						? `/applications/${id}/configuration/repository?from=/applications/${id}`
 						: ''}
 					class="no-underline"
@@ -174,7 +174,7 @@
 			<label for="destination">Destination</label>
 			<div class="col-span-2">
 				<a
-					href={$session.permission === 'admin'
+					href={$session.isAdmin
 						? `/applications/${id}/configuration/destination?from=/applications/${id}`
 						: ''}
 					class="no-underline"
@@ -191,7 +191,7 @@
 			<label for="buildPack">Build Pack</label>
 			<div class="col-span-2">
 				<a
-					href={$session.permission === 'admin'
+					href={$session.isAdmin
 						? `/applications/${id}/configuration/buildpack?from=/applications/${id}`
 						: ''}
 					class="no-underline "
@@ -209,7 +209,7 @@
 			<label for="domain">Domain</label>
 			<div class="col-span-2 ">
 				<input
-					readonly={$session.permission !== 'admin'}
+					readonly={!$session.isAdmin}
 					bind:this={domainEl}
 					name="domain"
 					id="domain"
@@ -226,7 +226,7 @@
 				<label for="port">Port</label>
 				<div class="col-span-2">
 					<input
-						readonly={$session.permission !== 'admin'}
+						readonly={!$session.isAdmin}
 						name="port"
 						id="port"
 						bind:value={$appConfiguration.configuration.port}
@@ -240,7 +240,7 @@
 			<label for="installCommand">Install Command</label>
 			<div class="col-span-2">
 				<input
-					readonly={$session.permission !== 'admin'}
+					readonly={!$session.isAdmin}
 					name="installCommand"
 					id="installCommand"
 					bind:value={$appConfiguration.configuration.installCommand}
@@ -252,7 +252,7 @@
 			<label for="buildCommand">Build Command</label>
 			<div class="col-span-2">
 				<input
-					readonly={$session.permission !== 'admin'}
+					readonly={!$session.isAdmin}
 					name="buildCommand"
 					id="buildCommand"
 					bind:value={$appConfiguration.configuration.buildCommand}
@@ -264,7 +264,7 @@
 			<label for="startCommand" class="">Start Command</label>
 			<div class="col-span-2">
 				<input
-					readonly={$session.permission !== 'admin'}
+					readonly={!$session.isAdmin}
 					name="startCommand"
 					id="startCommand"
 					bind:value={$appConfiguration.configuration.startCommand}
@@ -276,7 +276,7 @@
 			<label for="baseDirectory">Base Directory</label>
 			<div class="col-span-2">
 				<input
-					readonly={$session.permission !== 'admin'}
+					readonly={!$session.isAdmin}
 					name="baseDirectory"
 					id="baseDirectory"
 					bind:value={$appConfiguration.configuration.baseDirectory}
@@ -291,7 +291,7 @@
 			<label for="publishDirectory">Publish Directory</label>
 			<div class="col-span-2">
 				<input
-					readonly={$session.permission !== 'admin'}
+					readonly={!$session.isAdmin}
 					name="publishDirectory"
 					id="publishDirectory"
 					bind:value={$appConfiguration.configuration.publishDirectory}

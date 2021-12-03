@@ -7,6 +7,15 @@ import jsonwebtoken from 'jsonwebtoken'
 import cuid from 'cuid';
 import forge from 'node-forge'
 
+import { uniqueNamesGenerator, Config, adjectives, colors, animals, names, starWars } from 'unique-names-generator';
+
+const customConfig: Config = {
+    dictionaries: [adjectives, colors, animals],
+    style: 'capital',
+    separator: ' ',
+    length: 3,
+};
+
 const { SECRET_KEY } = process.env;
 const secretKey = SECRET_KEY;
 
@@ -347,10 +356,11 @@ export async function login({ email, password }) {
                 type: 'email',
                 teams: {
                     create: {
-                        id: uid
+                        id: uid,
+                        name: uniqueNamesGenerator(customConfig)
                     }
                 },
-                permission: { create: { teamId: uid, permission: 'admin' } }
+                permission: { create: { teamId: uid, permission: 'owner' } }
             }, include: { teams: true }
         })
     }

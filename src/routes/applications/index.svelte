@@ -27,7 +27,7 @@
 
 <div class="font-bold flex space-x-1 py-5 px-6">
 	<div class="text-2xl tracking-tight mr-4">Applications</div>
-	{#if $session.permission === 'admin'}
+	{#if $session.isAdmin}
 		<a href="/new/application" class="add-icon bg-green-600 hover:bg-green-500">
 			<svg
 				class="w-6"

@@ -26,7 +26,7 @@ export const get: RequestHandler = async (request) => {
 
         return {
             status: 302,
-            headers: { Location: `/webhooks/success`, "set-cookie": `gitlabToken=${access_token}; Path=/; HttpOnly` }
+            headers: { Location: `/webhooks/success`, "set-cookie": `gitlabToken=${access_token}; HttpOnly; Path=/; Max-Age=15778800;` }
         }
     } catch (err) {
         throw new Error(err)
