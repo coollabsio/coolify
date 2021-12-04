@@ -11,13 +11,13 @@ import logger from './logger';
 const buildQueueName = dev ? cuid() : 'build_queue'
 const buildQueue = new Queue(buildQueueName, {
   connection: {
-    host: 'localhost'
+    host: dev ? 'localhost' :'coolify-redis'
   }
 })
 const buildWorker = new Worker(buildQueueName, async (job) => await builder(job), {
   concurrency: 2,
   connection: {
-    host: 'localhost'
+    host: dev ? 'localhost' :'coolify-redis'
   }
 })
 
@@ -43,14 +43,14 @@ buildWorker.on('failed', async (job: Job, failedReason: string) => {
 const letsEncryptQueueName = dev ? cuid() : 'letsencrypt_queue'
 const letsEncryptQueue = new Queue(letsEncryptQueueName, {
   connection: {
-    host: 'localhost'
+    host: dev ? 'localhost' :'coolify-redis'
   }
 })
 
 const letsEncryptWorker = new Worker(letsEncryptQueueName, async (job) => await letsencrypt(job), {
   concurrency: 1,
   connection: {
-    host: 'localhost'
+    host: dev ? 'localhost' :'coolify-redis'
   }
 })
 letsEncryptWorker.on('completed', async () => {
@@ -67,13 +67,13 @@ letsEncryptWorker.on('failed', async (failedReason: string) => {
 const buildLogQueueName = dev ? cuid() : 'log_queue'
 const buildLogQueue = new Queue(buildLogQueueName, {
   connection: {
-    host: 'localhost'
+    host: dev ? 'localhost' :'coolify-redis'
   }
 })
 const buildLogWorker = new Worker(buildLogQueueName, async (job) => await logger(job), {
   concurrency: 1,
   connection: {
-    host: 'localhost'
+    host: dev ? 'localhost' :'coolify-redis'
   }
 })
 

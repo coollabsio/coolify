@@ -33,7 +33,7 @@
 	$: buildId;
 
 	let skip = 0;
-	let noMoreBuilds = buildCount <= skip;
+	let noMoreBuilds = buildCount < 5 || buildCount <= skip;
 	const { id } = $page.params;
 
 	let preselectedBuildId = $page.query.get('buildId');
@@ -112,9 +112,9 @@
 				</div>
 			</div>
 		{/each}
-		{#if buildCount > 0}
-			<button class="w-full" disabled={noMoreBuilds} on:click={loadMoreBuilds}
-				>{noMoreBuilds ? 'No more builds available' : 'Load More'}</button
+		{#if buildCount > 0 && !noMoreBuilds}
+			<button class="w-full"  on:click={loadMoreBuilds}
+				>Load More</button
 			>
 		{/if}
 	</div>

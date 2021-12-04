@@ -184,6 +184,7 @@
 		if (response.ok) {
 			const deployKeys = await response.json();
 			const deployKey = deployKeys.find((key) => key.title === 'coolify-deploy-key');
+			console.log(deployKey)
 			if (deployKey) {
 				return await saveDeployKey(updateDeployKeyIdUrl, deployKey.id);
 			}
@@ -239,7 +240,7 @@
 	}
 	async function save() {
 		loading.save = true;
-		let deployKeyId = application.gitSource.gitlabApp.deployKeyId;
+		// let deployKeyId = application.gitSource.gitlabApp.deployKeyId;
 		let privateSshKey = application.gitSource.gitlabApp.privateSshKey;
 
 		const deployKeyUrl = `${apiUrl}/v4/projects/${selected.project.id}/deploy_keys`;
@@ -247,10 +248,11 @@
 		const sshkeyUrl = `/applications/${id}/configuration/sshkey.json`;
 
 		try {
-			if (!deployKeyId) await checkDeployKey(deployKeyUrl, updateDeployKeyIdUrl);
 			if (!privateSshKey) {
 				await checkSSHKey(sshkeyUrl, deployKeyUrl, updateDeployKeyIdUrl);
 			}
+			// if (!deployKeyId) await checkDeployKey(deployKeyUrl, updateDeployKeyIdUrl);
+		
 		} catch (error) {
 			console.log(error);
 			throw new Error(error);
@@ -292,7 +294,7 @@
 		}
 	}}
 >
-	<div class="px-4 flex xl:flex-row flex-col xl:space-x-2 space-y-2">
+	<div class="px-4 space-y-2 xl:space-y-0 flex xl:flex-row flex-col xl:space-x-2 ">
 		{#if loading.base}
 			<select name="group" disabled class="w-96">
 				<option selected value="">Loading groups...</option>

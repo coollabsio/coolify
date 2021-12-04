@@ -75,7 +75,7 @@
 	>
 		<div class="flex space-x-2 h-8 items-center">
 			<div class="font-bold text-xl text-white">Configuration</div>
-			{#if $session.permission === 'admin'}
+			{#if $session.isAdmin}
 				<button
 					type="submit"
 					class:bg-sky-600={!loading}
@@ -88,7 +88,7 @@
 			<label for="name">Name</label>
 			<div class="col-span-2">
 				<input
-					readonly={$session.permission !== 'admin'}
+					readonly={!$session.isAdmin}
 					name="name"
 					placeholder="name"
 					bind:value={payload.name}
@@ -105,7 +105,7 @@
 			<label for="engine">Engine</label>
 			<div class="col-span-2">
 				<input
-					readonly={$session.permission !== 'admin'}
+					readonly={!$session.isAdmin}
 					name="engine"
 					placeholder="/var/run/docker.sock"
 					bind:value={payload.engine}
@@ -116,7 +116,7 @@
 			<label for="network">Network</label>
 			<div class="col-span-2">
 				<input
-					readonly={$session.permission !== 'admin'}
+					readonly={!$session.isAdmin}
 					name="network"
 					placeholder="default: coollabs"
 					bind:value={payload.network}

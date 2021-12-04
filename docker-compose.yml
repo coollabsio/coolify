@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   coolify:
-    image: coolify:v2.0.0-alpha
+    image: coolify:v2.0.0-rc.1
     container_name: coolify
     ports: 
       - target: 3000
@@ -11,50 +11,22 @@ services:
         mode: host
     volumes:
       - './db:/app/db'
+      - '/var/run/docker.sock:/var/run/docker.sock'
     environment:
       - APP_ID=${APP_ID}
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE_URL=${DATABASE_URL}
-  haproxy: 
-    image: haproxytech/haproxy-ubuntu:2.4
-    container_name: coolify-haproxy
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
     networks:
-      - coollabs
-    volumes:
-      - './data/haproxy/:/usr/local/etc/haproxy/'
-    ports: 
-      - target: 80
-        published: 80
-        protocol: tcp
-        mode: host
-      - target: 443
-        published: 443
-        protocol: tcp
-        mode: host
-      - target: 8404
-        published: 8404
-        protocol: tcp
-        mode: host
-      - target: 5555
-        published: 5555
-        protocol: tcp
-        mode: host
+      - "coolify"
   redis:
     image: bitnami/redis:6.2
     container_name: coolify-redis
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
     networks:
-      - coollabs
-    ports:
-      - target: 6379
-        published: 6379
-        protocol: tcp
+      - "coolify"
 
 networks:
-  coollabs:
-    driver: overlay
-    name: coollabs
-    external: true
+  coolify:
+    attachable: true
+    name: coolify

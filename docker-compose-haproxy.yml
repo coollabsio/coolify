@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  haproxy: 
+    image: haproxytech/haproxy-ubuntu:2.4
+    container_name: coolify-haproxy
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    networks:
+      - coollabs
+    volumes:
+      - './data/haproxy/:/usr/local/etc/haproxy/'
+    ports: 
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+      - target: 8404
+        published: 8404
+        protocol: tcp
+        mode: host
+      - target: 5555
+        published: 5555
+        protocol: tcp
+        mode: host
+
+networks:
+  coolify:
+    attachable: true
+    name: coolify

@@ -130,7 +130,7 @@
 		method="post"
 		use:enhance={{
 			result: async () => {
-				window.location.reload()
+				window.location.reload();
 			},
 			pending: async () => {},
 			final: async () => {}
@@ -205,7 +205,7 @@
 	</div>
 </div>
 {#if $session.isAdmin}
-	<div class="max-w-2xl mx-auto pt-24">
+	<div class="max-w-2xl mx-auto pt-8">
 		<form on:submit|preventDefault={sendInvitation}>
 			<div class="font-bold flex space-x-1 py-5 px-6">
 				<div class="text-xl tracking-tight mr-4">Invite new member</div>

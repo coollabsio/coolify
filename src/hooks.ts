@@ -4,14 +4,18 @@ import type { GetSession } from "@sveltejs/kit";
 import { handleSession } from "svelte-kit-cookie-session";
 import { getUserDetails, isTeamIdTokenAvailable, sentry } from '$lib/common';
 
+
+// EDGE case: Same SECRET_KEY, but different database. Permission not found.
 export const handle = handleSession(
     {
         secret: process.env['SECRET_KEY'],
         expires: 30
     },
     async function ({ request, resolve }) {
-        const isTeamIdTokenAvailableResult = isTeamIdTokenAvailable(request);
+        let isTeamIdTokenAvailableResult = null
         if (Object.keys(request.locals.session.data).length > 0) {
+            isTeamIdTokenAvailableResult = isTeamIdTokenAvailable(request)
+
             const { permission, teamId } = await getUserDetails(request, false);
             request.locals.user = {
                 teamId,
@@ -26,7 +30,7 @@ export const handle = handleSession(
         let responseWithCookie = response
 
         // This check needed for switching team with HttpOnly cookie (see /src/routes/index.json.ts)
-        if (isTeamIdTokenAvailableResult && request.path !== '/index.json' && request.method !== 'POST') {
+        if (isTeamIdTokenAvailableResult && request.path !== '/index.json' && request.method !== 'POST' && request.path !== '/logout.json') {
             responseWithCookie = {
                 ...response,
                 headers: {
@@ -36,10 +40,6 @@ export const handle = handleSession(
             }
         }
         return responseWithCookie
-        // if (!response.body || !response.headers) {
-        //     return response;
-        // }
-        // return response;
     }
 );
 

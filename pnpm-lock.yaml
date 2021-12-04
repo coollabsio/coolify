@@ -14,6 +14,7 @@ specifiers:
   autoprefixer: ^10.4.0
   bcrypt: ^5.0.1
   bullmq: ^1.51.1
+  compare-versions: ^4.1.1
   cuid: ^2.1.8
   dayjs: ^1.10.7
   dockerode: ^3.3.1
@@ -44,6 +45,7 @@ dependencies:
   '@sentry/node': 6.15.0
   bcrypt: 5.0.1
   bullmq: 1.51.1
+  compare-versions: 4.1.1
   cuid: 2.1.8
   dayjs: 1.10.7
   dockerode: 3.3.1
@@ -946,6 +948,10 @@ packages:
     resolution: {integrity: sha512-U7VdrJFnJgo4xjrHpTzu0yrHPGImdsmD95ZlgYSEajAn2JKzDhDTPG9kBTefmObL2w/ngeZnilk+OV9CG3d7UA==}
     engines: {node: '>= 6'}
     dev: true
+
+  /compare-versions/4.1.1:
+    resolution: {integrity: sha512-jHQA7zMUpbO+FhPz/kADChZVSk3edtD7c3WkEAjleBtwgAl0ji6wGrYxryaBhViGgq0A+Pb6JPhjhg9jpth4mQ==}
+    dev: false
 
   /concat-map/0.0.1:
     resolution: {integrity: sha1-2Klr13/Wjfd5OnMDajug1UBdR3s=}
