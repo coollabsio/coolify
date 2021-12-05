@@ -3,6 +3,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     const network = request.body.get('network')
+    
     if (network) {
         const found = await db.prisma.destinationDocker.findFirst({ where: { network } })
         return {

@@ -29,12 +29,17 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 export const del: RequestHandler = async (request) => {
     const { teamId, status, body } = await getUserDetails(request);
     if (status === 401) return { status, body }
-    
+
     const { id } = request.params
-    return {
-        body: {
-            destination: await db.removeDestination({ id })
-        }
-    };
+    try {
+        return {
+            body: {
+                destination: await db.removeDestination({ id })
+            }
+        };
+    } catch (err) {
+        return err
+    }
+
 }
 

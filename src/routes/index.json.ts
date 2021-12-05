@@ -3,24 +3,29 @@ import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (request) => {
-	const teamId = getTeam(request)
-	const applicationsCount = await (await db.listApplications(teamId)).length
-	const sourcesCount = await (await db.listSources(teamId)).length
-	const destinationsCount = await (await db.listDestinations(teamId)).length
-
-	return {
-		body: {
-			applicationsCount,
-			sourcesCount,
-			destinationsCount
-		}
-	};
+	try {
+		const teamId = getTeam(request)
+		const applicationsCount = await (await db.listApplications(teamId)).length
+		const sourcesCount = await (await db.listSources(teamId)).length
+		const destinationsCount = await (await db.listDestinations(teamId)).length
+		const teamsCount = await (await db.listTeams()).length
+		return {
+			body: {
+				applicationsCount,
+				sourcesCount,
+				destinationsCount,
+				teamsCount
+			}
+		};
+	} catch (err) {
+		return err
+	}
 }
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
 	const { status, body } = await getUserDetails(request, false);
 	if (status === 401) return { status, body }
-	
+
 	const cookie = request.body.get('cookie')
 	const value = request.body.get('value')
 	const from = request.query.get('from') || '/'

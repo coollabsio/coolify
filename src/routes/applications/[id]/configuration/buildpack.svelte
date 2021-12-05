@@ -26,12 +26,9 @@
 </script>
 
 <script lang="ts">
-	import type Prisma from '@prisma/client';
-
 	import { page } from '$app/stores';
 	import { enhance } from '$lib/form';
-	import { goto } from '$app/navigation';
-
+	
 	const { id } = $page.params;
 	const from = $page.query.get('from');
 
@@ -56,7 +53,7 @@
 				<input class="hidden" name="buildPack" value={buildPack.name} />
 				<button
 					type="submit"
-					class="box-selection text-xl"
+					class="box-selection text-xl font-bold"
 					class:hover:border-green-500={buildPack.name === 'node'}
 					class:hover:border-red-500={buildPack.name === 'static'}>{buildPack.name}</button
 				>

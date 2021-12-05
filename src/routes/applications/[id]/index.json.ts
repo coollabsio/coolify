@@ -56,6 +56,10 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const baseDirectory = request.body.get('baseDirectory') || null
     const publishDirectory = request.body.get('publishDirectory') || null
 
-    return await db.configureApplication({ id, teamId, domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
+    try {
+        return await db.configureApplication({ id, teamId, domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
+    } catch (err) {
+        return err
+    }
 
 }

@@ -4,7 +4,11 @@ import type { RequestHandler } from '@sveltejs/kit';
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { id } = request.params
     const gitSourceId = request.body.get('gitSourceId') || null
-    return await db.configureGitsource({ id, gitSourceId })
+    try {
+        return await db.configureGitsource({ id, gitSourceId })
+    } catch(err) {
+        return err
+    }
 }
 
 

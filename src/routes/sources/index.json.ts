@@ -4,9 +4,15 @@ import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (request) => {
     const teamId = getTeam(request)
-    return {
-        body: {
-            sources: await db.listSources(teamId)
-        }
-    };
+    try {
+        const sources = await db.listSources(teamId)
+        return {
+            body: {
+                sources
+            }
+        };
+    } catch (err) {
+        return err
+    }
+
 }

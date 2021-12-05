@@ -5,6 +5,7 @@ import * as db from '$lib/database'
 
 export default async function ({ applicationId, workdir, githubAppId, repository, branch, buildId }): Promise<string> {
     try {
+        db
         saveBuildLog({ line: 'GitHub importer started.', buildId, applicationId })
         const { privateKey, appId, installationId } = await db.getUniqueGithubApp({ githubAppId })
         const githubPrivateKey = privateKey.replace(/\\n/g, '\n').replace(/"/g, '');

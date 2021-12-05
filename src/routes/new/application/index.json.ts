@@ -7,7 +7,11 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 	if (status === 401) return { status, body }
 
 	const name = request.body.get('name') || null
-	return await db.newApplication({ name, teamId })
+	try {
+		return await db.newApplication({ name, teamId })
+	} catch(err) {
+		return err
+	}
 }
 
 

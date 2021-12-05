@@ -77,7 +77,6 @@
 		window.location.reload();
 	}
 </script>
-
 {#if $session.uid}
 	<nav class="nav-main">
 		<div class="flex flex-col w-full h-screen items-center transition-all duration-100">

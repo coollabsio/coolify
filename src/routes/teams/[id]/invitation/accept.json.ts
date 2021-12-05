@@ -8,6 +8,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     if (status === 401) return { status, body }
 
     const id = request.body.get('id')
+    
     try {
         const invitation = await db.prisma.teamInvitation.findFirst({ where: { uid: userId }, rejectOnNotFound: true })
         await db.prisma.team.update({ where: { id: invitation.teamId }, data: { users: { connect: { id: userId } } } })

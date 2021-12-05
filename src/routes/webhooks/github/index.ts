@@ -4,23 +4,27 @@ import type { RequestHandler } from '@sveltejs/kit';
 export const get: RequestHandler = async (request) => {
     const code = request.query.get('code')
     const state = request.query.get('state')
-    const response = await fetch(`https://api.github.com/app-manifests/${code}/conversions`, { method: 'POST' })
-    if (!response.ok) {
-        return {
-            status: 500,
-            body: { ...await response.json() }
+    try {
+        const response = await fetch(`https://api.github.com/app-manifests/${code}/conversions`, { method: 'POST' })
+        if (!response.ok) {
+            return {
+                status: 500,
+                body: { ...await response.json() }
+            }
         }
-    }
 
-    const { id, client_id, slug, client_secret, pem, webhook_secret } = await response.json()
-    const dbresponse = await db.createGithubApp({ id, client_id, slug, client_secret, pem, webhook_secret, state })
-    if (dbresponse.status !== 201) {
-        return {
-            ...dbresponse
+        const { id, client_id, slug, client_secret, pem, webhook_secret } = await response.json()
+        const dbresponse = await db.createGithubApp({ id, client_id, slug, client_secret, pem, webhook_secret, state })
+        if (dbresponse.status !== 201) {
+            return {
+                ...dbresponse
+            }
         }
-    }
-    return {
-        status: 302,
-        headers: { Location: `/sources/${state}` }
+        return {
+            status: 302,
+            headers: { Location: `/sources/${state}` }
+        }
+    } catch (err) {
+        return err
     }
 }
