@@ -16,45 +16,55 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const teamId = request.body.get('teamId')
     const teamName = request.body.get('teamName')
 
-    const userFound = await db.prisma.user.findUnique({ where: { email } })
-    if (!userFound) {
-        return {
-            status: 404,
-            body: {
-                message: `No user found with '${email}' email address.`
-            }
-        };
-    }
-    const uid = userFound.id
-    // Invitation to yourself?!
-    if (uid === userId) {
-        return {
-            status: 400,
-            body: {
-                message: `Invitation to yourself? Whaaaaat?`
-            }
-        };
-    }
-    const alreadyInTeam = await db.prisma.team.findFirst({ where: { id: teamId, users: { some: { id: uid } } } })
-    if (alreadyInTeam) {
-        return {
-            status: 400,
-            body: {
-                message: `Already in the team.`
-            }
-        };
-    }
-    const invitationFound = await db.prisma.teamInvitation.findFirst({ where: { uid, teamId } })
-    if (invitationFound) {
-        if (dayjs().toDate() < dayjs(invitationFound.createdAt).add(1, 'day').toDate()) {
+    try {
+        const userFound = await db.prisma.user.findUnique({ where: { email }, rejectOnNotFound: false })
+        if (!userFound) {
+            return {
+                status: 404,
+                body: {
+                    message: `No user found with '${email}' email address.`
+                }
+            };
+        }
+        const uid = userFound.id
+        // Invitation to yourself?!
+        if (uid === userId) {
             return {
                 status: 400,
                 body: {
-                    message: "Invitiation already pending on user confirmation."
+                    message: `Invitation to yourself? Whaaaaat?`
                 }
             };
+        }
+        const alreadyInTeam = await db.prisma.team.findFirst({ where: { id: teamId, users: { some: { id: uid } } }, rejectOnNotFound: false })
+        if (alreadyInTeam) {
+            return {
+                status: 400,
+                body: {
+                    message: `Already in the team.`
+                }
+            };
+        }
+        const invitationFound = await db.prisma.teamInvitation.findFirst({ where: { uid, teamId }, rejectOnNotFound: false })
+        if (invitationFound) {
+            if (dayjs().toDate() < dayjs(invitationFound.createdAt).add(1, 'day').toDate()) {
+                return {
+                    status: 400,
+                    body: {
+                        message: "Invitiation already pending on user confirmation."
+                    }
+                };
+            } else {
+                await db.prisma.teamInvitation.delete({ where: { id: invitationFound.id } })
+                await createInvitation({ email, uid, teamId, teamName, permission })
+                return {
+                    status: 200,
+                    body: {
+                        message: "Invitiation sent."
+                    }
+                };
+            }
         } else {
-            await db.prisma.teamInvitation.delete({ where: { id: invitationFound.id } })
             await createInvitation({ email, uid, teamId, teamName, permission })
             return {
                 status: 200,
@@ -63,13 +73,9 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
                 }
             };
         }
-    } else {
-        await createInvitation({ email, uid, teamId, teamName, permission })
-        return {
-            status: 200,
-            body: {
-                message: "Invitiation sent."
-            }
-        };
+    } catch (err) {
+        console.log(err)
+        return err
     }
+
 }
