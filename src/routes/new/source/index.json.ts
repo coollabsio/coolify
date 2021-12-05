@@ -14,7 +14,6 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
     try {
         return await db.newSource({ name, teamId, type, htmlUrl, apiUrl, organization })
-
     } catch (err) {
         return err
     }

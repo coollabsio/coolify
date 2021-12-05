@@ -66,7 +66,7 @@
 				});
 				if (response.ok) {
 					errorNotification(
-						`Local Docker Engine with ${payload.network} is already configured.`
+						`A configuration with '${payload.network}' network is already configured.`
 					);
 					throw new Error(await response.json());
 				}

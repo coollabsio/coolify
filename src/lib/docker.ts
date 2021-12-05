@@ -42,7 +42,7 @@ export async function streamEvents({ stream, docker, buildId, applicationId }) {
                 reject(event.error);
             } else if (event.stream) {
                 if (event.stream !== '\n') {
-                    saveBuildLog({ line: event.stream.replace('\n', ''), buildId, applicationId })
+                    saveBuildLog({ line: `[DOCKER ENGINE] - ${event.stream.replace('\n', '')}`, buildId, applicationId })
                 }
             }
         }

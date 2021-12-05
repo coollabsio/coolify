@@ -7,6 +7,7 @@ import { asyncExecShell, saveBuildLog } from '../common'
 import { completeTransaction, getNextTransactionId, haproxyInstance } from '../haproxy'
 import * as db from '$lib/database'
 import { decrypt } from '$lib/crypto'
+import { getSetting } from '$lib/database'
 
 export default async function (job) {
   /*
@@ -104,15 +105,15 @@ export default async function (job) {
       } catch (error) {
         //
       } finally {
-        saveBuildLog({ line: 'Remove old deployments.', buildId, applicationId })
+        saveBuildLog({ line: '[DOCKER ENGINE] - Removing old deployments.', buildId, applicationId })
       }
 
       // TODO: Must be localhost
       if (destinationDocker.engine === '/var/run/docker.sock') {
-        saveBuildLog({ line: 'Deploying.', buildId, applicationId })
+        saveBuildLog({ line: '[DOCKER ENGINE] - Deployment started.', buildId, applicationId })
         const { stderr } = await asyncExecShell(`docker run --name ${applicationId} --network ${docker.network} --restart always -d ${applicationId}:${commit.slice(0, 7)}`)
         if (stderr) console.log(stderr)
-        saveBuildLog({ line: 'Deployment successful!', buildId, applicationId })
+        saveBuildLog({ line: '[DOCKER ENGINE] - Deployment successful!', buildId, applicationId })
       }
       // TODO: Implement remote docker engine
 
@@ -122,70 +123,76 @@ export default async function (job) {
       // Deploy to k8s
     }
   }
+  const isCoolifyProxyUsed = await getSetting({ name: 'isCoolifyProxyUsed' })
+
   // TODO: Separate logic
-  const haproxy = haproxyInstance()
+  if (isCoolifyProxyUsed) {
+    const haproxy = haproxyInstance()
 
-  try {
-    const transactionId = await getNextTransactionId()
     try {
-      const backendFound = await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
-      if (backendFound) {
-        await haproxy.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
-          searchParams: {
-            transaction_id: transactionId
-          },
-        }).json()
-        saveBuildLog({ line: 'HAPROXY - Old backend deleted.', buildId, applicationId })
-      }
+      const transactionId = await getNextTransactionId()
+      try {
+        const backendFound = await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
+        if (backendFound) {
+          await haproxy.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
+            searchParams: {
+              transaction_id: transactionId
+            },
+          }).json()
+          saveBuildLog({ line: '[COOLIFY PROXY] - Old backend deleted.', buildId, applicationId })
+        }
 
-    } catch (error) {
-      // Backend not found, no worries, it means it's not defined yet
-    }
-    try {
-      if (oldDomain) {
-        await haproxy.delete(`v2/services/haproxy/configuration/backends/${oldDomain}`, {
-          searchParams: {
-            transaction_id: transactionId
-          },
-        }).json()
-        await db.prisma.application.update({ where: { id: applicationId }, data: { oldDomain: null } })
-        saveBuildLog({ line: 'HAPROXY - Old backend deleted with different domain.', buildId, applicationId })
+      } catch (error) {
+        // Backend not found, no worries, it means it's not defined yet
       }
-    } catch (error) {
-      // Backend not found, no worries, it means it's not defined yet
-    }
-    await haproxy.post('v2/services/haproxy/configuration/backends', {
-      searchParams: {
-        transaction_id: transactionId
-      },
-      json: {
-        "init-addr": "last,libc,none",
-        "forwardfor": { "enabled": "enabled" },
-        "name": domain
+      try {
+        if (oldDomain) {
+          await haproxy.delete(`v2/services/haproxy/configuration/backends/${oldDomain}`, {
+            searchParams: {
+              transaction_id: transactionId
+            },
+          }).json()
+          await db.prisma.application.update({ where: { id: applicationId }, data: { oldDomain: null } })
+          saveBuildLog({ line: '[COOLIFY PROXY] - Old backend deleted with different domain.', buildId, applicationId })
+        }
+      } catch (error) {
+        // Backend not found, no worries, it means it's not defined yet
       }
-    })
+      await haproxy.post('v2/services/haproxy/configuration/backends', {
+        searchParams: {
+          transaction_id: transactionId
+        },
+        json: {
+          "init-addr": "last,libc,none",
+          "forwardfor": { "enabled": "enabled" },
+          "name": domain
+        }
+      })
 
-    saveBuildLog({ line: 'HAPROXY - New backend defined.', buildId, applicationId })
-    await haproxy.post('v2/services/haproxy/configuration/servers', {
-      searchParams: {
-        transaction_id: transactionId,
-        backend: domain
-      },
-      json: {
-        "address": applicationId,
-        "check": "enabled",
-        "name": applicationId,
-        "port": port
-      }
-    })
-    saveBuildLog({ line: 'HAPROXY - New servers defined.', buildId, applicationId })
-    await completeTransaction(transactionId)
-    saveBuildLog({ line: 'HAPROXY - Transaction done.', buildId, applicationId })
-  } catch (error) {
-    console.log(error)
-    throw new Error(error)
+      saveBuildLog({ line: '[COOLIFY PROXY] - New backend defined.', buildId, applicationId })
+      await haproxy.post('v2/services/haproxy/configuration/servers', {
+        searchParams: {
+          transaction_id: transactionId,
+          backend: domain
+        },
+        json: {
+          "address": applicationId,
+          "check": "enabled",
+          "name": applicationId,
+          "port": port
+        }
+      })
+      saveBuildLog({ line: '[COOLIFY PROXY] - New servers defined.', buildId, applicationId })
+      await completeTransaction(transactionId)
+      saveBuildLog({ line: '[COOLIFY PROXY] - Transaction done.', buildId, applicationId })
+    } catch (error) {
+      console.log(error)
+      throw new Error(error)
+    } finally {
+      await asyncExecShell(`rm -fr ${workdir}`)
+    }
+  } else {
+    saveBuildLog({ line: '[COOLIFY] - Custom proxy is used! Please configure it properly.', buildId, applicationId })
   }
-
-
-  // await asyncExecShell(`rm -fr ${workdir}`)
+  await asyncExecShell(`rm -fr ${workdir}`)
 }
