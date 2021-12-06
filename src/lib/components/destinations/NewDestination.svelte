@@ -62,6 +62,8 @@
 					if (!update) {
 						const { id } = await res.json();
 						window.location.assign(`/destinations/${id}`);
+					} else {
+						window.location.reload()
 					}
 				}, 200);
 			},
@@ -116,7 +118,7 @@
 			<label for="network">Network</label>
 			<div class="col-span-2">
 				<input
-					readonly={!$session.isAdmin}
+					readonly
 					name="network"
 					placeholder="default: coollabs"
 					bind:value={payload.network}
