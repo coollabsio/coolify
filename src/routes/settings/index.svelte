@@ -23,7 +23,7 @@
 	import { session } from '$app/stores';
 
 	export let settings;
-	import Setting from './_Setting.svelte';
+	import Setting from '$lib/components/Setting.svelte';
 
 	let isRegistrationEnabled =
 		settings.find((setting) => setting.name === 'isRegistrationEnabled').value === 'true';

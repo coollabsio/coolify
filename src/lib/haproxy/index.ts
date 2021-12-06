@@ -1,8 +1,9 @@
+import { dev } from "$app/env";
 import got from "got";
 
 export function haproxyInstance() {
     return got.extend({
-        prefixUrl: 'http://localhost:5555',
+        prefixUrl: dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555',
         username: 'haproxy-dataplaneapi',
         password: 'adminpwd'
     });

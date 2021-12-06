@@ -109,15 +109,16 @@ model Build {
 }
 
 model DestinationDocker {
-  id          String        @id @default(cuid())
-  network     String        @unique
-  name        String
-  teams       Team[]
-  engine      String
-  isSwarm     Boolean?      @default(false)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  application Application[]
+  id                 String        @id @default(cuid())
+  network            String        @unique
+  name               String
+  engine             String
+  isSwarm            Boolean?      @default(false)
+  isCoolifyProxyUsed Boolean?      @default(false)
+  teams              Team[]
+  application        Application[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 }
 
 model GitSource {

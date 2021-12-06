@@ -77,13 +77,13 @@
 						}}
 					>
 						<input class="hidden" name="destinationId" value={destination.id} />
-						<button type="submit" class="box-selection border-sky-500 text-xl font-bold"
-							>{destination.name}</button
-						>
+						<button type="submit" class="box-selection border-sky-500 font-bold">
+							<div class="font-bold text-xl text-center truncate">{destination.name}</div>
+							<div class="text-center truncate">{destination.network}</div>
+						</button>
 					</form>
 				</div>
 			{/each}
 		</div>
 	{/if}
 </div>
-

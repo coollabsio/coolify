@@ -6,6 +6,7 @@ export async function buildCacheImageWithNode({applicationId, commit, workdir, d
     const Dockerfile: Array<string> = []
     Dockerfile.push(`FROM node:lts`)
     Dockerfile.push('WORKDIR /usr/src/app')
+    // TODO: If build command defined, install command should be the default yarn install
     if (installCommand) {
         Dockerfile.push(`COPY ./${baseDirectory || ""}package*.json ./`)
         Dockerfile.push(`RUN ${installCommand}`)

@@ -17,16 +17,16 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE_URL=${DATABASE_URL}
     networks:
-      - "coolify"
+      - coolify-infra
   redis:
     image: bitnami/redis:6.2
     container_name: coolify-redis
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
     networks:
-      - "coolify"
+      - coolify-infra
 
 networks:
-  coolify:
+  coolify-infra:
     attachable: true
-    name: coolify
+    name: coolify-infra

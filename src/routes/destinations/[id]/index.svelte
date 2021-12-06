@@ -29,8 +29,7 @@
 <script lang="ts">
 	export let destination: Prisma.DestinationDocker;
 	import type Prisma from '@prisma/client';
-	import NewDestination from '$lib/components/destinations/NewDestination.svelte';
-
+	import LocalDocker from './_LocalDocker.svelte';
 </script>
 
 <div class="font-bold flex space-x-1 p-5 px-6 text-2xl">
@@ -39,4 +38,4 @@
 	<span class="pr-2">{destination.name}</span>
 </div>
 
-<NewDestination {destination} update={true} />
+<LocalDocker {destination} />

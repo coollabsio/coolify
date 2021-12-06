@@ -1,29 +1,17 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import Setting from '$lib/components/Setting.svelte';
 	import { enhance, errorNotification } from '$lib/form';
 
+	let formEl: HTMLFormElement;
 	let payload = {
 		name: undefined,
 		isSwarm: false,
 		engine: undefined,
-		network: undefined
+		network: undefined,
+		isCoolifyProxyUsed: false
 	};
 
-	export let destination = payload;
-	export let update = false;
-
-	const { id } = $page.params;
-
-	let action = update ? `/destinations/${id}.json` : '/new/destination.json';
-
-	if (destination) {
-		payload = {
-			name: destination.name,
-			isSwarm: destination.isSwarm,
-			engine: destination.engine,
-			network: destination.network
-		};
-	}
 	function setPredefined(type) {
 		switch (type) {
 			case 'localdocker':
@@ -31,13 +19,44 @@
 					name: 'Local Docker',
 					isSwarm: false,
 					engine: '/var/run/docker.sock',
-					network: 'coollabs'
+					network: 'coolify',
+					isCoolifyProxyUsed: true
 				};
 				break;
 
 			default:
 				break;
 		}
+	}
+	async function submitForm() {
+		const networkCheckForm = new FormData();
+		networkCheckForm.append('network', payload.network);
+
+		const networkCheckResponse = await fetch(`/new/destination/check.json`, {
+			method: 'POST',
+			headers: {
+				accept: 'application/json'
+			},
+			body: networkCheckForm
+		});
+		if (networkCheckResponse.ok) {
+			return errorNotification(`A configuration with '${payload.network}' network is already configured.`);
+		}
+		const saveForm = new FormData(formEl);
+		saveForm.append('isCoolifyProxyUsed', payload.isCoolifyProxyUsed.toString());
+
+		const saveFormResponse = await fetch(`/new/destination.json`, {
+			method: 'POST',
+			headers: {
+				accept: 'application/json'
+			},
+			body: saveForm
+		});
+		if (!saveFormResponse.ok) {
+			return errorNotification(await saveFormResponse.json());
+		}
+		const { id } = await saveFormResponse.json();
+		window.location.assign(`/destinations/${id}`);
 	}
 </script>
 
@@ -49,35 +68,10 @@
 </div>
 <div class="flex justify-center pb-8 px-6">
 	<form
-		{action}
+		on:submit|preventDefault={submitForm}
+		bind:this={formEl}
 		method="post"
 		class="grid grid-flow-row gap-2 py-4"
-		use:enhance={{
-			beforeSubmit: async () => {
-				const form = new FormData();
-				form.append('network', payload.network);
-
-				const response = await fetch(`/new/destination/check.json`, {
-					method: 'POST',
-					headers: {
-						accept: 'application/json'
-					},
-					body: form
-				});
-				if (response.ok) {
-					errorNotification(
-						`A configuration with '${payload.network}' network is already configured.`
-					);
-					throw new Error(await response.json());
-				}
-			},
-			result: async (res) => {
-				if (!update) {
-					const { id } = await res.json();
-					window.location.assign(`/destinations/${id}`);
-				}
-			}
-		}}
 	>
 		<div class="flex space-x-2 h-8 items-center">
 			<div class="font-bold text-xl text-white">Configuration</div>
@@ -104,8 +98,19 @@
 		<div class="grid grid-cols-3 items-center">
 			<label for="network">Network</label>
 			<div class="col-span-2">
-				<input name="network" placeholder="default: coollabs" bind:value={payload.network} />
+				<input name="network" placeholder="default: coolify" bind:value={payload.network} />
 			</div>
+		</div>
+		<div class="flex justify-start">
+			<ul class="mt-2 divide-y divide-warmGray-800">
+				<Setting
+					bind:setting={payload.isCoolifyProxyUsed}
+					on:click={() => (payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed)}
+					isPadding={false}
+					title="Use Coolify Proxy?"
+					description="This will install a proxy on the destination to allow you to access your applications/database/services without any manual configuration (recommended for Docker)."
+				/>
+			</ul>
 		</div>
 	</form>
 </div>

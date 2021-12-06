@@ -11,16 +11,28 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const isSwarm = request.body.get('isSwarm') || false
     const engine = request.body.get('engine') || null
     const network = request.body.get('network') || null
+    const isCoolifyProxyUsed = request.body.get('isCoolifyProxyUsed') === 'true' ? true : false
 
     try {
-        await db.newDestination({ name, teamId, isSwarm, engine, network })
+        const { body } = await db.newDestination({ name, teamId, isSwarm, engine, network, isCoolifyProxyUsed })
         const destinationDocker = {
             engine,
             network
         }
+        // TODO Create docker context
         const docker = dockerInstance({ destinationDocker })
-        docker.engine.createNetwork({ name: network, attachable: true })
-        return { status: 200, body: { message: 'Destination created' } }
+        // if (engine === '/var/run/docker.sock') {
+        //     await asyncExecShell(`docker context create ${body.id} --description "${name}" --docker "host=unix:///var/run/docker.sock"`)
+
+        // } else {
+        //     await asyncExecShell(`docker context create ${body.id} --description "${name}" --docker "host=${engine}"`)
+        // }
+        const networks = await docker.engine.listNetworks()
+        const found = networks.find(network => network.Name === destinationDocker.network)
+        if (!found) {
+            await docker.engine.createNetwork({ name: network, attachable: true })
+        }
+        return { status: 200, body: { message: 'Destination created', id: body.id } }
     } catch (err) {
         return err
     }

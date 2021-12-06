@@ -71,7 +71,7 @@ export default async function (job) {
   if (configHash !== currentHash) {
     await db.prisma.application.update({ where: { id: applicationId }, data: { configHash: currentHash } })
     deployNeeded = true
-    saveBuildLog({ line: 'Configuration changed, redeploying.', buildId, applicationId })
+    saveBuildLog({ line: '[COOLIFY] - Configuration changed, redeploying.', buildId, applicationId })
   } else {
     deployNeeded = false
   }
@@ -123,10 +123,11 @@ export default async function (job) {
       // Deploy to k8s
     }
   }
-  const isCoolifyProxyUsed = await getSetting({ name: 'isCoolifyProxyUsed' })
+  // destinationDocker.isCoolifyProxyUsed
+  // const isCoolifyProxyUsed = await getSetting({ name: 'isCoolifyProxyUsed' })
 
   // TODO: Separate logic
-  if (isCoolifyProxyUsed) {
+  if (destinationDocker.isCoolifyProxyUsed) {
     const haproxy = haproxyInstance()
 
     try {
@@ -186,13 +187,13 @@ export default async function (job) {
       await completeTransaction(transactionId)
       saveBuildLog({ line: '[COOLIFY PROXY] - Transaction done.', buildId, applicationId })
     } catch (error) {
-      console.log(error)
+      console.log(error.response.body)
       throw new Error(error)
     } finally {
       await asyncExecShell(`rm -fr ${workdir}`)
     }
   } else {
-    saveBuildLog({ line: '[COOLIFY] - Custom proxy is used! Please configure it properly.', buildId, applicationId })
+    saveBuildLog({ line: '[COOLIFY] - Custom proxy is configured. Nothing else to do.', buildId, applicationId })
   }
   await asyncExecShell(`rm -fr ${workdir}`)
 }
