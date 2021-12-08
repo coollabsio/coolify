@@ -187,7 +187,7 @@
 				>
 			</div>
 		</div>
-		<div class="grid grid-cols-3 items-center pb-8">
+		<div class="grid grid-cols-3 items-center py-8">
 			<label for="buildPack">Build Pack</label>
 			<div class="col-span-2">
 				<a

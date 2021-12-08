@@ -4,6 +4,7 @@
 	import { page } from '$app/stores';
 	import Setting from '$lib/components/Setting.svelte';
 	import { errorNotification } from '$lib/form';
+	import FoundApp from './_FoundApp.svelte';
 	const { id } = $page.params;
 
 	let formEl: HTMLFormElement;
@@ -14,7 +15,8 @@
 		network: undefined,
 		isCoolifyProxyUsed: false
 	};
-
+	let scannedApps = [];
+	let loading = false;
 	if (destination) {
 		payload = {
 			name: destination.name,
@@ -43,9 +45,16 @@
 		window.location.reload();
 	}
 	async function scanApps() {
+		scannedApps = [];
+		loading = true;
 		const data = await fetch(`/destinations/${id}/scan.json`);
-		const apps = await data.json()
-		console.log(apps)
+		const { containers } = await data.json();
+		scannedApps = containers.map(
+			(container) =>
+				container.Labels['coolify.configuration'] &&
+				JSON.parse(atob(container.Labels['coolify.configuration']))
+		);
+		loading = false;
 	}
 </script>
 
@@ -59,7 +68,9 @@
 		<div class="flex space-x-2 h-8 items-center">
 			<div class="font-bold text-xl text-white">Configuration</div>
 			<button type="submit" class="bg-sky-600 hover:bg-sky-500">Save</button>
-			<button type="button" class="bg-sky-600 hover:bg-sky-500" on:click={scanApps}>Load Application</button>
+			<button type="button" class="bg-indigo-600 hover:bg-indigo-500" on:click={scanApps}
+				>{loading ? 'Scanning...' : 'Scan for applications'}</button
+			>
 		</div>
 		<div class="grid grid-cols-3 items-center">
 			<label for="name">Name</label>
@@ -108,3 +119,18 @@
 		</div>
 	</form>
 </div>
+
+{#if scannedApps.length > 0}
+	<div class="flex justify-center px-6 pb-10">
+		<div class="flex space-x-2 h-8 items-center">
+			<div class="font-bold text-xl text-white">Found applications</div>
+		</div>
+	</div>
+	<div class="max-w-4xl mx-auto px-6">
+		<div class="flex space-x-2 justify-center">
+			{#each scannedApps as app}
+				<FoundApp {app} />
+			{/each}
+		</div>
+	</div>
+{/if}

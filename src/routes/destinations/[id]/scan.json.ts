@@ -11,18 +11,28 @@ export const get: RequestHandler = async (request) => {
     const docker = dockerInstance({ destinationDocker })
     const containers = await docker.engine.listContainers()
     const coolifyManaged = containers.filter((container) => {
-        console.log(container.Labels.configuration)
-        return container.Labels.configuration
-        // const configuration = container.Labels.configuration && JSON.parse(container.Labels.configuration)
-        // if (configuration.coolifyManaged === 'true') {
-        //     return configuration
-
-        // }
+        return container.Labels['coolify.configuration']
     })
     return {
         body: {
-            containers:coolifyManaged
+            containers: coolifyManaged
         }
     };
+}
+
+export const post: RequestHandler<Locals, FormData> = async (request) => {
+    const teamId = getTeam(request)
+    const { id } = request.params
+    const domain = request.body.get('domain')
+    const found = await db.prisma.application.findFirst({ where: { domain } })
+    if (found) {
+        return {
+            status: 200
+        }
+    }
+    return {
+        status: 404
+    }
+
 }
 

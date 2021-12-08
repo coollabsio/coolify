@@ -13,7 +13,7 @@ const createDockerfile = async ({ applicationId, commit, image, workdir, buildCo
     }
     Dockerfile.push(`EXPOSE 80`)
     Dockerfile.push('CMD ["nginx", "-g", "daemon off;"]')
-    Dockerfile.push(`LABEL configuration=${label}`)
+    label.forEach(l => Dockerfile.push(l))
     await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'))
 }
 
