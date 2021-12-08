@@ -1,6 +1,12 @@
 import crypto from 'crypto'
 const algorithm = 'aes-256-ctr';
 
+export const base64Encode = (text: string) => {
+    return Buffer.from(text).toString('base64')
+}
+export const base64Decode = (text: string) => {
+    return Buffer.from(text, 'base64').toString('ascii')
+}
 export const encrypt = (text: string) => {
     if (text) {
         const iv = crypto.randomBytes(16);

@@ -7,7 +7,6 @@ import { asyncExecShell, saveBuildLog } from '../common'
 import { completeTransaction, getNextTransactionId, haproxyInstance } from '../haproxy'
 import * as db from '$lib/database'
 import { decrypt } from '$lib/crypto'
-import { getSetting } from '$lib/database'
 
 export default async function (job) {
   /*
@@ -88,7 +87,7 @@ export default async function (job) {
   }
   // TODO: Should check if it's running!
   if (!imageFound || deployNeeded) {
-    await buildpacks[buildPack]({ applicationId, commit, workdir, docker, buildId: build.id, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
+    await buildpacks[buildPack]({ applicationId, commit, workdir, docker, buildId: build.id, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory, job: job.data })
     deployNeeded = true
   } else {
     deployNeeded = false

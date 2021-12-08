@@ -42,6 +42,11 @@
 		}
 		window.location.reload();
 	}
+	async function scanApps() {
+		const data = await fetch(`/destinations/${id}/scan.json`);
+		const apps = await data.json()
+		console.log(apps)
+	}
 </script>
 
 <div class="flex justify-center pb-8 px-6">
@@ -54,6 +59,7 @@
 		<div class="flex space-x-2 h-8 items-center">
 			<div class="font-bold text-xl text-white">Configuration</div>
 			<button type="submit" class="bg-sky-600 hover:bg-sky-500">Save</button>
+			<button type="button" class="bg-sky-600 hover:bg-sky-500" on:click={scanApps}>Load Application</button>
 		</div>
 		<div class="grid grid-cols-3 items-center">
 			<label for="name">Name</label>

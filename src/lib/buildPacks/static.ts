@@ -1,7 +1,8 @@
 import { buildCacheImageWithNode, buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
+import { makeLabel } from './common';
 
-const createDockerfile = async ({ applicationId, commit, image, workdir, buildCommand, baseDirectory, publishDirectory }): Promise<void> => {
+const createDockerfile = async ({ applicationId, commit, image, workdir, buildCommand, baseDirectory, publishDirectory, label }): Promise<void> => {
     let Dockerfile: Array<string> = []
     Dockerfile.push(`FROM ${image}`)
     Dockerfile.push('WORKDIR /usr/share/nginx/html')
@@ -12,14 +13,17 @@ const createDockerfile = async ({ applicationId, commit, image, workdir, buildCo
     }
     Dockerfile.push(`EXPOSE 80`)
     Dockerfile.push('CMD ["nginx", "-g", "daemon off;"]')
+    Dockerfile.push(`LABEL configuration=${label}`)
     await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'))
 }
 
-export default async function ({ applicationId, commit, workdir, docker, buildId, installCommand, buildCommand, baseDirectory, publishDirectory }) {
+export default async function ({ applicationId, commit, workdir, docker, buildId, installCommand, buildCommand, baseDirectory, publishDirectory, job }) {
     const image = 'nginx:stable-alpine'
+    const label = makeLabel(job)
+
     if (buildCommand) {
         await buildCacheImageWithNode({ applicationId, commit, workdir, docker, buildId, baseDirectory, installCommand, buildCommand })
     }
-    await createDockerfile({ applicationId, commit, image, workdir, buildCommand, baseDirectory, publishDirectory })
+    await createDockerfile({ applicationId, commit, image, workdir, buildCommand, baseDirectory, publishDirectory, label })
     await buildImage({ applicationId, commit, workdir, docker, buildId })
 }
