@@ -49,11 +49,7 @@
 		loading = true;
 		const data = await fetch(`/destinations/${id}/scan.json`);
 		const { containers } = await data.json();
-		scannedApps = containers.map(
-			(container) =>
-				container.Labels['coolify.configuration'] &&
-				JSON.parse(atob(container.Labels['coolify.configuration']))
-		);
+		scannedApps = containers
 		loading = false;
 	}
 </script>

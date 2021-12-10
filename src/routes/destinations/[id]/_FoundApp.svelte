@@ -1,13 +1,16 @@
 <script lang="ts">
 	export let app;
 	import { onMount } from 'svelte';
-    import { page } from '$app/stores';
+	import { page } from '$app/stores';
 	const { id } = $page.params;
-	let loading = true
-    async function checkApp() {
+	let loading = true;
+	async function checkApp() {
 		const form = new FormData();
-		form.append('name',app.name);
-        form.append('domain',app.domain);
+		form.append('name', app.name);
+		form.append('domain', app.domain);
+		form.append('projectId', app.projectId);
+		form.append('repository', app.repository);
+		form.append('branch', app.branch);
 		const response = await fetch(`/destinations/${id}/scan.json`, {
 			method: 'POST',
 			headers: {
@@ -16,28 +19,39 @@
 			body: form
 		});
 		if (response.ok) {
-            app.found = true
+			const { by, name } = await response.json();
+			if (by === 'domain') {
+				app.foundByDomain = true;
+			} else if (by === 'repository') {
+				app.foundByRepository = true;
+			}
+			app.foundName = name;
 		}
 	}
 	onMount(async () => {
-        await checkApp();
-		loading = false
+		await checkApp();
+		loading = false;
 	});
 	async function addToCoolify() {
-		console.log(app)
+		console.log(app);
 	}
 </script>
 
 <div class="box-selection hover:scale-100 hover:bg-coolgray-200 hover:border-transparent">
 	<div class="font-bold text-xl text-center truncate pb-2">{app.domain}</div>
 	{#if loading}
-	<div class="font-bold w-full text-center">Loading...</div>
+		<div class="font-bold w-full text-center">Loading...</div>
+	{:else if app.foundByDomain}
+		<button disabled class="w-full bg-coolgray-200"
+			><span class="text-red-500">Domain</span> already configured for <span class="text-red-500">{app.foundName}</span></button
+		>
+	{:else if app.foundByRepository}
+		<button disabled class="w-full bg-coolgray-200"
+			><span class="text-red-500">Repository</span> already configured for <span class="text-red-500">{app.foundName}</span></button
+		>
 	{:else}
-	{#if app.found}
-	<button disabled class="w-full bg-coolgray-200">Already saved in Coolify</button>
-{:else}
-	<button class="bg-green-600 hover:bg-green-500 w-full" on:click={addToCoolify}>Add to Coolify</button>
-{/if}
+		<button class="bg-green-600 hover:bg-green-500 w-full" on:click={addToCoolify}
+			>Add to Coolify</button
+		>
 	{/if}
-
 </div>
