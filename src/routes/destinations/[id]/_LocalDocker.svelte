@@ -69,7 +69,7 @@
 			<div class="font-bold text-xl text-white">Configuration</div>
 			<button type="submit" class="bg-sky-600 hover:bg-sky-500">Save</button>
 			<button type="button" class="bg-indigo-600 hover:bg-indigo-500" on:click={scanApps}
-				>{loading ? 'Scanning...' : 'Scan for applications'}</button
+				>Scan for applications</button
 			>
 		</div>
 		<div class="grid grid-cols-3 items-center">

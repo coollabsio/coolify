@@ -21,6 +21,7 @@
 
 <script lang="ts">
 	import { errorNotification } from '$lib/form';
+import { session } from '$app/stores';
 
 	export let teams;
 	export let invitations;
@@ -57,6 +58,23 @@
 
 <div class="font-bold flex space-x-1 py-5 px-6">
 	<div class="text-2xl tracking-tight mr-4">Teams</div>
+	{#if $session.isAdmin}
+		<a href="/new/team" class="add-icon bg-cyan-600 hover:bg-cyan-500">
+			<svg
+				class="w-6"
+				xmlns="http://www.w3.org/2000/svg"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				><path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+				/></svg
+			>
+		</a>
+	{/if}
 </div>
 
 {#if invitations.length > 0}
