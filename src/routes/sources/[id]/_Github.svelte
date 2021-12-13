@@ -19,7 +19,7 @@
 				hook_attributes: {
 					url: `https://${host}/webhooks/applications/deploy`
 				},
-				redirect_url: `http://${window.location.host}/webhooks/github`,
+				redirect_url: `https://${window.location.host}/webhooks/github`,
 				callback_urls: [`https://${window.location.host}/login/github/app`],
 				public: false,
 				request_oauth_on_install: false,

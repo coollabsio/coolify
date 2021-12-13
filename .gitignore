@@ -6,6 +6,7 @@ node_modules
 
 .env
 .env.prod
+.env.stag
 /db/*.db
 /db/*.db-journal
 /data/haproxy/haproxy.cfg

@@ -1,6 +1,4 @@
-import Prisma from '@prisma/client';
-const { PrismaClient } = Prisma;
-
+const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient();
 
 async function main() {
@@ -8,4 +6,11 @@ async function main() {
 	const found = await prisma.setting.findUnique({ where: { name: 'isRegistrationEnabled' } })
 	if (!found) await prisma.setting.create({ data: { name: 'isRegistrationEnabled', value: 'true' } });
 }
-main();
+main()
+	.catch((e) => {
+		console.error(e)
+		process.exit(1)
+	})
+	.finally(async () => {
+		await prisma.$disconnect()
+	})

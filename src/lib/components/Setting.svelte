@@ -7,19 +7,16 @@
 	export let isPadding = true
 </script>
 
-<li class="py-4 flex items-center justify-between">
+<li class="py-4 flex items-center">
 	<div class="flex flex-col" class:px-10={isPadding} class:pr-32={!isPadding}>
 		<p class="text-base font-bold text-warmGray-100">{title}</p>
 		<Explainer text={description} />
-		<!-- <p class="text-sm font-medium text-warmGray-400">
-			{description}
-		</p> -->
 	</div>
 	<div
 		type="button"
 		on:click
 		aria-pressed="false"
-		class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 "
+		class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 mx-20"
 		class:bg-green-600={setting}
 		class:bg-warmGray-700={!setting}
 	>

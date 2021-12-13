@@ -1,27 +1,33 @@
 import { saveBuildLog } from '$lib/common'
-import type { Job } from 'bullmq'
-import { Queue, Worker } from 'bullmq'
+import * as Bullmq from 'bullmq'
+import { default as ProdBullmq } from 'bullmq'
 import cuid from 'cuid'
 import { dev } from '$app/env';
 import { prisma } from '$lib/database';
 import builder from './builder';
 import letsencrypt from './letsencrypt';
 import logger from './logger';
+let { Queue, Worker } = Bullmq;
+
+if (!dev) {
+  Queue = ProdBullmq.Queue;
+  Worker = ProdBullmq.Worker;
+}
 
 const buildQueueName = dev ? cuid() : 'build_queue'
 const buildQueue = new Queue(buildQueueName, {
   connection: {
-    host: dev ? 'localhost' :'coolify-redis'
+    host: dev ? 'localhost' : 'coolify-redis'
   }
 })
 const buildWorker = new Worker(buildQueueName, async (job) => await builder(job), {
   concurrency: 2,
   connection: {
-    host: dev ? 'localhost' :'coolify-redis'
+    host: dev ? 'localhost' : 'coolify-redis'
   }
 })
 
-buildWorker.on('completed', async (job: Job) => {
+buildWorker.on('completed', async (job: bullmq.Job) => {
   try {
     await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'success' } })
   } catch (err) {
@@ -29,7 +35,7 @@ buildWorker.on('completed', async (job: Job) => {
   }
 })
 
-buildWorker.on('failed', async (job: Job, failedReason: string) => {
+buildWorker.on('failed', async (job: bullmq.Job, failedReason: string) => {
   console.log(failedReason)
   try {
     await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'failed' } })
@@ -43,14 +49,14 @@ buildWorker.on('failed', async (job: Job, failedReason: string) => {
 const letsEncryptQueueName = dev ? cuid() : 'letsencrypt_queue'
 const letsEncryptQueue = new Queue(letsEncryptQueueName, {
   connection: {
-    host: dev ? 'localhost' :'coolify-redis'
+    host: dev ? 'localhost' : 'coolify-redis'
   }
 })
 
 const letsEncryptWorker = new Worker(letsEncryptQueueName, async (job) => await letsencrypt(job), {
   concurrency: 1,
   connection: {
-    host: dev ? 'localhost' :'coolify-redis'
+    host: dev ? 'localhost' : 'coolify-redis'
   }
 })
 letsEncryptWorker.on('completed', async () => {
@@ -67,13 +73,13 @@ letsEncryptWorker.on('failed', async (failedReason: string) => {
 const buildLogQueueName = dev ? cuid() : 'log_queue'
 const buildLogQueue = new Queue(buildLogQueueName, {
   connection: {
-    host: dev ? 'localhost' :'coolify-redis'
+    host: dev ? 'localhost' : 'coolify-redis'
   }
 })
 const buildLogWorker = new Worker(buildLogQueueName, async (job) => await logger(job), {
   concurrency: 1,
   connection: {
-    host: dev ? 'localhost' :'coolify-redis'
+    host: dev ? 'localhost' : 'coolify-redis'
   }
 })
 

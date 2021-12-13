@@ -8,6 +8,7 @@ export const get: RequestHandler = async (request) => {
     const tokenUrl = 'https://gitlab.com/oauth/token'
     const code = request.query.get('code')
     const state = request.query.get('state')
+
     try {
         const application = await db.getApplication({ id: state, teamId })
         const { appId, appSecret } = application.gitSource.gitlabApp
@@ -19,7 +20,7 @@ export const get: RequestHandler = async (request) => {
                 code,
                 state,
                 grant_type: 'authorization_code',
-                redirect_uri: 'http://localhost:3000/webhooks/gitlab'
+                redirect_uri: `http://${request.headers.host}/webhooks/gitlab`
             }
         }).json()
 

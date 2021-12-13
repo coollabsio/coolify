@@ -66,6 +66,7 @@ model Application {
   domain              String?            @unique
   name                String
   teams               Team[]
+  debugLogs           Boolean           @default(false)
   oldDomain           String?
   repository          String?
   branch              String?

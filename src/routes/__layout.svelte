@@ -378,14 +378,14 @@
 			>
 				<a
 					class="text-[10px] no-underline"
-					href="https://github.com/coollabsio/coolify/releases/tag/v2.0.0-alpha"
-					target="_blank">2.0.0-alpha</a
+					href="https://github.com/coollabsio/coolify/releases/tag/2.0.0-rc.1"
+					target="_blank">v2.0.0-rc.1</a
 				>
 			</div>
 		</div>
 	</nav>
 	<select
-		class="fixed right-0 bottom-0 p-2 px-4 m-2"
+		class="fixed right-0 bottom-0 p-2 px-4 m-2 z-50"
 		bind:value={selectedTeamId}
 		on:change={switchTeam}
 	>

@@ -1,9 +1,8 @@
 import { asyncExecShell, saveBuildLog } from "$lib/common";
 
-export default async function ({ applicationId, workdir, repodir, repository, branch, buildId, privateSshKey }): Promise<string> {
+export default async function ({ applicationId, debugLogs, workdir, repodir, repository, branch, buildId, privateSshKey }): Promise<string> {
     try {
         saveBuildLog({ line: '[GIT IMPORTER] - GitLab importer started.', buildId, applicationId })
-        saveBuildLog({ line: '[GIT IMPORTER] - Setup deploy key.', buildId, applicationId })
         await asyncExecShell(`echo '${privateSshKey}' > ${repodir}/id.rsa`)
         await asyncExecShell(`chmod 600 ${repodir}/id.rsa`)
         await asyncExecShell(`git clone -q -b ${branch} git@gitlab.com:${repository}.git --config core.sshCommand="ssh -q -i ${repodir}id.rsa -o StrictHostKeyChecking=no" ${workdir}/ && cd ${workdir}/ && git submodule update --init --recursive && cd ..`)

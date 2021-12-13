@@ -28,6 +28,7 @@
 	}
 
 	async function submitForm() {
+		loading = true;
 		const saveForm = new FormData(formEl);
 		saveForm.append('isCoolifyProxyUsed', payload.isCoolifyProxyUsed.toString());
 
@@ -46,11 +47,23 @@
 	}
 	async function scanApps() {
 		scannedApps = [];
-		loading = true;
 		const data = await fetch(`/destinations/${id}/scan.json`);
 		const { containers } = await data.json();
-		scannedApps = containers
-		loading = false;
+		scannedApps = containers;
+	}
+	async function changeProxySetting() {
+		if (payload.isCoolifyProxyUsed === true) {
+			const sure = confirm(
+				`Are you sure you want to ${
+					payload.isCoolifyProxyUsed ? 'disable' : 'enable'
+				} Coolify proxy? It will remove the proxy for all configured networks and all deployments on '${payload.engine}'! Nothing will be reachable if you do it!`
+			);
+			if (sure) {
+				payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed;
+			}
+		} else {
+			payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed;
+		}
 	}
 </script>
 
@@ -63,7 +76,14 @@
 	>
 		<div class="flex space-x-2 h-8 items-center">
 			<div class="font-bold text-xl text-white">Configuration</div>
-			<button type="submit" class="bg-sky-600 hover:bg-sky-500">Save</button>
+			<button
+				type="submit"
+				class="bg-sky-600 hover:bg-sky-500"
+				class:bg-sky-600={!loading}
+				class:hover:bg-sky-500={!loading}
+				disabled={loading}
+				>{loading ? 'Saving...' : 'Save'}
+			</button>
 			<button type="button" class="bg-indigo-600 hover:bg-indigo-500" on:click={scanApps}
 				>Scan for applications</button
 			>
@@ -106,7 +126,7 @@
 			<ul class="mt-2 divide-y divide-warmGray-800">
 				<Setting
 					bind:setting={payload.isCoolifyProxyUsed}
-					on:click={() => (payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed)}
+					on:click={changeProxySetting}
 					isPadding={false}
 					title="Use Coolify Proxy?"
 					description="This will install a proxy on the destination to allow you to access your applications/database/services without any manual configuration (recommended for Docker)."

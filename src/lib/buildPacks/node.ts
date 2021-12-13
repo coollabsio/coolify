@@ -15,10 +15,10 @@ const createDockerfile = async ({ image, workdir, port, installCommand, buildCom
     await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'))
 }
 
-export default async function ({ applicationId, commit, workdir, docker, buildId, port, installCommand, buildCommand, startCommand, baseDirectory, job }) {
-
+export default async function ({ applicationId, debugLogs, commit, workdir, docker, buildId, port, installCommand, buildCommand, startCommand, baseDirectory, job }) {
     // TODO: Select node version
     const image = 'node:lts'
+
     await createDockerfile({ image, workdir, port, installCommand, buildCommand, startCommand, baseDirectory, job })
-    await buildImage({ applicationId, commit, workdir, docker, buildId })
+    await buildImage({ applicationId, commit, workdir, docker, buildId, debugLogs })
 }

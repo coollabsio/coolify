@@ -40,7 +40,7 @@
 				class="flex flex-col py-4 space-y-2"
 			>
 				<div class="text-6xl font-bold mb-4 border-gradient w-48 mx-auto border-b-4">Coolify</div>
-				<input type="text" name="email" placeholder="Email" required bind:this={emailEl} />
+				<input type="text" name="email" placeholder="Email" autocomplete="off" required bind:this={emailEl} />
 				<input type="password" name="password" placeholder="Password" bind:this={passwordEl} required />
 
 				<div class="flex space-x-2 h-8 items-center justify-center pt-14">

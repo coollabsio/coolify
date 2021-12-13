@@ -53,6 +53,7 @@ CREATE TABLE "Application" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "domain" TEXT,
     "name" TEXT NOT NULL,
+    "debugLogs" BOOLEAN NOT NULL DEFAULT false,
     "oldDomain" TEXT,
     "repository" TEXT,
     "branch" TEXT,
@@ -104,6 +105,7 @@ CREATE TABLE "DestinationDocker" (
     "name" TEXT NOT NULL,
     "engine" TEXT NOT NULL,
     "isSwarm" BOOLEAN DEFAULT false,
+    "isCoolifyProxyUsed" BOOLEAN DEFAULT false,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );

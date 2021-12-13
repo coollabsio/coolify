@@ -37,15 +37,33 @@
 
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { appConfiguration } from '$lib/store';
+	import Setting from '$lib/components/Setting.svelte';
 	const { id } = $page.params;
 
 	let domainEl: HTMLInputElement;
 
 	let loading = false;
-
+	let debugLogs = application.debugLogs;
 	onMount(() => {
 		domainEl.focus();
 	});
+
+	async function changeSettings(name) {
+		const form = new FormData();
+		if (name === 'debugLogs') {
+			debugLogs = !debugLogs;
+			form.append('debugLogs', debugLogs.toString());
+		} 
+
+		try {
+			await fetch(`/applications/${id}/settings.json`, {
+				method: 'POST',
+				body: form
+			});
+		} catch (e) {
+			console.error(e);
+		}
+	}
 </script>
 
 <div class="font-bold flex space-x-1 p-5 px-6 text-2xl items-center">
@@ -104,7 +122,7 @@
 	</a>
 </div>
 
-<div class="flex justify-center px-6">
+<div class="max-w-4xl mx-auto px-6">
 	<form
 		action="/applications/{id}.json"
 		use:enhance={{
@@ -122,10 +140,10 @@
 			}
 		}}
 		method="post"
-		class="grid grid-flow-row gap-2 py-4"
+		class=" py-4"
 	>
-		<div class="flex space-x-2 h-8 items-center">
-			<div class="font-bold text-xl text-white">Configuration</div>
+		<div class="font-bold flex space-x-1 py-5">
+			<div class="text-xl tracking-tight mr-4">Base Configuration</div>
 			{#if $session.isAdmin}
 				<button
 					type="submit"
@@ -135,172 +153,184 @@
 				>
 			{/if}
 		</div>
-		<div class="grid grid-cols-3 items-center">
-			<label for="gitSource">Git Source</label>
-			<div class="col-span-2">
-				<a
-					href={$session.isAdmin
-						? `/applications/${id}/configuration/source?from=/applications/${id}`
-						: ''}
-					class="no-underline"
-					><span class="arrow-right-applications">></span><input
-						value={$appConfiguration.configuration.gitSource.name}
-						id="gitSource"
-						disabled
-						class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
-					/></a
-				>
-			</div>
-		</div>
-		<div class="grid grid-cols-3 items-center">
-			<label for="repository">Git Repository</label>
-			<div class="col-span-2">
-				<a
-					href={$session.isAdmin
-						? `/applications/${id}/configuration/repository?from=/applications/${id}`
-						: ''}
-					class="no-underline"
-					><span class="arrow-right-applications">></span><input
-						value="{$appConfiguration.configuration.repository}/{$appConfiguration.configuration
-							.branch}"
-						id="repository"
-						disabled
-						class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
-					/></a
-				>
-			</div>
-		</div>
-		<div class="grid grid-cols-3 items-center">
-			<label for="destination">Destination</label>
-			<div class="col-span-2">
-				<a
-					href={$session.isAdmin
-						? `/applications/${id}/configuration/destination?from=/applications/${id}`
-						: ''}
-					class="no-underline"
-					><span class="arrow-right-applications">></span><input
-						value={$appConfiguration.configuration.destinationDocker.name}
-						id="destination"
-						disabled
-						class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
-					/></a
-				>
-			</div>
-		</div>
-		<div class="grid grid-cols-3 items-center py-8">
-			<label for="buildPack">Build Pack</label>
-			<div class="col-span-2">
-				<a
-					href={$session.isAdmin
-						? `/applications/${id}/configuration/buildpack?from=/applications/${id}`
-						: ''}
-					class="no-underline "
-					><span class="arrow-right-applications">></span>
-					<input
-						value={$appConfiguration.configuration.buildPack}
-						id="buildPack"
-						disabled
-						class="bg-transparent hover:bg-coolgray-500 cursor-pointer -ml-1"
-					/></a
-				>
-			</div>
-		</div>
-		<div class="grid grid-cols-3 items-center">
-			<label for="domain">Domain</label>
-			<div class="col-span-2 ">
-				<input
-					readonly={!$session.isAdmin}
-					bind:this={domainEl}
-					name="domain"
-					id="domain"
-					value={$appConfiguration.configuration.domain}
-					pattern="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-					placeholder="eg: coollabs.io"
-					required
-				/>
-			</div>
-		</div>
-
-		{#if $appConfiguration.configuration.buildPack !== 'static'}
-			<div class="grid grid-cols-3 items-center">
-				<label for="port">Port</label>
+		<div class="grid grid-flow-row gap-2 px-10">
+			<div class="grid grid-cols-3 items-center mt-2">
+				<label for="gitSource">Git Source</label>
 				<div class="col-span-2">
+					<a
+						href={$session.isAdmin
+							? `/applications/${id}/configuration/source?from=/applications/${id}`
+							: ''}
+						class="no-underline"
+						><span class="arrow-right-applications">></span><input
+							value={$appConfiguration.configuration.gitSource.name}
+							id="gitSource"
+							disabled
+							class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
+						/></a
+					>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center">
+				<label for="repository">Git Repository</label>
+				<div class="col-span-2">
+					<a
+						href={$session.isAdmin
+							? `/applications/${id}/configuration/repository?from=/applications/${id}`
+							: ''}
+						class="no-underline"
+						><span class="arrow-right-applications">></span><input
+							value="{$appConfiguration.configuration.repository}/{$appConfiguration.configuration
+								.branch}"
+							id="repository"
+							disabled
+							class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
+						/></a
+					>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center">
+				<label for="destination">Destination</label>
+				<div class="col-span-2">
+					<a
+						href={$session.isAdmin
+							? `/applications/${id}/configuration/destination?from=/applications/${id}`
+							: ''}
+						class="no-underline"
+						><span class="arrow-right-applications">></span><input
+							value={$appConfiguration.configuration.destinationDocker.name}
+							id="destination"
+							disabled
+							class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
+						/></a
+					>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center py-8">
+				<label for="buildPack">Build Pack</label>
+				<div class="col-span-2">
+					<a
+						href={$session.isAdmin
+							? `/applications/${id}/configuration/buildpack?from=/applications/${id}`
+							: ''}
+						class="no-underline "
+						><span class="arrow-right-applications">></span>
+						<input
+							value={$appConfiguration.configuration.buildPack}
+							id="buildPack"
+							disabled
+							class="bg-transparent hover:bg-coolgray-500 cursor-pointer -ml-1"
+						/></a
+					>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center">
+				<label for="domain">Domain</label>
+				<div class="col-span-2 ">
 					<input
 						readonly={!$session.isAdmin}
-						name="port"
-						id="port"
-						bind:value={$appConfiguration.configuration.port}
-						placeholder="default: 3000"
+						bind:this={domainEl}
+						name="domain"
+						id="domain"
+						value={$appConfiguration.configuration.domain}
+						pattern="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+						placeholder="eg: coollabs.io"
+						required
 					/>
 				</div>
 			</div>
-		{/if}
 
-		<div class="grid grid-cols-3 items-center pt-8">
-			<label for="installCommand">Install Command</label>
-			<div class="col-span-2">
-				<input
-					readonly={!$session.isAdmin}
-					name="installCommand"
-					id="installCommand"
-					bind:value={$appConfiguration.configuration.installCommand}
-					placeholder="default: yarn install"
-				/>
+			{#if $appConfiguration.configuration.buildPack !== 'static'}
+				<div class="grid grid-cols-3 items-center">
+					<label for="port">Port</label>
+					<div class="col-span-2">
+						<input
+							readonly={!$session.isAdmin}
+							name="port"
+							id="port"
+							bind:value={$appConfiguration.configuration.port}
+							placeholder="default: 3000"
+						/>
+					</div>
+				</div>
+			{/if}
+
+			<div class="grid grid-cols-3 items-center pt-8">
+				<label for="installCommand">Install Command</label>
+				<div class="col-span-2">
+					<input
+						readonly={!$session.isAdmin}
+						name="installCommand"
+						id="installCommand"
+						bind:value={$appConfiguration.configuration.installCommand}
+						placeholder="default: yarn install"
+					/>
+				</div>
 			</div>
-		</div>
-		<div class="grid grid-cols-3 items-center">
-			<label for="buildCommand">Build Command</label>
-			<div class="col-span-2">
-				<input
-					readonly={!$session.isAdmin}
-					name="buildCommand"
-					id="buildCommand"
-					bind:value={$appConfiguration.configuration.buildCommand}
-					placeholder="default: yarn build"
-				/>
+			<div class="grid grid-cols-3 items-center">
+				<label for="buildCommand">Build Command</label>
+				<div class="col-span-2">
+					<input
+						readonly={!$session.isAdmin}
+						name="buildCommand"
+						id="buildCommand"
+						bind:value={$appConfiguration.configuration.buildCommand}
+						placeholder="default: yarn build"
+					/>
+				</div>
 			</div>
-		</div>
-		<div class="grid grid-cols-3 items-center pb-8">
-			<label for="startCommand" class="">Start Command</label>
-			<div class="col-span-2">
-				<input
-					readonly={!$session.isAdmin}
-					name="startCommand"
-					id="startCommand"
-					bind:value={$appConfiguration.configuration.startCommand}
-					placeholder="default: yarn start"
-				/>
+			<div class="grid grid-cols-3 items-center pb-8">
+				<label for="startCommand" class="">Start Command</label>
+				<div class="col-span-2">
+					<input
+						readonly={!$session.isAdmin}
+						name="startCommand"
+						id="startCommand"
+						bind:value={$appConfiguration.configuration.startCommand}
+						placeholder="default: yarn start"
+					/>
+				</div>
 			</div>
-		</div>
-		<div class="grid grid-cols-3">
-			<label for="baseDirectory">Base Directory</label>
-			<div class="col-span-2">
-				<input
-					readonly={!$session.isAdmin}
-					name="baseDirectory"
-					id="baseDirectory"
-					bind:value={$appConfiguration.configuration.baseDirectory}
-					placeholder="default: /"
-				/>
-				<Explainer
-					text="Directory to use as the base of all commands. <br> Could be useful with monorepos."
-				/>
+			<div class="grid grid-cols-3">
+				<label for="baseDirectory">Base Directory</label>
+				<div class="col-span-2">
+					<input
+						readonly={!$session.isAdmin}
+						name="baseDirectory"
+						id="baseDirectory"
+						bind:value={$appConfiguration.configuration.baseDirectory}
+						placeholder="default: /"
+					/>
+					<Explainer
+						text="Directory to use as the base of all commands. <br> Could be useful with monorepos."
+					/>
+				</div>
 			</div>
-		</div>
-		<div class="grid grid-cols-3">
-			<label for="publishDirectory">Publish Directory</label>
-			<div class="col-span-2">
-				<input
-					readonly={!$session.isAdmin}
-					name="publishDirectory"
-					id="publishDirectory"
-					bind:value={$appConfiguration.configuration.publishDirectory}
-					placeholder=" default: /"
-				/>
-				<Explainer
-					text="Directory containing all the assets for deployment. <br> For example: dist or _site or public"
-				/>
+			<div class="grid grid-cols-3">
+				<label for="publishDirectory">Publish Directory</label>
+				<div class="col-span-2">
+					<input
+						readonly={!$session.isAdmin}
+						name="publishDirectory"
+						id="publishDirectory"
+						bind:value={$appConfiguration.configuration.publishDirectory}
+						placeholder=" default: /"
+					/>
+					<Explainer
+						text="Directory containing all the assets for deployment. <br> For example: dist or _site or public"
+					/>
+				</div>
 			</div>
 		</div>
 	</form>
+	<div class="px-4 sm:px-6">
+		<ul class="mt-2 divide-y divide-warmGray-800">
+			<Setting
+				bind:setting={debugLogs}
+				on:click={() => changeSettings('debugLogs')}
+				title="Debug logs"
+				description="Enable debug logs during build. <br>(<span class='text-red-500'>sensitive information</span> could be visible in logs)"
+			/>
+		</ul>
+	</div>
 </div>

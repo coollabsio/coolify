@@ -13,7 +13,7 @@ export default async function (job) {
     Edge cases:
     1 - Change build pack and redeploy, what should happen?
   */
-  let { id: applicationId, repository, branch, buildPack, destinationDocker, gitSource, build_id: buildId, configHash, port, installCommand, buildCommand, startCommand, domain, oldDomain, baseDirectory, publishDirectory, projectId } = job.data
+  let { id: applicationId, repository, branch, buildPack, destinationDocker, gitSource, build_id: buildId, configHash, port, installCommand, buildCommand, startCommand, domain, oldDomain, baseDirectory, publishDirectory, projectId, debugLogs } = job.data
 
   const destinationSwarm = null
   const kubernetes = null
@@ -37,6 +37,7 @@ export default async function (job) {
   const workdir = `/tmp/build-sources/${repository}/${build.id}`
   const repodir = `/tmp/build-sources/${repository}/`
   await asyncExecShell(`mkdir -p ${workdir}`)
+
   // TODO: Separate logic
   if (buildPack === 'node') {
     if (!port) port = 3000
@@ -48,6 +49,7 @@ export default async function (job) {
   }
   const commit = await importers[gitSource.type]({
     applicationId,
+    debugLogs,
     workdir,
     repodir,
     githubAppId: gitSource.githubApp?.id,
@@ -87,7 +89,7 @@ export default async function (job) {
   }
   // TODO: Should check if it's running!
   if (!imageFound || deployNeeded) {
-    await buildpacks[buildPack]({ applicationId, commit, workdir, docker, buildId: build.id, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory, job: job.data })
+    await buildpacks[buildPack]({ applicationId, debugLogs, commit, workdir, docker, buildId: build.id, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory, job: job.data })
     deployNeeded = true
   } else {
     deployNeeded = false
@@ -104,15 +106,15 @@ export default async function (job) {
       } catch (error) {
         //
       } finally {
-        saveBuildLog({ line: '[DOCKER ENGINE] - Removing old deployments.', buildId, applicationId })
+        saveBuildLog({ line: '[COOLIFY] - Removing old deployments.', buildId, applicationId })
       }
 
       // TODO: Must be localhost
       if (destinationDocker.engine === '/var/run/docker.sock') {
-        saveBuildLog({ line: '[DOCKER ENGINE] - Deployment started.', buildId, applicationId })
+        saveBuildLog({ line: '[COOLIFY] - Deployment started.', buildId, applicationId })
         const { stderr } = await asyncExecShell(`docker run --name ${applicationId} --network ${docker.network} --restart always -d ${applicationId}:${commit.slice(0, 7)}`)
         if (stderr) console.log(stderr)
-        saveBuildLog({ line: '[DOCKER ENGINE] - Deployment successful!', buildId, applicationId })
+        saveBuildLog({ line: '[COOLIFY] - Deployment successful!', buildId, applicationId })
       }
       // TODO: Implement remote docker engine
 
@@ -130,6 +132,7 @@ export default async function (job) {
     const haproxy = haproxyInstance()
 
     try {
+      saveBuildLog({ line: '[PROXY] - Configuring proxy.', buildId, applicationId })
       const transactionId = await getNextTransactionId()
       try {
         const backendFound = await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
@@ -139,7 +142,7 @@ export default async function (job) {
               transaction_id: transactionId
             },
           }).json()
-          saveBuildLog({ line: '[COOLIFY PROXY] - Old backend deleted.', buildId, applicationId })
+
         }
 
       } catch (error) {
@@ -153,7 +156,6 @@ export default async function (job) {
             },
           }).json()
           await db.prisma.application.update({ where: { id: applicationId }, data: { oldDomain: null } })
-          saveBuildLog({ line: '[COOLIFY PROXY] - Old backend deleted with different domain.', buildId, applicationId })
         }
       } catch (error) {
         // Backend not found, no worries, it means it's not defined yet
@@ -169,7 +171,6 @@ export default async function (job) {
         }
       })
 
-      saveBuildLog({ line: '[COOLIFY PROXY] - New backend defined.', buildId, applicationId })
       await haproxy.post('v2/services/haproxy/configuration/servers', {
         searchParams: {
           transaction_id: transactionId,
@@ -182,9 +183,8 @@ export default async function (job) {
           "port": port
         }
       })
-      saveBuildLog({ line: '[COOLIFY PROXY] - New servers defined.', buildId, applicationId })
       await completeTransaction(transactionId)
-      saveBuildLog({ line: '[COOLIFY PROXY] - Transaction done.', buildId, applicationId })
+      saveBuildLog({ line: '[PROXY] - Configured.', buildId, applicationId })
     } catch (error) {
       console.log(error.response.body)
       throw new Error(error)

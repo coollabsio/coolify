@@ -16,7 +16,7 @@ export async function newApplication({ name, teamId }) {
 
 export async function getApplication({ id, teamId }) {
     try {
-        let body = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } } }})
+        let body = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } } } })
 
         if (body.gitSource?.githubApp?.clientSecret) {
             body.gitSource.githubApp.clientSecret = decrypt(body.gitSource.githubApp.clientSecret)
@@ -65,6 +65,15 @@ export async function configureApplication({ id, teamId, domain, port, installCo
             application = await prisma.application.update({ where: { id }, data: { domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory } })
         }
         return { status: 201, body: { application } }
+    } catch (e) {
+        throw PrismaErrorHandler(e)
+    }
+}
+
+export async function setApplicationSettings({ id, debugLogs }) {
+    try {
+        await prisma.application.update({ where: { id }, data: { debugLogs } })
+        return { status: 201 }
     } catch (e) {
         throw PrismaErrorHandler(e)
     }

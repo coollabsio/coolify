@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   coolify:
-    image: coolify:v2.0.0-rc.1
+    image: coollabsio/coolify:v2.0.0-rc.1
     container_name: coolify
     ports: 
       - target: 3000
@@ -12,10 +12,8 @@ services:
     volumes:
       - './db:/app/db'
       - '/var/run/docker.sock:/var/run/docker.sock'
-    environment:
-      - APP_ID=${APP_ID}
-      - SECRET_KEY=${SECRET_KEY}
-      - DATABASE_URL=${DATABASE_URL}
+    env_file:
+      - ".env"
     networks:
       - coolify-infra
   redis:

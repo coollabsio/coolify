@@ -113,7 +113,7 @@
 				},
 				result: async (res) => {
 					const { buildId } = await res.json();
-					window.location.replace(`/applications/${id}/logs?buildId=${buildId}`);
+					window.location.assign(`/applications/${id}/logs?buildId=${buildId}`);
 				}
 			}}
 		>
@@ -125,11 +125,12 @@
 					$appConfiguration.configuration.gitSource &&
 					$appConfiguration.configuration.repository &&
 					$appConfiguration.configuration.destinationDocker}
-				class="icons bg-transparent tooltip-bottom text-sm "
+				class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2"
 				data-tooltip={$session.isAdmin
 					? 'Queue for deployment'
 					: 'You do not have permission to deploy.'}
 			>
+				<div>Build & Deploy</div>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="w-6 h-6"
@@ -142,8 +143,8 @@
 				>
 					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 					<path d="M7 4v16l13 -8z" />
-				</svg></button
-			>
+				</svg>
+			</button>
 		</form>
 
 		<div class="border border-warmGray-700 h-8" />

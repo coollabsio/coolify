@@ -17,13 +17,12 @@ const createDockerfile = async ({ applicationId, commit, image, workdir, buildCo
     await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'))
 }
 
-export default async function ({ applicationId, commit, workdir, docker, buildId, installCommand, buildCommand, baseDirectory, publishDirectory, job }) {
+export default async function ({ applicationId, debugLogs, commit, workdir, docker, buildId, installCommand, buildCommand, baseDirectory, publishDirectory, job }) {
     const image = 'nginx:stable-alpine'
     const label = makeLabel(job)
-
     if (buildCommand) {
         await buildCacheImageWithNode({ applicationId, commit, workdir, docker, buildId, baseDirectory, installCommand, buildCommand })
     }
     await createDockerfile({ applicationId, commit, image, workdir, buildCommand, baseDirectory, publishDirectory, label })
-    await buildImage({ applicationId, commit, workdir, docker, buildId })
+    await buildImage({ applicationId, commit, workdir, docker, buildId, debugLogs })
 }

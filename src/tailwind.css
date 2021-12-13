@@ -23,7 +23,7 @@ select {
 }
 
 label {
-	@apply w-64 inline-block;
+	@apply w-64 inline-block text-xs;
 }
 
 button {
