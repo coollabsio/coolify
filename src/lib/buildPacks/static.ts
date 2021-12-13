@@ -21,7 +21,7 @@ export default async function ({ applicationId, debugLogs, commit, workdir, dock
     const image = 'nginx:stable-alpine'
     const label = makeLabel(job)
     if (buildCommand) {
-        await buildCacheImageWithNode({ applicationId, commit, workdir, docker, buildId, baseDirectory, installCommand, buildCommand })
+        await buildCacheImageWithNode({ applicationId, commit, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debugLogs })
     }
     await createDockerfile({ applicationId, commit, image, workdir, buildCommand, baseDirectory, publishDirectory, label })
     await buildImage({ applicationId, commit, workdir, docker, buildId, debugLogs })

@@ -22,7 +22,7 @@ async function installCoolifyProxy({ engine, network }) {
     if (!found) {
         try {
             const host = getHost({ engine })
-            await asyncExecShell(`DOCKER_HOST="${host}" docker run --add-host 'host.docker.internal:host-gateway' --network coolify-infra -v "$(pwd)/data/haproxy/:/usr/local/etc/haproxy/" -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" --name coolify-haproxy --rm -d haproxytech/haproxy-ubuntu:2.4`)
+            await asyncExecShell(`DOCKER_HOST="${host}" docker run --add-host 'host.docker.internal:host-gateway' --network coolify-infra  -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" --name coolify-haproxy --rm -d coollabsio/haproxy-alpine:1.0.0-rc.1`)
             await asyncExecShell(`docker network connect ${network} coolify-haproxy`)
         } catch (err) {
             console.log(err)

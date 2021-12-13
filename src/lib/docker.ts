@@ -2,7 +2,7 @@ import Dockerode from 'dockerode'
 import { promises as fs } from 'fs';
 import { saveBuildLog } from './common';
 
-export async function buildCacheImageWithNode({ applicationId, commit, workdir, docker, buildId, baseDirectory, installCommand, buildCommand }) {
+export async function buildCacheImageWithNode({ applicationId, commit, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debugLogs }) {
     const Dockerfile: Array<string> = []
     Dockerfile.push(`FROM node:lts`)
     Dockerfile.push('WORKDIR /usr/src/app')
@@ -14,7 +14,7 @@ export async function buildCacheImageWithNode({ applicationId, commit, workdir, 
     Dockerfile.push(`COPY ./${baseDirectory || ""} ./`)
     Dockerfile.push(`RUN ${buildCommand}`)
     await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'))
-    await buildImage({ applicationId, commit, workdir, docker, buildId, isCache: true })
+    await buildImage({ applicationId, commit, workdir, docker, buildId, isCache: true, debugLogs })
 }
 
 export async function buildImage({ applicationId, commit, workdir, docker, buildId, isCache = false, debugLogs = false }) {
