@@ -27,7 +27,7 @@ const buildWorker = new Worker(buildQueueName, async (job) => await builder(job)
   }
 })
 
-buildWorker.on('completed', async (job: bullmq.Job) => {
+buildWorker.on('completed', async (job: Bullmq.Job) => {
   try {
     await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'success' } })
   } catch (err) {
@@ -35,7 +35,7 @@ buildWorker.on('completed', async (job: bullmq.Job) => {
   }
 })
 
-buildWorker.on('failed', async (job: bullmq.Job, failedReason: string) => {
+buildWorker.on('failed', async (job: Bullmq.Job, failedReason: string) => {
   console.log(failedReason)
   try {
     await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'failed' } })
