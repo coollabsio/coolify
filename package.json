@@ -16,7 +16,7 @@
 		"format": "prettier --ignore-path .gitignore --write --plugin-search-dir=. .",
 		"db:generate": "prisma generate",
 		"db:push": "prisma db push && prisma generate",
-		"release:coolify": "docker build -t coollabsio/coolify:v2.0.0-rc.1 . && docker push coollabsio/coolify:v2.0.0-rc.1",
+		"release:coolify": "docker build -t coollabsio/coolify:2.0.0-rc.1 . && docker push coollabsio/coolify:2.0.0-rc.1",
 		"release:haproxy": "docker build -f haproxy.Dockerfile -t coollabsio/haproxy-alpine:1.0.0-rc.1 . && docker push coollabsio/haproxy-alpine:1.0.0-rc.1"
 	},
 	"devDependencies": {

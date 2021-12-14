@@ -36,7 +36,7 @@
 	import { browser } from '$app/env';
 	import { onMount } from 'svelte';
 	import { errorNotification } from '$lib/form';
-
+	console.log()
 	let alpha = true;
 
 	onMount(async () => {
@@ -378,8 +378,8 @@
 			>
 				<a
 					class="text-[10px] no-underline"
-					href="https://github.com/coollabsio/coolify/releases/tag/2.0.0-rc.1"
-					target="_blank">v2.0.0-rc.1</a
+					href={`https://github.com/coollabsio/coolify/releases/tag/v${$session.version}`}
+					target="_blank">v{$session.version}</a
 				>
 			</div>
 		</div>
