@@ -12,7 +12,7 @@ RUN yarn build
 
 FROM node:16.13.1-alpine
 WORKDIR /app
-RUN apk add --no-cache git openssh-client g++ make python3 curl cmake
+RUN apk add --no-cache git openssh-client
 
 COPY --from=0 /app/build .
 COPY --from=0 /app/package.json .
