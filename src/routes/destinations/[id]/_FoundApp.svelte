@@ -37,17 +37,17 @@
 	}
 </script>
 
-<div class="box-selection hover:scale-100 hover:bg-coolgray-200 hover:border-transparent">
+<div class="box-selection hover:bg-coolgray-200 hover:border-transparent">
 	<div class="font-bold text-xl text-center truncate pb-2">{app.domain}</div>
 	{#if loading}
 		<div class="font-bold w-full text-center">Loading...</div>
 	{:else if app.foundByDomain}
-		<button disabled class="w-full bg-coolgray-200"
-			><span class="text-red-500">Domain</span> already configured for <span class="text-red-500">{app.foundName}</span></button
+		<div class="w-full bg-coolgray-200"
+			><span class="text-red-500">Domain</span> already configured for <span class="text-red-500">{app.foundName}</span></div
 		>
 	{:else if app.foundByRepository}
-		<button disabled class="w-full bg-coolgray-200"
-			><span class="text-red-500">Repository</span> already configured for <span class="text-red-500">{app.foundName}</span></button
+		<div class="w-full bg-coolgray-200"
+			><span class="text-red-500">Repository</span> already configured for <span class="text-red-500">{app.foundName}</span></div
 		>
 	{:else}
 		<button class="bg-green-600 hover:bg-green-500 w-full" on:click={addToCoolify}

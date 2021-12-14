@@ -1,33 +1,13 @@
 <script lang="ts">
+	export let payload;
+
 	import { page } from '$app/stores';
 	import Setting from '$lib/components/Setting.svelte';
 	import { enhance, errorNotification } from '$lib/form';
-
 	let formEl: HTMLFormElement;
-	let payload = {
-		name: undefined,
-		isSwarm: false,
-		engine: undefined,
-		network: undefined,
-		isCoolifyProxyUsed: false
-	};
 
-	function setPredefined(type) {
-		switch (type) {
-			case 'localdocker':
-				payload = {
-					name: 'Local Docker',
-					isSwarm: false,
-					engine: '/var/run/docker.sock',
-					network: 'coolify',
-					isCoolifyProxyUsed: true
-				};
-				break;
 
-			default:
-				break;
-		}
-	}
+
 	async function submitForm() {
 		const networkCheckForm = new FormData();
 		networkCheckForm.append('network', payload.network);
@@ -60,12 +40,7 @@
 	}
 </script>
 
-<div class="flex-col text-center space-y-2 pb-10">
-	<div class="font-bold text-xl text-white">Predefined destinations</div>
-	<div class="flex space-x-2 justify-center">
-		<button class="w-32" on:click={() => setPredefined('localdocker')}>Local Docker</button>
-	</div>
-</div>
+
 <div class="flex justify-center pb-8 px-6">
 	<form
 		on:submit|preventDefault={submitForm}

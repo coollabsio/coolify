@@ -9,7 +9,7 @@ export const get: RequestHandler = async (request) => {
 
     const destinationDocker = await db.getDestination({ id, teamId })
     const docker = dockerInstance({ destinationDocker })
-    const listContainers = await docker.engine.listContainers()
+    const listContainers = await docker.engine.listContainers({ filters: { network: [destinationDocker.network] } })
     const containers = listContainers.filter((container) => {
         return container.Labels['coolify.configuration']
     })

@@ -19,10 +19,9 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const isSwarm = request.body.get('isSwarm')
     const engine = request.body.get('engine')
     const network = request.body.get('network')
-    const isCoolifyProxyUsed = request.body.get('isCoolifyProxyUsed') === 'true' ? true : false
     return {
         body: {
-            destination: await db.updateDestination({ id, name, isSwarm, engine, network, isCoolifyProxyUsed })
+            destination: await db.updateDestination({ id, name, isSwarm, engine, network })
         }
     };
 }

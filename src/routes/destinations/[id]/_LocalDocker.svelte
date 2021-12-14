@@ -56,13 +56,31 @@
 			const sure = confirm(
 				`Are you sure you want to ${
 					payload.isCoolifyProxyUsed ? 'disable' : 'enable'
-				} Coolify proxy? It will remove the proxy for all configured networks and all deployments on '${payload.engine}'! Nothing will be reachable if you do it!`
+				} Coolify proxy? It will remove the proxy for all configured networks and all deployments on '${
+					payload.engine
+				}'! Nothing will be reachable if you do it!`
 			);
 			if (sure) {
 				payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed;
 			}
 		} else {
 			payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed;
+		}
+
+		const saveForm = new FormData(formEl);
+		saveForm.append('isCoolifyProxyUsed', payload.isCoolifyProxyUsed.toString());
+		saveForm.append('engine', payload.engine);
+
+		const saveFormResponse = await fetch(`/destinations/${id}/settings.json`, {
+			method: 'POST',
+			headers: {
+				accept: 'application/json'
+			},
+			body: saveForm
+		});
+		if (!saveFormResponse.ok) {
+			const err = await saveFormResponse.json();
+			return errorNotification(err.message);
 		}
 	}
 </script>

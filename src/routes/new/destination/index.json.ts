@@ -19,7 +19,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             engine,
             network
         }
-        // TODO Create docker context
+        // TODO Create docker context?
         const docker = dockerInstance({ destinationDocker })
         // if (engine === '/var/run/docker.sock') {
         //     await asyncExecShell(`docker context create ${body.id} --description "${name}" --docker "host=unix:///var/run/docker.sock"`)
