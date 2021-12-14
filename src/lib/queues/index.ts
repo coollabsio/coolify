@@ -8,22 +8,24 @@ import builder from './builder';
 import letsencrypt from './letsencrypt';
 import logger from './logger';
 let { Queue, Worker } = Bullmq;
+let redisHost = 'localhost';
 
 if (!dev) {
   Queue = ProdBullmq.Queue;
   Worker = ProdBullmq.Worker;
-}
+  redisHost = 'coolify-redis'
+} 
 
 const buildQueueName = dev ? cuid() : 'build_queue'
 const buildQueue = new Queue(buildQueueName, {
   connection: {
-    host: dev ? 'localhost' : 'coolify-redis'
+    host: redisHost
   }
 })
 const buildWorker = new Worker(buildQueueName, async (job) => await builder(job), {
   concurrency: 2,
   connection: {
-    host: dev ? 'localhost' : 'coolify-redis'
+    host: redisHost
   }
 })
 
@@ -49,14 +51,14 @@ buildWorker.on('failed', async (job: Bullmq.Job, failedReason: string) => {
 const letsEncryptQueueName = dev ? cuid() : 'letsencrypt_queue'
 const letsEncryptQueue = new Queue(letsEncryptQueueName, {
   connection: {
-    host: dev ? 'localhost' : 'coolify-redis'
+    host: redisHost
   }
 })
 
 const letsEncryptWorker = new Worker(letsEncryptQueueName, async (job) => await letsencrypt(job), {
   concurrency: 1,
   connection: {
-    host: dev ? 'localhost' : 'coolify-redis'
+    host: redisHost
   }
 })
 letsEncryptWorker.on('completed', async () => {
@@ -73,13 +75,13 @@ letsEncryptWorker.on('failed', async (failedReason: string) => {
 const buildLogQueueName = dev ? cuid() : 'log_queue'
 const buildLogQueue = new Queue(buildLogQueueName, {
   connection: {
-    host: dev ? 'localhost' : 'coolify-redis'
+    host: redisHost
   }
 })
 const buildLogWorker = new Worker(buildLogQueueName, async (job) => await logger(job), {
   concurrency: 1,
   connection: {
-    host: dev ? 'localhost' : 'coolify-redis'
+    host: redisHost
   }
 })
 

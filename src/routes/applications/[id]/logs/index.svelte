@@ -118,7 +118,7 @@
 			>
 		{/if}
 	</div>
-	<div class="flex-1">
+	<div class="flex-1 w-96">
 		{#if buildId}
 			{#key buildId}
 				<svelte:component this={BuildLog} {buildId} on:updateBuildStatus={updateBuildStatus} />

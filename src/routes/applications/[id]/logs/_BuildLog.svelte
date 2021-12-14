@@ -54,12 +54,12 @@
 {#if loading}
 	<Loading />
 {:else}
-	<div class="relative w-[1200px]">
+	<div class="relative overflow-y-auto">
 		{#if currentStatus === 'running'}
 			<LoadingLogs />
 		{/if}
 		<pre
-			class="leading-4 text-left text-sm font-semibold tracking-tighter rounded bg-black p-6 truncate">
+			class="leading-4 text-left text-sm font-semibold tracking-tighter rounded bg-black p-6 whitespace-pre-wrap break-words">
 			{#each logs as log}
 				<div>{log.line + '\n'}</div>
 			{/each}
