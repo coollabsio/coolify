@@ -3,14 +3,7 @@ import * as Prisma from '@prisma/client'
 import { default as ProdPrisma } from '@prisma/client'
 
 import forge from 'node-forge'
-import { uniqueNamesGenerator, Config, adjectives, colors, animals, names, starWars } from 'unique-names-generator';
 
-const customConfig: Config = {
-    dictionaries: [adjectives, colors, animals],
-    style: 'capital',
-    separator: ' ',
-    length: 3,
-};
 
 let { PrismaClient } = Prisma
 let P = Prisma.Prisma
@@ -67,4 +60,3 @@ export async function generateSshKeyPair(): Promise<{ publicKey: string, private
 }
 
 
-export const uniqueName = () => uniqueNamesGenerator(customConfig);

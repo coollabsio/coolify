@@ -36,7 +36,6 @@
 	import { browser } from '$app/env';
 	import { onMount } from 'svelte';
 	import { errorNotification } from '$lib/form';
-	console.log()
 	let alpha = true;
 
 	onMount(async () => {

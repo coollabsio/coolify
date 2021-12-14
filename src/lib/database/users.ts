@@ -1,7 +1,8 @@
 import cuid from "cuid";
 import bcrypt from 'bcrypt';
 
-import { prisma, PrismaErrorHandler, uniqueName } from "./common";
+import { prisma, PrismaErrorHandler } from "./common";
+import { uniqueName } from "$lib/common";
 
 export async function login({ email, password }) {
     try {

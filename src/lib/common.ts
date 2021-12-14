@@ -3,15 +3,25 @@ import util from 'util'
 import { buildLogQueue } from './queues'
 import * as db from '$lib/database';
 import * as Sentry from '@sentry/node';
+import { uniqueNamesGenerator, Config, adjectives, colors, animals, names, starWars } from 'unique-names-generator';
 
 Sentry.init({
     dsn: process.env['SENTRY_DSN'],
     tracesSampleRate: 0,
 });
 
+
+const customConfig: Config = {
+    dictionaries: [adjectives, colors, animals],
+    style: 'capital',
+    separator: ' ',
+    length: 3,
+};
 export const asyncExecShell = util.promisify(child.exec)
 export const asyncSleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay))
 export const sentry = Sentry
+
+export const uniqueName = () => uniqueNamesGenerator(customConfig);
 
 export const saveBuildLog = async ({ line, buildId, applicationId }) => {
     await buildLogQueue.add(buildId, { buildId, line, applicationId })
