@@ -184,6 +184,37 @@
 			></a
 		>
 		<a
+			href="/applications/{id}/secrets"
+			sveltekit:prefetch
+			class="hover:text-pink-500 rounded"
+			class:text-pink-500={$page.path === `/applications/${id}/secrets`}
+			class:bg-coolgray-500={$page.path === `/applications/${id}/secrets`}
+		>
+			<button
+				title="Secrets"
+				class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
+				data-tooltip="Secrets"
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="w-6 h-6"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<path
+						d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"
+					/>
+					<circle cx="12" cy="11" r="1" />
+					<line x1="12" y1="12" x2="12" y2="14.5" />
+				</svg></button
+			></a
+		>
+		<a
 			href="/applications/{id}/logs"
 			sveltekit:prefetch
 			class="hover:text-sky-500 rounded"
