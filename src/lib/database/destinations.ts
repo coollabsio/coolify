@@ -75,20 +75,21 @@ export async function updateDestination({ id, name, isSwarm, engine, network }) 
 
 export async function newDestination({ name, teamId, isSwarm, engine, network, isCoolifyProxyUsed }) {
     try {
-        const destinations = await prisma.destinationDocker.findMany({ where: { engine } })
-
-        const proxyConfigured = destinations.find(destination => destination.isCoolifyProxyUsed === true)
-
-        if (proxyConfigured) {
-            isCoolifyProxyUsed = true
-        } else {
-            isCoolifyProxyUsed = false
-        }
-
         const destination = await prisma.destinationDocker.create({ data: { name, teams: { connect: { id: teamId } }, isSwarm, engine, network, isCoolifyProxyUsed } })
 
+        const destinations = await prisma.destinationDocker.findMany({ where: { engine } })
+
+        if (destinations.length > 0) {
+            const proxyConfigured = destinations.find(destination => destination.network !== network && destination.isCoolifyProxyUsed === true)
+
+            if (proxyConfigured) {
+                isCoolifyProxyUsed = true
+            } else {
+                isCoolifyProxyUsed = false
+            }
+        }
         await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } })
-        
+
         if (isCoolifyProxyUsed) {
             await installCoolifyProxy({ engine, destinations })
         } else {

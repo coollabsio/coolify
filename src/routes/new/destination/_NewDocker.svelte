@@ -4,9 +4,9 @@
 	import { page } from '$app/stores';
 	import Setting from '$lib/components/Setting.svelte';
 	import { enhance, errorNotification } from '$lib/form';
+
 	let formEl: HTMLFormElement;
-
-
+	let loading = false;
 
 	async function submitForm() {
 		const networkCheckForm = new FormData();
@@ -20,7 +20,9 @@
 			body: networkCheckForm
 		});
 		if (networkCheckResponse.ok) {
-			return errorNotification(`A configuration with '${payload.network}' network is already configured.`);
+			return errorNotification(
+				`A configuration with '${payload.network}' network is already configured.`
+			);
 		}
 		const saveForm = new FormData(formEl);
 		saveForm.append('isCoolifyProxyUsed', payload.isCoolifyProxyUsed.toString());
@@ -40,22 +42,36 @@
 	}
 </script>
 
-
 <div class="flex justify-center pb-8 px-6">
 	<form
 		on:submit|preventDefault={submitForm}
 		bind:this={formEl}
 		method="post"
 		class="grid grid-flow-row gap-2 py-4"
+		use:enhance={{
+			pending: async () => {
+				loading = true;
+			}
+		}}
 	>
 		<div class="flex space-x-2 h-8 items-center">
 			<div class="font-bold text-xl text-white">Configuration</div>
-			<button type="submit" class="bg-sky-600 hover:bg-sky-500">Save</button>
+			<button
+				type="submit"
+				class:bg-sky-600={!loading}
+				class:hover:bg-sky-500={!loading}
+				disabled={loading}
+				>{loading
+					? payload.isCoolifyProxyUsed
+						? 'Saving and configuring proxy...'
+						: 'Saving...'
+					: 'Save'}</button
+			>
 		</div>
 		<div class="grid grid-cols-3 items-center">
 			<label for="name">Name</label>
 			<div class="col-span-2">
-				<input name="name" placeholder="name" bind:value={payload.name} />
+				<input required name="name" placeholder="name" bind:value={payload.name} />
 			</div>
 		</div>
 		<!-- <div class="flex items-center">
@@ -67,13 +83,23 @@
 		<div class="grid grid-cols-3 items-center">
 			<label for="engine">Engine</label>
 			<div class="col-span-2">
-				<input name="engine" placeholder="/var/run/docker.sock" bind:value={payload.engine} />
+				<input
+					required
+					name="engine"
+					placeholder="/var/run/docker.sock"
+					bind:value={payload.engine}
+				/>
 			</div>
 		</div>
 		<div class="grid grid-cols-3 items-center">
 			<label for="network">Network</label>
 			<div class="col-span-2">
-				<input name="network" placeholder="default: coolify" bind:value={payload.network} />
+				<input
+					required
+					name="network"
+					placeholder="default: coolify"
+					bind:value={payload.network}
+				/>
 			</div>
 		</div>
 		<div class="flex justify-start">

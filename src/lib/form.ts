@@ -14,7 +14,7 @@ export function enhance(
         final?: () => Promise<void>,
         pending?: (data: FormData, form: HTMLFormElement) => void;
         error?: (res: Response, error: Error, form: HTMLFormElement) => void;
-        result: (res: Response, form: HTMLFormElement) => void;
+        result?: (res: Response, form: HTMLFormElement) => void;
         
     }
 ): { destroy: () => void } {
