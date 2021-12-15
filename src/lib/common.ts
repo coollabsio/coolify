@@ -1,14 +1,25 @@
 import child from 'child_process'
 import util from 'util'
-import { buildLogQueue } from './queues'
-import * as db from '$lib/database';
+import { dev } from '$app/env';
 import * as Sentry from '@sentry/node';
 import { uniqueNamesGenerator, Config, adjectives, colors, animals, names, starWars } from 'unique-names-generator';
 
-Sentry.init({
-    dsn: process.env['SENTRY_DSN'],
-    tracesSampleRate: 0,
-});
+import * as db from '$lib/database';
+import { buildLogQueue } from './queues'
+
+
+try {
+    if (!dev) {
+        Sentry.init({
+            dsn: process.env['SENTRY_DSN'],
+            tracesSampleRate: 0,
+        });
+    }
+} catch (err) {
+    console.log('Could not initialize Sentry')
+    console.log(err)
+}
+
 
 
 const customConfig: Config = {

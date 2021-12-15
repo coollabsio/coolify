@@ -24,3 +24,16 @@ export async function isDockerNetworkExists({ network }) {
         throw PrismaErrorHandler(err)
     }
 }
+
+
+
+export async function isSecretExists({ id, name }) {
+    try {
+        const found = await prisma.secret.findFirst({ where: { name, applicationId: id } })
+        return {
+            status: 200
+        }
+    } catch (e) {
+        throw PrismaErrorHandler(e)
+    }
+}

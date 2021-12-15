@@ -13,7 +13,7 @@ export default async function (job) {
     Edge cases:
     1 - Change build pack and redeploy, what should happen?
   */
-  let { id: applicationId, repository, branch, buildPack, destinationDocker, gitSource, build_id: buildId, configHash, port, installCommand, buildCommand, startCommand, domain, oldDomain, baseDirectory, publishDirectory, projectId, debugLogs } = job.data
+  let { id: applicationId, repository, branch, buildPack, destinationDocker, gitSource, build_id: buildId, configHash, port, installCommand, buildCommand, startCommand, domain, oldDomain, baseDirectory, publishDirectory, projectId, debugLogs, secrets } = job.data
 
   const destinationSwarm = null
   const kubernetes = null
@@ -68,11 +68,11 @@ export default async function (job) {
     console.log(err)
   }
 
-  const currentHash = crypto.createHash('sha256').update(JSON.stringify({ buildPack, port, installCommand, buildCommand, startCommand })).digest('hex')
+  const currentHash = crypto.createHash('sha256').update(JSON.stringify({ buildPack, port, installCommand, buildCommand, startCommand, secrets })).digest('hex')
   if (configHash !== currentHash) {
     await db.prisma.application.update({ where: { id: applicationId }, data: { configHash: currentHash } })
     deployNeeded = true
-    saveBuildLog({ line: '[COOLIFY] - Configuration changed, redeploying.', buildId, applicationId })
+    saveBuildLog({ line: '[COOLIFY] - Configuration changed.', buildId, applicationId })
   } else {
     deployNeeded = false
   }
@@ -89,7 +89,7 @@ export default async function (job) {
   }
   // TODO: Should check if it's running!
   if (!imageFound || deployNeeded) {
-    await buildpacks[buildPack]({ applicationId, debugLogs, commit, workdir, docker, buildId: build.id, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory, job: job.data })
+    await buildpacks[buildPack]({ applicationId, debugLogs, commit, workdir, docker, buildId: build.id, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory, secrets, job: job.data })
     deployNeeded = true
   } else {
     deployNeeded = false
@@ -112,7 +112,15 @@ export default async function (job) {
       // TODO: Must be localhost
       if (destinationDocker.engine === '/var/run/docker.sock') {
         saveBuildLog({ line: '[COOLIFY] - Deployment started.', buildId, applicationId })
-        const { stderr } = await asyncExecShell(`docker run --name ${applicationId} --network ${docker.network} --restart always -d ${applicationId}:${commit.slice(0, 7)}`)
+        const envs = []
+        if (secrets.length > 0) {
+          secrets.forEach(secret => {
+            if (!secret.isBuildSecret) {
+              envs.push(`--env ${secret.name}=${secret.value}`)
+            }
+          })
+        }
+        const { stderr } = await asyncExecShell(`docker run ${envs.join()} --name ${applicationId} --network ${docker.network} --restart always -d ${applicationId}:${commit.slice(0, 7)}`)
         if (stderr) console.log(stderr)
         saveBuildLog({ line: '[COOLIFY] - Deployment successful!', buildId, applicationId })
       }

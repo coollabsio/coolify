@@ -2,10 +2,17 @@ import Dockerode from 'dockerode'
 import { promises as fs } from 'fs';
 import { saveBuildLog } from './common';
 
-export async function buildCacheImageWithNode({ applicationId, commit, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debugLogs }) {
+export async function buildCacheImageWithNode({ applicationId, commit, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debugLogs, secrets }) {
     const Dockerfile: Array<string> = []
     Dockerfile.push(`FROM node:lts`)
     Dockerfile.push('WORKDIR /usr/src/app')
+    if (secrets.length > 0) {
+        secrets.forEach(secret => {
+            if (secret.isBuildSecret) {
+                Dockerfile.push(`ARG ${secret.name} ${secret.value}`)
+            }
+        })
+    }
     // TODO: If build command defined, install command should be the default yarn install
     if (installCommand) {
         Dockerfile.push(`COPY ./${baseDirectory || ""}package*.json ./`)

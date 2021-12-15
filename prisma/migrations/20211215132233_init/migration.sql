@@ -76,6 +76,18 @@ CREATE TABLE "Application" (
 );
 
 -- CreateTable
+CREATE TABLE "Secret" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "isBuildSecret" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    "applicationId" TEXT NOT NULL,
+    CONSTRAINT "Secret_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "Application" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "BuildLog" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "applicationId" TEXT,
@@ -212,6 +224,9 @@ CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Application_domain_key" ON "Application"("domain");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Secret_name_key" ON "Secret"("name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "DestinationDocker_network_key" ON "DestinationDocker"("network");

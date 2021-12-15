@@ -75,11 +75,16 @@ export async function updateDestination({ id, name, isSwarm, engine, network }) 
 
 export async function newDestination({ name, teamId, isSwarm, engine, network, isCoolifyProxyUsed }) {
     try {
-        const destination = await prisma.destinationDocker.create({ data: { name, teams: { connect: { id: teamId } }, isSwarm, engine, network, isCoolifyProxyUsed } })
         const destinations = await prisma.destinationDocker.findMany({ where: { engine } })
+
+        const destination = await prisma.destinationDocker.create({ data: { name, teams: { connect: { id: teamId } }, isSwarm, engine, network, isCoolifyProxyUsed } })
+
         const proxyConfigured = destinations.find(destination => destination.isCoolifyProxyUsed === true)
+        
         if (proxyConfigured) {
             isCoolifyProxyUsed = true
+        } else {
+            isCoolifyProxyUsed = false
         }
         await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } })
         if (isCoolifyProxyUsed) {
@@ -97,7 +102,9 @@ export async function newDestination({ name, teamId, isSwarm, engine, network, i
 export async function removeDestination({ id }) {
     try {
         const destination = await prisma.destinationDocker.delete({ where: { id } })
-        await asyncExecShell(`docker network disconnect ${destination.network} coolify-haproxy`)
+        if (destination.isCoolifyProxyUsed) {
+            await asyncExecShell(`docker network disconnect ${destination.network} coolify-haproxy`)
+        }
         return { status: 200 }
     } catch (e) {
         throw PrismaErrorHandler(e)
@@ -115,6 +122,7 @@ export async function getDestination({ id, teamId }) {
 
 export async function setDestinationSettings({ engine, isCoolifyProxyUsed }) {
     try {
+        console.log(isCoolifyProxyUsed)
         await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } })
         const destinations = await prisma.destinationDocker.findMany({ where: { engine } })
         if (isCoolifyProxyUsed) {

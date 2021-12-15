@@ -125,12 +125,11 @@
 					$appConfiguration.configuration.gitSource &&
 					$appConfiguration.configuration.repository &&
 					$appConfiguration.configuration.destinationDocker}
-				class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2"
+				class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-green-600 hover:text-white"
 				data-tooltip={$session.isAdmin
 					? 'Queue for deployment'
 					: 'You do not have permission to deploy.'}
 			>
-				<div>Build & Deploy</div>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="w-6 h-6"

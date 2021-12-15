@@ -16,7 +16,7 @@ export async function newApplication({ name, teamId }) {
 
 export async function getApplication({ id, teamId }) {
     try {
-        let body = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } } } })
+        let body = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, secrets: true } })
 
         if (body.gitSource?.githubApp?.clientSecret) {
             body.gitSource.githubApp.clientSecret = decrypt(body.gitSource.githubApp.clientSecret)
@@ -29,6 +29,12 @@ export async function getApplication({ id, teamId }) {
         }
         if (body?.gitSource?.gitlabApp?.appSecret) {
             body.gitSource.gitlabApp.appSecret = decrypt(body.gitSource.gitlabApp.appSecret)
+        }
+        if (body?.secrets.length > 0) {
+            body.secrets = body.secrets.map(s => {
+                s.value = decrypt(s.value)
+                return s
+            })
         }
 
         return { ...body }

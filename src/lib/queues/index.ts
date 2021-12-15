@@ -35,6 +35,7 @@ buildWorker.on('completed', async (job: Bullmq.Job) => {
   } catch (err) {
     console.log(err)
   }
+  return
 })
 
 buildWorker.on('failed', async (job: Bullmq.Job, failedReason: string) => {

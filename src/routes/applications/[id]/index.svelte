@@ -142,7 +142,7 @@
 		method="post"
 		class=" py-4"
 	>
-		<div class="font-bold flex space-x-1 py-5">
+		<div class="font-bold flex space-x-1 pb-5">
 			<div class="text-xl tracking-tight mr-4">Base Configuration</div>
 			{#if $session.isAdmin}
 				<button
@@ -329,7 +329,7 @@
 				bind:setting={debugLogs}
 				on:click={() => changeSettings('debugLogs')}
 				title="Debug logs"
-				description="Enable debug logs during build. <br>(<span class='text-red-500'>sensitive information</span> could be visible in logs)"
+				description="Enable debug logs during build phase. <br>(<span class='text-red-500'>sensitive information</span> could be visible and saved to logs)"
 			/>
 		</ul>
 	</div>
