@@ -1,4 +1,5 @@
 import { asyncExecShell } from "$lib/common"
+import { dockerInstance } from "$lib/docker"
 import { prisma, PrismaErrorHandler } from "./common"
 
 // TODO: add uninstall function, remove all coolify proxies
@@ -43,7 +44,7 @@ async function uninstallCoolifyProxy({ engine }) {
     if (found) {
         try {
             const host = getHost({ engine })
-            await asyncExecShell(`DOCKER_HOST="${host}" docker stop -t 0 coolify-haproxy`)
+            await asyncExecShell(`DOCKER_HOST="${host}" docker stop -t 0 coolify-haproxy && docker rm coolify-haproxy`)
         } catch (err) {
             console.log(err)
         }
@@ -77,18 +78,30 @@ export async function newDestination({ name, teamId, isSwarm, engine, network, i
     try {
         const destination = await prisma.destinationDocker.create({ data: { name, teams: { connect: { id: teamId } }, isSwarm, engine, network, isCoolifyProxyUsed } })
 
+        const destinationDocker = {
+            engine,
+            network
+        }
+        const docker = dockerInstance({ destinationDocker })
+        const networks = await docker.engine.listNetworks()
+        const found = networks.find(network => network.Name === destinationDocker.network)
+        if (!found) {
+            await docker.engine.createNetwork({ name: network, attachable: true })
+        }
+
         const destinations = await prisma.destinationDocker.findMany({ where: { engine } })
 
         if (destinations.length > 0) {
             const proxyConfigured = destinations.find(destination => destination.network !== network && destination.isCoolifyProxyUsed === true)
-
             if (proxyConfigured) {
-                isCoolifyProxyUsed = true
-            } else {
-                isCoolifyProxyUsed = false
+                if (proxyConfigured.isCoolifyProxyUsed) {
+                    isCoolifyProxyUsed = true
+                } else {
+                    isCoolifyProxyUsed = false
+                }
             }
+            await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } })
         }
-        await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } })
 
         if (isCoolifyProxyUsed) {
             await installCoolifyProxy({ engine, destinations })
