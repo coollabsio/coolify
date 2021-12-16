@@ -83,7 +83,7 @@
 		const left = screen.width / 2 - 1020 / 2;
 		const top = screen.height / 2 - 618 / 2;
 		const newWindow = open(
-			`${htmlUrl}/oauth/authorize?client_id=1bb215b60f284e9536a51bf339d8aedcf4c65e2813fdd458825c130580caef45&redirect_uri=${window.location.origin}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${$page.params.id}`,
+			`${htmlUrl}/oauth/authorize?client_id=${application.gitSource.gitlabApp.appId}&redirect_uri=${window.location.origin}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${$page.params.id}`,
 			'GitLab',
 			'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
 				top +
@@ -275,8 +275,7 @@
 		});
 		if (response.ok) {
 			loading.save = false;
-			goto(from || `/applications/${id}/configuration/buildpack`);
-			return;
+			window.location.replace(from || `/applications/${id}/configuration/buildpack`)
 		}
 	}
 </script>
