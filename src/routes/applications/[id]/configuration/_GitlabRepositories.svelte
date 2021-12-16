@@ -6,6 +6,7 @@
 
 	import { enhance, errorNotification } from '$lib/form';
 	import { goto } from '$app/navigation';
+	import { dev } from '$app/env';
 
 	const { id } = $page.params;
 	const from = $page.query.get('from');
@@ -184,7 +185,7 @@
 		if (response.ok) {
 			const deployKeys = await response.json();
 			const deployKey = deployKeys.find((key) => key.title === 'coolify-deploy-key');
-			console.log(deployKey)
+			console.log(deployKey);
 			if (deployKey) {
 				return await saveDeployKey(updateDeployKeyIdUrl, deployKey.id);
 			}
@@ -238,27 +239,63 @@
 		}
 		return await saveDeployKey(updateDeployKeyIdUrl, id);
 	}
+	async function setWebhook(url) {
+		const host = window.location.origin;
+		const response = await fetch(url, {
+			method: 'GET',
+			headers: {
+				Authorization: `Bearer ${gitlabToken}`,
+				'Content-Type': 'application/json'
+			}
+		});
+		const urls = await response.json();
+		const found = urls.find((url) => url.url.startsWith(host));
+		if (!found) {
+			const response = await fetch(url, {
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${gitlabToken}`,
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					id: selected.project.id,
+					url: `${host}/webhooks/gitlab/events`,
+					push_events: true,
+					enable_ssl_verification: true,
+					merge_requests_events: true
+				})
+			});
+			if (!response.ok) {
+				const error = await response.json();
+				errorNotification(error);
+				throw error;
+			}
+		}
+	}
 	async function save() {
 		loading.save = true;
-		// let deployKeyId = application.gitSource.gitlabApp.deployKeyId;
 		let privateSshKey = application.gitSource.gitlabApp.privateSshKey;
 
 		const deployKeyUrl = `${apiUrl}/v4/projects/${selected.project.id}/deploy_keys`;
 		const updateDeployKeyIdUrl = `/applications/${id}/configuration/deploykey.json`;
 		const sshkeyUrl = `/applications/${id}/configuration/sshkey.json`;
+		const webhookUrl = `${apiUrl}/v4/projects/${selected.project.id}/hooks`;
 
 		try {
 			if (!privateSshKey) {
 				await checkSSHKey(sshkeyUrl, deployKeyUrl, updateDeployKeyIdUrl);
 			}
-			// if (!deployKeyId) await checkDeployKey(deployKeyUrl, updateDeployKeyIdUrl);
-		
 		} catch (error) {
 			console.log(error);
 			throw new Error(error);
 		}
 
-		// TODO : check webhook https://gitlab.com/api/v4/projects/7260661/hooks
+		try {
+			await setWebhook(webhookUrl);
+		} catch (err) {
+			console.log(err);
+			throw new Error(err);
+		}
 
 		const url = `/applications/${id}/configuration/repository.json`;
 		const form = new FormData();
@@ -275,7 +312,7 @@
 		});
 		if (response.ok) {
 			loading.save = false;
-			window.location.replace(from || `/applications/${id}/configuration/buildpack`)
+			window.location.replace(from || `/applications/${id}/configuration/buildpack`);
 		}
 	}
 </script>

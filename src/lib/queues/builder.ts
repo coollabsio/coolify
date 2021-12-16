@@ -13,7 +13,7 @@ export default async function (job) {
     Edge cases:
     1 - Change build pack and redeploy, what should happen?
   */
-  let { id: applicationId, repository, branch, buildPack, destinationDocker, gitSource, build_id: buildId, configHash, port, installCommand, buildCommand, startCommand, domain, oldDomain, baseDirectory, publishDirectory, projectId, debugLogs, secrets } = job.data
+  let { id: applicationId, repository, branch, buildPack, destinationDocker, gitSource, build_id: buildId, configHash, port, installCommand, buildCommand, startCommand, domain, oldDomain, baseDirectory, publishDirectory, projectId, debugLogs, secrets, type } = job.data
 
   const destinationSwarm = null
   const kubernetes = null
@@ -31,6 +31,7 @@ export default async function (job) {
       githubAppId: gitSource.githubApp?.id,
       gitlabAppId: gitSource.gitlabApp?.id,
       status: 'running',
+      type,
     }
   })
 

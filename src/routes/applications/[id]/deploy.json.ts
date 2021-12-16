@@ -26,7 +26,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
                 .digest('hex')
             await db.prisma.application.update({ where: { id }, data: { configHash } })
         }
-        await buildQueue.add(buildId, { build_id: buildId, ...applicationFound })
+        await buildQueue.add(buildId, { build_id: buildId, type: 'manual', ...applicationFound })
         return {
             status: 200,
             body: {

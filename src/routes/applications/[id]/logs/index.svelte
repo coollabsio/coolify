@@ -89,15 +89,18 @@
 					new Date(build.createdAt)
 				) + `\n${build.status}`}
 				on:click={() => (buildId = build.id)}
-				class="flex py-4 cursor-pointer transition-all duration-100 border-l-2 hover:shadow-xl no-underline hover:bg-coolgray-400 border-transparent tooltip-top rounded-r"
+				class="flex justify-center items-center py-4 cursor-pointer transition-all duration-100 border-l-2 hover:shadow-xl no-underline hover:bg-coolgray-400 border-transparent tooltip-top rounded-r"
 				class:bg-coolgray-400={buildId === build.id}
 				class:border-red-500={build.status === 'failed'}
 				class:border-green-500={build.status === 'success'}
 				class:border-yellow-500={build.status === 'inprogress'}
 			>
-				<div class="flex space-x-2 px-2">
-					<div class="font-bold text-sm flex justify-center items-center">
+				<div class="flex-col px-2">
+					<div class="font-bold text-sm">
 						{application.branch}
+					</div>
+					<div class="text-xs">
+						{build.type}
 					</div>
 				</div>
 				<div class="flex-1" />

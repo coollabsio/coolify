@@ -110,6 +110,7 @@ model BuildLog {
 
 model Build {
   id                  String   @id @default(cuid())
+  type                String
   applicationId       String?
   destinationDockerId String?
   gitSourceId         String?

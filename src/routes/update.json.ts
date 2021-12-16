@@ -1,3 +1,4 @@
+import { dev } from '$app/env';
 import { asyncExecShell, version } from '$lib/common';
 import type { RequestHandler } from '@sveltejs/kit';
 
@@ -23,9 +24,21 @@ export const get: RequestHandler = async (request) => {
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     const latestVersion = request.body.get('latestVersion');
-    try {
-        await asyncExecShell(`env | grep COOLIFY > .env && docker run -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db-sqlite coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && docker-compose up -d"`)
-    } catch (err) {
-        return err
+    if (!dev) {
+        try {
+            await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion} && env | grep COOLIFY > .env && docker run -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db-sqlite coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && docker-compose up -d"`)
+            return {
+                status: 200
+            }
+        } catch (err) {
+            return err
+        }
+    } else {
+        console.log('dev mode')
+        console.log(latestVersion)
+        return {
+            status: 200
+        }
     }
+
 }
