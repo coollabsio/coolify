@@ -14,6 +14,16 @@ export async function newApplication({ name, teamId }) {
     }
 }
 
+export async function importApplication({ name, teamId, domain, port, buildCommand, startCommand, installCommand }) {
+    try {
+        const app = await prisma.application.create({ data: { name, domain, port, buildCommand, startCommand, installCommand, teams: { connect: { id: teamId } } } })
+        return { status: 201, body: { id: app.id } }
+    } catch (e) {
+        throw PrismaErrorHandler(e)
+    }
+}
+
+
 export async function getApplication({ id, teamId }) {
     try {
         let body = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, secrets: true } })

@@ -33,7 +33,26 @@
 		loading = false;
 	});
 	async function addToCoolify() {
-		console.log(app);
+		console.log(app)
+		const form = new FormData();
+		form.append('name', app.name);
+		form.append('domain', app.domain);
+		if (app.port) form.append('port', app.port);
+		if (app.buildCommand) form.append('buildCommand', app.buildCommand);
+		if (app.startCommand) form.append('startCommand', app.startCommand);
+		if (app.installCommand) form.append('installCommand', app.installCommand);
+
+		const response = await fetch(`/new/application/import.json`, {
+			method: 'POST',
+			headers: {
+				accept: 'application/json'
+			},
+			body: form
+		});
+		if (response.ok) {
+			const { id } = await response.json();
+			window.location.replace(`/applications/${id}`);
+		}
 	}
 </script>
 
@@ -42,13 +61,15 @@
 	{#if loading}
 		<div class="font-bold w-full text-center">Loading...</div>
 	{:else if app.foundByDomain}
-		<div class="w-full bg-coolgray-200"
-			><span class="text-red-500">Domain</span> already configured for <span class="text-red-500">{app.foundName}</span></div
-		>
+		<div class="w-full bg-coolgray-200">
+			<span class="text-red-500">Domain</span> already configured for
+			<span class="text-red-500">{app.foundName}</span>
+		</div>
 	{:else if app.foundByRepository}
-		<div class="w-full bg-coolgray-200"
-			><span class="text-red-500">Repository</span> already configured for <span class="text-red-500">{app.foundName}</span></div
-		>
+		<div class="w-full bg-coolgray-200">
+			<span class="text-red-500">Repository</span> already configured for
+			<span class="text-red-500">{app.foundName}</span>
+		</div>
 	{:else}
 		<button class="bg-green-600 hover:bg-green-500 w-full" on:click={addToCoolify}
 			>Add to Coolify</button

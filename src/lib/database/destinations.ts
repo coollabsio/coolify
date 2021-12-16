@@ -22,7 +22,7 @@ async function installCoolifyProxy({ engine, destinations }) {
     if (!found) {
         try {
             const host = getHost({ engine })
-            await asyncExecShell(`DOCKER_HOST="${host}" docker run --add-host 'host.docker.internal:host-gateway' --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" --name coolify-haproxy --rm -d coollabsio/haproxy-alpine:1.0.0-rc.1`)
+            await asyncExecShell(`DOCKER_HOST="${host}" docker run --restart always --add-host 'host.docker.internal:host-gateway' --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" --name coolify-haproxy -d coollabsio/haproxy-alpine:1.0.0-rc.1`)
 
         } catch (err) {
             console.log(err)
@@ -125,7 +125,6 @@ export async function getDestination({ id, teamId }) {
 
 export async function setDestinationSettings({ engine, isCoolifyProxyUsed }) {
     try {
-        console.log(isCoolifyProxyUsed)
         await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } })
         const destinations = await prisma.destinationDocker.findMany({ where: { engine } })
         if (isCoolifyProxyUsed) {
