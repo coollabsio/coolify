@@ -3,7 +3,7 @@ dotEnvExtended.load();
 import type { GetSession } from "@sveltejs/kit";
 import { handleSession } from "svelte-kit-cookie-session";
 import { getUserDetails, isTeamIdTokenAvailable, sentry } from '$lib/common';
-import { version } from '../package.json';
+import { version } from '$lib/common';
 
 // EDGE case: Same SECRET_KEY, but different database. Permission not found.
 export const handle = handleSession(

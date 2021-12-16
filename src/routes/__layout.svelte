@@ -33,11 +33,11 @@
 
 	import '../tailwind.css';
 	import { page, session } from '$app/stores';
-	import { browser } from '$app/env';
+	import { browser, dev } from '$app/env';
 	import { onMount } from 'svelte';
 	import { errorNotification } from '$lib/form';
 	let alpha = true;
-
+	let isUpdateAvailable = false;
 	onMount(async () => {
 		if ($session.uid) {
 			const response = await fetch(`/login.json`, {
@@ -53,6 +53,15 @@
 				browser && window.location.reload();
 			}
 		}
+		// check for update
+		const response = await fetch(`/update.json`, {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		});
+		const data = await response.json();
+		isUpdateAvailable = data.isUpdateAvailable;
 	});
 	async function logout() {
 		await fetch(`/logout.json`, {
@@ -75,7 +84,25 @@
 		}
 		window.location.reload();
 	}
+
+	async function update() {
+		if (!dev) {
+			const response = await fetch(`/update.json`, {
+				method: 'post',
+				body: JSON.stringify({})
+			});
+			if (!response.ok) {
+				const { message } = await response.json();
+				errorNotification(message);
+				return;
+			}
+			//TODO wait 20 sec and reload
+		} else {
+			alert('Update not available in development mode.');
+		}
+	}
 </script>
+
 {#if $session.uid}
 	<nav class="nav-main">
 		<div class="flex flex-col w-full h-screen items-center transition-all duration-100">
@@ -383,6 +410,15 @@
 			</div>
 		</div>
 	</nav>
+	{#if isUpdateAvailable}
+		<div class="fixed left-0 bottom-0 p-2 px-20 m-2 z-50">
+			<button
+				on:click={update}
+				class="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 hover:scale-105 duration-75"
+				>New version available, <br />click here to upgrade!</button
+			>
+		</div>
+	{/if}
 	<select
 		class="fixed right-0 bottom-0 p-2 px-4 m-2 z-50"
 		bind:value={selectedTeamId}

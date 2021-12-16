@@ -7,6 +7,7 @@ import { uniqueNamesGenerator, Config, adjectives, colors, animals, names, starW
 import * as db from '$lib/database';
 import { buildLogQueue } from './queues'
 
+import { version as currentVersion } from '../../package.json';
 
 try {
     if (!dev) {
@@ -21,13 +22,14 @@ try {
 }
 
 
-
 const customConfig: Config = {
     dictionaries: [adjectives, colors, animals],
     style: 'capital',
     separator: ' ',
     length: 3,
 };
+
+export const version = currentVersion;
 export const asyncExecShell = util.promisify(child.exec)
 export const asyncSleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay))
 export const sentry = Sentry

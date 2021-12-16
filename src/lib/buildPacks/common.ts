@@ -1,9 +1,10 @@
 import { encrypt, base64Encode } from '$lib/crypto';
+import { version } from '$lib/common';
 export function makeLabel(data) {
     return [
         'LABEL coolify.managed=true',
         `LABEL coolify.configuration=${base64Encode(JSON.stringify({
-            version: '2.0.0',
+            version,
             domain: data.domain,
             name: data.name,
             buildpack: data.buildpack,
