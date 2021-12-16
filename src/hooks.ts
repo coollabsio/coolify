@@ -5,10 +5,10 @@ import { handleSession } from "svelte-kit-cookie-session";
 import { getUserDetails, isTeamIdTokenAvailable, sentry } from '$lib/common';
 import { version } from '$lib/common';
 
-// EDGE case: Same SECRET_KEY, but different database. Permission not found.
+// EDGE case: Same COOLIFY_SECRET_KEY, but different database. Permission not found.
 export const handle = handleSession(
     {
-        secret: process.env['SECRET_KEY'],
+        secret: process.env['COOLIFY_SECRET_KEY'],
         expires: 30
     },
     async function ({ request, resolve }) {

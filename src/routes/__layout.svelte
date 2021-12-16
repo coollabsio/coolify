@@ -38,6 +38,8 @@
 	import { errorNotification } from '$lib/form';
 	let alpha = true;
 	let isUpdateAvailable = false;
+	let latestVersion = null;
+
 	onMount(async () => {
 		if ($session.uid) {
 			const response = await fetch(`/login.json`, {
@@ -62,6 +64,7 @@
 		});
 		const data = await response.json();
 		isUpdateAvailable = data.isUpdateAvailable;
+		latestVersion = data.latestVersion;
 	});
 	async function logout() {
 		await fetch(`/logout.json`, {
@@ -87,16 +90,18 @@
 
 	async function update() {
 		if (!dev) {
+			const form = new FormData();
+			form.append('latestVersion', latestVersion);
 			const response = await fetch(`/update.json`, {
 				method: 'post',
-				body: JSON.stringify({})
+				body: form
 			});
 			if (!response.ok) {
 				const { message } = await response.json();
 				errorNotification(message);
 				return;
 			}
-			//TODO wait 20 sec and reload
+			// TODO: wait 20 sec and reload
 		} else {
 			alert('Update not available in development mode.');
 		}

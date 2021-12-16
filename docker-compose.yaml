@@ -10,7 +10,7 @@ services:
         protocol: tcp
         mode: host
     volumes:
-      - './db:/app/db'
+      - 'coolify-db-sqlite:/app/db'
       - '/var/run/docker.sock:/var/run/docker.sock'
     env_file:
       - ".env"
@@ -28,3 +28,7 @@ networks:
   coolify-infra:
     attachable: true
     name: coolify-infra
+
+volumes:
+  coolify-db-sqlite:
+    external: true

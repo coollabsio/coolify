@@ -4,9 +4,9 @@
 	"version": "2.0.0-rc.1",
 	"license": "AGPL-3.0",
 	"scripts": {
-		"dev": "docker-compose -f docker-compose-dev.yml up -d && NODE_ENV=development svelte-kit dev --host 0.0.0.0",
-		"dev:stop": "docker-compose -f docker-compose-dev.yml down",
-		"dev:logs": "docker-compose -f docker-compose-dev.yml logs -f --tail 10",
+		"dev": "docker-compose -f docker-compose-dev.yaml up -d && NODE_ENV=development svelte-kit dev --host 0.0.0.0",
+		"dev:stop": "docker-compose -f docker-compose-dev.yaml down",
+		"dev:logs": "docker-compose -f docker-compose-dev.yaml logs -f --tail 10",
 		"studio": "npx prisma studio",
 		"start": "npx prisma migrate deploy && npx prisma generate && npx prisma db seed && node index.js",
 		"build": "svelte-kit build",

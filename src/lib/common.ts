@@ -12,7 +12,7 @@ import { version as currentVersion } from '../../package.json';
 try {
     if (!dev) {
         Sentry.init({
-            dsn: process.env['SENTRY_DSN'],
+            dsn: process.env['COOLIFY_SENTRY_DSN'],
             tracesSampleRate: 0,
         });
     }
