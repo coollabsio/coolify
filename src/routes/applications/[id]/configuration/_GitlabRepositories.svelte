@@ -294,7 +294,7 @@
 			await setWebhook(webhookUrl);
 		} catch (err) {
 			console.log(err);
-			throw new Error(err);
+			if (!dev) throw new Error(err);
 		}
 
 		const url = `/applications/${id}/configuration/repository.json`;

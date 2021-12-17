@@ -41,7 +41,7 @@ export function enhance(
             if (token !== current_token) return;
 
             if (res.ok) {
-                result(res, form);
+                if (result) result(res, form);
             } else if (error) {
                 error(res, null, form);
             } else {

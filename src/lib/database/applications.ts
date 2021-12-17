@@ -24,7 +24,7 @@ export async function importApplication({ name, teamId, domain, port, buildComma
 }
 
 
-export async function getApplicationWebhook({projectId, branch}) {
+export async function getApplicationWebhook({ projectId, branch }) {
     try {
         let body = await prisma.application.findFirst({ where: { projectId, branch }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, secrets: true } })
 

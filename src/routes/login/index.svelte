@@ -24,8 +24,14 @@
 				action="/login.json"
 				method="post"
 				use:enhance={{
-					result: async () => {
-						window.location.replace('/');
+					result: async (response) => {
+						const { teamId } = await response.json();
+						if (teamId === '0') {
+							console.log('settings');
+							window.location.replace('/settings');
+						} else {
+							window.location.replace('/');
+						}
 					},
 					pending: async () => {
 						loading = true;
@@ -41,8 +47,21 @@
 			>
 				<div class="text-6xl font-bold border-gradient w-48 mx-auto border-b-4">Coolify</div>
 				<div class="text-xs text-center font-bold pb-10">v{$session.version}</div>
-				<input type="email" name="email" placeholder="Email" autocomplete="off" required bind:this={emailEl} />
-				<input type="password" name="password" placeholder="Password" bind:this={passwordEl} required />
+				<input
+					type="email"
+					name="email"
+					placeholder="Email"
+					autocomplete="off"
+					required
+					bind:this={emailEl}
+				/>
+				<input
+					type="password"
+					name="password"
+					placeholder="Password"
+					bind:this={passwordEl}
+					required
+				/>
 
 				<div class="flex space-x-2 h-8 items-center justify-center pt-14">
 					<button

@@ -43,111 +43,126 @@ export const post = async (request) => {
         }
     }
 }
-
 // {
-//     "object_kind": "push",
-//     "event_name": "push",
-//     "before": "45b7898888840e55b046e0b01bacd529d010387b",
-//     "after": "530cace23f4e13d5cbb516dd0a1ffdbd636689f9",
-//     "ref": "refs/heads/master",
-//     "checkout_sha": "530cace23f4e13d5cbb516dd0a1ffdbd636689f9",
-//     "message": null,
-//     "user_id": 2010476,
-//     "user_name": "András Bácsai",
-//     "user_username": "andrasbacsai",
-//     "user_email": "",
-//     "user_avatar": "https://secure.gravatar.com/avatar/b70ee596e0c0dcfd09481ddd2c95a66d?s=80&d=identicon",
-//     "project_id": 7260661,
+//     "object_kind": "merge_request",
+//     "event_type": "merge_request",
+//     "user": {
+//       "id": 2010476,
+//       "name": "András Bácsai",
+//       "username": "andrasbacsai",
+//       "avatar_url": "https://secure.gravatar.com/avatar/b70ee596e0c0dcfd09481ddd2c95a66d?s=80&d=identicon",
+//       "email": "[REDACTED]"
+//     },
 //     "project": {
-//       "id": 7260661,
-//       "name": "coolLabs.io-frontend-v1",
-//       "description": "First version of the frontend. Currently not in use.",
-//       "web_url": "https://gitlab.com/coollabsio/coolLabs.io-frontend-v1",
+//       "id": 16690121,
+//       "name": "coolLabs.io",
+//       "description": "",
+//       "web_url": "https://gitlab.com/coollabsio/production/coollabs.io",
 //       "avatar_url": null,
-//       "git_ssh_url": "git@gitlab.com:coollabsio/coolLabs.io-frontend-v1.git",
-//       "git_http_url": "https://gitlab.com/coollabsio/coolLabs.io-frontend-v1.git",
-//       "namespace": "coolLabs",
+//       "git_ssh_url": "git@gitlab.com:coollabsio/production/coollabs.io.git",
+//       "git_http_url": "https://gitlab.com/coollabsio/production/coollabs.io.git",
+//       "namespace": "Production Web Applications",
 //       "visibility_level": 0,
-//       "path_with_namespace": "coollabsio/coolLabs.io-frontend-v1",
+//       "path_with_namespace": "coollabsio/production/coollabs.io",
 //       "default_branch": "master",
 //       "ci_config_path": null,
-//       "homepage": "https://gitlab.com/coollabsio/coolLabs.io-frontend-v1",
-//       "url": "git@gitlab.com:coollabsio/coolLabs.io-frontend-v1.git",
-//       "ssh_url": "git@gitlab.com:coollabsio/coolLabs.io-frontend-v1.git",
-//       "http_url": "https://gitlab.com/coollabsio/coolLabs.io-frontend-v1.git"
+//       "homepage": "https://gitlab.com/coollabsio/production/coollabs.io",
+//       "url": "git@gitlab.com:coollabsio/production/coollabs.io.git",
+//       "ssh_url": "git@gitlab.com:coollabsio/production/coollabs.io.git",
+//       "http_url": "https://gitlab.com/coollabsio/production/coollabs.io.git"
 //     },
-//     "commits": [
-//       {
-//         "id": "530cace23f4e13d5cbb516dd0a1ffdbd636689f9",
-//         "message": "Delete .gitlab-ci.yml",
-//         "title": "Delete .gitlab-ci.yml",
-//         "timestamp": "2018-07-16T12:05:34+00:00",
-//         "url": "https://gitlab.com/coollabsio/coolLabs.io-frontend-v1/-/commit/530cace23f4e13d5cbb516dd0a1ffdbd636689f9",
-//         "author": {
-//           "name": "András Bácsai",
-//           "email": "andras.bacsai@protonmail.com"
-//         },
-//         "added": [
-
-//         ],
-//         "modified": [
-
-//         ],
-//         "removed": [
-//           ".gitlab-ci.yml"
-//         ]
+//     "object_attributes": {
+//       "assignee_id": null,
+//       "author_id": 2010476,
+//       "created_at": "2021-12-17T08:58:50.489Z",
+//       "description": "",
+//       "head_pipeline_id": null,
+//       "id": 131552249,
+//       "iid": 1,
+//       "last_edited_at": null,
+//       "last_edited_by_id": null,
+//       "merge_commit_sha": null,
+//       "merge_error": null,
+//       "merge_params": {
+//         "force_remove_source_branch": "1"
 //       },
-//       {
-//         "id": "2d150c2dbce111b486dd2717b174ffec7eca43af",
-//         "message": "Update .gitlab-ci.yml",
-//         "title": "Update .gitlab-ci.yml",
-//         "timestamp": "2018-07-15T11:48:28+00:00",
-//         "url": "https://gitlab.com/coollabsio/coolLabs.io-frontend-v1/-/commit/2d150c2dbce111b486dd2717b174ffec7eca43af",
-//         "author": {
-//           "name": "András Bácsai",
-//           "email": "andras.bacsai@protonmail.com"
-//         },
-//         "added": [
-
-//         ],
-//         "modified": [
-//           ".gitlab-ci.yml"
-//         ],
-//         "removed": [
-
-//         ]
+//       "merge_status": "cannot_be_merged",
+//       "merge_user_id": null,
+//       "merge_when_pipeline_succeeds": false,
+//       "milestone_id": null,
+//       "source_branch": "next",
+//       "source_project_id": 16690121,
+//       "state_id": 1,
+//       "target_branch": "master",
+//       "target_project_id": 16690121,
+//       "time_estimate": 0,
+//       "title": "Draft: PR",
+//       "updated_at": "2021-12-17T08:58:50.489Z",
+//       "updated_by_id": null,
+//       "url": "https://gitlab.com/coollabsio/production/coollabs.io/-/merge_requests/1",
+//       "source": {
+//         "id": 16690121,
+//         "name": "coolLabs.io",
+//         "description": "",
+//         "web_url": "https://gitlab.com/coollabsio/production/coollabs.io",
+//         "avatar_url": null,
+//         "git_ssh_url": "git@gitlab.com:coollabsio/production/coollabs.io.git",
+//         "git_http_url": "https://gitlab.com/coollabsio/production/coollabs.io.git",
+//         "namespace": "Production Web Applications",
+//         "visibility_level": 0,
+//         "path_with_namespace": "coollabsio/production/coollabs.io",
+//         "default_branch": "master",
+//         "ci_config_path": null,
+//         "homepage": "https://gitlab.com/coollabsio/production/coollabs.io",
+//         "url": "git@gitlab.com:coollabsio/production/coollabs.io.git",
+//         "ssh_url": "git@gitlab.com:coollabsio/production/coollabs.io.git",
+//         "http_url": "https://gitlab.com/coollabsio/production/coollabs.io.git"
 //       },
-//       {
-//         "id": "45b7898888840e55b046e0b01bacd529d010387b",
-//         "message": "Update .gitlab-ci.yml",
-//         "title": "Update .gitlab-ci.yml",
-//         "timestamp": "2018-07-15T11:27:52+00:00",
-//         "url": "https://gitlab.com/coollabsio/coolLabs.io-frontend-v1/-/commit/45b7898888840e55b046e0b01bacd529d010387b",
+//       "target": {
+//         "id": 16690121,
+//         "name": "coolLabs.io",
+//         "description": "",
+//         "web_url": "https://gitlab.com/coollabsio/production/coollabs.io",
+//         "avatar_url": null,
+//         "git_ssh_url": "git@gitlab.com:coollabsio/production/coollabs.io.git",
+//         "git_http_url": "https://gitlab.com/coollabsio/production/coollabs.io.git",
+//         "namespace": "Production Web Applications",
+//         "visibility_level": 0,
+//         "path_with_namespace": "coollabsio/production/coollabs.io",
+//         "default_branch": "master",
+//         "ci_config_path": null,
+//         "homepage": "https://gitlab.com/coollabsio/production/coollabs.io",
+//         "url": "git@gitlab.com:coollabsio/production/coollabs.io.git",
+//         "ssh_url": "git@gitlab.com:coollabsio/production/coollabs.io.git",
+//         "http_url": "https://gitlab.com/coollabsio/production/coollabs.io.git"
+//       },
+//       "last_commit": {
+//         "id": "74b60f621d7ea57be6c1bd95cc86d982001e464c",
+//         "message": "Ton updates\n",
+//         "title": "Ton updates",
+//         "timestamp": "2019-12-27T15:15:08+01:00",
+//         "url": "https://gitlab.com/coollabsio/production/coollabs.io/-/commit/74b60f621d7ea57be6c1bd95cc86d982001e464c",
 //         "author": {
-//           "name": "András Bácsai",
-//           "email": "andras.bacsai@protonmail.com"
-//         },
-//         "added": [
-
-//         ],
-//         "modified": [
-//           ".gitlab-ci.yml"
-//         ],
-//         "removed": [
-
-//         ]
-//       }
-//     ],
-//     "total_commits_count": 3,
-//     "push_options": {
+//           "name": "andrasbacsai",
+//           "email": "andras.bacsai@gmail.com"
+//         }
+//       },
+//       "work_in_progress": true,
+//       "total_time_spent": 0,
+//       "time_change": 0,
+//       "human_total_time_spent": null,
+//       "human_time_change": null,
+//       "human_time_estimate": null,
+//       "assignee_ids": [],
+//       "state": "opened",
+//       "blocking_discussions_resolved": true
 //     },
+//     "labels": [],
+//     "changes": {},
 //     "repository": {
-//       "name": "coolLabs.io-frontend-v1",
-//       "url": "git@gitlab.com:coollabsio/coolLabs.io-frontend-v1.git",
-//       "description": "First version of the frontend. Currently not in use.",
-//       "homepage": "https://gitlab.com/coollabsio/coolLabs.io-frontend-v1",
-//       "git_http_url": "https://gitlab.com/coollabsio/coolLabs.io-frontend-v1.git",
-//       "git_ssh_url": "git@gitlab.com:coollabsio/coolLabs.io-frontend-v1.git",
-//       "visibility_level": 0
+//       "name": "coolLabs.io",
+//       "url": "git@gitlab.com:coollabsio/production/coollabs.io.git",
+//       "description": "",
+//       "homepage": "https://gitlab.com/coollabsio/production/coollabs.io"
 //     }
 //   }
