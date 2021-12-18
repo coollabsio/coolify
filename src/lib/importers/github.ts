@@ -23,7 +23,7 @@ export default async function ({ applicationId, debugLogs, workdir, githubAppId,
                 Accept: 'application/vnd.github.machine-man-preview+json'
             }
         }).json()
-        saveBuildLog({ line: '[GIT IMPORTER] - Cloning repository.', buildId, applicationId })
+        saveBuildLog({ line: `[GIT IMPORTER] - Cloning ${repository} repository ${branch} branch.`, buildId, applicationId })
         await asyncExecShell(`git clone -q -b ${branch} https://x-access-token:${token}@github.com/${repository}.git ${workdir}/ && cd ${workdir} && git submodule update --init --recursive && cd ..`)
         const { stdout: commit } = await asyncExecShell(`cd ${workdir}/ && git rev-parse HEAD`)
         return commit.replace('\n', '')

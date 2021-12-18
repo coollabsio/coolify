@@ -14,7 +14,10 @@ export default async function (job) {
     1 - Change build pack and redeploy, what should happen?
   */
   let { id: applicationId, repository, branch, buildPack, destinationDocker, gitSource, build_id: buildId, configHash, port, installCommand, buildCommand, startCommand, domain, oldDomain, baseDirectory, publishDirectory, projectId, debugLogs, secrets, type } = job.data
-
+  
+  // Merge/pull requests, we need to get the source branch
+  if (job.data.sourceBranch) branch = job.data.sourceBranch
+  
   const destinationSwarm = null
   const kubernetes = null
 

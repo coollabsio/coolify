@@ -49,7 +49,7 @@ export async function getApplicationWebhook({ projectId, branch }) {
 
         return { ...body }
     } catch (e) {
-        throw PrismaErrorHandler(e)
+        throw { status: 404, body: { message: e.message } }
     }
 }
 export async function getApplication({ id, teamId }) {

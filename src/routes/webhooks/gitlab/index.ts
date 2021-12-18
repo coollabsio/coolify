@@ -3,6 +3,18 @@ import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import got from 'got';
 
+export const options = async () => {
+    return {
+        status: 200,
+        headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+
+        }
+    }
+}
+
 export const get: RequestHandler = async (request) => {
     const teamId = getTeam(request)
     const tokenUrl = 'https://gitlab.com/oauth/token'
