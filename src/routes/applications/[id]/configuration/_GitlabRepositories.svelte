@@ -59,8 +59,12 @@
 				const user = await response.json();
 				username = user.username;
 			} else {
-				console.error(response);
-				throw new Error(response.statusText);
+				if (response.status === 401) {
+					getGitlabToken();
+				} else {
+					errorNotification(response);
+					throw new Error(response.statusText);
+				}
 			}
 
 			response = await fetch(`${apiUrl}/v4/groups?per_page=5000`, {
@@ -104,7 +108,7 @@
 		loading.projects = true;
 		if (username === selected.group.name) {
 			const response = await fetch(
-				`${apiUrl}/v4/users/${selected.group.name}/projects?min_access_level=40&page=1&per_page=25`,
+				`${apiUrl}/v4/users/${selected.group.name}/projects?min_access_level=40&page=1&per_page=25&archived=false`,
 				{
 					method: 'GET',
 					headers: {
@@ -122,7 +126,7 @@
 			}
 		} else {
 			const response = await fetch(
-				`${apiUrl}/v4/groups/${selected.group.id}/projects?page=1&per_page=25`,
+				`${apiUrl}/v4/groups/${selected.group.id}/projects?page=1&per_page=25&archived=false`,
 				{
 					method: 'GET',
 					headers: {
