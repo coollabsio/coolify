@@ -99,6 +99,7 @@ CREATE TABLE "BuildLog" (
 -- CreateTable
 CREATE TABLE "Build" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "type" TEXT NOT NULL,
     "applicationId" TEXT,
     "destinationDockerId" TEXT,
     "gitSourceId" TEXT,
