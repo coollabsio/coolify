@@ -8,9 +8,10 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
     const { id } = request.params
     const debugLogs = request.body.get('debugLogs') === 'true' ? true : false
+    const mergepullRequestDeployments = request.body.get('mergepullRequestDeployments') === 'true' ? true : false
 
     try {
-        return await db.setApplicationSettings({ id, debugLogs })
+        return await db.setApplicationSettings({ id, debugLogs, mergepullRequestDeployments })
     } catch (err) {
         return err
     }

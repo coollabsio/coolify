@@ -11,15 +11,13 @@ export const get: RequestHandler = async (request) => {
     const docker = dockerInstance({ destinationDocker })
     const listContainers = await docker.engine.listContainers({ filters: { network: [destinationDocker.network] } })
     const containers = listContainers.filter((container) => {
-        return container.Labels['coolify.configuration']
+        return container.Labels['coolify.configuration']  
     })
+    const jsonContainers = containers.map(container => JSON.parse(Buffer.from(container.Labels['coolify.configuration'], 'base64').toString())).filter(container => container.type === 'manual')
+    console.log(jsonContainers)
     return {
         body: {
-            containers: containers.map(
-                (container) =>
-                    container.Labels['coolify.configuration'] &&
-                    JSON.parse(Buffer.from(container.Labels['coolify.configuration'], 'base64').toString())
-            )
+            containers:jsonContainers
         }
     };
 }

@@ -22,6 +22,7 @@
 <script lang="ts">
 	export let applications: Array<Applications>;
 	import { session } from '$app/stores';
+	import Application from './_Application.svelte';
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
@@ -51,31 +52,7 @@
 		</div>
 	{:else}
 		{#each applications as application}
-			<a href="/applications/{application.id}" class="no-underline p-2 ">
-				<div
-					class="box-selection"
-					class:border-red-500={!application.domain ||
-						!application.gitSourceId ||
-						application.buildPack === 'static'}
-					class:border-0={!application.domain ||
-						!application.gitSourceId ||
-						!application.destinationDockerId}
-					class:border-l-4={!application.domain ||
-						!application.gitSourceId ||
-						!application.destinationDockerId}
-					class:border-green-500={application.buildPack === 'node'}
-				>
-					<div class="font-bold text-xl text-center truncate">{application.name}</div>
-					{#if application.domain}
-						<div class="text-center truncate">{application.domain}</div>
-					{/if}
-					{#if !application.gitSourceId || !application.destinationDockerId}
-						<div class="font-bold text-xs text-center truncate text-red-500">
-							Invalid configuration
-						</div>
-					{/if}
-				</div>
-			</a>
+			<Application {application} />
 		{/each}
 	{/if}
 </div>

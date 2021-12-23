@@ -44,6 +44,8 @@
 
 	let loading = false;
 	let debugLogs = application.debugLogs;
+	let mergepullRequestDeployments = application.mergepullRequestDeployments;
+
 	onMount(() => {
 		domainEl.focus();
 	});
@@ -52,8 +54,12 @@
 		const form = new FormData();
 		if (name === 'debugLogs') {
 			debugLogs = !debugLogs;
-			form.append('debugLogs', debugLogs.toString());
-		} 
+		}
+		if (name === 'mergepullRequestDeployments') {
+			mergepullRequestDeployments = !mergepullRequestDeployments;
+		}
+		form.append('mergepullRequestDeployments', mergepullRequestDeployments.toString());
+		form.append('debugLogs', debugLogs.toString());
 
 		try {
 			await fetch(`/applications/${id}/settings.json`, {
@@ -326,10 +332,18 @@
 	<div class="px-4 sm:px-6">
 		<ul class="mt-2 divide-y divide-warmGray-800">
 			<Setting
+				bind:setting={mergepullRequestDeployments}
+				on:click={() => changeSettings('mergepullRequestDeployments')}
+				title="Enable MR/PR Deployments"
+				description="Enable automatic merge/pull request deployments."
+			/>
+		</ul>
+		<ul class="mt-2 divide-y divide-warmGray-800">
+			<Setting
 				bind:setting={debugLogs}
 				on:click={() => changeSettings('debugLogs')}
-				title="Debug logs"
-				description="Enable debug logs during build phase. <br>(<span class='text-red-500'>sensitive information</span> could be visible and saved to logs)"
+				title="Debug Logs"
+				description="Enable debug logs during build phase. <br>(<span class='text-red-500'>sensitive information</span> could be visible in logs)"
 			/>
 		</ul>
 	</div>

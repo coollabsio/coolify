@@ -114,9 +114,9 @@ export async function configureApplication({ id, teamId, domain, port, installCo
     }
 }
 
-export async function setApplicationSettings({ id, debugLogs }) {
+export async function setApplicationSettings({ id, debugLogs, mergepullRequestDeployments }) {
     try {
-        await prisma.application.update({ where: { id }, data: { debugLogs } })
+        await prisma.application.update({ where: { id }, data: { debugLogs, mergepullRequestDeployments } })
         return { status: 201 }
     } catch (e) {
         throw PrismaErrorHandler(e)

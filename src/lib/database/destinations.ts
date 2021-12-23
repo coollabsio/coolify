@@ -135,6 +135,14 @@ export async function getDestination({ id, teamId }) {
         throw PrismaErrorHandler(e)
     }
 }
+export async function getDestinationByApplicationId({ id, teamId }) {
+    try {
+        const body = await prisma.destinationDocker.findFirst({ where: { application: { some: { id } }, teams: { every: { id: teamId } } } })
+        return { ...body }
+    } catch (e) {
+        throw PrismaErrorHandler(e)
+    }
+}
 
 export async function setDestinationSettings({ engine, isCoolifyProxyUsed }) {
     try {

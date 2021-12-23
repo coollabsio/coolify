@@ -26,55 +26,53 @@ export const post = async (request) => {
             const projectId = Number(request.body['project_id'])
             const branch = ref.split('/')[2]
             const applicationFound = await db.getApplicationWebhook({ projectId, branch })
-            if (!applicationFound.configHash) {
-                const configHash = crypto
-                    .createHash('sha256')
-                    .update(
-                        JSON.stringify({
-                            buildPack: applicationFound.buildPack,
-                            port: applicationFound.port,
-                            installCommand: applicationFound.installCommand,
-                            buildCommand: applicationFound.buildCommand,
-                            startCommand: applicationFound.startCommand,
-                        })
-                    )
-                    .digest('hex')
-                await db.prisma.application.updateMany({ where: { branch, projectId }, data: { configHash } })
-            }
-            await buildQueue.add(buildId, { build_id: buildId, type: 'webhook_commit', ...applicationFound })
-            return {
-                status: 200,
-                body: {
-                    message: 'Queued. Thank you!'
+            if (applicationFound) {
+                if (!applicationFound.configHash) {
+                    const configHash = crypto
+                        .createHash('sha256')
+                        .update(
+                            JSON.stringify({
+                                buildPack: applicationFound.buildPack,
+                                port: applicationFound.port,
+                                installCommand: applicationFound.installCommand,
+                                buildCommand: applicationFound.buildCommand,
+                                startCommand: applicationFound.startCommand,
+                            })
+                        )
+                        .digest('hex')
+                    await db.prisma.application.updateMany({ where: { branch, projectId }, data: { configHash } })
+                }
+                await buildQueue.add(buildId, { build_id: buildId, type: 'webhook_commit', ...applicationFound })
+                return {
+                    status: 200,
+                    body: {
+                        message: 'Queued. Thank you!'
+                    }
                 }
             }
         } else if (objectKind === 'merge_request') {
             const projectId = Number(request.body.project.id)
             const sourceBranch = request.body.object_attributes.source_branch
             const targetBranch = request.body.object_attributes.target_branch
-            const mergeRequestId = request.body.object_attributes.iid
+            const pullmergeRequestId = request.body.object_attributes.iid
             const applicationFound = await db.getApplicationWebhook({ projectId, branch: targetBranch })
-            if (!applicationFound.configHash) {
-                const configHash = crypto
-                    .createHash('sha256')
-                    .update(
-                        JSON.stringify({
-                            buildPack: applicationFound.buildPack,
-                            port: applicationFound.port,
-                            installCommand: applicationFound.installCommand,
-                            buildCommand: applicationFound.buildCommand,
-                            startCommand: applicationFound.startCommand,
-                        })
-                    )
-                    .digest('hex')
-                await db.prisma.application.updateMany({ where: { branch: targetBranch, projectId }, data: { configHash } })
-            }
-            await buildQueue.add(buildId, { build_id: buildId, type: 'webhook_prmr', ...applicationFound, sourceBranch, mergeRequestId })
-            return {
-                status: 200,
-                body: {
-                    message: 'Queued. Thank you!'
+            if (applicationFound) {
+                if (applicationFound.mergepullRequestDeployments) {
+                    await buildQueue.add(buildId, { build_id: buildId, type: 'webhook_mr', ...applicationFound, sourceBranch, pullmergeRequestId })
+                    return {
+                        status: 200,
+                        body: {
+                            message: 'Queued. Thank you!'
+                        }
+                    }
+                } 
+                return {
+                    status: 500,
+                    body: {
+                        message: 'Merge request deployments are not enabled.'
+                    }
                 }
+               
             }
         }
 

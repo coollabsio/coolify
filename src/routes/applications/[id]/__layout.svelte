@@ -216,6 +216,38 @@
 			></a
 		>
 		<a
+			href="/applications/{id}/prmr"
+			sveltekit:prefetch
+			class="hover:text-orange-500 rounded"
+			class:text-orange-500={$page.path === `/applications/${id}/prmr`}
+			class:bg-coolgray-500={$page.path === `/applications/${id}/prmr`}
+		>
+			<button
+				title="Pull/Merge Requests"
+				class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
+				data-tooltip="Pull/Merge Requests"
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="w-6 h-6"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<circle cx="7" cy="18" r="2" />
+					<circle cx="7" cy="6" r="2" />
+					<circle cx="17" cy="12" r="2" />
+					<line x1="7" y1="8" x2="7" y2="16" />
+					<path d="M7 8a4 4 0 0 0 4 4h4" />
+				</svg></button
+			></a
+		>
+		<div class="border border-warmGray-700 h-8" />
+		<a
 			href="/applications/{id}/logs"
 			sveltekit:prefetch
 			class="hover:text-sky-500 rounded"

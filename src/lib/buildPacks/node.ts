@@ -23,10 +23,10 @@ const createDockerfile = async ({ image, workdir, port, installCommand, buildCom
     await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'))
 }
 
-export default async function ({ applicationId, imageId, debugLogs, commit, workdir, docker, buildId, port, installCommand, buildCommand, startCommand, baseDirectory, secrets, job }) {
+export default async function ({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, publishDirectory, debugLogs, commit, tag, workdir, docker, buildId, port, installCommand, buildCommand, startCommand, baseDirectory, secrets }) {
     // TODO: Select node version
     const image = 'node:lts'
-    const label = makeLabel(job)
+    const label = makeLabel({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
     await createDockerfile({ image, workdir, port, installCommand, buildCommand, startCommand, baseDirectory, label, secrets })
-    await buildImage({ applicationId, imageId, commit, workdir, docker, buildId, debugLogs })
+    await buildImage({ applicationId, tag, workdir, docker, buildId, debugLogs })
 }
