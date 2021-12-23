@@ -41,7 +41,7 @@
 		"svelte": "^3.44.2",
 		"svelte-check": "^2.2.10",
 		"svelte-preprocess": "^4.9.8",
-		"tailwindcss": "^2.2.19",
+		"tailwindcss": "^3.0.7",
 		"ts-node": "^10.4.0",
 		"tslib": "^2.3.1",
 		"typescript": "^4.5.2"

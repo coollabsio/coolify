@@ -7,6 +7,7 @@ export function makeLabel(data) {
             version,
             domain: data.domain,
             name: data.name,
+            type: data.type,
             buildpack: data.buildpack,
             repository: data.repository,
             branch: data.branch,

@@ -2,7 +2,7 @@ import Dockerode from 'dockerode'
 import { promises as fs } from 'fs';
 import { saveBuildLog } from './common';
 
-export async function buildCacheImageWithNode({ applicationId, commit, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debugLogs, secrets }) {
+export async function buildCacheImageWithNode({ applicationId, imageId,commit, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debugLogs, secrets }) {
     const Dockerfile: Array<string> = []
     Dockerfile.push(`FROM node:lts`)
     Dockerfile.push('WORKDIR /usr/src/app')
@@ -21,10 +21,10 @@ export async function buildCacheImageWithNode({ applicationId, commit, workdir, 
     Dockerfile.push(`COPY ./${baseDirectory || ""} ./`)
     Dockerfile.push(`RUN ${buildCommand}`)
     await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'))
-    await buildImage({ applicationId, commit, workdir, docker, buildId, isCache: true, debugLogs })
+    await buildImage({ applicationId, imageId, commit, workdir, docker, buildId, isCache: true, debugLogs })
 }
 
-export async function buildImage({ applicationId, commit, workdir, docker, buildId, isCache = false, debugLogs = false }) {
+export async function buildImage({ applicationId, imageId ,commit, workdir, docker, buildId, isCache = false, debugLogs = false }) {
     if (!debugLogs) {
         saveBuildLog({ line: `[COOLIFY] - Debug turned off.`, buildId, applicationId })
     }
@@ -32,7 +32,7 @@ export async function buildImage({ applicationId, commit, workdir, docker, build
 
     const stream = await docker.engine.buildImage(
         { src: ['.'], context: workdir },
-        { dockerfile: isCache ? 'Dockerfile-cache' : 'Dockerfile', t: `${applicationId}:${commit.slice(0, 7)}${isCache ? '-cache' : ''}` }
+        { dockerfile: isCache ? 'Dockerfile-cache' : 'Dockerfile', t: `${imageId}:${commit.slice(0, 7)}${isCache ? '-cache' : ''}` }
     );
     await streamEvents({ stream, docker, buildId, applicationId, debugLogs })
 }

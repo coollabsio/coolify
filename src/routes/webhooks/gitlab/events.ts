@@ -52,7 +52,7 @@ export const post = async (request) => {
             const projectId = Number(request.body.project.id)
             const sourceBranch = request.body.object_attributes.source_branch
             const targetBranch = request.body.object_attributes.target_branch
-
+            const mergeRequestId = request.body.object_attributes.iid
             const applicationFound = await db.getApplicationWebhook({ projectId, branch: targetBranch })
             if (!applicationFound.configHash) {
                 const configHash = crypto
@@ -69,7 +69,7 @@ export const post = async (request) => {
                     .digest('hex')
                 await db.prisma.application.updateMany({ where: { branch: targetBranch, projectId }, data: { configHash } })
             }
-            await buildQueue.add(buildId, { build_id: buildId, type: 'webhook_prmr', ...applicationFound, sourceBranch })
+            await buildQueue.add(buildId, { build_id: buildId, type: 'webhook_prmr', ...applicationFound, sourceBranch, mergeRequestId })
             return {
                 status: 200,
                 body: {
