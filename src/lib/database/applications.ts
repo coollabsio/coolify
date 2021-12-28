@@ -1,4 +1,4 @@
-import { decrypt } from "$lib/crypto"
+import { decrypt, encrypt } from "$lib/crypto"
 import { prisma, PrismaErrorHandler } from "./common"
 
 export async function listApplications(teamId) {
@@ -39,6 +39,9 @@ export async function getApplicationWebhook({ projectId, branch }) {
         }
         if (body?.gitSource?.gitlabApp?.appSecret) {
             body.gitSource.gitlabApp.appSecret = decrypt(body.gitSource.gitlabApp.appSecret)
+        }
+        if (body?.gitSource?.gitlabApp?.webhookToken) {
+            body.gitSource.gitlabApp.webhookToken = decrypt(body.gitSource.gitlabApp.webhookToken)
         }
         if (body?.secrets.length > 0) {
             body.secrets = body.secrets.map(s => {
@@ -82,9 +85,10 @@ export async function getApplication({ id, teamId }) {
 }
 
 
-export async function configureGitRepository({ id, repository, branch, projectId }) {
+export async function configureGitRepository({ id, repository, branch, projectId, webhookToken }) {
     try {
-        await prisma.application.update({ where: { id }, data: { repository, branch, projectId } })
+        const encryptedWebhookToken = encrypt(webhookToken)
+        await prisma.application.update({ where: { id }, data: { repository, branch, projectId, gitSource: { update: { gitlabApp: { update: { webhookToken: encryptedWebhookToken } } } } } })
         return { status: 201 }
     } catch (e) {
         throw PrismaErrorHandler(e)

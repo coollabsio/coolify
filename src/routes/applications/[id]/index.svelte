@@ -335,7 +335,7 @@
 				bind:setting={mergepullRequestDeployments}
 				on:click={() => changeSettings('mergepullRequestDeployments')}
 				title="Enable MR/PR Deployments"
-				description="Enable automatic merge/pull request deployments."
+				description="Creates application deployments from pull and <br>merge requests."
 			/>
 		</ul>
 		<ul class="mt-2 divide-y divide-warmGray-800">

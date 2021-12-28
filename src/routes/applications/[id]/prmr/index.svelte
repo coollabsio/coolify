@@ -33,9 +33,13 @@
 </div>
 
 <div class="max-w-4xl mx-auto px-6">
-	<div class="flex-col justify-start space-y-1">
+	<div class="flex flex-wrap justify-center space-x-2">
 		{#each containers as container}
-			{container.domain}
+			<a href="http://{container.domain}" class="no-underline p-2" target="_blank">
+				<div class="box-selection hover:bg-coolgray-200 hover:border-transparent text-center">
+					<div class="font-bold text-xl text-center truncate">{container.domain}</div>
+				</div>
+			</a>
 		{/each}
 	</div>
 </div>

@@ -51,6 +51,15 @@ export const post = async (request) => {
                 }
             }
         } else if (objectKind === 'merge_request') {
+            const webhookToken = request.headers['x-gitlab-token']
+            if (!webhookToken) {
+                return {
+                    status: 500,
+                    body: {
+                        message: 'Something went wrong. Please try again.'
+                    }
+                }
+            }
             const projectId = Number(request.body.project.id)
             const sourceBranch = request.body.object_attributes.source_branch
             const targetBranch = request.body.object_attributes.target_branch
@@ -58,6 +67,15 @@ export const post = async (request) => {
             const applicationFound = await db.getApplicationWebhook({ projectId, branch: targetBranch })
             if (applicationFound) {
                 if (applicationFound.mergepullRequestDeployments) {
+                    if (applicationFound.gitSource.gitlabApp.webhookToken !== webhookToken) {
+                        return {
+                            status: 500,
+                            body: {
+                                message: 'Something went wrong. Please try again.'
+                            }
+                        }
+                    }
+
                     await buildQueue.add(buildId, { build_id: buildId, type: 'webhook_mr', ...applicationFound, sourceBranch, pullmergeRequestId })
                     return {
                         status: 200,
@@ -65,14 +83,14 @@ export const post = async (request) => {
                             message: 'Queued. Thank you!'
                         }
                     }
-                } 
+                }
                 return {
                     status: 500,
                     body: {
                         message: 'Merge request deployments are not enabled.'
                     }
                 }
-               
+
             }
         }
 

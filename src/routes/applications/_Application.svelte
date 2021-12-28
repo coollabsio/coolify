@@ -2,7 +2,7 @@
 	export let application;
 </script>
 
-<a href="/applications/{application.id}" class="no-underline p-2 ">
+<a href="/applications/{application.id}" class="no-underline p-2">
 	<div
 		class="box-selection"
 		class:border-red-500={!application.domain ||

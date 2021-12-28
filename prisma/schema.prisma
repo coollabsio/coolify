@@ -175,6 +175,7 @@ model GitlabApp {
   teams         Team[]
   deployKeyId   Int?
   privateSshKey String?
+  webhookToken  String?
   appId         String?
   appSecret     String?
   createdAt     DateTime   @default(now())

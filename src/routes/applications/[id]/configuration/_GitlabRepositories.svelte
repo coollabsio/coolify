@@ -7,6 +7,7 @@
 	import { enhance, errorNotification } from '$lib/form';
 	import { goto } from '$app/navigation';
 	import { dev } from '$app/env';
+	import cuid from 'cuid';
 
 	const { id } = $page.params;
 	const from = $page.query.get('from');
@@ -243,7 +244,7 @@
 		}
 		return await saveDeployKey(updateDeployKeyIdUrl, id);
 	}
-	async function setWebhook(url) {
+	async function setWebhook(url, webhookToken) {
 		const host = window.location.origin;
 		const response = await fetch(url, {
 			method: 'GET',
@@ -263,7 +264,10 @@
 				},
 				body: JSON.stringify({
 					id: selected.project.id,
-					url: `${host}/webhooks/gitlab/events`,
+					url: dev
+						? 'https://webhook.site/9f1710a3-54a3-41b2-9917-3286383cc0ee'
+						: `${host}/webhooks/gitlab/events`,
+					token: webhookToken,
 					push_events: true,
 					enable_ssl_verification: true,
 					merge_requests_events: true
@@ -271,6 +275,7 @@
 			});
 			if (!response.ok) {
 				const error = await response.json();
+				console.log({ error });
 				errorNotification(error);
 				throw error;
 			}
@@ -284,6 +289,7 @@
 		const updateDeployKeyIdUrl = `/applications/${id}/configuration/deploykey.json`;
 		const sshkeyUrl = `/applications/${id}/configuration/sshkey.json`;
 		const webhookUrl = `${apiUrl}/v4/projects/${selected.project.id}/hooks`;
+		const webhookToken = cuid();
 
 		try {
 			if (!privateSshKey) {
@@ -295,7 +301,7 @@
 		}
 
 		try {
-			await setWebhook(webhookUrl);
+			await setWebhook(webhookUrl, webhookToken);
 		} catch (err) {
 			console.log(err);
 			if (!dev) throw new Error(err);
@@ -306,6 +312,7 @@
 		form.append('repository', `${selected.group.full_path}/${selected.project.name}`);
 		form.append('branch', selected.branch.name);
 		form.append('projectId', selected.project.id);
+		form.append('webhookToken', webhookToken);
 
 		const response = await fetch(url, {
 			method: 'POST',
