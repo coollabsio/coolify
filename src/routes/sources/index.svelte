@@ -54,14 +54,13 @@
 			{#each sources as source}
 				<a href="/sources/{source.id}" class="no-underline p-2">
 					<div
-						class="box-selection"
-						class:border-red-500={!source.gitlabAppId}
-						class:border-orange-500={source.gitlabAppId}
-						class:border-0={!source.gitlabAppId}
-						class:border-l-4={!source.gitlabAppId}
+						class="box-selection border-orange-500"
+						class:border-red-500={source.gitlabApp && !source.gitlabAppId}
+						class:border-0={source.gitlabApp && !source.gitlabAppId}
+						class:border-l-4={source.gitlabApp && !source.gitlabAppId}
 					>
 						<div class="font-bold text-xl text-center truncate">{source.name}</div>
-						{#if !source.gitlabAppId}
+						{#if source.gitlabApp && !source.gitlabAppId}
 							<div class="font-bold text-center text-xs truncate text-red-500">Not configured</div>
 						{/if}
 					</div>

@@ -78,16 +78,18 @@
 					>
 						<input class="hidden" name="gitSourceId" value={source.id} />
 						<button
-							disabled={!source.gitlabAppId}
+							disabled={source.gitlabApp && !source.gitlabAppId}
 							type="submit"
 							class="disabled:opacity-95 bg-coolgray-200 disabled:text-white box-selection border-orange-500"
-							class:border-red-500={!source.gitlabAppId}
-							class:border-0={!source.gitlabAppId}
-							class:border-l-4={!source.gitlabAppId}
-							>
+							class:border-red-500={source.gitlabApp && !source.gitlabAppId}
+							class:border-0={source.gitlabApp && !source.gitlabAppId}
+							class:border-l-4={source.gitlabApp && !source.gitlabAppId}
+						>
 							<div class="font-bold text-xl text-center truncate">{source.name}</div>
-							{#if !source.gitlabAppId}
-								<div class="font-bold text-center text-xs truncate text-red-500">Not configured</div>
+							{#if source.gitlabApp && !source.gitlabAppId}
+								<div class="font-bold text-center text-xs truncate text-red-500">
+									Not configured
+								</div>
 							{/if}
 						</button>
 					</form>

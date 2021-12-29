@@ -23,7 +23,6 @@ export async function importApplication({ name, teamId, domain, port, buildComma
     }
 }
 
-
 export async function getApplicationWebhook({ projectId, branch }) {
     try {
         let body = await prisma.application.findFirst({ where: { projectId, branch }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, secrets: true } })
@@ -87,8 +86,12 @@ export async function getApplication({ id, teamId }) {
 
 export async function configureGitRepository({ id, repository, branch, projectId, webhookToken }) {
     try {
-        const encryptedWebhookToken = encrypt(webhookToken)
-        await prisma.application.update({ where: { id }, data: { repository, branch, projectId, gitSource: { update: { gitlabApp: { update: { webhookToken: encryptedWebhookToken } } } } } })
+        if (webhookToken) {
+            const encryptedWebhookToken = encrypt(webhookToken)
+            await prisma.application.update({ where: { id }, data: { repository, branch, projectId, gitSource: { update: { gitlabApp: { update: { webhookToken: encryptedWebhookToken } } } } } })
+        } else {
+            await prisma.application.update({ where: { id }, data: { repository, branch, projectId } })
+        }
         return { status: 201 }
     } catch (e) {
         throw PrismaErrorHandler(e)

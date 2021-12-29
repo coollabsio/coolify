@@ -22,7 +22,6 @@ export default async function (job) {
     domain = `${pullmergeRequestId}.${domain}`
     imageId = `${applicationId}-${pullmergeRequestId}`
   }
-
   const destinationSwarm = null
   const kubernetes = null
 

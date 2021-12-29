@@ -20,6 +20,7 @@
 	let branches = [];
 
 	let selected = {
+		projectId: undefined,
 		repository: undefined,
 		branch: undefined
 	};
@@ -68,6 +69,8 @@
 	}
 	async function loadBranches() {
 		loading.branches = true;
+		selected.branch = undefined;
+		selected.projectId = repositories.find(repo => repo.full_name === selected.repository).id;
 		const response = await fetch(`${apiUrl}/repos/${selected.repository}/branches`, {
 			headers: {
 				Authorization: `token ${token}`
@@ -124,6 +127,7 @@
 					{/each}
 				</select>
 			{/if}
+			<input class="hidden" value={selected.projectId} name="projectId" />
 			{#if loading.branches}
 				<select name="branch" disabled class="w-96">
 					<option selected value="">Loading branches...</option>
@@ -156,13 +160,13 @@
 				class:bg-orange-600={showSave}
 				class:hover:bg-orange-500={showSave}>Save</button
 			>
-			<button class="w-40"
+			<!-- <button class="w-40"
 				><a
 					class="no-underline"
 					href="{apiUrl}/apps/{application.gitSource.githubApp.name}/installations/new"
 					>Modify Repositories</a
 				></button
-			>
+			> -->
 		</div>
 	</form>
 {/if}

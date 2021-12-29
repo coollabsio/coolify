@@ -329,7 +329,7 @@
 			</div>
 		</div>
 	</form>
-	<div class="px-4 sm:px-6">
+	<div class="px-4 sm:px-6 pb-10">
 		<ul class="mt-2 divide-y divide-warmGray-800">
 			<Setting
 				bind:setting={mergepullRequestDeployments}

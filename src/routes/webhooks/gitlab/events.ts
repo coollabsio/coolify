@@ -56,7 +56,7 @@ export const post = async (request) => {
                 return {
                     status: 500,
                     body: {
-                        message: 'Something went wrong. Please try again.'
+                        message: 'Ooops, something is not okay, are you okay?'
                     }
                 }
             }
@@ -64,14 +64,14 @@ export const post = async (request) => {
             const sourceBranch = request.body.object_attributes.source_branch
             const targetBranch = request.body.object_attributes.target_branch
             const pullmergeRequestId = request.body.object_attributes.iid
-            const applicationFound = await db.getApplicationWebhook({ projectId, branch: targetBranch })
+            const applicationFound = await db.getApplicationGitLabWebhook({ projectId, branch: targetBranch })
             if (applicationFound) {
                 if (applicationFound.mergepullRequestDeployments) {
                     if (applicationFound.gitSource.gitlabApp.webhookToken !== webhookToken) {
                         return {
                             status: 500,
                             body: {
-                                message: 'Something went wrong. Please try again.'
+                                message: 'Ooops, something is not okay, are you okay?'
                             }
                         }
                     }
