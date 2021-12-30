@@ -8,6 +8,8 @@ import * as db from '$lib/database';
 import { buildLogQueue } from './queues'
 
 import { version as currentVersion } from '../../package.json';
+import { dockerInstance } from './docker';
+import { getHost } from '$lib/database';
 
 try {
     if (!dev) {
@@ -92,4 +94,12 @@ export const getUserDetails = async (request, isAdminRequired = true) => {
         }
     }
 
+}
+
+export const removeMergePullDeployments = async ({ application, pullmergeRequestId }) => {
+    const { destinationDocker, id } = application
+    const host = getHost({ engine: destinationDocker.engine })
+    await asyncExecShell(`DOCKER_HOST=${host} docker stop -t 0 ${id}-${pullmergeRequestId}`)
+    await asyncExecShell(`DOCKER_HOST=${host} docker rm ${id}-${pullmergeRequestId}`)
+    return
 }

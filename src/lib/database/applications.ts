@@ -23,6 +23,17 @@ export async function importApplication({ name, teamId, domain, port, buildComma
     }
 }
 
+export async function removeApplication({ id, teamId }) {
+    try {
+        await prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } })
+        await prisma.buildLog.deleteMany({ where: { applicationId: id } })
+        await prisma.secret.deleteMany({ where: { applicationId: id } })
+        return { status: 200 }
+    } catch (e) {
+        throw PrismaErrorHandler(e)
+    }
+}
+
 export async function getApplicationWebhook({ projectId, branch }) {
     try {
         let body = await prisma.application.findFirst({ where: { projectId, branch }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, secrets: true } })

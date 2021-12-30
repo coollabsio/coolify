@@ -1,4 +1,4 @@
-import { getTeam, getUserDetails } from '$lib/common';
+import { getTeam, getUserDetails, removeMergePullDeployments } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
@@ -21,7 +21,7 @@ export const post = async (request) => {
     try {
         const buildId = cuid()
         const allowedGithubEvents = ['push', 'pull_request'];
-        const allowedPRActions = ['opened', 'reopened', 'synchronize', 'closed'];
+        const allowedActions = ['opened', 'reopened', 'synchronize', 'closed'];
         const githubEvent = request.headers['x-github-event'].toLowerCase();
         const githubSignature = request.headers['x-hub-signature-256'].toLowerCase();
         if (!allowedGithubEvents.includes(githubEvent)) {
@@ -37,7 +37,7 @@ export const post = async (request) => {
         if (githubEvent === 'push') {
             repository = request.body.repository
             projectId = repository.id
-            branch = request.body.ref.split('/')[2]            
+            branch = request.body.ref.split('/')[2]
         } else if (githubEvent === 'pull_request') {
             repository = request.body.pull_request.head.repo
             projectId = repository.id
@@ -61,7 +61,7 @@ export const post = async (request) => {
                     }
                 };
             }
-            if (githubEvent === 'push') { 
+            if (githubEvent === 'push') {
                 if (!applicationFound.configHash) {
                     const configHash = crypto
                         .createHash('sha256')
@@ -88,7 +88,7 @@ export const post = async (request) => {
                 const pullmergeRequestId = request.body.number
                 const pullmergeRequestAction = request.body.action
                 const sourceBranch = request.body.pull_request.head.ref
-                if (!allowedPRActions.includes(pullmergeRequestAction)) {
+                if (!allowedActions.includes(pullmergeRequestAction)) {
                     return {
                         status: 500,
                         body: {
@@ -96,21 +96,32 @@ export const post = async (request) => {
                         }
                     };
                 }
+
                 if (applicationFound.mergepullRequestDeployments) {
-                    await buildQueue.add(buildId, { build_id: buildId, type: 'webhook_mr', ...applicationFound, sourceBranch, pullmergeRequestId })
-                    return {
-                        status: 200,
-                        body: {
-                            message: 'Queued. Thank you!'
+                    if (pullmergeRequestAction === 'opened' || pullmergeRequestAction === 'reopened') {
+                        await buildQueue.add(buildId, { build_id: buildId, type: 'webhook_pr', ...applicationFound, sourceBranch, pullmergeRequestId })
+                        return {
+                            status: 200,
+                            body: {
+                                message: 'Queued. Thank you!'
+                            }
+                        }
+                    } else if (pullmergeRequestAction === 'closed') {
+                        await removeMergePullDeployments({ application: applicationFound, pullmergeRequestId })
+                        return {
+                            status: 200
                         }
                     }
+                } else {
+                    return {
+                        status: 500,
+                        body: {
+                            message: 'Pull/Merge request deployments not allowed.'
+                        }
+                    };
                 }
-
             }
-
         }
-
-
         return {
             status: 500,
             body: {

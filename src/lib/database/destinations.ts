@@ -15,7 +15,7 @@ async function checkCoolifyProxy({ engine }) {
     }
     return haProxyFound
 }
-function getHost({ engine }) {
+export function getHost({ engine }) {
     return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : `tcp://${engine}:2375`
 }
 async function installCoolifyProxy({ engine, destinations }) {

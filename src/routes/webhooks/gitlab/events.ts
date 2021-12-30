@@ -1,4 +1,4 @@
-import { getTeam, getUserDetails } from '$lib/common';
+import { getTeam, getUserDetails, removeMergePullDeployments } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
@@ -18,6 +18,7 @@ export const options = async () => {
 }
 
 export const post = async (request) => {
+    const allowedActions = ['opened', 'reopen', 'close'];
     const { object_kind: objectKind } = request.body
     const buildId = cuid()
     try {
@@ -60,11 +61,32 @@ export const post = async (request) => {
                     }
                 }
             }
+
+            const isDraft = request.body.object_attributes.work_in_progress
+            const action = request.body.object_attributes.action
             const projectId = Number(request.body.project.id)
             const sourceBranch = request.body.object_attributes.source_branch
             const targetBranch = request.body.object_attributes.target_branch
             const pullmergeRequestId = request.body.object_attributes.iid
-            const applicationFound = await db.getApplicationGitLabWebhook({ projectId, branch: targetBranch })
+
+            if (!allowedActions.includes(action)) {
+                return {
+                    status: 500,
+                    body: {
+                        message: 'Action not allowed.'
+                    }
+                }
+            }
+            if (isDraft) {
+                return {
+                    status: 500,
+                    body: {
+                        message: 'Draft MR, do nothing.'
+                    }
+                }
+            }
+
+            const applicationFound = await db.getApplicationWebhook({ projectId, branch: targetBranch })
             if (applicationFound) {
                 if (applicationFound.mergepullRequestDeployments) {
                     if (applicationFound.gitSource.gitlabApp.webhookToken !== webhookToken) {
@@ -75,12 +97,18 @@ export const post = async (request) => {
                             }
                         }
                     }
-
-                    await buildQueue.add(buildId, { build_id: buildId, type: 'webhook_mr', ...applicationFound, sourceBranch, pullmergeRequestId })
-                    return {
-                        status: 200,
-                        body: {
-                            message: 'Queued. Thank you!'
+                    if (action === 'opened' || action === 'reopened') {
+                        await buildQueue.add(buildId, { build_id: buildId, type: 'webhook_mr', ...applicationFound, sourceBranch, pullmergeRequestId })
+                        return {
+                            status: 200,
+                            body: {
+                                message: 'Queued. Thank you!'
+                            }
+                        }
+                    } else if (action === 'close') {
+                        await removeMergePullDeployments({ application: applicationFound, pullmergeRequestId })
+                        return {
+                            status: 200
                         }
                     }
                 }
@@ -101,6 +129,12 @@ export const post = async (request) => {
             }
         }
     } catch (err) {
-        return err
+        console.log(err)
+        return {
+            status: 500,
+            body: {
+                message: err.message
+            }
+        }
     }
 }
