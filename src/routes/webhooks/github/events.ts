@@ -97,7 +97,7 @@ export const post = async (request) => {
                     };
                 }
 
-                if (applicationFound.mergepullRequestDeployments) {
+                if (applicationFound.settings.previews) {
                     if (pullmergeRequestAction === 'opened' || pullmergeRequestAction === 'reopened') {
                         await buildQueue.add(buildId, { build_id: buildId, type: 'webhook_pr', ...applicationFound, sourceBranch, pullmergeRequestId })
                         return {

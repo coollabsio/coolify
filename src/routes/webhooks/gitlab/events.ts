@@ -18,7 +18,7 @@ export const options = async () => {
 }
 
 export const post = async (request) => {
-    const allowedActions = ['opened', 'reopen', 'close'];
+    const allowedActions = ['opened', 'reopen', 'close', 'open', 'update'];
     const { object_kind: objectKind } = request.body
     const buildId = cuid()
     try {
@@ -68,7 +68,6 @@ export const post = async (request) => {
             const sourceBranch = request.body.object_attributes.source_branch
             const targetBranch = request.body.object_attributes.target_branch
             const pullmergeRequestId = request.body.object_attributes.iid
-
             if (!allowedActions.includes(action)) {
                 return {
                     status: 500,
@@ -88,7 +87,7 @@ export const post = async (request) => {
 
             const applicationFound = await db.getApplicationWebhook({ projectId, branch: targetBranch })
             if (applicationFound) {
-                if (applicationFound.mergepullRequestDeployments) {
+                if (applicationFound.settings.previews) {
                     if (applicationFound.gitSource.gitlabApp.webhookToken !== webhookToken) {
                         return {
                             status: 500,
@@ -97,7 +96,7 @@ export const post = async (request) => {
                             }
                         }
                     }
-                    if (action === 'opened' || action === 'reopened') {
+                    if (action === 'opened' || action === 'reopened' || action === 'open' || action === 'update') {
                         await buildQueue.add(buildId, { build_id: buildId, type: 'webhook_mr', ...applicationFound, sourceBranch, pullmergeRequestId })
                         return {
                             status: 200,

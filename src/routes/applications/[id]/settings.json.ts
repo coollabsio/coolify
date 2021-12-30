@@ -7,11 +7,11 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     if (status === 401) return { status, body }
 
     const { id } = request.params
-    const debugLogs = request.body.get('debugLogs') === 'true' ? true : false
-    const mergepullRequestDeployments = request.body.get('mergepullRequestDeployments') === 'true' ? true : false
+    const debug = request.body.get('debug') === 'true' ? true : false
+    const previews = request.body.get('previews') === 'true' ? true : false
 
     try {
-        return await db.setApplicationSettings({ id, debugLogs, mergepullRequestDeployments })
+        return await db.setApplicationSettings({ id, debug, previews })
     } catch (err) {
         return err
     }

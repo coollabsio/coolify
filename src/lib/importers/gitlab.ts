@@ -1,6 +1,6 @@
 import { asyncExecShell, saveBuildLog } from "$lib/common";
 
-export default async function ({ applicationId, debugLogs, workdir, repodir, repository, branch, buildId, privateSshKey }): Promise<string> {
+export default async function ({ applicationId, debug, workdir, repodir, repository, branch, buildId, privateSshKey }): Promise<string> {
     try {
         saveBuildLog({ line: '[GIT IMPORTER] - GitLab importer started.', buildId, applicationId })
         await asyncExecShell(`echo '${privateSshKey}' > ${repodir}/id.rsa`)

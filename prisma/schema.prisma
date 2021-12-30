@@ -62,32 +62,41 @@ model TeamInvitation {
 }
 
 model Application {
-  id                          String             @id @default(cuid())
-  domain                      String?            @unique
-  name                        String
-  teams                       Team[]
-  debugLogs                   Boolean            @default(false)
-  mergepullRequestDeployments Boolean            @default(false)
-  oldDomain                   String?
-  repository                  String?
-  branch                      String?
-  buildPack                   String?
-  projectId                   Int?
-  port                        Int?
-  installCommand              String?
-  buildCommand                String?
-  startCommand                String?
-  configHash                  String?
-  baseDirectory               String?
-  publishDirectory            String?
-  forceSsl                    Boolean?           @default(false)
-  createdAt                   DateTime           @default(now())
-  updatedAt                   DateTime           @updatedAt
-  destinationDockerId         String?
-  destinationDocker           DestinationDocker? @relation(fields: [destinationDockerId], references: [id])
-  gitSourceId                 String?
-  gitSource                   GitSource?         @relation(fields: [gitSourceId], references: [id])
-  secrets                     Secret[]
+  id                  String               @id @default(cuid())
+  name                String
+  domain              String?              @unique
+  oldDomain           String?
+  teams               Team[]
+  repository          String?
+  branch              String?
+  buildPack           String?
+  projectId           Int?
+  port                Int?
+  installCommand      String?
+  buildCommand        String?
+  startCommand        String?
+  configHash          String?
+  baseDirectory       String?
+  publishDirectory    String?
+  forceSsl            Boolean?             @default(false)
+  destinationDockerId String?
+  destinationDocker   DestinationDocker?   @relation(fields: [destinationDockerId], references: [id])
+  gitSourceId         String?
+  gitSource           GitSource?           @relation(fields: [gitSourceId], references: [id])
+  secrets             Secret[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  settings            ApplicationSettings?
+}
+
+model ApplicationSettings {
+  id            String      @id @default(cuid())
+  application   Application @relation(fields: [applicationId], references: [id])
+  applicationId String      @unique
+  debug         Boolean     @default(false)
+  previews      Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
 model Secret {

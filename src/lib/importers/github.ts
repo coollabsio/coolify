@@ -3,7 +3,7 @@ import got from "got"
 import jsonwebtoken from 'jsonwebtoken'
 import * as db from '$lib/database'
 
-export default async function ({ applicationId, debugLogs, workdir, githubAppId, repository, branch, buildId }): Promise<string> {
+export default async function ({ applicationId, debug, workdir, githubAppId, repository, branch, buildId }): Promise<string> {
     try {
         saveBuildLog({ line: '[GIT IMPORTER] - GitHub importer started.', buildId, applicationId })
         const { privateKey, appId, installationId } = await db.getUniqueGithubApp({ githubAppId })

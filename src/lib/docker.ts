@@ -2,7 +2,7 @@ import Dockerode from 'dockerode'
 import { promises as fs } from 'fs';
 import { saveBuildLog } from './common';
 
-export async function buildCacheImageWithNode({ applicationId, tag, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debugLogs, secrets }) {
+export async function buildCacheImageWithNode({ applicationId, tag, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debug, secrets }) {
     const Dockerfile: Array<string> = []
     Dockerfile.push(`FROM node:lts`)
     Dockerfile.push('WORKDIR /usr/src/app')
@@ -21,11 +21,11 @@ export async function buildCacheImageWithNode({ applicationId, tag, workdir, doc
     Dockerfile.push(`COPY ./${baseDirectory || ""} ./`)
     Dockerfile.push(`RUN ${buildCommand}`)
     await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'))
-    await buildImage({ applicationId, tag, workdir, docker, buildId, isCache: true, debugLogs })
+    await buildImage({ applicationId, tag, workdir, docker, buildId, isCache: true, debug })
 }
 
-export async function buildImage({ applicationId, tag, workdir, docker, buildId, isCache = false, debugLogs = false }) {
-    if (!debugLogs) {
+export async function buildImage({ applicationId, tag, workdir, docker, buildId, isCache = false, debug = false }) {
+    if (!debug) {
         saveBuildLog({ line: `[COOLIFY] - Debug turned off.`, buildId, applicationId })
     }
     saveBuildLog({ line: `[COOLIFY] - Building image.`, buildId, applicationId })
@@ -34,7 +34,7 @@ export async function buildImage({ applicationId, tag, workdir, docker, buildId,
         { src: ['.'], context: workdir },
         { dockerfile: isCache ? 'Dockerfile-cache' : 'Dockerfile', t: `${applicationId}:${tag}${isCache ? '-cache' : ''}` }
     );
-    await streamEvents({ stream, docker, buildId, applicationId, debugLogs })
+    await streamEvents({ stream, docker, buildId, applicationId, debug })
 }
 
 export function dockerInstance({ destinationDocker }): { engine: Dockerode, network: string } {
@@ -45,7 +45,7 @@ export function dockerInstance({ destinationDocker }): { engine: Dockerode, netw
         network: destinationDocker.network,
     }
 }
-export async function streamEvents({ stream, docker, buildId, applicationId, debugLogs }) {
+export async function streamEvents({ stream, docker, buildId, applicationId, debug }) {
     await new Promise((resolve, reject) => {
         docker.engine.modem.followProgress(stream, onFinished, onProgress);
         function onFinished(err, res) {
@@ -57,7 +57,7 @@ export async function streamEvents({ stream, docker, buildId, applicationId, deb
                 reject(event.error);
             } else if (event.stream) {
                 if (event.stream !== '\n') {
-                    if (debugLogs) saveBuildLog({ line: `[DOCKER ENGINE] - ${event.stream.replace('\n', '')}`, buildId, applicationId })
+                    if (debug) saveBuildLog({ line: `[DOCKER ENGINE] - ${event.stream.replace('\n', '')}`, buildId, applicationId })
                 }
             }
         }

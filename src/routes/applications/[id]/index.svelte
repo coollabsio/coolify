@@ -43,8 +43,8 @@
 	let domainEl: HTMLInputElement;
 
 	let loading = false;
-	let debugLogs = application.debugLogs;
-	let mergepullRequestDeployments = application.mergepullRequestDeployments;
+	let debug = application.settings.debug;
+	let previews = application.settings.previews;
 
 	onMount(() => {
 		domainEl.focus();
@@ -52,14 +52,14 @@
 
 	async function changeSettings(name) {
 		const form = new FormData();
-		if (name === 'debugLogs') {
-			debugLogs = !debugLogs;
+		if (name === 'debug') {
+			debug = !debug;
 		}
-		if (name === 'mergepullRequestDeployments') {
-			mergepullRequestDeployments = !mergepullRequestDeployments;
+		if (name === 'previews') {
+			previews = !previews;
 		}
-		form.append('mergepullRequestDeployments', mergepullRequestDeployments.toString());
-		form.append('debugLogs', debugLogs.toString());
+		form.append('previews', previews.toString());
+		form.append('debug', debug.toString());
 
 		try {
 			await fetch(`/applications/${id}/settings.json`, {
@@ -332,16 +332,16 @@
 	<div class="px-4 sm:px-6 pb-10">
 		<ul class="mt-2 divide-y divide-warmGray-800">
 			<Setting
-				bind:setting={mergepullRequestDeployments}
-				on:click={() => changeSettings('mergepullRequestDeployments')}
+				bind:setting={previews}
+				on:click={() => changeSettings('previews')}
 				title="Enable MR/PR Deployments"
 				description="Creates application deployments from pull and <br>merge requests."
 			/>
 		</ul>
 		<ul class="mt-2 divide-y divide-warmGray-800">
 			<Setting
-				bind:setting={debugLogs}
-				on:click={() => changeSettings('debugLogs')}
+				bind:setting={debug}
+				on:click={() => changeSettings('debug')}
 				title="Debug Logs"
 				description="Enable debug logs during build phase. <br>(<span class='text-red-500'>sensitive information</span> could be visible in logs)"
 			/>

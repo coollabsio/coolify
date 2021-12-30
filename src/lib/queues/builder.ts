@@ -13,8 +13,8 @@ export default async function (job) {
     Edge cases:
     1 - Change build pack and redeploy, what should happen?
   */
-  let { id: applicationId, repository, branch, buildPack, name, destinationDocker, gitSource, build_id: buildId, configHash, port, installCommand, buildCommand, startCommand, domain, oldDomain, baseDirectory, publishDirectory, projectId, debugLogs, secrets, type, pullmergeRequestId = null, sourceBranch = null, mergepullRequestDeployments } = job.data
-
+  let { id: applicationId, repository, branch, buildPack, name, destinationDocker, gitSource, build_id: buildId, configHash, port, installCommand, buildCommand, startCommand, domain, oldDomain, baseDirectory, publishDirectory, projectId, secrets, type, pullmergeRequestId = null, sourceBranch = null, settings } = job.data
+  const { debug, previews } = settings
   let imageId = applicationId
   // Merge/pull requests, we need to get the source branch and set subdomain
   if (pullmergeRequestId) {
@@ -57,7 +57,7 @@ export default async function (job) {
   }
   let commit = await importers[gitSource.type]({
     applicationId,
-    debugLogs,
+    debug,
     workdir,
     repodir,
     githubAppId: gitSource.githubApp?.id,
@@ -106,7 +106,7 @@ export default async function (job) {
   }
   // TODO: Should check if it's running!
   if (!imageFound || deployNeeded) {
-    await buildpacks[buildPack]({ buildId: build.id, applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, publishDirectory, debugLogs, commit, tag, workdir, docker, port, installCommand, buildCommand, startCommand, baseDirectory, secrets })
+    await buildpacks[buildPack]({ buildId: build.id, applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, publishDirectory, debug, commit, tag, workdir, docker, port, installCommand, buildCommand, startCommand, baseDirectory, secrets })
     deployNeeded = true
   } else {
     deployNeeded = false

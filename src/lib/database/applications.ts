@@ -7,7 +7,7 @@ export async function listApplications(teamId) {
 
 export async function newApplication({ name, teamId }) {
     try {
-        const app = await prisma.application.create({ data: { name, teams: { connect: { id: teamId } } } })
+        const app = await prisma.application.create({ data: { name, teams: { connect: { id: teamId } }, settings: { create: { debug: false, previews: false } } } })
         return { status: 201, body: { id: app.id } }
     } catch (e) {
         throw PrismaErrorHandler(e)
@@ -36,7 +36,7 @@ export async function removeApplication({ id, teamId }) {
 
 export async function getApplicationWebhook({ projectId, branch }) {
     try {
-        let body = await prisma.application.findFirst({ where: { projectId, branch }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, secrets: true } })
+        let body = await prisma.application.findFirst({ where: { projectId, branch }, include: { destinationDocker: true, settings: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, secrets: true } })
 
         if (body.gitSource?.githubApp?.clientSecret) {
             body.gitSource.githubApp.clientSecret = decrypt(body.gitSource.githubApp.clientSecret)
@@ -67,7 +67,7 @@ export async function getApplicationWebhook({ projectId, branch }) {
 }
 export async function getApplication({ id, teamId }) {
     try {
-        let body = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, secrets: true } })
+        let body = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true, settings: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, secrets: true } })
 
         if (body.gitSource?.githubApp?.clientSecret) {
             body.gitSource.githubApp.clientSecret = decrypt(body.gitSource.githubApp.clientSecret)
@@ -132,9 +132,9 @@ export async function configureApplication({ id, teamId, domain, port, installCo
     }
 }
 
-export async function setApplicationSettings({ id, debugLogs, mergepullRequestDeployments }) {
+export async function setApplicationSettings({ id, debug, previews }) {
     try {
-        await prisma.application.update({ where: { id }, data: { debugLogs, mergepullRequestDeployments } })
+        await prisma.application.update({ where: { id }, data: { settings: { update: { debug, previews } } } })
         return { status: 201 }
     } catch (e) {
         throw PrismaErrorHandler(e)

@@ -24,13 +24,14 @@ const createDockerfile = async ({ applicationId, tag, image, workdir, buildComma
     await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'))
 }
 
-export default async function ({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, publishDirectory, debugLogs, commit, tag, workdir, docker, buildId, port, installCommand, buildCommand, startCommand, baseDirectory, secrets }) {
+export default async function ({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, publishDirectory, debug, commit, tag, workdir, docker, buildId, port, installCommand, buildCommand, startCommand, baseDirectory, secrets }) {
+    console.log(debug)
     const image = 'nginx:stable-alpine'
     const label = makeLabel({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
 
     if (buildCommand) {
-        await buildCacheImageWithNode({ applicationId, tag, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debugLogs, secrets })
+        await buildCacheImageWithNode({ applicationId, tag, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debug, secrets })
     }
     await createDockerfile({ applicationId, tag, image, workdir, buildCommand, baseDirectory, publishDirectory, label, secrets })
-    await buildImage({ applicationId, tag, workdir, docker, buildId, debugLogs })
+    await buildImage({ applicationId, tag, workdir, docker, buildId, debug })
 }
