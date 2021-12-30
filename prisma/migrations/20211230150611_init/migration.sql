@@ -51,9 +51,8 @@ CREATE TABLE "TeamInvitation" (
 -- CreateTable
 CREATE TABLE "Application" (
     "id" TEXT NOT NULL PRIMARY KEY,
-    "domain" TEXT,
     "name" TEXT NOT NULL,
-    "debugLogs" BOOLEAN NOT NULL DEFAULT false,
+    "domain" TEXT,
     "oldDomain" TEXT,
     "repository" TEXT,
     "branch" TEXT,
@@ -67,12 +66,23 @@ CREATE TABLE "Application" (
     "baseDirectory" TEXT,
     "publishDirectory" TEXT,
     "forceSsl" BOOLEAN DEFAULT false,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
     "destinationDockerId" TEXT,
     "gitSourceId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "Application_destinationDockerId_fkey" FOREIGN KEY ("destinationDockerId") REFERENCES "DestinationDocker" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "Application_gitSourceId_fkey" FOREIGN KEY ("gitSourceId") REFERENCES "GitSource" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ApplicationSettings" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "applicationId" TEXT NOT NULL,
+    "debug" BOOLEAN NOT NULL DEFAULT false,
+    "previews" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "ApplicationSettings_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "Application" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -160,6 +170,7 @@ CREATE TABLE "GitlabApp" (
     "groupName" TEXT,
     "deployKeyId" INTEGER,
     "privateSshKey" TEXT,
+    "webhookToken" TEXT,
     "appId" TEXT,
     "appSecret" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -225,6 +236,9 @@ CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Application_domain_key" ON "Application"("domain");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ApplicationSettings_applicationId_key" ON "ApplicationSettings"("applicationId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Secret_name_key" ON "Secret"("name");
