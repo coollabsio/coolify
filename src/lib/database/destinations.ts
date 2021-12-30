@@ -18,9 +18,9 @@ async function checkCoolifyProxy({ engine }) {
 
 async function installCoolifyProxy({ engine, destinations }) {
     const found = await checkCoolifyProxy({ engine })
+    const host = getHost({ engine })
     if (!found) {
         try {
-            const host = getHost({ engine })
             await asyncExecShell(`DOCKER_HOST="${host}" docker run --restart always --add-host 'host.docker.internal:host-gateway' --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" --name coolify-haproxy -d coollabsio/haproxy-alpine:1.0.0-rc.1`)
 
         } catch (err) {
@@ -29,7 +29,7 @@ async function installCoolifyProxy({ engine, destinations }) {
     }
     destinations.forEach(async (destination) => {
         try {
-            await asyncExecShell(`docker network connect ${destination.network} coolify-haproxy`)
+            await asyncExecShell(`DOCKER_HOST="${host}" docker network connect ${destination.network} coolify-haproxy`)
         } catch (err) {
             // TODO: handle error
         }
@@ -116,8 +116,9 @@ export async function newDestination({ name, teamId, isSwarm, engine, network, i
 export async function removeDestination({ id }) {
     try {
         const destination = await prisma.destinationDocker.delete({ where: { id } })
+        const host = getHost({ engine: destination.engine })
         if (destination.isCoolifyProxyUsed) {
-            await asyncExecShell(`docker network disconnect ${destination.network} coolify-haproxy`)
+            await asyncExecShell(`DOCKER_HOST="${host}" docker network disconnect ${destination.network} coolify-haproxy`)
         }
         return { status: 200 }
     } catch (e) {
