@@ -1,4 +1,4 @@
-import { asyncExecShell } from "$lib/common"
+import { asyncExecShell, getHost } from "$lib/common"
 import { dockerInstance } from "$lib/docker"
 import { prisma, PrismaErrorHandler } from "./common"
 
@@ -15,9 +15,7 @@ async function checkCoolifyProxy({ engine }) {
     }
     return haProxyFound
 }
-export function getHost({ engine }) {
-    return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : `tcp://${engine}:2375`
-}
+
 async function installCoolifyProxy({ engine, destinations }) {
     const found = await checkCoolifyProxy({ engine })
     if (!found) {

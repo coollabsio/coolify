@@ -140,3 +140,23 @@ export async function setApplicationSettings({ id, debug, previews }) {
         throw PrismaErrorHandler(e)
     }
 }
+
+export async function createBuild({ id, applicationId, destinationDockerId, gitSourceId, githubAppId, gitlabAppId, type }) {
+    try {
+        return await prisma.build.create({
+            data: {
+                id,
+                applicationId,
+                destinationDockerId,
+                gitSourceId,
+                githubAppId,
+                gitlabAppId,
+                status: 'running',
+                type,
+            }
+        })
+    } catch (e) {
+        throw PrismaErrorHandler(e)
+    }
+
+}

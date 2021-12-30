@@ -21,13 +21,13 @@
 		});
 		if (networkCheckResponse.ok) {
 			return errorNotification(
-				`A configuration with '${payload.network}' network is already configured.`
+				`A destination with '${payload.network}' network is already configured.`
 			);
 		}
 		const saveForm = new FormData(formEl);
 		saveForm.append('isCoolifyProxyUsed', payload.isCoolifyProxyUsed.toString());
 
-		const saveFormResponse = await fetch(`/new/destination.json`, {
+		const saveFormResponse = await fetch(`/new/destination/docker.json`, {
 			method: 'POST',
 			headers: {
 				accept: 'application/json'

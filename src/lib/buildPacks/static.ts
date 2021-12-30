@@ -25,7 +25,6 @@ const createDockerfile = async ({ applicationId, tag, image, workdir, buildComma
 }
 
 export default async function ({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, publishDirectory, debug, commit, tag, workdir, docker, buildId, port, installCommand, buildCommand, startCommand, baseDirectory, secrets }) {
-    console.log(debug)
     const image = 'nginx:stable-alpine'
     const label = makeLabel({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
 

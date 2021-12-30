@@ -1,5 +1,5 @@
 <script>
-	import NewDocker from './_NewDocker.svelte';
+	import Docker from './_Docker.svelte';
 
 	let payload = {};
 	let selected = 'docker';
@@ -34,7 +34,7 @@
 	</div>
 </div>
 {#if selected === 'docker'}
-	<NewDocker {payload} />
+	<Docker {payload} />
 {:else}
 	<div class="text-center font-bold text-4xl py-10">Not implemented yet</div>
 {/if}

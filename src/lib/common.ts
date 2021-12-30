@@ -9,7 +9,6 @@ import { buildLogQueue } from './queues'
 
 import { version as currentVersion } from '../../package.json';
 import { dockerInstance } from './docker';
-import { getHost } from '$lib/database';
 
 try {
     if (!dev) {
@@ -96,10 +95,43 @@ export const getUserDetails = async (request, isAdminRequired = true) => {
 
 }
 
+export function getHost({ engine }) {
+    return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : `tcp://${engine}:2375`
+}
+
 export const removeMergePullDeployments = async ({ application, pullmergeRequestId }) => {
     const { destinationDocker, id } = application
     const host = getHost({ engine: destinationDocker.engine })
     await asyncExecShell(`DOCKER_HOST=${host} docker stop -t 0 ${id}-${pullmergeRequestId}`)
     await asyncExecShell(`DOCKER_HOST=${host} docker rm ${id}-${pullmergeRequestId}`)
     return
+}
+
+export const createDirectories = async ({ repository, buildId }) => {
+    const repodir = `/tmp/build-sources/${repository}/`
+    const workdir = `/tmp/build-sources/${repository}/${buildId}`
+
+    await asyncExecShell(`mkdir -p ${workdir}`)
+
+    return {
+        workdir, repodir
+    }
+}
+
+export const setDefaultConfiguration = async ({ buildPack, port, installCommand, startCommand }) => {
+    // TODO: Separate logic
+    if (buildPack === 'node') {
+        if (!port) port = 3000
+        if (!installCommand) installCommand = 'yarn install'
+        if (!startCommand) startCommand = 'yarn start'
+    }
+    if (buildPack === 'static') {
+        port = 80
+    }
+    return {
+        buildPack,
+        port,
+        installCommand,
+        startCommand
+    }
 }
