@@ -116,7 +116,7 @@ export const post = async (request) => {
                     return {
                         status: 500,
                         body: {
-                            message: 'Previews are not allowed.'
+                            message: 'Pull request previews are not enabled.'
                         }
                     };
                 }

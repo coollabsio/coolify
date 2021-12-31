@@ -25,12 +25,16 @@ const createDockerfile = async ({ applicationId, tag, image, workdir, buildComma
 }
 
 export default async function ({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, publishDirectory, debug, commit, tag, workdir, docker, buildId, port, installCommand, buildCommand, startCommand, baseDirectory, secrets }) {
-    const image = 'nginx:stable-alpine'
-    const label = makeLabel({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
+    try {
+        const image = 'nginx:stable-alpine'
+        const label = makeLabel({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
 
-    if (buildCommand) {
-        await buildCacheImageWithNode({ applicationId, tag, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debug, secrets })
+        if (buildCommand) {
+            await buildCacheImageWithNode({ applicationId, tag, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debug, secrets })
+        }
+        await createDockerfile({ applicationId, tag, image, workdir, buildCommand, baseDirectory, publishDirectory, label, secrets })
+        await buildImage({ applicationId, tag, workdir, docker, buildId, debug })
+    } catch (error) {
+        throw error
     }
-    await createDockerfile({ applicationId, tag, image, workdir, buildCommand, baseDirectory, publishDirectory, label, secrets })
-    await buildImage({ applicationId, tag, workdir, docker, buildId, debug })
 }

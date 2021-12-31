@@ -121,9 +121,9 @@ export const createDirectories = async ({ repository, buildId }) => {
 }
 
 export const setDefaultConfiguration = async ({ buildPack, port, installCommand, startCommand }) => {
-    // TODO: Separate logic
+    if (!port) port = 3000
+
     if (buildPack === 'node') {
-        if (!port) port = 3000
         if (!installCommand) installCommand = 'yarn install'
         if (!startCommand) startCommand = 'yarn start'
     }

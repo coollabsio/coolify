@@ -230,7 +230,7 @@
 					>
 				</div>
 			</div>
-			<div class="grid grid-cols-3 items-center">
+			<div class="grid grid-cols-3 items-center pb-8">
 				<label for="domain">Domain</label>
 				<div class="col-span-2 ">
 					<input
@@ -260,43 +260,44 @@
 					</div>
 				</div>
 			{/if}
-
-			<div class="grid grid-cols-3 items-center pt-8">
-				<label for="installCommand">Install Command</label>
-				<div class="col-span-2">
-					<input
-						readonly={!$session.isAdmin}
-						name="installCommand"
-						id="installCommand"
-						bind:value={$appConfiguration.configuration.installCommand}
-						placeholder="default: yarn install"
-					/>
+			{#if $appConfiguration.configuration.buildPack !== 'docker'}
+				<div class="grid grid-cols-3 items-center">
+					<label for="installCommand">Install Command</label>
+					<div class="col-span-2">
+						<input
+							readonly={!$session.isAdmin}
+							name="installCommand"
+							id="installCommand"
+							bind:value={$appConfiguration.configuration.installCommand}
+							placeholder="default: yarn install"
+						/>
+					</div>
 				</div>
-			</div>
-			<div class="grid grid-cols-3 items-center">
-				<label for="buildCommand">Build Command</label>
-				<div class="col-span-2">
-					<input
-						readonly={!$session.isAdmin}
-						name="buildCommand"
-						id="buildCommand"
-						bind:value={$appConfiguration.configuration.buildCommand}
-						placeholder="default: yarn build"
-					/>
+				<div class="grid grid-cols-3 items-center">
+					<label for="buildCommand">Build Command</label>
+					<div class="col-span-2">
+						<input
+							readonly={!$session.isAdmin}
+							name="buildCommand"
+							id="buildCommand"
+							bind:value={$appConfiguration.configuration.buildCommand}
+							placeholder="default: yarn build"
+						/>
+					</div>
 				</div>
-			</div>
-			<div class="grid grid-cols-3 items-center pb-8">
-				<label for="startCommand" class="">Start Command</label>
-				<div class="col-span-2">
-					<input
-						readonly={!$session.isAdmin}
-						name="startCommand"
-						id="startCommand"
-						bind:value={$appConfiguration.configuration.startCommand}
-						placeholder="default: yarn start"
-					/>
+				<div class="grid grid-cols-3 items-center pb-8">
+					<label for="startCommand" class="">Start Command</label>
+					<div class="col-span-2">
+						<input
+							readonly={!$session.isAdmin}
+							name="startCommand"
+							id="startCommand"
+							bind:value={$appConfiguration.configuration.startCommand}
+							placeholder="default: yarn start"
+						/>
+					</div>
 				</div>
-			</div>
+			{/if}
 			<div class="grid grid-cols-3">
 				<label for="baseDirectory">Base Directory</label>
 				<div class="col-span-2">
@@ -334,8 +335,8 @@
 			<Setting
 				bind:setting={previews}
 				on:click={() => changeSettings('previews')}
-				title="Enable MR/PR Deployments"
-				description="Creates previews from pull and <br>merge requests."
+				title="Enable MR/PR Previews"
+				description="Creates previews from pull and merge requests."
 			/>
 		</ul>
 		<ul class="mt-2 divide-y divide-warmGray-800">

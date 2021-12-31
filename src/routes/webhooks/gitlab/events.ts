@@ -114,7 +114,7 @@ export const post = async (request) => {
                 return {
                     status: 500,
                     body: {
-                        message: 'Merge request deployments are not enabled.'
+                        message: 'Merge request previews are not enabled.'
                     }
                 }
 

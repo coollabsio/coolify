@@ -2,7 +2,7 @@ import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler<Locals, FormData> = async (request) => {
-    const buildPacks = [{ name: 'node' }, { name: 'static' }]
+    const buildPacks = [{ name: 'node' }, { name: 'static' }, { name: 'docker' }];
     return {
         status: 200,
         body: {
