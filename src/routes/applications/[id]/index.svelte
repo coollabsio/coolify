@@ -149,7 +149,7 @@
 		class=" py-4"
 	>
 		<div class="font-bold flex space-x-1 pb-5">
-			<div class="text-xl tracking-tight mr-4">Base Configuration</div>
+			<div class="text-xl tracking-tight mr-4">Configurations</div>
 			{#if $session.isAdmin}
 				<button
 					type="submit"
@@ -330,6 +330,10 @@
 			</div>
 		</div>
 	</form>
+	<div class="font-bold flex space-x-1 pb-5">
+		<div class="text-xl tracking-tight mr-4">Features</div>
+	
+	</div>
 	<div class="px-4 sm:px-6 pb-10">
 		<ul class="mt-2 divide-y divide-warmGray-800">
 			<Setting

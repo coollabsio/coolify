@@ -157,9 +157,9 @@
 			class:bg-coolgray-500={$page.path === `/applications/${id}`}
 		>
 			<button
-				title="Configuration"
+				title="Configurations"
 				class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-				data-tooltip="Configuration"
+				data-tooltip="Configurations"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
