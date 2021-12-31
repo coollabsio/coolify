@@ -1,4 +1,4 @@
-import { getTeam, getUserDetails, removePreview } from '$lib/common';
+import { getTeam, getUserDetails, removePreviewDestinationDocker } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
@@ -107,9 +107,14 @@ export const post = async (request) => {
                             }
                         }
                     } else if (pullmergeRequestAction === 'closed') {
-                        await removePreview({ application: applicationFound, pullmergeRequestId })
+                        if (applicationFound.destinationDockerId) {
+                            await removePreviewDestinationDocker({ id: applicationFound.id, destinationDocker: applicationFound.destinationDocker, pullmergeRequestId })
+                        }
                         return {
-                            status: 200
+                            status: 200,
+                            body: {
+                                message: 'Removed preview. Thank you!'
+                            }
                         }
                     }
                 } else {

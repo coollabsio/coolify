@@ -31,3 +31,18 @@ export async function completeTransaction(transactionId) {
     return await haproxyInstance().put(`v2/services/haproxy/transactions/${transactionId}`)
 }
 
+export async function removeProxyConfiguration({ domain }) {
+    const haproxy = haproxyInstance()
+    const transactionId = await getNextTransactionId()
+    const backendFound = await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
+    console.log(backendFound)
+    if (backendFound) {
+        await haproxy.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
+            searchParams: {
+                transaction_id: transactionId
+            },
+        }).json()
+        await completeTransaction(transactionId)
+
+    }
+}

@@ -15,6 +15,7 @@
 			!application.gitSourceId ||
 			!application.destinationDockerId}
 		class:border-green-500={application.buildPack === 'node'}
+		class:border-sky-500={application.buildPack === 'docker'}
 	>
 		<div class="font-bold text-xl text-center truncate">{application.name}</div>
 		{#if application.domain}

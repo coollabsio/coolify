@@ -9,6 +9,7 @@ import { buildLogQueue } from './queues'
 
 import { version as currentVersion } from '../../package.json';
 import { dockerInstance } from './docker';
+import { removeProxyConfiguration } from './haproxy';
 
 try {
     if (!dev) {
@@ -99,14 +100,42 @@ export function getHost({ engine }) {
     return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : `tcp://${engine}:2375`
 }
 
-export const removePreview = async ({ application, pullmergeRequestId }) => {
-    const { destinationDocker, destinationDockerId, id } = application
-    if (destinationDockerId) {
-        const host = getHost({ engine: destinationDocker.engine })
-        await asyncExecShell(`DOCKER_HOST=${host} docker stop -t 0 ${id}-${pullmergeRequestId}`)
-        await asyncExecShell(`DOCKER_HOST=${host} docker rm ${id}-${pullmergeRequestId}`)
-        return
+export const removeDestinationDocker = async ({ id, destinationDocker }) => {
+    const docker = dockerInstance({ destinationDocker })
+    await docker.engine.getContainer(id).stop()
+    await docker.engine.getContainer(id).remove()
+}
+
+export const removePreviewDestinationDocker = async ({ id, destinationDocker, pullmergeRequestId }) => {
+    try {
+        const docker = dockerInstance({ destinationDocker })
+        await docker.engine.getContainer(`${id}-${pullmergeRequestId}`).stop()
+        await docker.engine.getContainer(`${id}-${pullmergeRequestId}`).remove()
+    } catch(error) {
+        if (error.statusCode === 404) {
+            throw {
+                    message: 'Nothing to do.'
+            }
+        }
+        throw error
     }
+
+}
+
+export const removeAllPreviewsDestinationDocker = async ({ id, destinationDocker }) => {
+    const docker = dockerInstance({ destinationDocker })
+    const listContainers = await docker.engine.listContainers({ filters: { network: [destinationDocker.network] } })
+    const containers = listContainers.filter((container) => {
+        return container.Image.startsWith(id)
+    })
+    const previews = []
+    for (const container of containers) {
+        const preview = container.Image.split('-')[1]
+        if (preview) previews.push(preview)
+        await docker.engine.getContainer(container.Id).stop()
+        await docker.engine.getContainer(container.Id).remove()
+    }
+    return previews
 }
 
 export const createDirectories = async ({ repository, buildId }) => {

@@ -1,4 +1,7 @@
 import { decrypt, encrypt } from "$lib/crypto"
+import { removeProxyConfiguration } from "$lib/haproxy"
+
+import { removeAllPreviewsDestinationDocker, removeDestinationDocker } from "$lib/common"
 import { prisma, PrismaErrorHandler } from "./common"
 
 export async function listApplications(teamId) {
@@ -25,9 +28,31 @@ export async function importApplication({ name, teamId, domain, port, buildComma
 
 export async function removeApplication({ id, teamId }) {
     try {
+        const { domain, destinationDockerId, destinationDocker } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
+
+        await prisma.applicationSettings.deleteMany({ where: { application: { id } } })
         await prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } })
         await prisma.buildLog.deleteMany({ where: { applicationId: id } })
         await prisma.secret.deleteMany({ where: { applicationId: id } })
+        let previews = []
+        if (destinationDockerId) {
+            await removeDestinationDocker({ id, destinationDocker })
+            previews = await removeAllPreviewsDestinationDocker({ id, destinationDocker })
+        }
+        if (domain) {
+            try {
+                await removeProxyConfiguration({ domain })
+                if (previews.length > 0) {
+                    previews.forEach(async preview => {
+                        await removeProxyConfiguration({ domain: `${preview}.${domain}` })
+                    })
+                }
+            } catch (error) {
+                console.log(error)
+            }
+        }
+
+
         return { status: 200 }
     } catch (e) {
         throw PrismaErrorHandler(e)
