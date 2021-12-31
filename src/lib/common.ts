@@ -100,11 +100,13 @@ export function getHost({ engine }) {
 }
 
 export const removePreview = async ({ application, pullmergeRequestId }) => {
-    const { destinationDocker, id } = application
-    const host = getHost({ engine: destinationDocker.engine })
-    await asyncExecShell(`DOCKER_HOST=${host} docker stop -t 0 ${id}-${pullmergeRequestId}`)
-    await asyncExecShell(`DOCKER_HOST=${host} docker rm ${id}-${pullmergeRequestId}`)
-    return
+    const { destinationDocker, destinationDockerId, id } = application
+    if (destinationDockerId) {
+        const host = getHost({ engine: destinationDocker.engine })
+        await asyncExecShell(`DOCKER_HOST=${host} docker stop -t 0 ${id}-${pullmergeRequestId}`)
+        await asyncExecShell(`DOCKER_HOST=${host} docker rm ${id}-${pullmergeRequestId}`)
+        return
+    }
 }
 
 export const createDirectories = async ({ repository, buildId }) => {
