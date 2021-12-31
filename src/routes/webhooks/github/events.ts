@@ -1,4 +1,4 @@
-import { getTeam, getUserDetails, removeMergePullDeployments } from '$lib/common';
+import { getTeam, getUserDetails, removePreview } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
@@ -107,7 +107,7 @@ export const post = async (request) => {
                             }
                         }
                     } else if (pullmergeRequestAction === 'closed') {
-                        await removeMergePullDeployments({ application: applicationFound, pullmergeRequestId })
+                        await removePreview({ application: applicationFound, pullmergeRequestId })
                         return {
                             status: 200
                         }
@@ -116,7 +116,7 @@ export const post = async (request) => {
                     return {
                         status: 500,
                         body: {
-                            message: 'Pull/Merge request deployments not allowed.'
+                            message: 'Previews are not allowed.'
                         }
                     };
                 }

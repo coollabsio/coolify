@@ -1,4 +1,4 @@
-import { getTeam, getUserDetails, removeMergePullDeployments } from '$lib/common';
+import { getTeam, getUserDetails, removePreview } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
@@ -105,7 +105,7 @@ export const post = async (request) => {
                             }
                         }
                     } else if (action === 'close') {
-                        await removeMergePullDeployments({ application: applicationFound, pullmergeRequestId })
+                        await removePreview({ application: applicationFound, pullmergeRequestId })
                         return {
                             status: 200
                         }

@@ -18,7 +18,7 @@ export default async function (job) {
 
   let imageId = applicationId
 
-  // Merge/pull requests, we need to get the source branch and set subdomain
+  // Previews, we need to get the source branch and set subdomain
   if (pullmergeRequestId) {
     branch = sourceBranch
     domain = `${pullmergeRequestId}.${domain}`

@@ -216,16 +216,16 @@
 			></a
 		>
 		<a
-			href="/applications/{id}/prmr"
+			href="/applications/{id}/previews"
 			sveltekit:prefetch
 			class="hover:text-orange-500 rounded"
-			class:text-orange-500={$page.path === `/applications/${id}/prmr`}
-			class:bg-coolgray-500={$page.path === `/applications/${id}/prmr`}
+			class:text-orange-500={$page.path === `/applications/${id}/previews`}
+			class:bg-coolgray-500={$page.path === `/applications/${id}/previews`}
 		>
 			<button
-				title="Pull/Merge Requests"
+				title="Previews"
 				class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-				data-tooltip="Pull/Merge Requests"
+				data-tooltip="Previews"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"

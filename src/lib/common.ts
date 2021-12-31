@@ -99,7 +99,7 @@ export function getHost({ engine }) {
     return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : `tcp://${engine}:2375`
 }
 
-export const removeMergePullDeployments = async ({ application, pullmergeRequestId }) => {
+export const removePreview = async ({ application, pullmergeRequestId }) => {
     const { destinationDocker, id } = application
     const host = getHost({ engine: destinationDocker.engine })
     await asyncExecShell(`DOCKER_HOST=${host} docker stop -t 0 ${id}-${pullmergeRequestId}`)

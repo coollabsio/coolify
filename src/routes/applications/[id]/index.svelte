@@ -335,7 +335,7 @@
 				bind:setting={previews}
 				on:click={() => changeSettings('previews')}
 				title="Enable MR/PR Deployments"
-				description="Creates application deployments from pull and <br>merge requests."
+				description="Creates previews from pull and <br>merge requests."
 			/>
 		</ul>
 		<ul class="mt-2 divide-y divide-warmGray-800">
