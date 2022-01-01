@@ -131,7 +131,12 @@ export default async function (job) {
     // TODO: Separate logic
     if (destinationDocker.isCoolifyProxyUsed) {
       const haproxy = haproxyInstance()
-
+      try {
+         await haproxy.get('v2/info')
+      } catch(error) {
+        saveBuildLog({ line: '[PROXY] - Haproxy is not running or not reachable. Skipping this step.', buildId, applicationId })
+        return
+      }
       try {
         saveBuildLog({ line: '[PROXY] - Configuring proxy.', buildId, applicationId })
         const transactionId = await getNextTransactionId()
@@ -188,6 +193,7 @@ export default async function (job) {
         await completeTransaction(transactionId)
         saveBuildLog({ line: '[PROXY] - Configured.', buildId, applicationId })
       } catch (error) {
+        console.log(error.code)
         console.log(error.response.body)
         throw new Error(error)
       } finally {
