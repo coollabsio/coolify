@@ -121,6 +121,7 @@ export async function configureProxy({ domain, applicationId, port }) {
             }
         })
         await completeTransaction(transactionId)
+        console.log('proxy configured for this application', domain, applicationId, port)
     } catch (error) {
         console.log(error)
         throw new Error(error)
