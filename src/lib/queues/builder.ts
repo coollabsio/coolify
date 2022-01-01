@@ -4,7 +4,7 @@ import * as buildpacks from '../buildPacks'
 import * as importers from '../importers'
 import { dockerInstance } from '../docker'
 import { asyncExecShell, createDirectories, getHost, saveBuildLog, setDefaultConfiguration } from '../common'
-import { completeTransaction, getNextTransactionId, haproxyInstance } from '../haproxy'
+import { completeTransaction, configureProxy, getNextTransactionId, haproxyInstance } from '../haproxy'
 import * as db from '$lib/database'
 import { decrypt } from '$lib/crypto'
 
@@ -127,78 +127,9 @@ export default async function (job) {
     const { stderr } = await asyncExecShell(`DOCKER_HOST=${host} docker run ${envs.join()} --name ${imageId} --network ${docker.network} --restart always -d ${applicationId}:${tag}`)
     if (stderr) console.log(stderr)
     saveBuildLog({ line: '[COOLIFY] - Deployment successful!', buildId, applicationId })
-    // TODO: Implement remote docker engine
-    // TODO: Separate logic
+
     if (destinationDocker.isCoolifyProxyUsed) {
-      const haproxy = haproxyInstance()
-      try {
-         await haproxy.get('v2/info')
-      } catch(error) {
-        saveBuildLog({ line: '[PROXY] - Haproxy is not running or not reachable. Skipping this step.', buildId, applicationId })
-        return
-      }
-      try {
-        saveBuildLog({ line: '[PROXY] - Configuring proxy.', buildId, applicationId })
-        const transactionId = await getNextTransactionId()
-        try {
-          const backendFound = await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
-          if (backendFound) {
-            await haproxy.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
-              searchParams: {
-                transaction_id: transactionId
-              },
-            }).json()
-
-          }
-
-        } catch (error) {
-          // Backend not found, no worries, it means it's not defined yet
-        }
-        try {
-          if (oldDomain) {
-            // TODO: PRMR builds should be deleted or reconfigured as well??
-            await haproxy.delete(`v2/services/haproxy/configuration/backends/${oldDomain}`, {
-              searchParams: {
-                transaction_id: transactionId
-              },
-            }).json()
-            await db.prisma.application.update({ where: { id: applicationId }, data: { oldDomain: null } })
-          }
-        } catch (error) {
-          // Backend not found, no worries, it means it's not defined yet
-        }
-        await haproxy.post('v2/services/haproxy/configuration/backends', {
-          searchParams: {
-            transaction_id: transactionId
-          },
-          json: {
-            "init-addr": "last,libc,none",
-            "forwardfor": { "enabled": "enabled" },
-            "name": domain
-          }
-        })
-
-        await haproxy.post('v2/services/haproxy/configuration/servers', {
-          searchParams: {
-            transaction_id: transactionId,
-            backend: domain
-          },
-          json: {
-            "address": applicationId,
-            "check": "enabled",
-            "name": applicationId,
-            "port": port
-          }
-        })
-        await completeTransaction(transactionId)
-        saveBuildLog({ line: '[PROXY] - Configured.', buildId, applicationId })
-      } catch (error) {
-        console.log(error.code)
-        console.log(error.response.body)
-        throw new Error(error)
-      } finally {
-        await asyncExecShell(`rm -fr ${workdir}`)
-      }
+      await configureProxy({ domain, applicationId, port })
     } else {
       saveBuildLog({ line: '[COOLIFY] - Custom proxy is configured. Nothing else to do.', buildId, applicationId })
     }

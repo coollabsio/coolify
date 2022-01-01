@@ -162,7 +162,7 @@
 		</form>
 	{:else}
 		<a href={`${source.htmlUrl}/oauth/applications/${source.gitlabApp.oauthId}`}
-			><button>Check OAuth Application on GitLab</button></a
+			><button>Check OAuth Application</button></a
 		>
 	{/if}
 </div>
