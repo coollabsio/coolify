@@ -11,6 +11,7 @@ const config = {
         },
 		headers: {
 			host: 'X-Forwarded-Host',
+			protocol: 'X-Forwarded-Proto',
 		},
 		floc: true,
 		vite: {
