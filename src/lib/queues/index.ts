@@ -11,9 +11,6 @@ import logger from './logger';
 import proxy from './proxy';
 import { saveBuildLog } from '$lib/common'
 
-
-
-
 let { Queue, Worker } = Bullmq;
 let redisHost = 'localhost';
 

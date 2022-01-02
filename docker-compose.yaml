@@ -11,6 +11,8 @@ services:
         mode: host
     volumes:
       - 'coolify-db-sqlite:/app/db'
+      - 'coolify-ssl-certs:/app/ssl'
+      - 'coolify-letsencrypt:/etc/letsencrypt'
       - '/var/run/docker.sock:/var/run/docker.sock'
     env_file:
       - ".env"
@@ -31,4 +33,8 @@ networks:
 
 volumes:
   coolify-db-sqlite:
+    external: true
+  coolify-ssl-certs:
+    external: true
+  coolify-letsencrypt:
     external: true

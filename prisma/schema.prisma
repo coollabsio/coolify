@@ -95,6 +95,7 @@ model ApplicationSettings {
   applicationId String      @unique
   debug         Boolean     @default(false)
   previews      Boolean     @default(false)
+  forceSSL      Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 }

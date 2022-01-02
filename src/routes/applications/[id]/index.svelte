@@ -45,21 +45,29 @@
 	let loading = false;
 	let debug = application.settings.debug;
 	let previews = application.settings.previews;
-	
+	let forceSSL = application.settings.forceSSL;
+
 	onMount(() => {
 		domainEl.focus();
 	});
 
 	async function changeSettings(name) {
 		const form = new FormData();
+		let forceSSLChanged = false
 		if (name === 'debug') {
 			debug = !debug;
 		}
 		if (name === 'previews') {
 			previews = !previews;
 		}
+		if (name === 'forceSSL') {
+			if (!forceSSL) forceSSLChanged = true;
+			forceSSL = !forceSSL;
+		}
 		form.append('previews', previews.toString());
 		form.append('debug', debug.toString());
+		form.append('forceSSL', forceSSL.toString());
+		form.append('forceSSLChanged', forceSSLChanged.toString());
 
 		try {
 			await fetch(`/applications/${id}/settings.json`, {
@@ -335,6 +343,14 @@
 	
 	</div>
 	<div class="px-4 sm:px-6 pb-10">
+		<ul class="mt-2 divide-y divide-warmGray-800">
+			<Setting
+				bind:setting={forceSSL}
+				on:click={() => changeSettings('forceSSL')}
+				title="Force SSL"
+				description=""
+			/>
+		</ul>
 		<ul class="mt-2 divide-y divide-warmGray-800">
 			<Setting
 				bind:setting={previews}
