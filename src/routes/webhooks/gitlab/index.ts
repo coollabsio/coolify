@@ -22,7 +22,6 @@ export const get: RequestHandler = async (request) => {
     const state = request.url.searchParams.get('state')
 
     try {
-        const protocol = dev ? 'http' : 'https'
         const application = await db.getApplication({ id: state, teamId })
         const { appId, appSecret } = application.gitSource.gitlabApp
         const { htmlUrl } = application.gitSource
@@ -33,7 +32,7 @@ export const get: RequestHandler = async (request) => {
                 code,
                 state,
                 grant_type: 'authorization_code',
-                redirect_uri: `${protocol}://${request.headers.host}/webhooks/gitlab`
+                redirect_uri: `${request.url.origin}/webhooks/gitlab`
             }
         }).json()
 
@@ -46,7 +45,6 @@ export const get: RequestHandler = async (request) => {
             }
         }
     } catch (err) {
-        console.log(err.response)
         return err
     }
 
