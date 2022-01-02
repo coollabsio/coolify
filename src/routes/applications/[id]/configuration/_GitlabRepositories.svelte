@@ -10,7 +10,7 @@
 	import cuid from 'cuid';
 
 	const { id } = $page.params;
-	const from = $page.query.get('from');
+	const from = $page.url.searchParams.get('from');
 
 	let loading = {
 		base: true,

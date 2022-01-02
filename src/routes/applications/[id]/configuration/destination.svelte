@@ -1,15 +1,15 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, page, stuff }) => {
+	export const load: Load = async ({ fetch, params, url, stuff }) => {
 		const { application } = stuff;
-		if (application?.destinationDockerId && !page.query.get('from')) {
+		if (application?.destinationDockerId && !url.searchParams.get('from')) {
 			return {
 				status: 302,
-				redirect: `/applications/${page.params.id}`
+				redirect: `/applications/${params.id}`
 			};
 		}
-		const url = `/destinations.json`;
-		const res = await fetch(url);
+		const endpoint = `/destinations.json`;
+		const res = await fetch(endpoint);
 
 		if (res.ok) {
 			return {
@@ -33,7 +33,7 @@
 	import { enhance } from '$lib/form';
 
 	const { id } = $page.params;
-	const from = $page.query.get('from');
+	const from = $page.url.searchParams.get('from');
 
 	export let destinations: Prisma.DestinationDocker[];
 </script>

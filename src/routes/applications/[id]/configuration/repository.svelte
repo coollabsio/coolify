@@ -1,11 +1,11 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ page, stuff }) => {
+	export const load: Load = async ({ params,url, stuff }) => {
 		const { application, githubToken, gitlabToken } = stuff;
-		if (application?.branch && application?.repository && !page.query.get('from')) {
+		if (application?.branch && application?.repository && !url.searchParams.get('from')) {
 			return {
 				status: 302,
-				redirect: `/applications/${page.params.id}`
+				redirect: `/applications/${params.id}`
 			};
 		}
 		return {

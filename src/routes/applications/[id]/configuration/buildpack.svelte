@@ -1,10 +1,8 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ fetch, params, url, stuff }) => {
-		const { application } = stuff;
-		console.log(url)
-		
-		if (application?.buildPack && !params.query.get('from')) {
+		const { application } = stuff;		
+		if (application?.buildPack && !url.searchParams.get('from')) {
 			return {
 				status: 302,
 				redirect: `/applications/${params.id}`
@@ -32,7 +30,7 @@
 	import { enhance } from '$lib/form';
 	
 	const { id } = $page.params;
-	const from = $page.query.get('from');
+	const from = $page.url.searchParams.get('from');
 
 	export let buildPacks: BuildPack[];
 </script>

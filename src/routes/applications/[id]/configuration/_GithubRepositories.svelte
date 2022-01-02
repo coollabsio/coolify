@@ -7,7 +7,7 @@
 	import { onMount } from 'svelte';
 
 	const { id } = $page.params;
-	const from = $page.query.get('from');
+	const from = $page.url.searchParams.get('from');
 
 	let htmlUrl = application.gitSource.htmlUrl;
 	let apiUrl = application.gitSource.apiUrl;

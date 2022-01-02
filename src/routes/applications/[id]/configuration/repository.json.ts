@@ -3,8 +3,8 @@ import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler<Locals, FormData> = async (request) => {
     const { id } = request.params
-    const repository = request.query.get('repository') || null
-    const branch = request.query.get('branch') || null
+    const repository = request.url.searchParams.get('repository') || null
+    const branch = request.url.searchParams.get('branch') || null
 
     try {
         return await db.isBranchAlreadyUsed({ repository, branch, id })

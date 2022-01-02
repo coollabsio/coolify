@@ -26,7 +26,7 @@ export const get: RequestHandler = async (request) => {
         const application = await db.getApplication({ id: state, teamId })
         const { appId, appSecret } = application.gitSource.gitlabApp
         const { htmlUrl } = application.gitSource
-        const { access_token } = await got.post(htmlUrl, {
+        const { access_token } = await got.post(`${htmlUrl}/oauth/token`, {
             searchParams: {
                 client_id: appId,
                 client_secret: appSecret,
@@ -46,6 +46,7 @@ export const get: RequestHandler = async (request) => {
             }
         }
     } catch (err) {
+        console.log(err.response)
         return err
     }
 
