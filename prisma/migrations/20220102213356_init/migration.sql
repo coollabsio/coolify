@@ -80,6 +80,7 @@ CREATE TABLE "ApplicationSettings" (
     "applicationId" TEXT NOT NULL,
     "debug" BOOLEAN NOT NULL DEFAULT false,
     "previews" BOOLEAN NOT NULL DEFAULT false,
+    "forceSSL" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "ApplicationSettings_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "Application" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
