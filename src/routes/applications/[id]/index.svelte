@@ -1,6 +1,6 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, page, stuff }) => {
+	export const load: Load = async ({ fetch, params, stuff }) => {
 		if (stuff?.application?.id) {
 			return {
 				props: {
@@ -8,8 +8,8 @@
 				}
 			};
 		}
-		const url = `/applications/${page.params.id}.json`;
-		const res = await fetch(url);
+		const endpoint = `/applications/${params.id}.json`;
+		const res = await fetch(endpoint);
 
 		if (res.ok) {
 			return {
@@ -21,7 +21,7 @@
 
 		return {
 			status: res.status,
-			error: new Error(`Could not load ${url}`)
+			error: new Error(`Could not load ${endpoint}`)
 		};
 	};
 </script>
@@ -45,7 +45,7 @@
 	let loading = false;
 	let debug = application.settings.debug;
 	let previews = application.settings.previews;
-
+	
 	onMount(() => {
 		domainEl.focus();
 	});

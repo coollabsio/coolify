@@ -30,7 +30,7 @@ export const handle = handleSession(
         let responseWithCookie = response
 
         // This check needed for switching team with HttpOnly cookie (see /src/routes/index.json.ts)
-        if (isTeamIdTokenAvailableResult && request.path !== '/index.json' && request.method !== 'POST' && request.path !== '/logout.json') {
+        if (isTeamIdTokenAvailableResult && request.url.pathname !== '/index.json' && request.method !== 'POST' && request.url.pathname !== '/logout.json') {
             responseWithCookie = {
                 ...response,
                 headers: {

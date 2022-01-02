@@ -28,7 +28,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
 	const cookie = request.body.get('cookie')
 	const value = request.body.get('value')
-	const from = request.query.get('from') || '/'
+	const from = request.url.searchParams.get('from') || '/'
 
 	return {
 		status: 302,

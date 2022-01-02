@@ -1,7 +1,7 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, page, stuff }) => {
-		let url = `/applications/${page.params.id}/secrets.json`;
+	export const load: Load = async ({ fetch, params }) => {
+		let url = `/applications/${params.id}/secrets.json`;
 		const res = await fetch(url);
 		if (res.ok) {
 			return {

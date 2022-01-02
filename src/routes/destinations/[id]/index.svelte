@@ -1,6 +1,6 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, page, stuff }) => {
+	export const load: Load = async ({ fetch, params, stuff }) => {
 		if (stuff?.destination) {
 			return {
 				props: {
@@ -8,7 +8,7 @@
 				}
 			};
 		}
-		const url = `/destinations/${page.params.id}.json`;
+		const url = `/destinations/${params.id}.json`;
 		const res = await fetch(url);
 
 		if (res.ok) {

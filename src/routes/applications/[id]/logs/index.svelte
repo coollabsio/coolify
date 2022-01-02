@@ -1,8 +1,9 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, page, stuff }) => {
-		let url = `/applications/${page.params.id}/logs.json?skip=0`;
-		const res = await fetch(url);
+	export const load: Load = async ({ fetch, params,url, stuff }) => {
+
+		let endpoint = `/applications/${params.id}/logs.json?skip=0`;
+		const res = await fetch(endpoint);
 		if (res.ok) {
 			return {
 				props: {
@@ -22,7 +23,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { dateOptions } from '$lib/components/common';
-	
+
 	import BuildLog from './_BuildLog.svelte';
 
 	export let builds;
@@ -35,8 +36,7 @@
 	let skip = 0;
 	let noMoreBuilds = buildCount < 5 || buildCount <= skip;
 	const { id } = $page.params;
-
-	let preselectedBuildId = $page.query.get('buildId');
+	let preselectedBuildId = $page.url.searchParams.get('buildId');
 	if (preselectedBuildId) buildId = preselectedBuildId;
 
 	async function updateBuildStatus({ detail }) {
@@ -79,7 +79,9 @@
 </script>
 
 <div class="font-bold flex space-x-1 py-6 px-6">
-	<div class="text-2xl tracking-tight mr-4">Logs of <a href="http://{application.domain}" target="_blank">{application.domain}</a></div>
+	<div class="text-2xl tracking-tight mr-4">
+		Logs of <a href="http://{application.domain}" target="_blank">{application.domain}</a>
+	</div>
 </div>
 <div class="flex flex-row px-10 justify-start pt-6 space-x-2 ">
 	<div class="min-w-[16rem] space-y-2">
@@ -116,9 +118,7 @@
 			</div>
 		{/each}
 		{#if buildCount > 0 && !noMoreBuilds}
-			<button class="w-full"  on:click={loadMoreBuilds}
-				>Load More</button
-			>
+			<button class="w-full" on:click={loadMoreBuilds}>Load More</button>
 		{/if}
 	</div>
 	<div class="flex-1 w-96">

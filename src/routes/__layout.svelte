@@ -2,8 +2,8 @@
 	import type { Load } from '@sveltejs/kit';
 	import { publicPaths } from '$lib/settings';
 
-	export const load: Load = async ({ fetch, page, session }) => {
-		if (!session.uid && !publicPaths.includes(page.path)) {
+	export const load: Load = async ({ fetch, url, params, session }) => {
+		if (!session.uid && !publicPaths.includes(url.pathname)) {
 			return {
 				status: 302,
 				redirect: '/login'
@@ -12,8 +12,8 @@
 		if (!session.uid) {
 			return {};
 		}
-		const url = `/teams.json`;
-		const res = await fetch(url);
+		const endpoint = `/teams.json`;
+		const res = await fetch(endpoint);
 
 		if (res.ok) {
 			return {
@@ -77,7 +77,7 @@
 		const form = new FormData();
 		form.append('cookie', 'teamId');
 		form.append('value', selectedTeamId);
-		const response = await fetch(`/index.json?from=${$page.path}`, {
+		const response = await fetch(`/index.json?from=${$page.url.pathname}`, {
 			method: 'post',
 			body: form
 		});
@@ -114,8 +114,8 @@
 					sveltekit:prefetch
 					href="/"
 					class="icons bg-coolgray-200 hover:text-white tooltip-right"
-					class:text-white={$page.path === '/'}
-					class:bg-coolgray-500={$page.path === '/'}
+					class:text-white={$page.url.pathname === '/'}
+					class:bg-coolgray-500={$page.url.pathname === '/'}
 					data-tooltip="Dashboard"
 				>
 					<svg
@@ -141,10 +141,10 @@
 					sveltekit:prefetch
 					href="/applications"
 					class="icons hover:text-green-500 bg-coolgray-200 tooltip-right"
-					class:text-green-500={$page.path.startsWith('/applications') ||
-						$page.path.startsWith('/new/application')}
-					class:bg-coolgray-500={$page.path.startsWith('/applications') ||
-						$page.path.startsWith('/new/application')}
+					class:text-green-500={$page.url.pathname.startsWith('/applications') ||
+						$page.url.pathname.startsWith('/new/application')}
+					class:bg-coolgray-500={$page.url.pathname.startsWith('/applications') ||
+						$page.url.pathname.startsWith('/new/application')}
 					data-tooltip="Applications"
 				>
 					<svg
@@ -169,10 +169,10 @@
 					sveltekit:prefetch
 					href="/sources"
 					class="icons hover:text-orange-500 bg-coolgray-200 tooltip-right"
-					class:text-orange-500={$page.path.startsWith('/sources') ||
-						$page.path.startsWith('/new/source')}
-					class:bg-coolgray-500={$page.path.startsWith('/sources') ||
-						$page.path.startsWith('/new/source')}
+					class:text-orange-500={$page.url.pathname.startsWith('/sources') ||
+						$page.url.pathname.startsWith('/new/source')}
+					class:bg-coolgray-500={$page.url.pathname.startsWith('/sources') ||
+						$page.url.pathname.startsWith('/new/source')}
 					data-tooltip="Git Sources"
 				>
 					<svg
@@ -198,10 +198,10 @@
 					sveltekit:prefetch
 					href="/destinations"
 					class="icons hover:text-sky-500 bg-coolgray-200 tooltip-right"
-					class:text-sky-500={$page.path.startsWith('/destinations') ||
-						$page.path.startsWith('/new/destination')}
-					class:bg-coolgray-500={$page.path.startsWith('/destinations') ||
-						$page.path.startsWith('/new/destination')}
+					class:text-sky-500={$page.url.pathname.startsWith('/destinations') ||
+						$page.url.pathname.startsWith('/new/destination')}
+					class:bg-coolgray-500={$page.url.pathname.startsWith('/destinations') ||
+						$page.url.pathname.startsWith('/new/destination')}
 					data-tooltip="Destinations"
 				>
 					<svg
@@ -278,8 +278,8 @@
 						sveltekit:prefetch
 						href="/databases"
 						class="icons hover:text-purple-500 bg-coolgray-200 tooltip-right"
-						class:text-purple-500={$page.path.startsWith('/databases')}
-						class:bg-coolgray-500={$page.path.startsWith('/databases')}
+						class:text-purple-500={$page.url.pathname.startsWith('/databases')}
+						class:bg-coolgray-500={$page.url.pathname.startsWith('/databases')}
 						data-tooltip="Databases"
 					>
 						<svg
@@ -303,8 +303,8 @@
 						sveltekit:prefetch
 						href="/services"
 						class="icons hover:text-pink-500 bg-coolgray-200 tooltip-right"
-						class:text-pink-500={$page.path.startsWith('/services')}
-						class:bg-coolgray-500={$page.path.startsWith('/services')}
+						class:text-pink-500={$page.url.pathname.startsWith('/services')}
+						class:bg-coolgray-500={$page.url.pathname.startsWith('/services')}
 						data-tooltip="Services"
 					>
 						<svg
@@ -330,8 +330,8 @@
 					sveltekit:prefetch
 					href="/teams"
 					class="icons hover:text-cyan-500 bg-coolgray-200 tooltip-right"
-					class:text-cyan-500={$page.path.startsWith('/teams')}
-					class:bg-coolgray-500={$page.path.startsWith('/teams')}
+					class:text-cyan-500={$page.url.pathname.startsWith('/teams')}
+					class:bg-coolgray-500={$page.url.pathname.startsWith('/teams')}
 					data-tooltip="Teams"
 				>
 					<svg
@@ -356,8 +356,8 @@
 						sveltekit:prefetch
 						href="/settings"
 						class="icons hover:text-yellow-500 bg-coolgray-200 tooltip-right"
-						class:text-yellow-500={$page.path.startsWith('/settings')}
-						class:bg-coolgray-500={$page.path.startsWith('/settings')}
+						class:text-yellow-500={$page.url.pathname.startsWith('/settings')}
+						class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
 						data-tooltip="Settings"
 					>
 						<svg

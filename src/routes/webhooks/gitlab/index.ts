@@ -1,3 +1,4 @@
+import { dev } from '$app/env';
 import { getTeam } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
@@ -17,22 +18,22 @@ export const options = async () => {
 
 export const get: RequestHandler = async (request) => {
     const teamId = getTeam(request)
-    const tokenUrl = 'https://gitlab.com/oauth/token'
-    const code = request.query.get('code')
-    const state = request.query.get('state')
+    const code = request.url.searchParams.get('code')
+    const state = request.url.searchParams.get('state')
 
     try {
+        const protocol = dev ? 'http' : 'https'
         const application = await db.getApplication({ id: state, teamId })
         const { appId, appSecret } = application.gitSource.gitlabApp
-        // TODO must not be localhost
-        const { access_token } = await got.post(tokenUrl, {
+        const { htmlUrl } = application.gitSource
+        const { access_token } = await got.post(htmlUrl, {
             searchParams: {
                 client_id: appId,
                 client_secret: appSecret,
                 code,
                 state,
                 grant_type: 'authorization_code',
-                redirect_uri: `http://${request.headers.host}/webhooks/gitlab`
+                redirect_uri: `${protocol}://${request.headers.host}/webhooks/gitlab`
             }
         }).json()
 

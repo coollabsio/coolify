@@ -1,3 +1,5 @@
+import { dev } from '$app/env';
+import { getTeam } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
@@ -14,10 +16,13 @@ export const options = async () => {
 }
 
 export const get: RequestHandler = async (request) => {
-    const code = request.query.get('code')
-    const state = request.query.get('state')
+    const teamId = getTeam(request)
+    const code = request.url.searchParams.get('code')
+    const state = request.url.searchParams.get('state')
     try {
-        const response = await fetch(`https://api.github.com/app-manifests/${code}/conversions`, { method: 'POST' })
+        const application = await db.getApplication({ id: state, teamId })
+        const { apiUrl } = application.gitSource
+        const response = await fetch(`https://${apiUrl}/app-manifests/${code}/conversions`, { method: 'POST' })
         if (!response.ok) {
             return {
                 status: 500,

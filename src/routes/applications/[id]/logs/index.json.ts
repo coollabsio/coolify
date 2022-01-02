@@ -4,8 +4,8 @@ import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (request) => {
     const { id } = request.params
-    const buildId = request.query.get('buildId')
-    const skip = Number(request.query.get('skip')) || 0
+    const buildId = request.url.searchParams.get('buildId')
+    const skip = Number(request.url.searchParams.get('skip')) || 0
     let builds = []
     const buildCount = await db.prisma.build.count({where: { applicationId: id }})
     if (buildId) {

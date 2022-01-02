@@ -1,15 +1,17 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, page, stuff }) => {
+	export const load: Load = async ({ fetch, params, url, stuff }) => {
 		const { application } = stuff;
-		if (application?.buildPack && !page.query.get('from')) {
+		console.log(url)
+		
+		if (application?.buildPack && !params.query.get('from')) {
 			return {
 				status: 302,
-				redirect: `/applications/${page.params.id}`
+				redirect: `/applications/${params.id}`
 			};
 		}
-		const url = `/applications/${page.params.name}/configuration/buildpack.json`;
-		const res = await fetch(url);
+		const endpoint = `/applications/${params.name}/configuration/buildpack.json`;
+		const res = await fetch(endpoint);
 		if (res.ok) {
 			return {
 				props: {

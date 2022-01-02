@@ -13,9 +13,9 @@
 		}
 		return configurationPhase;
 	}
-	export const load: Load = async ({ fetch, page }) => {
-		const url = `/applications/${page.params.id}.json`;
-		const res = await fetch(url);
+	export const load: Load = async ({ fetch, url, params }) => {
+		const endpoint = `/applications/${params.id}.json`;
+		const res = await fetch(endpoint);
 		if (res.ok) {
 			const { application, githubToken, gitlabToken } = await res.json();
 			if (!application || Object.entries(application).length === 0) {
@@ -27,11 +27,11 @@
 			const configurationPhase = checkConfiguration(application);
 			if (
 				configurationPhase &&
-				page.path !== `/applications/${page.params.id}/configuration/${configurationPhase}`
+				url.pathname !== `/applications/${params.id}/configuration/${configurationPhase}`
 			) {
 				return {
 					status: 302,
-					redirect: `/applications/${page.params.id}/configuration/${configurationPhase}`
+					redirect: `/applications/${params.id}/configuration/${configurationPhase}`
 				};
 			}
 
@@ -153,8 +153,8 @@
 			href="/applications/{id}"
 			sveltekit:prefetch
 			class="hover:text-yellow-500 rounded"
-			class:text-yellow-500={$page.path === `/applications/${id}`}
-			class:bg-coolgray-500={$page.path === `/applications/${id}`}
+			class:text-yellow-500={$page.url.pathname === `/applications/${id}`}
+			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}`}
 		>
 			<button
 				title="Configurations"
@@ -188,8 +188,8 @@
 			href="/applications/{id}/secrets"
 			sveltekit:prefetch
 			class="hover:text-pink-500 rounded"
-			class:text-pink-500={$page.path === `/applications/${id}/secrets`}
-			class:bg-coolgray-500={$page.path === `/applications/${id}/secrets`}
+			class:text-pink-500={$page.url.pathname === `/applications/${id}/secrets`}
+			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/secrets`}
 		>
 			<button
 				title="Secrets"
@@ -219,8 +219,8 @@
 			href="/applications/{id}/previews"
 			sveltekit:prefetch
 			class="hover:text-orange-500 rounded"
-			class:text-orange-500={$page.path === `/applications/${id}/previews`}
-			class:bg-coolgray-500={$page.path === `/applications/${id}/previews`}
+			class:text-orange-500={$page.url.pathname === `/applications/${id}/previews`}
+			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/previews`}
 		>
 			<button
 				title="Previews"
@@ -251,8 +251,8 @@
 			href="/applications/{id}/logs"
 			sveltekit:prefetch
 			class="hover:text-sky-500 rounded"
-			class:text-sky-500={$page.path === `/applications/${id}/logs`}
-			class:bg-coolgray-500={$page.path === `/applications/${id}/logs`}
+			class:text-sky-500={$page.url.pathname === `/applications/${id}/logs`}
+			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs`}
 		>
 			<button
 				title="Logs"

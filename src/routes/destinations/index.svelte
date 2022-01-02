@@ -1,6 +1,6 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, page }) => {
+	export const load: Load = async ({ fetch }) => {
 		const url = `/destinations.json`;
 		const res = await fetch(url);
 

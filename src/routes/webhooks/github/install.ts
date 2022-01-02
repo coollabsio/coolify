@@ -14,8 +14,8 @@ export const options = async () => {
 }
 
 export const get: RequestHandler = async (request) => {
-    const gitSourceId = request.query.get('gitSourceId')
-    const installation_id = request.query.get('installation_id')
+    const gitSourceId = request.url.searchParams.get('gitSourceId')
+    const installation_id = request.url.searchParams.get('installation_id')
 
     const dbresponse = await db.addInstallation({ gitSourceId, installation_id })
     if (dbresponse.status !== 201) {

@@ -1,4 +1,6 @@
 <script lang="ts">
+import { dev } from '$app/env';
+
 	import { dashify } from '$lib/github';
 
 	export let source;
@@ -9,21 +11,23 @@
 
 	function newGithubApp(source) {
 		const { organization, id, htmlUrl, type } = source;
+        const protocol = dev ? 'http' : 'https'
+
 		if (type === 'github') {
 			let url = 'settings/apps/new';
 			if (organization) url = `organizations/${organization}/settings/apps/new`;
 			const host = dashify(window.location.host);
 			const data = JSON.stringify({
 				name: `coolify-${host}`,
-				url: `https://${window.location.host}`,
+				url: `${protocol}://${window.location.host}`,
 				hook_attributes: {
-					url: `https://${host}/webhooks/applications/deploy`
+					url: `${protocol}://${host}/webhooks/applications/deploy`
 				},
-				redirect_url: `https://${window.location.host}/webhooks/github`,
-				callback_urls: [`https://${window.location.host}/login/github/app`],
+				redirect_url: `${protocol}://${window.location.host}/webhooks/github`,
+				callback_urls: [`${protocol}://${window.location.host}/login/github/app`],
 				public: false,
 				request_oauth_on_install: false,
-				setup_url: `http://${window.location.host}/webhooks/github/install?gitSourceId=${id}`,
+				setup_url: `${protocol}://${window.location.host}/webhooks/github/install?gitSourceId=${id}`,
 				setup_on_update: true,
 				default_permissions: {
 					contents: 'read',

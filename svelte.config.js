@@ -9,7 +9,9 @@ const config = {
 		prerender: {
             enabled: false,
         },
-		hostHeader: 'X-Forwarded-Host',
+		headers: {
+			host: 'X-Forwarded-Host',
+		},
 		floc: true,
 		vite: {
 			optimizeDeps: {

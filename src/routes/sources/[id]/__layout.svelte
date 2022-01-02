@@ -1,7 +1,7 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, page }) => {
-		const url = `/sources/${page.params.id}.json`;
+	export const load: Load = async ({ fetch, params }) => {
+		const url = `/sources/${params.id}.json`;
 		const res = await fetch(url);
 		if (res.ok) {
 			const { source } = await res.json();
