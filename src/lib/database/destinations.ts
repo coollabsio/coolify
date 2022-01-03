@@ -1,15 +1,17 @@
 import { asyncExecShell, getHost } from "$lib/common"
 import { dockerInstance } from "$lib/docker"
+import { configureCoolifyProxyOn } from "$lib/haproxy"
 import { prisma, PrismaErrorHandler } from "./common"
 
-// TODO: add uninstall function, remove all coolify proxies
-
-async function checkCoolifyProxy({ engine }) {
+export async function checkCoolifyProxy({ engine }) {
     let haProxyFound = false
     try {
         const host = getHost({ engine })
-        await asyncExecShell(`DOCKER_HOST="${host}" docker inspect coolify-haproxy`)
-        haProxyFound = true
+        const { stdout } = await asyncExecShell(`DOCKER_HOST="${host}" docker inspect --format '{{json .State}}' coolify-haproxy`)
+        if (JSON.parse(stdout).Running) {
+            haProxyFound = true
+        }
+
     } catch (err) {
         // HAProxy not found
     }
@@ -151,6 +153,15 @@ export async function setDestinationSettings({ engine, isCoolifyProxyUsed }) {
             await installCoolifyProxy({ engine, destinations })
         } else {
             await uninstallCoolifyProxy({ engine })
+            const domain = await prisma.setting.findUnique({ where: { name: 'domain' } })
+            if (domain) {
+                const found = await checkCoolifyProxy({ engine: '/var/run/docker.sock' })
+                if (!found) {
+                    await asyncExecShell(`docker run --restart always --add-host 'host.docker.internal:host-gateway' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" --name coolify-haproxy -d coollabsio/haproxy-alpine:1.0.0-rc.1`)
+                }
+                await configureCoolifyProxyOn({ domain: domain.value })
+
+            }
         }
         return { status: 200 }
     } catch (e) {

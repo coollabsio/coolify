@@ -8,7 +8,7 @@
 </script>
 
 <li class="py-4 flex items-center">
-	<div class="flex flex-col" class:px-10={isPadding} class:pr-32={!isPadding}>
+	<div class="flex flex-col" class:px-4={isPadding} class:pr-32={!isPadding}>
 		<p class="text-base font-bold text-warmGray-100">{title}</p>
 		<Explainer text={description} />
 	</div>

@@ -27,8 +27,26 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 
 	let isRegistrationEnabled =
-		settings.find((setting) => setting.name === 'isRegistrationEnabled').value === 'true';
+		settings.find((setting) => setting.name === 'isRegistrationEnabled')?.value === 'true';
 
+	let domain = settings.find((setting) => setting.name === 'domain')?.value;
+	let domainConfigured = !!domain;
+	async function removeDomain(name) {
+		if (domainConfigured) {
+			const form = new FormData();
+			form.append('name', name);
+
+			try {
+				await fetch('/settings.json', {
+					method: 'DELETE',
+					body: form
+				});
+				window.location.reload();
+			} catch (e) {
+				console.error(e);
+			}
+		}
+	}
 	async function changeSettings(name) {
 		const form = new FormData();
 		form.append('name', name);
@@ -37,11 +55,15 @@
 			isRegistrationEnabled = !isRegistrationEnabled;
 			form.append('value', isRegistrationEnabled.toString());
 		}
+		if (name === 'domain') {
+			form.append('value', domain.toString());
+		}
 		try {
 			await fetch('/settings.json', {
 				method: 'POST',
 				body: form
 			});
+			window.location.reload();
 		} catch (e) {
 			console.error(e);
 		}
@@ -58,20 +80,30 @@
 		</div>
 		<div class="px-4 sm:px-6">
 			<div class="py-4 flex items-center">
-				<div class="flex flex-col">
-					<p class="text-base font-bold text-warmGray-100">Domain</p>
-					<Explainer text="Set the domain that you could use to access Coolify." />
-				</div>
-				<form class="flex">
-					<input
-						readonly={!$session.isAdmin}
-						name="domain"
-						id="domain"
-						pattern="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-						placeholder="eg: coolify.io"
-						required
-					/>
-					<button type="submit" class="mx-2">Save</button>
+				<form class="flex" on:submit|preventDefault={() => changeSettings('domain')}>
+					<div class="flex flex-col">
+						<div class="flex">
+							<p class="text-base font-bold text-warmGray-100">Domain</p>
+							<button type="submit" class="mx-2 bg-green-600 hover:bg-green-500">Save</button>
+						</div>
+						<Explainer text="Set the domain that you could use to access Coolify." />
+					</div>
+
+					<div class="justify-center text-center space-y-2">
+						<input
+							bind:value={domain}
+							readonly={!$session.isAdmin}
+							name="domain"
+							id="domain"
+							pattern="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+							placeholder="eg: coolify.io"
+							required
+						/>
+
+						{#if domainConfigured}
+							<button on:click|preventDefault={() => removeDomain('domain')} class="bg-red-600 hover:bg-red-500">Remove domain</button>
+						{/if}
+					</div>
 				</form>
 			</div>
 			<ul class="mt-2 divide-y divide-warmGray-800">

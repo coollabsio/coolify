@@ -54,15 +54,10 @@ export async function removeProxyConfiguration({ domain }) {
 }
 export async function forceSSLOff({ domain }) {
     const haproxy = haproxyInstance()
-    try {
-        await haproxy.get('v2/info')
-    } catch (error) {
-        console.log(error)
-        return
-    }
+    await checkHAProxy()
     try {
         const transactionId = await getNextTransactionId()
-        const rules = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
+        const rules: any = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
             searchParams: {
                 parent_name: 'http',
                 parent_type: 'frontend',
@@ -79,7 +74,6 @@ export async function forceSSLOff({ domain }) {
                     }
                 }).json()
                 await completeTransaction(transactionId)
-                console.log('SSL force turned off for ', domain)
             }
 
         }
@@ -90,15 +84,10 @@ export async function forceSSLOff({ domain }) {
 }
 export async function forceSSLOn({ domain }) {
     const haproxy = haproxyInstance()
-    try {
-        await haproxy.get('v2/info')
-    } catch (error) {
-        console.log(error)
-        return
-    }
+    await checkHAProxy()
     try {
         const transactionId = await getNextTransactionId()
-        const rules = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
+        const rules: any = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
             searchParams: {
                 parent_name: 'http',
                 parent_type: 'frontend',
@@ -125,24 +114,18 @@ export async function forceSSLOn({ domain }) {
             }
         }).json()
         await completeTransaction(transactionId)
-        console.log('SSL force turned on for', domain)
     } catch (error) {
         console.log(error)
     }
 }
 export async function configureProxy({ domain, applicationId, port, forceSSL }) {
     const haproxy = haproxyInstance()
-
-    try {
-        await haproxy.get('v2/info')
-    } catch (error) {
-        return
-    }
+    await checkHAProxy()
 
     try {
         try {
-            const backend = await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
-            const server = await haproxy.get(`v2/services/haproxy/configuration/servers/${applicationId}`, {
+            const backend: any = await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
+            const server: any = await haproxy.get(`v2/services/haproxy/configuration/servers/${applicationId}`, {
                 searchParams: {
                     backend: domain
                 },
@@ -166,7 +149,7 @@ export async function configureProxy({ domain, applicationId, port, forceSSL }) 
             }
 
             if (forceSSL) {
-                const rules = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
+                const rules: any = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
                     searchParams: {
                         parent_name: 'http',
                         parent_type: 'frontend',
@@ -219,46 +202,75 @@ export async function configureProxy({ domain, applicationId, port, forceSSL }) 
             }
         })
         await completeTransaction(transactionId)
-        console.log('proxy configured for this application', domain, applicationId, port)
     } catch (error) {
         console.log(error)
         throw new Error(error)
     }
 }
 
-async function configureCoolifyProxyOn({ domain }) {
+export async function configureCoolifyProxyOff({ domain }) {
     const haproxy = haproxyInstance()
-    const transactionId = await getNextTransactionId()
-
+    await checkHAProxy()
+    try {
+        const transactionId = await getNextTransactionId()
+        await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
+        await haproxy.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
+            searchParams: {
+                transaction_id: transactionId
+            },
+        }).json()
+        await completeTransaction(transactionId)
+        if (!dev) await forceSSLOff({ domain })
+    } catch (error) {
+        console.log(error)
+    }
+}
+export async function checkHAProxy() {
+    const haproxy = haproxyInstance()
     try {
         await haproxy.get('v2/info')
     } catch (error) {
+        throw 'HAProxy is not running, but it should be!'
+    }
+}
+export async function configureCoolifyProxyOn({ domain }) {
+    const haproxy = haproxyInstance()
+    await checkHAProxy()
+  
+    try {
+        await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
         return
+    } catch (error) {
+
+    }
+    try {
+        const transactionId = await getNextTransactionId()
+        await haproxy.post('v2/services/haproxy/configuration/backends', {
+            searchParams: {
+                transaction_id: transactionId
+            },
+            json: {
+                "init-addr": "last,libc,none",
+                "forwardfor": { "enabled": "enabled" },
+                "name": domain
+            }
+        })
+        await haproxy.post('v2/services/haproxy/configuration/servers', {
+            searchParams: {
+                transaction_id: transactionId,
+                backend: domain
+            },
+            json: {
+                "address": dev ? "host.docker.internal" : "coolify",
+                "check": "enabled",
+                "name": "coolify",
+                "port": 3000
+            }
+        })
+        await completeTransaction(transactionId)
+        if (!dev) await forceSSLOn({ domain })
+    } catch (error) {
+        console.log(error)
     }
 
-    await haproxy.post('v2/services/haproxy/configuration/backends', {
-        searchParams: {
-            transaction_id: transactionId
-        },
-        json: {
-            "init-addr": "last,libc,none",
-            "forwardfor": { "enabled": "enabled" },
-            "name": domain
-        }
-    })
-
-    await haproxy.post('v2/services/haproxy/configuration/servers', {
-        searchParams: {
-            transaction_id: transactionId,
-            backend: domain
-        },
-        json: {
-            "address": "coolify",
-            "check": "enabled",
-            "name": "coolify",
-            "port": 3000
-        }
-    })
-    await completeTransaction(transactionId)
-    await forceSSLOn({ domain })
 }
