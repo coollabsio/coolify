@@ -4,13 +4,20 @@ import { asyncExecShell, getHost } from "../common"
 
 export default async function (job) {
   try {
-    const { destinationDocker, domain, forceSSLChanged } = job.data
+    const { destinationDocker, domain, forceSSLChanged, isCoolify } = job.data
     if (dev) {
       if (forceSSLChanged) {
         await forceSSLOn({ domain })
       } else {
         await forceSSLOff({ domain })
       }
+      return
+    }
+    if (isCoolify) {
+      const { stderr } = await asyncExecShell(`docker run --rm --name certbot -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080 -d ${domain} --agree-tos --non-interactive --register-unsafely-without-email --test-cert`)
+      if (stderr) throw new Error(stderr)
+      const { stderr: err } = await asyncExecShell(`docker run --rm --name bash -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" blang/busybox-bash cat /etc/letsencrypt/live/${domain}/fullchain.pem /etc/letsencrypt/live/${domain}/privkey.pem > /app/ssl/${domain}.pem`)
+      if (err) throw new Error(err)
       return
     }
     // Set SSL with Let's encrypt

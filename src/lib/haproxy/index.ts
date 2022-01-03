@@ -1,4 +1,5 @@
 import { dev } from "$app/env";
+import { letsEncryptQueue } from "$lib/queues";
 import got from "got";
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555'
 
@@ -220,7 +221,9 @@ export async function configureCoolifyProxyOff({ domain }) {
             },
         }).json()
         await completeTransaction(transactionId)
-        if (!dev) await forceSSLOff({ domain })
+        if (!dev) {
+            await forceSSLOff({ domain })
+        }
     } catch (error) {
         console.log(error)
     }
@@ -236,7 +239,7 @@ export async function checkHAProxy() {
 export async function configureCoolifyProxyOn({ domain }) {
     const haproxy = haproxyInstance()
     await checkHAProxy()
-  
+
     try {
         await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
         return
@@ -268,7 +271,10 @@ export async function configureCoolifyProxyOn({ domain }) {
             }
         })
         await completeTransaction(transactionId)
-        if (!dev) await forceSSLOn({ domain })
+        if (!dev) {
+            letsEncryptQueue.add(domain, { domain, isCoolify: true })
+            await forceSSLOn({ domain })
+        }
     } catch (error) {
         console.log(error)
     }
