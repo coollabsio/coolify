@@ -20,7 +20,7 @@ export function makeLabel({ applicationId, domain, name, type, pullmergeRequestI
             buildCommand,
             startCommand,
             baseDirectory,
-            publishDirectory,
+            publishDirectory
         }))}`,
     ]
 }

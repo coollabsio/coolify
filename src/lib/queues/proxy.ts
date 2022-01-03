@@ -11,7 +11,9 @@ export default async function () {
             const configurations = containers.filter(container => container.Labels['coolify.managed']).map(container => container.Labels['coolify.configuration']).map(configuration => JSON.parse(Buffer.from(configuration, 'base64').toString()))
             for (const configuration of configurations) {
                 const { domain, applicationId, port } = configuration
-                await configureProxy({ domain, applicationId, port })
+                const application = await prisma.application.findUnique({ where: { id: applicationId }, include: { settings: true } })
+                const { forceSSL } = application.settings
+                await configureProxy({ domain, applicationId, port, forceSSL })
             }
         }
     }

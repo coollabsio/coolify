@@ -1,5 +1,5 @@
 import * as Bullmq from 'bullmq'
-import { default as ProdBullmq, QueueScheduler } from 'bullmq'
+import { default as ProdBullmq, Job, QueueScheduler } from 'bullmq'
 import cuid from 'cuid'
 import { dev } from '$app/env';
 import { prisma } from '$lib/database';
@@ -34,7 +34,6 @@ proxyCronWorker.on('failed', async (job: Bullmq.Job, failedReason: string) => {
 
 })
 proxyCronQueue.drain().then(() => {
-  console.log('proxyCronQueue drained')
   proxyCronQueue.add('proxyCron', {}, { repeat: { every: 10000 } })
 })
 
@@ -77,7 +76,12 @@ letsEncryptWorker.on('completed', async () => {
   console.log('Lets Encrypt job completed')
 })
 
-letsEncryptWorker.on('failed', async (failedReason: string) => {
+letsEncryptWorker.on('failed', async (job: Job, failedReason: string) => {
+  try {
+    await prisma.applicationSettings.updateMany({ where: { applicationId: job.data.id }, data: { forceSSL: false } })
+  } catch(error) {
+    console.log(error)
+  }
   console.log('Lets Encrypt job failed')
   console.log(failedReason)
 })

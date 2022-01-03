@@ -4,7 +4,7 @@ import * as buildpacks from '../buildPacks'
 import * as importers from '../importers'
 import { dockerInstance } from '../docker'
 import { asyncExecShell, createDirectories, getHost, saveBuildLog, setDefaultConfiguration } from '../common'
-import { completeTransaction, configureProxy, getNextTransactionId, haproxyInstance } from '../haproxy'
+import { configureProxy } from '../haproxy'
 import * as db from '$lib/database'
 import { decrypt } from '$lib/crypto'
 
@@ -14,7 +14,7 @@ export default async function (job) {
     1 - Change build pack and redeploy, what should happen?
   */
   let { id: applicationId, repository, branch, buildPack, name, destinationDocker, destinationDockerId, gitSource, build_id: buildId, configHash, port, installCommand, buildCommand, startCommand, domain, oldDomain, baseDirectory, publishDirectory, projectId, secrets, type, pullmergeRequestId = null, sourceBranch = null, settings } = job.data
-  const { debug, previews } = settings
+  const { debug, previews, forceSSL } = settings
 
   let imageId = applicationId
 
@@ -129,7 +129,7 @@ export default async function (job) {
     saveBuildLog({ line: '[COOLIFY] - Deployment successful!', buildId, applicationId })
 
     if (destinationDocker.isCoolifyProxyUsed) {
-      await configureProxy({ domain, applicationId, port })
+      await configureProxy({ domain, applicationId, port, forceSSL })
     } else {
       saveBuildLog({ line: '[COOLIFY] - Custom proxy is configured. Nothing else to do.', buildId, applicationId })
     }

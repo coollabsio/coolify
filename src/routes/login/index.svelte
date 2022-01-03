@@ -27,7 +27,6 @@
 					result: async (response) => {
 						const { teamId } = await response.json();
 						if (teamId === '0') {
-							console.log('settings');
 							window.location.replace('/settings');
 						} else {
 							window.location.replace('/');

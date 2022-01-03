@@ -27,10 +27,9 @@
 </script>
 
 <script lang="ts">
-	export let application: Prisma.Application;
-
-	import type Prisma from '@prisma/client';
-
+	export let application: Application & {
+		settings: ApplicationSettings;
+	};
 	import { page, session } from '$app/stores';
 	import { enhance } from '$lib/form';
 	import { onMount } from 'svelte';
@@ -38,6 +37,7 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { appConfiguration } from '$lib/store';
 	import Setting from '$lib/components/Setting.svelte';
+	import type { Application, ApplicationSettings } from '@prisma/client';
 	const { id } = $page.params;
 
 	let domainEl: HTMLInputElement;
@@ -53,7 +53,7 @@
 
 	async function changeSettings(name) {
 		const form = new FormData();
-		let forceSSLChanged = false
+		let forceSSLChanged = false;
 		if (name === 'debug') {
 			debug = !debug;
 		}
@@ -340,7 +340,6 @@
 	</form>
 	<div class="font-bold flex space-x-1 pb-5">
 		<div class="text-xl tracking-tight mr-4">Features</div>
-	
 	</div>
 	<div class="px-4 sm:px-6 pb-10">
 		<ul class="mt-2 divide-y divide-warmGray-800">

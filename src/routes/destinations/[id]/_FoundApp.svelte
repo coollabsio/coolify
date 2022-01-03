@@ -33,7 +33,6 @@
 		loading = false;
 	});
 	async function addToCoolify() {
-		console.log(app)
 		const form = new FormData();
 		form.append('name', app.name);
 		form.append('domain', app.domain);

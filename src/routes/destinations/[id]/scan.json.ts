@@ -14,7 +14,6 @@ export const get: RequestHandler = async (request) => {
         return container.Labels['coolify.configuration']  
     })
     const jsonContainers = containers.map(container => JSON.parse(Buffer.from(container.Labels['coolify.configuration'], 'base64').toString())).filter(container => container.type === 'manual')
-    console.log(jsonContainers)
     return {
         body: {
             containers:jsonContainers

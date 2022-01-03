@@ -24,6 +24,7 @@
 
 	export let settings;
 	import Setting from '$lib/components/Setting.svelte';
+	import Explainer from '$lib/components/Explainer.svelte';
 
 	let isRegistrationEnabled =
 		settings.find((setting) => setting.name === 'isRegistrationEnabled').value === 'true';
@@ -56,6 +57,23 @@
 			<div class="text-xl tracking-tight mr-4">Global Settings</div>
 		</div>
 		<div class="px-4 sm:px-6">
+			<div class="py-4 flex items-center">
+				<div class="flex flex-col">
+					<p class="text-base font-bold text-warmGray-100">Domain</p>
+					<Explainer text="Set the domain that you could use to access Coolify." />
+				</div>
+				<form class="flex">
+					<input
+						readonly={!$session.isAdmin}
+						name="domain"
+						id="domain"
+						pattern="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+						placeholder="eg: coolify.io"
+						required
+					/>
+					<button type="submit" class="mx-2">Save</button>
+				</form>
+			</div>
 			<ul class="mt-2 divide-y divide-warmGray-800">
 				<Setting
 					bind:setting={isRegistrationEnabled}
