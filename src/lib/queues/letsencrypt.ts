@@ -14,10 +14,11 @@ export default async function (job) {
       return
     }
     if (isCoolify) {
-      const { stderr } = await asyncExecShell(`docker run --rm --name certbot -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080 -d ${domain} --agree-tos --non-interactive --register-unsafely-without-email --test-cert`)
+      await asyncExecShell(`docker run --rm --name certbot -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080 -d ${domain} --agree-tos --non-interactive --register-unsafely-without-email --test-cert`)
+
+      const { stderr } = await asyncExecShell(`docker run --rm -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" blang/busybox-bash cat /etc/letsencrypt/live/${domain}/fullchain.pem /etc/letsencrypt/live/${domain}/privkey.pem > /app/ssl/${domain}.pem`)
       if (stderr) throw new Error(stderr)
-      const { stderr: err } = await asyncExecShell(`docker run --rm --name bash -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" blang/busybox-bash cat /etc/letsencrypt/live/${domain}/fullchain.pem /etc/letsencrypt/live/${domain}/privkey.pem > /app/ssl/${domain}.pem`)
-      if (err) throw new Error(err)
+      await reloadConfiguration()
       return
     }
     // Set SSL with Let's encrypt
@@ -25,12 +26,11 @@ export default async function (job) {
       if (forceSSLChanged) {
         const host = getHost({ engine: destinationDocker.engine })
         // saveBuildLog({ line: 'Requesting SSL cert.', buildId })
-        const { stderr } = await asyncExecShell(`DOCKER_HOST=${host} docker run --rm --name certbot -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080 -d ${domain} --agree-tos --non-interactive --register-unsafely-without-email --test-cert`)
-        if (stderr) throw new Error(stderr)
+        await asyncExecShell(`DOCKER_HOST=${host} docker run --rm --name certbot -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080 -d ${domain} --agree-tos --non-interactive --register-unsafely-without-email --test-cert`)
         // saveBuildLog({ line: 'SSL cert requested successfully!', buildId })
         // saveBuildLog({ line: 'Parsing SSL cert.', buildId })
-        const { stderr: err } = await asyncExecShell(`DOCKER_HOST=${host} docker run --rm --name bash -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" blang/busybox-bash cat /etc/letsencrypt/live/${domain}/fullchain.pem /etc/letsencrypt/live/${domain}/privkey.pem > /app/ssl/${domain}.pem`)
-        if (err) throw new Error(err)
+        const { stderr } = await asyncExecShell(`DOCKER_HOST=${host} docker run --rm --name bash -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" blang/busybox-bash cat /etc/letsencrypt/live/${domain}/fullchain.pem /etc/letsencrypt/live/${domain}/privkey.pem > /app/ssl/${domain}.pem`)
+        if (stderr) throw new Error(stderr)
 
         // saveBuildLog({ line: 'SSL cert parsed.', buildId })
         // saveBuildLog({ line: 'Reloading Haproxy', buildId })
@@ -40,14 +40,8 @@ export default async function (job) {
         await forceSSLOff({ domain })
       }
       await reloadConfiguration()
-
-      // await asyncExecShell(`DOCKER_HOST=${host} docker kill -s HUP coolify-haproxy`)
-
     }
-
   } catch (err) {
     throw err
   }
-
-
 }
