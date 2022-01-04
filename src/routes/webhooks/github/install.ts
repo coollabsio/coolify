@@ -25,6 +25,6 @@ export const get: RequestHandler = async (request) => {
     }
     return {
         status: 302,
-        headers: { Location: `/sources/${gitSourceId}` }
+        headers: { Location: `/webhooks/success` }
     }
 }

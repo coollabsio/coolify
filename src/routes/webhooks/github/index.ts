@@ -20,16 +20,15 @@ export const get: RequestHandler = async (request) => {
     const code = request.url.searchParams.get('code')
     const state = request.url.searchParams.get('state')
     try {
-        const application = await db.getApplication({ id: state, teamId })
-        const { apiUrl } = application.gitSource
-        const response = await fetch(`https://${apiUrl}/app-manifests/${code}/conversions`, { method: 'POST' })
+        const { apiUrl } = await db.getSource({ id: state, teamId })
+        const response = await fetch(`${apiUrl}/app-manifests/${code}/conversions`, { method: 'POST' })
         if (!response.ok) {
+            const error = await response.json()
             return {
                 status: 500,
-                body: { ...await response.json() }
+                body: { ...error }
             }
         }
-
         const { id, client_id, slug, client_secret, pem, webhook_secret } = await response.json()
         const dbresponse = await db.createGithubApp({ id, client_id, slug, client_secret, pem, webhook_secret, state })
         if (dbresponse.status !== 201) {

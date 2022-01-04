@@ -153,7 +153,7 @@ export async function setDestinationSettings({ engine, isCoolifyProxyUsed }) {
             await installCoolifyProxy({ engine, destinations })
         } else {
             await uninstallCoolifyProxy({ engine })
-            const domain = await prisma.setting.findUnique({ where: { name: 'domain' } })
+            const domain = await prisma.setting.findUnique({ where: { name: 'domain' }, rejectOnNotFound: false })
             if (domain) {
                 const found = await checkCoolifyProxy({ engine: '/var/run/docker.sock' })
                 if (!found) {

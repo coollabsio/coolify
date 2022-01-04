@@ -1,5 +1,6 @@
+import { toast } from '@zerodevx/svelte-toast';
 export function errorNotification(message) {
-    alert(message)
+    toast.push(message);
 }
 export function enhance(
     form: HTMLFormElement,

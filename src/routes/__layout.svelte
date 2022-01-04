@@ -32,6 +32,7 @@
 	export let selectedTeamId;
 
 	import '../tailwind.css';
+	import { SvelteToast } from '@zerodevx/svelte-toast';
 	import { page, session } from '$app/stores';
 	import { browser, dev } from '$app/env';
 	import { onMount } from 'svelte';
@@ -105,6 +106,7 @@
 	}
 </script>
 
+<SvelteToast options={{intro: { y: -64 }, duration: 2000, pausable: true  }} />
 {#if $session.uid}
 	<nav class="nav-main">
 		<div class="flex flex-col w-full h-screen items-center transition-all duration-100">

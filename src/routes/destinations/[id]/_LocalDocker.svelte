@@ -1,6 +1,6 @@
 <script lang="ts">
 	export let destination;
-
+	import { toast } from '@zerodevx/svelte-toast';
 	import { page } from '$app/stores';
 	import Setting from '$lib/components/Setting.svelte';
 	import { errorNotification } from '$lib/form';
@@ -61,9 +61,11 @@
 				}'! Nothing will be reachable if you do it!`
 			);
 			if (sure) {
+				toast.push('Coolify Proxy will be stopped!');
 				payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed;
 			}
 		} else {
+			toast.push('Coolify Proxy will start soon.');
 			payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed;
 		}
 
@@ -102,7 +104,7 @@
 				disabled={loading}
 				>{loading ? 'Saving...' : 'Save'}
 			</button>
-			<button type="button" class="bg-indigo-600 hover:bg-indigo-500" on:click={scanApps}
+			<button type="button" class="bg-coollabs hover:bg-coollabs-100" on:click={scanApps}
 				>Scan for applications</button
 			>
 		</div>

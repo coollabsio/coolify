@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { browser } from '$app/env';
 	import { goto } from '$app/navigation';
-	import { session } from '$app/stores';
+	import { session, page } from '$app/stores';
 	import { enhance, errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
 	let loading = false;
 	let passwordEl;
 	let emailEl;
 	if (browser && $session.uid) {
-		goto('/');
+		goto('/')
 	}
 	onMount(() => {
 		emailEl.focus();

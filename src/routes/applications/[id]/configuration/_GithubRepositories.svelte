@@ -3,6 +3,7 @@
 	export let application;
 
 	import { page } from '$app/stores';
+	import { getGithubToken } from '$lib/components/common';
 	import { enhance, errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
 
@@ -27,22 +28,22 @@
 	let showSave = false;
 	let token = null;
 
-	async function getGithubToken(): Promise<void> {
-		const response = await fetch(
-			`${apiUrl}/app/installations/${application.gitSource.githubApp.installationId}/access_tokens`,
-			{
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${githubToken}`
-				}
-			}
-		);
-		if (!response.ok) {
-			throw new Error('Git Source not configured.');
-		}
-		const data = await response.json();
-		token = data.token;
-	}
+	// async function getGithubToken(): Promise<void> {
+	// 	const response = await fetch(
+	// 		`${apiUrl}/app/installations/${application.gitSource.githubApp.installationId}/access_tokens`,
+	// 		{
+	// 			method: 'POST',
+	// 			headers: {
+	// 				Authorization: `Bearer ${githubToken}`
+	// 			}
+	// 		}
+	// 	);
+	// 	if (!response.ok) {
+	// 		throw new Error('Git Source not configured.');
+	// 	}
+	// 	const data = await response.json();
+	// 	token = data.token;
+	// }
 	async function loadRepositoriesByPage(page = 0) {
 		const response = await fetch(`${apiUrl}/installation/repositories?per_page=100&page=${page}`, {
 			headers: {
@@ -52,7 +53,8 @@
 		return await response.json();
 	}
 	async function loadRepositories() {
-		await getGithubToken();
+		token = await getGithubToken({ apiUrl, githubToken, application });
+		// await getGithubToken();
 		let page = 1;
 		let reposCount = 0;
 		const loadedRepos = await loadRepositoriesByPage();
@@ -70,7 +72,7 @@
 	async function loadBranches() {
 		loading.branches = true;
 		selected.branch = undefined;
-		selected.projectId = repositories.find(repo => repo.full_name === selected.repository).id;
+		selected.projectId = repositories.find((repo) => repo.full_name === selected.repository).id;
 		const response = await fetch(`${apiUrl}/repos/${selected.repository}/branches`, {
 			headers: {
 				Authorization: `token ${token}`

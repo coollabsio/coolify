@@ -102,8 +102,10 @@ export function getHost({ engine }) {
 
 export const removeDestinationDocker = async ({ id, destinationDocker }) => {
     const docker = dockerInstance({ destinationDocker })
-    await docker.engine.getContainer(id).stop()
-    await docker.engine.getContainer(id).remove()
+    if (docker.engine.getContainer(id)) {
+        await docker.engine.getContainer(id).stop()
+        await docker.engine.getContainer(id).remove()
+    }
 }
 
 export const removePreviewDestinationDocker = async ({ id, destinationDocker, pullmergeRequestId }) => {
@@ -132,8 +134,10 @@ export const removeAllPreviewsDestinationDocker = async ({ id, destinationDocker
     for (const container of containers) {
         const preview = container.Image.split('-')[1]
         if (preview) previews.push(preview)
-        await docker.engine.getContainer(container.Id).stop()
-        await docker.engine.getContainer(container.Id).remove()
+        if (docker.engine.getContainer(container.Id)) {
+            await docker.engine.getContainer(container.Id).stop()
+            await docker.engine.getContainer(container.Id).remove()
+        }
     }
     return previews
 }

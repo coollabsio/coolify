@@ -5,7 +5,6 @@
 	import { onMount } from 'svelte';
 
 	import { enhance, errorNotification } from '$lib/form';
-	import { goto } from '$app/navigation';
 	import { dev } from '$app/env';
 	import cuid from 'cuid';
 
@@ -37,16 +36,6 @@
 		if (!gitlabToken) {
 			getGitlabToken();
 		} else {
-			// https://gitlab.com/api/v4/user
-			// https://gitlab.com/api/v4/groups?per_page=5000
-			// https://gitlab.com/api/v4/users/andrasbacsai/projects?min_access_level=40&page=1&per_page=25 or https://gitlab.com/api/v4/groups/3086145/projects?page=1&per_page=25
-			// https://gitlab.com/api/v4/projects/7260661/repository/branches?per_page=100&page=1
-
-			// https://gitlab.com/api/v4/projects/coollabsio%2FcoolLabs.io-frontend-v1/repository/tree?per_page=100&ref=master
-			// https://gitlab.com/api/v4/projects/7260661/repository/files/package.json?ref=master
-
-			// https://gitlab.com/api/v4/projects/7260661/deploy_keys - Create deploy keys with ssh-keys?
-			// TODO: this is not working!!!! https://gitlab.com/api/v4/projects/7260661/hooks - set webhook for project
 			loading.base = true;
 
 			let response = await fetch(`${apiUrl}/v4/user`, {

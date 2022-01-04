@@ -12,6 +12,7 @@ specifiers:
   '@types/node-forge': ^0.10.10
   '@typescript-eslint/eslint-plugin': ^4.31.1
   '@typescript-eslint/parser': ^4.31.1
+  '@zerodevx/svelte-toast': ^0.6.3
   autoprefixer: ^10.4.0
   bcrypt: ^5.0.1
   bullmq: ^1.51.1
@@ -68,6 +69,7 @@ devDependencies:
   '@types/node-forge': 0.10.10
   '@typescript-eslint/eslint-plugin': 4.33.0_d00b196ac5df1286ea7e45797bebddbc
   '@typescript-eslint/parser': 4.33.0_eslint@7.32.0+typescript@4.5.2
+  '@zerodevx/svelte-toast': 0.6.3
   autoprefixer: 10.4.0_postcss@8.3.11
   eslint: 7.32.0
   eslint-config-prettier: 8.3.0_eslint@7.32.0
@@ -537,6 +539,10 @@ packages:
     dependencies:
       '@typescript-eslint/types': 4.33.0
       eslint-visitor-keys: 2.1.0
+    dev: true
+
+  /@zerodevx/svelte-toast/0.6.3:
+    resolution: {integrity: sha512-k0W1JFoqHIcIQaP9ij99+Rv0ugaQSSNwOuNwwmTGRjWtIqrQr+ExLDE8LQGXLlJIprqDyMWB4lJkUql/r0RAtA==}
     dev: true
 
   /abbrev/1.1.1:

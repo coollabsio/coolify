@@ -1,4 +1,5 @@
 import { getTeam, getUserDetails } from '$lib/common';
+import { getGithubToken } from '$lib/components/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import jsonwebtoken from 'jsonwebtoken'
@@ -7,6 +8,7 @@ export const get: RequestHandler = async (request) => {
     const teamId = getTeam(request)
     let githubToken = null;
     let gitlabToken = null;
+    let ghToken = null;
     const { id } = request.params
     const application = await db.getApplication({ id, teamId })
 
@@ -25,6 +27,7 @@ export const get: RequestHandler = async (request) => {
             githubToken = jsonwebtoken.sign(payload, application.gitSource.githubApp.privateKey, {
                 algorithm: 'RS256',
             })
+            ghToken = await getGithubToken({ apiUrl: application.gitSource.apiUrl, application, githubToken })
         }
     } else if (application.gitSource?.type === 'gitlab') {
         if (request.headers.cookie) {
@@ -35,6 +38,7 @@ export const get: RequestHandler = async (request) => {
 
     return {
         body: {
+            ghToken,
             githubToken,
             gitlabToken,
             application

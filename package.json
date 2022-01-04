@@ -31,6 +31,7 @@
 		"@types/node-forge": "^0.10.10",
 		"@typescript-eslint/eslint-plugin": "^4.31.1",
 		"@typescript-eslint/parser": "^4.31.1",
+		"@zerodevx/svelte-toast": "^0.6.3",
 		"autoprefixer": "^10.4.0",
 		"eslint": "^7.32.0",
 		"eslint-config-prettier": "^8.3.0",

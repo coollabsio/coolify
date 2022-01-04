@@ -6,7 +6,24 @@ import { dev } from '$app/env';
 	export let source;
 
 	async function installRepositories(source) {
-		window.location.assign(`https://github.com/apps/${source.githubApp.name}/installations/new`);
+		const {htmlUrl} = source
+		const left = screen.width / 2 - 1020 / 2;
+		const top = screen.height / 2 - 618 / 2;
+		const newWindow = open(
+			`${htmlUrl}/apps/${source.githubApp.name}/installations/new`,
+			'GitHub',
+			'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
+				top +
+				', left=' +
+				left +
+				', toolbar=0, menubar=0, status=0'
+		);
+		const timer = setInterval(() => {
+			if (newWindow?.closed) {
+				clearInterval(timer);
+				window.location.reload()
+			}
+		}, 100);
 	}
 
 	function newGithubApp(source) {

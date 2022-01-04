@@ -242,3 +242,16 @@ a {
 .box-selection {
 	@apply min-w-[16rem] max-w-[24rem] bg-coolgray-200 hover:bg-coolgray-400 rounded justify-center p-6 shadow-lg border-t-4 border-transparent hover:border-green-500 transition duration-150;
 }
+
+._toastBar  {
+	@apply hidden !important;
+}
+._toastMsg {
+	@apply text-xs !important;
+}
+._toastBtn {
+	@apply text-xs !important;
+}
+._toastItem {
+	@apply bg-coollabs bg-opacity-80 !important;
+}
