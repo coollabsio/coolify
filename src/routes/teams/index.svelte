@@ -21,7 +21,7 @@
 
 <script lang="ts">
 	import { errorNotification } from '$lib/form';
-import { session } from '$app/stores';
+	import { session } from '$app/stores';
 
 	export let teams;
 	export let invitations;

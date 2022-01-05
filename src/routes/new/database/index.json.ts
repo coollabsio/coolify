@@ -15,8 +15,8 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
 	const name = request.body.get('name') || null
 	try {
-		return await db.newApplication({ name, teamId })
-	} catch (err) {
+		return await db.newDatabase({ name, teamId })
+	} catch(err) {
 		return err
 	}
 }

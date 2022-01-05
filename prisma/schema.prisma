@@ -49,6 +49,8 @@ model Team {
   permissions       Permission[]
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+  database          Database?           @relation(fields: [databaseId], references: [id])
+  databaseId        String?
 }
 
 model TeamInvitation {
@@ -191,4 +193,25 @@ model GitlabApp {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
   gitSource     GitSource?
+}
+
+model Database {
+  id               String            @id @default(cuid())
+  name             String            @unique
+  teams            Team[]
+  type             String?
+  url              String?
+  user             String?           @default("dbuser")
+  password         String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  databaseSettings DatabaseSettings?
+}
+
+model DatabaseSettings {
+  id         String   @id @default(cuid())
+  database   Database @relation(fields: [databaseId], references: [id])
+  databaseId String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }

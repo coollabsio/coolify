@@ -220,7 +220,7 @@
 					>
 				</div>
 			</div>
-			<div class="grid grid-cols-3 items-center py-8">
+			<div class="grid grid-cols-3 items-center pb-8">
 				<label for="buildPack">Build Pack</label>
 				<div class="col-span-2">
 					<a
@@ -236,6 +236,18 @@
 							class="bg-transparent hover:bg-coolgray-500 cursor-pointer -ml-1"
 						/></a
 					>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center">
+				<label for="name">Name</label>
+				<div class="col-span-2 ">
+					<input
+						readonly={!$session.isAdmin}
+						name="name"
+						id="name"
+						value={$appConfiguration.configuration.name}
+						required
+					/>
 				</div>
 			</div>
 			<div class="grid grid-cols-3 items-center pb-8">

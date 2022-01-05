@@ -39,7 +39,7 @@
 		"postcss": "^8.3.11",
 		"prettier": "^2.4.1",
 		"prettier-plugin-svelte": "^2.4.0",
-		"prisma": "3.6.0",
+		"prisma": "3.7.0",
 		"svelte": "^3.44.2",
 		"svelte-check": "^2.2.10",
 		"svelte-preprocess": "^4.9.8",
@@ -50,7 +50,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@prisma/client": "3.6.0",
+		"@prisma/client": "3.7.0",
 		"@sentry/node": "^6.15.0",
 		"bcrypt": "^5.0.1",
 		"bullmq": "^1.51.1",

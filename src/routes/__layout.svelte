@@ -106,7 +106,7 @@
 	}
 </script>
 
-<SvelteToast options={{intro: { y: -64 }, duration: 2000, pausable: true  }} />
+<SvelteToast options={{ intro: { y: -64 }, duration: 2000, pausable: true }} />
 {#if $session.uid}
 	<nav class="nav-main">
 		<div class="flex flex-col w-full h-screen items-center transition-all duration-100">
@@ -231,100 +231,54 @@
 					</svg>
 				</a>
 				<div class="border-t border-warmGray-700" />
-				{#if alpha}
-					<!-- svelte-ignore a11y-invalid-attribute -->
-					<a
-						href="javascript:void(0)"
-						class="icons hover:bg-coolgray-200 text-warmGray-600 tooltip-right cursor-not-allowed"
-						data-tooltip="Databases"
+				<a
+					sveltekit:prefetch
+					href="/databases"
+					class="icons hover:text-purple-500 bg-coolgray-200 tooltip-right"
+					class:text-purple-500={$page.url.pathname.startsWith('/databases')}
+					class:bg-coolgray-500={$page.url.pathname.startsWith('/databases')}
+					data-tooltip="Databases"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-8 w-8"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
 					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-8 w-8"
-							viewBox="0 0 24 24"
-							stroke-width="1.5"
-							stroke="currentColor"
-							fill="none"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						>
-							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-							<ellipse cx="12" cy="6" rx="8" ry="3" />
-							<path d="M4 6v6a8 3 0 0 0 16 0v-6" />
-							<path d="M4 12v6a8 3 0 0 0 16 0v-6" />
-						</svg>
-					</a>
-					<div class="border-t border-warmGray-700" />
-					<!-- svelte-ignore a11y-invalid-attribute -->
-					<a
-						href="javascript:void(0)"
-						class="icons hover:bg-coolgray-200 text-warmGray-600 tooltip-right cursor-not-allowed"
-						data-tooltip="Services"
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<ellipse cx="12" cy="6" rx="8" ry="3" />
+						<path d="M4 6v6a8 3 0 0 0 16 0v-6" />
+						<path d="M4 12v6a8 3 0 0 0 16 0v-6" />
+					</svg>
+				</a>
+				<div class="border-t border-warmGray-700" />
+				<a
+					sveltekit:prefetch
+					href="/services"
+					class="icons hover:text-pink-500 bg-coolgray-200 tooltip-right"
+					class:text-pink-500={$page.url.pathname.startsWith('/services')}
+					class:bg-coolgray-500={$page.url.pathname.startsWith('/services')}
+					data-tooltip="Services"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-8 w-8"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
 					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-8 w-8"
-							viewBox="0 0 24 24"
-							stroke-width="1.5"
-							stroke="currentColor"
-							fill="none"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						>
-							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-							<path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-12" />
-						</svg>
-					</a>
-				{:else}
-					<a
-						sveltekit:prefetch
-						href="/databases"
-						class="icons hover:text-purple-500 bg-coolgray-200 tooltip-right"
-						class:text-purple-500={$page.url.pathname.startsWith('/databases')}
-						class:bg-coolgray-500={$page.url.pathname.startsWith('/databases')}
-						data-tooltip="Databases"
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-8 w-8"
-							viewBox="0 0 24 24"
-							stroke-width="1.5"
-							stroke="currentColor"
-							fill="none"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						>
-							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-							<ellipse cx="12" cy="6" rx="8" ry="3" />
-							<path d="M4 6v6a8 3 0 0 0 16 0v-6" />
-							<path d="M4 12v6a8 3 0 0 0 16 0v-6" />
-						</svg>
-					</a>
-					<div class="border-t border-warmGray-700" />
-					<a
-						sveltekit:prefetch
-						href="/services"
-						class="icons hover:text-pink-500 bg-coolgray-200 tooltip-right"
-						class:text-pink-500={$page.url.pathname.startsWith('/services')}
-						class:bg-coolgray-500={$page.url.pathname.startsWith('/services')}
-						data-tooltip="Services"
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-8 w-8"
-							viewBox="0 0 24 24"
-							stroke-width="1.5"
-							stroke="currentColor"
-							fill="none"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						>
-							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-							<path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-12" />
-						</svg>
-					</a>
-					<div class="border-t border-warmGray-700" />
-				{/if}
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-12" />
+					</svg>
+				</a>
+				<div class="border-t border-warmGray-700" />
 			</div>
 			<div class="flex-1" />
 			<div class="flex flex-col space-y-4 py-2">

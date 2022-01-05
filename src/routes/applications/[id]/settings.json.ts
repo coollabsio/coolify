@@ -11,7 +11,6 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const previews = request.body.get('previews') === 'true' ? true : false
     const forceSSL = request.body.get('forceSSL') === 'true' ? true : false
     const forceSSLChanged = request.body.get('forceSSLChanged') === 'true' ? true : false
-    console.log(forceSSLChanged)
 
     try {
         return await db.setApplicationSettings({ id, debug, previews, forceSSL, forceSSLChanged })

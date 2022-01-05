@@ -8,8 +8,8 @@
 				redirect: `/applications/${params.id}`
 			};
 		}
-		const destination = `/sources.json`;
-		const res = await fetch(destination);
+		const endpoint = `/sources.json`;
+		const res = await fetch(endpoint);
 
 		if (res.ok) {
 			return {

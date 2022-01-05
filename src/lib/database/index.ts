@@ -10,3 +10,4 @@ export * from './settings';
 export * from './users';
 export * from './teams';
 export * from './secrets';
+export * from './databases';

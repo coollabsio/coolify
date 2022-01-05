@@ -144,13 +144,13 @@ export async function configureBuildPack({ id, buildPack }) {
     }
 }
 
-export async function configureApplication({ id, teamId, domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
+export async function configureApplication({ id, name,teamId, domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
     try {
         let application = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } } })
         if (application.domain !== domain && !application.oldDomain) {
-            application = await prisma.application.update({ where: { id }, data: { domain, oldDomain: application.domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory } })
+            application = await prisma.application.update({ where: { id }, data: { domain, oldDomain: application.domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory, name } })
         } else {
-            application = await prisma.application.update({ where: { id }, data: { domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory } })
+            application = await prisma.application.update({ where: { id }, data: { domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory, name } })
         }
         return { status: 201, body: { application } }
     } catch (e) {

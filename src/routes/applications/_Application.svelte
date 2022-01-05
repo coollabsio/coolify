@@ -22,7 +22,7 @@
 			<div class="text-center truncate">{application.domain}</div>
 		{/if}
 		{#if !application.gitSourceId || !application.destinationDockerId}
-			<div class="font-bold text-xs text-center truncate text-red-500">Invalid configuration</div>
+			<div class="font-bold text-xs text-center truncate text-red-500">Not configured</div>
 		{/if}
 	</div>
 </a>

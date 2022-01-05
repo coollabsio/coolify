@@ -1,7 +1,7 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ fetch, session }) => {
-		const url = `/new/application.json`;
+		const url = `/new/database.json`;
 		const res = await fetch(url);
 
 		if (res.ok) {
@@ -24,33 +24,28 @@
 	import { enhance } from '$lib/form';
 	import { onMount } from 'svelte';
 	let autofocus;
+
 	onMount(() => {
 		autofocus.focus();
 	});
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Add New Application</div>
+	<div class="text-2xl tracking-tight mr-4">Add New Database</div>
 </div>
 <div class="pt-10">
 	<form
-		action="/new/application.json"
+		action="/new/database.json"
 		method="post"
 		use:enhance={{
 			result: async (res) => {
 				const { id } = await res.json();
-				window.location.assign(`/applications/${id}`);
+				window.location.assign(`/databases/${id}`);
 			}
 		}}
 	>
 		<div class="flex flex-col items-center space-y-4">
-			<input
-				name="name"
-				placeholder="Application name"
-				required
-				bind:this={autofocus}
-				value={name}
-			/>
+			<input name="name" placeholder="Database name" required bind:this={autofocus} value={name} />
 			<button type="submit" class="bg-green-600 hover:bg-green-500">Save</button>
 		</div>
 	</form>
