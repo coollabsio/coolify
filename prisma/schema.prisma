@@ -146,6 +146,7 @@ model DestinationDocker {
   application        Application[]
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
+  database           Database[]
 }
 
 model GitSource {
@@ -196,16 +197,23 @@ model GitlabApp {
 }
 
 model Database {
-  id               String            @id @default(cuid())
-  name             String            @unique
-  teams            Team[]
-  type             String?
-  url              String?
-  user             String?           @default("dbuser")
-  password         String?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  databaseSettings DatabaseSettings?
+  id                  String             @id @default(cuid())
+  name                String             @unique
+  domain              String?            @unique
+  defaultDatabase     String?
+  destinationDockerId String?
+  destinationDocker   DestinationDocker? @relation(fields: [destinationDockerId], references: [id])
+  version             String?
+  teams               Team[]
+  type                String?
+  url                 String?
+  dbUser              String?
+  dbUserPassword      String?
+  rootUser            String?
+  rootUserPassword    String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  databaseSettings    DatabaseSettings?
 }
 
 model DatabaseSettings {

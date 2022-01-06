@@ -38,8 +38,28 @@
 				>
 			{/if}
 		</div>
+
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="grid grid-cols-3 items-center pb-8">
+				<label for="destination">Destination</label>
+				<div class="col-span-2">
+					{#if database.destinationDockerId}
+						<a
+							href={$session.isAdmin
+								? `/databases/${id}/configuration/destination?from=/databases/${id}`
+								: ''}
+							class="no-underline"
+							><span class="arrow-right-applications">></span><input
+								value={database.destinationDocker.name}
+								id="destination"
+								disabled
+								class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
+							/></a
+						>
+					{/if}
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center">
 				<label for="name">Name</label>
 				<div class="col-span-2 ">
 					<input
@@ -48,6 +68,106 @@
 						id="name"
 						value={database.name}
 						required
+					/>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center pb-8">
+				<label for="domain">Domain</label>
+				<div class="col-span-2">
+					<input
+						readonly={!$session.isAdmin}
+						name="domain"
+						id="domain"
+						pattern="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+						placeholder="eg: {database.type}.coollabs.io"
+						value={database.domain}
+						required
+					/>
+				</div>
+			</div>
+		</div>
+
+		<div class="grid grid-flow-row gap-2 px-10">
+			<div class="grid grid-cols-3 items-center pb-8">
+				<label for="version">Version</label>
+				<div class="col-span-2 ">
+					<select name="version" id="version" bind:value={database.version}>
+						<option value="Select a version" disabled selected>Select a version</option>
+						<option value="8.0.27">8.0.27</option>
+						<option value="5.7.36">5.7.36</option>
+					</select>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center pb-8">
+				<label for="defaultDatabase">Default Database Name</label>
+				<div class="col-span-2 ">
+					<input
+						placeholder="generate automatically"
+						name="defaultDatabase"
+						id="defaultDatabase"
+						value={database.defaultDatabase}
+					/>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center">
+				<label for="dbUser">User</label>
+				<div class="col-span-2 ">
+					<input
+						placeholder="generate automatically"
+						name="dbUser"
+						id="dbUser"
+						value={database.dbUser}
+					/>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center">
+				<label for="dbUserPassword">Password</label>
+				<div class="col-span-2 ">
+					<input
+						readonly={!$session.isAdmin}
+						placeholder="generate automatically"
+						type="password"
+						name="dbUserPassword"
+						id="dbUserPassword"
+						value={database.dbUserPassword}
+					/>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center">
+				<label for="rootUser">Root User</label>
+				<div class="col-span-2 ">
+					<input
+						placeholder="generate automatically"
+						name="rootUser"
+						id="rootUser"
+						value={database.rootUser}
+					/>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center pb-8">
+				<label for="rootUserPassword">Root User's Password</label>
+				<div class="col-span-2 ">
+					<input
+						readonly={!$session.isAdmin}
+						placeholder="generate automatically"
+						type="password"
+						name="rootUserPassword"
+						id="rootUserPassword"
+						value={database.rootUserPassword}
+					/>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center">
+				<label for="url">Connection string</label>
+				<div class="col-span-2 ">
+					<textarea
+						rows="3"
+						class="bg-coolblack"
+						readonly
+						placeholder="will be available after deployment"
+						name="url"
+						id="url"
+						value={database.url}
 					/>
 				</div>
 			</div>

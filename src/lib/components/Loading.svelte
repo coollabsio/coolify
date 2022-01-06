@@ -1,9 +1,13 @@
 <script lang="ts">
 	export let fullscreen = true;
+	export let cover = false;
 </script>
 
 {#if fullscreen}
-	<div class="main fixed left-0 top-0 flex flex-wrap content-center h-full">
+	<div
+		class="main fixed left-0 top-0 flex flex-wrap content-center h-full"
+		class:bg-coolblack={cover}
+	>
 		<span class="loader" />
 	</div>
 {:else}
@@ -52,7 +56,7 @@
 			height: 4px;
 		}
 	}
-    @keyframes animloader2 {
+	@keyframes animloader2 {
 		0% {
 			height: 4px;
 		}

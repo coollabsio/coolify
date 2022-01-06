@@ -1,10 +1,13 @@
 import { encrypt, base64Encode } from '$lib/crypto';
 import { version } from '$lib/common';
-export function makeLabel({ applicationId, domain, name, type, pullmergeRequestId = null, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
+import * as db from '$lib/database';
+
+export function makeLabelForApplication({ applicationId, domain, name, type, pullmergeRequestId = null, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
     return [
         'LABEL coolify.managed=true',
+        `LABEL coolify.version=${version}`,
+        `LABEL coolify.type=application`,
         `LABEL coolify.configuration=${base64Encode(JSON.stringify({
-            version,
             applicationId,
             domain,
             name,
@@ -21,6 +24,24 @@ export function makeLabel({ applicationId, domain, name, type, pullmergeRequestI
             startCommand,
             baseDirectory,
             publishDirectory
+        }))}`,
+    ]
+}
+export async function makeLabelForDatabase({ id, image, volume }) {
+    const database = await db.prisma.database.findFirst({ where: { id } })
+    delete database.destinationDockerId
+    delete database.createdAt
+    delete database.updatedAt
+    delete database.url
+    return [
+        'LABEL coolify.managed=true',
+        `LABEL coolify.version=${version}`,
+        `LABEL coolify.type=database`,
+        `LABEL coolify.configuration=${base64Encode(JSON.stringify({
+            version,
+            image,
+            volume,
+            ...database
         }))}`,
     ]
 }

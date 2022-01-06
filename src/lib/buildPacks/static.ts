@@ -1,6 +1,6 @@
 import { buildCacheImageWithNode, buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
-import { makeLabel } from './common';
+import { makeLabelForApplication } from './common';
 
 const createDockerfile = async ({ applicationId, tag, image, workdir, buildCommand, baseDirectory, publishDirectory, label, secrets }): Promise<void> => {
     let Dockerfile: Array<string> = []
@@ -27,7 +27,7 @@ const createDockerfile = async ({ applicationId, tag, image, workdir, buildComma
 export default async function ({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, publishDirectory, debug, commit, tag, workdir, docker, buildId, port, installCommand, buildCommand, startCommand, baseDirectory, secrets }) {
     try {
         const image = 'nginx:stable-alpine'
-        const label = makeLabel({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
+        const label = makeLabelForApplication({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
 
         if (buildCommand) {
             await buildCacheImageWithNode({ applicationId, tag, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debug, secrets })

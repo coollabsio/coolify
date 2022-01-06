@@ -17,6 +17,10 @@ main, .main {
 input {
 	@apply text-xs px-2  py-2 rounded bg-transparent border border-transparent bg-coolgray-200 text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500 placeholder-warmGray-600 w-96;
 }
+textarea {
+	@apply text-xs px-2 py-2 rounded bg-transparent border border-transparent bg-coolgray-200 text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500 placeholder-warmGray-600 w-96;
+}
+
 
 select {
 	@apply text-xs px-2 py-2 rounded font-bold bg-coolgray-200  text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500  disabled:text-warmGray-600;

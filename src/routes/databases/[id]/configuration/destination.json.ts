@@ -5,7 +5,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { id } = request.params
     const destinationId = request.body.get('destinationId') || null
     try {
-        return await db.configureDestinationForApplication({ id, destinationId })
+        return await db.configureDestinationForDatabase({ id, destinationId })
     } catch(err) {
         return err
     }

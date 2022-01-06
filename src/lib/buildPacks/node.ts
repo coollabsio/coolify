@@ -1,6 +1,6 @@
 import { buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
-import { makeLabel } from './common';
+import { makeLabelForApplication } from './common';
 
 const createDockerfile = async ({ image, workdir, port, installCommand, buildCommand, startCommand, baseDirectory, label, secrets }): Promise<void> => {
     const Dockerfile: Array<string> = []
@@ -27,7 +27,7 @@ export default async function ({ applicationId, domain, name, type, pullmergeReq
     try {
         // TODO: Select node version
         const image = 'node:lts'
-        const label = makeLabel({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
+        const label = makeLabelForApplication({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
         await createDockerfile({ image, workdir, port, installCommand, buildCommand, startCommand, baseDirectory, label, secrets })
         await buildImage({ applicationId, tag, workdir, docker, buildId, debug })
     } catch (error) {

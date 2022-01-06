@@ -9,6 +9,7 @@ import builder from './builder';
 import letsencrypt from './letsencrypt';
 import logger from './logger';
 import proxy from './proxy';
+
 import { saveBuildLog } from '$lib/common'
 
 let { Queue, Worker } = Bullmq;
@@ -79,7 +80,7 @@ letsEncryptWorker.on('completed', async () => {
 letsEncryptWorker.on('failed', async (job: Job, failedReason: string) => {
   try {
     await prisma.applicationSettings.updateMany({ where: { applicationId: job.data.id }, data: { forceSSL: false } })
-  } catch(error) {
+  } catch (error) {
     console.log(error)
   }
   console.log('Lets Encrypt job failed')
@@ -93,7 +94,6 @@ const buildLogWorker = new Worker(buildLogQueueName, async (job) => await logger
   concurrency: 1,
   ...connectionOptions
 })
-
 
 
 export { buildQueue, letsEncryptQueue, buildLogQueue, proxyCronQueue }

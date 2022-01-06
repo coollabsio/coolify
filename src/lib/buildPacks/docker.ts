@@ -1,6 +1,6 @@
 import { buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
-import { makeLabel } from './common';
+import { makeLabelForApplication } from './common';
 
 const createDockerfile = async ({ image, workdir, port, installCommand, buildCommand, startCommand, baseDirectory, label, secrets }): Promise<void> => {
     const Dockerfile: Array<string> = []
@@ -19,7 +19,7 @@ const createDockerfile = async ({ image, workdir, port, installCommand, buildCom
 
 export default async function ({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, publishDirectory, debug, commit, tag, workdir, docker, buildId, port, installCommand, buildCommand, startCommand, baseDirectory, secrets }) {
     try {
-        const label = makeLabel({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
+        const label = makeLabelForApplication({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
 
         let file = `${workdir}/Dockerfile`
         if (baseDirectory) {

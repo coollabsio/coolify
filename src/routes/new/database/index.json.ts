@@ -14,6 +14,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 	if (status === 401) return { status, body }
 
 	const name = request.body.get('name') || null
+	
 	try {
 		return await db.newDatabase({ name, teamId })
 	} catch(err) {

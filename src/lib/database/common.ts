@@ -1,9 +1,16 @@
 import { dev } from '$app/env'
 import * as Prisma from '@prisma/client'
 import { default as ProdPrisma } from '@prisma/client'
-
+import generator from 'generate-password';
 import forge from 'node-forge'
 
+export function generatePassword({ length } = { length: 24 }) {
+    return generator.generate({
+        length,
+        numbers: true,
+        strict: true
+    });
+}
 
 let { PrismaClient } = Prisma
 let P = Prisma.Prisma
