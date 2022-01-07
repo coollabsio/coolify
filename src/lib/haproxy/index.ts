@@ -53,73 +53,301 @@ export async function removeProxyConfiguration({ domain }) {
 
     }
 }
-export async function forceSSLOff({ domain }) {
+export async function forceSSLOnDatabase({ domain }) {
+    if (!dev) {
+        const haproxy = haproxyInstance()
+        await checkHAProxy()
+        const transactionId = await getNextTransactionId()
+
+        try {
+            const rules: any = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
+                searchParams: {
+                    parent_name: 'tcp',
+                    parent_type: 'frontend',
+                }
+            }).json()
+
+            if (rules.data.length > 0) {
+                for (const rule of rules.data) {
+                    if (rule.name === domain) {
+                        await haproxy.delete(`v2/services/haproxy/configuration/http_request_rules/${rule.index}`, {
+                            searchParams: {
+                                frontend: 'tcp',
+                                transaction_id: transactionId
+                            }
+                        }).json()
+                    }
+                }
+            }
+        } catch (error) {
+            console.log(error)
+        } finally {
+            await completeTransaction(transactionId)
+        }
+    } else {
+        console.log(`adding ssl for ${domain}`)
+    }
+
+}
+
+export async function forceSSLOffDatabase({ domain }) {
+    if (!dev) {
+        const haproxy = haproxyInstance()
+        await checkHAProxy()
+        const transactionId = await getNextTransactionId()
+
+        try {
+            const rules: any = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
+                searchParams: {
+                    parent_name: 'tcp',
+                    parent_type: 'frontend',
+                }
+            }).json()
+            if (rules.data.length > 0) {
+                for (const rule of rules.data) {
+                    if (rule.name === domain) {
+                        await haproxy.delete(`v2/services/haproxy/configuration/http_request_rules/${rule.index}`, {
+                            searchParams: {
+                                frontend: 'tcp',
+                                transaction_id: transactionId
+                            }
+                        }).json()
+                    }
+                }
+            }
+        } catch (error) {
+            console.log(error)
+        } finally {
+            await completeTransaction(transactionId)
+        }
+    } else {
+        console.log(`removing ssl for ${domain}`)
+    }
+
+}
+export async function forceSSLOffApplication({ domain }) {
+    if (!dev) {
+        const haproxy = haproxyInstance()
+        await checkHAProxy()
+        const transactionId = await getNextTransactionId()
+        try {
+            const rules: any = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
+                searchParams: {
+                    parent_name: 'http',
+                    parent_type: 'frontend',
+                }
+            }).json()
+            if (rules.data.length > 0) {
+                const rule = rules.data.find(rule => rule.cond_test.includes(`-i ${domain}`))
+                if (rule) {
+                    await haproxy.delete(`v2/services/haproxy/configuration/http_request_rules/${rule.index}`, {
+                        searchParams: {
+                            transaction_id: transactionId,
+                            parent_name: 'http',
+                            parent_type: 'frontend',
+                        }
+                    }).json()
+                }
+            }
+        } catch (error) {
+            console.log(error)
+        } finally {
+            await completeTransaction(transactionId)
+        }
+    } else {
+        console.log(`removing ssl for ${domain}`)
+    }
+
+}
+export async function forceSSLOnApplication({ domain }) {
+    if (!dev) {
+        const haproxy = haproxyInstance()
+        await checkHAProxy()
+        const transactionId = await getNextTransactionId()
+
+        try {
+            const rules: any = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
+                searchParams: {
+                    parent_name: 'http',
+                    parent_type: 'frontend',
+                }
+            }).json()
+            let nextRule = 0
+            if (rules.data.length > 0) {
+                nextRule = rules.data[rules.data.length - 1].index + 1
+            }
+            await haproxy.post(`v2/services/haproxy/configuration/http_request_rules`, {
+                searchParams: {
+                    transaction_id: transactionId,
+                    parent_name: 'http',
+                    parent_type: 'frontend',
+                },
+                json: {
+                    "index": nextRule,
+                    "cond": "if",
+                    "cond_test": `{ hdr(Host) -i ${domain} } !{ ssl_fc }`,
+                    "type": "redirect",
+                    "redir_type": "scheme",
+                    "redir_value": "https",
+                    "redir_code": 301
+                }
+            }).json()
+        } catch (error) {
+            console.log(error)
+        } finally {
+            await completeTransaction(transactionId)
+        }
+    } else {
+        console.log(`adding ssl for ${domain}`)
+    }
+
+}
+export async function configureProxyForDatabase({ domain, id, port, isPublic }) {
     const haproxy = haproxyInstance()
     await checkHAProxy()
     try {
-        const transactionId = await getNextTransactionId()
+        if (!isPublic) {
+            const transactionId = await getNextTransactionId()
+            try {
+                await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
+                await haproxy.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
+                    searchParams: {
+                        transaction_id: transactionId
+                    },
+                }).json()
+            } catch (error) {
+
+            }
+            try {
+                const rules = await haproxy.get(`v2/services/haproxy/configuration/backend_switching_rules`, {
+                    searchParams: {
+                        frontend: 'tcp'
+                    }
+                }).json()
+                if (rules.data.length > 0) {
+                    for (const rule of rules.data) {
+                        if (rule.name === domain) {
+                            console.log({ found: true, switch: true, rule })
+                            await haproxy.delete(`v2/services/haproxy/configuration/backend_switching_rules/${rule.index}`, {
+                                searchParams: {
+                                    frontend: 'tcp',
+                                    transaction_id: transactionId
+                                }
+                            }).json()
+                            console.log({ deleted: true, switch: true, rule })
+                        }
+                    }
+                }
+            } catch (error) {
+                console.log('switching rules deletion failed')
+                console.log(error.response.body)
+            }
+            // try {
+            //     const rules = await haproxy.get(`v2/services/haproxy/configuration/acls`, {
+            //         searchParams: {
+            //             parent_name: 'tcp',
+            //             parent_type: 'frontend',
+            //         }
+            //     }).json()
+            //     if (rules.data.length > 0) {
+            //         for (const rule of rules.data) {
+            //             if (rule.acl_name === domain) {
+            //                 console.log({ found: true, acls: true, rule })
+            //                 await haproxy.delete(`v2/services/haproxy/configuration/acls/${rule.index}`, {
+            //                     searchParams: {
+            //                         parent_name: 'tcp',
+            //                         parent_type: 'frontend',
+            //                         transaction_id: transactionId
+            //                     }
+            //                 }).json()
+            //                 console.log({ deleted: true, acls: true, rule })
+            //             }
+            //         }
+            //     }
+            // } catch (error) {
+            //     console.log('acl deletion failed')
+            //     console.log(error.response.body)
+            // }
+            await completeTransaction(transactionId)
+        }
+        else {
+            const transactionId = await getNextTransactionId()
+            await haproxy.post('v2/services/haproxy/configuration/backends', {
+                searchParams: {
+                    transaction_id: transactionId
+                },
+                json: {
+                    "init-addr": "last,libc,none",
+                    "mode": "tcp",
+                    "name": domain
+                }
+            })
+
+            await haproxy.post('v2/services/haproxy/configuration/servers', {
+                searchParams: {
+                    transaction_id: transactionId,
+                    backend: domain
+                },
+                json: {
+                    "address": id,
+                    "check": "enabled",
+                    "name": id,
+                    "port": port
+                }
+            })
+            // await haproxy.post(`v2/services/haproxy/configuration/acls`, {
+            //     searchParams: {
+            //         transaction_id: transactionId,
+            //         parent_name: 'tcp',
+            //         parent_type: 'frontend',
+            //     },
+            //     json: {
+            //         "acl_name": `${domain}`,
+            //         "criterion": "req.ssl_sni",
+            //         "index": 0,
+            //         "value": `-i ${domain}`
+            //     }
+            // })
+            await haproxy.post(`v2/services/haproxy/configuration/backend_switching_rules`, {
+                searchParams: {
+                    transaction_id: transactionId,
+                    frontend: 'tcp'
+                },
+                json: {
+                    "cond": "if",
+                    "cond_test": `{ req.ssl_sni -i ${domain} }`,
+                    "index": 0,
+                    "name": `${domain}`,
+                }
+            })
+            await completeTransaction(transactionId)
+
+        }
+
+        let sslConfigured = false
         const rules: any = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
             searchParams: {
-                parent_name: 'http',
+                parent_name: 'ftp',
                 parent_type: 'frontend',
             }
         }).json()
         if (rules.data.length > 0) {
             const rule = rules.data.find(rule => rule.cond_test.includes(`-i ${domain}`))
-            if (rule) {
-                await haproxy.delete(`v2/services/haproxy/configuration/http_request_rules/${rule.index}`, {
-                    searchParams: {
-                        transaction_id: transactionId,
-                        parent_name: 'http',
-                        parent_type: 'frontend',
-                    }
-                }).json()
-                await completeTransaction(transactionId)
-            }
-
+            if (rule) sslConfigured = true
+        }
+        if (isPublic && !sslConfigured) {
+            await forceSSLOnDatabase({ domain })
+        } else {
+            await forceSSLOffDatabase({ domain })
         }
     } catch (error) {
-        console.log(error)
+        console.log(error.response.body)
+        // No worries, it's okay to not handle it
     }
 
+
 }
-export async function forceSSLOn({ domain }) {
-    const haproxy = haproxyInstance()
-    await checkHAProxy()
-    try {
-        const transactionId = await getNextTransactionId()
-        const rules: any = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
-            searchParams: {
-                parent_name: 'http',
-                parent_type: 'frontend',
-            }
-        }).json()
-        let nextRule = 0
-        if (rules.data.length > 0) {
-            nextRule = rules.data[rules.data.length - 1].index + 1
-        }
-        await haproxy.post(`v2/services/haproxy/configuration/http_request_rules`, {
-            searchParams: {
-                transaction_id: transactionId,
-                parent_name: 'http',
-                parent_type: 'frontend',
-            },
-            json: {
-                "index": nextRule,
-                "cond": "if",
-                "cond_test": `{ hdr(Host) -i ${domain} } !{ ssl_fc }`,
-                "type": "redirect",
-                "redir_type": "scheme",
-                "redir_value": "https",
-                "redir_code": 301
-            }
-        }).json()
-        await completeTransaction(transactionId)
-    } catch (error) {
-        console.log(error)
-    }
-}
-export async function configureProxy({ domain, applicationId, port, forceSSL }) {
+export async function configureProxyForApplication({ domain, applicationId, port, forceSSL }) {
     const haproxy = haproxyInstance()
     await checkHAProxy()
 
@@ -161,7 +389,7 @@ export async function configureProxy({ domain, applicationId, port, forceSSL }) 
                     if (rule) sslConfigured = true
                 }
             }
-            if (!sslConfigured && forceSSL) await forceSSLOn({ domain })
+            if (!sslConfigured && forceSSL) await forceSSLOnApplication({ domain })
             if (serverConfigured) return
 
         } catch (error) {
@@ -222,7 +450,7 @@ export async function configureCoolifyProxyOff({ domain }) {
         }).json()
         await completeTransaction(transactionId)
         if (!dev) {
-            await forceSSLOff({ domain })
+            await forceSSLOffApplication({ domain })
         }
     } catch (error) {
         console.log(error)
@@ -273,7 +501,7 @@ export async function configureCoolifyProxyOn({ domain }) {
         await completeTransaction(transactionId)
         if (!dev) {
             letsEncryptQueue.add(domain, { domain, isCoolify: true })
-            await forceSSLOn({ domain })
+            await forceSSLOnApplication({ domain })
         }
     } catch (error) {
         console.log(error)

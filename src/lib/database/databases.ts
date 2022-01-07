@@ -15,7 +15,7 @@ export async function newDatabase({ name, teamId }) {
         const defaultDatabase = cuid()
         const version = '8.0.27'
 
-        const database = await prisma.database.create({ data: { name, teams: { connect: { id: teamId } } } })
+        const database = await prisma.database.create({ data: { name, teams: { connect: { id: teamId } }, settings: { create: { isPublic: false } } } })
 
         const { id, domain } = database
         await updateDatabase({ id, name, domain, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version })
@@ -28,7 +28,7 @@ export async function newDatabase({ name, teamId }) {
 
 export async function getDatabase({ id, teamId }) {
     try {
-        const body = await prisma.database.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true } })
+        const body = await prisma.database.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true, settings: true } })
 
         if (body.dbUserPassword) body.dbUserPassword = decrypt(body.dbUserPassword)
         if (body.rootUserPassword) body.rootUserPassword = decrypt(body.rootUserPassword)
@@ -61,12 +61,21 @@ export async function configureDatabaseType({ id, type }) {
     }
 }
 
-export async function updateDatabase({ id, name, domain, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version, url = null }) {
+export async function updateDatabase({ id, name = undefined, domain = undefined, defaultDatabase = undefined, dbUser = undefined, dbUserPassword = undefined, rootUser = undefined, rootUserPassword = undefined, version = undefined, url = undefined }) {
     try {
         const encryptedDbUserPassword = dbUserPassword && encrypt(dbUserPassword)
         const encryptedRootUserPassword = rootUserPassword && encrypt(rootUserPassword)
         await prisma.database.update({ where: { id }, data: { name, domain, defaultDatabase, dbUser, dbUserPassword: encryptedDbUserPassword, rootUser, rootUserPassword: encryptedRootUserPassword, version, url } })
         return { status: 200 }
+    } catch (e) {
+        throw PrismaErrorHandler(e)
+    }
+}
+
+export async function setDatabaseSettings({ id, isPublic }) {
+    try {
+        await prisma.database.update({ where: { id }, data: { settings: { upsert: { update: { isPublic }, create: { isPublic } } } } })
+        return { status: 201 }
     } catch (e) {
         throw PrismaErrorHandler(e)
     }

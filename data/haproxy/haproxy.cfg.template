@@ -13,7 +13,8 @@ defaults
 userlist haproxy-dataplaneapi 
   user admin insecure-password mypassword
 
-frontend http 
+frontend http
+  mode http
   bind :80
   bind :::80
   bind :443 ssl crt /usr/local/etc/haproxy/ssl/ alpn h2,http/1.1
@@ -21,6 +22,17 @@ frontend http
   acl is_certbot path_beg /.well-known/acme-challenge/
   use_backend backend-certbot if is_certbot
   use_backend %[req.hdr(host),lower]
+
+frontend tcp
+  mode tcp
+  option tcplog
+  log-format "%ci:%cp [%t] %ft %b/%s %Tw/%Tc/%Tt %B %ts %ac/%fc/%bc/%sc/%rc %sq/%bq ssl_fc_has_sni '%[ssl_fc_has_sni]' sni:'%[capture.req.hdr(0)]' ssl_fc_sni '%[ssl_fc_sni]' ssl_fc_protocol '%[ssl_fc_protocol]' ssl_bc '%[ssl_bc]' ssl_bc_alpn '%[ssl_bc_alpn]' ssl_bc_protocol '%[ssl_bc_protocol]' ssl_c_i_dn '%[ssl_c_i_dn()]' ssl_c_s_dn '%[ssl_c_s_dn()]' ssl_f_i_dn '%[ssl_f_i_dn()]' ssl_f_s_dn '%[ssl_f_s_dn]' ssl_fc_cipher '%[ssl_fc_cipher]' "
+
+  bind :3306
+  bind :::3306
+  tcp-request inspect-delay 5s
+  tcp-request content capture req.ssl_sni len 25
+  tcp-request content accept if { req.ssl_hello_type 1 }
 
 frontend stats 
   bind *:8404

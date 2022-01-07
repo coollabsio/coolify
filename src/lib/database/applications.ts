@@ -144,7 +144,7 @@ export async function configureBuildPack({ id, buildPack }) {
     }
 }
 
-export async function configureApplication({ id, name,teamId, domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
+export async function configureApplication({ id, name, teamId, domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
     try {
         let application = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } } })
         if (application.domain !== domain && !application.oldDomain) {

@@ -1,10 +1,31 @@
 <script lang="ts">
 	export let database;
 	import { page, session } from '$app/stores';
+	import Setting from '$lib/components/Setting.svelte';
 	import { enhance } from '$lib/form';
 
 	const { id } = $page.params;
 	let loading = false;
+	let isPublic = database.settings.isPublic || false;
+
+	async function changeSettings(name) {
+		const form = new FormData();
+		if (name === 'isPublic') {
+			isPublic = !isPublic;
+		}
+
+		form.append('isPublic', isPublic.toString());
+
+		try {
+			await fetch(`/databases/${id}/settings.json`, {
+				method: 'POST',
+				body: form
+			});
+			window.location.reload()
+		} catch (e) {
+			console.error(e);
+		}
+	}
 </script>
 
 <div class="max-w-4xl mx-auto px-6">
@@ -126,7 +147,6 @@
 					<input
 						readonly={!$session.isAdmin}
 						placeholder="generate automatically"
-						type="password"
 						name="dbUserPassword"
 						id="dbUserPassword"
 						value={database.dbUserPassword}
@@ -150,7 +170,6 @@
 					<input
 						readonly={!$session.isAdmin}
 						placeholder="generate automatically"
-						type="password"
 						name="rootUserPassword"
 						id="rootUserPassword"
 						value={database.rootUserPassword}
@@ -173,4 +192,19 @@
 			</div>
 		</div>
 	</form>
+	{#if database.url}
+		<div class="font-bold flex space-x-1 pb-5">
+			<div class="text-xl tracking-tight mr-4">Features</div>
+		</div>
+		<div class="px-4 sm:px-6 pb-10">
+			<ul class="mt-2 divide-y divide-warmGray-800">
+				<Setting
+					bind:setting={isPublic}
+					on:click={() => changeSettings('isPublic')}
+					title="Make it publicly available"
+					description="Your database will be reachable over the internet. Take security seriously in this case!"
+				/>
+			</ul>
+		</div>
+	{/if}
 </div>

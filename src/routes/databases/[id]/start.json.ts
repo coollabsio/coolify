@@ -74,8 +74,8 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         }
         try {
             await asyncExecShell(`DOCKER_HOST=${host} docker-compose -f ${composeFileDestination} up -d`)
-            const url = `mysql://${dbUser}:${dbUserPassword}@${domain}:3306/${defaultDatabase}`
-            await db.updateDatabase({ id, name, domain, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version, url })
+            const url = `mysql://${dbUser}:${dbUserPassword}@${id}:3306/${defaultDatabase}`
+            await db.updateDatabase({ id, url })
             return {
                 status: 200
             }

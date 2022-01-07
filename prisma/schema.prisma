@@ -213,13 +213,14 @@ model Database {
   rootUserPassword    String?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
-  databaseSettings    DatabaseSettings?
+  settings            DatabaseSettings?
 }
 
 model DatabaseSettings {
   id         String   @id @default(cuid())
   database   Database @relation(fields: [databaseId], references: [id])
   databaseId String   @unique
+  isPublic   Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }

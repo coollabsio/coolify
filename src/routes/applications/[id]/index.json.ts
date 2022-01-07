@@ -52,17 +52,17 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     if (status === 401) return { status, body }
 
     const { id } = request.params
-    const name = request.body.get('name') || null
-    const domain = request.body.get('domain') || null
-    const port = Number(request.body.get('port')) || null
-    const installCommand = request.body.get('installCommand') || null
-    const buildCommand = request.body.get('buildCommand') || null
-    const startCommand = request.body.get('startCommand') || null
-    const baseDirectory = request.body.get('baseDirectory') || null
-    const publishDirectory = request.body.get('publishDirectory') || null
+    const name = request.body.get('name') || undefined
+    const domain = request.body.get('domain') || undefined
+    const port = Number(request.body.get('port')) || undefined
+    const installCommand = request.body.get('installCommand') || undefined
+    const buildCommand = request.body.get('buildCommand') || undefined
+    const startCommand = request.body.get('startCommand') || undefined
+    const baseDirectory = request.body.get('baseDirectory') || undefined
+    const publishDirectory = request.body.get('publishDirectory') || undefined
 
     try {
-        return await db.configureApplication({ id,name, teamId, domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
+        return await db.configureApplication({ id, name, teamId, domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
     } catch (err) {
         return err
     }

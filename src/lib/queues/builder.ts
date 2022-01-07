@@ -4,7 +4,7 @@ import * as buildpacks from '../buildPacks'
 import * as importers from '../importers'
 import { dockerInstance } from '../docker'
 import { asyncExecShell, createDirectories, getHost, saveBuildLog, setDefaultConfiguration } from '../common'
-import { configureProxy } from '../haproxy'
+import { configureProxyForApplication } from '../haproxy'
 import * as db from '$lib/database'
 import { decrypt } from '$lib/crypto'
 
@@ -128,8 +128,8 @@ export default async function (job) {
     if (stderr) console.log(stderr)
     saveBuildLog({ line: '[COOLIFY] - Deployment successful!', buildId, applicationId })
 
-    if (destinationDocker.isCoolifyProxyUsed) {
-      await configureProxy({ domain, applicationId, port, forceSSL })
+    if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
+      await configureProxyForApplication({ domain, applicationId, port, forceSSL })
     } else {
       saveBuildLog({ line: '[COOLIFY] - Custom proxy is configured. Nothing else to do.', buildId, applicationId })
     }

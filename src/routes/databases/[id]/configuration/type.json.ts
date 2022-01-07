@@ -1,4 +1,4 @@
-import { getUserDetails } from '$lib/common';
+import { asyncExecShell, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
@@ -23,7 +23,12 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const type = request.body.get('type')
 
     try {
-        return await db.configureDatabaseType({ id, type })
+        await db.configureDatabaseType({ id, type })
+        const { version } = await db.getDatabase({ id, teamId })
+        asyncExecShell(`docker pull ${type}:${version}`)
+        return {
+            status: 201
+        }
     } catch (err) {
         return err
     }

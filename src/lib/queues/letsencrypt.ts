@@ -1,5 +1,5 @@
 import { dev } from "$app/env"
-import { forceSSLOff, forceSSLOn, getNextTransactionId, reloadConfiguration } from "$lib/haproxy"
+import { forceSSLOffApplication, forceSSLOnApplication, getNextTransactionId, reloadConfiguration } from "$lib/haproxy"
 import { asyncExecShell, getHost } from "../common"
 
 export default async function (job) {
@@ -7,9 +7,9 @@ export default async function (job) {
     const { destinationDocker, domain, forceSSLChanged, isCoolify } = job.data
     if (dev) {
       if (forceSSLChanged) {
-        await forceSSLOn({ domain })
+        await forceSSLOnApplication({ domain })
       } else {
-        await forceSSLOff({ domain })
+        await forceSSLOffApplication({ domain })
       }
       return
     }
@@ -34,10 +34,10 @@ export default async function (job) {
 
         // saveBuildLog({ line: 'SSL cert parsed.', buildId })
         // saveBuildLog({ line: 'Reloading Haproxy', buildId })
-        await forceSSLOn({ domain })
+        await forceSSLOnApplication({ domain })
 
       } else {
-        await forceSSLOff({ domain })
+        await forceSSLOffApplication({ domain })
       }
       await reloadConfiguration()
     }
