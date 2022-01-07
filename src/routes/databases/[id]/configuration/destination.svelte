@@ -2,13 +2,13 @@
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ fetch, params, url, stuff }) => {
 		const { database } = stuff;
-		console.log(database)
 		if (database?.destinationDockerId && !url.searchParams.get('from')) {
 			return {
 				status: 302,
 				redirect: `/database/${params.id}`
 			};
 		}
+		
 		const endpoint = `/destinations.json`;
 		const res = await fetch(endpoint);
 

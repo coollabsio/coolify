@@ -200,6 +200,7 @@ model Database {
   id                  String             @id @default(cuid())
   name                String             @unique
   domain              String?            @unique
+  port                Int?
   defaultDatabase     String?
   destinationDockerId String?
   destinationDocker   DestinationDocker? @relation(fields: [destinationDockerId], references: [id])

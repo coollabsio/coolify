@@ -7,7 +7,7 @@ services:
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     networks:
-      - coolify-infra
+      - coolify
     volumes:
       - './data/haproxy/:/usr/local/etc/haproxy/'
     ports: 
@@ -15,8 +15,9 @@ services:
       - "443:443"
       - "8404:8404"
       - "5555:5555"
+      - "3306:3306"
 
 networks:
-  coolify-infra:
+  coolify:
     attachable: true
-    name: coolify-infra
+    name: coolify

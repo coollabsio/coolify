@@ -1,5 +1,6 @@
 import { asyncExecShell, getHost, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
+import { deleteProxyForDatabase } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
@@ -16,6 +17,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
             await asyncExecShell(`DOCKER_HOST=${host} docker stop -t 0 ${id} && docker rm ${id}`)
             await db.updateDatabase({ id, name, domain, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version, url: null })
+            await deleteProxyForDatabase({domain})
         }
 
         return {

@@ -1,6 +1,6 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { configureProxyForApplication, configureProxyForDatabase } from '$lib/haproxy';
+import { configureDatabaseVisibility } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
@@ -12,13 +12,12 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
     try {
         await db.setDatabaseSettings({ id, isPublic })
-        const { dbUser, dbUserPassword, domain, defaultDatabase, destinationDockerId, destinationDocker } = await db.getDatabase({ id, teamId })
+        const { dbUser, dbUserPassword, domain, defaultDatabase, destinationDockerId, destinationDocker, port } = await db.getDatabase({ id, teamId })
 
-        let url = `mysql://${dbUser}:${dbUserPassword}@${id}:3306/${defaultDatabase}`
-        if (isPublic) url = `mysql://${dbUser}:${dbUserPassword}@${domain}/${defaultDatabase}`
+        const url = `mysql://${dbUser}:${dbUserPassword}@${isPublic ? domain : id}:${port}/${defaultDatabase}`
         await db.updateDatabase({ id, url })
         if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-            await configureProxyForDatabase({ domain, id, port: 3306, isPublic })
+            await configureDatabaseVisibility({ domain, isPublic })
         }
         return {
             status: 201

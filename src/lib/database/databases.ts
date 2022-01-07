@@ -14,8 +14,9 @@ export async function newDatabase({ name, teamId }) {
         const rootUserPassword = generatePassword()
         const defaultDatabase = cuid()
         const version = '8.0.27'
+        const port = Math.floor(Math.random() * (60100 - 60000) + 60000);
 
-        const database = await prisma.database.create({ data: { name, teams: { connect: { id: teamId } }, settings: { create: { isPublic: false } } } })
+        const database = await prisma.database.create({ data: { name, port, teams: { connect: { id: teamId } }, settings: { create: { isPublic: false } } } })
 
         const { id, domain } = database
         await updateDatabase({ id, name, domain, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version })
@@ -41,7 +42,7 @@ export async function getDatabase({ id, teamId }) {
 
 export async function removeDatabase({ id }) {
     try {
-        console.log(id)
+        await prisma.databaseSettings.deleteMany({ where: { databaseId: id } })
         await prisma.database.delete({ where: { id } })
         return { status: 200 }
     } catch (e) {

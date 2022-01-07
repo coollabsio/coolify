@@ -92,7 +92,7 @@
 					/>
 				</div>
 			</div>
-			<div class="grid grid-cols-3 items-center pb-8">
+			<div class="grid grid-cols-3 items-center">
 				<label for="domain">Domain</label>
 				<div class="col-span-2">
 					<input
@@ -103,6 +103,17 @@
 						placeholder="eg: {database.type}.coollabs.io"
 						value={database.domain}
 						required
+					/>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center pb-8">
+				<label for="port">Port</label>
+				<div class="col-span-2">
+					<input
+						readonly
+						name="port"
+						id="port"
+						value={database.port}
 					/>
 				</div>
 			</div>
@@ -148,6 +159,7 @@
 						readonly={!$session.isAdmin}
 						placeholder="generate automatically"
 						name="dbUserPassword"
+						type="password"
 						id="dbUserPassword"
 						value={database.dbUserPassword}
 					/>
@@ -170,23 +182,10 @@
 					<input
 						readonly={!$session.isAdmin}
 						placeholder="generate automatically"
+						type="password"
 						name="rootUserPassword"
 						id="rootUserPassword"
 						value={database.rootUserPassword}
-					/>
-				</div>
-			</div>
-			<div class="grid grid-cols-3 items-center">
-				<label for="url">Connection string</label>
-				<div class="col-span-2 ">
-					<textarea
-						rows="3"
-						class="bg-coolblack"
-						readonly
-						placeholder="will be available after deployment"
-						name="url"
-						id="url"
-						value={database.url}
 					/>
 				</div>
 			</div>
@@ -201,8 +200,8 @@
 				<Setting
 					bind:setting={isPublic}
 					on:click={() => changeSettings('isPublic')}
-					title="Make it publicly available"
-					description="Your database will be reachable over the internet. Take security seriously in this case!"
+					title="Set it public"
+					description="Your database will be reachable over the internet. <br>Take security seriously in this case!"
 				/>
 			</ul>
 		</div>
