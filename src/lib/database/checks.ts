@@ -37,3 +37,24 @@ export async function isSecretExists({ id, name }) {
         throw PrismaErrorHandler(e)
     }
 }
+
+export async function isDomainConfigured({ domain }) {
+    try {
+
+        const foundApplication = await prisma.application.findFirst({ where: { domain }, rejectOnNotFound: false })
+        const foundDatabase = await prisma.database.findFirst({ where: { domain }, rejectOnNotFound: false })
+        if (foundApplication || foundDatabase) {
+            return {
+                status: 500,
+                body: {
+                    message: "Domain already configured!"
+                }
+            }
+        }
+        return {
+            status: 200
+        }
+    } catch (e) {
+        throw PrismaErrorHandler(e)
+    }
+}

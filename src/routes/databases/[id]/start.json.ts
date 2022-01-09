@@ -23,8 +23,9 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         const database = await db.getDatabase({ id, teamId })
         const { name, domain, dbUser, dbUserPassword, rootUser, rootUserPassword, defaultDatabase, version, type, destinationDockerId, destinationDocker, port, settings } = database
         const { isPublic } = settings
-
+        let privatePort;
         if (type === 'mysql') {
+            privatePort = 3306;
             environmentVariables = {
                 MYSQL_USER: dbUser,
                 MYSQL_PASSWORD: dbUserPassword,
@@ -79,10 +80,6 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             const url = `mysql://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`
             await db.updateDatabase({ id, url })
             if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-                let privatePort = 3306
-                if (type === 'mysql') {
-                    privatePort = 3306
-                }
                 await configureProxyForDatabase({ domain, id, port, isPublic, privatePort })
             }
             return {

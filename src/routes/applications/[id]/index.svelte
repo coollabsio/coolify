@@ -31,7 +31,7 @@
 		settings: ApplicationSettings;
 	};
 	import { page, session } from '$app/stores';
-	import { enhance } from '$lib/form';
+	import { enhance, errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
 
 	import Explainer from '$lib/components/Explainer.svelte';
@@ -140,6 +140,22 @@
 	<form
 		action="/applications/{id}.json"
 		use:enhance={{
+			beforeSubmit: async () => {
+				const form = new FormData();
+				form.append('domain', domainEl.value);
+				const response = await fetch(`/applications/${id}/check.json`, {
+					method: 'POST',
+					headers: {
+						accept: 'application/json'
+					},
+					body: form
+				});
+				if (!response.ok) {
+					const error = await response.json();
+					errorNotification(error.message || error);
+					throw new Error(error.message || error);
+				}
+			},
 			result: async () => {
 				setTimeout(() => {
 					loading = false;

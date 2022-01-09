@@ -102,9 +102,13 @@ export function getHost({ engine }) {
 
 export const removeDestinationDocker = async ({ id, destinationDocker }) => {
     const docker = dockerInstance({ destinationDocker })
-    if (docker.engine.getContainer(id)) {
-        await docker.engine.getContainer(id).stop()
-        await docker.engine.getContainer(id).remove()
+    try {
+        if (docker.engine.getContainer(id)) {
+            await docker.engine.getContainer(id).stop()
+            await docker.engine.getContainer(id).remove()
+        }
+    } catch (error) {
+        console.log(error)
     }
 }
 
@@ -113,10 +117,10 @@ export const removePreviewDestinationDocker = async ({ id, destinationDocker, pu
         const docker = dockerInstance({ destinationDocker })
         await docker.engine.getContainer(`${id}-${pullmergeRequestId}`).stop()
         await docker.engine.getContainer(`${id}-${pullmergeRequestId}`).remove()
-    } catch(error) {
+    } catch (error) {
         if (error.statusCode === 404) {
             throw {
-                    message: 'Nothing to do.'
+                message: 'Nothing to do.'
             }
         }
         throw error
@@ -134,10 +138,15 @@ export const removeAllPreviewsDestinationDocker = async ({ id, destinationDocker
     for (const container of containers) {
         const preview = container.Image.split('-')[1]
         if (preview) previews.push(preview)
-        if (docker.engine.getContainer(container.Id)) {
-            await docker.engine.getContainer(container.Id).stop()
-            await docker.engine.getContainer(container.Id).remove()
+        try {
+            if (docker.engine.getContainer(container.Id)) {
+                await docker.engine.getContainer(container.Id).stop()
+                await docker.engine.getContainer(container.Id).remove()
+            }
+        } catch (error) {
+            console.log(error)
         }
+
     }
     return previews
 }

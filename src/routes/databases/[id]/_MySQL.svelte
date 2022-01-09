@@ -1,8 +1,9 @@
 <script lang="ts">
 	export let database;
 	import { page, session } from '$app/stores';
+	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Setting from '$lib/components/Setting.svelte';
-	import { enhance } from '$lib/form';
+	import { enhance, errorNotification } from '$lib/form';
 
 	const { id } = $page.params;
 	let loading = false;
@@ -21,7 +22,7 @@
 				method: 'POST',
 				body: form
 			});
-			window.location.reload()
+			window.location.reload();
 		} catch (e) {
 			console.error(e);
 		}
@@ -32,6 +33,22 @@
 	<form
 		action="/databases/{id}.json"
 		use:enhance={{
+			beforeSubmit: async () => {
+				const form = new FormData();
+				form.append('domain', database.domain);
+				const response = await fetch(`/databases/${id}/check.json`, {
+					method: 'POST',
+					headers: {
+						accept: 'application/json'
+					},
+					body: form
+				});
+				if (!response.ok) {
+					const error = await response.json();
+					errorNotification(error.message || error);
+					throw new Error(error.message || error);
+				}
+			},
 			result: async () => {
 				setTimeout(() => {
 					loading = false;
@@ -109,12 +126,7 @@
 			<div class="grid grid-cols-3 items-center pb-8">
 				<label for="port">Port</label>
 				<div class="col-span-2">
-					<input
-						readonly
-						name="port"
-						id="port"
-						value={database.port}
-					/>
+					<input readonly name="port" id="port" value={database.port} />
 				</div>
 			</div>
 		</div>
@@ -144,10 +156,10 @@
 			<div class="grid grid-cols-3 items-center">
 				<label for="dbUser">User</label>
 				<div class="col-span-2 ">
-					<input
+					<CopyPasswordField
 						placeholder="generate automatically"
-						name="dbUser"
 						id="dbUser"
+						name="dbUser"
 						value={database.dbUser}
 					/>
 				</div>
@@ -155,12 +167,11 @@
 			<div class="grid grid-cols-3 items-center">
 				<label for="dbUserPassword">Password</label>
 				<div class="col-span-2 ">
-					<input
-						readonly={!$session.isAdmin}
+					<CopyPasswordField
 						placeholder="generate automatically"
-						name="dbUserPassword"
-						type="password"
+						isPasswordField={true}
 						id="dbUserPassword"
+						name="dbUserPassword"
 						value={database.dbUserPassword}
 					/>
 				</div>
@@ -168,10 +179,10 @@
 			<div class="grid grid-cols-3 items-center">
 				<label for="rootUser">Root User</label>
 				<div class="col-span-2 ">
-					<input
+					<CopyPasswordField
 						placeholder="generate automatically"
-						name="rootUser"
 						id="rootUser"
+						name="rootUser"
 						value={database.rootUser}
 					/>
 				</div>
@@ -179,12 +190,11 @@
 			<div class="grid grid-cols-3 items-center pb-8">
 				<label for="rootUserPassword">Root User's Password</label>
 				<div class="col-span-2 ">
-					<input
-						readonly={!$session.isAdmin}
+					<CopyPasswordField
 						placeholder="generate automatically"
-						type="password"
-						name="rootUserPassword"
+						isPasswordField={true}
 						id="rootUserPassword"
+						name="rootUserPassword"
 						value={database.rootUserPassword}
 					/>
 				</div>
