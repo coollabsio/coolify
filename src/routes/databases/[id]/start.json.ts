@@ -23,8 +23,12 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         const database = await db.getDatabase({ id, teamId })
         const { name, domain, dbUser, dbUserPassword, rootUser, rootUserPassword, defaultDatabase, version, type, destinationDockerId, destinationDocker, port, settings } = database
         const { isPublic } = settings
+
         let privatePort;
+        let url;
+
         if (type === 'mysql') {
+            url = `mysql://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`
             privatePort = 3306;
             environmentVariables = {
                 MYSQL_USER: dbUser,
@@ -35,6 +39,17 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             }
             image = `bitnami/mysql:${version}`;
             volume = `${id}-${type}-data:/bitnami/mysql/data`;
+        } else if (type === 'mongodb') {
+            url = `mongodb://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`
+            privatePort = 27017;
+            environmentVariables = {
+                MONGODB_USERNAME: dbUser,
+                MONGODB_PASSWORD: dbUserPassword,
+                MONGODB_ROOT_PASSWORD: rootUserPassword,
+                MONGODB_DATABASE: defaultDatabase
+            }
+            image = `bitnami/mongodb:${version}`;
+            volume = `${id}-${type}-data:/bitnami/mongodb`;
         }
         const network = destinationDockerId && destinationDocker.network
         const host = getHost({ engine: destinationDocker.engine })
@@ -77,7 +92,6 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         }
         try {
             await asyncExecShell(`DOCKER_HOST=${host} docker-compose -f ${composeFileDestination} up -d`)
-            const url = `mysql://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`
             await db.updateDatabase({ id, url })
             if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
                 await configureProxyForDatabase({ domain, id, port, isPublic, privatePort })

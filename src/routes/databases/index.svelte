@@ -53,7 +53,7 @@
 				<div class="box-selection">
 					<div class="font-bold text-xl text-center truncate">{database.name}</div>
 					{#if !database.type}
-						<div class="font-bold text-xs text-center truncate text-red-500">Not configured</div>
+						<div class="font-bold text-center truncate text-red-500">Not configured</div>
 						{:else}
 						<div class="text-center truncate">{database.type}</div>
 					{/if}

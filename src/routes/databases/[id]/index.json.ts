@@ -1,5 +1,6 @@
 import { asyncExecShell, getHost, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
+import { dockerInstance } from '$lib/docker';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (request) => {
@@ -52,7 +53,20 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const version = request.body.get('version')
 
     try {
-        return db.updateDatabase({ id, name, domain, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version })
+        db.updateDatabase({ id, name, domain, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version })
+
+        const { type, destinationDockerId, destinationDocker } = await db.getDatabase({ id, teamId })
+        if (destinationDockerId) {
+            const docker = dockerInstance({ destinationDocker })
+            try {
+                if (type && version) {
+                    docker.engine.pull(`bitnami/${type}:${version}`)
+                }
+            } catch (error) {
+                // console.log(error)
+            }
+        }
+
     } catch (err) {
         return err
     }

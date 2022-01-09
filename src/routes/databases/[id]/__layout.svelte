@@ -6,6 +6,8 @@
 			configurationPhase = 'type';
 		} else if (!database.destinationDockerId) {
 			configurationPhase = 'destination';
+		} else if (!database.version) {
+			configurationPhase = 'version';
 		}
 		return configurationPhase;
 	}

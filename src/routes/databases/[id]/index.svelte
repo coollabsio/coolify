@@ -1,5 +1,6 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
+	import MongoDb from './_MongoDB.svelte';
 	export const load: Load = async ({ fetch, params, stuff }) => {
 		if (stuff?.database?.id) {
 			return {
@@ -42,4 +43,6 @@
 
 {#if database.type === 'mysql'}
 	<MySql {database} />
+{:else if database.type === 'mongodb'}
+	<MongoDb {database} />
 {/if}

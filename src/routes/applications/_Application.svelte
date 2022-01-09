@@ -5,15 +5,7 @@
 <a href="/applications/{application.id}" class="no-underline p-2">
 	<div
 		class="box-selection"
-		class:border-red-500={!application.domain ||
-			!application.gitSourceId ||
-			application.buildPack === 'static'}
-		class:border-0={!application.domain ||
-			!application.gitSourceId ||
-			!application.destinationDockerId}
-		class:border-l-4={!application.domain ||
-			!application.gitSourceId ||
-			!application.destinationDockerId}
+		class:border-red-500={application.buildPack === 'static'}	
 		class:border-green-500={application.buildPack === 'node'}
 		class:border-sky-500={application.buildPack === 'docker'}
 	>
@@ -22,7 +14,7 @@
 			<div class="text-center truncate">{application.domain}</div>
 		{/if}
 		{#if !application.gitSourceId || !application.destinationDockerId}
-			<div class="font-bold text-xs text-center truncate text-red-500">Not configured</div>
+			<div class="font-bold text-center truncate text-red-500">Not configured</div>
 		{/if}
 	</div>
 </a>

@@ -13,13 +13,17 @@ export async function newDatabase({ name, teamId }) {
         const rootUser = cuid()
         const rootUserPassword = generatePassword()
         const defaultDatabase = cuid()
-        const version = '8.0.27'
-        const port = Math.floor(Math.random() * (60100 - 60000) + 60000);
+        const databases = await prisma.database.findMany({ orderBy: { port: 'desc' } })
 
+        let port = 60000
+        if (databases.length > 0) {
+            port = databases[0].port + 1
+        }
+        
         const database = await prisma.database.create({ data: { name, port, teams: { connect: { id: teamId } }, settings: { create: { isPublic: false } } } })
 
         const { id, domain } = database
-        await updateDatabase({ id, name, domain, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version })
+        await updateDatabase({ id, name, domain, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword })
 
         return { status: 201, body: { id: database.id } }
     } catch (e) {
