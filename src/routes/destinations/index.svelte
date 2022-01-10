@@ -55,7 +55,7 @@
 		<div class="flex flex-wrap justify-center">
 			{#each destinations as destination}
 				<a href="/destinations/{destination.id}" class="no-underline p-2">
-					<div class="box-selection border-sky-500">
+					<div class="box-selection hover:bg-sky-700">
 						<div class="font-bold text-xl text-center truncate">{destination.name}</div>
 						<div class="text-center truncate">{destination.network}</div>
 					</div>

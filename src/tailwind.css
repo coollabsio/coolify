@@ -244,7 +244,7 @@ a {
 }
 
 .box-selection {
-	@apply min-w-[16rem] max-w-[24rem] bg-coolgray-200 hover:bg-coolgray-400 rounded justify-center p-6 shadow-lg border-t-4 border-transparent hover:border-green-500 transition duration-150;
+	@apply min-w-[16rem] max-w-[24rem] bg-coolgray-200 hover:bg-coolgray-400 rounded-lg justify-center p-6 shadow-lg border-transparent hover:border-transparent hover:scale-105 transition duration-150;
 }
 
 ._toastBar  {

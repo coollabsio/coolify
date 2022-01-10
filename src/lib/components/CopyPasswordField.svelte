@@ -12,7 +12,7 @@
 	export let placeholder;
 
 	let disabledClass =
-		'bg-coolblack disabled:bg-coolblack border border-coolgray-300 text-warmGray-400';
+		'bg-coolgray-100 disabled:bg-coolgray-100 text-warmGray-400';
 	let actionsShow = false;
 	function showActions(value) {
 		actionsShow = value;
