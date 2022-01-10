@@ -34,10 +34,10 @@ export async function makeLabelForDatabase({ id, image, volume }) {
     delete database.updatedAt
     delete database.url
     return [
-        'LABEL coolify.managed=true',
-        `LABEL coolify.version=${version}`,
-        `LABEL coolify.type=database`,
-        `LABEL coolify.configuration=${base64Encode(JSON.stringify({
+        'coolify.managed=true',
+        `coolify.version=${version}`,
+        `coolify.type=database`,
+        `coolify.configuration=${base64Encode(JSON.stringify({
             version,
             image,
             volume,

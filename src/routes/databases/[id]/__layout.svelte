@@ -66,12 +66,14 @@
 	async function deleteDatabase() {
 		const sure = confirm(`Are you sure you would like to delete '${database.name}'?`);
 		if (sure) {
+			loading = true;
 			const response = await fetch(`/databases/${database.id}/delete.json`, {
 				method: 'delete',
 				body: JSON.stringify({ id: database.id })
 			});
 			if (!response.ok) {
 				const { message } = await response.json();
+				loading = false;
 				errorNotification(message);
 			} else {
 				window.location.assign('/databases');

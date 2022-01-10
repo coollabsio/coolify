@@ -6,10 +6,10 @@
 <div class="grid grid-cols-3 items-center pb-8">
 	<label for="defaultDatabase">Default Database Name</label>
 	<div class="col-span-2 ">
-		<input
+		<CopyPasswordField
 			placeholder="generate automatically"
-			name="defaultDatabase"
 			id="defaultDatabase"
+			name="defaultDatabase"
 			value={database.defaultDatabase}
 		/>
 	</div>

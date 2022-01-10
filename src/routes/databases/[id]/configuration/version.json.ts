@@ -26,7 +26,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const version = request.body.get('version')
 
     try {
-        await db.updateDatabase({ id, version })
+        await db.setDatabase({ id, version })
         return {
             status: 201
         }

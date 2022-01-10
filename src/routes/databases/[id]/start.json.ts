@@ -61,7 +61,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         }
         try {
             await asyncExecShell(`DOCKER_HOST=${host} docker-compose -f ${composeFileDestination} up -d`)
-            await db.updateDatabase({ id, url })
+            await db.setDatabase({ id, url })
             if (destinationDockerId) {
                 const found = await checkCoolifyProxy(engine)
                 if (!found) await startCoolifyProxy(engine)

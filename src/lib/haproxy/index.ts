@@ -201,9 +201,39 @@ export async function deleteProxyForDatabase({ id }) {
 }
 export async function configureProxyForDatabase({ id, port, isPublic, privatePort }) {
     const haproxy = haproxyInstance()
-    const transactionId = await getNextTransactionId()
     try {
         await checkHAProxy()
+    } catch (error) {
+        return
+    }
+
+    try {
+        let alreadyConfigured = false
+        try {
+            const backend: any = await haproxy.get(`v2/services/haproxy/configuration/backends/${id}`).json()
+            const server: any = await haproxy.get(`v2/services/haproxy/configuration/servers/${id}`, {
+                searchParams: {
+                    backend: id
+                },
+            }).json()
+            if (backend.data.name === id) {
+                if (server.data.port === privatePort) {
+                    if (server.data.check === 'enabled') {
+                        if (server.data.address === id) {
+                            alreadyConfigured = true
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            // OK
+        }
+        if (alreadyConfigured) return
+    } catch (error) {
+
+    }
+    const transactionId = await getNextTransactionId()
+    try {
         await haproxy.post('v2/services/haproxy/configuration/backends', {
             searchParams: {
                 transaction_id: transactionId
@@ -265,64 +295,64 @@ export async function configureProxyForDatabase({ id, port, isPublic, privatePor
 }
 export async function configureProxyForApplication({ domain, applicationId, port, forceSSL }) {
     const haproxy = haproxyInstance()
-    await checkHAProxy()
-
     try {
-        try {
-            const backend: any = await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
-            const server: any = await haproxy.get(`v2/services/haproxy/configuration/servers/${applicationId}`, {
-                searchParams: {
-                    backend: domain
-                },
-            }).json()
-            let serverConfigured = false
-            let sslConfigured = false
-            if (backend && server) {
-                // Very sophisticated way to check if the server is already configured in proxy
-                if (backend.data.forwardfor.enabled === 'enabled') {
-                    if (backend.data.name === domain) {
-                        if (server.data.check === 'enabled') {
-                            if (server.data.address === applicationId) {
-                                if (server.data.port === port) {
-                                    // console.log('proxy already configured for this application', domain, applicationId, port)
-                                    serverConfigured = true
-                                }
+        await checkHAProxy()
+
+    } catch (error) {
+        return
+    }
+    try {
+        let serverConfigured = false
+        const backend: any = await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
+        const server: any = await haproxy.get(`v2/services/haproxy/configuration/servers/${applicationId}`, {
+            searchParams: {
+                backend: domain
+            },
+        }).json()
+
+        let sslConfigured = false
+        if (backend && server) {
+            // Very sophisticated way to check if the server is already configured in proxy
+            if (backend.data.forwardfor.enabled === 'enabled') {
+                if (backend.data.name === domain) {
+                    if (server.data.check === 'enabled') {
+                        if (server.data.address === applicationId) {
+                            if (server.data.port === port) {
+                                // console.log('proxy already configured for this application', domain, applicationId, port)
+                                serverConfigured = true
                             }
                         }
                     }
                 }
             }
-
-            if (forceSSL) {
-                const rules: any = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
-                    searchParams: {
-                        parent_name: 'http',
-                        parent_type: 'frontend',
-                    }
-                }).json()
-                if (rules.data.length > 0) {
-                    const rule = rules.data.find(rule => rule.cond_test.includes(`-i ${domain}`))
-                    if (rule) sslConfigured = true
-                }
-            }
-            if (!sslConfigured && forceSSL) await forceSSLOnApplication({ domain })
-            if (serverConfigured) return
-
-        } catch (error) {
-            // No worries, it's okay to not handle it
         }
-        const transactionId = await getNextTransactionId()
 
-        try {
-            await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
-            await haproxy.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
+        if (forceSSL) {
+            const rules: any = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
                 searchParams: {
-                    transaction_id: transactionId
-                },
+                    parent_name: 'http',
+                    parent_type: 'frontend',
+                }
             }).json()
-        } catch (error) {
-
+            if (rules.data.length > 0) {
+                const rule = rules.data.find(rule => rule.cond_test.includes(`-i ${domain}`))
+                if (rule) sslConfigured = true
+            }
         }
+        if (!sslConfigured && forceSSL) await forceSSLOnApplication({ domain })
+        if (serverConfigured) return
+    } catch (error) {
+
+    }
+    const transactionId = await getNextTransactionId()
+
+    try {
+        await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
+        await haproxy.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
+            searchParams: {
+                transaction_id: transactionId
+            },
+        }).json()
         await haproxy.post('v2/services/haproxy/configuration/backends', {
             searchParams: {
                 transaction_id: transactionId
@@ -346,10 +376,12 @@ export async function configureProxyForApplication({ domain, applicationId, port
                 "port": port
             }
         })
-        await completeTransaction(transactionId)
+
     } catch (error) {
-        console.log(error)
-        throw new Error(error)
+        console.log(error.response.body)
+        throw error.response.body
+    } finally {
+        await completeTransaction(transactionId)
     }
 }
 

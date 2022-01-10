@@ -63,14 +63,24 @@ export async function configureDatabaseType({ id, type }) {
         throw PrismaErrorHandler(e)
     }
 }
-
-export async function updateDatabase({ id, name = undefined, domain = undefined, defaultDatabase = undefined, dbUser = undefined, dbUserPassword = undefined, rootUser = undefined, rootUserPassword = undefined, version = undefined, url = undefined }) {
+export async function setDatabase({ id, url = undefined, version = undefined, isPublic = undefined }) {
+    try {
+        await prisma.database.update({
+            where: { id },
+            data: { url, version, settings: { upsert: { update: { isPublic }, create: { isPublic } } } }
+        })
+        return { status: 200 }
+    } catch (e) {
+        throw PrismaErrorHandler(e)
+    }
+}
+export async function updateDatabase({ id, name = undefined, domain = undefined, defaultDatabase = undefined, dbUser = undefined, dbUserPassword = undefined, rootUser = undefined, rootUserPassword = undefined, version = undefined, url = undefined, noConfiguration = false }) {
     try {
         const encryptedDbUserPassword = dbUserPassword && encrypt(dbUserPassword)
         const encryptedRootUserPassword = rootUserPassword && encrypt(rootUserPassword)
         if (!domain) {
             const { destinationDockerId, destinationDocker } = await prisma.database.update({ where: { id }, data: { name, domain, defaultDatabase, dbUser, dbUserPassword: encryptedDbUserPassword, rootUser, rootUserPassword: encryptedRootUserPassword, version, url, settings: { update: { isPublic: false } } }, select: { destinationDockerId: true, destinationDocker: true } })
-            if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
+            if (destinationDockerId && destinationDocker.isCoolifyProxyUsed && !noConfiguration) {
                 await configureDatabaseVisibility({ id, isPublic: false })
             }
         } else {
@@ -84,7 +94,7 @@ export async function updateDatabase({ id, name = undefined, domain = undefined,
 
 export async function setDatabaseSettings({ id, isPublic }) {
     try {
-        await prisma.database.update({ where: { id }, data: { settings: { upsert: { update: { isPublic }, create: { isPublic } } } } })
+        await prisma.databaseSettings.update({ where: { databaseId: id }, data: { isPublic } })
         return { status: 201 }
     } catch (e) {
         throw PrismaErrorHandler(e)

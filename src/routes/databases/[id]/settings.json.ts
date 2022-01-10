@@ -25,7 +25,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             }
         }
         await db.setDatabaseSettings({ id, isPublic })
-        await db.updateDatabase({ id, url })
+        await db.setDatabase({ id, url })
         if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
             await configureDatabaseVisibility({ id, isPublic })
         }

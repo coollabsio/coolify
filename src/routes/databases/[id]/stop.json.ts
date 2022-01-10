@@ -15,7 +15,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         if (destinationDockerId) {
             const host = getEngine(destinationDocker.engine)
             await asyncExecShell(`DOCKER_HOST=${host} docker stop -t 0 ${id} && docker rm ${id}`)
-            await db.updateDatabase({ id, url: null })
+            await db.setDatabase({ id, url: null }) 
             await deleteProxyForDatabase({ id })
         }
 

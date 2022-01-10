@@ -71,7 +71,6 @@ export async function configureDestinationForDatabase({ id, destinationId }) {
                 if (type && version) {
                     const baseImage = getBaseImage(type)
                     docker.engine.pull(`${baseImage}:${version}`)
-                    console.log(`pull initiated for ${baseImage}:${version}`)
                 }
             } catch (error) {
                 // console.log(error)
