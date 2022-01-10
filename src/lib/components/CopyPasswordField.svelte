@@ -5,37 +5,59 @@
 	export let isEditable = false;
 	export let isPasswordField = false;
 	export let isReadOnly = false;
+	export let textarea = false;
 
 	export let id;
 	export let name;
 	export let placeholder;
 
+	let disabledClass =
+		'bg-coolblack disabled:bg-coolblack border border-coolgray-300 text-warmGray-400';
 	let actionsShow = false;
 	function showActions(value) {
 		actionsShow = value;
 		if (value === false) {
-			showPassword = false
+			showPassword = false;
 		}
 	}
 	function copyToClipboard() {
-		navigator.clipboard.writeText(value)
+		navigator.clipboard.writeText(value);
 		toast.push('Copied to clipboard');
 	}
 </script>
 
-<span class="relative" on:mouseenter={() => showActions(true)} on:mouseleave={() => showActions(false)}>
+<span
+	class="relative"
+	on:mouseenter={() => showActions(true)}
+	on:mouseleave={() => showActions(false)}
+>
 	{#if !isPasswordField || showPassword}
-		<input
-			type="text"
-			{id}
-			{name}
-			readonly={isReadOnly}
-			bind:value
-			disabled={!isEditable}
-			{placeholder}
-		/>
+		{#if textarea}
+			<textarea
+				rows="3"
+				class={disabledClass}
+				{placeholder}
+				type="text"
+				{id}
+				readonly={isReadOnly}
+				disabled={!isEditable}
+				{name}>{value}</textarea
+			>
+		{:else}
+			<input
+				class={disabledClass}
+				type="text"
+				{id}
+				{name}
+				readonly={isReadOnly}
+				bind:value
+				disabled={!isEditable}
+				{placeholder}
+			/>
+		{/if}
 	{:else}
 		<input
+			class={disabledClass}
 			type="password"
 			{id}
 			{name}
@@ -90,22 +112,24 @@
 						{/if}
 					</div>
 				{/if}
-				<div on:click={copyToClipboard}>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<rect x="8" y="8" width="12" height="12" rx="2" />
-						<path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2" />
-					</svg>
-				</div>
+				{#if value}
+					<div on:click={copyToClipboard}>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="w-6 h-6"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<rect x="8" y="8" width="12" height="12" rx="2" />
+							<path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2" />
+						</svg>
+					</div>
+				{/if}
 			</div>
 		</div>
 	{/if}

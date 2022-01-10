@@ -1,11 +1,12 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	import MongoDb from './_MongoDB.svelte';
+	import Databases from './_Databases/_Databases.svelte';
 	export const load: Load = async ({ fetch, params, stuff }) => {
 		if (stuff?.database?.id) {
 			return {
 				props: {
-					database: stuff.database
+					database: stuff.database,
+					versions: stuff.versions
 				}
 			};
 		}
@@ -28,9 +29,8 @@
 </script>
 
 <script lang="ts">
-	import MySql from './_MySQL.svelte';
-
 	export let database;
+	export let versions;
 </script>
 
 <div class="font-bold flex space-x-1 p-5 px-6 text-2xl items-center">
@@ -41,8 +41,4 @@
 	<span class="pr-2">{database.type}</span>
 </div>
 
-{#if database.type === 'mysql'}
-	<MySql {database} />
-{:else if database.type === 'mongodb'}
-	<MongoDb {database} />
-{/if}
+<Databases {database} {versions} />

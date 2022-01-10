@@ -1,4 +1,4 @@
-import { asyncExecShell, getHost, getUserDetails } from '$lib/common';
+import { asyncExecShell, getEngine, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { dockerInstance } from '$lib/docker';
 import { deleteProxyForDatabase } from '$lib/haproxy';
@@ -9,9 +9,9 @@ export const del: RequestHandler<Locals, FormData> = async (request) => {
     if (status === 401) return { status, body }
     const { id } = request.params
     try {
-        const { domain, destinationDockerId, destinationDocker } = await db.getDatabase({ id, teamId })
+        const { destinationDockerId, destinationDocker } = await db.getDatabase({ id, teamId })
         await db.removeDatabase({ id })
-        await deleteProxyForDatabase({ domain })
+        await deleteProxyForDatabase({ id })
         if (destinationDockerId) {
             const docker = dockerInstance({ destinationDocker })
             try {

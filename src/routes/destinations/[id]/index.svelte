@@ -1,7 +1,7 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ fetch, params, stuff }) => {
-		if (stuff?.destination) {
+		if (stuff?.destination.id) {
 			return {
 				props: {
 					destination: stuff.destination

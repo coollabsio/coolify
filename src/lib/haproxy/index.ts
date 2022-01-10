@@ -1,7 +1,12 @@
 import { dev } from "$app/env";
+import { asyncExecShell, getEngine } from "$lib/common";
+import { checkCoolifyProxy } from "$lib/database";
 import { letsEncryptQueue } from "$lib/queues";
 import got from "got";
+import * as db from '$lib/database';
+
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555'
+const defaultProxyImage = `haproxy-alpine:1.0.0-rc.1`
 
 export function haproxyInstance() {
     return got.extend({
@@ -36,7 +41,8 @@ export async function getNextTransactionId(): Promise<string> {
 }
 
 export async function completeTransaction(transactionId) {
-    return await haproxyInstance().put(`v2/services/haproxy/transactions/${transactionId}`)
+    const haproxy = haproxyInstance()
+    return await haproxy.put(`v2/services/haproxy/transactions/${transactionId}`)
 }
 
 export async function removeProxyConfiguration({ domain }) {
@@ -53,78 +59,6 @@ export async function removeProxyConfiguration({ domain }) {
 
     }
 }
-// export async function forceSSLOnDatabase({ domain }) {
-//     if (!dev) {
-//         const haproxy = haproxyInstance()
-//         await checkHAProxy()
-//         const transactionId = await getNextTransactionId()
-
-//         try {
-//             const rules: any = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
-//                 searchParams: {
-//                     parent_name: 'tcp',
-//                     parent_type: 'frontend',
-//                 }
-//             }).json()
-
-//             if (rules.data.length > 0) {
-//                 for (const rule of rules.data) {
-//                     if (rule.name === domain) {
-//                         await haproxy.delete(`v2/services/haproxy/configuration/http_request_rules/${rule.index}`, {
-//                             searchParams: {
-//                                 frontend: 'tcp',
-//                                 transaction_id: transactionId
-//                             }
-//                         }).json()
-//                     }
-//                 }
-//             }
-//         } catch (error) {
-//             console.log(error)
-//         } finally {
-//             await completeTransaction(transactionId)
-//         }
-//     } else {
-//         console.log(`adding ssl for ${domain}`)
-//     }
-
-// }
-
-// export async function forceSSLOffDatabase({ domain }) {
-//     if (!dev) {
-//         const haproxy = haproxyInstance()
-//         await checkHAProxy()
-//         const transactionId = await getNextTransactionId()
-
-//         try {
-//             const rules: any = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
-//                 searchParams: {
-//                     parent_name: 'tcp',
-//                     parent_type: 'frontend',
-//                 }
-//             }).json()
-//             if (rules.data.length > 0) {
-//                 for (const rule of rules.data) {
-//                     if (rule.name === domain) {
-//                         await haproxy.delete(`v2/services/haproxy/configuration/http_request_rules/${rule.index}`, {
-//                             searchParams: {
-//                                 frontend: 'tcp',
-//                                 transaction_id: transactionId
-//                             }
-//                         }).json()
-//                     }
-//                 }
-//             }
-//         } catch (error) {
-//             console.log(error)
-//         } finally {
-//             await completeTransaction(transactionId)
-//         }
-//     } else {
-//         console.log(`removing ssl for ${domain}`)
-//     }
-
-// }
 export async function forceSSLOffApplication({ domain }) {
     if (!dev) {
         const haproxy = haproxyInstance()
@@ -203,16 +137,17 @@ export async function forceSSLOnApplication({ domain }) {
 
 }
 
-export async function configureDatabaseVisibility({ domain, isPublic }) {
+export async function configureDatabaseVisibility({ id, isPublic }) {
     const haproxy = haproxyInstance()
     await checkHAProxy()
     const transactionId = await getNextTransactionId()
+    const database = await db.prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
     try {
         if (isPublic) {
             await haproxy.delete(`v2/services/haproxy/configuration/tcp_request_rules/0`, {
                 searchParams: {
                     transaction_id: transactionId,
-                    parent_name: domain,
+                    parent_name: id,
                     parent_type: 'frontend',
                 }
             })
@@ -220,37 +155,39 @@ export async function configureDatabaseVisibility({ domain, isPublic }) {
             await haproxy.post(`v2/services/haproxy/configuration/tcp_request_rules`, {
                 searchParams: {
                     transaction_id: transactionId,
-                    parent_name: domain,
+                    parent_name: id,
                     parent_type: 'frontend',
                 },
                 json: {
-                    "action": "reject",
+                    cond: "if",
+                    cond_test: `{ src ${database.destinationDocker.subnet} }`,
+                    "action": "accept",
                     "index": 0,
                     "type": "connection"
                 }
             })
-
         }
 
     } catch (error) {
         console.log(error.response.body)
+        throw error.response.body
     } finally {
         await completeTransaction(transactionId)
     }
 }
-export async function deleteProxyForDatabase({ domain }) {
+export async function deleteProxyForDatabase({ id }) {
     const haproxy = haproxyInstance()
     await checkHAProxy()
     const transactionId = await getNextTransactionId()
     try {
-        await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
-        await haproxy.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
+        await haproxy.get(`v2/services/haproxy/configuration/backends/${id}`).json()
+        await haproxy.delete(`v2/services/haproxy/configuration/backends/${id}`, {
             searchParams: {
                 transaction_id: transactionId
             },
         }).json()
-        await haproxy.get(`v2/services/haproxy/configuration/frontends/${domain}`).json()
-        await haproxy.delete(`v2/services/haproxy/configuration/frontends/${domain}`, {
+        await haproxy.get(`v2/services/haproxy/configuration/frontends/${id}`).json()
+        await haproxy.delete(`v2/services/haproxy/configuration/frontends/${id}`, {
             searchParams: {
                 transaction_id: transactionId
             },
@@ -262,11 +199,11 @@ export async function deleteProxyForDatabase({ domain }) {
     }
 
 }
-export async function configureProxyForDatabase({ domain, id, port, isPublic, privatePort }) {
+export async function configureProxyForDatabase({ id, port, isPublic, privatePort }) {
     const haproxy = haproxyInstance()
-    await checkHAProxy()
     const transactionId = await getNextTransactionId()
     try {
+        await checkHAProxy()
         await haproxy.post('v2/services/haproxy/configuration/backends', {
             searchParams: {
                 transaction_id: transactionId
@@ -274,14 +211,13 @@ export async function configureProxyForDatabase({ domain, id, port, isPublic, pr
             json: {
                 "init-addr": "last,libc,none",
                 "mode": "tcp",
-                "name": domain
+                "name": id
             }
         })
-
         await haproxy.post('v2/services/haproxy/configuration/servers', {
             searchParams: {
                 transaction_id: transactionId,
-                backend: domain
+                backend: id
             },
             json: {
                 "address": id,
@@ -293,33 +229,36 @@ export async function configureProxyForDatabase({ domain, id, port, isPublic, pr
         await haproxy.post('v2/services/haproxy/configuration/frontends', {
             searchParams: {
                 transaction_id: transactionId,
-                backend: domain
+                backend: id
             },
             json: {
-                "default_backend": domain,
+                "default_backend": id,
                 "mode": "tcp",
-                "name": domain
+                "name": id
             }
         })
         await haproxy.post('v2/services/haproxy/configuration/binds', {
             searchParams: {
                 transaction_id: transactionId,
-                frontend: domain
+                frontend: id
             },
             json: {
                 "address": "*",
-                "name": domain,
+                "name": id,
                 "port": port
             }
         })
-
     } catch (error) {
         console.log(error.response.body)
-        // No worries, it's okay to not handle it
+        throw error.response.body
     } finally {
-        await completeTransaction(transactionId)
+        try {
+            await completeTransaction(transactionId)
+        } catch (error) {
+            console.log(error.response)
+        }
     }
-    await configureDatabaseVisibility({ domain, isPublic })
+    await configureDatabaseVisibility({ id, isPublic })
 
 
 
@@ -484,4 +423,29 @@ export async function configureCoolifyProxyOn({ domain }) {
         console.log(error)
     }
 
+}
+
+export async function startCoolifyProxy(engine) {
+    const host = getEngine(engine)
+    if (host) {
+        await asyncExecShell(`DOCKER_HOST="${host}" docker run --restart always --add-host 'host.docker.internal:host-gateway' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "60000-60100:60000-60100" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`)
+        return await configureNetworkCoolifyProxy(engine)
+
+    } else {
+        await asyncExecShell(`docker run --restart always --add-host 'host.docker.internal:host-gateway' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "60000-60100:60000-60100" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`)
+        return await configureNetworkCoolifyProxy(engine)
+    }
+
+}
+
+export async function configureNetworkCoolifyProxy(engine) {
+    const host = getEngine(engine)
+    const destinations = await db.prisma.destinationDocker.findMany({ where: { engine } })
+    destinations.forEach(async (destination) => {
+        try {
+            await asyncExecShell(`DOCKER_HOST="${host}" docker network connect ${destination.network} coolify-haproxy`)
+        } catch (err) {
+            // TODO: handle error
+        }
+    })
 }

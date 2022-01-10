@@ -66,4 +66,111 @@ export async function generateSshKeyPair(): Promise<{ publicKey: string, private
     })
 }
 
+export const supportedDatabaseTypesAndVersions = [
+    { name: 'mongodb', baseImage: 'bitnami/mongodb', versions: ['5.0.5', '4.4.11', '4.2.18', '4.0.27'] },
+    { name: 'mysql', baseImage: 'bitnami/mysql', versions: ['8.0.27', '5.7.36'] },
+    { name: 'postgresql', baseImage: 'bitnami/postgresql', versions: ['14.1.0', '13.5.0', '12.9.0', '11.14.0', '10.19.0', '9.6.24'] },
+    { name: 'redis', baseImage: 'bitnami/redis', versions: ['6.2.6', '6.0.16', '5.0.14'] },
+    { name: 'couchdb', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] },
+    // { name: 'clickhouse', versions: ['21.12', '21.11', ''] }
+];
 
+export function getVersions(type) {
+    const found = supportedDatabaseTypesAndVersions.find(t => t.name === type)
+    if (found) {
+        return found.versions
+    }
+    return []
+}
+export function getBaseImage(type) {
+    const found = supportedDatabaseTypesAndVersions.find(t => t.name === type)
+    if (found) {
+        return found.baseImage
+    }
+    return ''
+}
+export function generateDatabaseConfiguration(database) {
+    const { id, dbUser, dbUserPassword, rootUser, rootUserPassword, defaultDatabase, version, type, port } = database
+    const baseImage = getBaseImage(type)
+    if (type === 'mysql') {
+        return {
+            url: `mysql://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`,
+            privatePort: 3306,
+            environmentVariables: {
+                MYSQL_USER: dbUser,
+                MYSQL_PASSWORD: dbUserPassword,
+                MYSQL_ROOT_PASSWORD: rootUserPassword,
+                MYSQL_ROOT_USER: rootUser,
+                MYSQL_DATABASE: defaultDatabase
+            },
+            image: `${baseImage}:${version}`,
+            volume: `${id}-${type}-data:/bitnami/mysql/data`,
+            ulimits: {}
+        }
+
+    } else if (type === 'mongodb') {
+        return {
+            url: `mongodb://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`,
+            privatePort: 27017,
+            environmentVariables: {
+                MONGODB_USERNAME: dbUser,
+                MONGODB_PASSWORD: dbUserPassword,
+                MONGODB_ROOT_PASSWORD: rootUserPassword,
+                MONGODB_DATABASE: defaultDatabase
+            },
+            image: `${baseImage}:${version}`,
+            volume: `${id}-${type}-data:/bitnami/mongodb`,
+            ulimits: {}
+        }
+    } else if (type === 'postgresql') {
+        return {
+            url: `psql://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`,
+            privatePort: 5432,
+            environmentVariables: {
+                POSTGRESQL_PASSWORD: dbUserPassword,
+                POSTGRESQL_USERNAME: dbUser,
+                POSTGRESQL_DATABASE: defaultDatabase
+            },
+            image: `${baseImage}:${version}`,
+            volume: `${id}-${type}-data:/bitnami/postgresql`,
+            ulimits: {}
+        }
+    } else if (type === 'redis') {
+        return {
+            url: `redis://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`,
+            privatePort: 6379,
+            environmentVariables: {
+                REDIS_PASSWORD: dbUserPassword,
+            },
+            image: `${baseImage}:${version}`,
+            volume: `${id}-${type}-data:/bitnami/redis/data`,
+            ulimits: {}
+        }
+    } else if (type === 'couchdb') {
+        return {
+            url: `couchdb://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`,
+            privatePort: 5984,
+            environmentVariables: {
+                COUCHDB_PASSWORD: dbUserPassword,
+                COUCHDB_USER: dbUser,
+            },
+            image: `${baseImage}:${version}`,
+            volume: `${id}-${type}-data:/bitnami/couchdb`,
+            ulimits: {}
+        }
+    }
+    // } else if (type === 'clickhouse') {
+    //     return {
+    //         url: `clickhouse://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`,
+    //         privatePort: 9000,
+    //         image: `bitnami/clickhouse-server:${version}`,
+    //         volume: `${id}-${type}-data:/var/lib/clickhouse`,
+    //         ulimits: {
+    // 			nofile: {
+    // 				soft: 262144,
+    // 				hard: 262144
+    // 			}
+    // 		}
+    //     }
+    // }
+}

@@ -1,6 +1,6 @@
 import { dev } from "$app/env"
 import { forceSSLOffApplication, forceSSLOnApplication, getNextTransactionId, reloadConfiguration } from "$lib/haproxy"
-import { asyncExecShell, getHost } from "../common"
+import { asyncExecShell, getEngine } from "../common"
 
 export default async function (job) {
   try {
@@ -24,7 +24,7 @@ export default async function (job) {
     // Set SSL with Let's encrypt
     if (destinationDocker) {
       if (forceSSLChanged) {
-        const host = getHost({ engine: destinationDocker.engine })
+        const host = getEngine(destinationDocker.engine)
         // saveBuildLog({ line: 'Requesting SSL cert.', buildId })
         await asyncExecShell(`DOCKER_HOST=${host} docker run --rm --name certbot -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080 -d ${domain} --agree-tos --non-interactive --register-unsafely-without-email --test-cert`)
         // saveBuildLog({ line: 'SSL cert requested successfully!', buildId })

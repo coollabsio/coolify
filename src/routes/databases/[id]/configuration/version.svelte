@@ -40,7 +40,7 @@
 	<div class="text-2xl tracking-tight mr-4">Select a Database version</div>
 </div>
 
-<div class="flex justify-center">
+<div class="flex flex-wrap justify-center">
 	{#each versions as version}
 		<div class="p-2">
 			<form
@@ -52,8 +52,8 @@
 					}
 				}}
 			>
-				<input class="hidden" name="version" value={version.version} />
-				<button type="submit" class="box-selection text-xl font-bold">{version.name}</button>
+				<input class="hidden" name="version" value={version} />
+				<button type="submit" class="box-selection text-xl font-bold">{version}</button>
 			</form>
 		</div>
 	{/each}

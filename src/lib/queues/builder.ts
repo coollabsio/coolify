@@ -3,7 +3,7 @@ import crypto from 'crypto'
 import * as buildpacks from '../buildPacks'
 import * as importers from '../importers'
 import { dockerInstance } from '../docker'
-import { asyncExecShell, createDirectories, getHost, saveBuildLog, setDefaultConfiguration } from '../common'
+import { asyncExecShell, createDirectories, getEngine, saveBuildLog, setDefaultConfiguration } from '../common'
 import { configureProxyForApplication } from '../haproxy'
 import * as db from '$lib/database'
 import { decrypt } from '$lib/crypto'
@@ -38,7 +38,7 @@ export default async function (job) {
 
   if (destinationType === 'docker') {
     const docker = dockerInstance({ destinationDocker })
-    const host = getHost({ engine: destinationDocker.engine })
+    const host = getEngine(destinationDocker.engine)
 
     const build = await db.createBuild({ id: buildId, applicationId, destinationDockerId: destinationDocker.id, gitSourceId: gitSource.id, githubAppId: gitSource.githubApp?.id, gitlabAppId: gitSource.gitlabApp?.id, type })
 

@@ -1,9 +1,16 @@
 <script lang="ts">
 	export let database;
+	export let versions;
 	import { page, session } from '$app/stores';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 	import { enhance, errorNotification } from '$lib/form';
+
+	import MySql from './_MySQL.svelte';
+	import MongoDb from './_MongoDB.svelte';
+	import PostgreSql from './_PostgreSQL.svelte';
+	import Redis from './_Redis.svelte';
+	import CouchDb from './_CouchDb.svelte';
 
 	const { id } = $page.params;
 	let loading = false;
@@ -14,9 +21,7 @@
 		if (name === 'isPublic') {
 			isPublic = !isPublic;
 		}
-
 		form.append('isPublic', isPublic.toString());
-
 		try {
 			await fetch(`/databases/${id}/settings.json`, {
 				method: 'POST',
@@ -34,19 +39,21 @@
 		action="/databases/{id}.json"
 		use:enhance={{
 			beforeSubmit: async () => {
-				const form = new FormData();
-				form.append('domain', database.domain);
-				const response = await fetch(`/databases/${id}/check.json`, {
-					method: 'POST',
-					headers: {
-						accept: 'application/json'
-					},
-					body: form
-				});
-				if (!response.ok) {
-					const error = await response.json();
-					errorNotification(error.message || error);
-					throw new Error(error.message || error);
+				if (database.domain) {
+					const form = new FormData();
+					form.append('domain', database.domain);
+					const response = await fetch(`/databases/${id}/check.json`, {
+						method: 'POST',
+						headers: {
+							accept: 'application/json'
+						},
+						body: form
+					});
+					if (!response.ok) {
+						const error = await response.json();
+						errorNotification(error.message || error);
+						throw new Error(error.message || error);
+					}
 				}
 			},
 			result: async () => {
@@ -63,7 +70,7 @@
 			}
 		}}
 		method="post"
-		class=" py-4"
+		class="py-4"
 	>
 		<div class="font-bold flex space-x-1 pb-5">
 			<div class="text-xl tracking-tight mr-4">Configurations</div>
@@ -119,103 +126,86 @@
 						pattern="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 						placeholder="eg: {database.type}.coollabs.io"
 						value={database.domain}
-						required
+					/>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center pb-8">
+				<label for="version">Version</label>
+				<div class="col-span-2 ">
+					<select name="version" id="version" bind:value={database.version}>
+						<option value="Select a version" disabled selected>Select a version</option>
+						{#each versions as version}
+							<option value={version}>{version}</option>
+						{/each}
+					</select>
+				</div>
+			</div>
+		</div>
+
+		<div class="grid grid-flow-row gap-2 px-10">
+			<div class="grid grid-cols-3 items-center">
+				<label for="host">Host</label>
+				<div class="col-span-2 ">
+					<CopyPasswordField
+						placeholder="generated after start"
+						isPasswordField={false}
+						id="host"
+						name="host"
+						value={database.id}
 					/>
 				</div>
 			</div>
 			<div class="grid grid-cols-3 items-center pb-8">
 				<label for="port">Port</label>
 				<div class="col-span-2">
-					<input readonly name="port" id="port" value={database.port} />
+					<CopyPasswordField
+						placeholder="generate automatically"
+						id="port"
+						name="port"
+						value={database.port}
+					/>
 				</div>
 			</div>
-		</div>
+			{#if database.type === 'mysql'}
+				<MySql {database} />
+			{:else if database.type === 'postgresql'}
+				<PostgreSql {database} />
+			{:else if database.type === 'mongodb'}
+				<MongoDb {database} />
+			{:else if database.type === 'redis'}
+				<Redis {database} />
+			{:else if database.type === 'couchdb'}
+				<CouchDb {database} />
+			{/if}
 
-		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="grid grid-cols-3 items-center pb-8">
-				<label for="version">Version</label>
-				<div class="col-span-2 ">
-					<select required name="version" id="version" bind:value={database.version}>
-						<option value={null} disabled selected>Select a version</option>
-						<option value="5.0.5">5.0.5</option>
-						<option value="4.4.11">4.4.11</option>
-						<option value="4.2.18">4.2.18</option>
-						<option value="4.0.27">4.0.27</option>
-					</select>
-				</div>
-			</div>
-			<div class="grid grid-cols-3 items-center pb-8">
-				<label for="defaultDatabase">Default Database Name</label>
-				<div class="col-span-2 ">
-					<input
-						placeholder="generate automatically"
-						name="defaultDatabase"
-						id="defaultDatabase"
-						value={database.defaultDatabase}
-					/>
-				</div>
-			</div>
-			<div class="grid grid-cols-3 items-center">
-				<label for="dbUser">User</label>
+				<label for="url">Connection String</label>
 				<div class="col-span-2 ">
 					<CopyPasswordField
-						placeholder="generate automatically"
-						id="dbUser"
-						name="dbUser"
-						value={database.dbUser}
-					/>
-				</div>
-			</div>
-			<div class="grid grid-cols-3 items-center">
-				<label for="dbUserPassword">Password</label>
-				<div class="col-span-2 ">
-					<CopyPasswordField
-						placeholder="generate automatically"
-						isPasswordField={true}
-						id="dbUserPassword"
-						name="dbUserPassword"
-						value={database.dbUserPassword}
-					/>
-				</div>
-			</div>
-			<div class="grid grid-cols-3 items-center">
-				<label for="rootUser">Root User</label>
-				<div class="col-span-2 ">
-					<CopyPasswordField
-						placeholder="generate automatically"
-						id="rootUser"
-						name="rootUser"
-						value={database.rootUser}
-					/>
-				</div>
-			</div>
-			<div class="grid grid-cols-3 items-center pb-8">
-				<label for="rootUserPassword">Root User's Password</label>
-				<div class="col-span-2 ">
-					<CopyPasswordField
-						placeholder="generate automatically"
-						isPasswordField={true}
-						id="rootUserPassword"
-						name="rootUserPassword"
-						value={database.rootUserPassword}
+						textarea={true}
+						placeholder="generated after start"
+						isPasswordField={false}
+						id="url"
+						name="url"
+						value={database.url}
 					/>
 				</div>
 			</div>
 		</div>
 	</form>
-	{#if database.url}
-		<div class="font-bold flex space-x-1 pb-5">
-			<div class="text-xl tracking-tight mr-4">Features</div>
-		</div>
-		<div class="px-4 sm:px-6 pb-10">
-			<ul class="mt-2 divide-y divide-warmGray-800">
-				<Setting
-					bind:setting={isPublic}
-					on:click={() => changeSettings('isPublic')}
-					title="Set it public"
-					description="Your database will be reachable over the internet. <br>Take security seriously in this case!"
-				/>
-			</ul>
-		</div>
-	{/if}
+	<div class="font-bold flex space-x-1 pb-5">
+		<div class="text-xl tracking-tight mr-4">Features</div>
+	</div>
+	<div class="px-4 sm:px-6 pb-10">
+		<ul class="mt-2 divide-y divide-warmGray-800">
+			<Setting
+				disabled={!database.domain}
+				disabledReason="You must set a domain to make it public"
+				bind:setting={isPublic}
+				on:click={() => changeSettings('isPublic')}
+				title="Set it public"
+				description="Your database will be reachable over the internet. <br>Take security seriously in this case!"
+			/>
+		</ul>
+	</div>
 </div>

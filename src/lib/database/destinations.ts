@@ -1,13 +1,17 @@
-import { asyncExecShell, getHost } from "$lib/common"
+import { asyncExecShell, getEngine } from "$lib/common"
 import { dockerInstance } from "$lib/docker"
-import { configureCoolifyProxyOn } from "$lib/haproxy"
+import { configureCoolifyProxyOn, configureNetworkCoolifyProxy, startCoolifyProxy } from "$lib/haproxy"
+import { getBaseImage } from "."
 import { prisma, PrismaErrorHandler } from "./common"
 
-export async function checkCoolifyProxy({ engine }) {
+export async function checkCoolifyProxy(engine) {
+    const host = getEngine(engine)
     let haProxyFound = false
     try {
-        const host = getHost({ engine })
         const { stdout } = await asyncExecShell(`DOCKER_HOST="${host}" docker inspect --format '{{json .State}}' coolify-haproxy`)
+        if (JSON.parse(stdout).Status === 'exited') {
+            await asyncExecShell(`DOCKER_HOST="${host}" docker rm coolify-haproxy`)
+        }
         if (JSON.parse(stdout).Running) {
             haProxyFound = true
         }
@@ -18,32 +22,23 @@ export async function checkCoolifyProxy({ engine }) {
     return haProxyFound
 }
 
-async function installCoolifyProxy({ engine, destinations }) {
-    const found = await checkCoolifyProxy({ engine })
-    const host = getHost({ engine })
+async function installCoolifyProxy(engine) {
+    const found = await checkCoolifyProxy(engine)
     if (!found) {
         try {
-            await asyncExecShell(`DOCKER_HOST="${host}" docker run --restart always --add-host 'host.docker.internal:host-gateway' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "60000-60100:60000-60100" --name coolify-haproxy -d coollabsio/haproxy-alpine:1.0.0-rc.1`)
-
+            await startCoolifyProxy(engine)
         } catch (err) {
             console.log(err)
         }
     }
-    destinations.forEach(async (destination) => {
-        try {
-            await asyncExecShell(`DOCKER_HOST="${host}" docker network connect ${destination.network} coolify-haproxy`)
-        } catch (err) {
-            // TODO: handle error
-        }
-    })
     return
 }
 
-async function uninstallCoolifyProxy({ engine }) {
-    const found = await checkCoolifyProxy({ engine })
+async function uninstallCoolifyProxy(engine) {
+    const found = await checkCoolifyProxy(engine)
     if (found) {
+        const host = getEngine(engine)
         try {
-            const host = getHost({ engine })
             await asyncExecShell(`DOCKER_HOST="${host}" docker stop -t 0 coolify-haproxy && docker rm coolify-haproxy`)
         } catch (err) {
             console.log(err)
@@ -67,6 +62,21 @@ export async function configureDestinationForApplication({ id, destinationId }) 
 export async function configureDestinationForDatabase({ id, destinationId }) {
     try {
         await prisma.database.update({ where: { id }, data: { destinationDocker: { connect: { id: destinationId } } } })
+        
+        const { destinationDockerId, destinationDocker, version, type } = await prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
+
+        if (destinationDockerId) {
+            const docker = dockerInstance({ destinationDocker })
+            try {
+                if (type && version) {
+                    const baseImage = getBaseImage(type)
+                    docker.engine.pull(`${baseImage}:${version}`)
+                    console.log(`pull initiated for ${baseImage}:${version}`)
+                }
+            } catch (error) {
+                // console.log(error)
+            }
+        }
         return { status: 201 }
     } catch (e) {
         throw PrismaErrorHandler(e)
@@ -84,8 +94,6 @@ export async function updateDestination({ id, name, isSwarm, engine, network }) 
 
 export async function newDestination({ name, teamId, isSwarm, engine, network, isCoolifyProxyUsed }) {
     try {
-        const destination = await prisma.destinationDocker.create({ data: { name, teams: { connect: { id: teamId } }, isSwarm, engine, network, isCoolifyProxyUsed } })
-
         const destinationDocker = {
             engine,
             network
@@ -94,10 +102,12 @@ export async function newDestination({ name, teamId, isSwarm, engine, network, i
         const networks = await docker.engine.listNetworks()
         const found = networks.find(network => network.Name === destinationDocker.network)
         if (!found) {
-            await docker.engine.createNetwork({ name: network, attachable: true })
+            const data = await docker.engine.createNetwork({ name: network, attachable: true })
+            const networkInspect = await data.inspect()
+            await prisma.destinationDocker.create({ data: { name, subnet: networkInspect.IPAM.Config[0].Subnet, teams: { connect: { id: teamId } }, isSwarm, engine, network, isCoolifyProxyUsed } })
         }
-
         const destinations = await prisma.destinationDocker.findMany({ where: { engine } })
+        const destination = destinations.find(destination => destination.network === network)
 
         if (destinations.length > 0) {
             const proxyConfigured = destinations.find(destination => destination.network !== network && destination.isCoolifyProxyUsed === true)
@@ -112,9 +122,10 @@ export async function newDestination({ name, teamId, isSwarm, engine, network, i
         }
 
         if (isCoolifyProxyUsed) {
-            await installCoolifyProxy({ engine, destinations })
+            await installCoolifyProxy(engine)
+            await configureNetworkCoolifyProxy(engine)
         } else {
-            await uninstallCoolifyProxy({ engine })
+            await uninstallCoolifyProxy(engine)
         }
         return {
             status: 201, body: { id: destination.id }
@@ -126,9 +137,10 @@ export async function newDestination({ name, teamId, isSwarm, engine, network, i
 export async function removeDestination({ id }) {
     try {
         const destination = await prisma.destinationDocker.delete({ where: { id } })
-        const host = getHost({ engine: destination.engine })
         if (destination.isCoolifyProxyUsed) {
+            const host = getEngine(destination.engine)
             await asyncExecShell(`DOCKER_HOST="${host}" docker network disconnect ${destination.network} coolify-haproxy`)
+            await asyncExecShell(`DOCKER_HOST="${host}" docker network rm ${destination.network}`)
         }
         return { status: 200 }
     } catch (e) {
@@ -156,19 +168,21 @@ export async function getDestinationByApplicationId({ id, teamId }) {
 export async function setDestinationSettings({ engine, isCoolifyProxyUsed }) {
     try {
         await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } })
-        const destinations = await prisma.destinationDocker.findMany({ where: { engine } })
         if (isCoolifyProxyUsed) {
-            await installCoolifyProxy({ engine, destinations })
+            await installCoolifyProxy(engine)
+            await configureNetworkCoolifyProxy(engine)
         } else {
-            await uninstallCoolifyProxy({ engine })
+            // TODO: must check if other destination is using the proxy??? or not?
             const domain = await prisma.setting.findUnique({ where: { name: 'domain' }, rejectOnNotFound: false })
-            if (domain) {
-                const found = await checkCoolifyProxy({ engine: '/var/run/docker.sock' })
-                if (!found) {
-                    await asyncExecShell(`docker run --restart always --add-host 'host.docker.internal:host-gateway' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "60000-60100:60000-60100"  --name coolify-haproxy -d coollabsio/haproxy-alpine:1.0.0-rc.1`)
+            if (!domain) {
+                await uninstallCoolifyProxy(engine)
+            } else {
+                return {
+                    stastus: 500,
+                    body: {
+                        message: 'You can not disable the Coolify proxy while the domain is set for Coolify itself.'
+                    }
                 }
-                await configureCoolifyProxyOn({ domain: domain.value })
-
             }
         }
         return { status: 200 }

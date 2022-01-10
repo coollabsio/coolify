@@ -40,7 +40,6 @@ export async function isSecretExists({ id, name }) {
 
 export async function isDomainConfigured({ id, domain }) {
     try {
-
         const foundApplication = await prisma.application.findFirst({ where: { domain, id: { not: id } }, rejectOnNotFound: false })
         const foundDatabase = await prisma.database.findFirst({ where: { domain, id: { not: id } }, rejectOnNotFound: false })
         if (foundApplication || foundDatabase) {

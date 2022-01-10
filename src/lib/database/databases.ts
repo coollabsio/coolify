@@ -9,9 +9,9 @@ export async function listDatabases(teamId) {
 export async function newDatabase({ name, teamId }) {
     try {
         const dbUser = cuid()
-        const dbUserPassword = generatePassword()
+        const dbUserPassword = encrypt(generatePassword())
         const rootUser = cuid()
-        const rootUserPassword = generatePassword()
+        const rootUserPassword = encrypt(generatePassword())
         const defaultDatabase = cuid()
         const databases = await prisma.database.findMany({ orderBy: { port: 'desc' } })
 
@@ -19,11 +19,8 @@ export async function newDatabase({ name, teamId }) {
         if (databases.length > 0) {
             port = databases[0].port + 1
         }
-        
-        const database = await prisma.database.create({ data: { name, port, teams: { connect: { id: teamId } }, settings: { create: { isPublic: false } } } })
 
-        const { id, domain } = database
-        await updateDatabase({ id, name, domain, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword })
+        const database = await prisma.database.create({ data: { name, port, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, teams: { connect: { id: teamId } }, settings: { create: { isPublic: false } } } })
 
         return { status: 201, body: { id: database.id } }
     } catch (e) {

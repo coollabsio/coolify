@@ -1,5 +1,6 @@
-import { asyncExecShell, getHost, getUserDetails } from '$lib/common';
+import { asyncExecShell, getEngine, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
+import { getVersions } from '$lib/database';
 import { dockerInstance } from '$lib/docker';
 import type { RequestHandler } from '@sveltejs/kit';
 
@@ -12,9 +13,9 @@ export const get: RequestHandler = async (request) => {
     const { destinationDockerId, destinationDocker } = database
 
     let state = 'not started'
-
     if (destinationDockerId) {
-        const host = getHost({ engine: destinationDocker.engine })
+        const host = getEngine(destinationDocker.engine)
+
         try {
             const { stdout } = await asyncExecShell(`DOCKER_HOST=${host} docker inspect --format '{{json .State}}' ${id}`)
 
@@ -22,15 +23,16 @@ export const get: RequestHandler = async (request) => {
                 state = 'running'
             }
         } catch (error) {
-            if (!error.stderr.includes('No such object')) {
-                console.log(error)
-            }
+            // if (!error.stderr.includes('No such object')) {
+            //     console.log(error)
+            // }
         }
     }
     return {
         body: {
             database,
-            state
+            state,
+            versions: getVersions(database.type)
         }
     };
 
@@ -40,11 +42,10 @@ export const get: RequestHandler = async (request) => {
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { teamId, status, body } = await getUserDetails(request);
     if (status === 401) return { status, body }
-
     const { id } = request.params
 
     const name = request.body.get('name')
-    const domain = request.body.get('domain')
+    const domain = request.body.get('domain') || null
     const defaultDatabase = request.body.get('defaultDatabase')
     const dbUser = request.body.get('dbUser')
     const dbUserPassword = request.body.get('dbUserPassword')
@@ -53,20 +54,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const version = request.body.get('version')
 
     try {
-        db.updateDatabase({ id, name, domain, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version })
-
-        const { type, destinationDockerId, destinationDocker } = await db.getDatabase({ id, teamId })
-        if (destinationDockerId) {
-            const docker = dockerInstance({ destinationDocker })
-            try {
-                if (type && version) {
-                    docker.engine.pull(`bitnami/${type}:${version}`)
-                }
-            } catch (error) {
-                // console.log(error)
-            }
-        }
-
+        return await db.updateDatabase({ id, name, domain, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version })
     } catch (err) {
         return err
     }

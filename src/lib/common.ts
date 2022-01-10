@@ -96,7 +96,7 @@ export const getUserDetails = async (request, isAdminRequired = true) => {
 
 }
 
-export function getHost({ engine }) {
+export function getEngine(engine) {
     return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : `tcp://${engine}:2375`
 }
 

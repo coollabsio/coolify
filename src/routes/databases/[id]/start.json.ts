@@ -1,63 +1,32 @@
-import { asyncExecShell, createDirectories, getHost, getUserDetails } from '$lib/common';
+import { asyncExecShell, createDirectories, getEngine, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { generatePassword } from '$lib/database';
+import { checkCoolifyProxy, generateDatabaseConfiguration, generatePassword } from '$lib/database';
 // import { databaseQueue } from '$lib/queues';
 import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
 import { makeLabelForDatabase } from '$lib/buildPacks/common';
-import { configureProxyForDatabase } from '$lib/haproxy';
+import { configureProxyForDatabase, startCoolifyProxy } from '$lib/haproxy';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { teamId, status, body } = await getUserDetails(request);
     if (status === 401) return { status, body }
+    
     const { id } = request.params
 
     try {
-        let environmentVariables = {};
-        let image = null;
-        let volume = null;
-        let ulimits = {};
-
         const database = await db.getDatabase({ id, teamId })
-        const { name, domain, dbUser, dbUserPassword, rootUser, rootUserPassword, defaultDatabase, version, type, destinationDockerId, destinationDocker, port, settings } = database
-        const { isPublic } = settings
+        const { type, destinationDockerId, destinationDocker, port, settings: { isPublic } } = database
+        const { url, privatePort, environmentVariables, image, volume, ulimits } = generateDatabaseConfiguration(database);
 
-        let privatePort;
-        let url;
-
-        if (type === 'mysql') {
-            url = `mysql://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`
-            privatePort = 3306;
-            environmentVariables = {
-                MYSQL_USER: dbUser,
-                MYSQL_PASSWORD: dbUserPassword,
-                MYSQL_ROOT_PASSWORD: rootUserPassword,
-                MYSQL_ROOT_USER: rootUser,
-                MYSQL_DATABASE: defaultDatabase
-            }
-            image = `bitnami/mysql:${version}`;
-            volume = `${id}-${type}-data:/bitnami/mysql/data`;
-        } else if (type === 'mongodb') {
-            url = `mongodb://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`
-            privatePort = 27017;
-            environmentVariables = {
-                MONGODB_USERNAME: dbUser,
-                MONGODB_PASSWORD: dbUserPassword,
-                MONGODB_ROOT_PASSWORD: rootUserPassword,
-                MONGODB_DATABASE: defaultDatabase
-            }
-            image = `bitnami/mongodb:${version}`;
-            volume = `${id}-${type}-data:/bitnami/mongodb`;
-        }
         const network = destinationDockerId && destinationDocker.network
-        const host = getHost({ engine: destinationDocker.engine })
-
+        const host = getEngine(destinationDocker.engine)
+        const engine = destinationDocker.engine
         const volumeName = volume.split(':')[0]
         const labels = await makeLabelForDatabase({ id, image, volume })
 
-        const { workdir, repodir } = await createDirectories({ repository: type, buildId: id })
+        const { workdir } = await createDirectories({ repository: type, buildId: id })
 
         const composeFile = {
             version: '3.8',
@@ -93,8 +62,10 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         try {
             await asyncExecShell(`DOCKER_HOST=${host} docker-compose -f ${composeFileDestination} up -d`)
             await db.updateDatabase({ id, url })
-            if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-                await configureProxyForDatabase({ domain, id, port, isPublic, privatePort })
+            if (destinationDockerId) {
+                const found = await checkCoolifyProxy(engine)
+                if (!found) await startCoolifyProxy(engine)
+                await configureProxyForDatabase({ id, port, isPublic, privatePort })
             }
             return {
                 status: 200

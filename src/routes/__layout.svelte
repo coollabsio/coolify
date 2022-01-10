@@ -235,8 +235,8 @@
 					sveltekit:prefetch
 					href="/databases"
 					class="icons hover:text-purple-500 bg-coolgray-200 tooltip-right"
-					class:text-purple-500={$page.url.pathname.startsWith('/databases')}
-					class:bg-coolgray-500={$page.url.pathname.startsWith('/databases')}
+					class:text-purple-500={$page.url.pathname.startsWith('/databases') || $page.url.pathname.startsWith('/new/database')}
+					class:bg-coolgray-500={$page.url.pathname.startsWith('/databases') || $page.url.pathname.startsWith('/new/database')}
 					data-tooltip="Databases"
 				>
 					<svg
@@ -260,8 +260,8 @@
 					sveltekit:prefetch
 					href="/services"
 					class="icons hover:text-pink-500 bg-coolgray-200 tooltip-right"
-					class:text-pink-500={$page.url.pathname.startsWith('/services')}
-					class:bg-coolgray-500={$page.url.pathname.startsWith('/services')}
+					class:text-pink-500={$page.url.pathname.startsWith('/services') || $page.url.pathname.startsWith('/new/service')}
+					class:bg-coolgray-500={$page.url.pathname.startsWith('/services') || $page.url.pathname.startsWith('/new/service')}
 					data-tooltip="Services"
 				>
 					<svg

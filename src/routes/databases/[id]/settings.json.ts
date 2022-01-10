@@ -11,13 +11,21 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const isPublic = request.body.get('isPublic') === 'true' ? true : false
 
     try {
-        await db.setDatabaseSettings({ id, isPublic })
         const { dbUser, dbUserPassword, domain, defaultDatabase, destinationDockerId, destinationDocker, port } = await db.getDatabase({ id, teamId })
-
         const url = `mysql://${dbUser}:${dbUserPassword}@${isPublic ? domain : id}:${port}/${defaultDatabase}`
+
+        if (isPublic && !domain) {
+            return {
+                status: 500,
+                body: {
+                    message: 'You must provide a domain to make a database public'
+                }
+            }
+        }
+        await db.setDatabaseSettings({ id, isPublic })
         await db.updateDatabase({ id, url })
         if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-            await configureDatabaseVisibility({ domain, isPublic })
+            await configureDatabaseVisibility({ id, isPublic })
         }
         return {
             status: 201

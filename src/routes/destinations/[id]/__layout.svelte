@@ -4,7 +4,7 @@
 		const url = `/destinations/${params.id}.json`;
 		const res = await fetch(url);
 		if (res.ok) {
-			const { destination } = await res.json();
+			const { destination, state } = await res.json();
 			if (!destination || Object.entries(destination).length === 0) {
 				return {
 					status: 302,
@@ -13,10 +13,12 @@
 			}
 			return {
 				props: {
-					destination
+					destination,
+					state
 				},
 				stuff: {
-					destination
+					destination,
+					state
 				}
 			};
 		}

@@ -138,6 +138,7 @@ model Build {
 model DestinationDocker {
   id                 String        @id @default(cuid())
   network            String        @unique
+  subnet             String
   name               String
   engine             String
   isSwarm            Boolean?      @default(false)
