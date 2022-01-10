@@ -155,17 +155,19 @@
 					/>
 				</div>
 			</div>
-			<div class="grid grid-cols-3 items-center pb-8">
-				<label for="port">Port</label>
-				<div class="col-span-2">
-					<CopyPasswordField
-						placeholder="generate automatically"
-						id="port"
-						name="port"
-						value={database.port}
-					/>
+			{#if isPublic}
+				<div class="grid grid-cols-3 items-center">
+					<label for="port">Public Port</label>
+					<div class="col-span-2">
+						<CopyPasswordField
+							placeholder="generate automatically"
+							id="port"
+							name="port"
+							value={database.port}
+						/>
+					</div>
 				</div>
-			</div>
+			{/if}
 			{#if database.type === 'mysql'}
 				<MySql {database} />
 			{:else if database.type === 'postgresql'}

@@ -100,12 +100,12 @@ export async function newDestination({ name, teamId, isSwarm, engine, network, i
         }
         const docker = dockerInstance({ destinationDocker })
         const networks = await docker.engine.listNetworks()
-        const found = networks.find(network => network.Name === destinationDocker.network)
+        let found = networks.find(network => network.Name === destinationDocker.network)
         if (!found) {
-            const data = await docker.engine.createNetwork({ name: network, attachable: true })
-            const networkInspect = await data.inspect()
-            await prisma.destinationDocker.create({ data: { name, subnet: networkInspect.IPAM.Config[0].Subnet, teams: { connect: { id: teamId } }, isSwarm, engine, network, isCoolifyProxyUsed } })
+            await docker.engine.createNetwork({ name: network, attachable: true })
         }
+        found = networks.find(network => network.Name === destinationDocker.network)
+        await prisma.destinationDocker.create({ data: { name, subnet: found.IPAM.Config[0].Subnet, teams: { connect: { id: teamId } }, isSwarm, engine, network, isCoolifyProxyUsed } })
         const destinations = await prisma.destinationDocker.findMany({ where: { engine } })
         const destination = destinations.find(destination => destination.network === network)
 

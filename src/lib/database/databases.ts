@@ -1,4 +1,5 @@
 import { decrypt, encrypt } from "$lib/crypto"
+import { configureDatabaseVisibility } from "$lib/haproxy"
 import cuid from "cuid"
 import { generatePassword } from "."
 import { prisma, PrismaErrorHandler } from "./common"
@@ -67,7 +68,14 @@ export async function updateDatabase({ id, name = undefined, domain = undefined,
     try {
         const encryptedDbUserPassword = dbUserPassword && encrypt(dbUserPassword)
         const encryptedRootUserPassword = rootUserPassword && encrypt(rootUserPassword)
-        await prisma.database.update({ where: { id }, data: { name, domain, defaultDatabase, dbUser, dbUserPassword: encryptedDbUserPassword, rootUser, rootUserPassword: encryptedRootUserPassword, version, url } })
+        if (!domain) {
+            const { destinationDockerId, destinationDocker } = await prisma.database.update({ where: { id }, data: { name, domain, defaultDatabase, dbUser, dbUserPassword: encryptedDbUserPassword, rootUser, rootUserPassword: encryptedRootUserPassword, version, url, settings: { update: { isPublic: false } } }, select: { destinationDockerId: true, destinationDocker: true } })
+            if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
+                await configureDatabaseVisibility({ id, isPublic: false })
+            }
+        } else {
+            await prisma.database.update({ where: { id }, data: { name, domain, defaultDatabase, dbUser, dbUserPassword: encryptedDbUserPassword, rootUser, rootUserPassword: encryptedRootUserPassword, version, url } })
+        }
         return { status: 200 }
     } catch (e) {
         throw PrismaErrorHandler(e)

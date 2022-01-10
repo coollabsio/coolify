@@ -1,5 +1,6 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
+import { generateDatabaseConfiguration } from '$lib/database';
 import { configureDatabaseVisibility } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
@@ -11,8 +12,9 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const isPublic = request.body.get('isPublic') === 'true' ? true : false
 
     try {
-        const { dbUser, dbUserPassword, domain, defaultDatabase, destinationDockerId, destinationDocker, port } = await db.getDatabase({ id, teamId })
-        const url = `mysql://${dbUser}:${dbUserPassword}@${isPublic ? domain : id}:${port}/${defaultDatabase}`
+        const database = await db.getDatabase({ id, teamId })
+        const { domain, destinationDockerId, destinationDocker } = database
+        const { url } = generateDatabaseConfiguration(database)
 
         if (isPublic && !domain) {
             return {

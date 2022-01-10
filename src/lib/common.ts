@@ -82,7 +82,7 @@ export const getUserDetails = async (request, isAdminRequired = true) => {
 
         return payload
     } catch (err) {
-        console.log(err)
+        // console.log(err)
         return {
             teamId: null,
             userId: null,

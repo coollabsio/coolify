@@ -90,11 +90,11 @@ export function getBaseImage(type) {
     return ''
 }
 export function generateDatabaseConfiguration(database) {
-    const { id, dbUser, dbUserPassword, rootUser, rootUserPassword, defaultDatabase, version, type, port } = database
+    const { id, dbUser, dbUserPassword, rootUser, rootUserPassword, defaultDatabase, version, type, port, isPublic } = database
     const baseImage = getBaseImage(type)
     if (type === 'mysql') {
         return {
-            url: `mysql://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`,
+            url: `mysql://${dbUser}:${dbUserPassword}@${id}:${isPublic ? port : 3306}/${defaultDatabase}`,
             privatePort: 3306,
             environmentVariables: {
                 MYSQL_USER: dbUser,
@@ -110,7 +110,7 @@ export function generateDatabaseConfiguration(database) {
 
     } else if (type === 'mongodb') {
         return {
-            url: `mongodb://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`,
+            url: `mongodb://${dbUser}:${dbUserPassword}@${id}:${isPublic ? port : 27017}/${defaultDatabase}`,
             privatePort: 27017,
             environmentVariables: {
                 MONGODB_USERNAME: dbUser,
@@ -124,7 +124,7 @@ export function generateDatabaseConfiguration(database) {
         }
     } else if (type === 'postgresql') {
         return {
-            url: `psql://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`,
+            url: `psql://${dbUser}:${dbUserPassword}@${id}:${isPublic ? port : 5432}/${defaultDatabase}`,
             privatePort: 5432,
             environmentVariables: {
                 POSTGRESQL_PASSWORD: dbUserPassword,
@@ -137,7 +137,7 @@ export function generateDatabaseConfiguration(database) {
         }
     } else if (type === 'redis') {
         return {
-            url: `redis://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`,
+            url: `redis://${dbUser}:${dbUserPassword}@${id}:${isPublic ? port : 6379}/${defaultDatabase}`,
             privatePort: 6379,
             environmentVariables: {
                 REDIS_PASSWORD: dbUserPassword,
@@ -148,7 +148,7 @@ export function generateDatabaseConfiguration(database) {
         }
     } else if (type === 'couchdb') {
         return {
-            url: `couchdb://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`,
+            url: `couchdb://${dbUser}:${dbUserPassword}@${id}:${isPublic ? port : 5984}/${defaultDatabase}`,
             privatePort: 5984,
             environmentVariables: {
                 COUCHDB_PASSWORD: dbUserPassword,

@@ -15,7 +15,6 @@ export const handle = handleSession(
         let isTeamIdTokenAvailableResult = null
         if (Object.keys(request.locals.session.data).length > 0) {
             isTeamIdTokenAvailableResult = isTeamIdTokenAvailable(request)
-
             const { permission, teamId } = await getUserDetails(request, false);
             request.locals.user = {
                 teamId,
@@ -25,8 +24,21 @@ export const handle = handleSession(
         }
 
 
-        const response = await resolve(request);
-
+        let response = await resolve(request);
+        if (response.status === 500 && response?.body.toString().startsWith(`TypeError: Cannot read properties of undefined (reading 'length')`)) {
+            response = {
+                ...response,
+                headers: {
+                    ...response.headers,
+                    'set-cookie': [
+                        "kit.session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT",
+                        "teamId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT",
+                        "gitlabToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+                    ],
+                }
+            }
+            return response
+        }
         let responseWithCookie = response
 
         // This check needed for switching team with HttpOnly cookie (see /src/routes/index.json.ts)
