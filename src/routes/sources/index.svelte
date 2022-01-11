@@ -54,7 +54,7 @@
 			{#each sources as source}
 				<a href="/sources/{source.id}" class="no-underline p-2">
 					<div
-						class="box-selection hover:bg-orange-700"
+						class="box-selection hover:bg-orange-600"
 						class:border-red-500={source.gitlabApp && !source.gitlabAppId}
 						class:border-0={source.gitlabApp && !source.gitlabAppId}
 						class:border-l-4={source.gitlabApp && !source.gitlabAppId}

@@ -77,7 +77,7 @@
 						}}
 					>
 						<input class="hidden" name="destinationId" value={destination.id} />
-						<button type="submit" class="box-selection border-sky-500 font-bold">
+						<button type="submit" class="box-selection hover:bg-sky-700 font-bold">
 							<div class="font-bold text-xl text-center truncate">{destination.name}</div>
 							<div class="text-center truncate">{destination.network}</div>
 						</button>

@@ -8,7 +8,7 @@ export default async function () {
     for (const destination of destinationDockers) {
         if (destination.isCoolifyProxyUsed) {
             const docker = dockerInstance({ destinationDocker: destination })
-            const containers = await docker.engine.listContainers({ all: true })
+            const containers = await docker.engine.listContainers()
             const configurations = containers.filter(container => container.Labels['coolify.managed'])
             for (const configuration of configurations) {
                 const parsedConfiguration = JSON.parse(Buffer.from(configuration.Labels['coolify.configuration'], 'base64').toString())

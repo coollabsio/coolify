@@ -21,18 +21,11 @@
 	<input class="hidden" name="buildPack" value={buildPack.name} />
 	<button
 		type="submit"
-		class="box-selection text-xl font-bold"
-		class:border-green-500={buildPack.name === 'node' && suggestion === 'node'}
-		class:border-sky-500={buildPack.name === 'docker' && suggestion === 'docker'}
-		class:border-red-500={buildPack.name === 'static' && suggestion === 'static'}
-		class:hover:border-green-500={buildPack.name === 'node'}
-		class:hover:border-red-500={buildPack.name === 'static'}
-		class:hover:border-sky-500={buildPack.name === 'docker'}
-		>{buildPack.name}
+		class="relative box-selection text-xl font-bold flex {buildPack.hoverColor} {suggestion === buildPack.name &&
+			buildPack.color}"
+		><span>{buildPack.fancyName}</span>
+		{#if !scanning && suggestion === buildPack.name}
+			<span class="text-xs absolute bottom-0 pb-2">This one...</span>
+		{/if}
 	</button>
 </form>
-<div class="text-center text-xs font-bold uppercase pt-2">
-	{#if !scanning && suggestion === buildPack.name}
-		Pick this one!
-	{/if}
-</div>

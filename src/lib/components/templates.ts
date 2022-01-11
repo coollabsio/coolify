@@ -1,64 +1,64 @@
 const defaultBuildAndDeploy = {
-	installation: 'yarn install',
-	build: 'yarn build',
-	start: 'yarn start'
+	installCommand: 'yarn install',
+	buildCommand: 'yarn build',
+	startCommand: 'yarn start'
 };
 
 const templates = {
 	svelte: {
-		pack: 'svelte',
+		buildPack: 'svelte',
 		...defaultBuildAndDeploy,
-		directory: 'public',
+		publishDirectory: 'public',
 		name: 'Svelte'
 	},
 	'@nestjs/core': {
-		pack: 'nestjs',
+		buildPack: 'nestjs',
 		...defaultBuildAndDeploy,
 		start: 'yarn start:prod',
 		port: 3000,
 		name: 'NestJS'
 	},
 	next: {
-		pack: 'nextjs',
+		buildPack: 'nextjs',
 		...defaultBuildAndDeploy,
 		port: 3000,
 		name: 'NextJS'
 	},
 	nuxt: {
-		pack: 'nuxtjs',
+		buildPack: 'nuxtjs',
 		...defaultBuildAndDeploy,
 		port: 3000,
 		name: 'NuxtJS'
 	},
 	'react-scripts': {
-		pack: 'react',
+		buildPack: 'react',
 		...defaultBuildAndDeploy,
-		directory: 'build',
+		publishDirectory: 'build',
 		name: 'React'
 	},
 	'parcel-bundler': {
-		pack: 'static',
+		buildPack: 'static',
 		...defaultBuildAndDeploy,
-		directory: 'dist',
+		publishDirectory: 'dist',
 		name: 'Parcel'
 	},
 	'@vue/cli-service': {
-		pack: 'vuejs',
+		buildPack: 'vuejs',
 		...defaultBuildAndDeploy,
-		directory: 'dist',
+		publishDirectory: 'dist',
 		port: 80,
 		name: 'Vue'
 	},
 	gatsby: {
-		pack: 'gatsby',
+		buildPack: 'gatsby',
 		...defaultBuildAndDeploy,
-		directory: 'public',
+		publishDirectory: 'public',
 		name: 'Gatsby'
 	},
 	'preact-cli': {
-		pack: 'react',
+		buildPack: 'react',
 		...defaultBuildAndDeploy,
-		directory: 'build',
+		publishDirectory: 'build',
 		name: 'Preact'
 	}
 };

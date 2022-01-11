@@ -107,7 +107,7 @@
 		{#each teams as team}
 			<a href="/teams/{team.teamId}" class="no-underline p-2 ">
 				<div
-					class="box-selection h-32 hover:bg-cyan-700"
+					class="box-selection h-32 hover:bg-cyan-600"
 				>
 					<div class="font-bold text-xl text-center truncate">{team.team.name}</div>
 					<div class="text-center text-xs">({team.permission})</div>

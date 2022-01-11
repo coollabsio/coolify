@@ -285,7 +285,7 @@ export async function configureProxyForDatabase({ id, port, isPublic, privatePor
         try {
             await completeTransaction(transactionId)
         } catch (error) {
-            console.log(error.response)
+            console.log(error.response.body)
         }
     }
     await configureDatabaseVisibility({ id, isPublic })
@@ -295,14 +295,15 @@ export async function configureProxyForDatabase({ id, port, isPublic, privatePor
 }
 export async function configureProxyForApplication({ domain, applicationId, port, forceSSL }) {
     const haproxy = haproxyInstance()
+    let serverConfigured = false
+    let sslConfigured = false
+
     try {
         await checkHAProxy()
-
     } catch (error) {
         return
     }
     try {
-        let serverConfigured = false
         const backend: any = await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
         const server: any = await haproxy.get(`v2/services/haproxy/configuration/servers/${applicationId}`, {
             searchParams: {
@@ -310,7 +311,6 @@ export async function configureProxyForApplication({ domain, applicationId, port
             },
         }).json()
 
-        let sslConfigured = false
         if (backend && server) {
             // Very sophisticated way to check if the server is already configured in proxy
             if (backend.data.forwardfor.enabled === 'enabled') {
@@ -326,7 +326,11 @@ export async function configureProxyForApplication({ domain, applicationId, port
                 }
             }
         }
-
+    } catch (error) {
+        console.log('error getting backend or server', error.response.body)
+        //
+    }
+    try {
         if (forceSSL) {
             const rules: any = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
                 searchParams: {
@@ -339,13 +343,16 @@ export async function configureProxyForApplication({ domain, applicationId, port
                 if (rule) sslConfigured = true
             }
         }
-        if (!sslConfigured && forceSSL) await forceSSLOnApplication({ domain })
-        if (serverConfigured) return
     } catch (error) {
-
+        console.log('error getting http_request_rules', error.response.body)
+        //
     }
+    if (!sslConfigured && forceSSL) await forceSSLOnApplication({ domain })
+    if (serverConfigured) return
+
     const transactionId = await getNextTransactionId()
 
+    // Try to delete old backend
     try {
         await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
         await haproxy.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
@@ -353,6 +360,10 @@ export async function configureProxyForApplication({ domain, applicationId, port
                 transaction_id: transactionId
             },
         }).json()
+    } catch(error) {
+        console.log('error deleting backend', error.response.body)
+    }
+    try {
         await haproxy.post('v2/services/haproxy/configuration/backends', {
             searchParams: {
                 transaction_id: transactionId

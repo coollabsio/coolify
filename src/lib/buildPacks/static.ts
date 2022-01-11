@@ -1,9 +1,10 @@
 import { buildCacheImageWithNode, buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
-import { makeLabelForApplication } from './common';
 
-const createDockerfile = async ({ applicationId, tag, image, workdir, buildCommand, baseDirectory, publishDirectory, label, secrets }): Promise<void> => {
-    let Dockerfile: Array<string> = []
+const createDockerfile = async (data, image): Promise<void> => {
+    const { applicationId, tag, workdir, buildCommand, baseDirectory, publishDirectory, secrets } = data;
+    const Dockerfile: Array<string> = []
+
     Dockerfile.push(`FROM ${image}`)
     Dockerfile.push('WORKDIR /usr/share/nginx/html')
     if (secrets.length > 0) {
@@ -13,7 +14,6 @@ const createDockerfile = async ({ applicationId, tag, image, workdir, buildComma
             }
         })
     }
-    label.forEach(l => Dockerfile.push(l))
     if (buildCommand) {
         Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /usr/src/app/${publishDirectory} ./`)
     } else {
@@ -24,16 +24,13 @@ const createDockerfile = async ({ applicationId, tag, image, workdir, buildComma
     await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'))
 }
 
-export default async function ({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, publishDirectory, debug, commit, tag, workdir, docker, buildId, port, installCommand, buildCommand, startCommand, baseDirectory, secrets }) {
+export default async function (data) {
     try {
         const image = 'nginx:stable-alpine'
-        const label = makeLabelForApplication({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
-
-        if (buildCommand) {
-            await buildCacheImageWithNode({ applicationId, tag, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debug, secrets })
-        }
-        await createDockerfile({ applicationId, tag, image, workdir, buildCommand, baseDirectory, publishDirectory, label, secrets })
-        await buildImage({ applicationId, tag, workdir, docker, buildId, debug })
+        const imageForBuild = 'node:lts'
+        if (data.buildCommand) await buildCacheImageWithNode(data, imageForBuild)
+        await createDockerfile(data, image)
+        await buildImage(data)
     } catch (error) {
         throw error
     }

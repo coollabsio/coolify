@@ -32,9 +32,9 @@ export async function removeApplication({ id, teamId }) {
         const { domain, destinationDockerId, destinationDocker } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
 
         await prisma.applicationSettings.deleteMany({ where: { application: { id } } })
-        await prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } })
         await prisma.buildLog.deleteMany({ where: { applicationId: id } })
         await prisma.secret.deleteMany({ where: { applicationId: id } })
+        await prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } })
         let previews = []
         if (destinationDockerId) {
             await removeDestinationDocker({ id, destinationDocker })

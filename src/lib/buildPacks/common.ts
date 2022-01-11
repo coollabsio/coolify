@@ -1,13 +1,13 @@
-import { encrypt, base64Encode } from '$lib/crypto';
+import { base64Encode } from '$lib/crypto';
 import { version } from '$lib/common';
 import * as db from '$lib/database';
 
 export function makeLabelForApplication({ applicationId, domain, name, type, pullmergeRequestId = null, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
     return [
-        'LABEL coolify.managed=true',
-        `LABEL coolify.version=${version}`,
-        `LABEL coolify.type=application`,
-        `LABEL coolify.configuration=${base64Encode(JSON.stringify({
+        '--label coolify.managed=true',
+        `--label coolify.version=${version}`,
+        `--label coolify.type=application`,
+        `--label coolify.configuration=${base64Encode(JSON.stringify({
             applicationId,
             domain,
             name,

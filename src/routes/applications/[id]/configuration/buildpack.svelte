@@ -52,10 +52,8 @@
 		Object.keys(templates).map((dep) => {
 			if (checkPackageJSONContents({ dep, json })) {
 				const config = templates[dep];
-				suggestion = config.pack;
-			} else {
-				suggestion = 'node';
-			}
+				suggestion = config.buildPack;
+			} 
 		});
 	}
 
@@ -174,6 +172,6 @@
 </div>
 {#if scanning}
 	<div class="font-bold flex space-x-1 py-5 px-6 justify-center">
-		<div class="text-xl tracking-tight">Scanning repository to suggestion build pack...</div>
+		<div class="text-xl tracking-tight">Scanning repository to suggest a build pack for you...</div>
 	</div>
 {/if}

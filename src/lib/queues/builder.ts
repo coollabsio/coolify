@@ -7,6 +7,7 @@ import { asyncExecShell, createDirectories, getEngine, saveBuildLog, setDefaultC
 import { configureProxyForApplication } from '../haproxy'
 import * as db from '$lib/database'
 import { decrypt } from '$lib/crypto'
+import { makeLabelForApplication } from '$lib/buildPacks/common'
 
 export default async function (job) {
   /*
@@ -44,12 +45,16 @@ export default async function (job) {
 
     const { workdir, repodir } = await createDirectories({ repository, buildId: build.id })
 
-    const configuration = await setDefaultConfiguration({ buildPack, port, installCommand, startCommand })
+    const configuration = await setDefaultConfiguration(job.data)
 
     buildPack = configuration.buildPack
     port = configuration.port
     installCommand = configuration.installCommand
     startCommand = configuration.startCommand
+    buildCommand = configuration.buildCommand
+    publishDirectory = configuration.publishDirectory
+    
+    console.log(configuration)
 
     let commit = await importers[gitSource.type]({
       applicationId,
@@ -123,8 +128,10 @@ export default async function (job) {
         }
       })
     }
+    const labels = makeLabelForApplication({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
+    console.log(labels.join(' '))
     saveBuildLog({ line: '[COOLIFY] - Deployment started.', buildId, applicationId })
-    const { stderr } = await asyncExecShell(`DOCKER_HOST=${host} docker run ${envs.join()} --name ${imageId} --network ${docker.network} --restart always -d ${applicationId}:${tag}`)
+    const { stderr } = await asyncExecShell(`DOCKER_HOST=${host} docker run ${envs.join()} ${labels.join(' ')} --name ${imageId} --network ${docker.network} --restart always -d ${applicationId}:${tag}`)
     if (stderr) console.log(stderr)
     saveBuildLog({ line: '[COOLIFY] - Deployment successful!', buildId, applicationId })
 

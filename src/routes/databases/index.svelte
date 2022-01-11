@@ -50,7 +50,7 @@
 	{:else}
 		{#each databases as database}
 			<a href="/databases/{database.id}" class="no-underline p-2">
-				<div class="box-selection hover:bg-purple-900">
+				<div class="box-selection hover:bg-purple-600">
 					<div class="font-bold text-xl text-center truncate">{database.name}</div>
 					{#if !database.type}
 						<div class="font-bold text-center truncate text-red-500">Not configured</div>

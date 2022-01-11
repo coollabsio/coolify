@@ -2,13 +2,14 @@ import Dockerode from 'dockerode'
 import { promises as fs } from 'fs';
 import { saveBuildLog } from './common';
 
-export async function buildCacheImageWithNode({ applicationId, tag, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debug, secrets }) {
+export async function buildCacheImageWithNode(data, imageForBuild) {
+    const { applicationId, tag, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debug, secrets } = data
     const Dockerfile: Array<string> = []
-    Dockerfile.push(`FROM node:lts`)
+    Dockerfile.push(`FROM ${imageForBuild}`)
     Dockerfile.push('WORKDIR /usr/src/app')
     if (secrets.length > 0) {
         secrets.forEach(secret => {
-            if (secret.isBuildSecret) {
+            if (!secret.isBuildSecret) {
                 Dockerfile.push(`ARG ${secret.name} ${secret.value}`)
             }
         })
