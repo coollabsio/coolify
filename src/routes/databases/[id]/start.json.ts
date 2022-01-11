@@ -38,7 +38,8 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
                     environment: environmentVariables,
                     volumes: [volume],
                     ulimits,
-                    labels
+                    labels,
+                    restart: 'always',
                 }
             },
             networks: {

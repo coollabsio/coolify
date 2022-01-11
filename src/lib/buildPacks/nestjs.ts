@@ -1,9 +1,9 @@
-import { buildImage } from '$lib/docker';
+import { buildCacheImageWithNode, buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
 import { makeLabelForApplication } from './common';
 
-const createDockerfile = async ({ image, workdir, port, installCommand, buildCommand, startCommand, baseDirectory, label, secrets }): Promise<void> => {
-    const Dockerfile: Array<string> = []
+const createDockerfile = async ({ installCommand, port, startCommand, image, workdir, buildCommand, baseDirectory, publishDirectory, label, secrets }): Promise<void> => {
+    let Dockerfile: Array<string> = []
     Dockerfile.push(`FROM ${image}`)
     Dockerfile.push('WORKDIR /usr/src/app')
     if (secrets.length > 0) {
@@ -27,7 +27,11 @@ export default async function ({ applicationId, domain, name, type, pullmergeReq
     try {
         const image = 'node:lts'
         const label = makeLabelForApplication({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
-        await createDockerfile({ image, workdir, port, installCommand, buildCommand, startCommand, baseDirectory, label, secrets })
+
+        if (buildCommand) {
+            await buildCacheImageWithNode({ applicationId, tag, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debug, secrets })
+        }
+        await createDockerfile({ installCommand, port, startCommand, image, workdir, buildCommand, baseDirectory, publishDirectory, label, secrets })
         await buildImage({ applicationId, tag, workdir, docker, buildId, debug })
     } catch (error) {
         throw error

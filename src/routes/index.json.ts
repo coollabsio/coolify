@@ -9,12 +9,14 @@ export const get: RequestHandler = async (request) => {
 		const sourcesCount = await (await db.listSources(teamId)).length
 		const destinationsCount = await (await db.listDestinations(teamId)).length
 		const teamsCount = await (await db.listTeams()).length
+		const databasesCount = await (await db.listDatabases(teamId)).length
 		return {
 			body: {
 				applicationsCount,
 				sourcesCount,
 				destinationsCount,
-				teamsCount
+				teamsCount,
+				databasesCount
 			}
 		};
 	} catch (err) {

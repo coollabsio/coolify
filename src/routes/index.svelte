@@ -24,6 +24,7 @@
 	export let sourcesCount: number;
 	export let destinationsCount: number;
 	export let teamsCount: number;
+	export let databasesCount: number;
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
@@ -78,7 +79,7 @@
 						class="flex flex-col rounded p-6 text-center hover:bg-purple-500 hover:text-white text-purple-500 transition duration-150 cursor-pointer no-underline"
 					>
 						<dt class="order-2 mt-2 text-sm leading-6 font-bold text-white uppercase">Databases</dt>
-						<dd class="order-1 text-5xl font-extrabold ">0</dd>
+						<dd class="order-1 text-5xl font-extrabold ">{databasesCount}</dd>
 					</a>
 					<a
 						href="/services"
