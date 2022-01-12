@@ -18,7 +18,6 @@ export const get: RequestHandler = async (request) => {
         if (JSON.parse(stdout).Running) {
             running = true
         } 
-        console.log(running, isCoolifyProxyUsed)
         if (isCoolifyProxyUsed !== running) {
             await db.setDestinationSettings({ engine, isCoolifyProxyUsed: true })
             destination = await db.getDestination({ id, teamId })

@@ -38,6 +38,7 @@
 	import { appConfiguration } from '$lib/store';
 	import Setting from '$lib/components/Setting.svelte';
 	import type { Application, ApplicationSettings } from '@prisma/client';
+	import { notNodeDeployments, staticDeployments } from '$lib/components/common';
 	const { id } = $page.params;
 
 	let domainEl: HTMLInputElement;
@@ -206,7 +207,7 @@
 				<div class="col-span-2">
 					<a
 						href={$session.isAdmin
-							? `/applications/${id}/configuration/repository?from=/applications/${id}`
+							? `/applications/${id}/configuration/repository?from=/applications/${id}&to=/applications/${id}/configuration/buildpack`
 							: ''}
 						class="no-underline"
 						><span class="arrow-right-applications">></span><input
@@ -282,7 +283,7 @@
 				</div>
 			</div>
 
-			{#if $appConfiguration.configuration.buildPack !== 'static'}
+			{#if !staticDeployments.includes($appConfiguration.configuration.buildPack)}
 				<div class="grid grid-cols-3 items-center">
 					<label for="port">Port</label>
 					<div class="col-span-2">
@@ -296,7 +297,7 @@
 					</div>
 				</div>
 			{/if}
-			{#if $appConfiguration.configuration.buildPack !== 'docker'}
+			{#if !notNodeDeployments.includes($appConfiguration.configuration.buildPack)}
 				<div class="grid grid-cols-3 items-center">
 					<label for="installCommand">Install Command</label>
 					<div class="col-span-2">
@@ -334,6 +335,7 @@
 					</div>
 				</div>
 			{/if}
+
 			<div class="grid grid-cols-3">
 				<label for="baseDirectory">Base Directory</label>
 				<div class="col-span-2">
@@ -349,21 +351,23 @@
 					/>
 				</div>
 			</div>
-			<div class="grid grid-cols-3">
-				<label for="publishDirectory">Publish Directory</label>
-				<div class="col-span-2">
-					<input
-						readonly={!$session.isAdmin}
-						name="publishDirectory"
-						id="publishDirectory"
-						bind:value={$appConfiguration.configuration.publishDirectory}
-						placeholder=" default: /"
-					/>
-					<Explainer
-						text="Directory containing all the assets for deployment. <br> For example: dist or _site or public"
-					/>
+			{#if !notNodeDeployments.includes($appConfiguration.configuration.buildPack)}
+				<div class="grid grid-cols-3">
+					<label for="publishDirectory">Publish Directory</label>
+					<div class="col-span-2">
+						<input
+							readonly={!$session.isAdmin}
+							name="publishDirectory"
+							id="publishDirectory"
+							bind:value={$appConfiguration.configuration.publishDirectory}
+							placeholder=" default: /"
+						/>
+						<Explainer
+							text="Directory containing all the assets for deployment. <br> For example: dist or _site or public"
+						/>
+					</div>
 				</div>
-			</div>
+			{/if}
 		</div>
 	</form>
 	<div class="font-bold flex space-x-1 pb-5">

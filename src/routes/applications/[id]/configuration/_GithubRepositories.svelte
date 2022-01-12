@@ -9,6 +9,7 @@
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
+	const to = $page.url.searchParams.get('to');
 
 	let htmlUrl = application.gitSource.htmlUrl;
 	let apiUrl = application.gitSource.apiUrl;
@@ -28,22 +29,6 @@
 	let showSave = false;
 	let token = null;
 
-	// async function getGithubToken(): Promise<void> {
-	// 	const response = await fetch(
-	// 		`${apiUrl}/app/installations/${application.gitSource.githubApp.installationId}/access_tokens`,
-	// 		{
-	// 			method: 'POST',
-	// 			headers: {
-	// 				Authorization: `Bearer ${githubToken}`
-	// 			}
-	// 		}
-	// 	);
-	// 	if (!response.ok) {
-	// 		throw new Error('Git Source not configured.');
-	// 	}
-	// 	const data = await response.json();
-	// 	token = data.token;
-	// }
 	async function loadRepositoriesByPage(page = 0) {
 		const response = await fetch(`${apiUrl}/installation/repositories?per_page=100&page=${page}`, {
 			headers: {
@@ -54,7 +39,6 @@
 	}
 	async function loadRepositories() {
 		token = await getGithubToken({ apiUrl, githubToken, application });
-		// await getGithubToken();
 		let page = 1;
 		let reposCount = 0;
 		const loadedRepos = await loadRepositoriesByPage();
@@ -107,6 +91,10 @@
 		method="post"
 		use:enhance={{
 			result: async () => {
+				if (to) {
+					window.location.assign(`${to}?from=${from}`);
+					return
+				}
 				window.location.assign(from || `/applications/${id}/configuration/buildpack`);
 			}
 		}}

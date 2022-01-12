@@ -10,7 +10,7 @@ import letsencrypt from './letsencrypt';
 import logger from './logger';
 import proxy from './proxy';
 
-import { saveBuildLog } from '$lib/common'
+import { asyncExecShell, saveBuildLog } from '$lib/common'
 
 let { Queue, Worker } = Bullmq;
 let redisHost = 'localhost';
@@ -50,6 +50,8 @@ buildWorker.on('completed', async (job: Bullmq.Job) => {
     await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'success' } })
   } catch (err) {
     console.log(err)
+  } finally {
+    await asyncExecShell(`rm -fr ${job.data.workdir}`)
   }
   return
 })
@@ -60,6 +62,8 @@ buildWorker.on('failed', async (job: Bullmq.Job, failedReason: string) => {
     await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'failed' } })
   } catch (error) {
     console.log(error)
+  } finally {
+    await asyncExecShell(`rm -fr ${job.data.workdir}`)
   }
   saveBuildLog({ line: 'Failed build!', buildId: job.data.build_id, applicationId: job.data.id })
   saveBuildLog({ line: `Reason: ${failedReason.toString()}`, buildId: job.data.build_id, applicationId: job.data.id })
@@ -74,7 +78,7 @@ const letsEncryptWorker = new Worker(letsEncryptQueueName, async (job) => await 
 })
 letsEncryptWorker.on('completed', async () => {
   // TODO: Save letsencrypt logs as build logs!
-  console.log('Lets Encrypt job completed')
+  console.log('[DEBUG] Lets Encrypt job completed')
 })
 
 letsEncryptWorker.on('failed', async (job: Job, failedReason: string) => {
@@ -83,7 +87,7 @@ letsEncryptWorker.on('failed', async (job: Job, failedReason: string) => {
   } catch (error) {
     console.log(error)
   }
-  console.log('Lets Encrypt job failed')
+  console.log('[DEBUG] Lets Encrypt job failed')
   console.log(failedReason)
 })
 

@@ -28,13 +28,15 @@
 </script>
 
 <script lang="ts">
-	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
+
 	import templates from '$lib/components/templates';
 	import BuildPack from './_BuildPack.svelte';
 
-	let suggestion = null;
 	let scanning = true;
+	let foundConfig = {
+		buildPack: 'node'
+	};
 
 	export let buildPacks: BuildPack[];
 	export let apiUrl;
@@ -49,16 +51,14 @@
 		return json?.dependencies?.hasOwnProperty(dep) || json?.devDependencies?.hasOwnProperty(dep);
 	}
 	function checkTemplates({ json }) {
-		Object.keys(templates).map((dep) => {
+		Object.keys(templates).forEach((dep) => {
 			if (checkPackageJSONContents({ dep, json })) {
-				const config = templates[dep];
-				suggestion = config.buildPack;
-			} 
+				foundConfig = templates[dep];
+			}
 		});
 	}
 
 	onMount(async () => {
-		// TODO:
 		if (type === 'gitlab') {
 			const response = await fetch(`${apiUrl}/v4/projects/${projectId}/repository/tree`, {
 				method: 'GET',
@@ -80,8 +80,9 @@
 				(file) => file.name === 'requirements.txt' && file.type === 'blob'
 			);
 			const indexHtml = files.find((file) => file.name === 'index.html' && file.type === 'blob');
+			const indexPHP = files.find((file) => file.name === 'index.php' && file.type === 'blob');
 			if (dockerfile) {
-				suggestion = 'docker';
+				foundConfig.buildPack = 'docker';
 			} else if (packageJson) {
 				const path = packageJson.path;
 				const response = await fetch(
@@ -102,12 +103,14 @@
 				const json = await response.json();
 				checkTemplates({ json });
 			} else if (cargoToml) {
-				suggestion = 'rust';
+				foundConfig.buildPack = 'rust';
 			} else if (requirementsTxt) {
-				suggestion = 'python';
+				foundConfig.buildPack = 'python';
 			} else if (indexHtml) {
-				suggestion = 'static';
-			}
+				foundConfig.buildPack = 'static';
+			} else if (indexPHP) {
+				foundConfig.buildPack = 'php';
+			} 
 			scanning = false;
 		} else if (type === 'github') {
 			const response = await fetch(`${apiUrl}/repos/${repository}/contents?ref=${branch}`, {
@@ -131,8 +134,9 @@
 				(file) => file.name === 'requirements.txt' && file.type === 'file'
 			);
 			const indexHtml = files.find((file) => file.name === 'index.html' && file.type === 'file');
+			const indexPHP = files.find((file) => file.name === 'index.php' && file.type === 'file');
 			if (dockerfile) {
-				suggestion = 'docker';
+				foundConfig.buildPack = 'docker';
 			} else if (packageJson) {
 				const response = await fetch(`${packageJson.git_url}`, {
 					method: 'GET',
@@ -148,12 +152,14 @@
 				const json = await response.json();
 				checkTemplates({ json });
 			} else if (cargoToml) {
-				suggestion = 'rust';
+				foundConfig.buildPack = 'rust';
 			} else if (requirementsTxt) {
-				suggestion = 'python';
+				foundConfig.buildPack = 'python';
 			} else if (indexHtml) {
-				suggestion = 'static';
-			}
+				foundConfig.buildPack = 'static';
+			} else if (indexPHP) {
+				foundConfig.buildPack = 'php';
+			} 
 			scanning = false;
 		}
 	});
@@ -163,15 +169,16 @@
 	<div class="text-2xl tracking-tight mr-4">Configure Build Pack</div>
 </div>
 
-<div class="flex flex-wrap justify-center">
-	{#each buildPacks as buildPack}
-		<div class="p-2">
-			<BuildPack {suggestion} {buildPack} {scanning} />
-		</div>
-	{/each}
-</div>
 {#if scanning}
 	<div class="font-bold flex space-x-1 py-5 px-6 justify-center">
 		<div class="text-xl tracking-tight">Scanning repository to suggest a build pack for you...</div>
+	</div>
+{:else}
+	<div class="max-w-5xl mx-auto flex flex-wrap justify-center">
+		{#each buildPacks as buildPack}
+			<div class="p-2">
+				<BuildPack {buildPack} {scanning} {foundConfig} />
+			</div>
+		{/each}
 	</div>
 {/if}

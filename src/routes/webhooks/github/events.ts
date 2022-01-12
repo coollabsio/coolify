@@ -57,7 +57,7 @@ export const post = async (request) => {
                 return {
                     status: 500,
                     body: {
-                        message: 'Ooops, something is not okay, are you okay?'
+                        message: 'SHA256 checksum failed. Are you doing something fishy?'
                     }
                 };
             }

@@ -21,6 +21,12 @@
 
 <script lang="ts">
 	export let databases;
+	import Clickhouse from '$lib/components/svg/databases/Clickhouse.svelte';
+	import CouchDB from '$lib/components/svg/databases/CouchDB.svelte';
+	import MongoDB from '$lib/components/svg/databases/MongoDB.svelte';
+	import MySQL from '$lib/components/svg/databases/MySQL.svelte';
+	import PostgreSQL from '$lib/components/svg/databases/PostgreSQL.svelte';
+	import Redis from '$lib/components/svg/databases/Redis.svelte';
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
@@ -42,7 +48,7 @@
 	</a>
 </div>
 
-<div class="flex flex-wrap justify-center">
+<div class="flex flex-wrap justify-center space-x-4">
 	{#if !databases || databases.length === 0}
 		<div class="flex-col">
 			<div class="text-center font-bold text-xl">No databases found</div>
@@ -50,11 +56,26 @@
 	{:else}
 		{#each databases as database}
 			<a href="/databases/{database.id}" class="no-underline p-2">
-				<div class="box-selection hover:bg-purple-600">
-					<div class="font-bold text-xl text-center truncate">{database.name}</div>
+				<div class="box-selection relative	">
+					{#if database.type === 'clickhouse'}
+						<Clickhouse />
+					{:else if database.type === 'couchdb'}
+						<CouchDB />
+					{:else if database.type === 'mongodb'}
+						<MongoDB />
+					{:else if database.type === 'mysql'}
+						<MySQL />
+					{:else if database.type === 'postgresql'}
+						<PostgreSQL />
+					{:else if database.type === 'redis'}
+						<Redis />
+					{/if}
+					<div class="font-bold text-xl text-center truncate">
+						{database.name}
+					</div>
 					{#if !database.type}
 						<div class="font-bold text-center truncate text-red-500">Not configured</div>
-						{:else}
+					{:else}
 						<div class="text-center truncate">{database.type}</div>
 					{/if}
 				</div>

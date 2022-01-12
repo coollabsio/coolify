@@ -1,6 +1,7 @@
 lockfileVersion: 5.3
 
 specifiers:
+  '@iarna/toml': ^2.2.5
   '@prisma/client': 3.7.0
   '@sentry/node': ^6.15.0
   '@sveltejs/adapter-node': ^1.0.0-next.59
@@ -45,6 +46,7 @@ specifiers:
   unique-names-generator: ^4.6.0
 
 dependencies:
+  '@iarna/toml': 2.2.5
   '@prisma/client': 3.7.0_prisma@3.7.0
   '@sentry/node': 6.15.0
   bcrypt: 5.0.1
@@ -155,6 +157,10 @@ packages:
   /@humanwhocodes/object-schema/1.2.0:
     resolution: {integrity: sha512-wdppn25U8z/2yiaT6YGquE6X8sSv7hNMWSXYSSU1jGv/yd6XqjXgTDJ8KP4NgjTXfJ3GbRjeeb8RTV7a/VpM+w==}
     dev: true
+
+  /@iarna/toml/2.2.5:
+    resolution: {integrity: sha512-trnsAYxU3xnS1gPHPyU961coFyLkh4gAD/0zQ5mymY4yOZ+CYvsPqUbOFSw0aDM4y0tV7tiFxL/1XfXPNC6IPg==}
+    dev: false
 
   /@mapbox/node-pre-gyp/1.0.6:
     resolution: {integrity: sha512-qK1ECws8UxuPqOA8F5LFD90vyVU33W7N3hGfgsOVfrJaRVc8McC3JClTDHpeSbL9CBrOHly/4GsNPAvIgNZE+g==}

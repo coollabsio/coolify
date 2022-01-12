@@ -3,6 +3,7 @@
 	import { publicPaths } from '$lib/settings';
 
 	export const load: Load = async ({ fetch, url, params, session }) => {
+		const currentRoute = url.pathname;
 		if (!session.uid && !publicPaths.includes(url.pathname)) {
 			return {
 				status: 302,
@@ -18,6 +19,7 @@
 		if (res.ok) {
 			return {
 				props: {
+					currentRoute,
 					selectedTeamId: session.teamId,
 					...(await res.json())
 				}
@@ -30,6 +32,8 @@
 <script>
 	export let teams;
 	export let selectedTeamId;
+	export let currentRoute;
+	import { fade } from 'svelte/transition';
 
 	import '../tailwind.css';
 	import { SvelteToast } from '@zerodevx/svelte-toast';
@@ -235,8 +239,10 @@
 					sveltekit:prefetch
 					href="/databases"
 					class="icons hover:text-purple-500 bg-coolgray-200 tooltip-right"
-					class:text-purple-500={$page.url.pathname.startsWith('/databases') || $page.url.pathname.startsWith('/new/database')}
-					class:bg-coolgray-500={$page.url.pathname.startsWith('/databases') || $page.url.pathname.startsWith('/new/database')}
+					class:text-purple-500={$page.url.pathname.startsWith('/databases') ||
+						$page.url.pathname.startsWith('/new/database')}
+					class:bg-coolgray-500={$page.url.pathname.startsWith('/databases') ||
+						$page.url.pathname.startsWith('/new/database')}
 					data-tooltip="Databases"
 				>
 					<svg
@@ -260,8 +266,10 @@
 					sveltekit:prefetch
 					href="/services"
 					class="icons hover:text-pink-500 bg-coolgray-200 tooltip-right"
-					class:text-pink-500={$page.url.pathname.startsWith('/services') || $page.url.pathname.startsWith('/new/service')}
-					class:bg-coolgray-500={$page.url.pathname.startsWith('/services') || $page.url.pathname.startsWith('/new/service')}
+					class:text-pink-500={$page.url.pathname.startsWith('/services') ||
+						$page.url.pathname.startsWith('/new/service')}
+					class:bg-coolgray-500={$page.url.pathname.startsWith('/services') ||
+						$page.url.pathname.startsWith('/new/service')}
 					data-tooltip="Services"
 				>
 					<svg
@@ -388,6 +396,8 @@
 		{/each}
 	</select>
 {/if}
-<main>
-	<slot />
-</main>
+{#key currentRoute}
+	<main in:fade={{ duration: 150 }}>
+		<slot />
+	</main>
+{/key}

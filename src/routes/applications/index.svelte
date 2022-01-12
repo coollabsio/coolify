@@ -45,7 +45,7 @@
 		</a>
 	{/if}
 </div>
-<div class="flex flex-wrap justify-center">
+<div class="flex flex-wrap justify-center space-x-4">
 	{#if !applications || applications.length === 0}
 		<div class="flex-col">
 			<div class="text-center font-bold text-xl">No applications found</div>

@@ -7,5 +7,8 @@ import react from './react'
 import nestjs from './nestjs'
 import nextjs from './nextjs'
 import nuxtjs from './nuxtjs'
-import vue from './vue'
-export { node, staticApp as static, docker, gatsby, svelte, react, nestjs, nextjs, nuxtjs, vue }
+import vuejs from './vuejs'
+import php from './php'
+import rust from './rust'
+
+export { node, staticApp as static, docker, gatsby, svelte, react, nestjs, nextjs, nuxtjs, vuejs, php, rust }

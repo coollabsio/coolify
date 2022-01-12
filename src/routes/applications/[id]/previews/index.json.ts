@@ -13,7 +13,7 @@ export const get: RequestHandler = async (request) => {
     const docker = dockerInstance({ destinationDocker })
     const listContainers = await docker.engine.listContainers({ filters: { network: [destinationDocker.network] } })
     const containers = listContainers.filter((container) => {
-        return container.Labels['coolify.configuration']
+        return container.Labels['coolify.configuration'] && container.Labels['coolify.type'] === 'application'
     })
     const jsonContainers = containers.map(container => JSON.parse(Buffer.from(container.Labels['coolify.configuration'], 'base64').toString())).filter(container => container.type !== 'manual' && container.applicationId === id)
     return {

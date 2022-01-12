@@ -25,3 +25,5 @@ export async function getGithubToken({apiUrl, application, githubToken}): Promis
 	const data = await response.json();
 	return data.token;
 }
+export const staticDeployments = ['react', 'vuejs', 'static', 'svelte', 'gatsby', 'php'];
+export const notNodeDeployments = ['php', 'docker', 'rust']

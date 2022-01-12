@@ -25,11 +25,32 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
     await buildImage({ applicationId, tag, workdir, docker, buildId, isCache: true, debug })
 }
 
+export async function buildCacheImageWithCargo(data, imageForBuild) {
+    const { applicationId, tag, workdir, docker, buildId, baseDirectory, installCommand, buildCommand, debug, secrets } = data
+    const Dockerfile: Array<string> = []
+    Dockerfile.push(`FROM ${imageForBuild} as planner-${applicationId}`)
+    Dockerfile.push('WORKDIR /usr/src/app')
+    Dockerfile.push('RUN cargo install cargo-chef')
+    Dockerfile.push('COPY . .')
+    Dockerfile.push('RUN cargo chef prepare --recipe-path recipe.json')
+    Dockerfile.push(`FROM ${imageForBuild}`)
+    Dockerfile.push('WORKDIR /usr/src/app')
+    Dockerfile.push('RUN cargo install cargo-chef')
+    Dockerfile.push(`COPY --from=planner-${applicationId} /usr/src/app/recipe.json recipe.json`)
+    Dockerfile.push('RUN cargo chef cook --release --recipe-path recipe.json')
+    await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'))
+    await buildImage({ applicationId, tag, workdir, docker, buildId, isCache: true, debug })
+}
+
 export async function buildImage({ applicationId, tag, workdir, docker, buildId, isCache = false, debug = false }) {
     if (!debug) {
         saveBuildLog({ line: `[COOLIFY] - Debug turned off.`, buildId, applicationId })
     }
-    saveBuildLog({ line: `[COOLIFY] - Building image.`, buildId, applicationId })
+    if (isCache) {
+        saveBuildLog({ line: `[COOLIFY] - Building cache image.`, buildId, applicationId })
+    } else {
+        saveBuildLog({ line: `[COOLIFY] - Building image.`, buildId, applicationId })
+    }
 
     const stream = await docker.engine.buildImage(
         { src: ['.'], context: workdir },

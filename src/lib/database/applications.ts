@@ -162,7 +162,7 @@ export async function setApplicationSettings({ id, debug, previews, forceSSL, fo
     try {
         const application = await prisma.application.update({ where: { id }, data: { settings: { update: { debug, previews, forceSSL } } }, include: { destinationDocker: true } })
         const { destinationDocker, domain } = application
-        letsEncryptQueue.add(domain, { destinationDocker, domain, id, forceSSLChanged })
+        forceSSLChanged && letsEncryptQueue.add(domain, { destinationDocker, domain, id, forceSSLChanged })
         return { status: 201 }
     } catch (e) {
         throw PrismaErrorHandler(e)

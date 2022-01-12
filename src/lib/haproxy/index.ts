@@ -132,7 +132,7 @@ export async function forceSSLOnApplication({ domain }) {
             await completeTransaction(transactionId)
         }
     } else {
-        console.log(`adding ssl for ${domain}`)
+        console.log(`[DEBUG] Adding ssl for ${domain}`)
     }
 
 }
@@ -207,31 +207,28 @@ export async function configureProxyForDatabase({ id, port, isPublic, privatePor
         return
     }
 
+    let alreadyConfigured = false
     try {
-        let alreadyConfigured = false
-        try {
-            const backend: any = await haproxy.get(`v2/services/haproxy/configuration/backends/${id}`).json()
-            const server: any = await haproxy.get(`v2/services/haproxy/configuration/servers/${id}`, {
-                searchParams: {
-                    backend: id
-                },
-            }).json()
-            if (backend.data.name === id) {
-                if (server.data.port === privatePort) {
-                    if (server.data.check === 'enabled') {
-                        if (server.data.address === id) {
-                            alreadyConfigured = true
-                        }
+        const backend: any = await haproxy.get(`v2/services/haproxy/configuration/backends/${id}`).json()
+        const server: any = await haproxy.get(`v2/services/haproxy/configuration/servers/${id}`, {
+            searchParams: {
+                backend: id
+            },
+        }).json()
+        if (backend.data.name === id) {
+            if (server.data.port === privatePort) {
+                if (server.data.check === 'enabled') {
+                    if (server.data.address === id) {
+                        alreadyConfigured = true
                     }
                 }
             }
-        } catch (error) {
-            // OK
         }
-        if (alreadyConfigured) return
     } catch (error) {
-
+        console.log('error getting backend or server', error.response.body)
     }
+    if (alreadyConfigured) return
+
     const transactionId = await getNextTransactionId()
     try {
         await haproxy.post('v2/services/haproxy/configuration/backends', {
@@ -289,9 +286,6 @@ export async function configureProxyForDatabase({ id, port, isPublic, privatePor
         }
     }
     await configureDatabaseVisibility({ id, isPublic })
-
-
-
 }
 export async function configureProxyForApplication({ domain, applicationId, port, forceSSL }) {
     const haproxy = haproxyInstance()
@@ -360,7 +354,7 @@ export async function configureProxyForApplication({ domain, applicationId, port
                 transaction_id: transactionId
             },
         }).json()
-    } catch(error) {
+    } catch (error) {
         console.log('error deleting backend', error.response.body)
     }
     try {

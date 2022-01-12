@@ -3,11 +3,11 @@ import crypto from 'crypto'
 import * as buildpacks from '../buildPacks'
 import * as importers from '../importers'
 import { dockerInstance } from '../docker'
-import { asyncExecShell, createDirectories, getEngine, saveBuildLog, setDefaultConfiguration } from '../common'
+import { asyncExecShell, createDirectories, getEngine, saveBuildLog } from '../common'
 import { configureProxyForApplication } from '../haproxy'
 import * as db from '$lib/database'
 import { decrypt } from '$lib/crypto'
-import { makeLabelForApplication } from '$lib/buildPacks/common'
+import { copyBaseConfigurationFiles, makeLabelForApplication, setDefaultConfiguration } from '$lib/buildPacks/common'
 
 export default async function (job) {
   /*
@@ -54,8 +54,6 @@ export default async function (job) {
     buildCommand = configuration.buildCommand
     publishDirectory = configuration.publishDirectory
     
-    console.log(configuration)
-
     let commit = await importers[gitSource.type]({
       applicationId,
       debug,
@@ -104,7 +102,12 @@ export default async function (job) {
       //
     }
     if (!imageFound || deployNeeded) {
-      await buildpacks[buildPack]({ buildId: build.id, applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, publishDirectory, debug, commit, tag, workdir, docker, port, installCommand, buildCommand, startCommand, baseDirectory, secrets })
+      await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId);
+      if (buildpacks[buildPack]) await buildpacks[buildPack]({ buildId: build.id, applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, publishDirectory, debug, commit, tag, workdir, docker, port, installCommand, buildCommand, startCommand, baseDirectory, secrets })
+      else {
+        saveBuildLog({ line: `[COOLIFY] - Build pack ${buildPack} not found`, buildId, applicationId })
+        throw new Error(`Build pack ${buildPack} not found.`)
+      }
       deployNeeded = true
     } else {
       deployNeeded = false
@@ -129,7 +132,6 @@ export default async function (job) {
       })
     }
     const labels = makeLabelForApplication({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
-    console.log(labels.join(' '))
     saveBuildLog({ line: '[COOLIFY] - Deployment started.', buildId, applicationId })
     const { stderr } = await asyncExecShell(`DOCKER_HOST=${host} docker run ${envs.join()} ${labels.join(' ')} --name ${imageId} --network ${docker.network} --restart always -d ${applicationId}:${tag}`)
     if (stderr) console.log(stderr)
@@ -140,8 +142,5 @@ export default async function (job) {
     } else {
       saveBuildLog({ line: '[COOLIFY] - Custom proxy is configured. Nothing else to do.', buildId, applicationId })
     }
-    await asyncExecShell(`rm -fr ${workdir}`)
   }
-
-
 }

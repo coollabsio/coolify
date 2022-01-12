@@ -9,12 +9,13 @@ const templates = {
 		buildPack: 'svelte',
 		...defaultBuildAndDeploy,
 		publishDirectory: 'public',
+		port: 80,
 		name: 'Svelte'
 	},
 	'@nestjs/core': {
 		buildPack: 'nestjs',
 		...defaultBuildAndDeploy,
-		start: 'yarn start:prod',
+		startCommand: 'yarn start:prod',
 		port: 3000,
 		name: 'NestJS'
 	},
@@ -34,12 +35,14 @@ const templates = {
 		buildPack: 'react',
 		...defaultBuildAndDeploy,
 		publishDirectory: 'build',
+		port: 80,
 		name: 'React'
 	},
 	'parcel-bundler': {
 		buildPack: 'static',
 		...defaultBuildAndDeploy,
 		publishDirectory: 'dist',
+		port: 80,
 		name: 'Parcel'
 	},
 	'@vue/cli-service': {
@@ -53,12 +56,14 @@ const templates = {
 		buildPack: 'gatsby',
 		...defaultBuildAndDeploy,
 		publishDirectory: 'public',
+		port: 80,
 		name: 'Gatsby'
 	},
 	'preact-cli': {
 		buildPack: 'react',
 		...defaultBuildAndDeploy,
 		publishDirectory: 'build',
+		port: 80,
 		name: 'Preact'
 	}
 };

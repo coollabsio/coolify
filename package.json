@@ -50,6 +50,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@iarna/toml": "^2.2.5",
 		"@prisma/client": "3.7.0",
 		"@sentry/node": "^6.15.0",
 		"bcrypt": "^5.0.1",

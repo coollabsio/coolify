@@ -162,36 +162,3 @@ export const createDirectories = async ({ repository, buildId }) => {
         workdir, repodir
     }
 }
-
-export const setDefaultConfiguration = async (data) => {
-    let { buildPack, port, installCommand, startCommand, buildCommand, publishDirectory } = data
-    const template = templates[buildPack]
-
-    if (!port) port = template?.port || 80
-    if (!installCommand) installCommand = template?.installCommand || 'yarn install'
-    if (!startCommand) startCommand = template?.startCommand || 'yarn start'
-    if (!buildCommand) buildCommand = template?.buildCommand || null
-    if (!publishDirectory) publishDirectory = template?.publishDirectory || null
-
-    return {
-        buildPack,
-        port,
-        installCommand,
-        startCommand,
-        buildCommand,
-        publishDirectory
-    }
-}
-
-export const buildPacks = [
-    { name: 'node', fancyName: 'Node.js', description: 'Builds a Node.js application', hoverColor: 'hover:bg-green-700', color: 'bg-green-700' },
-    { name: 'static', fancyName: 'Static', description: 'Builds a static website', hoverColor: 'hover:bg-orange-700', color: 'bg-orange-700' },
-    { name: 'docker', fancyName: 'Docker', description: 'Builds a Docker application', hoverColor: 'hover:bg-sky-700', color: 'bg-sky-700' },
-    { name: 'svelte', fancyName: 'Svelte', description: 'Builds a Svelte application', hoverColor: 'hover:bg-orange-700', color: 'bg-orange-700' },
-    { name: 'nestjs', fancyName: 'NestJS', description: 'Builds a NestJS application', hoverColor: 'hover:bg-red-700', color: 'bg-red-700' },
-    { name: 'react', fancyName: 'React', description: 'Builds a React application', hoverColor: 'hover:bg-blue-700', color: 'bg-blue-700' },
-    { name: 'nextjs', fancyName: 'NextJS', description: 'Builds a NextJS application', hoverColor: 'hover:bg-blue-700', color: 'bg-blue-700' },
-    { name: 'gatsby', fancyName: 'Gatsby', description: 'Builds a Gatsby application', hoverColor: 'hover:bg-blue-700', color: 'bg-blue-700' },
-    { name: 'vue', fancyName: 'VueJS', description: 'Builds a VueJS application', hoverColor: 'hover:bg-green-700', color: 'bg-green-700' },
-    { name: 'nuxtjs', fancyName: 'NuxtJS', description: 'Builds a NuxtJS application', hoverColor: 'hover:bg-green-700', color: 'bg-green-700' },
-];

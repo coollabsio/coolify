@@ -67,11 +67,11 @@ export async function generateSshKeyPair(): Promise<{ publicKey: string, private
 }
 
 export const supportedDatabaseTypesAndVersions = [
-    { name: 'mongodb', baseImage: 'bitnami/mongodb', versions: ['5.0.5', '4.4.11', '4.2.18', '4.0.27'] },
-    { name: 'mysql', baseImage: 'bitnami/mysql', versions: ['8.0.27', '5.7.36'] },
-    { name: 'postgresql', baseImage: 'bitnami/postgresql', versions: ['14.1.0', '13.5.0', '12.9.0', '11.14.0', '10.19.0', '9.6.24'] },
-    { name: 'redis', baseImage: 'bitnami/redis', versions: ['6.2.6', '6.0.16', '5.0.14'] },
-    { name: 'couchdb', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] },
+    { name: 'mongodb', fancyName: 'MongoDB', baseImage: 'bitnami/mongodb', versions: ['5.0.5', '4.4.11', '4.2.18', '4.0.27'] },
+    { name: 'mysql', fancyName: 'MySQL', baseImage: 'bitnami/mysql', versions: ['8.0.27', '5.7.36'] },
+    { name: 'postgresql', fancyName: 'PostgreSQL', baseImage: 'bitnami/postgresql', versions: ['14.1.0', '13.5.0', '12.9.0', '11.14.0', '10.19.0', '9.6.24'] },
+    { name: 'redis', fancyName: 'Redis', baseImage: 'bitnami/redis', versions: ['6.2.6', '6.0.16', '5.0.14'] },
+    { name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] },
     // { name: 'clickhouse', versions: ['21.12', '21.11', ''] }
 ];
 

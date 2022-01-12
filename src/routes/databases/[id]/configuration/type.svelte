@@ -34,6 +34,12 @@
 	const from = $page.url.searchParams.get('from');
 
 	export let types;
+	import Clickhouse from '$lib/components/svg/databases/Clickhouse.svelte';
+	import CouchDB from '$lib/components/svg/databases/CouchDB.svelte';
+	import MongoDB from '$lib/components/svg/databases/MongoDB.svelte';
+	import MySQL from '$lib/components/svg/databases/MySQL.svelte';
+	import PostgreSQL from '$lib/components/svg/databases/PostgreSQL.svelte';
+	import Redis from '$lib/components/svg/databases/Redis.svelte';
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
@@ -52,14 +58,23 @@
 					}
 				}}
 			>
-            <input class="hidden" name="type" value={type.name} />
-            <button
-                type="submit"
-                class="box-selection text-xl font-bold"
-                >{type.name}
-            </button>
-            </form>
-
+				<input class="hidden" name="type" value={type.name} />
+				<button type="submit" class="box-selection text-xl font-bold hover:bg-purple-700 relative">
+					{#if type.name === 'clickhouse'}
+						<Clickhouse />
+					{:else if type.name === 'couchdb'}
+						<CouchDB />
+					{:else if type.name === 'mongodb'}
+						<MongoDB />
+					{:else if type.name === 'mysql'}
+						<MySQL />
+					{:else if type.name === 'postgresql'}
+						<PostgreSQL />
+					{:else if type.name === 'redis'}
+						<Redis />
+					{/if}{type.fancyName}
+				</button>
+			</form>
 		</div>
 	{/each}
 </div>
