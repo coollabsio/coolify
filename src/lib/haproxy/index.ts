@@ -5,8 +5,9 @@ import got from "got";
 import * as db from '$lib/database';
 
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555'
-const defaultProxyImage = `haproxy-alpine:1.0.0-rc.1`
-const defaultProxyImageDatabase = `haproxy-alpine-db:1.0.0-rc.1`
+
+export const defaultProxyImage = `haproxy-alpine:1.0.0-rc.1`
+export const defaultProxyImageDatabase = `haproxy-db-alpine:1.0.0-rc.1`
 
 export function haproxyInstance() {
     return got.extend({
@@ -469,7 +470,6 @@ export async function configureCoolifyProxyOn({ domain }) {
 export async function stopDatabaseProxy(destinationDocker, publicPort) {
     const { engine } = destinationDocker
     const host = getEngine(engine)
-
     const containerName = `haproxy-for-${publicPort}`
     const found = await checkContainer(engine, containerName)
     try {
@@ -488,7 +488,6 @@ export async function startDatabaseProxy(destinationDocker, id, publicPort, priv
     const containerName = `haproxy-for-${publicPort}`
     const found = await checkContainer(engine, containerName)
     const foundDB = await checkContainer(engine, id)
-    console.log(foundDB)
 
     try {
         if (foundDB && !found) {
@@ -501,7 +500,7 @@ export async function startDatabaseProxy(destinationDocker, id, publicPort, priv
 }
 export async function startCoolifyProxy(engine) {
     const host = getEngine(engine)
-    const found = await checkCoolifyProxy(engine)
+    const found = await checkContainer(engine, 'coolify-haproxy')
     if (!found) {
         await asyncExecShell(`DOCKER_HOST="${host}" docker run --restart always --add-host 'host.docker.internal:host-gateway' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "5000:5000" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`)
         return await configureNetworkCoolifyProxy(engine)
@@ -510,13 +509,18 @@ export async function startCoolifyProxy(engine) {
 export async function checkContainer(engine, container) {
     const host = getEngine(engine)
     let containerFound = false
+
     try {
         const { stdout } = await asyncExecShell(`DOCKER_HOST="${host}" docker inspect --format '{{json .State}}' ${container}`)
+        
+        const parsedStdout = JSON.parse(stdout)
+        const status = parsedStdout.Status
+        const isRunning = parsedStdout.Running
 
-        if (JSON.parse(stdout).Status === 'exited' || JSON.parse(stdout).Status === 'created') {
+        if (status === 'exited' || status === 'created') {
             await asyncExecShell(`DOCKER_HOST="${host}" docker rm ${container}`)
         }
-        if (JSON.parse(stdout).Running) {
+        if (isRunning) {
             containerFound = true
         }
 
@@ -526,30 +530,9 @@ export async function checkContainer(engine, container) {
     return containerFound
 }
 
-export async function checkCoolifyProxy(engine) {
-    const host = getEngine(engine)
-    let haProxyFound = false
-    try {
-        const { stdout } = await asyncExecShell(`DOCKER_HOST="${host}" docker inspect --format '{{json .State}}' coolify-haproxy`)
-        console.log(JSON.parse(stdout))
-
-        if (JSON.parse(stdout).Status === 'exited' || JSON.parse(stdout).Status === 'created') {
-            await asyncExecShell(`DOCKER_HOST="${host}" docker rm coolify-haproxy`)
-        }
-        if (JSON.parse(stdout).Running) {
-            haProxyFound = true
-        }
-
-    } catch (err) {
-        // HAProxy not found
-    }
-    return haProxyFound
-}
-
-
 export async function stopCoolifyProxy(engine) {
     const host = getEngine(engine)
-    const found = await checkCoolifyProxy(engine)
+    const found = await checkContainer(engine, 'coolify-haproxy')
     try {
         if (found) {
             await asyncExecShell(`DOCKER_HOST="${host}" docker stop -t 0 coolify-haproxy && docker rm coolify-haproxy`)

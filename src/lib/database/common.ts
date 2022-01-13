@@ -90,7 +90,7 @@ export function getBaseImage(type) {
     return ''
 }
 export function generateDatabaseConfiguration(database) {
-    const { id, dbUser, dbUserPassword, rootUser, rootUserPassword, defaultDatabase, version, type, port, settings: { isPublic } } = database
+    const { id, dbUser, dbUserPassword, rootUser, rootUserPassword, defaultDatabase, version, type } = database
     const baseImage = getBaseImage(type)
     if (type === 'mysql') {
         return {

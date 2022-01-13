@@ -126,14 +126,14 @@
 					/>
 				</div>
 			</div>
-			<div class="grid grid-cols-3 items-center">
-				<label for="port">Public Port</label>
+			<div class="grid grid-cols-3 items-center pb-8">
+				<label for="port">Port</label>
 				<div class="col-span-2">
 					<CopyPasswordField
 						placeholder="generate automatically"
 						id="port"
 						name="port"
-						value={database.port}
+						value={isPublic ? database.port : privatePort}
 					/>
 				</div>
 			</div>
@@ -159,9 +159,9 @@
 						name="url"
 						value="{database.type}://{database.dbUser}:{database.dbUserPassword}@{browser
 							? isPublic
-								? window.location.hostname
+								? window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname
 								: database.id
-							: 'loading'}:{isPublic ? database.port: privatePort}/{database.defaultDatabase}"
+							: 'loading'}:{isPublic ? database.port : privatePort}/{database.defaultDatabase}"
 					/>
 				</div>
 			</div>

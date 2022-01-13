@@ -15,8 +15,8 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
     try {
         const database = await db.getDatabase({ id, teamId })
-        const { type, destinationDockerId, destinationDocker, port } = database
-        const {  privatePort, environmentVariables, image, volume, ulimits } = generateDatabaseConfiguration(database);
+        const { type, destinationDockerId, destinationDocker, port, settings: { isPublic } } = database
+        const { privatePort, environmentVariables, image, volume, ulimits } = generateDatabaseConfiguration(database);
 
         const network = destinationDockerId && destinationDocker.network
         const host = getEngine(destinationDocker.engine)
@@ -60,7 +60,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         }
         try {
             await asyncExecShell(`DOCKER_HOST=${host} docker-compose -f ${composeFileDestination} up -d`)
-            await startDatabaseProxy(destinationDocker, id, port, privatePort)
+            if (isPublic) await startDatabaseProxy(destinationDocker, id, port, privatePort)
             return {
                 status: 200
             }

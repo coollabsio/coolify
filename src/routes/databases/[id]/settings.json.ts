@@ -20,9 +20,6 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
         if (destinationDockerId) {
             if (isPublic) {
-            console.log(isPublic)
-
-            console.log('starting proxy')
                 await startDatabaseProxy(destinationDocker, id, port, privatePort)
             } else {
                 await stopDatabaseProxy(destinationDocker, port)

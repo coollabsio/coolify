@@ -1,6 +1,6 @@
 import { asyncExecShell, getEngine } from "$lib/common"
 import { dockerInstance } from "$lib/docker"
-import { startCoolifyProxy } from "$lib/haproxy"
+import { defaultProxyImageDatabase, startCoolifyProxy } from "$lib/haproxy"
 import { getBaseImage } from "."
 import { prisma, PrismaErrorHandler } from "./common"
 
@@ -29,6 +29,7 @@ export async function configureDestinationForDatabase({ id, destinationId }) {
                 if (type && version) {
                     const baseImage = getBaseImage(type)
                     docker.engine.pull(`${baseImage}:${version}`)
+                    docker.engine.pull(defaultProxyImageDatabase)
                 }
             } catch (error) {
                 // console.log(error)
@@ -120,7 +121,7 @@ export async function getDestinationByApplicationId({ id, teamId }) {
 export async function setDestinationSettings({ engine, isCoolifyProxyUsed }) {
     try {
         await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } })
-        
+
         // if (isCoolifyProxyUsed) {
         //     await installCoolifyProxy(engine)
         //     await configureNetworkCoolifyProxy(engine)

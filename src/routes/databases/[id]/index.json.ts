@@ -29,10 +29,10 @@ export const get: RequestHandler = async (request) => {
             // }
         }
     }
-    const privatePort = await generateDatabaseConfiguration(database).privatePort
+    const configuration = generateDatabaseConfiguration(database)
     return {
         body: {
-            privatePort,
+            privatePort: configuration?.privatePort,
             database,
             state,
             versions: getVersions(database.type)
