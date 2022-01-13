@@ -34,7 +34,9 @@ CREATE TABLE "Team" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "updatedAt" DATETIME NOT NULL,
+    "databaseId" TEXT,
+    CONSTRAINT "Team_databaseId_fkey" FOREIGN KEY ("databaseId") REFERENCES "Database" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -179,6 +181,34 @@ CREATE TABLE "GitlabApp" (
 );
 
 -- CreateTable
+CREATE TABLE "Database" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "port" INTEGER,
+    "defaultDatabase" TEXT,
+    "destinationDockerId" TEXT,
+    "version" TEXT,
+    "type" TEXT,
+    "dbUser" TEXT,
+    "dbUserPassword" TEXT,
+    "rootUser" TEXT,
+    "rootUserPassword" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Database_destinationDockerId_fkey" FOREIGN KEY ("destinationDockerId") REFERENCES "DestinationDocker" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "DatabaseSettings" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "databaseId" TEXT NOT NULL,
+    "isPublic" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "DatabaseSettings_databaseId_fkey" FOREIGN KEY ("databaseId") REFERENCES "Database" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "_TeamToUser" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
@@ -261,6 +291,12 @@ CREATE UNIQUE INDEX "GitlabApp_oauthId_key" ON "GitlabApp"("oauthId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "GitlabApp_groupName_key" ON "GitlabApp"("groupName");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Database_name_key" ON "Database"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "DatabaseSettings_databaseId_key" ON "DatabaseSettings"("databaseId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "_TeamToUser_AB_unique" ON "_TeamToUser"("A", "B");
