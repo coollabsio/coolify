@@ -1,14 +1,13 @@
 import { dev } from '$app/env';
 import { asyncExecShell, version } from '$lib/common';
 import type { RequestHandler } from '@sveltejs/kit';
-
 import compare from 'compare-versions';
 import got from "got"
 
 export const get: RequestHandler = async (request) => {
     try {
         const currentVersion = version;
-        const versions = await got.get(`https://get.coollabs.io/version.json`).json()
+        const versions = await got.get(`https://get.coollabs.io/version.json?appId=${process.env['COOLIFY_APP_ID']}`).json()
         const latestVersion = versions["coolify-v2"].main.version;
         const isUpdateAvailable = compare(latestVersion, currentVersion)
         return {
