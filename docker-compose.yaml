@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   coolify:
-    image: coollabsio/coolify:2.0.0-rc.1
+    image: coollabsio/coolify:2.0.0-rc.2
     container_name: coolify
     ports: 
       - target: 3000

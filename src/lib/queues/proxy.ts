@@ -1,6 +1,6 @@
 import { prisma } from "$lib/database"
 import { dockerInstance } from "$lib/docker"
-import { checkCoolifyProxy, configureCoolifyProxyOn, configureProxyForApplication, startCoolifyProxy } from "$lib/haproxy"
+import { checkContainer, configureCoolifyProxyOn, configureProxyForApplication, startCoolifyProxy } from "$lib/haproxy"
 
 export default async function () {
     const destinationDockers = await prisma.destinationDocker.findMany({})
@@ -27,7 +27,7 @@ export default async function () {
     }
     const domain = await prisma.setting.findUnique({ where: { name: 'domain' }, rejectOnNotFound: false })
     if (domain) {
-        const found = await checkCoolifyProxy('/var/run/docker.sock')
+        const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy')
         if (!found) await startCoolifyProxy('/var/run/docker.sock')
         await configureCoolifyProxyOn({ domain: domain.value })
     }

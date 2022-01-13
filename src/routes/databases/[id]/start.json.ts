@@ -59,7 +59,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             console.log(error)
         }
         try {
-            await asyncExecShell(`DOCKER_HOST=${host} docker-compose -f ${composeFileDestination} up -d`)
+            await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`)
             if (isPublic) await startDatabaseProxy(destinationDocker, id, port, privatePort)
             return {
                 status: 200

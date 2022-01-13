@@ -196,7 +196,7 @@
 					on:click={changeProxySetting}
 					isPadding={false}
 					title="Use Coolify Proxy?"
-					description="This will let you install a proxy on the destination to allow you to access your applications/database/services without any manual configuration (recommended for Docker)."
+					description="This will install a proxy on the destination to allow you to access your applications and services without any manual configuration (recommended for Docker). Databases will have their own proxy."
 				/>
 			</ul>
 		</div>

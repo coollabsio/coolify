@@ -12,7 +12,8 @@ export const get: RequestHandler = async (request) => {
         const isUpdateAvailable = compare(latestVersion, currentVersion)
         return {
             body: {
-                isUpdateAvailable: isUpdateAvailable === 1,
+                // isUpdateAvailable: isUpdateAvailable === 1,
+                isUpdateAvailable: true,
                 latestVersion,
             }
         };
@@ -22,22 +23,29 @@ export const get: RequestHandler = async (request) => {
 }
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const latestVersion = request.body.get('latestVersion');
-    if (!dev) {
-        try {
-            await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion} && env | grep COOLIFY > .env && docker run -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db-sqlite coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && docker-compose up -d"`)
+    try {
+        const versions = await got.get(`https://get.coollabs.io/version.json?appId=${process.env['COOLIFY_APP_ID']}`).json()
+        const latestVersion = versions["coolify-v2"].main.version;
+        if (!dev) {
+            await asyncExecShell(`env | grep COOLIFY > .env`)
+            await asyncExecShell(`docker compose pull coollabsio/coolify:${latestVersion}`);
+            await asyncExecShell(`docker run -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db-sqlite coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && docker compose up -d --force-recreate"`)
             return {
                 status: 200
             }
-        } catch (err) {
-            return err
+        } else {
+            console.log('dev mode')
+            console.log(latestVersion)
+            return {
+                status: 200
+            }
         }
-    } else {
-        console.log('dev mode')
-        console.log(latestVersion)
+    } catch (error) {
         return {
-            status: 200
+            status: 500,
+            body: {
+                message: error.message || error
+            }
         }
     }
-
 }

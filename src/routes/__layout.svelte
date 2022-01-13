@@ -95,11 +95,8 @@
 	}
 
 	async function update() {
-		const form = new FormData();
-		form.append('latestVersion', latestVersion);
 		const response = await fetch(`/update.json`, {
-			method: 'post',
-			body: form
+			method: 'post'
 		});
 		if (!response.ok) {
 			const { message } = await response.json();
@@ -289,7 +286,32 @@
 				<div class="border-t border-warmGray-700" />
 			</div>
 			<div class="flex-1" />
+
 			<div class="flex flex-col space-y-4 py-2">
+				{#if isUpdateAvailable}
+					<button
+						data-tooltip="Update available"
+						on:click={update}
+						class="icons text-white bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 hover:scale-105 duration-75 tooltip-right"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="w-8 h-8"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<circle cx="12" cy="12" r="9" />
+							<line x1="12" y1="8" x2="8" y2="12" />
+							<line x1="12" y1="8" x2="12" y2="16" />
+							<line x1="16" y1="12" x2="12" y2="8" />
+						</svg></button
+					>
+				{/if}
 				<a
 					sveltekit:prefetch
 					href="/teams"
@@ -376,15 +398,6 @@
 			</div>
 		</div>
 	</nav>
-	{#if isUpdateAvailable}
-		<div class="fixed left-0 bottom-0 p-2 px-20 m-2 z-50">
-			<button
-				on:click={update}
-				class="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 hover:scale-105 duration-75"
-				>New version available, <br />click here to upgrade!</button
-			>
-		</div>
-	{/if}
 	<select
 		class="fixed right-0 bottom-0 p-2 px-4 m-2 z-50"
 		bind:value={selectedTeamId}
