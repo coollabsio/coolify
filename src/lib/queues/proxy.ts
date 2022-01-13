@@ -1,7 +1,6 @@
-import { checkCoolifyProxy, generateDatabaseConfiguration, prisma } from "$lib/database"
+import { prisma } from "$lib/database"
 import { dockerInstance } from "$lib/docker"
-import { configureCoolifyProxyOn, configureProxyForApplication, configureProxyForDatabase, startCoolifyProxy } from "$lib/haproxy"
-import * as db from '$lib/database';
+import { checkCoolifyProxy, configureCoolifyProxyOn, configureProxyForApplication, startCoolifyProxy } from "$lib/haproxy"
 
 export default async function () {
     const destinationDockers = await prisma.destinationDocker.findMany({})
@@ -17,12 +16,12 @@ export default async function () {
                     const application = await prisma.application.findUnique({ where: { id: applicationId }, include: { settings: true } })
                     const { forceSSL } = application.settings
                     await configureProxyForApplication({ domain, applicationId, port, forceSSL })
-                } else if (configuration.Labels['coolify.type'] === 'database') {
-                    const { id, port } = parsedConfiguration
-                    const { privatePort } = await generateDatabaseConfiguration(parsedConfiguration)
-                    const { settings: { isPublic = false } } = await prisma.database.findUnique({ where: { id }, include: { settings: true } })
-                    await configureProxyForDatabase({ id, port, isPublic, privatePort })
-                }
+                } //else if (configuration.Labels['coolify.type'] === 'database') {
+                //     const { id, port } = parsedConfiguration
+                //     const { privatePort } = await generateDatabaseConfiguration(parsedConfiguration)
+                //     const { settings: { isPublic = false } } = await prisma.database.findUnique({ where: { id }, include: { settings: true } })
+                //     await configureProxyForDatabase({ id, port, isPublic, privatePort })
+                // }
             }
         }
     }

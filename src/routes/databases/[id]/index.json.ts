@@ -29,8 +29,10 @@ export const get: RequestHandler = async (request) => {
             // }
         }
     }
+    const privatePort = await generateDatabaseConfiguration(database).privatePort
     return {
         body: {
+            privatePort,
             database,
             state,
             versions: getVersions(database.type)
@@ -46,7 +48,6 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { id } = request.params
 
     const name = request.body.get('name')
-    const domain = request.body.get('domain') || null
     const defaultDatabase = request.body.get('defaultDatabase')
     const dbUser = request.body.get('dbUser')
     const dbUserPassword = request.body.get('dbUserPassword')
@@ -55,7 +56,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const version = request.body.get('version')
 
     try {
-        return await db.updateDatabase({ id, name, domain, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version })
+        return await db.updateDatabase({ id, name, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version })
     } catch (err) {
         return err
     }

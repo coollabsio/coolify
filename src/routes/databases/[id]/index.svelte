@@ -6,7 +6,8 @@
 			return {
 				props: {
 					database: stuff.database,
-					versions: stuff.versions
+					versions: stuff.versions,
+					privatePort: stuff.privatePort
 				}
 			};
 		}
@@ -31,6 +32,7 @@
 <script lang="ts">
 	export let database;
 	export let versions;
+	export let privatePort;
 </script>
 
 <div class="font-bold flex space-x-1 p-5 px-6 text-2xl items-center">
@@ -41,4 +43,4 @@
 	<span class="pr-2">{database.type}</span>
 </div>
 
-<Databases {database} {versions} />
+<Databases {database} {versions} {privatePort} />

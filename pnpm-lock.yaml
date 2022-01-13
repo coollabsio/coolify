@@ -26,6 +26,7 @@ specifiers:
   eslint-config-prettier: ^8.3.0
   eslint-plugin-svelte3: ^3.2.1
   generate-password: ^1.7.0
+  get-port: ^6.0.0
   got: ^11.8.2
   js-cookie: ^3.0.1
   js-yaml: ^4.1.0
@@ -57,6 +58,7 @@ dependencies:
   dockerode: 3.3.1
   dotenv-extended: 2.9.0
   generate-password: 1.7.0
+  get-port: 6.0.0
   got: 11.8.2
   js-cookie: 3.0.1
   js-yaml: 4.1.0
@@ -1644,6 +1646,11 @@ packages:
   /get-port/5.1.1:
     resolution: {integrity: sha512-g/Q1aTSDOxFpchXC4i8ZWvxA1lnPqx/JHqcpIw0/LX9T8x/GBbi6YnlN5nhaKIFkT8oFsscUKgDJYxfwfS6QsQ==}
     engines: {node: '>=8'}
+    dev: false
+
+  /get-port/6.0.0:
+    resolution: {integrity: sha512-qSVkVF6Eq1GdL/cBNiFuP4nUHMF7OEMTqEjC6alR2N90u8BFOoO0PFhNTX2QtAUoGrz8NnrSWj85TZ8YXZ6LOA==}
+    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
     dev: false
 
   /get-stream/5.2.0:

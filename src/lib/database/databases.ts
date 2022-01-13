@@ -1,8 +1,9 @@
 import { decrypt, encrypt } from "$lib/crypto"
-import { configureDatabaseVisibility } from "$lib/haproxy"
+import { dockerInstance } from "$lib/docker"
 import cuid from "cuid"
 import { generatePassword } from "."
 import { prisma, PrismaErrorHandler } from "./common"
+import getPort from 'get-port';
 
 export async function listDatabases(teamId) {
     return await prisma.database.findMany({ where: { teams: { every: { id: teamId } } } })
@@ -14,13 +15,25 @@ export async function newDatabase({ name, teamId }) {
         const rootUser = cuid()
         const rootUserPassword = encrypt(generatePassword())
         const defaultDatabase = cuid()
-        const databases = await prisma.database.findMany({ orderBy: { port: 'desc' } })
 
-        let port = 60000
-        if (databases.length > 0) {
-            port = databases[0].port + 1
+        let port = await getPort()
+        let i = 0;
+
+        do {
+            const usedPorts = await prisma.database.findMany({ where: { port } })
+            if (usedPorts.length === 0) break
+            port = await getPort()
+            i++;
         }
-
+        while (i < 10);
+        if (i === 9) {
+            return {
+                status: 500,
+                body: {
+                    message: 'No free port found!? Is it possible?'
+                }
+            }
+        }
         const database = await prisma.database.create({ data: { name, port, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, teams: { connect: { id: teamId } }, settings: { create: { isPublic: false } } } })
 
         return { status: 201, body: { id: database.id } }
@@ -63,30 +76,23 @@ export async function configureDatabaseType({ id, type }) {
         throw PrismaErrorHandler(e)
     }
 }
-export async function setDatabase({ id, url = undefined, version = undefined, isPublic = undefined }) {
+export async function setDatabase({ id, version = undefined, isPublic = undefined }) {
     try {
         await prisma.database.update({
             where: { id },
-            data: { url, version, settings: { upsert: { update: { isPublic }, create: { isPublic } } } }
+            data: { version, settings: { upsert: { update: { isPublic }, create: { isPublic } } } }
         })
         return { status: 200 }
     } catch (e) {
         throw PrismaErrorHandler(e)
     }
 }
-export async function updateDatabase({ id, name = undefined, domain = undefined, defaultDatabase = undefined, dbUser = undefined, dbUserPassword = undefined, rootUser = undefined, rootUserPassword = undefined, version = undefined, url = undefined, noConfiguration = false }) {
+export async function updateDatabase({ id, name = undefined, defaultDatabase = undefined, dbUser = undefined, dbUserPassword = undefined, rootUser = undefined, rootUserPassword = undefined, version = undefined }) {
     try {
         const encryptedDbUserPassword = dbUserPassword && encrypt(dbUserPassword)
         const encryptedRootUserPassword = rootUserPassword && encrypt(rootUserPassword)
-        await prisma.database.update({ where: { id }, data: { name, domain, defaultDatabase, dbUser, dbUserPassword: encryptedDbUserPassword, rootUser, rootUserPassword: encryptedRootUserPassword, version, url } })
-        // if (!domain) {
-        //     // const { destinationDockerId, destinationDocker } = await prisma.database.update({ where: { id }, data: { name, domain, defaultDatabase, dbUser, dbUserPassword: encryptedDbUserPassword, rootUser, rootUserPassword: encryptedRootUserPassword, version, url, settings: { update: { isPublic: false } } }, select: { destinationDockerId: true, destinationDocker: true } })
-        //     // if (destinationDockerId && destinationDocker.isCoolifyProxyUsed && !noConfiguration) {
-        //     //     await configureDatabaseVisibility({ id, isPublic: false })
-        //     // }
-        // } else {
-        //     await prisma.database.update({ where: { id }, data: { name, domain, defaultDatabase, dbUser, dbUserPassword: encryptedDbUserPassword, rootUser, rootUserPassword: encryptedRootUserPassword, version, url } })
-        // }
+
+        await prisma.database.update({ where: { id }, data: { name, defaultDatabase, dbUser, dbUserPassword: encryptedDbUserPassword, rootUser, rootUserPassword: encryptedRootUserPassword, version } })
         return { status: 200 }
     } catch (e) {
         throw PrismaErrorHandler(e)
@@ -100,4 +106,24 @@ export async function setDatabaseSettings({ id, isPublic }) {
     } catch (e) {
         throw PrismaErrorHandler(e)
     }
+}
+
+export async function stopDatabase(database) {
+    let everStarted = false
+    const { id, destinationDockerId, destinationDocker } = database
+    if (destinationDockerId) {
+        const docker = dockerInstance({ destinationDocker })
+        try {
+            const container = docker.engine.getContainer(id)
+            if (container) {
+                everStarted = true
+                await container.stop()
+                await container.remove()
+            }
+
+        } catch (error) {
+            console.log(error)
+        }
+    }
+    return everStarted
 }

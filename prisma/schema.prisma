@@ -138,7 +138,6 @@ model Build {
 model DestinationDocker {
   id                 String        @id @default(cuid())
   network            String        @unique
-  subnet             String
   name               String
   engine             String
   isSwarm            Boolean?      @default(false)
@@ -200,7 +199,6 @@ model GitlabApp {
 model Database {
   id                  String             @id @default(cuid())
   name                String             @unique
-  domain              String?            @unique
   port                Int?
   defaultDatabase     String?
   destinationDockerId String?
@@ -208,7 +206,6 @@ model Database {
   version             String?
   teams               Team[]
   type                String?
-  url                 String?
   dbUser              String?
   dbUserPassword      String?
   rootUser            String?

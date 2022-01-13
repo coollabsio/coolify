@@ -1,6 +1,7 @@
 <script lang="ts">
 	export let database;
 	export let versions;
+	export let privatePort;
 	import { page, session } from '$app/stores';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Setting from '$lib/components/Setting.svelte';
@@ -11,6 +12,7 @@
 	import PostgreSql from './_PostgreSQL.svelte';
 	import Redis from './_Redis.svelte';
 	import CouchDb from './_CouchDb.svelte';
+	import { browser } from '$app/env';
 
 	const { id } = $page.params;
 	let loading = false;
@@ -27,7 +29,7 @@
 				method: 'POST',
 				body: form
 			});
-			window.location.reload();
+			// window.location.reload();
 		} catch (e) {
 			console.error(e);
 		}
@@ -38,24 +40,6 @@
 	<form
 		action="/databases/{id}.json"
 		use:enhance={{
-			beforeSubmit: async () => {
-				if (database.domain) {
-					const form = new FormData();
-					form.append('domain', database.domain);
-					const response = await fetch(`/databases/${id}/check.json`, {
-						method: 'POST',
-						headers: {
-							accept: 'application/json'
-						},
-						body: form
-					});
-					if (!response.ok) {
-						const error = await response.json();
-						errorNotification(error.message || error);
-						throw new Error(error.message || error);
-					}
-				}
-			},
 			result: async () => {
 				setTimeout(() => {
 					loading = false;
@@ -116,19 +100,6 @@
 					/>
 				</div>
 			</div>
-			<div class="grid grid-cols-3 items-center">
-				<label for="domain">Domain</label>
-				<div class="col-span-2">
-					<input
-						readonly={!$session.isAdmin}
-						name="domain"
-						id="domain"
-						pattern="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-						placeholder="eg: {database.type}.coollabs.io"
-						value={database.domain}
-					/>
-				</div>
-			</div>
 			<div class="grid grid-cols-3 items-center pb-8">
 				<label for="version">Version</label>
 				<div class="col-span-2 ">
@@ -155,19 +126,17 @@
 					/>
 				</div>
 			</div>
-			{#if isPublic}
-				<div class="grid grid-cols-3 items-center">
-					<label for="port">Public Port</label>
-					<div class="col-span-2">
-						<CopyPasswordField
-							placeholder="generate automatically"
-							id="port"
-							name="port"
-							value={database.port}
-						/>
-					</div>
+			<div class="grid grid-cols-3 items-center">
+				<label for="port">Public Port</label>
+				<div class="col-span-2">
+					<CopyPasswordField
+						placeholder="generate automatically"
+						id="port"
+						name="port"
+						value={database.port}
+					/>
 				</div>
-			{/if}
+			</div>
 			{#if database.type === 'mysql'}
 				<MySql {database} />
 			{:else if database.type === 'postgresql'}
@@ -179,7 +148,6 @@
 			{:else if database.type === 'couchdb'}
 				<CouchDb {database} />
 			{/if}
-
 			<div class="grid grid-cols-3 items-center pb-8">
 				<label for="url">Connection String</label>
 				<div class="col-span-2 ">
@@ -189,7 +157,11 @@
 						isPasswordField={false}
 						id="url"
 						name="url"
-						value={database.url}
+						value="{database.type}://{database.dbUser}:{database.dbUserPassword}@{browser
+							? isPublic
+								? window.location.hostname
+								: database.id
+							: 'loading'}:{isPublic ? database.port: privatePort}/{database.defaultDatabase}"
 					/>
 				</div>
 			</div>
@@ -201,8 +173,6 @@
 	<div class="px-4 sm:px-6 pb-10">
 		<ul class="mt-2 divide-y divide-warmGray-800">
 			<Setting
-				disabled={!database.domain}
-				disabledReason="You must set a domain to make it public"
 				bind:setting={isPublic}
 				on:click={() => changeSettings('isPublic')}
 				title="Set it public"

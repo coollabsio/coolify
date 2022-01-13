@@ -1,24 +1,22 @@
 import { asyncExecShell, createDirectories, getEngine, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { checkCoolifyProxy, generateDatabaseConfiguration, generatePassword } from '$lib/database';
-// import { databaseQueue } from '$lib/queues';
+import { generateDatabaseConfiguration } from '$lib/database';
 import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
-import cuid from 'cuid';
 import { makeLabelForDatabase } from '$lib/buildPacks/common';
-import { configureProxyForDatabase, startCoolifyProxy } from '$lib/haproxy';
+import { startDatabaseProxy } from '$lib/haproxy';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { teamId, status, body } = await getUserDetails(request);
     if (status === 401) return { status, body }
-    
+
     const { id } = request.params
 
     try {
         const database = await db.getDatabase({ id, teamId })
-        const { type, destinationDockerId, destinationDocker, port, settings: { isPublic } } = database
-        const { url, privatePort, environmentVariables, image, volume, ulimits } = generateDatabaseConfiguration(database);
+        const { type, destinationDockerId, destinationDocker, port } = database
+        const {  privatePort, environmentVariables, image, volume, ulimits } = generateDatabaseConfiguration(database);
 
         const network = destinationDockerId && destinationDocker.network
         const host = getEngine(destinationDocker.engine)
@@ -62,16 +60,12 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         }
         try {
             await asyncExecShell(`DOCKER_HOST=${host} docker-compose -f ${composeFileDestination} up -d`)
-            await db.setDatabase({ id, url })
-            if (destinationDockerId) {
-                const found = await checkCoolifyProxy(engine)
-                if (!found) await startCoolifyProxy(engine)
-                await configureProxyForDatabase({ id, port, isPublic, privatePort })
-            }
+            await startDatabaseProxy(destinationDocker, id, port, privatePort)
             return {
                 status: 200
             }
         } catch (error) {
+            console.log(error)
             return {
                 status: 500,
                 body: {

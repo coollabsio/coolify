@@ -1,7 +1,7 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { generateDatabaseConfiguration } from '$lib/database';
-import { configureDatabaseVisibility } from '$lib/haproxy';
+import { startDatabaseProxy, stopDatabaseProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
@@ -12,27 +12,28 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const isPublic = request.body.get('isPublic') === 'true' ? true : false
 
     try {
-        const database = await db.getDatabase({ id, teamId })
-        const { domain, destinationDockerId, destinationDocker } = database
-        const { url } = generateDatabaseConfiguration(database)
+        await db.setDatabase({ id, isPublic })
 
-        if (isPublic && !domain) {
-            return {
-                status: 500,
-                body: {
-                    message: 'You must provide a domain to make a database public'
-                }
+        const database = await db.getDatabase({ id, teamId })
+        const { destinationDockerId, destinationDocker, port } = database
+        const { privatePort } = generateDatabaseConfiguration(database)
+
+        if (destinationDockerId) {
+            if (isPublic) {
+            console.log(isPublic)
+
+            console.log('starting proxy')
+                await startDatabaseProxy(destinationDocker, id, port, privatePort)
+            } else {
+                await stopDatabaseProxy(destinationDocker, port)
             }
         }
-        await db.setDatabaseSettings({ id, isPublic })
-        await db.setDatabase({ id, url })
-        if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-            await configureDatabaseVisibility({ id, isPublic })
-        }
+
         return {
             status: 201
         }
     } catch (err) {
+        console.log(err)
         return err
     }
 

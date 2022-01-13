@@ -19,7 +19,8 @@
 		"db:push": "prisma db push && prisma generate",
 		"db:seed": "prisma db seed",
 		"release:coolify": "docker build -t coollabsio/coolify:2.0.0-rc.1 . && docker push coollabsio/coolify:2.0.0-rc.1",
-		"release:haproxy": "docker build -f haproxy.Dockerfile -t coollabsio/haproxy-alpine:1.0.0-rc.1 . && docker push coollabsio/haproxy-alpine:1.0.0-rc.1"
+		"release:haproxy": "docker build -f haproxy.Dockerfile -t coollabsio/haproxy-alpine:1.0.0-rc.1 . && docker push coollabsio/haproxy-alpine:1.0.0-rc.1",
+		"release:haproxy:db": "docker build -f haproxy-db.Dockerfile -t coollabsio/haproxy-alpine-db:1.0.0-rc.1 . && docker push coollabsio/haproxy-alpine-db:1.0.0-rc.1"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-node": "^1.0.0-next.59",
@@ -61,6 +62,7 @@
 		"dockerode": "^3.3.1",
 		"dotenv-extended": "^2.9.0",
 		"generate-password": "^1.7.0",
+		"get-port": "^6.0.0",
 		"got": "^11.8.2",
 		"js-cookie": "^3.0.1",
 		"js-yaml": "^4.1.0",

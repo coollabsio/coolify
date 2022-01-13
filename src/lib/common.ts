@@ -104,9 +104,10 @@ export function getEngine(engine) {
 export const removeDestinationDocker = async ({ id, destinationDocker }) => {
     const docker = dockerInstance({ destinationDocker })
     try {
-        if (docker.engine.getContainer(id)) {
-            await docker.engine.getContainer(id).stop()
-            await docker.engine.getContainer(id).remove()
+        const container = docker.engine.getContainer(id)
+        if (container) {
+            await container.stop()
+            await container.remove()
         }
     } catch (error) {
         console.log(error)

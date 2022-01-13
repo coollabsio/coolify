@@ -1,51 +1,9 @@
 import { asyncExecShell, getEngine } from "$lib/common"
 import { dockerInstance } from "$lib/docker"
-import { configureCoolifyProxyOn, configureNetworkCoolifyProxy, startCoolifyProxy } from "$lib/haproxy"
+import { startCoolifyProxy } from "$lib/haproxy"
 import { getBaseImage } from "."
 import { prisma, PrismaErrorHandler } from "./common"
 
-export async function checkCoolifyProxy(engine) {
-    const host = getEngine(engine)
-    let haProxyFound = false
-    try {
-        const { stdout } = await asyncExecShell(`DOCKER_HOST="${host}" docker inspect --format '{{json .State}}' coolify-haproxy`)
-        if (JSON.parse(stdout).Status === 'exited') {
-            await asyncExecShell(`DOCKER_HOST="${host}" docker rm coolify-haproxy`)
-        }
-        if (JSON.parse(stdout).Running) {
-            haProxyFound = true
-        }
-
-    } catch (err) {
-        // HAProxy not found
-    }
-    return haProxyFound
-}
-
-async function installCoolifyProxy(engine) {
-    const found = await checkCoolifyProxy(engine)
-    if (!found) {
-        try {
-            await startCoolifyProxy(engine)
-        } catch (err) {
-            console.log(err)
-        }
-    }
-    return
-}
-
-async function uninstallCoolifyProxy(engine) {
-    const found = await checkCoolifyProxy(engine)
-    if (found) {
-        const host = getEngine(engine)
-        try {
-            await asyncExecShell(`DOCKER_HOST="${host}" docker stop -t 0 coolify-haproxy && docker rm coolify-haproxy`)
-        } catch (err) {
-            console.log(err)
-        }
-    }
-    return
-}
 
 export async function listDestinations(teamId) {
     return await prisma.destinationDocker.findMany({ where: { teams: { every: { id: teamId } } } })
@@ -62,7 +20,7 @@ export async function configureDestinationForApplication({ id, destinationId }) 
 export async function configureDestinationForDatabase({ id, destinationId }) {
     try {
         await prisma.database.update({ where: { id }, data: { destinationDocker: { connect: { id: destinationId } } } })
-        
+
         const { destinationDockerId, destinationDocker, version, type } = await prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
 
         if (destinationDockerId) {
@@ -99,12 +57,12 @@ export async function newDestination({ name, teamId, isSwarm, engine, network, i
         }
         const docker = dockerInstance({ destinationDocker })
         const networks = await docker.engine.listNetworks()
-        let found = networks.find(network => network.Name === destinationDocker.network)
-        if (!found) {
-            await docker.engine.createNetwork({ name: network, attachable: true })
-        }
-        found = networks.find(network => network.Name === destinationDocker.network)
-        await prisma.destinationDocker.create({ data: { name, subnet: found.IPAM.Config[0].Subnet, teams: { connect: { id: teamId } }, isSwarm, engine, network, isCoolifyProxyUsed } })
+        // let found = networks.find(network => network.Name === destinationDocker.network)
+        // if (!found) {
+        //     await docker.engine.createNetwork({ name: network, attachable: true })
+        // }
+        // found = networks.find(network => network.Name === destinationDocker.network)
+        await prisma.destinationDocker.create({ data: { name, teams: { connect: { id: teamId } }, isSwarm, engine, network, isCoolifyProxyUsed } })
         const destinations = await prisma.destinationDocker.findMany({ where: { engine } })
         const destination = destinations.find(destination => destination.network === network)
 
@@ -120,12 +78,7 @@ export async function newDestination({ name, teamId, isSwarm, engine, network, i
             await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } })
         }
 
-        if (isCoolifyProxyUsed) {
-            await installCoolifyProxy(engine)
-            await configureNetworkCoolifyProxy(engine)
-        } else {
-            await uninstallCoolifyProxy(engine)
-        }
+        if (isCoolifyProxyUsed) await startCoolifyProxy(engine)
         return {
             status: 201, body: { id: destination.id }
         }
@@ -167,23 +120,24 @@ export async function getDestinationByApplicationId({ id, teamId }) {
 export async function setDestinationSettings({ engine, isCoolifyProxyUsed }) {
     try {
         await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } })
-        if (isCoolifyProxyUsed) {
-            await installCoolifyProxy(engine)
-            await configureNetworkCoolifyProxy(engine)
-        } else {
-            // TODO: must check if other destination is using the proxy??? or not?
-            const domain = await prisma.setting.findUnique({ where: { name: 'domain' }, rejectOnNotFound: false })
-            if (!domain) {
-                await uninstallCoolifyProxy(engine)
-            } else {
-                return {
-                    stastus: 500,
-                    body: {
-                        message: 'You can not disable the Coolify proxy while the domain is set for Coolify itself.'
-                    }
-                }
-            }
-        }
+        
+        // if (isCoolifyProxyUsed) {
+        //     await installCoolifyProxy(engine)
+        //     await configureNetworkCoolifyProxy(engine)
+        // } else {
+        //     // TODO: must check if other destination is using the proxy??? or not?
+        //     const domain = await prisma.setting.findUnique({ where: { name: 'domain' }, rejectOnNotFound: false })
+        //     if (!domain) {
+        //         await uninstallCoolifyProxy(engine)
+        //     } else {
+        //         return {
+        //             stastus: 500,
+        //             body: {
+        //                 message: 'You can not disable the Coolify proxy while the domain is set for Coolify itself.'
+        //             }
+        //         }
+        //     }
+        // }
         return { status: 200 }
     } catch (e) {
         throw PrismaErrorHandler(e)

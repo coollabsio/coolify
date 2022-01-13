@@ -1,12 +1,12 @@
 import { dev } from "$app/env";
 import { asyncExecShell, getEngine } from "$lib/common";
-import { checkCoolifyProxy } from "$lib/database";
 import { letsEncryptQueue } from "$lib/queues";
 import got from "got";
 import * as db from '$lib/database';
 
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555'
 const defaultProxyImage = `haproxy-alpine:1.0.0-rc.1`
+const defaultProxyImageDatabase = `haproxy-alpine-db:1.0.0-rc.1`
 
 export function haproxyInstance() {
     return got.extend({
@@ -137,47 +137,51 @@ export async function forceSSLOnApplication({ domain }) {
 
 }
 
-export async function configureDatabaseVisibility({ id, isPublic }) {
-    const haproxy = haproxyInstance()
-    await checkHAProxy()
-    const transactionId = await getNextTransactionId()
-    const database = await db.prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
-    try {
-        if (isPublic) {
-            await haproxy.delete(`v2/services/haproxy/configuration/tcp_request_rules/0`, {
-                searchParams: {
-                    transaction_id: transactionId,
-                    parent_name: id,
-                    parent_type: 'frontend',
-                }
-            })
-        } else {
-            await haproxy.post(`v2/services/haproxy/configuration/tcp_request_rules`, {
-                searchParams: {
-                    transaction_id: transactionId,
-                    parent_name: id,
-                    parent_type: 'frontend',
-                },
-                json: {
-                    cond: "if",
-                    cond_test: `{ src ${database.destinationDocker.subnet} }`,
-                    "action": "accept",
-                    "index": 0,
-                    "type": "connection"
-                }
-            })
-        }
+// export async function configureDatabaseVisibility({ id, isPublic }) {
+//     const haproxy = haproxyInstance()
+//     await checkHAProxy()
+//     const transactionId = await getNextTransactionId()
+//     const database = await db.prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
+//     try {
+//         if (isPublic) {
+//             await haproxy.delete(`v2/services/haproxy/configuration/tcp_request_rules/0`, {
+//                 searchParams: {
+//                     transaction_id: transactionId,
+//                     parent_name: id,
+//                     parent_type: 'frontend',
+//                 }
+//             })
+//         } else {
+//             await haproxy.post(`v2/services/haproxy/configuration/tcp_request_rules`, {
+//                 searchParams: {
+//                     transaction_id: transactionId,
+//                     parent_name: id,
+//                     parent_type: 'frontend',
+//                 },
+//                 json: {
+//                     cond: "if",
+//                     cond_test: `{ src ${database.destinationDocker.subnet} }`,
+//                     "action": "accept",
+//                     "index": 0,
+//                     "type": "connection"
+//                 }
+//             })
+//         }
 
-    } catch (error) {
-        console.log(error.response.body)
-        throw error.response.body
-    } finally {
-        await completeTransaction(transactionId)
-    }
-}
+//     } catch (error) {
+//         console.log(error.response.body)
+//         throw error.response.body
+//     } finally {
+//         await completeTransaction(transactionId)
+//     }
+// }
 export async function deleteProxyForDatabase({ id }) {
     const haproxy = haproxyInstance()
-    await checkHAProxy()
+    try {
+        await checkHAProxy()
+    } catch (error) {
+        return
+    }
     const transactionId = await getNextTransactionId()
     try {
         await haproxy.get(`v2/services/haproxy/configuration/backends/${id}`).json()
@@ -199,94 +203,94 @@ export async function deleteProxyForDatabase({ id }) {
     }
 
 }
-export async function configureProxyForDatabase({ id, port, isPublic, privatePort }) {
-    const haproxy = haproxyInstance()
-    try {
-        await checkHAProxy()
-    } catch (error) {
-        return
-    }
+// export async function configureProxyForDatabase({ id, port, isPublic, privatePort }) {
+//     const haproxy = haproxyInstance()
+//     try {
+//         await checkHAProxy()
+//     } catch (error) {
+//         return
+//     }
 
-    let alreadyConfigured = false
-    try {
-        const backend: any = await haproxy.get(`v2/services/haproxy/configuration/backends/${id}`).json()
-        const server: any = await haproxy.get(`v2/services/haproxy/configuration/servers/${id}`, {
-            searchParams: {
-                backend: id
-            },
-        }).json()
-        if (backend.data.name === id) {
-            if (server.data.port === privatePort) {
-                if (server.data.check === 'enabled') {
-                    if (server.data.address === id) {
-                        alreadyConfigured = true
-                    }
-                }
-            }
-        }
-    } catch (error) {
-        console.log('error getting backend or server', error.response.body)
-    }
-    if (alreadyConfigured) return
+//     let alreadyConfigured = false
+//     try {
+//         const backend: any = await haproxy.get(`v2/services/haproxy/configuration/backends/${id}`).json()
+//         const server: any = await haproxy.get(`v2/services/haproxy/configuration/servers/${id}`, {
+//             searchParams: {
+//                 backend: id
+//             },
+//         }).json()
+//         if (backend.data.name === id) {
+//             if (server.data.port === privatePort) {
+//                 if (server.data.check === 'enabled') {
+//                     if (server.data.address === id) {
+//                         alreadyConfigured = true
+//                     }
+//                 }
+//             }
+//         }
+//     } catch (error) {
+//         console.log('error getting backend or server', error.response.body)
+//     }
+//     if (alreadyConfigured) return
 
-    const transactionId = await getNextTransactionId()
-    try {
-        await haproxy.post('v2/services/haproxy/configuration/backends', {
-            searchParams: {
-                transaction_id: transactionId
-            },
-            json: {
-                "init-addr": "last,libc,none",
-                "mode": "tcp",
-                "name": id
-            }
-        })
-        await haproxy.post('v2/services/haproxy/configuration/servers', {
-            searchParams: {
-                transaction_id: transactionId,
-                backend: id
-            },
-            json: {
-                "address": id,
-                "check": "enabled",
-                "name": id,
-                "port": privatePort
-            }
-        })
-        await haproxy.post('v2/services/haproxy/configuration/frontends', {
-            searchParams: {
-                transaction_id: transactionId,
-                backend: id
-            },
-            json: {
-                "default_backend": id,
-                "mode": "tcp",
-                "name": id
-            }
-        })
-        await haproxy.post('v2/services/haproxy/configuration/binds', {
-            searchParams: {
-                transaction_id: transactionId,
-                frontend: id
-            },
-            json: {
-                "address": "*",
-                "name": id,
-                "port": port
-            }
-        })
-    } catch (error) {
-        console.log(error.response.body)
-        throw error.response.body
-    } finally {
-        try {
-            await completeTransaction(transactionId)
-        } catch (error) {
-            console.log(error.response.body)
-        }
-    }
-    await configureDatabaseVisibility({ id, isPublic })
-}
+//     const transactionId = await getNextTransactionId()
+//     try {
+//         await haproxy.post('v2/services/haproxy/configuration/backends', {
+//             searchParams: {
+//                 transaction_id: transactionId
+//             },
+//             json: {
+//                 "init-addr": "last,libc,none",
+//                 "mode": "tcp",
+//                 "name": id
+//             }
+//         })
+//         await haproxy.post('v2/services/haproxy/configuration/servers', {
+//             searchParams: {
+//                 transaction_id: transactionId,
+//                 backend: id
+//             },
+//             json: {
+//                 "address": id,
+//                 "check": "enabled",
+//                 "name": id,
+//                 "port": privatePort
+//             }
+//         })
+//         await haproxy.post('v2/services/haproxy/configuration/frontends', {
+//             searchParams: {
+//                 transaction_id: transactionId,
+//                 backend: id
+//             },
+//             json: {
+//                 "default_backend": id,
+//                 "mode": "tcp",
+//                 "name": id
+//             }
+//         })
+//         await haproxy.post('v2/services/haproxy/configuration/binds', {
+//             searchParams: {
+//                 transaction_id: transactionId,
+//                 frontend: id
+//             },
+//             json: {
+//                 "address": "*",
+//                 "name": id,
+//                 "port": port
+//             }
+//         })
+//     } catch (error) {
+//         console.log(error.response.body)
+//         throw error.response.body
+//     } finally {
+//         try {
+//             await completeTransaction(transactionId)
+//         } catch (error) {
+//             console.log(error.response.body)
+//         }
+//     }
+//     await configureDatabaseVisibility({ id, isPublic })
+// }
 export async function configureProxyForApplication({ domain, applicationId, port, forceSSL }) {
     const haproxy = haproxyInstance()
     let serverConfigured = false
@@ -462,15 +466,96 @@ export async function configureCoolifyProxyOn({ domain }) {
 
 }
 
+export async function stopDatabaseProxy(destinationDocker, publicPort) {
+    const { engine } = destinationDocker
+    const host = getEngine(engine)
+
+    const containerName = `haproxy-for-${publicPort}`
+    const found = await checkContainer(engine, containerName)
+    try {
+        if (found) {
+            return await asyncExecShell(`DOCKER_HOST=${host} docker stop -t 0 ${containerName} && docker rm ${containerName}`)
+        }
+    } catch (error) {
+        return error
+    }
+
+}
+export async function startDatabaseProxy(destinationDocker, id, publicPort, privatePort) {
+    const { network, engine } = destinationDocker
+    const host = getEngine(engine)
+
+    const containerName = `haproxy-for-${publicPort}`
+    const found = await checkContainer(engine, containerName)
+    const foundDB = await checkContainer(engine, id)
+    console.log(foundDB)
+
+    try {
+        if (foundDB && !found) {
+            return await asyncExecShell(`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} -d coollabsio/${defaultProxyImageDatabase}`)
+        }
+    } catch (error) {
+        return error
+    }
+
+}
 export async function startCoolifyProxy(engine) {
     const host = getEngine(engine)
-    if (host) {
-        await asyncExecShell(`DOCKER_HOST="${host}" docker run --restart always --add-host 'host.docker.internal:host-gateway' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "60000-60100:60000-60100" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`)
+    const found = await checkCoolifyProxy(engine)
+    if (!found) {
+        await asyncExecShell(`DOCKER_HOST="${host}" docker run --restart always --add-host 'host.docker.internal:host-gateway' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "5000:5000" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`)
         return await configureNetworkCoolifyProxy(engine)
+    }
+}
+export async function checkContainer(engine, container) {
+    const host = getEngine(engine)
+    let containerFound = false
+    try {
+        const { stdout } = await asyncExecShell(`DOCKER_HOST="${host}" docker inspect --format '{{json .State}}' ${container}`)
 
-    } else {
-        await asyncExecShell(`docker run --restart always --add-host 'host.docker.internal:host-gateway' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "60000-60100:60000-60100" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`)
-        return await configureNetworkCoolifyProxy(engine)
+        if (JSON.parse(stdout).Status === 'exited' || JSON.parse(stdout).Status === 'created') {
+            await asyncExecShell(`DOCKER_HOST="${host}" docker rm ${container}`)
+        }
+        if (JSON.parse(stdout).Running) {
+            containerFound = true
+        }
+
+    } catch (err) {
+        // Container not found
+    }
+    return containerFound
+}
+
+export async function checkCoolifyProxy(engine) {
+    const host = getEngine(engine)
+    let haProxyFound = false
+    try {
+        const { stdout } = await asyncExecShell(`DOCKER_HOST="${host}" docker inspect --format '{{json .State}}' coolify-haproxy`)
+        console.log(JSON.parse(stdout))
+
+        if (JSON.parse(stdout).Status === 'exited' || JSON.parse(stdout).Status === 'created') {
+            await asyncExecShell(`DOCKER_HOST="${host}" docker rm coolify-haproxy`)
+        }
+        if (JSON.parse(stdout).Running) {
+            haProxyFound = true
+        }
+
+    } catch (err) {
+        // HAProxy not found
+    }
+    return haProxyFound
+}
+
+
+export async function stopCoolifyProxy(engine) {
+    const host = getEngine(engine)
+    const found = await checkCoolifyProxy(engine)
+    try {
+        if (found) {
+            await asyncExecShell(`DOCKER_HOST="${host}" docker stop -t 0 coolify-haproxy && docker rm coolify-haproxy`)
+        }
+    } catch (error) {
+        return error
     }
 
 }

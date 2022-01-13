@@ -61,19 +61,48 @@
 				}'! Nothing will be reachable if you do it!`
 			);
 			if (sure) {
-				toast.push('Coolify Proxy will be stopped!');
 				payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed;
+				const saveForm = new FormData(formEl);
+				saveForm.append('isCoolifyProxyUsed', payload.isCoolifyProxyUsed.toString());
+				saveForm.append('engine', payload.engine);
+
+				const saveFormResponse = await fetch(`/destinations/${id}/settings.json`, {
+					method: 'POST',
+					headers: {
+						accept: 'application/json'
+					},
+					body: saveForm
+				});
+				if (!saveFormResponse.ok) {
+					const err = await saveFormResponse.json();
+					return errorNotification(err.message);
+				}
+				await stopProxy();
 			}
 		} else {
-			toast.push('Coolify Proxy will start soon.');
 			payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed;
-		}
+			const saveForm = new FormData(formEl);
+			saveForm.append('isCoolifyProxyUsed', payload.isCoolifyProxyUsed.toString());
+			saveForm.append('engine', payload.engine);
 
+			const saveFormResponse = await fetch(`/destinations/${id}/settings.json`, {
+				method: 'POST',
+				headers: {
+					accept: 'application/json'
+				},
+				body: saveForm
+			});
+			if (!saveFormResponse.ok) {
+				const err = await saveFormResponse.json();
+				return errorNotification(err.message);
+			}
+		}
+	}
+	async function stopProxy() {
 		const saveForm = new FormData(formEl);
-		saveForm.append('isCoolifyProxyUsed', payload.isCoolifyProxyUsed.toString());
 		saveForm.append('engine', payload.engine);
 
-		const saveFormResponse = await fetch(`/destinations/${id}/settings.json`, {
+		const saveFormResponse = await fetch(`/destinations/${id}/stop.json`, {
 			method: 'POST',
 			headers: {
 				accept: 'application/json'
@@ -84,6 +113,24 @@
 			const err = await saveFormResponse.json();
 			return errorNotification(err.message);
 		}
+		toast.push('Coolify Proxy will stopped soon.');
+	}
+	async function startProxy() {
+		const saveForm = new FormData(formEl);
+		saveForm.append('engine', payload.engine);
+
+		const saveFormResponse = await fetch(`/destinations/${id}/start.json`, {
+			method: 'POST',
+			headers: {
+				accept: 'application/json'
+			},
+			body: saveForm
+		});
+		if (!saveFormResponse.ok) {
+			const err = await saveFormResponse.json();
+			return errorNotification(err.message);
+		}
+		toast.push('Coolify Proxy will start soon.');
 	}
 </script>
 
@@ -149,12 +196,17 @@
 					on:click={changeProxySetting}
 					isPadding={false}
 					title="Use Coolify Proxy?"
-					description="This will install a proxy on the destination to allow you to access your applications/database/services without any manual configuration (recommended for Docker)."
+					description="This will let you install a proxy on the destination to allow you to access your applications/database/services without any manual configuration (recommended for Docker)."
 				/>
 			</ul>
 		</div>
 	</form>
 </div>
+{#if payload.isCoolifyProxyUsed}
+	Proxy service start/stop
+	<button on:click={startProxy}>start proxy</button>
+	<button on:click={stopProxy}>stop proxy</button>
+{/if}
 
 {#if scannedApps.length > 0}
 	<div class="flex justify-center px-6 pb-10">
