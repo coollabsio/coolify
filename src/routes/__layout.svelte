@@ -130,8 +130,7 @@
 			if (reachable) break;
 			tries++;
 		} while (!reachable || tries < 120);
-		toast.push('Update successful.');
-		toast.push("If the app doesn't reload automatically, please refresh the page.");
+		toast.push('New version reachable. Reloading....');
 		updateStatus.loading = false;
 		updateStatus.success = true;
 		await asyncSleep(3000);
