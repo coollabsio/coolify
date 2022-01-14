@@ -1,5 +1,6 @@
 <script lang="ts">
 	export let destination;
+	export let state;
 	import { toast } from '@zerodevx/svelte-toast';
 	import { page } from '$app/stores';
 	import Setting from '$lib/components/Setting.svelte';
@@ -96,6 +97,7 @@
 				const err = await saveFormResponse.json();
 				return errorNotification(err.message);
 			}
+			await startProxy()
 		}
 	}
 	async function stopProxy() {
@@ -113,7 +115,7 @@
 			const err = await saveFormResponse.json();
 			return errorNotification(err.message);
 		}
-		toast.push('Coolify Proxy will stopped soon.');
+		toast.push('Coolify Proxy stopped!');
 	}
 	async function startProxy() {
 		const saveForm = new FormData(formEl);
@@ -130,7 +132,7 @@
 			const err = await saveFormResponse.json();
 			return errorNotification(err.message);
 		}
-		toast.push('Coolify Proxy will start soon.');
+		toast.push('Coolify Proxy started!');
 	}
 </script>
 
@@ -202,11 +204,15 @@
 		</div>
 	</form>
 </div>
-{#if payload.isCoolifyProxyUsed}
-	Proxy service start/stop
-	<button on:click={startProxy}>start proxy</button>
-	<button on:click={stopProxy}>stop proxy</button>
-{/if}
+<!-- <div class="flex justify-center">
+	{#if payload.isCoolifyProxyUsed}
+		{#if state}
+			<button on:click={stopProxy}>Stop proxy</button>
+		{:else}
+			<button on:click={startProxy}>Start proxy</button>
+		{/if}
+	{/if}
+</div> -->
 
 {#if scannedApps.length > 0}
 	<div class="flex justify-center px-6 pb-10">

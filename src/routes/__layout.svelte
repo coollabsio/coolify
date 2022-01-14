@@ -107,12 +107,15 @@
 		});
 		if (!response.ok) {
 			const { message } = await response.json();
-			console.log(message);
 			errorNotification(message);
 			updateStatus.success = false;
 			updateStatus.loading = false;
 			return;
 		}
+
+		toast.push(
+			'Updating completed. Waiting for the new version to start. It will automatically reload your page.'
+		);
 
 		let reachable = false;
 		let tries = 0;
@@ -120,7 +123,6 @@
 			await asyncSleep(1000);
 			try {
 				const response = await fetch(`/undead.json`);
-				console.log(response);
 				reachable = response.ok;
 			} catch (error) {
 				reachable = false;
@@ -128,8 +130,8 @@
 			if (reachable) break;
 			tries++;
 		} while (!reachable || tries < 120);
-		toast.push("Update successful.");
-		toast.push("If the app doesn't reload automatically, please refresh the page.")
+		toast.push('Update successful.');
+		toast.push("If the app doesn't reload automatically, please refresh the page.");
 		updateStatus.loading = false;
 		updateStatus.success = true;
 		await asyncSleep(3000);

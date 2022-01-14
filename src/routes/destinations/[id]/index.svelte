@@ -4,7 +4,8 @@
 		if (stuff?.destination.id) {
 			return {
 				props: {
-					destination: stuff.destination
+					destination: stuff.destination,
+					state: stuff.state,
 				}
 			};
 		}
@@ -28,6 +29,7 @@
 
 <script lang="ts">
 	export let destination: Prisma.DestinationDocker;
+	export let state;
 	import type Prisma from '@prisma/client';
 	import LocalDocker from './_LocalDocker.svelte';
 </script>
@@ -38,4 +40,4 @@
 	<span class="pr-2">{destination.name}</span>
 </div>
 
-<LocalDocker {destination} />
+<LocalDocker {destination} {state} />

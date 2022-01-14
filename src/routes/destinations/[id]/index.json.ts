@@ -1,5 +1,6 @@
 import { asyncExecShell, getEngine, getTeam, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
+import { checkContainer } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (request) => {
@@ -7,11 +8,12 @@ export const get: RequestHandler = async (request) => {
 
     const { id } = request.params
     const destination = await db.getDestination({ id, teamId })
-
+    const state = await checkContainer(destination.engine, 'coolify-haproxy')
 
     return {
         body: {
             destination,
+            state
         }
     };
 }
