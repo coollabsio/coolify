@@ -123,7 +123,7 @@ export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, ap
         RewriteRule ^(.+)$ index.php [QSA,L]
         `
             );
-            saveBuildLog({ line: '[COOLIFY] - Copied default configuration file for PHP.', buildId, applicationId })
+            saveBuildLog({ line: 'Copied default configuration file for PHP.', buildId, applicationId })
         } else if (staticDeployments.includes(buildPack)) {
             await fs.writeFile(
                 `${workdir}/nginx.conf`,
@@ -169,7 +169,7 @@ export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, ap
             }
             `
             );
-            saveBuildLog({ line: '[COOLIFY] - Copied default configuration file.', buildId, applicationId })
+            saveBuildLog({ line: 'Copied default configuration file.', buildId, applicationId })
         }
     } catch (error) {
         console.log(error);

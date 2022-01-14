@@ -30,6 +30,8 @@ export async function configureDestinationForDatabase({ id, destinationId }) {
                     const baseImage = getBaseImage(type)
                     docker.engine.pull(`${baseImage}:${version}`)
                     docker.engine.pull(`coollabsio/${defaultProxyImageDatabase}`)
+                    docker.engine.pull(`certbot/certbot:latest`)
+                    docker.engine.pull(`alpine:latest`)
                 }
             } catch (error) {
                 // console.log(error)

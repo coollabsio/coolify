@@ -9,6 +9,7 @@ import { buildLogQueue } from './queues'
 
 import { version as currentVersion } from '../../package.json';
 import { dockerInstance } from './docker';
+import dayjs from 'dayjs';
 
 try {
     if (!dev) {
@@ -37,7 +38,8 @@ export const sentry = Sentry
 export const uniqueName = () => uniqueNamesGenerator(customConfig);
 
 export const saveBuildLog = async ({ line, buildId, applicationId }) => {
-    await buildLogQueue.add(buildId, { buildId, line, applicationId })
+    const addTimestamp = `${generateTimestamp()} ${line}`;
+    return await buildLogQueue.add(buildId, { buildId, line: addTimestamp, applicationId })
 }
 
 export const isTeamIdTokenAvailable = (request) => {
@@ -159,4 +161,9 @@ export const createDirectories = async ({ repository, buildId }) => {
     return {
         workdir, repodir
     }
+}
+
+
+export function generateTimestamp() {
+    return `${dayjs().format('HH:mm:ss.SSS')} `;
 }

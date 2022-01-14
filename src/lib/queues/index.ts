@@ -35,7 +35,7 @@ proxyCronWorker.on('failed', async (job: Bullmq.Job, failedReason: string) => {
 
 })
 proxyCronQueue.drain().then(() => {
-  proxyCronQueue.add('proxyCron', {}, { repeat: { every: 10000 } })
+  proxyCronQueue.add('proxyCron', {}, { repeat: { every: 60000 } })
 })
 
 const buildQueueName = dev ? cuid() : 'build_queue'

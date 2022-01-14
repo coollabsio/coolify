@@ -44,12 +44,12 @@ export async function buildCacheImageWithCargo(data, imageForBuild) {
 
 export async function buildImage({ applicationId, tag, workdir, docker, buildId, isCache = false, debug = false }) {
     if (!debug) {
-        saveBuildLog({ line: `[COOLIFY] - Debug turned off.`, buildId, applicationId })
+        saveBuildLog({ line: `Debug turned off. To see more details, allow it.`, buildId, applicationId })
     }
     if (isCache) {
-        saveBuildLog({ line: `[COOLIFY] - Building cache image.`, buildId, applicationId })
+        saveBuildLog({ line: `Building cache image started...`, buildId, applicationId })
     } else {
-        saveBuildLog({ line: `[COOLIFY] - Building image.`, buildId, applicationId })
+        saveBuildLog({ line: `Building image started...`, buildId, applicationId })
     }
 
     const stream = await docker.engine.buildImage(
@@ -79,7 +79,7 @@ export async function streamEvents({ stream, docker, buildId, applicationId, deb
                 reject(event.error);
             } else if (event.stream) {
                 if (event.stream !== '\n') {
-                    if (debug) saveBuildLog({ line: `[DOCKER ENGINE] - ${event.stream.replace('\n', '')}`, buildId, applicationId })
+                    if (debug) saveBuildLog({ line: `${event.stream.replace('\n', '')}`, buildId, applicationId })
                 }
             }
         }

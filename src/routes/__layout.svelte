@@ -46,7 +46,7 @@
 	let isUpdateAvailable = false;
 	let updateStatus = {
 		loading: false,
-		success: 'not started'
+		success: null
 	};
 
 	onMount(async () => {
@@ -101,11 +101,10 @@
 
 	async function update() {
 		updateStatus.loading = true;
+		toast.push('Updating initiated.');
 		const response = await fetch(`/update.json`, {
 			method: 'post'
 		});
-
-
 		if (!response.ok) {
 			const { message } = await response.json();
 			console.log(message);
@@ -129,7 +128,8 @@
 			if (reachable) break;
 			tries++;
 		} while (!reachable || tries < 120);
-		toast.push("Update successful. If the app doesn't reload, please refresh the page.");
+		toast.push("Update successful.");
+		toast.push("If the app doesn't reload automatically, please refresh the page.")
 		updateStatus.loading = false;
 		updateStatus.success = true;
 		await asyncSleep(3000);
@@ -137,7 +137,7 @@
 	}
 </script>
 
-<SvelteToast options={{ intro: { y: -64 }, duration: 2000, pausable: true }} />
+<SvelteToast options={{ intro: { y: -64 }, duration: 3000, pausable: true }} />
 {#if $session.uid}
 	<nav class="nav-main">
 		<div class="flex flex-col w-full h-screen items-center transition-all duration-100">
@@ -320,7 +320,7 @@
 			<div class="flex flex-col space-y-4 py-2">
 				{#if isUpdateAvailable}
 					<button
-						disabled={!updateStatus.success}
+						disabled={updateStatus.success === false}
 						in:fade={{ duration: 150 }}
 						data-tooltip="Update available"
 						on:click={update}
@@ -328,7 +328,7 @@
 					>
 						{#if updateStatus.loading}
 							<div class="lds-heart"><div /></div>
-						{:else if updateStatus.success === 'not started'}
+						{:else if updateStatus.success === null}
 							<svg
 								xmlns="http://www.w3.org/2000/svg"
 								class="w-8 h-9"

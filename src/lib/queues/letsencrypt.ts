@@ -2,9 +2,9 @@ import { dev } from "$app/env"
 import { forceSSLOffApplication, forceSSLOnApplication, getNextTransactionId, reloadConfiguration } from "$lib/haproxy"
 import { asyncExecShell, getEngine } from "../common"
 
-export default async function (job) {
+export async function letsEncrypt(job) {
   try {
-    const { destinationDocker, domain, forceSSLChanged, isCoolify } = job.data
+    const { destinationDocker, domain, forceSSLChanged, isCoolify } = job
     if (dev) {
       if (forceSSLChanged) {
         await forceSSLOnApplication({ domain })
@@ -14,7 +14,7 @@ export default async function (job) {
       return
     }
     if (isCoolify) {
-      await asyncExecShell(`docker run --rm --name certbot -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080 -d ${domain} --agree-tos --non-interactive --register-unsafely-without-email --test-cert`)
+      await asyncExecShell(`docker run --rm --name certbot -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080 -d ${domain} --agree-tos --non-interactive --register-unsafely-without-email`)
 
       const { stderr } = await asyncExecShell(`docker run --rm -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" alpine:latest cat /etc/letsencrypt/live/${domain}/fullchain.pem /etc/letsencrypt/live/${domain}/privkey.pem > /app/ssl/${domain}.pem`)
       if (stderr) throw new Error(stderr)
@@ -44,4 +44,8 @@ export default async function (job) {
   } catch (err) {
     throw err
   }
+}
+
+export default async function (job) {
+  return await letsEncrypt(job.data)
 }

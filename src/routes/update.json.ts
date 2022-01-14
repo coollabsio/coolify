@@ -11,6 +11,10 @@ export const get: RequestHandler = async (request) => {
         const versions = await got.get(`https://get.coollabs.io/version.json?appId=${process.env['COOLIFY_APP_ID']}`).json()
         const latestVersion = versions["coolify-v2"].main.version;
         const isUpdateAvailable = compare(latestVersion, currentVersion)
+        if (isUpdateAvailable === 1) {
+            await asyncExecShell(`env | grep COOLIFY > .env`)
+            await asyncExecShell(`docker compose pull`);
+        }
         return {
             body: {
                 isUpdateAvailable: isUpdateAvailable === 1,
@@ -25,8 +29,6 @@ export const get: RequestHandler = async (request) => {
 export const post: RequestHandler<Locals, FormData> = async () => {
     try {
         if (!dev) {
-            await asyncExecShell(`env | grep COOLIFY > .env`)
-            await asyncExecShell(`docker compose pull`);
             await asyncExecShell(`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db-sqlite coollabsio/coolify:latest /bin/sh -c "env | grep COOLIFY > .env && docker compose up -d --force-recreate"`)
             return {
                 status: 200

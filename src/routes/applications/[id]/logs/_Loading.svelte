@@ -7,8 +7,8 @@
 	.lds-ripple {
 		display: inline-block;
 		position: relative;
-		left: -18px;
-		top: -18px;
+		left: -19px;
+		top: -8px;
 		width: 40px;
 		height: 40px;
 	}
@@ -24,8 +24,8 @@
 	}
 	@keyframes lds-ripple {
 		0% {
-			top: 18px;
-			left: 18px;
+			top: 1px;
+			left: 1px;
 			width: 0;
 			height: 0;
 			opacity: 1;

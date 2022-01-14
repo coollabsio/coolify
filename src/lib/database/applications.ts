@@ -4,6 +4,7 @@ import { removeProxyConfiguration } from "$lib/haproxy"
 import { removeAllPreviewsDestinationDocker, removeDestinationDocker } from "$lib/common"
 import { prisma, PrismaErrorHandler } from "./common"
 import { letsEncryptQueue } from "$lib/queues"
+import { letsEncrypt } from "$lib/queues/letsencrypt"
 
 export async function listApplications(teamId) {
     return await prisma.application.findMany({ where: { teams: { every: { id: teamId } } } })
@@ -162,7 +163,9 @@ export async function setApplicationSettings({ id, debug, previews, forceSSL, fo
     try {
         const application = await prisma.application.update({ where: { id }, data: { settings: { update: { debug, previews, forceSSL } } }, include: { destinationDocker: true } })
         const { destinationDocker, domain } = application
-        forceSSLChanged && letsEncryptQueue.add(domain, { destinationDocker, domain, id, forceSSLChanged })
+        if (forceSSLChanged) {
+            await letsEncrypt({ destinationDocker, domain, id, forceSSLChanged })
+        }
         return { status: 201 }
     } catch (e) {
         throw PrismaErrorHandler(e)

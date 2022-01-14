@@ -39,6 +39,7 @@
 	import Setting from '$lib/components/Setting.svelte';
 	import type { Application, ApplicationSettings } from '@prisma/client';
 	import { notNodeDeployments, staticDeployments } from '$lib/components/common';
+import { toast } from '@zerodevx/svelte-toast';
 	const { id } = $page.params;
 
 	let domainEl: HTMLInputElement;
@@ -54,6 +55,7 @@
 
 	async function changeSettings(name) {
 		const form = new FormData();
+		let tempforceSSL = forceSSL
 		let forceSSLChanged = false;
 		if (name === 'debug') {
 			debug = !debug;
@@ -62,12 +64,12 @@
 			previews = !previews;
 		}
 		if (name === 'forceSSL') {
-			if (!forceSSL) forceSSLChanged = true;
-			forceSSL = !forceSSL;
+			if (!tempforceSSL) forceSSLChanged = true;
+			tempforceSSL = !tempforceSSL;
 		}
 		form.append('previews', previews.toString());
 		form.append('debug', debug.toString());
-		form.append('forceSSL', forceSSL.toString());
+		form.append('forceSSL', tempforceSSL.toString());
 		form.append('forceSSLChanged', forceSSLChanged.toString());
 
 		try {
@@ -75,8 +77,12 @@
 				method: 'POST',
 				body: form
 			});
+			toast.push('Settings saved.');
 		} catch (e) {
+			errorNotification(e);
 			console.error(e);
+		} finally {
+			forceSSL = tempforceSSL
 		}
 	}
 </script>
@@ -158,10 +164,7 @@
 				}
 			},
 			result: async () => {
-				setTimeout(() => {
-					loading = false;
-					window.location.reload();
-				}, 200);
+				window.location.reload();
 			},
 			pending: async () => {
 				loading = true;
@@ -378,8 +381,8 @@
 			<Setting
 				bind:setting={forceSSL}
 				on:click={() => changeSettings('forceSSL')}
-				title="Force SSL"
-				description=""
+				title="Force https"
+				description="Creates a https redirect for all requests from http and also generates a https certificate for the domain through Let's Encrypt."
 			/>
 		</ul>
 		<ul class="mt-2 divide-y divide-warmGray-800">

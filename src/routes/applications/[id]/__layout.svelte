@@ -122,7 +122,7 @@
 					},
 					result: async (res) => {
 						const { buildId } = await res.json();
-						window.location.assign(`/applications/${id}/logs?buildId=${buildId}`);
+						window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
 					}
 				}}
 			>
@@ -257,34 +257,61 @@
 			>
 			<div class="border border-warmGray-700 h-8" />
 			<a
-				href="/applications/{id}/logs"
+			href="/applications/{id}/logs"
+			sveltekit:prefetch
+			class="hover:text-sky-500 rounded"
+			class:text-sky-500={$page.url.pathname === `/applications/${id}/logs`}
+			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs`}
+		>
+			<button
+				title="Application Logs"
+				class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500 "
+				data-tooltip="Application Logs"
+			>
+			<svg
+			xmlns="http://www.w3.org/2000/svg"
+			class="h-6 w-6"
+			viewBox="0 0 24 24"
+			stroke-width="1.5"
+			stroke="currentColor"
+			fill="none"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
+			<path d="M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
+			<line x1="3" y1="6" x2="3" y2="19" />
+			<line x1="12" y1="6" x2="12" y2="19" />
+			<line x1="21" y1="6" x2="21" y2="19" />
+		</svg>
+			</button
+			></a
+		>
+			<a
+				href="/applications/{id}/logs/build"
 				sveltekit:prefetch
 				class="hover:text-sky-500 rounded"
-				class:text-sky-500={$page.url.pathname === `/applications/${id}/logs`}
-				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs`}
+				class:text-sky-500={$page.url.pathname === `/applications/${id}/logs/build`}
+				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs/build`}
 			>
 				<button
-					title="Logs"
+					title="Build Logs"
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500 "
-					data-tooltip="Logs"
+					data-tooltip="Build Logs"
 				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-6 w-6"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
-						<path d="M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
-						<line x1="3" y1="6" x2="3" y2="19" />
-						<line x1="12" y1="6" x2="12" y2="19" />
-						<line x1="21" y1="6" x2="21" y2="19" />
-					</svg></button
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+					<path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+					<circle cx="19" cy="13" r="2" />
+					<circle cx="4" cy="17" r="2" />
+					<circle cx="13" cy="17" r="2" />
+					<line x1="13" y1="19" x2="4" y2="19" />
+					<line x1="4" y1="15" x2="13" y2="15" />
+					<path d="M8 12v-5h2a3 3 0 0 1 3 3v5" />
+					<path d="M5 15v-2a1 1 0 0 1 1 -1h7" />
+					<path d="M19 11v-7l-6 7" />
+				  </svg>
+				</button
 				></a
 			>
 			<div class="border border-warmGray-700 h-8" />

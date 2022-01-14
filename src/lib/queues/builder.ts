@@ -85,7 +85,7 @@ export default async function (job) {
       if (configHash !== currentHash) {
         await db.prisma.application.update({ where: { id: applicationId }, data: { configHash: currentHash } })
         deployNeeded = true
-        saveBuildLog({ line: '[COOLIFY] - Configuration changed.', buildId, applicationId })
+        saveBuildLog({ line: 'Configuration changed.', buildId, applicationId })
       } else {
         deployNeeded = false
       }
@@ -105,7 +105,7 @@ export default async function (job) {
       await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId);
       if (buildpacks[buildPack]) await buildpacks[buildPack]({ buildId: build.id, applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, publishDirectory, debug, commit, tag, workdir, docker, port, installCommand, buildCommand, startCommand, baseDirectory, secrets })
       else {
-        saveBuildLog({ line: `[COOLIFY] - Build pack ${buildPack} not found`, buildId, applicationId })
+        saveBuildLog({ line: `Build pack ${buildPack} not found`, buildId, applicationId })
         throw new Error(`Build pack ${buildPack} not found.`)
       }
       deployNeeded = true
@@ -121,7 +121,7 @@ export default async function (job) {
     } catch (error) {
       //
     } finally {
-      saveBuildLog({ line: '[COOLIFY] - Removing old deployments.', buildId, applicationId })
+      saveBuildLog({ line: 'Removing old deployments.', buildId, applicationId })
     }
     const envs = []
     if (secrets.length > 0) {
@@ -132,15 +132,15 @@ export default async function (job) {
       })
     }
     const labels = makeLabelForStandaloneApplication({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
-    saveBuildLog({ line: '[COOLIFY] - Deployment started.', buildId, applicationId })
+    saveBuildLog({ line: 'Deployment started.', buildId, applicationId })
     const { stderr } = await asyncExecShell(`DOCKER_HOST=${host} docker run ${envs.join()} ${labels.join(' ')} --name ${imageId} --network ${docker.network} --restart always -d ${applicationId}:${tag}`)
     if (stderr) console.log(stderr)
-    saveBuildLog({ line: '[COOLIFY] - Deployment successful!', buildId, applicationId })
+    saveBuildLog({ line: 'Deployment successful!', buildId, applicationId })
 
     if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
       await configureProxyForApplication({ domain, applicationId, port, forceSSL })
     } else {
-      saveBuildLog({ line: '[COOLIFY] - Coolify Proxy is not configured for this destination. Nothing else to do.', buildId, applicationId })
+      saveBuildLog({ line: 'Coolify Proxy is not configured for this destination. Nothing else to do.', buildId, applicationId })
     }
   }
 }
