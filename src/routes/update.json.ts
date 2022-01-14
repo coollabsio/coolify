@@ -1,5 +1,6 @@
 import { dev } from '$app/env';
 import { asyncExecShell, version } from '$lib/common';
+import { asyncSleep } from '$lib/components/common';
 import type { RequestHandler } from '@sveltejs/kit';
 import compare from 'compare-versions';
 import got from "got"
@@ -12,8 +13,7 @@ export const get: RequestHandler = async (request) => {
         const isUpdateAvailable = compare(latestVersion, currentVersion)
         return {
             body: {
-                // isUpdateAvailable: isUpdateAvailable === 1,
-                isUpdateAvailable: true,
+                isUpdateAvailable: isUpdateAvailable === 1,
                 latestVersion,
             }
         };
@@ -22,20 +22,17 @@ export const get: RequestHandler = async (request) => {
     }
 }
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
+export const post: RequestHandler<Locals, FormData> = async () => {
     try {
-        const versions = await got.get(`https://get.coollabs.io/version.json?appId=${process.env['COOLIFY_APP_ID']}`).json()
-        const latestVersion = versions["coolify-v2"].main.version;
         if (!dev) {
             await asyncExecShell(`env | grep COOLIFY > .env`)
-            await asyncExecShell(`docker compose pull coollabsio/coolify:${latestVersion}`);
-            await asyncExecShell(`docker run -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db-sqlite coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && docker compose up -d --force-recreate"`)
+            await asyncExecShell(`docker compose pull`);
+            await asyncExecShell(`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db-sqlite coollabsio/coolify:latest /bin/sh -c "env | grep COOLIFY > .env && docker compose up -d --force-recreate"`)
             return {
                 status: 200
             }
         } else {
-            console.log('dev mode')
-            console.log(latestVersion)
+            await asyncSleep(5000)
             return {
                 status: 200
             }

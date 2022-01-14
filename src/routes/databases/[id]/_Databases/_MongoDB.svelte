@@ -3,7 +3,7 @@
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 </script>
 
-<div class="grid grid-cols-3 items-center pb-8">
+<!-- <div class="grid grid-cols-3 items-center pb-8">
 	<label for="defaultDatabase">Default Database Name</label>
 	<div class="col-span-2 ">
 		<CopyPasswordField
@@ -13,8 +13,8 @@
 			value={database.defaultDatabase}
 		/>
 	</div>
-</div>
-<div class="grid grid-cols-3 items-center">
+</div> -->
+<!-- <div class="grid grid-cols-3 items-center">
 	<label for="dbUser">User</label>
 	<div class="col-span-2 ">
 		<CopyPasswordField
@@ -36,7 +36,7 @@
 			value={database.dbUserPassword}
 		/>
 	</div>
-</div>
+</div> -->
 <div class="grid grid-cols-3 items-center">
 	<label for="rootUser">Root User</label>
 	<div class="col-span-2 ">

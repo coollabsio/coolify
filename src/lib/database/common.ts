@@ -113,10 +113,8 @@ export function generateDatabaseConfiguration(database) {
             // url: `mongodb://${dbUser}:${dbUserPassword}@${id}:${isPublic ? port : 27017}/${defaultDatabase}`,
             privatePort: 27017,
             environmentVariables: {
-                MONGODB_USERNAME: dbUser,
-                MONGODB_PASSWORD: dbUserPassword,
+                MONGODB_ROOT_USER: rootUser,
                 MONGODB_ROOT_PASSWORD: rootUserPassword,
-                MONGODB_DATABASE: defaultDatabase
             },
             image: `${baseImage}:${version}`,
             volume: `${id}-${type}-data:/bitnami/mongodb`,

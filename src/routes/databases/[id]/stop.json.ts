@@ -13,7 +13,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     try {
         const database = await db.getDatabase({ id, teamId })
         const everStarted = await stopDatabase(database)
-        if (everStarted) await stopDatabaseProxy(database.destinationDocker, database.port)
+        if (everStarted) await stopDatabaseProxy(database.destinationDocker, database.publicPort)
         await db.setDatabase({ id, isPublic: false })
 
         return {

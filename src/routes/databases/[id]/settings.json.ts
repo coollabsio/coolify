@@ -15,14 +15,14 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         await db.setDatabase({ id, isPublic })
 
         const database = await db.getDatabase({ id, teamId })
-        const { destinationDockerId, destinationDocker, port } = database
+        const { destinationDockerId, destinationDocker, publicPort } = database
         const { privatePort } = generateDatabaseConfiguration(database)
 
         if (destinationDockerId) {
             if (isPublic) {
-                await startDatabaseProxy(destinationDocker, id, port, privatePort)
+                await startDatabaseProxy(destinationDocker, id, publicPort, privatePort)
             } else {
-                await stopDatabaseProxy(destinationDocker, port)
+                await stopDatabaseProxy(destinationDocker, publicPort)
             }
         }
 

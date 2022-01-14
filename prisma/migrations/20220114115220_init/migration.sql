@@ -36,7 +36,7 @@ CREATE TABLE "Team" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     "databaseId" TEXT,
-    CONSTRAINT "Team_databaseId_fkey" FOREIGN KEY ("databaseId") REFERENCES "Database" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    FOREIGN KEY ("databaseId") REFERENCES "Database" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -57,6 +57,7 @@ CREATE TABLE "Application" (
     "domain" TEXT,
     "oldDomain" TEXT,
     "repository" TEXT,
+    "configHash" TEXT,
     "branch" TEXT,
     "buildPack" TEXT,
     "projectId" INTEGER,
@@ -64,14 +65,13 @@ CREATE TABLE "Application" (
     "installCommand" TEXT,
     "buildCommand" TEXT,
     "startCommand" TEXT,
-    "configHash" TEXT,
     "baseDirectory" TEXT,
     "publishDirectory" TEXT,
     "forceSsl" BOOLEAN DEFAULT false,
-    "destinationDockerId" TEXT,
-    "gitSourceId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
+    "destinationDockerId" TEXT,
+    "gitSourceId" TEXT,
     CONSTRAINT "Application_destinationDockerId_fkey" FOREIGN KEY ("destinationDockerId") REFERENCES "DestinationDocker" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "Application_gitSourceId_fkey" FOREIGN KEY ("gitSourceId") REFERENCES "GitSource" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
@@ -184,15 +184,15 @@ CREATE TABLE "GitlabApp" (
 CREATE TABLE "Database" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
-    "port" INTEGER,
+    "publicPort" INTEGER,
     "defaultDatabase" TEXT,
-    "destinationDockerId" TEXT,
-    "version" TEXT,
     "type" TEXT,
+    "version" TEXT,
     "dbUser" TEXT,
     "dbUserPassword" TEXT,
     "rootUser" TEXT,
     "rootUserPassword" TEXT,
+    "destinationDockerId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "Database_destinationDockerId_fkey" FOREIGN KEY ("destinationDockerId") REFERENCES "DestinationDocker" ("id") ON DELETE SET NULL ON UPDATE CASCADE
@@ -253,6 +253,14 @@ CREATE TABLE "_DestinationDockerToTeam" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
     FOREIGN KEY ("A") REFERENCES "DestinationDocker" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY ("B") REFERENCES "Team" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "_DatabaseToTeam" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+    FOREIGN KEY ("A") REFERENCES "Database" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY ("B") REFERENCES "Team" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -333,3 +341,9 @@ CREATE UNIQUE INDEX "_DestinationDockerToTeam_AB_unique" ON "_DestinationDockerT
 
 -- CreateIndex
 CREATE INDEX "_DestinationDockerToTeam_B_index" ON "_DestinationDockerToTeam"("B");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "_DatabaseToTeam_AB_unique" ON "_DatabaseToTeam"("A", "B");
+
+-- CreateIndex
+CREATE INDEX "_DatabaseToTeam_B_index" ON "_DatabaseToTeam"("B");

@@ -5,7 +5,7 @@
 	import { page, session } from '$app/stores';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Setting from '$lib/components/Setting.svelte';
-	import { enhance, errorNotification } from '$lib/form';
+	import { enhance } from '$lib/form';
 
 	import MySql from './_MySQL.svelte';
 	import MongoDb from './_MongoDB.svelte';
@@ -18,6 +18,28 @@
 	let loading = false;
 	let isPublic = database.settings.isPublic || false;
 
+	let databaseDefault = database.defaultDatabase;
+	let databaseDbUser = database.dbUser;
+	let databaseDbUserPassword = database.dbUserPassword;
+	if (database.type === 'mongodb') {
+		databaseDefault = '?readPreference=primary&ssl=false';
+		databaseDbUser = database.rootUser;
+		databaseDbUserPassword = database.rootUserPassword;
+	}
+	let databaseUrl = generateUrl();
+
+	function generateUrl() {
+		return `${database.type}://${databaseDbUser}:${databaseDbUserPassword}@${
+			browser
+				? isPublic
+					? window.location.hostname === 'localhost'
+						? '127.0.0.1'
+						: window.location.hostname
+					: database.id
+				: 'loading'
+		}:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`;
+	}
+
 	async function changeSettings(name) {
 		const form = new FormData();
 		if (name === 'isPublic') {
@@ -29,7 +51,7 @@
 				method: 'POST',
 				body: form
 			});
-			// window.location.reload();
+			window.location.reload();
 		} catch (e) {
 			console.error(e);
 		}
@@ -127,13 +149,13 @@
 				</div>
 			</div>
 			<div class="grid grid-cols-3 items-center pb-8">
-				<label for="port">Port</label>
+				<label for="publicPort">Port</label>
 				<div class="col-span-2">
 					<CopyPasswordField
 						placeholder="generate automatically"
-						id="port"
-						name="port"
-						value={isPublic ? database.port : privatePort}
+						id="publicPort"
+						name="publicPort"
+						value={isPublic ? database.publicPort : privatePort}
 					/>
 				</div>
 			</div>
@@ -157,11 +179,7 @@
 						isPasswordField={false}
 						id="url"
 						name="url"
-						value="{database.type}://{database.dbUser}:{database.dbUserPassword}@{browser
-							? isPublic
-								? window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname
-								: database.id
-							: 'loading'}:{isPublic ? database.port : privatePort}/{database.defaultDatabase}"
+						value={databaseUrl}
 					/>
 				</div>
 			</div>

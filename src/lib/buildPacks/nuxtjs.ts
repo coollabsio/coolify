@@ -1,6 +1,5 @@
 import { buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
-import { makeLabelForApplication } from './common';
 
 const createDockerfile = async (data, image): Promise<void> => {
     const { workdir, port, installCommand, buildCommand, startCommand, baseDirectory, secrets } = data;

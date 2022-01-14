@@ -28,7 +28,7 @@ import { dev } from '$app/env';
 
 	function newGithubApp(source) {
 		const { organization, id, htmlUrl, type } = source;
-        const protocol = dev ? 'http' : 'https'
+        const protocol = 'http'
 
 		if (type === 'github') {
 			let url = 'settings/apps/new';

@@ -5,11 +5,11 @@ import templates from '$lib/components/templates';
 import { promises as fs } from 'fs';
 import { staticDeployments } from '$lib/components/common';
 
-export function makeLabelForApplication({ applicationId, domain, name, type, pullmergeRequestId = null, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
+export function makeLabelForStandaloneApplication({ applicationId, domain, name, type, pullmergeRequestId = null, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
     return [
         '--label coolify.managed=true',
         `--label coolify.version=${version}`,
-        `--label coolify.type=application`,
+        `--label coolify.type=standalone-application`,
         `--label coolify.configuration=${base64Encode(JSON.stringify({
             applicationId,
             domain,
@@ -30,16 +30,15 @@ export function makeLabelForApplication({ applicationId, domain, name, type, pul
         }))}`,
     ]
 }
-export async function makeLabelForDatabase({ id, image, volume }) {
+export async function makeLabelForStandaloneDatabase({ id, image, volume }) {
     const database = await db.prisma.database.findFirst({ where: { id } })
     delete database.destinationDockerId
     delete database.createdAt
     delete database.updatedAt
-    delete database.url
     return [
         'coolify.managed=true',
         `coolify.version=${version}`,
-        `coolify.type=database`,
+        `coolify.type=standalone-database`,
         `coolify.configuration=${base64Encode(JSON.stringify({
             version,
             image,
@@ -48,6 +47,25 @@ export async function makeLabelForDatabase({ id, image, volume }) {
         }))}`,
     ]
 }
+
+export async function makeLabelForServiceDatabase({ id, image, volume }) {
+    const database = await db.prisma.database.findFirst({ where: { id } })
+    delete database.destinationDockerId
+    delete database.createdAt
+    delete database.updatedAt
+    return [
+        'coolify.managed=true',
+        `coolify.version=${version}`,
+        `coolify.type=service-database`,
+        `coolify.configuration=${base64Encode(JSON.stringify({
+            version,
+            image,
+            volume,
+            ...database
+        }))}`,
+    ]
+}
+
 
 export const setDefaultConfiguration = async (data) => {
     let { buildPack, port, installCommand, startCommand, buildCommand, publishDirectory } = data

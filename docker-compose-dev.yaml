@@ -1,43 +1,6 @@
 version: '3.8'
 
 services:
-  # postgres:
-  #   image: 'postgres:latest'
-  #   ports: 
-  #     - target: 5432
-  #       published: 5432
-  #       protocol: tcp
-  #       mode: host
-  #   networks:
-  #     - coollabs-dev
-  #   environment:
-  #     POSTGRES_PASSWORD: example
-  # haproxy: 
-  #   image: 'haproxytech/haproxy-ubuntu:2.4'
-  #   container_name: coolify-haproxy
-  #   extra_hosts:
-  #     - 'host.docker.internal:host-gateway'
-  #   networks:
-  #     - coolify-infra
-  #   volumes:
-  #     - './data/haproxy/:/usr/local/etc/haproxy/'
-  #   ports: 
-  #     - target: 80
-  #       published: 80
-  #       protocol: tcp
-  #       mode: host
-  #     - target: 443
-  #       published: 443
-  #       protocol: tcp
-  #       mode: host
-  #     - target: 8404
-  #       published: 8404
-  #       protocol: tcp
-  #       mode: host
-  #     - target: 5555
-  #       published: 5555
-  #       protocol: tcp
-  #       mode: host
   redis:
     image: 'bitnami/redis:6.2'
     container_name: coolify-redis

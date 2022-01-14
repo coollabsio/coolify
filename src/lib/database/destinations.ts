@@ -29,7 +29,7 @@ export async function configureDestinationForDatabase({ id, destinationId }) {
                 if (type && version) {
                     const baseImage = getBaseImage(type)
                     docker.engine.pull(`${baseImage}:${version}`)
-                    docker.engine.pull(defaultProxyImageDatabase)
+                    docker.engine.pull(`coollabsio/${defaultProxyImageDatabase}`)
                 }
             } catch (error) {
                 // console.log(error)

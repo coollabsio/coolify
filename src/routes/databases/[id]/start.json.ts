@@ -4,7 +4,7 @@ import { generateDatabaseConfiguration } from '$lib/database';
 import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
-import { makeLabelForDatabase } from '$lib/buildPacks/common';
+import { makeLabelForStandaloneDatabase } from '$lib/buildPacks/common';
 import { startDatabaseProxy } from '$lib/haproxy';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
@@ -15,14 +15,14 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
     try {
         const database = await db.getDatabase({ id, teamId })
-        const { type, destinationDockerId, destinationDocker, port, settings: { isPublic } } = database
+        const { type, destinationDockerId, destinationDocker, publicPort, settings: { isPublic } } = database
         const { privatePort, environmentVariables, image, volume, ulimits } = generateDatabaseConfiguration(database);
 
         const network = destinationDockerId && destinationDocker.network
         const host = getEngine(destinationDocker.engine)
         const engine = destinationDocker.engine
         const volumeName = volume.split(':')[0]
-        const labels = await makeLabelForDatabase({ id, image, volume })
+        const labels = await makeLabelForStandaloneDatabase({ id, image, volume })
 
         const { workdir } = await createDirectories({ repository: type, buildId: id })
 
@@ -60,7 +60,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         }
         try {
             await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`)
-            if (isPublic) await startDatabaseProxy(destinationDocker, id, port, privatePort)
+            if (isPublic) await startDatabaseProxy(destinationDocker, id, publicPort, privatePort)
             return {
                 status: 200
             }

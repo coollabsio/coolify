@@ -7,7 +7,7 @@ import { asyncExecShell, createDirectories, getEngine, saveBuildLog } from '../c
 import { configureProxyForApplication } from '../haproxy'
 import * as db from '$lib/database'
 import { decrypt } from '$lib/crypto'
-import { copyBaseConfigurationFiles, makeLabelForApplication, setDefaultConfiguration } from '$lib/buildPacks/common'
+import { copyBaseConfigurationFiles, makeLabelForStandaloneApplication, setDefaultConfiguration } from '$lib/buildPacks/common'
 
 export default async function (job) {
   /*
@@ -131,7 +131,7 @@ export default async function (job) {
         }
       })
     }
-    const labels = makeLabelForApplication({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
+    const labels = makeLabelForStandaloneApplication({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
     saveBuildLog({ line: '[COOLIFY] - Deployment started.', buildId, applicationId })
     const { stderr } = await asyncExecShell(`DOCKER_HOST=${host} docker run ${envs.join()} ${labels.join(' ')} --name ${imageId} --network ${docker.network} --restart always -d ${applicationId}:${tag}`)
     if (stderr) console.log(stderr)
@@ -140,7 +140,7 @@ export default async function (job) {
     if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
       await configureProxyForApplication({ domain, applicationId, port, forceSSL })
     } else {
-      saveBuildLog({ line: '[COOLIFY] - Custom proxy is configured. Nothing else to do.', buildId, applicationId })
+      saveBuildLog({ line: '[COOLIFY] - Coolify Proxy is not configured for this destination. Nothing else to do.', buildId, applicationId })
     }
   }
 }

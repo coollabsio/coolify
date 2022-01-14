@@ -1,4 +1,6 @@
 <script>
+import { browser } from '$app/env';
+
 	import { toast } from '@zerodevx/svelte-toast';
 	export let value;
 	let showPassword = false;
@@ -11,9 +13,10 @@
 	export let name;
 	export let placeholder;
 
-	let disabledClass =
-		'bg-coolgray-100 disabled:bg-coolgray-100 text-warmGray-400';
+	let disabledClass = 'bg-coolgray-100 disabled:bg-coolgray-100 text-warmGray-400';
 	let actionsShow = false;
+	let isHttps = browser && window.location.protocol === 'https';
+
 	function showActions(value) {
 		actionsShow = value;
 		if (value === false) {
@@ -21,8 +24,10 @@
 		}
 	}
 	function copyToClipboard() {
-		navigator.clipboard.writeText(value);
-		toast.push('Copied to clipboard');
+		if (isHttps && navigator.clipboard) {
+			navigator.clipboard.writeText(value);
+			toast.push('Copied to clipboard');
+		}
 	}
 </script>
 
@@ -112,7 +117,7 @@
 						{/if}
 					</div>
 				{/if}
-				{#if value}
+				{#if value && isHttps}
 					<div on:click={copyToClipboard}>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"

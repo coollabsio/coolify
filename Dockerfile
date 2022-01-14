@@ -7,7 +7,7 @@ RUN yarn build
 
 FROM node:16.13.2-alpine
 WORKDIR /app
-RUN apk add --no-cache git openssh-client curl
+RUN apk add --no-cache git openssh-client curl jq
 
 COPY --from=0 /app/docker-compose.yaml .
 COPY --from=0 /app/build .
@@ -20,8 +20,6 @@ RUN curl -fsSL "https://download.docker.com/linux/static/stable/x86_64/docker-20
 RUN mkdir -p ~/.docker/cli-plugins/
 RUN curl -SL https://github.com/docker/compose/releases/download/v2.2.2/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
 RUN chmod +x ~/.docker/cli-plugins/docker-compose
-# RUN curl -L "https://github.com/docker/compose/releases/download/v2.2.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/bin/docker-compose
-# RUN chmod +x /usr/bin/docker /usr/bin/docker-compose
 
 EXPOSE 3000
 CMD ["yarn", "start"]

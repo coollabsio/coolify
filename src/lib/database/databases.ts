@@ -16,13 +16,13 @@ export async function newDatabase({ name, teamId }) {
         const rootUserPassword = encrypt(generatePassword())
         const defaultDatabase = cuid()
 
-        let port = await getPort()
+        let publicPort = await getPort()
         let i = 0;
 
         do {
-            const usedPorts = await prisma.database.findMany({ where: { port } })
+            const usedPorts = await prisma.database.findMany({ where: { publicPort } })
             if (usedPorts.length === 0) break
-            port = await getPort()
+            publicPort = await getPort()
             i++;
         }
         while (i < 10);
@@ -34,7 +34,7 @@ export async function newDatabase({ name, teamId }) {
                 }
             }
         }
-        const database = await prisma.database.create({ data: { name, port, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, teams: { connect: { id: teamId } }, settings: { create: { isPublic: false } } } })
+        const database = await prisma.database.create({ data: { name, publicPort, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, teams: { connect: { id: teamId } }, settings: { create: { isPublic: false } } } })
 
         return { status: 201, body: { id: database.id } }
     } catch (e) {

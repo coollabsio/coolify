@@ -6,8 +6,8 @@ import * as db from '$lib/database';
 
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555'
 
-export const defaultProxyImage = `haproxy-alpine:1.0.0-rc.1`
-export const defaultProxyImageDatabase = `haproxy-db-alpine:1.0.0-rc.1`
+export const defaultProxyImage = `coolify-haproxy-alpine:latest`
+export const defaultProxyImageDatabase = `coolify-haproxy-db-alpine:latest`
 
 export function haproxyInstance() {
     return got.extend({

@@ -49,7 +49,7 @@ model Team {
   permissions       Permission[]
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
-  database          Database?           @relation(fields: [databaseId], references: [id])
+  database          Database[]          @relation(fields: [databaseId], references: [id])
   databaseId        String?
 }
 
@@ -68,8 +68,8 @@ model Application {
   name                String
   domain              String?              @unique
   oldDomain           String?
-  teams               Team[]
   repository          String?
+  configHash          String?
   branch              String?
   buildPack           String?
   projectId           Int?
@@ -77,18 +77,18 @@ model Application {
   installCommand      String?
   buildCommand        String?
   startCommand        String?
-  configHash          String?
   baseDirectory       String?
   publishDirectory    String?
   forceSsl            Boolean?             @default(false)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  settings            ApplicationSettings?
+  teams               Team[]
   destinationDockerId String?
   destinationDocker   DestinationDocker?   @relation(fields: [destinationDockerId], references: [id])
   gitSourceId         String?
   gitSource           GitSource?           @relation(fields: [gitSourceId], references: [id])
   secrets             Secret[]
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  settings            ApplicationSettings?
 }
 
 model ApplicationSettings {
@@ -199,20 +199,20 @@ model GitlabApp {
 model Database {
   id                  String             @id @default(cuid())
   name                String             @unique
-  port                Int?
+  publicPort          Int?
   defaultDatabase     String?
-  destinationDockerId String?
-  destinationDocker   DestinationDocker? @relation(fields: [destinationDockerId], references: [id])
-  version             String?
-  teams               Team[]
   type                String?
+  version             String?
   dbUser              String?
   dbUserPassword      String?
   rootUser            String?
   rootUserPassword    String?
+  settings            DatabaseSettings?
+  destinationDocker   DestinationDocker? @relation(fields: [destinationDockerId], references: [id])
+  destinationDockerId String?
+  teams               Team[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
-  settings            DatabaseSettings?
 }
 
 model DatabaseSettings {

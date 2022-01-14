@@ -1,8 +1,6 @@
-import { makeLabelForDatabase } from '$lib/buildPacks/common';
 import { asyncExecShell, getEngine, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { generateDatabaseConfiguration, getVersions } from '$lib/database';
-import { dockerInstance } from '$lib/docker';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (request) => {
