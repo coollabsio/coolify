@@ -2,15 +2,13 @@ import child from 'child_process'
 import util from 'util'
 import { dev } from '$app/env';
 import * as Sentry from '@sentry/node';
-import { uniqueNamesGenerator, Config, adjectives, colors, animals, names, starWars } from 'unique-names-generator';
+import { uniqueNamesGenerator, Config, adjectives, colors, animals } from 'unique-names-generator';
 
 import * as db from '$lib/database';
 import { buildLogQueue } from './queues'
 
 import { version as currentVersion } from '../../package.json';
 import { dockerInstance } from './docker';
-import { removeProxyConfiguration } from './haproxy';
-import templates from './components/templates';
 
 try {
     if (!dev) {
@@ -20,8 +18,7 @@ try {
         });
     }
 } catch (err) {
-    console.log('Could not initialize Sentry')
-    console.log(err)
+    console.log('Could not initialize Sentry, no worries.')
 }
 
 

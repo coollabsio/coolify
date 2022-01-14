@@ -15,7 +15,9 @@ export const get: RequestHandler = async (request) => {
     const containers = listContainers.filter((container) => {
         return container.Labels['coolify.configuration'] && container.Labels['coolify.type'] === 'standalone-application'
     })
-    const jsonContainers = containers.map(container => JSON.parse(Buffer.from(container.Labels['coolify.configuration'], 'base64').toString())).filter(container => container.type !== 'manual' && container.applicationId === id)
+    const jsonContainers = containers.map(container => JSON.parse(Buffer.from(container.Labels['coolify.configuration'], 'base64').toString())).filter(container => {
+        return container.type !== 'manual' && container.type !== 'webhook_commit' && container.applicationId === id
+    })
     return {
         body: {
             containers: jsonContainers

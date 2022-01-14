@@ -38,7 +38,7 @@ import { dev } from '$app/env';
 				name: `coolify-${host}`,
 				url: `${protocol}://${window.location.host}`,
 				hook_attributes: {
-					url: `${protocol}://${host}/webhooks/applications/deploy`
+					url: `${protocol}://${window.location.host}/webhooks/github/events`
 				},
 				redirect_url: `${protocol}://${window.location.host}/webhooks/github`,
 				callback_urls: [`${protocol}://${window.location.host}/login/github/app`],

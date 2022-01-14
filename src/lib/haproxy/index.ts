@@ -381,7 +381,7 @@ export async function configureProxyForApplication({ domain, applicationId, port
             },
             json: {
                 "address": applicationId,
-                "check": "enabled",
+                "check": "disabled",
                 "name": applicationId,
                 "port": port
             }
