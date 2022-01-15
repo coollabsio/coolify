@@ -4,7 +4,7 @@ import { removeProxyConfiguration } from "$lib/haproxy"
 import { removeAllPreviewsDestinationDocker, removeDestinationDocker } from "$lib/common"
 import { prisma, PrismaErrorHandler } from "./common"
 import { letsEncryptQueue } from "$lib/queues"
-import { letsEncrypt } from "$lib/queues/letsencrypt"
+import { letsEncrypt } from "$lib/letsencrypt"
 
 export async function listApplications(teamId) {
     return await prisma.application.findMany({ where: { teams: { every: { id: teamId } } } })

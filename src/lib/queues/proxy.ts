@@ -16,12 +16,7 @@ export default async function () {
                     const application = await prisma.application.findUnique({ where: { id: applicationId }, include: { settings: true } })
                     const { forceSSL } = application.settings
                     await configureProxyForApplication({ domain, applicationId, port, forceSSL })
-                } //else if (configuration.Labels['coolify.type'] === 'standalone-database') {
-                //     const { id, port } = parsedConfiguration
-                //     const { privatePort } = await generateDatabaseConfiguration(parsedConfiguration)
-                //     const { settings: { isPublic = false } } = await prisma.database.findUnique({ where: { id }, include: { settings: true } })
-                //     await configureProxyForDatabase({ id, port, isPublic, privatePort })
-                // }
+                }
             }
         }
     }

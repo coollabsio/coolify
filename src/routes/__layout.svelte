@@ -114,7 +114,7 @@
 		}
 
 		toast.push(
-			'Updating completed. Waiting for the new version to start. It will automatically reload your page.'
+			'Updating completed. Waiting for the new version to start...'
 		);
 
 		let reachable = false;
@@ -130,7 +130,7 @@
 			if (reachable) break;
 			tries++;
 		} while (!reachable || tries < 120);
-		toast.push('New version reachable. Reloading....');
+		toast.push('New version reachable. Reloading...');
 		updateStatus.loading = false;
 		updateStatus.success = true;
 		await asyncSleep(3000);

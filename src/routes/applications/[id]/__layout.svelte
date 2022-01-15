@@ -291,8 +291,8 @@
 			<a
 				href="/applications/{id}/logs/build"
 				sveltekit:prefetch
-				class="hover:text-sky-500 rounded"
-				class:text-sky-500={$page.url.pathname === `/applications/${id}/logs/build`}
+				class="hover:text-red-500 rounded"
+				class:text-red-500={$page.url.pathname === `/applications/${id}/logs/build`}
 				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs/build`}
 			>
 				<button

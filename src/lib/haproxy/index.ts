@@ -1,8 +1,8 @@
 import { dev } from "$app/env";
 import { asyncExecShell, getEngine } from "$lib/common";
-import { letsEncryptQueue } from "$lib/queues";
 import got from "got";
 import * as db from '$lib/database';
+import { letsEncrypt } from "$lib/letsencrypt";
 
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555'
 
@@ -458,7 +458,7 @@ export async function configureCoolifyProxyOn({ domain }) {
         })
         await completeTransaction(transactionId)
         if (!dev) {
-            letsEncryptQueue.add(domain, { domain, isCoolify: true })
+            await letsEncrypt({ domain, isCoolify: true })
             await forceSSLOnApplication({ domain })
         }
     } catch (error) {
@@ -512,7 +512,7 @@ export async function checkContainer(engine, container) {
 
     try {
         const { stdout } = await asyncExecShell(`DOCKER_HOST="${host}" docker inspect --format '{{json .State}}' ${container}`)
-        
+
         const parsedStdout = JSON.parse(stdout)
         const status = parsedStdout.Status
         const isRunning = parsedStdout.Running

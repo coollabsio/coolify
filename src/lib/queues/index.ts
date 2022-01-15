@@ -4,13 +4,12 @@ import cuid from 'cuid'
 import { dev } from '$app/env';
 import { prisma } from '$lib/database';
 
-
 import builder from './builder';
-import letsencrypt from './letsencrypt';
 import logger from './logger';
 import proxy from './proxy';
 
 import { asyncExecShell, saveBuildLog } from '$lib/common'
+import sslrenewal from './sslrenewal';
 
 let { Queue, Worker } = Bullmq;
 let redisHost = 'localhost';
@@ -26,16 +25,25 @@ const connectionOptions = {
     host: redisHost
   }
 }
-new QueueScheduler('proxyCron', connectionOptions);
-const proxyCronQueue = new Queue('proxyCron', connectionOptions)
+new QueueScheduler('cron', connectionOptions);
+const proxyCronQueue = new Queue('cron', connectionOptions)
 
-const proxyCronWorker = new Worker('proxyCron', async () => await proxy(), connectionOptions)
+const proxyCronWorker = new Worker('cron', async () => await proxy(), connectionOptions)
 proxyCronWorker.on('failed', async (job: Bullmq.Job, failedReason: string) => {
   console.log(failedReason)
 
 })
 proxyCronQueue.drain().then(() => {
-  proxyCronQueue.add('proxyCron', {}, { repeat: { every: 60000 } })
+  proxyCronQueue.add('cron', {}, { repeat: { every: 60000 } })
+})
+
+const sslRenewalCronQueue = new Queue('cron', connectionOptions)
+const sslRenewalCronWorker = new Worker('cron', async () => await sslrenewal(), connectionOptions)
+sslRenewalCronWorker.on('failed', async (job: Bullmq.Job, failedReason: string) => {
+  console.log(failedReason)
+})
+sslRenewalCronQueue.drain().then(() => {
+  sslRenewalCronQueue.add('cron', {}, { repeat: { every: 1800000 } })
 })
 
 const buildQueueName = dev ? cuid() : 'build_queue'
@@ -69,27 +77,27 @@ buildWorker.on('failed', async (job: Bullmq.Job, failedReason: string) => {
   saveBuildLog({ line: `Reason: ${failedReason.toString()}`, buildId: job.data.build_id, applicationId: job.data.id })
 })
 
-const letsEncryptQueueName = dev ? cuid() : 'letsencrypt_queue'
-const letsEncryptQueue = new Queue(letsEncryptQueueName, connectionOptions)
+// const letsEncryptQueueName = dev ? cuid() : 'letsencrypt_queue'
+// const letsEncryptQueue = new Queue(letsEncryptQueueName, connectionOptions)
 
-const letsEncryptWorker = new Worker(letsEncryptQueueName, async (job) => await letsencrypt(job), {
-  concurrency: 1,
-  ...connectionOptions
-})
-letsEncryptWorker.on('completed', async () => {
-  // TODO: Save letsencrypt logs as build logs!
-  console.log('[DEBUG] Lets Encrypt job completed')
-})
+// const letsEncryptWorker = new Worker(letsEncryptQueueName, async (job) => await letsencrypt(job), {
+//   concurrency: 1,
+//   ...connectionOptions
+// })
+// letsEncryptWorker.on('completed', async () => {
+//   // TODO: Save letsencrypt logs as build logs!
+//   console.log('[DEBUG] Lets Encrypt job completed')
+// })
 
-letsEncryptWorker.on('failed', async (job: Job, failedReason: string) => {
-  try {
-    await prisma.applicationSettings.updateMany({ where: { applicationId: job.data.id }, data: { forceSSL: false } })
-  } catch (error) {
-    console.log(error)
-  }
-  console.log('[DEBUG] Lets Encrypt job failed')
-  console.log(failedReason)
-})
+// letsEncryptWorker.on('failed', async (job: Job, failedReason: string) => {
+//   try {
+//     await prisma.applicationSettings.updateMany({ where: { applicationId: job.data.id }, data: { forceSSL: false } })
+//   } catch (error) {
+//     console.log(error)
+//   }
+//   console.log('[DEBUG] Lets Encrypt job failed')
+//   console.log(failedReason)
+// })
 
 
 const buildLogQueueName = dev ? cuid() : 'log_queue'
@@ -100,4 +108,4 @@ const buildLogWorker = new Worker(buildLogQueueName, async (job) => await logger
 })
 
 
-export { buildQueue, letsEncryptQueue, buildLogQueue, proxyCronQueue }
+export { buildQueue, buildLogQueue, proxyCronQueue }
