@@ -54,7 +54,7 @@
 {#if loading}
 	<Loading />
 {:else}
-	<div class="relative overflow-y-auto">
+	<div class="relative">
 		{#if currentStatus === 'running'}
 			<LoadingLogs />
 		{/if}
