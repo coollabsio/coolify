@@ -47,7 +47,7 @@ a {
 }
 
 .nav-side {
-	@apply flex text-white justify-end items-center m-5 fixed right-0 top-0 space-x-2 z-50;
+	@apply flex text-white justify-end items-center m-5 fixed right-0 top-0 space-x-2 z-50 bg-coolblack/40;
 }
 
 .add-icon {

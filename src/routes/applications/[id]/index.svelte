@@ -39,7 +39,7 @@
 	import Setting from '$lib/components/Setting.svelte';
 	import type { Application, ApplicationSettings } from '@prisma/client';
 	import { notNodeDeployments, staticDeployments } from '$lib/components/common';
-import { toast } from '@zerodevx/svelte-toast';
+	import { toast } from '@zerodevx/svelte-toast';
 	const { id } = $page.params;
 
 	let domainEl: HTMLInputElement;
@@ -55,7 +55,7 @@ import { toast } from '@zerodevx/svelte-toast';
 
 	async function changeSettings(name) {
 		const form = new FormData();
-		let tempforceSSL = forceSSL
+		let tempforceSSL = forceSSL;
 		let forceSSLChanged = false;
 		if (name === 'debug') {
 			debug = !debug;
@@ -71,28 +71,32 @@ import { toast } from '@zerodevx/svelte-toast';
 		form.append('debug', debug.toString());
 		form.append('forceSSL', tempforceSSL.toString());
 		form.append('forceSSLChanged', forceSSLChanged.toString());
-
 		try {
-			await fetch(`/applications/${id}/settings.json`, {
+			const response = await fetch(`/applications/${id}/settings.json`, {
 				method: 'POST',
 				body: form
 			});
-			toast.push('Settings saved.');
+			if (!response.ok) {
+				const error = await response.json();
+				errorNotification(error.message || error);
+				return;
+			}
+			if (forceSSLChanged) toast.push('Settings saved. Generating SSL certificate...');
+			else toast.push('Settings saved. Turned off https certificate.');
+			forceSSL = tempforceSSL;
 		} catch (e) {
-			errorNotification(e);
-			console.error(e);
-		} finally {
-			forceSSL = tempforceSSL
+			errorNotification(e.message || e);
+			throw new Error(e.message || e);
 		}
 	}
 </script>
 
 <div class="font-bold flex space-x-1 p-5 px-6 text-2xl items-center">
-	<div class="tracking-tight truncate md:max-w-64 md:block hidden">
+	<div class="tracking-tight truncate md:max-w-64 lg:block hidden">
 		{$appConfiguration.configuration.name}
 	</div>
 	{#if $appConfiguration.configuration.domain}
-		<span class="px-1 arrow-right-applications md:block hidden">></span>
+		<span class="px-1 arrow-right-applications lg:block hidden">></span>
 		<span class="pr-2"
 			><a href="http://{$appConfiguration.configuration.domain}" target="_blank"
 				>{$appConfiguration.configuration.domain}</a

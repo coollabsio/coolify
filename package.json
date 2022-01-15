@@ -18,7 +18,7 @@
 		"db:generate": "prisma generate",
 		"db:push": "prisma db push && prisma generate",
 		"db:seed": "prisma db seed",
-		"release:coolify": "docker build -t coollabsio/coolify:2.0.0-rc.1 -t coollabsio/coolify:latest . && docker push coollabsio/coolify:2.0.0-rc.1 && docker push coollabsio/coolify:latest",
+		"release:coolify": "cross-var docker build -t coollabsio/coolify:$npm_package_version -t coollabsio/coolify:latest . && docker push coollabsio/coolify:$npm_package_version && docker push coollabsio/coolify:latest",
 		"release:haproxy": "docker build -f haproxy.Dockerfile -t coollabsio/coolify-haproxy-alpine:1.0.0-rc.1 -t coollabsio/coolify-haproxy-alpine:latest . && docker push coollabsio/coolify-haproxy-alpine:1.0.0-rc.1 && docker push coollabsio/coolify-haproxy-alpine:latest",
 		"release:haproxy:db": "docker build -f haproxy-db.Dockerfile -t coollabsio/coolify-haproxy-db-alpine:1.0.0-rc.1 -t coollabsio/coolify-haproxy-db-alpine:latest . && docker push coollabsio/coolify-haproxy-db-alpine:1.0.0-rc.1 && docker push coollabsio/coolify-haproxy-db-alpine:latest"
 	},
@@ -34,6 +34,7 @@
 		"@typescript-eslint/parser": "^4.31.1",
 		"@zerodevx/svelte-toast": "^0.6.3",
 		"autoprefixer": "^10.4.0",
+		"cross-var": "^1.1.0",
 		"eslint": "^7.32.0",
 		"eslint-config-prettier": "^8.3.0",
 		"eslint-plugin-svelte3": "^3.2.1",
