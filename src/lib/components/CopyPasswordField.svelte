@@ -1,5 +1,5 @@
 <script>
-import { browser } from '$app/env';
+	import { browser } from '$app/env';
 
 	import { toast } from '@zerodevx/svelte-toast';
 	export let value;

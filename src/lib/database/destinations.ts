@@ -9,6 +9,14 @@ export async function listDestinations(teamId) {
     return await prisma.destinationDocker.findMany({ where: { teams: { every: { id: teamId } } } })
 }
 
+export async function configureDestinationForService({ id, destinationId }) {
+    try {
+        await prisma.service.update({ where: { id }, data: { destinationDocker: { connect: { id: destinationId } } } })
+        return { status: 201 }
+    } catch (e) {
+        throw PrismaErrorHandler(e)
+    }
+}
 export async function configureDestinationForApplication({ id, destinationId }) {
     try {
         await prisma.application.update({ where: { id }, data: { destinationDocker: { connect: { id: destinationId } } } })

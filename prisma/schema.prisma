@@ -51,6 +51,8 @@ model Team {
   updatedAt         DateTime            @updatedAt
   database          Database[]          @relation(fields: [databaseId], references: [id])
   databaseId        String?
+  service           Service[]           @relation(fields: [serviceId], references: [id])
+  serviceId         String?
 }
 
 model TeamInvitation {
@@ -147,6 +149,7 @@ model DestinationDocker {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   database           Database[]
+  service            Service[]
 }
 
 model GitSource {
@@ -213,6 +216,8 @@ model Database {
   teams               Team[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
+  service             Service?           @relation(fields: [serviceId], references: [id])
+  serviceId           String?
 }
 
 model DatabaseSettings {
@@ -222,4 +227,36 @@ model DatabaseSettings {
   isPublic   Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+model Service {
+  id                  String              @id @default(cuid())
+  name                String
+  domain              String?
+  type                String?
+  version             String?
+  databaseId          String?             @unique
+  teams               Team[]
+  destinationDockerId String?
+  destinationDocker   DestinationDocker?  @relation(fields: [destinationDockerId], references: [id])
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  Database            Database[]
+  plausibleAnalytics  PlausibleAnalytics?
+}
+
+model PlausibleAnalytics {
+  id                   String   @id @default(cuid())
+  email                String?
+  username             String?
+  password             String
+  postgresqlUser       String
+  postgresqlPassword   String
+  postgresqlDatabase   String
+  postgresqlPublicPort Int?
+  secretKeyBase        String?
+  serviceId            String   @unique
+  service              Service  @relation(fields: [serviceId], references: [id])
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }

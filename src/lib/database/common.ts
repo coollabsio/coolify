@@ -4,7 +4,7 @@ import { default as ProdPrisma } from '@prisma/client'
 import generator from 'generate-password';
 import forge from 'node-forge'
 
-export function generatePassword({ length } = { length: 24 }) {
+export function generatePassword(length = 24) {
     return generator.generate({
         length,
         numbers: true,
@@ -73,6 +73,13 @@ export const supportedDatabaseTypesAndVersions = [
     { name: 'redis', fancyName: 'Redis', baseImage: 'bitnami/redis', versions: ['6.2.6', '6.0.16', '5.0.14'] },
     { name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] },
     // { name: 'clickhouse', versions: ['21.12', '21.11', ''] }
+];
+export const supportedServiceTypesAndVersions = [
+    { name: 'plausibleanalytics', fancyName: 'Plausible Analytics', baseImage: 'plausible/analytics', versions: ['latest'] },
+    { name: 'nocodb', fancyName: 'NocoDB', baseImage: 'nocodb/nocodb', versions: ['latest'] },
+    { name: 'minio', fancyName: 'MinIO', baseImage: 'minio/minio', versions: ['latest'] },
+    { name: 'vscodeserver', fancyName: 'VSCode Server', baseImage: 'codercom/code-server', versions: ['latest'] },
+    { name: 'wordpress', fancyName: 'Wordpress', baseImage: 'wordpress', versions: ['latest', 'php8.1', 'php8.0', 'php7.4', 'php7.3'] },
 ];
 
 export function getVersions(type) {

@@ -56,7 +56,7 @@
 	{:else}
 		{#each databases as database}
 			<a href="/databases/{database.id}" class="no-underline p-2">
-				<div class="box-selection relative	">
+				<div class="box-selection relative hover:bg-purple-600">
 					{#if database.type === 'clickhouse'}
 						<Clickhouse />
 					{:else if database.type === 'couchdb'}

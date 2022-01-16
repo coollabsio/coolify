@@ -176,7 +176,7 @@ export async function forceSSLOnApplication({ domain }) {
 //         await completeTransaction(transactionId)
 //     }
 // }
-export async function deleteProxyForDatabase({ id }) {
+export async function deleteProxy({ id }) {
     const haproxy = haproxyInstance()
     try {
         await checkHAProxy()

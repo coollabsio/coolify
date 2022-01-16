@@ -11,3 +11,4 @@ export * from './users';
 export * from './teams';
 export * from './secrets';
 export * from './databases';
+export * from './services';

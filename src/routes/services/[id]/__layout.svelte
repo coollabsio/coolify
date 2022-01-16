@@ -1,56 +1,52 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	function checkConfiguration(database): string {
+	function checkConfiguration(service): string {
 		let configurationPhase = null;
-		if (!database.type) {
+		if (!service.type) {
 			configurationPhase = 'type';
-		} else if (!database.version) {
+		} else if (!service.version) {
 			configurationPhase = 'version';
-		} else if (!database.destinationDockerId) {
+		} else if (!service.destinationDockerId) {
 			configurationPhase = 'destination';
 		}
 		return configurationPhase;
 	}
 	export const load: Load = async ({ fetch, params, url }) => {
-		const endpoint = `/databases/${params.id}.json`;
+		const endpoint = `/services/${params.id}.json`;
 		const res = await fetch(endpoint);
 		if (res.ok) {
-			const { database, state, versions, privatePort } = await res.json();
-			if (!database || Object.entries(database).length === 0) {
+			const { service, state } = await res.json();
+			if (!service || Object.entries(service).length === 0) {
 				return {
 					status: 302,
 					redirect: '/databases'
 				};
 			}
-			const configurationPhase = checkConfiguration(database);
+			const configurationPhase = checkConfiguration(service);
 			if (
 				configurationPhase &&
-				url.pathname !== `/databases/${params.id}/configuration/${configurationPhase}`
+				url.pathname !== `/services/${params.id}/configuration/${configurationPhase}`
 			) {
 				return {
 					status: 302,
-					redirect: `/databases/${params.id}/configuration/${configurationPhase}`
+					redirect: `/services/${params.id}/configuration/${configurationPhase}`
 				};
 			}
 			return {
 				props: {
-					database,
-					state,
-					versions,
-					privatePort
+					service,
+					state
 				},
 				stuff: {
-					database,
-					state,
-					versions,
-					privatePort
+					service,
+					state
 				}
 			};
 		}
 
 		return {
 			status: 302,
-			redirect: '/databases'
+			redirect: '/services'
 		};
 	};
 </script>
@@ -61,32 +57,41 @@
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import Loading from '$lib/components/Loading.svelte';
 
-	export let database;
+	export let service;
 	export let state;
 	let loading = false;
 
-	async function deleteDatabase() {
-		const sure = confirm(`Are you sure you would like to delete '${database.name}'?`);
+	async function deleteService() {
+		const sure = confirm(`Are you sure you would like to delete '${service.name}'?`);
 		if (sure) {
 			loading = true;
-			const response = await fetch(`/databases/${database.id}/delete.json`, {
-				method: 'delete',
-				body: JSON.stringify({ id: database.id })
+			const responseStop = await fetch(`/services/${service.id}/${service.type}/stop.json`, {
+				method: 'POST'
 			});
-			if (!response.ok) {
-				const { message } = await response.json();
+			if (!responseStop.ok) {
 				loading = false;
+				const { message } = await responseStop.json();
 				errorNotification(message);
 			} else {
-				window.location.assign('/databases');
+				const responseDelete = await fetch(`/services/${service.id}/delete.json`, {
+					method: 'delete',
+					body: JSON.stringify({ id: service.id })
+				});
+				if (!responseDelete.ok) {
+					const { message } = await responseDelete.json();
+					loading = false;
+					errorNotification(message);
+				} else {
+					window.location.assign('/services');
+				}
 			}
 		}
 	}
-	async function stopDatabase() {
-		const sure = confirm(`Are you sure you would like to stop '${database.name}'?`);
+	async function stopService() {
+		const sure = confirm(`Are you sure you would like to stop '${service.name}'?`);
 		if (sure) {
 			loading = true;
-			const response = await fetch(`/databases/${database.id}/stop.json`, {
+			const response = await fetch(`/services/${service.id}/${service.type}/stop.json`, {
 				method: 'POST'
 			});
 			if (!response.ok) {
@@ -98,9 +103,9 @@
 			}
 		}
 	}
-	async function startDatabase() {
+	async function startService() {
 		loading = true;
-		const response = await fetch(`/databases/${database.id}/start.json`, {
+		const response = await fetch(`/services/${service.id}/${service.type}/start.json`, {
 			method: 'POST'
 		});
 		if (!response.ok) {
@@ -117,17 +122,17 @@
 	{#if loading}
 		<Loading fullscreen cover />
 	{:else}
-		{#if database.type && database.destinationDockerId && database.version}
+		{#if service.type && service.destinationDockerId && service.version}
 			{#if state === 'running'}
 				<button
-					on:click={stopDatabase}
-					title="Stop Database"
+					on:click={stopService}
+					title="Stop Service"
 					type="submit"
 					disabled={!$session.isAdmin}
-					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-purple-600 hover:text-white"
+					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-pink-600 hover:text-white"
 					data-tooltip={$session.isAdmin
-						? 'Stop database'
-						: 'You do not have permission to stop the database.'}
+						? 'Stop Service'
+						: 'You do not have permission to stop the service.'}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -146,14 +151,14 @@
 				</button>
 			{:else if state === 'not started'}
 				<button
-					on:click={startDatabase}
-					title="Start Database"
+					on:click={startService}
+					title="Start Service"
 					type="submit"
 					disabled={!$session.isAdmin}
-					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-purple-600 hover:text-white"
+					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-pink-600 hover:text-white"
 					data-tooltip={$session.isAdmin
-						? 'Start Database'
-						: 'You do not have permission to start the database.'}
+						? 'Start Service'
+						: 'You do not have permission to start the service.'}
 					><svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="w-6 h-6"
@@ -171,15 +176,15 @@
 			{/if}
 		{/if}
 		<button
-			on:click={deleteDatabase}
-			title="Delete Database"
+			on:click={deleteService}
+			title="Delete Service"
 			type="submit"
 			disabled={!$session.isAdmin}
 			class:hover:text-red-500={$session.isAdmin}
 			class="icons bg-transparent tooltip-bottom text-sm"
 			data-tooltip={$session.isAdmin
-				? 'Delete Database'
-				: 'You do not have permission to delete a Database'}><DeleteIcon /></button
+				? 'Delete Service'
+				: 'You do not have permission to delete a service.'}><DeleteIcon /></button
 		>
 	{/if}
 </nav>

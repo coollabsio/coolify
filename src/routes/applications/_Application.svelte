@@ -18,7 +18,7 @@
 </script>
 
 <a href="/applications/{application.id}" class="no-underline p-2">
-	<div class="box-selection relative">
+	<div class="box-selection relative hover:bg-green-600">
 		{#if buildPack === 'rust'}
 			<Rust />
 		{:else if buildPack === 'node'}

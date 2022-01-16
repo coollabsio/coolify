@@ -83,8 +83,8 @@
 			{#if $session.isAdmin}
 				<button
 					type="submit"
-					class:bg-green-600={!loading}
-					class:hover:bg-green-500={!loading}
+					class:bg-purple-600={!loading}
+					class:hover:bg-purple-500={!loading}
 					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
 				>
 			{/if}

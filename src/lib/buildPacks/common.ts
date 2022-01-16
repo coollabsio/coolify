@@ -48,20 +48,20 @@ export async function makeLabelForStandaloneDatabase({ id, image, volume }) {
     ]
 }
 
-export async function makeLabelForServiceDatabase({ id, image, volume }) {
-    const database = await db.prisma.database.findFirst({ where: { id } })
-    delete database.destinationDockerId
-    delete database.createdAt
-    delete database.updatedAt
+export async function makeLabelForPlausibleAnalytics({ id, images, volume }) {
+    const service = await db.prisma.service.findFirst({ where: { id }, include: { plausibleAnalytics: true } })
+    delete service.destinationDockerId
+    delete service.createdAt
+    delete service.updatedAt
     return [
         'coolify.managed=true',
         `coolify.version=${version}`,
-        `coolify.type=service-database`,
+        `coolify.type=service-plausibleanalytics`,
         `coolify.configuration=${base64Encode(JSON.stringify({
             version,
-            image,
+            images,
             volume,
-            ...database
+            ...service
         }))}`,
     ]
 }
