@@ -54,9 +54,7 @@
 		<Wordpress />
 	{/if}
 	<span class="px-1 arrow-right-applications md:block hidden">></span>
-	<a href={service.domain} target="_blank" class="pr-2"
-		>{service.domain.replace('https://', '').replace('http://', '')}</a
-	>
+	<a href={service.domain} target="_blank" class="pr-2">{service.domain}</a>
 </div>
 
 <Services {service} />

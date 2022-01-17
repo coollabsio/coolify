@@ -7,7 +7,6 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     if (status === 401) return { status, body }
     const { id } = request.params
     const domain = request.body.get('domain')
-    console.log(domain)
     try {
         return db.isDomainConfigured({ id, domain: domain.replace('http://', '').replace('https://', '') })
     } catch (err) {
