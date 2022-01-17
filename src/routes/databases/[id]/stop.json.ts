@@ -1,7 +1,7 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { stopDatabase } from '$lib/database';
-import { stopDatabaseProxy } from '$lib/haproxy';
+import { stopTcpHttpProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
@@ -13,7 +13,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     try {
         const database = await db.getDatabase({ id, teamId })
         const everStarted = await stopDatabase(database)
-        if (everStarted) await stopDatabaseProxy(database.destinationDocker, database.publicPort)
+        if (everStarted) await stopTcpHttpProxy(database.destinationDocker, database.publicPort)
         await db.setDatabase({ id, isPublic: false })
 
         return {

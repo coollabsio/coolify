@@ -1,0 +1,19 @@
+global
+  log stdout format raw local0 debug
+
+defaults 
+  mode http
+  log global
+  timeout http-request 10s
+  timeout connect 5s
+  timeout client 10s
+  timeout server 10s
+
+frontend "${APP}"
+  mode http
+  bind *:"${PORT}" name "${APP}"
+  default_backend "${APP}"
+
+backend "${APP}"
+  mode http
+  server "${APP}" "${APP}":"${PRIVATE_PORT}" check

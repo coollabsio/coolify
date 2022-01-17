@@ -7,7 +7,8 @@ import { letsEncrypt } from "$lib/letsencrypt";
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555'
 
 export const defaultProxyImage = `coolify-haproxy-alpine:latest`
-export const defaultProxyImageDatabase = `coolify-haproxy-db-alpine:latest`
+export const defaultProxyImageTcp = `coolify-haproxy-tcp-alpine:latest`
+export const defaultProxyImageHttp = `coolify-haproxy-http-alpine:latest`
 
 export function haproxyInstance() {
     return got.extend({
@@ -397,7 +398,11 @@ export async function configureProxyForApplication({ domain, applicationId, port
 
 export async function configureCoolifyProxyOff({ domain }) {
     const haproxy = haproxyInstance()
-    await checkHAProxy()
+    try {
+        await checkHAProxy()
+    } catch (error) {
+        return
+    }
     try {
         const transactionId = await getNextTransactionId()
         await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
@@ -424,7 +429,11 @@ export async function checkHAProxy() {
 }
 export async function configureCoolifyProxyOn({ domain }) {
     const haproxy = haproxyInstance()
-    await checkHAProxy()
+    try {
+        await checkHAProxy()
+    } catch (error) {
+        return
+    }
 
     try {
         await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
@@ -467,7 +476,7 @@ export async function configureCoolifyProxyOn({ domain }) {
 
 }
 
-export async function stopDatabaseProxy(destinationDocker, publicPort) {
+export async function stopTcpHttpProxy(destinationDocker, publicPort) {
     const { engine } = destinationDocker
     const host = getEngine(engine)
     const containerName = `haproxy-for-${publicPort}`
@@ -479,9 +488,8 @@ export async function stopDatabaseProxy(destinationDocker, publicPort) {
     } catch (error) {
         return error
     }
-
 }
-export async function startDatabaseProxy(destinationDocker, id, publicPort, privatePort) {
+export async function startTcpProxy(destinationDocker, id, publicPort, privatePort) {
     const { network, engine } = destinationDocker
     const host = getEngine(engine)
 
@@ -491,12 +499,27 @@ export async function startDatabaseProxy(destinationDocker, id, publicPort, priv
 
     try {
         if (foundDB && !found) {
-            return await asyncExecShell(`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} -d coollabsio/${defaultProxyImageDatabase}`)
+            return await asyncExecShell(`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} -d coollabsio/${defaultProxyImageTcp}`)
         }
     } catch (error) {
         return error
     }
+}
+export async function startHttpProxy(destinationDocker, id, publicPort, privatePort) {
+    const { network, engine } = destinationDocker
+    const host = getEngine(engine)
 
+    const containerName = `haproxy-for-${publicPort}`
+    const found = await checkContainer(engine, containerName)
+    const foundDB = await checkContainer(engine, id)
+
+    try {
+        if (foundDB && !found) {
+            return await asyncExecShell(`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} -d coollabsio/${defaultProxyImageHttp}`)
+        }
+    } catch (error) {
+        return error
+    }
 }
 export async function startCoolifyProxy(engine) {
     const host = getEngine(engine)
@@ -554,3 +577,72 @@ export async function configureNetworkCoolifyProxy(engine) {
         }
     })
 }
+
+
+export async function configureSimpleServiceProxyOn({ id, domain, port }) {
+    const haproxy = haproxyInstance()
+    try {
+        await checkHAProxy()
+    } catch (error) {
+        return
+    }
+    try {
+        await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
+        return
+    } catch (error) {
+
+    }
+    try {
+        const transactionId = await getNextTransactionId()
+        await haproxy.post('v2/services/haproxy/configuration/backends', {
+            searchParams: {
+                transaction_id: transactionId
+            },
+            json: {
+                "init-addr": "last,libc,none",
+                "forwardfor": { "enabled": "enabled" },
+                "name": domain
+            }
+        })
+        await haproxy.post('v2/services/haproxy/configuration/servers', {
+            searchParams: {
+                transaction_id: transactionId,
+                backend: domain
+            },
+            json: {
+                "address": id,
+                "check": "enabled",
+                "name": id,
+                "port": port
+            }
+        })
+        await completeTransaction(transactionId)
+
+    } catch (error) {
+        console.log(error)
+    }
+
+}
+
+export async function configureSimpleServiceProxyOff({ domain }) {
+    const haproxy = haproxyInstance()
+    try {
+        await checkHAProxy()
+    } catch (error) {
+        return
+    }
+    try {
+        const transactionId = await getNextTransactionId()
+        await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json()
+        await haproxy.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
+            searchParams: {
+                transaction_id: transactionId
+            },
+        }).json()
+        await completeTransaction(transactionId)
+    } catch (error) {
+        console.log(error)
+    }
+}
+
+

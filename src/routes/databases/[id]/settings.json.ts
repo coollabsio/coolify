@@ -1,7 +1,7 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { generateDatabaseConfiguration } from '$lib/database';
-import { startDatabaseProxy, stopDatabaseProxy } from '$lib/haproxy';
+import { startTcpProxy, stopTcpHttpProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
@@ -20,9 +20,9 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
         if (destinationDockerId) {
             if (isPublic) {
-                await startDatabaseProxy(destinationDocker, id, publicPort, privatePort)
+                await startTcpProxy(destinationDocker, id, publicPort, privatePort)
             } else {
-                await stopDatabaseProxy(destinationDocker, publicPort)
+                await stopTcpHttpProxy(destinationDocker, publicPort)
             }
         }
 

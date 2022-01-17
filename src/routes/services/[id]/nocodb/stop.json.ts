@@ -16,8 +16,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         if (destinationDockerId) {
             const docker = dockerInstance({ destinationDocker })
             const container = docker.engine.getContainer(id)
-            const postgresqlContainer = docker.engine.getContainer(`${id}-postgresql`)
-            const clickhouseContainer = docker.engine.getContainer(`${id}-clickhouse`)
+          
             try {
                 if (container) {
                     await container.stop()
@@ -26,24 +25,8 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             } catch (error) {
                 console.error(error)
             }
-            try {
-                if (postgresqlContainer) {
-                    await postgresqlContainer.stop()
-                    await postgresqlContainer.remove()
-                }
-            } catch (error) {
-                console.error(error)
-            }
-            try {
-                if (postgresqlContainer) {
-                    await clickhouseContainer.stop()
-                    await clickhouseContainer.remove()
-                }
-            } catch (error) {
-                console.error(error)
-            }
-
-            await configureSimpleServiceProxyOff({ domain: domain.replace(/^https?:\/\//, '').replace(/^http?:\/\//, '') })
+           
+            await configureSimpleServiceProxyOff({ domain:domain.replace(/^https?:\/\//, '').replace(/^http?:\/\//, '') })
         }
 
         return {

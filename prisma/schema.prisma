@@ -243,6 +243,7 @@ model Service {
   updatedAt           DateTime            @updatedAt
   Database            Database[]
   plausibleAnalytics  PlausibleAnalytics?
+  minio               Minio?
 }
 
 model PlausibleAnalytics {
@@ -259,4 +260,15 @@ model PlausibleAnalytics {
   service              Service  @relation(fields: [serviceId], references: [id])
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+}
+
+model Minio {
+  id               String   @id @default(cuid())
+  rootUser         String
+  rootUserPassword String
+  publicPort       Int?
+  serviceId        String   @unique
+  service          Service  @relation(fields: [serviceId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }

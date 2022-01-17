@@ -1,7 +1,7 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { dockerInstance } from '$lib/docker';
-import { configureSimpleServiceProxyOff } from '$lib/haproxy';
+import { configureSimpleServiceProxyOff, stopTcpHttpProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
@@ -12,12 +12,11 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
     try {
         const service = await db.getService({ id, teamId })
-        const { destinationDockerId, destinationDocker, domain } = service
+        const { destinationDockerId, destinationDocker, domain, minio: { publicPort } } = service
         if (destinationDockerId) {
             const docker = dockerInstance({ destinationDocker })
             const container = docker.engine.getContainer(id)
-            const postgresqlContainer = docker.engine.getContainer(`${id}-postgresql`)
-            const clickhouseContainer = docker.engine.getContainer(`${id}-clickhouse`)
+
             try {
                 if (container) {
                     await container.stop()
@@ -26,23 +25,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             } catch (error) {
                 console.error(error)
             }
-            try {
-                if (postgresqlContainer) {
-                    await postgresqlContainer.stop()
-                    await postgresqlContainer.remove()
-                }
-            } catch (error) {
-                console.error(error)
-            }
-            try {
-                if (postgresqlContainer) {
-                    await clickhouseContainer.stop()
-                    await clickhouseContainer.remove()
-                }
-            } catch (error) {
-                console.error(error)
-            }
-
+            await stopTcpHttpProxy(destinationDocker, publicPort)
             await configureSimpleServiceProxyOff({ domain: domain.replace(/^https?:\/\//, '').replace(/^http?:\/\//, '') })
         }
 

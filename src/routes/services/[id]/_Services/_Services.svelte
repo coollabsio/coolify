@@ -70,10 +70,33 @@
 				</div>
 			</div>
 			<div class="grid grid-cols-3 items-center">
-				<label for="domain">Domain</label>
-				<div class="col-span-2 ">
-					<input placeholder="eg: analytics.coollabs.io" readonly={!$session.isAdmin} name="domain" id="domain" bind:this={domainEl} value={service.domain} required />
-				</div>
+				{#if service.type === 'plausibleanalytics' || service.type === 'nocodb'}
+					<label for="domain">Domain with scheme</label>
+					<div class="col-span-2 ">
+						<input
+							placeholder="eg: https://analytics.coollabs.io"
+							readonly={!$session.isAdmin || service.domain}
+							name="domain"
+							id="domain"
+							bind:this={domainEl}
+							value={service.domain}
+							required
+						/>
+					</div>
+				{:else}
+					<label for="domain">Domain</label>
+					<div class="col-span-2 ">
+						<input
+							placeholder="eg: analytics.coollabs.io"
+							readonly={!$session.isAdmin}
+							name="domain"
+							id="domain"
+							bind:this={domainEl}
+							value={service.domain}
+							required
+						/>
+					</div>
+				{/if}
 			</div>
 			<div class="grid grid-cols-3 items-center">
 				<label for="destination">Destination</label>
@@ -92,15 +115,15 @@
 			</div>
 
 			{#if service.type === 'plausibleanalytics'}
-				<PlausibleAnalytics  {service}/>
+				<PlausibleAnalytics {service} />
 			{:else if service.type === 'nocodb'}
-				<NocoDb {service}/>
+				<NocoDb {service} />
 			{:else if service.type === 'minio'}
-				<MinIo {service}/>
+				<MinIo {service} />
 			{:else if service.type === 'vscodeserver'}
-				<VsCodeServer {service}/>
+				<VsCodeServer {service} />
 			{:else if service.type === 'wordpress'}
-				<Wordpress {service}/>
+				<Wordpress {service} />
 			{/if}
 		</div>
 	</form>

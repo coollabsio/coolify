@@ -4,6 +4,7 @@ import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
 import { letsEncrypt } from '$lib/letsencrypt';
+import { configureSimpleServiceProxyOn } from '$lib/haproxy';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { teamId, status, body } = await getUserDetails(request);
@@ -174,9 +175,12 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         try {
             const domainOnly = domain.replace('http://', '').replace('https://', '')
             await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`)
-            const ssl = { destinationDocker, domain: domainOnly, forceSSLChanged: true, isCoolify: false, id }
-            await letsEncrypt(ssl)
-            // TODO: configure proxy for frontend and postgresql if required
+            await configureSimpleServiceProxyOn({ id, domain: domainOnly, port: 8000 })
+            
+            if (domain.startsWith('https://')) {
+                const ssl = { destinationDocker, domain: domainOnly, forceSSLChanged: true, isCoolify: false, id }
+                await letsEncrypt(ssl)
+            }
             return {
                 status: 200
             }

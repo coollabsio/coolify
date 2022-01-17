@@ -1,6 +1,7 @@
 import { asyncExecShell, getEngine, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { generateDatabaseConfiguration, getVersions } from '$lib/database';
+import { generateDatabaseConfiguration, getServiceImage, getVersions } from '$lib/database';
+import { dockerInstance } from '$lib/docker';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (request) => {
@@ -9,12 +10,14 @@ export const get: RequestHandler = async (request) => {
 
     const { id } = request.params
     const service = await db.getService({ id, teamId })
-    const { destinationDockerId, destinationDocker } = service
+    const { destinationDockerId, destinationDocker, type, version } = service
 
     let state = 'not started'
     if (destinationDockerId) {
         const host = getEngine(destinationDocker.engine)
-
+        const docker = dockerInstance({ destinationDocker })
+        const baseImage = getServiceImage(type)
+        docker.engine.pull(`${baseImage}:${version}`)
         try {
             const { stdout } = await asyncExecShell(`DOCKER_HOST=${host} docker inspect --format '{{json .State}}' ${id}`)
 
@@ -29,7 +32,6 @@ export const get: RequestHandler = async (request) => {
         body: {
             state,
             service
-
         }
     };
 

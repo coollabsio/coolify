@@ -1,7 +1,7 @@
 import { asyncExecShell, getEngine } from "$lib/common"
 import { dockerInstance } from "$lib/docker"
-import { defaultProxyImageDatabase, startCoolifyProxy } from "$lib/haproxy"
-import { getBaseImage } from "."
+import { defaultProxyImageHttp, defaultProxyImageTcp, startCoolifyProxy } from "$lib/haproxy"
+import { getDatabaseImage } from "."
 import { prisma, PrismaErrorHandler } from "./common"
 
 
@@ -35,9 +35,10 @@ export async function configureDestinationForDatabase({ id, destinationId }) {
             const docker = dockerInstance({ destinationDocker })
             try {
                 if (type && version) {
-                    const baseImage = getBaseImage(type)
+                    const baseImage = getDatabaseImage(type)
                     docker.engine.pull(`${baseImage}:${version}`)
-                    docker.engine.pull(`coollabsio/${defaultProxyImageDatabase}`)
+                    docker.engine.pull(`coollabsio/${defaultProxyImageTcp}`)
+                    docker.engine.pull(`coollabsio/${defaultProxyImageHttp}`)
                     docker.engine.pull(`certbot/certbot:latest`)
                     docker.engine.pull(`alpine:latest`)
                 }

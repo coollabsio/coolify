@@ -89,8 +89,15 @@ export function getVersions(type) {
     }
     return []
 }
-export function getBaseImage(type) {
+export function getDatabaseImage(type) {
     const found = supportedDatabaseTypesAndVersions.find(t => t.name === type)
+    if (found) {
+        return found.baseImage
+    }
+    return ''
+}
+export function getServiceImage(type) {
+    const found = supportedServiceTypesAndVersions.find(t => t.name === type)
     if (found) {
         return found.baseImage
     }
@@ -98,7 +105,7 @@ export function getBaseImage(type) {
 }
 export function generateDatabaseConfiguration(database) {
     const { id, dbUser, dbUserPassword, rootUser, rootUserPassword, defaultDatabase, version, type } = database
-    const baseImage = getBaseImage(type)
+    const baseImage = getDatabaseImage(type)
     if (type === 'mysql') {
         return {
             // url: `mysql://${dbUser}:${dbUserPassword}@${id}:${isPublic ? port : 3306}/${defaultDatabase}`,

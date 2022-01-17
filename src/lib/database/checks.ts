@@ -40,9 +40,19 @@ export async function isSecretExists({ id, name }) {
 
 export async function isDomainConfigured({ id, domain }) {
     try {
-        const foundApplication = await prisma.application.findFirst({ where: { domain, id: { not: id } }, rejectOnNotFound: false })
-        const foundService = await prisma.service.findFirst({ where: { domain, id: { not: id } }, rejectOnNotFound: false })
-        if (foundApplication || foundService) {
+        const applicationDomains = await prisma.application.findMany({ where: { domain: { not: null }, id: { not: id } }, select: { domain: true } })
+        const serviceDomains = await prisma.service.findMany({ where: { domain: { not: null }, id: { not: id } }, select: { domain: true } })
+        let foundApplicationDomain = null
+        let foundServiceDomain = null
+        if (applicationDomains.length > 0) {
+            foundApplicationDomain = applicationDomains.find(applicationDomain => applicationDomain.domain.replace('http://', '').replace('https://', '') === domain)
+
+        }
+        if (serviceDomains.length > 0) {
+            foundServiceDomain = serviceDomains.find(serviceDomain => serviceDomain.domain.replace('http://', '').replace('https://', '') === domain)
+
+        }
+        if (foundApplicationDomain || foundServiceDomain) {
             return {
                 status: 500,
                 body: {

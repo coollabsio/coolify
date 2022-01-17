@@ -19,10 +19,13 @@ export async function newService({ name, teamId }) {
 
 export async function getService({ id, teamId }) {
     try {
-        const body = await prisma.service.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true, plausibleAnalytics: true } })
+        const body = await prisma.service.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true, plausibleAnalytics: true, minio: true } })
+
         if (body.plausibleAnalytics?.postgresqlPassword) body.plausibleAnalytics.postgresqlPassword = decrypt(body.plausibleAnalytics.postgresqlPassword)
         if (body.plausibleAnalytics?.password) body.plausibleAnalytics.password = decrypt(body.plausibleAnalytics.password)
         if (body.plausibleAnalytics?.secretKeyBase) body.plausibleAnalytics.secretKeyBase = decrypt(body.plausibleAnalytics.secretKeyBase)
+
+        if (body.minio?.rootUserPassword) body.minio.rootUserPassword = decrypt(body.minio.rootUserPassword)
 
         return { ...body }
     } catch (e) {
@@ -42,6 +45,18 @@ export async function configureServiceType({ id, type }) {
             await prisma.service.update({
                 where: { id },
                 data: { type, plausibleAnalytics: { create: { postgresqlDatabase, postgresqlUser, postgresqlPassword, password, secretKeyBase } } }
+            })
+        } else if (type === 'nocodb') {
+            await prisma.service.update({
+                where: { id },
+                data: { type }
+            })
+        } else if (type === 'minio') {
+            const rootUser = cuid()
+            const rootUserPassword = encrypt(generatePassword())
+            await prisma.service.update({
+                where: { id },
+                data: { type, minio: { create: { rootUser, rootUserPassword } } }
             })
         }
 
@@ -65,6 +80,23 @@ export async function updatePlausibleAnalyticsService({ id, domain = undefined, 
     try {
         await prisma.plausibleAnalytics.update({ where: { serviceId: id }, data: { email, username } })
         await prisma.service.update({ where: { id }, data: { name, domain } })
+        return { status: 200 }
+    } catch (e) {
+        throw PrismaErrorHandler(e)
+    }
+}
+export async function updateNocoDbService({ id, domain = undefined }) {
+    try {
+        await prisma.service.update({ where: { id }, data: { domain } })
+        return { status: 200 }
+    } catch (e) {
+        throw PrismaErrorHandler(e)
+    }
+}
+
+export async function updateMinioService({ id, publicPort = undefined }) {
+    try {
+        await prisma.minio.update({ where: { serviceId: id }, data: { publicPort } })
         return { status: 200 }
     } catch (e) {
         throw PrismaErrorHandler(e)
