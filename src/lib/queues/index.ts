@@ -6,10 +6,11 @@ import { prisma } from '$lib/database';
 
 import builder from './builder';
 import logger from './logger';
+import cleanup from './cleanup';
+import sslrenewal from './sslrenewal';
 import proxy from './proxy';
 
 import { asyncExecShell, saveBuildLog } from '$lib/common'
-import sslrenewal from './sslrenewal';
 
 let { Queue, Worker } = Bullmq;
 let redisHost = 'localhost';
@@ -36,6 +37,16 @@ proxyCronWorker.on('failed', async (job: Bullmq.Job, failedReason: string) => {
 proxyCronQueue.drain().then(() => {
   proxyCronQueue.add('cron', {}, { repeat: { every: 60000 } })
 })
+const cleanupQueue = new Queue('cron', connectionOptions)
+const cleanupWorker = new Worker('cron', async () => await cleanup(), connectionOptions)
+cleanupWorker.on('failed', async (job: Bullmq.Job, failedReason: string) => {
+  console.log(failedReason)
+
+})
+cleanupQueue.drain().then(() => {
+  cleanupQueue.add('cron', {}, { repeat: { every: 3600000 } })
+})
+
 
 const sslRenewalCronQueue = new Queue('cron', connectionOptions)
 const sslRenewalCronWorker = new Worker('cron', async () => await sslrenewal(), connectionOptions)

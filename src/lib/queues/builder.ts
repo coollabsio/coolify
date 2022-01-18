@@ -53,7 +53,7 @@ export default async function (job) {
     startCommand = configuration.startCommand
     buildCommand = configuration.buildCommand
     publishDirectory = configuration.publishDirectory
-    
+
     let commit = await importers[gitSource.type]({
       applicationId,
       debug,
