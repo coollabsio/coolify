@@ -42,11 +42,11 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     if (status === 401) return { status, body }
 
     const { id } = request.params
-    const name = request.body.get('name')
-    const oauthId = Number(request.body.get('oauthId'))
-    const groupName = request.body.get('groupName') || null
-    const appId = request.body.get('appId')
-    const appSecret = request.body.get('appSecret')
+    const name = request.body.get('name') || undefined
+    const oauthId = Number(request.body.get('oauthId')) || undefined
+    const groupName = request.body.get('groupName') || undefined
+    const appId = request.body.get('appId') || undefined
+    const appSecret = request.body.get('appSecret') || undefined
 
     try {
         const source = await db.addSource({ id, name, teamId, oauthId, groupName, appId, appSecret })

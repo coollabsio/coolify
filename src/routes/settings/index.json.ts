@@ -26,8 +26,8 @@ export const del: RequestHandler<Locals, FormData> = async (request) => {
     if (status === 401) return { status, body }
 
     const { id } = request.params
-    const name = request.body.get('name') || null
-    const value = request.body.get('value') || null
+    const name = request.body.get('name') || undefined
+    const value = request.body.get('value') || undefined
     try {
         if (name === 'domain') {
             const data = await db.prisma.setting.findUnique({ where: { name: 'domain' } })
@@ -50,8 +50,8 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     if (teamId !== '0') return { status: 401, body: { message: 'You do not have permission to do this. \nAsk an admin to modify your permissions.' } }
     if (status === 401) return { status, body }
 
-    const name = request.body.get('name') || null
-    const value = request.body.get('value') || null
+    const name = request.body.get('name') || undefined
+    const value = request.body.get('value') || undefined
 
     try {
         let oldDomain;

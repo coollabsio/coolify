@@ -7,10 +7,10 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { teamId, status, body } = await getUserDetails(request)
     if (status === 401) return { status, body }
 
-    const name = request.body.get('name') || null
+    const name = request.body.get('name') || undefined
     const isSwarm = request.body.get('isSwarm') || false
-    const engine = request.body.get('engine') || null
-    const network = request.body.get('network') || null
+    const engine = request.body.get('engine') || undefined
+    const network = request.body.get('network') || undefined
     const isCoolifyProxyUsed = request.body.get('isCoolifyProxyUsed') === 'true' ? true : false
 
     try {

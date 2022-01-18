@@ -23,7 +23,7 @@ export const get: RequestHandler<Locals, FormData> = async (request) => {
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { id } = request.params
-    const buildPack = request.body.get('buildPack') || null
+    const buildPack = request.body.get('buildPack') || undefined
     try {
         return await db.configureBuildPack({ id, buildPack })
     } catch (err) {

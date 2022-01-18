@@ -3,8 +3,8 @@ import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler<Locals, FormData> = async (request) => {
     const { id } = request.params
-    const repository = request.url.searchParams.get('repository') || null
-    const branch = request.url.searchParams.get('branch') || null
+    const repository = request.url.searchParams.get('repository') || undefined
+    const branch = request.url.searchParams.get('branch') || undefined
 
     try {
         return await db.isBranchAlreadyUsed({ repository, branch, id })
@@ -15,9 +15,9 @@ export const get: RequestHandler<Locals, FormData> = async (request) => {
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { id } = request.params
-    const repository = request.body.get('repository') || null
-    const branch = request.body.get('branch') || null
-    const projectId = Number(request.body.get('projectId')) || null
+    const repository = request.body.get('repository') || undefined
+    const branch = request.body.get('branch') || undefined
+    const projectId = Number(request.body.get('projectId')) || undefined
     const webhookToken = request.body.get('webhookToken')
     try {
         return await db.configureGitRepository({ id, repository, branch, projectId, webhookToken })

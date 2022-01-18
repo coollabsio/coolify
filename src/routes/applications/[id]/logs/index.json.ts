@@ -13,17 +13,29 @@ export const get: RequestHandler = async (request) => {
         const { destinationDockerId, destinationDocker } = await db.prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
         if (destinationDockerId) {
             const docker = dockerInstance({ destinationDocker })
-            const container = await docker.engine.getContainer(id)
-            if (container) {
-                return {
-                    body: {
-                        logs: (await container.logs({ stdout: true, stderr: true, timestamps: true })).toString()
-                            .split('\n')
-                            .map((l) => l.slice(8))
-                            .filter((a) => a)
+            try {
+                const container = await docker.engine.getContainer(id)
+                if (container) {
+                    return {
+                        body: {
+                            logs: (await container.logs({ stdout: true, stderr: true, timestamps: true })).toString()
+                                .split('\n')
+                                .map((l) => l.slice(8))
+                                .filter((a) => a)
+                        }
+                    }
+                }
+            } catch (error) {
+                const { statusCode } = error
+                if (statusCode === 404) {
+                    return {
+                        body: {
+                            logs: []
+                        }
                     }
                 }
             }
+
         }
     } catch (err) {
         return {

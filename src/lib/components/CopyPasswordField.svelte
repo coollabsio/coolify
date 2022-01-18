@@ -1,21 +1,22 @@
 <script>
 	import { browser } from '$app/env';
-
 	import { toast } from '@zerodevx/svelte-toast';
 	export let value;
 	let showPassword = false;
-	export let isEditable = false;
+
+	export let disabled = false;
 	export let isPasswordField = false;
-	export let isReadOnly = false;
+	export let readonly = false;
 	export let textarea = false;
+	export let required = false;
 
 	export let id;
 	export let name;
-	export let placeholder;
+	export let placeholder = '';
 
-	let disabledClass = 'bg-coolgray-100 disabled:bg-coolgray-100 text-warmGray-400';
+	let disabledClass = 'bg-coolback disabled:bg-coolblack select-all';
 	let actionsShow = false;
-	let isHttps = browser && window.location.protocol === 'https';
+	let isHttps = browser && window.location.protocol === 'https:';
 
 	function showActions(value) {
 		actionsShow = value;
@@ -44,8 +45,9 @@
 				{placeholder}
 				type="text"
 				{id}
-				readonly={isReadOnly}
-				disabled={!isEditable}
+				{required}
+				{readonly}
+				{disabled}
 				{name}>{value}</textarea
 			>
 		{:else}
@@ -54,9 +56,10 @@
 				type="text"
 				{id}
 				{name}
-				readonly={isReadOnly}
+				{required}
+				{readonly}
 				bind:value
-				disabled={!isEditable}
+				{disabled}
 				{placeholder}
 			/>
 		{/if}
@@ -66,9 +69,10 @@
 			type="password"
 			{id}
 			{name}
-			readonly={isReadOnly}
+			{readonly}
+			{required}
 			bind:value
-			disabled={!isEditable}
+			{disabled}
 			{placeholder}
 		/>
 	{/if}

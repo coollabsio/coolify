@@ -230,18 +230,14 @@
 			<div class="grid grid-cols-3 items-center">
 				<label for="destination">Destination</label>
 				<div class="col-span-2">
-					<a
-						href={$session.isAdmin
-							? `/applications/${id}/configuration/destination?from=/applications/${id}`
-							: ''}
-						class="no-underline"
-						><span class="arrow-right-applications">></span><input
+					<div class="no-underline">
+						<input
 							value={$appConfiguration.configuration.destinationDocker.name}
 							id="destination"
 							disabled
-							class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
-						/></a
-					>
+							class="bg-transparent "
+						/>
+					</div>
 				</div>
 			</div>
 			<div class="grid grid-cols-3 items-center pb-8">

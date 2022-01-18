@@ -24,10 +24,10 @@ export const get: RequestHandler = async (request) => {
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     const teamId = getTeam(request)
     const { id } = request.params
-    const domain = request.body.get('domain')
-    const projectId = Number(request.body.get('projectId'))
-    const repository = request.body.get('repository')
-    const branch = request.body.get('branch')
+    const domain = request.body.get('domain') || undefined
+    const projectId = Number(request.body.get('projectId')) || undefined
+    const repository = request.body.get('repository') || undefined
+    const branch = request.body.get('branch') || undefined
     try {
         const foundByDomain = await db.prisma.application.findFirst({ where: { domain }, rejectOnNotFound: false })
         const foundByRepository = await db.prisma.application.findFirst({ where: { repository, branch, projectId }, rejectOnNotFound: false })

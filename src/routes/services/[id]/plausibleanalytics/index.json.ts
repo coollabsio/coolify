@@ -8,10 +8,10 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     if (status === 401) return { status, body }
     const { id } = request.params
 
-    const name = request.body.get('name')
-    const domain = request.body.get('domain')
-    const email = request.body.get('email')
-    const username = request.body.get('username')
+    const name = request.body.get('name') || undefined
+    const domain = request.body.get('domain') || undefined
+    const email = request.body.get('email') || undefined
+    const username = request.body.get('username') || undefined
 
     try {
         return await db.updatePlausibleAnalyticsService({ id, domain, name, email, username })

@@ -29,15 +29,15 @@
 	let databaseUrl = generateUrl();
 
 	function generateUrl() {
-		return `${database.type}://${databaseDbUser}:${databaseDbUserPassword}@${
-			browser
-				? isPublic
-					? window.location.hostname === 'localhost'
-						? '127.0.0.1'
-						: window.location.hostname
-					: database.id
-				: 'loading'
-		}:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`;
+		return browser
+			? `${database.type}://${databaseDbUser}:${databaseDbUserPassword}@${
+					isPublic
+						? window.location.hostname === 'localhost'
+							? '127.0.0.1'
+							: window.location.hostname
+						: database.id
+			  }:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`
+			: 'Loading...';
 	}
 
 	async function changeSettings(name) {
@@ -51,7 +51,7 @@
 				method: 'POST',
 				body: form
 			});
-			window.location.reload();
+			databaseUrl = generateUrl();
 		} catch (e) {
 			console.error(e);
 		}
@@ -91,22 +91,19 @@
 		</div>
 
 		<div class="grid grid-flow-row gap-2 px-10">
-			<div class="grid grid-cols-3 items-center pb-8">
+			<div class="grid grid-cols-3 items-center">
 				<label for="destination">Destination</label>
 				<div class="col-span-2">
 					{#if database.destinationDockerId}
-						<a
-							href={$session.isAdmin
-								? `/databases/${id}/configuration/destination?from=/databases/${id}`
-								: ''}
-							class="no-underline"
-							><span class="arrow-right-applications">></span><input
+						<div class="no-underline">
+							<input
 								value={database.destinationDocker.name}
 								id="destination"
 								disabled
-								class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
-							/></a
-						>
+								readonly
+								class="bg-transparent "
+							/>
+						</div>
 					{/if}
 				</div>
 			</div>
@@ -122,15 +119,10 @@
 					/>
 				</div>
 			</div>
-			<div class="grid grid-cols-3 items-center pb-8">
+			<div class="grid grid-cols-3 items-center">
 				<label for="version">Version</label>
 				<div class="col-span-2 ">
-					<select name="version" id="version" bind:value={database.version}>
-						<option value="Select a version" disabled selected>Select a version</option>
-						{#each versions as version}
-							<option value={version}>{version}</option>
-						{/each}
-					</select>
+					<input value={database.version} readonly disabled class="bg-transparent " />
 				</div>
 			</div>
 		</div>
@@ -140,20 +132,24 @@
 				<label for="host">Host</label>
 				<div class="col-span-2 ">
 					<CopyPasswordField
-						placeholder="generated after start"
+						placeholder="Generated automatically after start"
 						isPasswordField={false}
+						readonly
+						disabled
 						id="host"
 						name="host"
 						value={database.id}
 					/>
 				</div>
 			</div>
-			<div class="grid grid-cols-3 items-center pb-8">
+			<div class="grid grid-cols-3 items-center">
 				<label for="publicPort">Port</label>
 				<div class="col-span-2">
 					<CopyPasswordField
-						placeholder="generate automatically"
+						placeholder="Generated automatically after start"
 						id="publicPort"
+						readonly
+						disabled
 						name="publicPort"
 						value={isPublic ? database.publicPort : privatePort}
 					/>
@@ -175,10 +171,12 @@
 				<div class="col-span-2 ">
 					<CopyPasswordField
 						textarea={true}
-						placeholder="generated after start"
+						placeholder="Generated automatically after start"
 						isPasswordField={false}
 						id="url"
 						name="url"
+						readonly
+						disabled
 						value={databaseUrl}
 					/>
 				</div>

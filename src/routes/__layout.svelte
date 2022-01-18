@@ -101,7 +101,7 @@
 
 	async function update() {
 		updateStatus.loading = true;
-		toast.push('Updating initiated.');
+		toast.push('Updating started.');
 		const response = await fetch(`/update.json`, {
 			method: 'post'
 		});

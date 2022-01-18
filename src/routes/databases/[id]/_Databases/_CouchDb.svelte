@@ -7,7 +7,7 @@
 	<label for="defaultDatabase">Default Database</label>
 	<div class="col-span-2 ">
 		<CopyPasswordField
-			placeholder="generate automatically"
+			placeholder="Generated automatically after start"
 			id="defaultDatabase"
 			name="defaultDatabase"
 			value={database.defaultDatabase}
@@ -18,7 +18,7 @@
 	<label for="dbUser">User</label>
 	<div class="col-span-2 ">
 		<CopyPasswordField
-			placeholder="generate automatically"
+			placeholder="Generated automatically after start"
 			id="dbUser"
 			name="dbUser"
 			value={database.dbUser}
@@ -29,7 +29,7 @@
 	<label for="dbUserPassword">Password</label>
 	<div class="col-span-2 ">
 		<CopyPasswordField
-			placeholder="generate automatically"
+			placeholder="Generated automatically after start"
 			isPasswordField={true}
 			id="dbUserPassword"
 			name="dbUserPassword"
@@ -41,18 +41,18 @@
 	<label for="rootUser">Root User</label>
 	<div class="col-span-2 ">
 		<CopyPasswordField
-			placeholder="generate automatically"
+			placeholder="Generated automatically after start"
 			id="rootUser"
 			name="rootUser"
 			value={database.rootUser}
 		/>
 	</div>
 </div>
-<div class="grid grid-cols-3 items-center pb-8">
+<div class="grid grid-cols-3 items-center">
 	<label for="rootUserPassword">Root User's Password</label>
 	<div class="col-span-2 ">
 		<CopyPasswordField
-			placeholder="generate automatically"
+			placeholder="Generated automatically after start"
 			isPasswordField={true}
 			id="rootUserPassword"
 			name="rootUserPassword"

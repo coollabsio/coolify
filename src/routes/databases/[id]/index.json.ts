@@ -45,14 +45,15 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     if (status === 401) return { status, body }
     const { id } = request.params
 
-    const name = request.body.get('name')
-    const defaultDatabase = request.body.get('defaultDatabase')
-    const dbUser = request.body.get('dbUser')
-    const dbUserPassword = request.body.get('dbUserPassword')
-    const rootUser = request.body.get('rootUser')
-    const rootUserPassword = request.body.get('rootUserPassword')
-    const version = request.body.get('version')
+    const name = request.body.get('name') || undefined
+    const defaultDatabase = request.body.get('defaultDatabase') || undefined
+    const dbUser = request.body.get('dbUser') || undefined
+    const dbUserPassword = request.body.get('dbUserPassword') || undefined
+    const rootUser = request.body.get('rootUser') || undefined
+    const rootUserPassword = request.body.get('rootUserPassword') || undefined
+    const version = request.body.get('version') || undefined
 
+    console.log({ id, name, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version })
     try {
         return await db.updateDatabase({ id, name, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version })
     } catch (err) {

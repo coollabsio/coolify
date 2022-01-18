@@ -65,18 +65,18 @@ export async function configureServiceType({ id, type }) {
         throw PrismaErrorHandler(e)
     }
 }
-export async function setService({ id, version = undefined, type = undefined }) {
+export async function setService({ id, version }) {
     try {
         await prisma.service.update({
             where: { id },
-            data: { version, type }
+            data: { version }
         })
         return { status: 200 }
     } catch (e) {
         throw PrismaErrorHandler(e)
     }
 }
-export async function updatePlausibleAnalyticsService({ id, domain = undefined, email = undefined, username = undefined, name = undefined }) {
+export async function updatePlausibleAnalyticsService({ id, domain, email, username, name }) {
     try {
         await prisma.plausibleAnalytics.update({ where: { serviceId: id }, data: { email, username } })
         await prisma.service.update({ where: { id }, data: { name, domain } })
@@ -85,7 +85,7 @@ export async function updatePlausibleAnalyticsService({ id, domain = undefined, 
         throw PrismaErrorHandler(e)
     }
 }
-export async function updateNocoDbService({ id, domain = undefined }) {
+export async function updateNocoDbService({ id, domain }) {
     try {
         await prisma.service.update({ where: { id }, data: { domain } })
         return { status: 200 }
@@ -94,7 +94,7 @@ export async function updateNocoDbService({ id, domain = undefined }) {
     }
 }
 
-export async function updateMinioService({ id, publicPort = undefined }) {
+export async function updateMinioService({ id, publicPort }) {
     try {
         await prisma.minio.update({ where: { serviceId: id }, data: { publicPort } })
         return { status: 200 }

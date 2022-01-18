@@ -19,7 +19,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     if (status === 401) return { status, body }
 
     const { id } = request.params
-    const type = request.body.get('type')
+    const type = request.body.get('type') || undefined
 
     try {
         await db.configureDatabaseType({ id, type })

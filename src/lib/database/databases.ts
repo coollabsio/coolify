@@ -87,7 +87,7 @@ export async function setDatabase({ id, version = undefined, isPublic = undefine
         throw PrismaErrorHandler(e)
     }
 }
-export async function updateDatabase({ id, name = undefined, defaultDatabase = undefined, dbUser = undefined, dbUserPassword = undefined, rootUser = undefined, rootUserPassword = undefined, version = undefined }) {
+export async function updateDatabase({ id, name, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version }) {
     try {
         const encryptedDbUserPassword = dbUserPassword && encrypt(dbUserPassword)
         const encryptedRootUserPassword = rootUserPassword && encrypt(rootUserPassword)

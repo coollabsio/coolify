@@ -23,7 +23,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     if (status === 401) return { status, body }
 
     const { id } = request.params
-    const version = request.body.get('version')
+    const version = request.body.get('version') || undefined
 
     try {
         await db.setDatabase({ id, version })
