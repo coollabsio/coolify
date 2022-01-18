@@ -85,9 +85,9 @@ export async function updatePlausibleAnalyticsService({ id, domain, email, usern
         throw PrismaErrorHandler(e)
     }
 }
-export async function updateNocoDbService({ id, domain }) {
+export async function updateNocoDbService({ id, domain, name }) {
     try {
-        await prisma.service.update({ where: { id }, data: { domain } })
+        await prisma.service.update({ where: { id }, data: { domain, name } })
         return { status: 200 }
     } catch (e) {
         throw PrismaErrorHandler(e)
