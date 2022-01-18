@@ -3,10 +3,12 @@ import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid'
 import crypto from 'crypto';
 import { buildQueue } from '$lib/queues';
-import { getTeam } from '$lib/common';
+import { getTeam, getUserDetails } from '$lib/common';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const teamId = getTeam(request)
+    const { teamId, status, body } = await getUserDetails(request);
+    if (status === 401) return { status, body }
+    
     const { id } = request.params
     try {
         const buildId = cuid()

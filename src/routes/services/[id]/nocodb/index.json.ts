@@ -8,7 +8,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     if (status === 401) return { status, body }
     const { id } = request.params
 
-    const domain = request.body.get('domain') || undefined
+    const domain = request.body.get('domain').toLocaleLowerCase() || undefined
 
     try {
         return await db.updateNocoDbService({ id, domain })

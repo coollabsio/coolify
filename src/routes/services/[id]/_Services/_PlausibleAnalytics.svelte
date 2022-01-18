@@ -5,7 +5,7 @@
 </script>
 
 <div class="font-bold flex space-x-1 py-5">
-	<div class="text-xl tracking-tight mr-4">Plausible</div>
+	<div class="text-xl tracking-tight mr-4">Plausible Analytics</div>
 </div>
 <div class="grid grid-cols-3 items-center">
 	<label for="email">Email Address</label>
@@ -34,7 +34,14 @@
 <div class="grid grid-cols-3 items-center">
 	<label for="password">Password</label>
 	<div class="col-span-2 ">
-		<input name="password" id="password" value={service.plausibleAnalytics.password} required />
+		<CopyPasswordField
+			id="password"
+			isPasswordField
+			readonly
+			disabled
+			name="password"
+			value={service.plausibleAnalytics.password}
+		/>
 	</div>
 </div>
 <div class="font-bold flex space-x-1 py-5">
@@ -47,18 +54,21 @@
 			name="postgresqlUser"
 			id="postgresqlUser"
 			value={service.plausibleAnalytics.postgresqlUser}
-			required
+			readonly
+			disabled
 		/>
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
 	<label for="postgresqlPassword">Password</label>
 	<div class="col-span-2 ">
-		<input
-			name="postgresqlPassword"
+		<CopyPasswordField
 			id="postgresqlPassword"
+			isPasswordField
+			readonly
+			disabled
+			name="postgresqlPassword"
 			value={service.plausibleAnalytics.postgresqlPassword}
-			required
 		/>
 	</div>
 </div>
@@ -69,7 +79,8 @@
 			name="postgresqlDatabase"
 			id="postgresqlDatabase"
 			value={service.plausibleAnalytics.postgresqlDatabase}
-			required
+			readonly
+			disabled
 		/>
 	</div>
 </div>
@@ -77,8 +88,9 @@
 	<label for="postgresqlPublicPort">Public Port</label>
 	<div class="col-span-2 ">
 		<CopyPasswordField
-			placeholder="Generated if database is public"
-			isReadOnly={true}
+			placeholder="Generated automatically after start"
+			readonly
+			disabled
 			id="postgresqlPublicPort"
 			name="postgresqlPublicPort"
 			value={service.plausibleAnalytics.postgresqlPublicPort}

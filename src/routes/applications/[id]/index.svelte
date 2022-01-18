@@ -377,7 +377,7 @@
 		<div class="text-xl tracking-tight mr-4">Features</div>
 	</div>
 	<div class="px-4 sm:px-6 pb-10">
-		<ul class="mt-2 divide-y divide-warmGray-800">
+		<ul class="mt-2 divide-y divide-stone-800">
 			<Setting
 				bind:setting={forceSSL}
 				on:click={() => changeSettings('forceSSL')}
@@ -385,7 +385,7 @@
 				description="Creates a https redirect for all requests from http and also generates a https certificate for the domain through Let's Encrypt."
 			/>
 		</ul>
-		<ul class="mt-2 divide-y divide-warmGray-800">
+		<ul class="mt-2 divide-y divide-stone-800">
 			<Setting
 				bind:setting={previews}
 				on:click={() => changeSettings('previews')}
@@ -393,7 +393,7 @@
 				description="Creates previews from pull and merge requests."
 			/>
 		</ul>
-		<ul class="mt-2 divide-y divide-warmGray-800">
+		<ul class="mt-2 divide-y divide-stone-800">
 			<Setting
 				bind:setting={debug}
 				on:click={() => changeSettings('debug')}

@@ -192,7 +192,7 @@
 			</div>
 		</div>
 		<div class="flex justify-start">
-			<ul class="mt-2 divide-y divide-warmGray-800">
+			<ul class="mt-2 divide-y divide-stone-800">
 				<Setting
 					bind:setting={payload.isCoolifyProxyUsed}
 					on:click={changeProxySetting}

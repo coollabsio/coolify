@@ -9,8 +9,8 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { id } = request.params
 
     const name = request.body.get('name') || undefined
-    const domain = request.body.get('domain') || undefined
-    const email = request.body.get('email') || undefined
+    const domain = request.body.get('domain').toLocaleLowerCase() || undefined
+    const email = request.body.get('email').toLocaleLowerCase() || undefined
     const username = request.body.get('username') || undefined
 
     try {

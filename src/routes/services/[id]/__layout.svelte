@@ -122,7 +122,7 @@
 	{#if loading}
 		<Loading fullscreen cover />
 	{:else}
-		{#if service.type && service.destinationDockerId && service.version}
+		{#if service.type && service.destinationDockerId && service.version && service.domain}
 			{#if state === 'running'}
 				<button
 					on:click={stopService}

@@ -14,7 +14,7 @@
 	import Gatsby from '$lib/components/svg/applications/Gatsby.svelte';
 	import Docker from '$lib/components/svg/applications/Docker.svelte';
 	
-	const buildPack = application.buildPack.toLowerCase();
+	const buildPack = application?.buildPack?.toLowerCase()
 </script>
 
 <a href="/applications/{application.id}" class="no-underline p-2">

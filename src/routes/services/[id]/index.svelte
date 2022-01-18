@@ -41,6 +41,10 @@
 	<div class="tracking-tight truncate md:max-w-64 md:block hidden">
 		{service.name}
 	</div>
+	{#if service.domain}
+		<span class="px-1 arrow-right-applications md:block hidden">></span>
+		<a href={service.domain} target="_blank" class="pr-2">{service.domain.replace('http://', '').replace('https://', '')}</a>
+	{/if}
 	<span class="px-1 arrow-right-applications md:block hidden">></span>
 	{#if service.type === 'plausibleanalytics'}
 		<PlausibleAnalytics />
@@ -53,8 +57,6 @@
 	{:else if service.type === 'wordpress'}
 		<Wordpress />
 	{/if}
-	<span class="px-1 arrow-right-applications md:block hidden">></span>
-	<a href={service.domain} target="_blank" class="pr-2">{service.domain}</a>
 </div>
 
 <Services {service} />

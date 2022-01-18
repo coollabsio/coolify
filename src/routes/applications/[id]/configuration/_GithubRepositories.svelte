@@ -1,4 +1,6 @@
 <script lang="ts">
+import { goto } from '$app/navigation';
+
 	export let githubToken;
 	export let application;
 
@@ -95,7 +97,8 @@
 					window.location.assign(`${to}?from=${from}`);
 					return
 				}
-				window.location.assign(from || `/applications/${id}/configuration/buildpack`);
+				goto(from || `/applications/${id}/configuration/destination`);
+				// window.location.assign(from || `/applications/${id}/configuration/buildpack`);
 			}
 		}}
 	>

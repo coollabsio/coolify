@@ -169,7 +169,7 @@
 						<path d="M16 15c-2.21 1.333 -5.792 1.333 -8 0" />
 					</svg>
 				</a>
-				<div class="border-t border-warmGray-700" />
+				<div class="border-t border-stone-700" />
 
 				<a
 					sveltekit:prefetch
@@ -262,7 +262,7 @@
 						<line x1="10" y1="16" x2="10" y2="16.01" />
 					</svg>
 				</a>
-				<div class="border-t border-warmGray-700" />
+				<div class="border-t border-stone-700" />
 				<a
 					sveltekit:prefetch
 					href="/databases"
@@ -289,7 +289,7 @@
 						<path d="M4 12v6a8 3 0 0 0 16 0v-6" />
 					</svg>
 				</a>
-				<div class="border-t border-warmGray-700" />
+				<div class="border-t border-stone-700" />
 				<a
 					sveltekit:prefetch
 					href="/services"
@@ -314,7 +314,7 @@
 						<path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-12" />
 					</svg>
 				</a>
-				<div class="border-t border-warmGray-700" />
+				<div class="border-t border-stone-700" />
 			</div>
 			<div class="flex-1" />
 
@@ -489,7 +489,7 @@
 				</div>
 			</div>
 			<div
-				class="w-full text-warmGray-400 hover:bg-coolgray-200 hover:text-white text-center font-bold"
+				class="w-full text-stone-400 hover:bg-coolgray-200 hover:text-white text-center font-bold"
 			>
 				<a
 					class="text-[10px] no-underline"

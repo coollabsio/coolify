@@ -7,6 +7,7 @@
 	import { enhance, errorNotification } from '$lib/form';
 	import { dev } from '$app/env';
 	import cuid from 'cuid';
+	import { goto } from '$app/navigation';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -161,7 +162,7 @@
 	}
 
 	async function isBranchAlreadyUsed() {
-		const url = `/applications/${id}/configuration/repository.json?repository=${selected.project.name}&branch=${selected.branch.name}`;
+		const url = `/applications/${id}/configuration/repository.json?repository=${selected.project.path_with_namespace}&branch=${selected.branch.name}`;
 		const res = await fetch(url);
 		if (res.ok) {
 			errorNotification('Branch already configured');
@@ -322,7 +323,8 @@
 	use:enhance={{
 		result: async () => {
 			loading.save = false;
-			window.location.assign(from || `/applications/${id}/configuration/buildpack`);
+			goto(from || `/applications/${id}/configuration/destination`);
+			// window.location.assign(from || `/applications/${id}/configuration/buildpack`);
 		},
 		pending: async () => {
 			loading.save = true;

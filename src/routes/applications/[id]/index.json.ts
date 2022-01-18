@@ -5,7 +5,9 @@ import type { RequestHandler } from '@sveltejs/kit';
 import jsonwebtoken from 'jsonwebtoken'
 
 export const get: RequestHandler = async (request) => {
-    const teamId = getTeam(request)
+    const { teamId, status, body } = await getUserDetails(request);
+    if (status === 401) return { status, body }
+    
     let githubToken = null;
     let gitlabToken = null;
     let ghToken = null;
@@ -53,7 +55,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
     const { id } = request.params
     const name = request.body.get('name') || undefined
-    const domain = request.body.get('domain') || undefined
+    const domain = request.body.get('domain').toLocaleLowerCase() || undefined
     const port = Number(request.body.get('port')) || undefined
     const installCommand = request.body.get('installCommand') || undefined
     const buildCommand = request.body.get('buildCommand') || undefined

@@ -84,7 +84,7 @@
 			<div class="text-xs">Is build variable?</div>
 
 			<div class="mt-2">
-				<ul class="divide-y divide-warmGray-800">
+				<ul class="divide-y divide-stone-800">
 					<li>
 						<div
 							type="button"
@@ -92,7 +92,7 @@
 							aria-pressed="false"
 							class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full transition-colors ease-in-out duration-200"
 							class:bg-green-600={isBuildSecret}
-							class:bg-warmGray-700={!isBuildSecret}
+							class:bg-stone-700={!isBuildSecret}
 							class:cursor-not-allowed={!isNewSecret}
 							class:cursor-pointer={isNewSecret}
 						>

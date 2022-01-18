@@ -117,7 +117,7 @@
 	{#if loading}
 		<Loading fullscreen cover />
 	{:else}
-		{#if database.type && database.destinationDockerId && database.version}
+		{#if database.type && database.destinationDockerId && database.version && database.defaultDatabase}
 			{#if state === 'running'}
 				<button
 					on:click={stopDatabase}

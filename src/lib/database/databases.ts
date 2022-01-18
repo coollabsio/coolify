@@ -67,9 +67,13 @@ export async function removeDatabase({ id }) {
 
 export async function configureDatabaseType({ id, type }) {
     try {
+        let defaultDatabase = undefined
+        if (type === 'mysql' || type === 'postgresql' || type === 'couchdb') {
+            defaultDatabase = ''
+        }
         await prisma.database.update({
             where: { id },
-            data: { type }
+            data: { type, defaultDatabase }
         })
         return { status: 200 }
     } catch (e) {

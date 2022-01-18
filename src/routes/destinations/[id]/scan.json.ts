@@ -4,7 +4,9 @@ import { dockerInstance } from '$lib/docker';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (request) => {
-    const teamId = getTeam(request)
+    const { teamId, status, body } = await getUserDetails(request);
+    if (status === 401) return { status, body }
+
     const { id } = request.params
 
     const destinationDocker = await db.getDestination({ id, teamId })
@@ -22,9 +24,11 @@ export const get: RequestHandler = async (request) => {
 }
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const teamId = getTeam(request)
+        const { teamId, status, body } = await getUserDetails(request);
+    if (status === 401) return { status, body }
+    
     const { id } = request.params
-    const domain = request.body.get('domain') || undefined
+    const domain = request.body.get('domain').toLocaleLowerCase() || undefined
     const projectId = Number(request.body.get('projectId')) || undefined
     const repository = request.body.get('repository') || undefined
     const branch = request.body.get('branch') || undefined

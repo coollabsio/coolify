@@ -1,10 +1,8 @@
 <script lang="ts">
 	export let service;
 	import { page, session } from '$app/stores';
-	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { enhance, errorNotification } from '$lib/form';
 	import MinIo from './_MinIO.svelte';
-	import NocoDb from './_NocoDB.svelte';
 	import PlausibleAnalytics from './_PlausibleAnalytics.svelte';
 	import VsCodeServer from './_VSCodeServer.svelte';
 	import Wordpress from './_Wordpress.svelte';
@@ -107,7 +105,7 @@
 								value={service.destinationDocker.name}
 								id="destination"
 								disabled
-								class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
+								class="bg-transparent "
 							/>
 						</div>
 					{/if}
@@ -116,8 +114,6 @@
 
 			{#if service.type === 'plausibleanalytics'}
 				<PlausibleAnalytics {service} />
-			{:else if service.type === 'nocodb'}
-				<NocoDb {service} />
 			{:else if service.type === 'minio'}
 				<MinIo {service} />
 			{:else if service.type === 'vscodeserver'}
@@ -131,7 +127,7 @@
 		<div class="text-xl tracking-tight mr-4">Features</div>
 	</div>
 	<div class="px-4 sm:px-6 pb-10">
-		<ul class="mt-2 divide-y divide-warmGray-800">
+		<ul class="mt-2 divide-y divide-stone-800">
 			<Setting
 				bind:setting={isPublic}
 				on:click={() => changeSettings('isPublic')}

@@ -1,4 +1,6 @@
 <script lang="ts">
+import { goto } from '$app/navigation';
+
 	import Explainer from '$lib/components/Explainer.svelte';
 
 	import { enhance } from '$lib/form';
@@ -20,7 +22,8 @@
 		use:enhance={{
 			result: async (res) => {
 				const { id } = await res.json();
-				window.location.assign(`/sources/${id}`);
+				goto(`/sources/${id}`);
+				// window.location.assign(`/sources/${id}`);
 			}
 		}}
 		class="grid grid-flow-row gap-2 py-4"

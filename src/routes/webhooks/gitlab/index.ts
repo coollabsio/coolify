@@ -17,7 +17,7 @@ export const options = async () => {
 }
 
 export const get: RequestHandler = async (request) => {
-    const teamId = getTeam(request)
+    const teamId = undefined
     const code = request.url.searchParams.get('code')
     const state = request.url.searchParams.get('state')
 

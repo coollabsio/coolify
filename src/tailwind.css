@@ -15,15 +15,15 @@ main, .main {
 }
 
 input {
-	@apply text-xs px-2  py-2 rounded bg-transparent border border-transparent bg-coolgray-200 text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500 placeholder-warmGray-600 w-96 select-all;
+	@apply text-xs px-2  py-2 rounded bg-transparent border border-transparent bg-coolgray-200 text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500 placeholder-stone-600 w-96 select-all disabled:bg-transparent;
 }
 textarea {
-	@apply text-xs px-2 py-2 rounded bg-transparent border border-transparent bg-coolgray-200 text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500 placeholder-warmGray-600 w-96 select-all;
+	@apply text-xs px-2 py-2 rounded bg-transparent border border-transparent bg-coolgray-200 text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500 placeholder-stone-600 w-96 select-all;
 }
 
 
 select {
-	@apply text-xs px-2 py-2 rounded font-bold bg-coolgray-200  text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500  disabled:text-warmGray-600;
+	@apply text-xs px-2 py-2 rounded font-bold bg-coolgray-200  text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:text-stone-600;
 }
 
 label {
@@ -31,7 +31,7 @@ label {
 }
 
 button {
-	@apply transition-all duration-100 rounded text-xs font-medium outline-none hover:bg-coolgray-500 disabled:text-warmGray-600 disabled:cursor-not-allowed disabled:bg-coolblack bg-coolgray-200 px-4 p-1;
+	@apply transition-all duration-100 rounded text-xs font-medium outline-none hover:bg-coolgray-500 disabled:text-stone-600 disabled:cursor-not-allowed disabled:bg-coolblack bg-coolgray-200 px-4 p-1;
 }
 
 a {
@@ -43,7 +43,7 @@ a {
 }
 
 .nav-main {
-	@apply w-16 bg-coolgray-200 top-0 left-0 fixed min-w-[4rem] min-h-screen border-r border-warmGray-800;
+	@apply w-16 bg-coolgray-200 top-0 left-0 fixed min-w-[4rem] min-h-screen border-r border-stone-800;
 }
 
 .nav-side {

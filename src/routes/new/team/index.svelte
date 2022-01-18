@@ -23,6 +23,7 @@
 	export let name;
 	import { enhance } from '$lib/form';
 	import { onMount } from 'svelte';
+import { goto } from '$app/navigation';
 
 	let autofocus;
 	onMount(() => {
@@ -41,7 +42,8 @@
 		use:enhance={{
 			result: async (res) => {
 				const { id } = await res.json();
-				window.location.assign(`/teams/${id}`);
+				goto(`/teams/${id}`);
+				// window.location.assign(`/teams/${id}`);
 			}
 		}}
 	>

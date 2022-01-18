@@ -24,6 +24,8 @@
 		databaseDefault = '?readPreference=primary&ssl=false';
 		databaseDbUser = database.rootUser;
 		databaseDbUserPassword = database.rootUserPassword;
+	} else if (database.type === 'redis') {
+		databaseDefault = ''
 	}
 	let databaseUrl = generateUrl();
 
@@ -118,6 +120,7 @@
 					/>
 				</div>
 			</div>
+
 			<div class="grid grid-cols-3 items-center">
 				<label for="version">Version</label>
 				<div class="col-span-2 ">
@@ -186,7 +189,7 @@
 		<div class="text-xl tracking-tight mr-4">Features</div>
 	</div>
 	<div class="px-4 sm:px-6 pb-10">
-		<ul class="mt-2 divide-y divide-warmGray-800">
+		<ul class="mt-2 divide-y divide-stone-800">
 			<Setting
 				bind:setting={isPublic}
 				on:click={() => changeSettings('isPublic')}

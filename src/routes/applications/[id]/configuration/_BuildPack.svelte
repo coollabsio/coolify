@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+
 	import { page } from '$app/stores';
 	import { enhance } from '$lib/form';
 
@@ -19,8 +21,9 @@
 			if (foundConfig.installCommand) form.append('installCommand', foundConfig.installCommand);
 			if (foundConfig.startCommand) form.append('startCommand', foundConfig.startCommand);
 			if (foundConfig.buildCommand) form.append('buildCommand', foundConfig.buildCommand);
-			if (foundConfig.publishDirectory)
+			if (foundConfig.publishDirectory) {
 				form.append('publishDirectory', foundConfig.publishDirectory);
+			}
 			form.append('port', foundConfig.port);
 			try {
 				await fetch(`/applications/${id}.json`, {
@@ -32,7 +35,8 @@
 			}
 		},
 		result: async () => {
-			window.location.assign(from || `/applications/${id}`);
+			goto(from || `/applications/${id}`);
+			// window.location.assign(from || `/applications/${id}`);
 		}
 	}}
 >

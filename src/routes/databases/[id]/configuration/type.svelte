@@ -40,6 +40,7 @@
 	import MySQL from '$lib/components/svg/databases/MySQL.svelte';
 	import PostgreSQL from '$lib/components/svg/databases/PostgreSQL.svelte';
 	import Redis from '$lib/components/svg/databases/Redis.svelte';
+	import { goto } from '$app/navigation';
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
@@ -54,7 +55,8 @@
 				method="post"
 				use:enhance={{
 					result: async () => {
-						window.location.assign(from || `/databases/${id}`);
+						goto(from || `/databases/${id}/configuration/version` || `/databases/${id}`);
+						// window.location.assign(from || `/databases/${id}`);
 					}
 				}}
 			>

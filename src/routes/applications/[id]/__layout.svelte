@@ -157,7 +157,7 @@
 				</button>
 			</form>
 
-			<div class="border border-warmGray-700 h-8" />
+			<div class="border border-stone-700 h-8" />
 			<a
 				href="/applications/{id}"
 				sveltekit:prefetch
@@ -255,7 +255,7 @@
 					</svg></button
 				></a
 			>
-			<div class="border border-warmGray-700 h-8" />
+			<div class="border border-stone-700 h-8" />
 			<a
 			href="/applications/{id}/logs"
 			sveltekit:prefetch
@@ -314,7 +314,7 @@
 				</button
 				></a
 			>
-			<div class="border border-warmGray-700 h-8" />
+			<div class="border border-stone-700 h-8" />
 		{/if}
 
 		<button

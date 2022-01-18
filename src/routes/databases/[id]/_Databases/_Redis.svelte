@@ -3,21 +3,15 @@
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 </script>
 
-<div class="grid grid-cols-3 items-center">
-	<label for="defaultDatabase">Default Database</label>
-	<div class="col-span-2 ">
-		<CopyPasswordField
-			placeholder="Generated automatically after start"
-			id="defaultDatabase"
-			name="defaultDatabase"
-			value={database.defaultDatabase}
-		/>
-	</div>
+<div class="font-bold flex space-x-1 py-5">
+	<div class="text-xl tracking-tight mr-4">Redis</div>
 </div>
 <div class="grid grid-cols-3 items-center">
 	<label for="dbUser">User</label>
 	<div class="col-span-2 ">
 		<CopyPasswordField
+			readonly
+			disabled
 			placeholder="Generated automatically after start"
 			id="dbUser"
 			name="dbUser"
@@ -29,8 +23,10 @@
 	<label for="dbUserPassword">Password</label>
 	<div class="col-span-2 ">
 		<CopyPasswordField
+			disabled
+			readonly
 			placeholder="Generated automatically after start"
-			isPasswordField={true}
+			isPasswordField
 			id="dbUserPassword"
 			name="dbUserPassword"
 			value={database.dbUserPassword}
@@ -41,6 +37,8 @@
 	<label for="rootUser">Root User</label>
 	<div class="col-span-2 ">
 		<CopyPasswordField
+			disabled
+			readonly
 			placeholder="Generated automatically after start"
 			id="rootUser"
 			name="rootUser"
@@ -49,11 +47,13 @@
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
-	<label for="rootUserPassword">Root User's Password</label>
+	<label for="rootUserPassword">Root's Password</label>
 	<div class="col-span-2 ">
 		<CopyPasswordField
+			disabled
+			readonly
 			placeholder="Generated automatically after start"
-			isPasswordField={true}
+			isPasswordField
 			id="rootUserPassword"
 			name="rootUserPassword"
 			value={database.rootUserPassword}

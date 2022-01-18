@@ -68,7 +68,7 @@
 						disabled={loading}
 						class="hover:opacity-90 text-white"
 						class:bg-transparent={loading}
-						class:text-warmGray-600={loading}
+						class:text-stone-600={loading}
 						class:bg-coollabs={!loading}>{loading ? 'Authenticating...' : 'Login'}</button
 					>
 				</div>

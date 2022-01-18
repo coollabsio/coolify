@@ -7,7 +7,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     if (status === 401) return { status, body }
 
     const name = request.body.get('name') || undefined
-    const domain = request.body.get('domain') || undefined
+    const domain = request.body.get('domain').toLocaleLowerCase() || undefined
     const port = Number(request.body.get('port')) || undefined
     const buildCommand = request.body.get('buildCommand') || undefined
     const startCommand = request.body.get('startCommand') || undefined

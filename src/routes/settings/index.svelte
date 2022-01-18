@@ -83,7 +83,7 @@
 				<form class="flex" on:submit|preventDefault={() => changeSettings('domain')}>
 					<div class="flex flex-col">
 						<div class="flex">
-							<p class="text-base font-bold text-warmGray-100">Domain</p>
+							<p class="text-base font-bold text-stone-100">Domain</p>
 							<button type="submit" class="mx-2 bg-green-600 hover:bg-green-500">Save</button>
 						</div>
 						<Explainer text="Set the domain that you could use to access Coolify." />
@@ -106,7 +106,7 @@
 					</div>
 				</form>
 			</div>
-			<ul class="mt-2 divide-y divide-warmGray-800">
+			<ul class="mt-2 divide-y divide-stone-800">
 				<Setting
 					bind:setting={isRegistrationEnabled}
 					title="Registration allowed?"

@@ -1,4 +1,6 @@
 <script lang="ts">
+import { goto } from '$app/navigation';
+
 	export let payload;
 
 	import { page } from '$app/stores';
@@ -38,7 +40,8 @@
 			return errorNotification(await saveFormResponse.json());
 		}
 		const { id } = await saveFormResponse.json();
-		window.location.assign(`/destinations/${id}`);
+		goto(`/destinations/${id}`)
+		// window.location.assign(`/destinations/${id}`);
 	}
 </script>
 
@@ -106,7 +109,7 @@
 			</div>
 		</div>
 		<div class="flex justify-start">
-			<ul class="mt-2 divide-y divide-warmGray-800">
+			<ul class="mt-2 divide-y divide-stone-800">
 				<Setting
 					bind:setting={payload.isCoolifyProxyUsed}
 					on:click={() => (payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed)}
