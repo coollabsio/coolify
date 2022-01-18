@@ -3,6 +3,7 @@ version: '3.8'
 services:
   coolify:
     image: coollabsio/coolify:latest
+    restart: always
     container_name: coolify
     ports: 
       - target: 3000
@@ -20,6 +21,7 @@ services:
       - coolify-infra
   redis:
     image: bitnami/redis:6.2
+    restart: always
     container_name: coolify-redis
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
