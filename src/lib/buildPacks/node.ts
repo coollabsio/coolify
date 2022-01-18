@@ -10,7 +10,6 @@ const createDockerfile = async (data, image): Promise<void> => {
     if (secrets.length > 0) {
         secrets.forEach(secret => {
             if (secret.isBuildSecret) {
-                console.log(secret.name)
                 Dockerfile.push(`ARG ${secret.name} ${secret.value}`)
             }
         })

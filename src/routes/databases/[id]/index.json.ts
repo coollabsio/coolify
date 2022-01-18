@@ -53,7 +53,6 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const rootUserPassword = request.body.get('rootUserPassword') || undefined
     const version = request.body.get('version') || undefined
 
-    console.log({ id, name, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version })
     try {
         return await db.updateDatabase({ id, name, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version })
     } catch (err) {

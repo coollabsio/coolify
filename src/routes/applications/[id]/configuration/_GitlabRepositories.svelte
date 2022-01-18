@@ -179,7 +179,6 @@
 		if (response.ok) {
 			const deployKeys = await response.json();
 			const deployKey = deployKeys.find((key) => key.title === 'coolify-deploy-key');
-			console.log(deployKey);
 			if (deployKey) {
 				return await saveDeployKey(updateDeployKeyIdUrl, deployKey.id);
 			}

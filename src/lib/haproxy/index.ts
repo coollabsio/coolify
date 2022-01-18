@@ -91,7 +91,7 @@ export async function forceSSLOffApplication({ domain }) {
             await completeTransaction(transactionId)
         }
     } else {
-        console.log(`removing ssl for ${domain}`)
+        console.log(`{DEBUG] Removing ssl for ${domain}`)
     }
 
 }
@@ -139,44 +139,6 @@ export async function forceSSLOnApplication({ domain }) {
 
 }
 
-// export async function configureDatabaseVisibility({ id, isPublic }) {
-//     const haproxy = haproxyInstance()
-//     await checkHAProxy()
-//     const transactionId = await getNextTransactionId()
-//     const database = await db.prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
-//     try {
-//         if (isPublic) {
-//             await haproxy.delete(`v2/services/haproxy/configuration/tcp_request_rules/0`, {
-//                 searchParams: {
-//                     transaction_id: transactionId,
-//                     parent_name: id,
-//                     parent_type: 'frontend',
-//                 }
-//             })
-//         } else {
-//             await haproxy.post(`v2/services/haproxy/configuration/tcp_request_rules`, {
-//                 searchParams: {
-//                     transaction_id: transactionId,
-//                     parent_name: id,
-//                     parent_type: 'frontend',
-//                 },
-//                 json: {
-//                     cond: "if",
-//                     cond_test: `{ src ${database.destinationDocker.subnet} }`,
-//                     "action": "accept",
-//                     "index": 0,
-//                     "type": "connection"
-//                 }
-//             })
-//         }
-
-//     } catch (error) {
-//         console.log(error.response.body)
-//         throw error.response.body
-//     } finally {
-//         await completeTransaction(transactionId)
-//     }
-// }
 export async function deleteProxy({ id }) {
     const haproxy = haproxyInstance()
     try {
