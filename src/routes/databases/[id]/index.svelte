@@ -31,7 +31,6 @@
 
 <script lang="ts">
 	export let database;
-	export let versions;
 	export let privatePort;
 </script>
 
@@ -43,4 +42,4 @@
 	<span class="pr-2">{database.type}</span>
 </div>
 
-<Databases {database} {versions} {privatePort} />
+<Databases {database} {privatePort} />

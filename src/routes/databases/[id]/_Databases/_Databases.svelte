@@ -1,6 +1,5 @@
 <script lang="ts">
 	export let database;
-	export let versions;
 	export let privatePort;
 	import { page, session } from '$app/stores';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
