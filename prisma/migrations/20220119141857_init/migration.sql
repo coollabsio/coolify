@@ -36,7 +36,9 @@ CREATE TABLE "Team" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     "databaseId" TEXT,
-    FOREIGN KEY ("databaseId") REFERENCES "Database" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    "serviceId" TEXT,
+    FOREIGN KEY ("databaseId") REFERENCES "Database" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    FOREIGN KEY ("serviceId") REFERENCES "Service" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -54,8 +56,8 @@ CREATE TABLE "TeamInvitation" (
 CREATE TABLE "Application" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
-    "domain" TEXT,
-    "oldDomain" TEXT,
+    "fqdn" TEXT,
+    "oldFqdn" TEXT,
     "repository" TEXT,
     "configHash" TEXT,
     "branch" TEXT,
@@ -67,7 +69,6 @@ CREATE TABLE "Application" (
     "startCommand" TEXT,
     "baseDirectory" TEXT,
     "publishDirectory" TEXT,
-    "forceSsl" BOOLEAN DEFAULT false,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     "destinationDockerId" TEXT,
@@ -82,7 +83,6 @@ CREATE TABLE "ApplicationSettings" (
     "applicationId" TEXT NOT NULL,
     "debug" BOOLEAN NOT NULL DEFAULT false,
     "previews" BOOLEAN NOT NULL DEFAULT false,
-    "forceSSL" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "ApplicationSettings_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "Application" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
@@ -195,7 +195,9 @@ CREATE TABLE "Database" (
     "destinationDockerId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Database_destinationDockerId_fkey" FOREIGN KEY ("destinationDockerId") REFERENCES "DestinationDocker" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    "serviceId" TEXT,
+    CONSTRAINT "Database_destinationDockerId_fkey" FOREIGN KEY ("destinationDockerId") REFERENCES "DestinationDocker" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "Database_serviceId_fkey" FOREIGN KEY ("serviceId") REFERENCES "Service" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -206,6 +208,49 @@ CREATE TABLE "DatabaseSettings" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "DatabaseSettings_databaseId_fkey" FOREIGN KEY ("databaseId") REFERENCES "Database" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Service" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "fqdn" TEXT,
+    "type" TEXT,
+    "version" TEXT,
+    "databaseId" TEXT,
+    "destinationDockerId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Service_destinationDockerId_fkey" FOREIGN KEY ("destinationDockerId") REFERENCES "DestinationDocker" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "PlausibleAnalytics" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "email" TEXT,
+    "username" TEXT,
+    "password" TEXT NOT NULL,
+    "postgresqlUser" TEXT NOT NULL,
+    "postgresqlPassword" TEXT NOT NULL,
+    "postgresqlDatabase" TEXT NOT NULL,
+    "postgresqlPublicPort" INTEGER,
+    "secretKeyBase" TEXT,
+    "serviceId" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "PlausibleAnalytics_serviceId_fkey" FOREIGN KEY ("serviceId") REFERENCES "Service" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Minio" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "rootUser" TEXT NOT NULL,
+    "rootUserPassword" TEXT NOT NULL,
+    "publicPort" INTEGER,
+    "serviceId" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Minio_serviceId_fkey" FOREIGN KEY ("serviceId") REFERENCES "Service" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -264,6 +309,14 @@ CREATE TABLE "_DatabaseToTeam" (
     FOREIGN KEY ("B") REFERENCES "Team" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- CreateTable
+CREATE TABLE "_ServiceToTeam" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+    FOREIGN KEY ("A") REFERENCES "Service" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY ("B") REFERENCES "Team" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Setting_name_key" ON "Setting"("name");
 
@@ -274,7 +327,7 @@ CREATE UNIQUE INDEX "User_id_key" ON "User"("id");
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Application_domain_key" ON "Application"("domain");
+CREATE UNIQUE INDEX "Application_fqdn_key" ON "Application"("fqdn");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ApplicationSettings_applicationId_key" ON "ApplicationSettings"("applicationId");
@@ -301,10 +354,16 @@ CREATE UNIQUE INDEX "GitlabApp_oauthId_key" ON "GitlabApp"("oauthId");
 CREATE UNIQUE INDEX "GitlabApp_groupName_key" ON "GitlabApp"("groupName");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Database_name_key" ON "Database"("name");
+CREATE UNIQUE INDEX "DatabaseSettings_databaseId_key" ON "DatabaseSettings"("databaseId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "DatabaseSettings_databaseId_key" ON "DatabaseSettings"("databaseId");
+CREATE UNIQUE INDEX "Service_databaseId_key" ON "Service"("databaseId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PlausibleAnalytics_serviceId_key" ON "PlausibleAnalytics"("serviceId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Minio_serviceId_key" ON "Minio"("serviceId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "_TeamToUser_AB_unique" ON "_TeamToUser"("A", "B");
@@ -347,3 +406,9 @@ CREATE UNIQUE INDEX "_DatabaseToTeam_AB_unique" ON "_DatabaseToTeam"("A", "B");
 
 -- CreateIndex
 CREATE INDEX "_DatabaseToTeam_B_index" ON "_DatabaseToTeam"("B");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "_ServiceToTeam_AB_unique" ON "_ServiceToTeam"("A", "B");
+
+-- CreateIndex
+CREATE INDEX "_ServiceToTeam_B_index" ON "_ServiceToTeam"("B");

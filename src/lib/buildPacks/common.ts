@@ -5,14 +5,14 @@ import templates from '$lib/components/templates';
 import { promises as fs } from 'fs';
 import { staticDeployments } from '$lib/components/common';
 
-export function makeLabelForStandaloneApplication({ applicationId, domain, name, type, pullmergeRequestId = null, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
+export function makeLabelForStandaloneApplication({ applicationId, fqdn, name, type, pullmergeRequestId = null, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
     return [
         '--label coolify.managed=true',
         `--label coolify.version=${version}`,
         `--label coolify.type=standalone-application`,
         `--label coolify.configuration=${base64Encode(JSON.stringify({
             applicationId,
-            domain,
+            fqdn,
             name,
             type,
             pullmergeRequestId,

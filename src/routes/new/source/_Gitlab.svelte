@@ -1,14 +1,11 @@
 <script lang="ts">
-import { goto } from '$app/navigation';
-
-	import Explainer from '$lib/components/Explainer.svelte';
+	import { goto } from '$app/navigation';
 
 	import { enhance } from '$lib/form';
 	import { gitSourcePayload } from '$lib/store';
 	import { onMount } from 'svelte';
 
 	let nameEl;
-	let organizationEl;
 
 	onMount(() => {
 		nameEl.focus();

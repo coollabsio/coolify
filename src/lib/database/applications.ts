@@ -1,7 +1,7 @@
 import { decrypt, encrypt } from "$lib/crypto"
 import { removeProxyConfiguration } from "$lib/haproxy"
 
-import { removeAllPreviewsDestinationDocker, removeDestinationDocker } from "$lib/common"
+import { getDomain, removeAllPreviewsDestinationDocker, removeDestinationDocker } from "$lib/common"
 import { prisma, PrismaErrorHandler } from "./common"
 
 export async function listApplications(teamId) {
@@ -17,9 +17,9 @@ export async function newApplication({ name, teamId }) {
     }
 }
 
-export async function importApplication({ name, teamId, domain, port, buildCommand, startCommand, installCommand }) {
+export async function importApplication({ name, teamId, fqdn, port, buildCommand, startCommand, installCommand }) {
     try {
-        const app = await prisma.application.create({ data: { name, domain, port, buildCommand, startCommand, installCommand, teams: { connect: { id: teamId } } } })
+        const app = await prisma.application.create({ data: { name, fqdn, port, buildCommand, startCommand, installCommand, teams: { connect: { id: teamId } } } })
         return { status: 201, body: { id: app.id } }
     } catch (e) {
         throw PrismaErrorHandler(e)
@@ -28,7 +28,9 @@ export async function importApplication({ name, teamId, domain, port, buildComma
 
 export async function removeApplication({ id, teamId }) {
     try {
-        const { domain, destinationDockerId, destinationDocker } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
+        const { fqdn, destinationDockerId, destinationDocker } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
+        
+        const domain = getDomain(fqdn)
 
         await prisma.applicationSettings.deleteMany({ where: { application: { id } } })
         await prisma.buildLog.deleteMany({ where: { applicationId: id } })
@@ -143,13 +145,13 @@ export async function configureBuildPack({ id, buildPack }) {
     }
 }
 
-export async function configureApplication({ id, name, teamId, domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
+export async function configureApplication({ id, name, teamId, fqdn, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
     try {
         let application = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } } })
-        if (application.domain !== domain && !application.oldDomain) {
-            application = await prisma.application.update({ where: { id }, data: { domain, oldDomain: application.domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory, name } })
+        if (application.fqdn !== fqdn && !application.oldFqdn) {
+            application = await prisma.application.update({ where: { id }, data: { fqdn, oldFqdn: application.fqdn, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory, name } })
         } else {
-            application = await prisma.application.update({ where: { id }, data: { domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory, name } })
+            application = await prisma.application.update({ where: { id }, data: { fqdn, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory, name } })
         }
         return { status: 201, body: { application } }
     } catch (e) {
@@ -157,9 +159,9 @@ export async function configureApplication({ id, name, teamId, domain, port, ins
     }
 }
 
-export async function setApplicationSettings({ id, debug, previews, forceSSL, forceSSLChanged }) {
+export async function setApplicationSettings({ id, debug, previews }) {
     try {
-        await prisma.application.update({ where: { id }, data: { settings: { update: { debug, previews, forceSSL } } }, include: { destinationDocker: true } })
+        await prisma.application.update({ where: { id }, data: { settings: { update: { debug, previews } } }, include: { destinationDocker: true } })
         return { status: 201 }
     } catch (e) {
         throw PrismaErrorHandler(e)

@@ -62,7 +62,7 @@
 					{:else if service.type === 'nocodb'}
 						<NocoDb isAbsolute />
 					{:else if service.type === 'minio'}
-						<MinIo  isAbsolute/>
+						<MinIo isAbsolute />
 					{:else if service.type === 'vscodeserver'}
 						<VsCodeServer isAbsolute />
 					{:else if service.type === 'wordpress'}
@@ -71,8 +71,8 @@
 					<div class="font-bold text-xl text-center truncate">
 						{service.name}
 					</div>
-					{#if !service.type || !service.domain}
-						<div class="font-bold text-center truncate text-red-500">Not configured</div>
+					{#if !service.type || !service.fqdn}
+						<div class="font-bold text-center truncate">Configuration missing</div>
 					{:else}
 						<div class="text-center truncate">{service.type}</div>
 					{/if}

@@ -5,6 +5,7 @@ import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
 import { letsEncrypt } from '$lib/letsencrypt';
 import { configureSimpleServiceProxyOn } from '$lib/haproxy';
+import { getDomain } from '$lib/components/common';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { teamId, status, body } = await getUserDetails(request);
@@ -14,7 +15,10 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
     try {
         const service = await db.getService({ id, teamId })
-        const { type, version, domain, destinationDockerId, destinationDocker } = service
+        const { type, version, fqdn, destinationDockerId, destinationDocker } = service
+
+        const domain = getDomain(fqdn)
+        const isHttps = fqdn.startsWith('https://')
 
         const network = destinationDockerId && destinationDocker.network
         const host = getEngine(destinationDocker.engine)
@@ -40,15 +44,13 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile))
-       
-        try {
-            const domainOnly = domain.replace('http://', '').replace('https://', '')
-            await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`)
-            await configureSimpleServiceProxyOn({ id, domain: domainOnly, port: 8080 })
 
-            if (domain.startsWith('https://')) {
-                const ssl = { destinationDocker, domain: domainOnly, forceSSLChanged: true, isCoolify: false, id }
-                await letsEncrypt(ssl)
+        try {
+            await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`)
+            await configureSimpleServiceProxyOn({ id, domain, port: 8080 })
+
+            if (isHttps) {
+                await letsEncrypt({ domain, id })
             }
             return {
                 status: 200

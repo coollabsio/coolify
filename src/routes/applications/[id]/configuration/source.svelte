@@ -31,7 +31,7 @@
 
 	import { page } from '$app/stores';
 	import { enhance } from '$lib/form';
-import { goto } from '$app/navigation';
+	import { goto } from '$app/navigation';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -89,9 +89,7 @@ import { goto } from '$app/navigation';
 						>
 							<div class="font-bold text-xl text-center truncate">{source.name}</div>
 							{#if source.gitlabApp && !source.gitlabAppId}
-								<div class="font-bold text-center text-xs truncate text-red-500">
-									Not configured
-								</div>
+								<div class="font-bold text-center truncate">Configuration missing</div>
 							{/if}
 						</button>
 					</form>

@@ -3,7 +3,7 @@ import crypto from 'crypto'
 import * as buildpacks from '../buildPacks'
 import * as importers from '../importers'
 import { dockerInstance } from '../docker'
-import { asyncExecShell, createDirectories, getEngine, saveBuildLog } from '../common'
+import { asyncExecShell, createDirectories, getDomain, getEngine, saveBuildLog } from '../common'
 import { configureProxyForApplication } from '../haproxy'
 import * as db from '$lib/database'
 import { decrypt } from '$lib/crypto'
@@ -14,10 +14,12 @@ export default async function (job) {
     Edge cases:
     1 - Change build pack and redeploy, what should happen?
   */
-  let { id: applicationId, repository, branch, buildPack, name, destinationDocker, destinationDockerId, gitSource, build_id: buildId, configHash, port, installCommand, buildCommand, startCommand, domain, oldDomain, baseDirectory, publishDirectory, projectId, secrets, type, pullmergeRequestId = null, sourceBranch = null, settings } = job.data
-  const { debug, previews, forceSSL } = settings
+  let { id: applicationId, repository, branch, buildPack, name, destinationDocker, destinationDockerId, gitSource, build_id: buildId, configHash, port, installCommand, buildCommand, startCommand, fqdn, baseDirectory, publishDirectory, projectId, secrets, type, pullmergeRequestId = null, sourceBranch = null, settings } = job.data
+  const { debug, forceSSL } = settings
 
   let imageId = applicationId
+  let domain = getDomain(fqdn)
+  const isHttps = fqdn.startsWith('https://')
 
   // Previews, we need to get the source branch and set subdomain
   if (pullmergeRequestId) {
@@ -81,11 +83,14 @@ export default async function (job) {
     }
 
     if (!pullmergeRequestId) {
-      const currentHash = crypto.createHash('sha256').update(JSON.stringify({ buildPack, port, installCommand, buildCommand, startCommand, secrets, branch, repository, domain })).digest('hex')
+      const currentHash = crypto.createHash('sha256').update(JSON.stringify({ buildPack, port, installCommand, buildCommand, startCommand, secrets, branch, repository, fqdn })).digest('hex')
+
       if (configHash !== currentHash) {
         await db.prisma.application.update({ where: { id: applicationId }, data: { configHash: currentHash } })
         deployNeeded = true
-        saveBuildLog({ line: 'Configuration changed.', buildId, applicationId })
+        if (configHash) {
+          saveBuildLog({ line: 'Configuration changed.', buildId, applicationId })
+        }
       } else {
         deployNeeded = false
       }
@@ -131,14 +136,14 @@ export default async function (job) {
         }
       })
     }
-    const labels = makeLabelForStandaloneApplication({ applicationId, domain, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
+    const labels = makeLabelForStandaloneApplication({ applicationId, fqdn, name, type, pullmergeRequestId, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
     saveBuildLog({ line: 'Deployment started.', buildId, applicationId })
     const { stderr } = await asyncExecShell(`DOCKER_HOST=${host} docker run ${envs.join()} ${labels.join(' ')} --name ${imageId} --network ${docker.network} --restart always -d ${applicationId}:${tag}`)
     if (stderr) console.log(stderr)
     saveBuildLog({ line: 'Deployment successful!', buildId, applicationId })
 
     if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-      await configureProxyForApplication({ domain, applicationId, port, forceSSL })
+      await configureProxyForApplication({ domain, applicationId, port, isHttps })
     } else {
       saveBuildLog({ line: 'Coolify Proxy is not configured for this destination. Nothing else to do.', buildId, applicationId })
     }

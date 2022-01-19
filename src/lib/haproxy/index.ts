@@ -255,7 +255,7 @@ export async function deleteProxy({ id }) {
 //     }
 //     await configureDatabaseVisibility({ id, isPublic })
 // }
-export async function configureProxyForApplication({ domain, applicationId, port, forceSSL }) {
+export async function configureProxyForApplication({ domain, applicationId, port, isHttps }) {
     const haproxy = haproxyInstance()
     let serverConfigured = false
     let sslConfigured = false
@@ -293,7 +293,7 @@ export async function configureProxyForApplication({ domain, applicationId, port
         //
     }
     try {
-        if (forceSSL) {
+        if (isHttps) {
             const rules: any = await haproxy.get(`v2/services/haproxy/configuration/http_request_rules`, {
                 searchParams: {
                     parent_name: 'http',
@@ -304,12 +304,13 @@ export async function configureProxyForApplication({ domain, applicationId, port
                 const rule = rules.data.find(rule => rule.cond_test.includes(`-i ${domain}`))
                 if (rule) sslConfigured = true
             }
+            await letsEncrypt({ domain, id: applicationId })
         }
     } catch (error) {
         console.log('error getting http_request_rules', error.response.body)
         //
     }
-    if (!sslConfigured && forceSSL) await forceSSLOnApplication({ domain })
+
     if (serverConfigured) return
 
     const transactionId = await getNextTransactionId()

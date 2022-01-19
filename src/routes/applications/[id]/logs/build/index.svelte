@@ -80,7 +80,7 @@
 
 <div class="font-bold flex space-x-1 py-6 px-6">
 	<div class="text-2xl tracking-tight mr-4">
-		Build logs of <a href="http://{application.domain}" target="_blank">{application.domain}</a>
+		Build logs of <a href="{application.fqdn}" target="_blank">{application.fqdn}</a>
 	</div>
 </div>
 <div class="flex flex-row px-10 justify-start pt-6 space-x-2 ">

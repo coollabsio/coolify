@@ -50,8 +50,8 @@
 
 <div class="font-bold flex space-x-1 py-6 px-6">
 	<div class="text-2xl tracking-tight mr-4">
-		Application logs of <a href="http://{application.domain}" target="_blank"
-			>{application.domain}</a
+		Application logs of <a href="{application.fqdn}" target="_blank"
+			>{application.fqdn}</a
 		>
 	</div>
 </div>

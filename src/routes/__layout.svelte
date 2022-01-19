@@ -3,7 +3,6 @@
 	import { publicPaths } from '$lib/settings';
 
 	export const load: Load = async ({ fetch, url, params, session }) => {
-		const currentRoute = url.pathname;
 		if (!session.uid && !publicPaths.includes(url.pathname)) {
 			return {
 				status: 302,
@@ -19,7 +18,6 @@
 		if (res.ok) {
 			return {
 				props: {
-					currentRoute,
 					selectedTeamId: session.teamId,
 					...(await res.json())
 				}
@@ -32,7 +30,6 @@
 <script>
 	export let teams;
 	export let selectedTeamId;
-	export let currentRoute;
 	import { fade } from 'svelte/transition';
 
 	import '../tailwind.css';
@@ -101,7 +98,6 @@
 
 	async function update() {
 		updateStatus.loading = true;
-		toast.push('Updating started.');
 		const response = await fetch(`/update.json`, {
 			method: 'post'
 		});
@@ -113,9 +109,8 @@
 			return;
 		}
 
-		toast.push(
-			'Updating completed. Waiting for the new version to start...'
-		);
+		toast.push('Update completed.');
+		toast.push('Waiting for the new version to start...');
 
 		let reachable = false;
 		let tries = 0;
@@ -228,6 +223,7 @@
 						<polyline points="10 15 13 18 10 21" />
 					</svg>
 				</a>
+				<div class="border-t border-stone-700" />
 				<a
 					sveltekit:prefetch
 					href="/destinations"
@@ -510,8 +506,6 @@
 		{/each}
 	</select>
 {/if}
-{#key currentRoute}
-	<main in:fade={{ duration: 150 }}>
-		<slot />
-	</main>
-{/key}
+<main>
+	<slot />
+</main>

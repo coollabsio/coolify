@@ -15,7 +15,7 @@
 		const endpoint = `/services/${params.id}.json`;
 		const res = await fetch(endpoint);
 		if (res.ok) {
-			const { service, state } = await res.json();
+			const { service, isRunning } = await res.json();
 			if (!service || Object.entries(service).length === 0) {
 				return {
 					status: 302,
@@ -35,11 +35,11 @@
 			return {
 				props: {
 					service,
-					state
+					isRunning
 				},
 				stuff: {
 					service,
-					state
+					isRunning
 				}
 			};
 		}
@@ -58,7 +58,7 @@
 	import Loading from '$lib/components/Loading.svelte';
 
 	export let service;
-	export let state;
+	export let isRunning;
 	let loading = false;
 
 	async function deleteService() {
@@ -122,8 +122,8 @@
 	{#if loading}
 		<Loading fullscreen cover />
 	{:else}
-		{#if service.type && service.destinationDockerId && service.version && service.domain}
-			{#if state === 'running'}
+		{#if service.type && service.destinationDockerId && service.version && service.fqdn}
+			{#if isRunning}
 				<button
 					on:click={stopService}
 					title="Stop Service"
@@ -149,7 +149,7 @@
 						<rect x="14" y="5" width="4" height="14" rx="1" />
 					</svg>
 				</button>
-			{:else if state === 'not started'}
+			{:else}
 				<button
 					on:click={startService}
 					title="Start Service"

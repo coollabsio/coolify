@@ -118,7 +118,7 @@
 			</div>
 
 			<div class="grid grid-cols-3 items-start">
-				<label for="oauthId">OAuth ID</label>
+				<label for="oauthId" class="pt-2">OAuth ID</label>
 				<div class="col-span-2">
 					<input
 						on:change={checkOauthId}

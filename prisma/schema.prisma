@@ -68,8 +68,8 @@ model TeamInvitation {
 model Application {
   id                  String               @id @default(cuid())
   name                String
-  domain              String?              @unique
-  oldDomain           String?
+  fqdn                String?              @unique
+  oldFqdn             String?
   repository          String?
   configHash          String?
   branch              String?
@@ -81,7 +81,6 @@ model Application {
   startCommand        String?
   baseDirectory       String?
   publishDirectory    String?
-  forceSsl            Boolean?             @default(false)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   settings            ApplicationSettings?
@@ -99,7 +98,6 @@ model ApplicationSettings {
   applicationId String      @unique
   debug         Boolean     @default(false)
   previews      Boolean     @default(false)
-  forceSSL      Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -201,7 +199,7 @@ model GitlabApp {
 
 model Database {
   id                  String             @id @default(cuid())
-  name                String             @unique
+  name                String
   publicPort          Int?
   defaultDatabase     String?
   type                String?
@@ -232,7 +230,7 @@ model DatabaseSettings {
 model Service {
   id                  String              @id @default(cuid())
   name                String
-  domain              String?
+  fqdn                String?
   type                String?
   version             String?
   databaseId          String?             @unique

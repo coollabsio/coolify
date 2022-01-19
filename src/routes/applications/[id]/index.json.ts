@@ -55,7 +55,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
     const { id } = request.params
     const name = request.body.get('name') || undefined
-    const domain = request.body.get('domain').toLocaleLowerCase() || undefined
+    const fqdn = request.body.get('fqdn')?.toLocaleLowerCase() || undefined
     const port = Number(request.body.get('port')) || undefined
     const installCommand = request.body.get('installCommand') || undefined
     const buildCommand = request.body.get('buildCommand') || undefined
@@ -64,7 +64,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const publishDirectory = request.body.get('publishDirectory') || undefined
 
     try {
-        return await db.configureApplication({ id, name, teamId, domain, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
+        return await db.configureApplication({ id, name, teamId, fqdn, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory })
     } catch (err) {
         return err
     }

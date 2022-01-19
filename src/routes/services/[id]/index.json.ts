@@ -12,7 +12,7 @@ export const get: RequestHandler = async (request) => {
     const service = await db.getService({ id, teamId })
     const { destinationDockerId, destinationDocker, type, version } = service
 
-    let state = 'not started'
+    let isRunning = false
     if (destinationDockerId) {
         const host = getEngine(destinationDocker.engine)
         const docker = dockerInstance({ destinationDocker })
@@ -22,7 +22,7 @@ export const get: RequestHandler = async (request) => {
             const { stdout } = await asyncExecShell(`DOCKER_HOST=${host} docker inspect --format '{{json .State}}' ${id}`)
 
             if (JSON.parse(stdout).Running) {
-                state = 'running'
+                isRunning = true
             }
         } catch (error) {
             //
@@ -30,7 +30,7 @@ export const get: RequestHandler = async (request) => {
     }
     return {
         body: {
-            state,
+            isRunning,
             service
         }
     };

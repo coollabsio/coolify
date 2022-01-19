@@ -91,7 +91,7 @@
 	{#if loading}
 		<Loading fullscreen cover />
 	{:else}
-		{#if application.domain && $appConfiguration.configuration.gitSource && $appConfiguration.configuration.repository && $appConfiguration.configuration.destinationDocker && $appConfiguration.configuration.buildPack}
+		{#if application.fqdn && $appConfiguration.configuration.gitSource && $appConfiguration.configuration.repository && $appConfiguration.configuration.destinationDocker && $appConfiguration.configuration.buildPack}
 			<!-- svelte-ignore missing-declaration -->
 			<form
 				action="/applications/{id}/deploy.json"
@@ -99,7 +99,7 @@
 				use:enhance={{
 					beforeSubmit: async () => {
 						const form = new FormData();
-						form.append('domain', $appConfiguration.configuration.domain);
+						form.append('fqdn', $appConfiguration.configuration.fqdn);
 						form.append('port', $appConfiguration?.configuration?.port?.toString() || '');
 						form.append('installCommand', $appConfiguration.configuration.installCommand || '');
 						form.append('buildCommand', $appConfiguration.configuration.buildCommand || '');

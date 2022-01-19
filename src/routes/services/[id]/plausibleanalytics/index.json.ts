@@ -8,12 +8,12 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { id } = request.params
 
     const name = request.body.get('name') || undefined
-    const domain = request.body.get('domain').toLocaleLowerCase() || undefined
-    const email = request.body.get('email').toLocaleLowerCase() || undefined
+    const fqdn = request.body.get('fqdn')?.toLocaleLowerCase() || undefined
+    const email = request.body.get('email')?.toLocaleLowerCase() || undefined
     const username = request.body.get('username') || undefined
 
     try {
-        return await db.updatePlausibleAnalyticsService({ id, domain, name, email, username })
+        return await db.updatePlausibleAnalyticsService({ id, fqdn, name, email, username })
     } catch (err) {
         return err
     }

@@ -48,11 +48,11 @@
 		{/if}
 
 		<div class="font-bold text-xl text-center truncate">{application.name}</div>
-		{#if application.domain}
-			<div class="text-center truncate">{application.domain}</div>
+		{#if application.fqdn}
+			<div class="text-center truncate">{application.fqdn}</div>
 		{/if}
 		{#if !application.gitSourceId || !application.destinationDockerId}
-			<div class="font-bold text-center truncate text-red-200 uppercase">Not configured</div>
+			<div class="font-bold text-center truncate">Configuration missing</div>
 		{/if}
 	</div>
 </a>

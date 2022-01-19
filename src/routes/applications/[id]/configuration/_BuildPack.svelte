@@ -35,8 +35,7 @@
 			}
 		},
 		result: async () => {
-			goto(from || `/applications/${id}`);
-			// window.location.assign(from || `/applications/${id}`);
+			window.location.assign(from || `/applications/${id}`);
 		}
 	}}
 >

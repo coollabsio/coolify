@@ -167,3 +167,7 @@ export const createDirectories = async ({ repository, buildId }) => {
 export function generateTimestamp() {
     return `${dayjs().format('HH:mm:ss.SSS')} `;
 }
+
+export function getDomain(domain) {
+    return domain?.replace('https://', '').replace('http://', '')
+}

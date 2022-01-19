@@ -24,7 +24,9 @@ export const handle = handleSession(
         }
 
 
-        let response = await resolve(request);
+        let response = await resolve(request, {
+            ssr: !request.url.pathname.startsWith('/webhooks/success')
+        });
         if (response.status === 500 && response?.body.toString().startsWith(`TypeError: Cannot read properties of undefined (reading 'length')`)) {
             response = {
                 ...response,

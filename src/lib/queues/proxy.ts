@@ -1,3 +1,4 @@
+import { getDomain } from "$lib/common"
 import { prisma } from "$lib/database"
 import { dockerInstance } from "$lib/docker"
 import { checkContainer, configureCoolifyProxyOn, configureProxyForApplication, startCoolifyProxy } from "$lib/haproxy"
@@ -12,10 +13,12 @@ export default async function () {
             for (const configuration of configurations) {
                 const parsedConfiguration = JSON.parse(Buffer.from(configuration.Labels['coolify.configuration'], 'base64').toString())
                 if (configuration.Labels['coolify.type'] === 'standalone-application') {
-                    const { domain, applicationId, port } = parsedConfiguration
-                    const application = await prisma.application.findUnique({ where: { id: applicationId }, include: { settings: true } })
-                    const { forceSSL } = application.settings
-                    await configureProxyForApplication({ domain, applicationId, port, forceSSL })
+                    const { fqdn, applicationId, port } = parsedConfiguration
+                    if (fqdn) {
+                        const domain = getDomain(fqdn)
+                        const isHttps = fqdn.startsWith('https://')
+                        await configureProxyForApplication({ domain, applicationId, port, isHttps })
+                    }
                 }
             }
         }

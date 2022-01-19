@@ -54,9 +54,6 @@ import { goto } from '$app/navigation';
 		use:enhance={{
 			pending: async () => {
 				loading = true;
-			},
-			final: async () => {
-				loading = false;
 			}
 		}}
 	>

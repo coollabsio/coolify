@@ -6,11 +6,11 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { status, body } = await getUserDetails(request);
     if (status === 401) return { status, body }
     const { id } = request.params
-    
-    const domain = request.body.get('domain').toLocaleLowerCase() || undefined
+
+    const fqdn = request.body.get('fqdn')?.toLocaleLowerCase() || undefined
 
     try {
-        return db.isDomainConfigured({ id, domain: domain.replace('http://', '').replace('https://', '') })
+        return db.isDomainConfigured({ id, fqdn })
     } catch (err) {
         return err
     }

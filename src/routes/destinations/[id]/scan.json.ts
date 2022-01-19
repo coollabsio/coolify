@@ -28,12 +28,12 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     if (status === 401) return { status, body }
     
     const { id } = request.params
-    const domain = request.body.get('domain').toLocaleLowerCase() || undefined
+    const fqdn = request.body.get('fqdn')?.toLocaleLowerCase() || undefined
     const projectId = Number(request.body.get('projectId')) || undefined
     const repository = request.body.get('repository') || undefined
     const branch = request.body.get('branch') || undefined
     try {
-        const foundByDomain = await db.prisma.application.findFirst({ where: { domain }, rejectOnNotFound: false })
+        const foundByDomain = await db.prisma.application.findFirst({ where: { fqdn }, rejectOnNotFound: false })
         const foundByRepository = await db.prisma.application.findFirst({ where: { repository, branch, projectId }, rejectOnNotFound: false })
         if (foundByDomain) {
             return {

@@ -1,4 +1,5 @@
 import { getUserDetails } from '$lib/common';
+import { getDomain } from '$lib/components/common';
 import * as db from '$lib/database';
 import { dockerInstance } from '$lib/docker';
 import { configureSimpleServiceProxyOff, stopTcpHttpProxy } from '$lib/haproxy';
@@ -12,7 +13,8 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
     try {
         const service = await db.getService({ id, teamId })
-        const { destinationDockerId, destinationDocker, domain, minio: { publicPort } } = service
+        const { destinationDockerId, destinationDocker, fqdn, minio: { publicPort } } = service
+        const domain = getDomain(fqdn)
         if (destinationDockerId) {
             const docker = dockerInstance({ destinationDocker })
             const container = docker.engine.getContainer(id)
@@ -26,7 +28,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
                 console.error(error)
             }
             await stopTcpHttpProxy(destinationDocker, publicPort)
-            await configureSimpleServiceProxyOff({ domain: domain.replace(/^https?:\/\//, '').replace(/^http?:\/\//, '') })
+            await configureSimpleServiceProxyOff({ domain })
         }
 
         return {

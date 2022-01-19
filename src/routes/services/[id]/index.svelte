@@ -4,7 +4,8 @@
 		if (stuff?.service?.id) {
 			return {
 				props: {
-					service: stuff.service
+					service: stuff.service,
+					isRunning: stuff.isRunning
 				}
 			};
 		}
@@ -35,15 +36,16 @@
 	import Services from './_Services/_Services.svelte';
 
 	export let service;
+	export let isRunning;
 </script>
 
 <div class="font-bold flex space-x-1 p-5 px-6 text-2xl items-center">
 	<div class="tracking-tight truncate md:max-w-64 md:block hidden">
 		{service.name}
 	</div>
-	{#if service.domain}
+	{#if service.fqdn}
 		<span class="px-1 arrow-right-applications md:block hidden">></span>
-		<a href={service.domain} target="_blank" class="pr-2">{service.domain.replace('http://', '').replace('https://', '')}</a>
+		<a href={service.fqdn} target="_blank" class="pr-2">{service.fqdn}</a>
 	{/if}
 	<span class="px-1 arrow-right-applications md:block hidden">></span>
 	{#if service.type === 'plausibleanalytics'}
@@ -59,4 +61,4 @@
 	{/if}
 </div>
 
-<Services {service} />
+<Services {service} {isRunning} />

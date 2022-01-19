@@ -10,15 +10,10 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { id } = request.params
     const debug = request.body.get('debug') === 'true' ? true : false
     const previews = request.body.get('previews') === 'true' ? true : false
-    const forceSSL = request.body.get('forceSSL') === 'true' ? true : false
-    const forceSSLChanged = request.body.get('forceSSLChanged') === 'true' ? true : false
 
     try {
-        await db.setApplicationSettings({ id, debug, previews, forceSSL, forceSSLChanged })
-        const { destinationDockerId, destinationDocker, domain } = await db.getApplication({ id, teamId })
-        if (destinationDockerId && forceSSLChanged) {
-            await letsEncrypt({ destinationDocker, domain, id, forceSSLChanged })
-        }
+        await db.setApplicationSettings({ id, debug, previews })
+
         return { status: 200 }
     } catch (err) {
         return {

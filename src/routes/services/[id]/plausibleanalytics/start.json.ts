@@ -5,6 +5,7 @@ import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
 import { letsEncrypt } from '$lib/letsencrypt';
 import { configureSimpleServiceProxyOn } from '$lib/haproxy';
+import { getDomain } from '$lib/components/common';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { teamId, status, body } = await getUserDetails(request);
@@ -14,7 +15,11 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
     try {
         const service = await db.getService({ id, teamId })
-        const { type, version, domain, destinationDockerId, destinationDocker, plausibleAnalytics: { id: plausibleDbId, username, email, password, postgresqlDatabase, postgresqlPassword, postgresqlUser, secretKeyBase } } = service
+        const { type, version, fqdn, destinationDockerId, destinationDocker, plausibleAnalytics: { id: plausibleDbId, username, email, password, postgresqlDatabase, postgresqlPassword, postgresqlUser, secretKeyBase } } = service
+
+        const domain = getDomain(fqdn)
+        const isHttps = fqdn.startsWith('https://')
+
         const config = {
             plausibleAnalytics: {
                 image: `plausible/analytics:${version}`,
@@ -173,13 +178,11 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             console.log(error)
         }
         try {
-            const domainOnly = domain.replace('http://', '').replace('https://', '')
             await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`)
-            await configureSimpleServiceProxyOn({ id, domain: domainOnly, port: 8000 })
-            
-            if (domain.startsWith('https://')) {
-                const ssl = { destinationDocker, domain: domainOnly, forceSSLChanged: true, isCoolify: false, id }
-                await letsEncrypt(ssl)
+            await configureSimpleServiceProxyOn({ id, domain, port: 8000 })
+
+            if (isHttps) {
+                await letsEncrypt({ domain, id })
             }
             return {
                 status: 200

@@ -27,3 +27,7 @@ export async function getGithubToken({apiUrl, application, githubToken}): Promis
 }
 export const staticDeployments = ['react', 'vuejs', 'static', 'svelte', 'gatsby', 'php'];
 export const notNodeDeployments = ['php', 'docker', 'rust']
+
+export function getDomain(domain) {
+    return domain?.replace('https://', '').replace('http://', '')
+}

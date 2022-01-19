@@ -74,7 +74,7 @@
 						{database.name}
 					</div>
 					{#if !database.type}
-						<div class="font-bold text-center truncate text-red-500">Not configured</div>
+						<div class="font-bold text-center truncate">Configuration missing</div>
 					{:else}
 						<div class="text-center truncate">{database.type}</div>
 					{/if}

@@ -76,18 +76,18 @@ export async function setService({ id, version }) {
         throw PrismaErrorHandler(e)
     }
 }
-export async function updatePlausibleAnalyticsService({ id, domain, email, username, name }) {
+export async function updatePlausibleAnalyticsService({ id, fqdn, email, username, name }) {
     try {
         await prisma.plausibleAnalytics.update({ where: { serviceId: id }, data: { email, username } })
-        await prisma.service.update({ where: { id }, data: { name, domain } })
+        await prisma.service.update({ where: { id }, data: { name, fqdn } })
         return { status: 200 }
     } catch (e) {
         throw PrismaErrorHandler(e)
     }
 }
-export async function updateNocoDbService({ id, domain, name }) {
+export async function updateNocoDbService({ id, fqdn, name }) {
     try {
-        await prisma.service.update({ where: { id }, data: { domain, name } })
+        await prisma.service.update({ where: { id }, data: { fqdn, name } })
         return { status: 200 }
     } catch (e) {
         throw PrismaErrorHandler(e)

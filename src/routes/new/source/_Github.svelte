@@ -84,7 +84,7 @@ import { goto } from '$app/navigation';
 			</div>
 		</div>
 		<div class="grid grid-cols-3">
-			<label for="organization">Organization</label>
+			<label for="organization" class="pt-2">Organization</label>
 			<div class="col-span-2">
 				<input
 					name="organization"

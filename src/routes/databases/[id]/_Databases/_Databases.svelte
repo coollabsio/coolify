@@ -25,7 +25,7 @@
 		databaseDbUser = database.rootUser;
 		databaseDbUserPassword = database.rootUserPassword;
 	} else if (database.type === 'redis') {
-		databaseDefault = ''
+		databaseDefault = '';
 	}
 	let databaseUrl = generateUrl();
 
@@ -80,7 +80,7 @@
 		class="py-4"
 	>
 		<div class="font-bold flex space-x-1 pb-5">
-			<div class="text-xl tracking-tight mr-4">Configurations</div>
+			<div class="text-xl tracking-tight mr-4">General</div>
 			{#if $session.isAdmin}
 				<button
 					type="submit"
@@ -92,6 +92,18 @@
 		</div>
 
 		<div class="grid grid-flow-row gap-2 px-10">
+			<div class="grid grid-cols-3 items-center">
+				<label for="name">Name</label>
+				<div class="col-span-2 ">
+					<input
+						readonly={!$session.isAdmin}
+						name="name"
+						id="name"
+						value={database.name}
+						required
+					/>
+				</div>
+			</div>
 			<div class="grid grid-cols-3 items-center">
 				<label for="destination">Destination</label>
 				<div class="col-span-2">
@@ -106,18 +118,6 @@
 							/>
 						</div>
 					{/if}
-				</div>
-			</div>
-			<div class="grid grid-cols-3 items-center">
-				<label for="name">Name</label>
-				<div class="col-span-2 ">
-					<input
-						readonly={!$session.isAdmin}
-						name="name"
-						id="name"
-						value={database.name}
-						required
-					/>
 				</div>
 			</div>
 

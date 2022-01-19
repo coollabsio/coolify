@@ -6,6 +6,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { letsEncrypt } from '$lib/letsencrypt';
 import { configureSimpleServiceProxyOn, startHttpProxy, startTcpProxy } from '$lib/haproxy';
 import getPort from 'get-port';
+import { getDomain } from '$lib/components/common';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
     const { teamId, status, body } = await getUserDetails(request);
@@ -15,7 +16,10 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
     try {
         const service = await db.getService({ id, teamId })
-        const { type, version, domain, destinationDockerId, destinationDocker, minio: { rootUser, rootUserPassword } } = service
+        const { type, version, fqdn, destinationDockerId, destinationDocker, minio: { rootUser, rootUserPassword } } = service
+
+        const domain = getDomain(fqdn)
+        const isHttps = fqdn.startsWith('https://')
 
         const network = destinationDockerId && destinationDocker.network
         const host = getEngine(destinationDocker.engine)
@@ -30,7 +34,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             environmentVariables: {
                 MINIO_ROOT_USER: rootUser,
                 MINIO_ROOT_PASSWORD: rootUserPassword,
-                MINIO_BROWSER_REDIRECT_URL: domain
+                MINIO_BROWSER_REDIRECT_URL: fqdn
             },
         }
         const composeFile = {
@@ -67,17 +71,15 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             console.log(error)
         }
         try {
-            
-            const domainOnly = domain.replace('http://', '').replace('https://', '')
+
             await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`)
-            await configureSimpleServiceProxyOn({ id, domain: domainOnly, port: consolePort })
+            await configureSimpleServiceProxyOn({ id, domain, port: consolePort })
 
             await db.updateMinioService({ id, publicPort })
             await startHttpProxy(destinationDocker, id, publicPort, apiPort)
-            
-            if (domain.startsWith('https://')) {
-                const ssl = { destinationDocker, domain: domainOnly, forceSSLChanged: true, isCoolify: false, id }
-                await letsEncrypt(ssl)
+
+            if (isHttps) {
+                await letsEncrypt({ domain, id })
             }
             return {
                 status: 200

@@ -38,7 +38,7 @@
 	import { appConfiguration } from '$lib/store';
 	import Setting from '$lib/components/Setting.svelte';
 	import type { Application, ApplicationSettings } from '@prisma/client';
-	import { notNodeDeployments, staticDeployments } from '$lib/components/common';
+	import { getDomain, notNodeDeployments, staticDeployments } from '$lib/components/common';
 	import { toast } from '@zerodevx/svelte-toast';
 	const { id } = $page.params;
 
@@ -47,7 +47,6 @@
 	let loading = false;
 	let debug = application.settings.debug;
 	let previews = application.settings.previews;
-	let forceSSL = application.settings.forceSSL;
 
 	onMount(() => {
 		domainEl.focus();
@@ -55,22 +54,14 @@
 
 	async function changeSettings(name) {
 		const form = new FormData();
-		let tempforceSSL = forceSSL;
-		let forceSSLChanged = false;
 		if (name === 'debug') {
 			debug = !debug;
 		}
 		if (name === 'previews') {
 			previews = !previews;
 		}
-		if (name === 'forceSSL') {
-			if (!tempforceSSL) forceSSLChanged = true;
-			tempforceSSL = !tempforceSSL;
-		}
 		form.append('previews', previews.toString());
 		form.append('debug', debug.toString());
-		form.append('forceSSL', tempforceSSL.toString());
-		form.append('forceSSLChanged', forceSSLChanged.toString());
 		try {
 			const response = await fetch(`/applications/${id}/settings.json`, {
 				method: 'POST',
@@ -80,10 +71,7 @@
 				const error = await response.json();
 				errorNotification(error.message || error);
 				return;
-			}
-			if (forceSSLChanged) toast.push('Settings saved. Generating SSL certificate...');
-			else toast.push('Settings saved. Turned off https certificate.');
-			forceSSL = tempforceSSL;
+			} else toast.push('Settings saved.');
 		} catch (e) {
 			errorNotification(e.message || e);
 			throw new Error(e.message || e);
@@ -95,11 +83,11 @@
 	<div class="tracking-tight truncate md:max-w-64 lg:block hidden">
 		{$appConfiguration.configuration.name}
 	</div>
-	{#if $appConfiguration.configuration.domain}
+	{#if $appConfiguration.configuration.fqdn}
 		<span class="px-1 arrow-right-applications lg:block hidden">></span>
 		<span class="pr-2"
-			><a href="http://{$appConfiguration.configuration.domain}" target="_blank"
-				>{$appConfiguration.configuration.domain}</a
+			><a href={$appConfiguration.configuration.fqdn} target="_blank"
+				>{getDomain($appConfiguration.configuration.fqdn)}</a
 			></span
 		>
 	{/if}
@@ -109,7 +97,7 @@
 		target="_blank"
 		class="w-10"
 	>
-		{#if $appConfiguration.configuration.gitSource.type === 'gitlab'}
+		{#if $appConfiguration.configuration.gitSource?.type === 'gitlab'}
 			<svg viewBox="0 0 128 128" class="icons">
 				<path
 					fill="#FC6D26"
@@ -131,7 +119,7 @@
 					d="M119.58 50.663H87.145l13.94-42.902c.717-2.206 3.84-2.206 4.557 0l13.94 42.903z"
 				/>
 			</svg>
-		{:else if $appConfiguration.configuration.gitSource.type === 'github'}
+		{:else if $appConfiguration.configuration.gitSource?.type === 'github'}
 			<svg viewBox="0 0 128 128" class="icons">
 				<g fill="#ffffff"
 					><path
@@ -148,6 +136,7 @@
 </div>
 
 <div class="max-w-4xl mx-auto px-6">
+	<!-- svelte-ignore missing-declaration -->
 	<form
 		action="/applications/{id}.json"
 		use:enhance={{
@@ -181,7 +170,7 @@
 		class=" py-4"
 	>
 		<div class="font-bold flex space-x-1 pb-5">
-			<div class="text-xl tracking-tight mr-4">Configurations</div>
+			<div class="text-xl tracking-tight mr-4">General</div>
 			{#if $session.isAdmin}
 				<button
 					type="submit"
@@ -193,6 +182,18 @@
 		</div>
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="grid grid-cols-3 items-center mt-2">
+				<label for="name">Name</label>
+				<div class="col-span-2 ">
+					<input
+						readonly={!$session.isAdmin}
+						name="name"
+						id="name"
+						value={$appConfiguration.configuration.name}
+						required
+					/>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center">
 				<label for="gitSource">Git Source</label>
 				<div class="col-span-2">
 					<a
@@ -204,7 +205,7 @@
 							value={$appConfiguration.configuration.gitSource.name}
 							id="gitSource"
 							disabled
-							class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
+							class="bg-coolgray-200 hover:bg-coolgray-500 cursor-pointer"
 						/></a
 					>
 				</div>
@@ -222,25 +223,12 @@
 								.branch}"
 							id="repository"
 							disabled
-							class="bg-transparent hover:bg-coolgray-500 cursor-pointer"
+							class="bg-coolgray-200 hover:bg-coolgray-500 cursor-pointer"
 						/></a
 					>
 				</div>
 			</div>
 			<div class="grid grid-cols-3 items-center">
-				<label for="destination">Destination</label>
-				<div class="col-span-2">
-					<div class="no-underline">
-						<input
-							value={$appConfiguration.configuration.destinationDocker.name}
-							id="destination"
-							disabled
-							class="bg-transparent "
-						/>
-					</div>
-				</div>
-			</div>
-			<div class="grid grid-cols-3 items-center pb-8">
 				<label for="buildPack">Build Pack</label>
 				<div class="col-span-2">
 					<a
@@ -253,35 +241,44 @@
 							value={$appConfiguration.configuration.buildPack}
 							id="buildPack"
 							disabled
-							class="bg-transparent hover:bg-coolgray-500 cursor-pointer -ml-1"
+							class="bg-coolgray-200 hover:bg-coolgray-500 cursor-pointer -ml-1"
 						/></a
 					>
 				</div>
 			</div>
-			<div class="grid grid-cols-3 items-center">
-				<label for="name">Name</label>
-				<div class="col-span-2 ">
-					<input
-						readonly={!$session.isAdmin}
-						name="name"
-						id="name"
-						value={$appConfiguration.configuration.name}
-						required
-					/>
+			<div class="grid grid-cols-3 items-center pb-8">
+				<label for="destination">Destination</label>
+				<div class="col-span-2">
+					<div class="no-underline">
+						<input
+							value={$appConfiguration.configuration.destinationDocker.name}
+							id="destination"
+							disabled
+							class="bg-transparent "
+						/>
+					</div>
 				</div>
 			</div>
-			<div class="grid grid-cols-3 items-center pb-8">
-				<label for="domain">Domain</label>
-				<div class="col-span-2 ">
+
+			<div class="font-bold flex space-x-1 py-5">
+				<div class="text-xl tracking-tight mr-4">Application</div>
+			</div>
+
+			<div class="grid grid-cols-3">
+				<label for="fqdn" class="pt-2">Domain (FQDN)</label>
+				<div class="col-span-2">
 					<input
 						readonly={!$session.isAdmin}
 						bind:this={domainEl}
-						name="domain"
-						id="domain"
-						value={$appConfiguration.configuration.domain}
-						pattern="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-						placeholder="eg: coollabs.io"
+						name="fqdn"
+						id="fqdn"
+						value={$appConfiguration.configuration.fqdn}
+						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+						placeholder="eg: https://coollabs.io"
 						required
+					/>
+					<Explainer
+						text="If you specify <span class='text-green-600'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you."
 					/>
 				</div>
 			</div>
@@ -325,7 +322,7 @@
 						/>
 					</div>
 				</div>
-				<div class="grid grid-cols-3 items-center pb-8">
+				<div class="grid grid-cols-3 items-center">
 					<label for="startCommand" class="">Start Command</label>
 					<div class="col-span-2">
 						<input
@@ -340,7 +337,7 @@
 			{/if}
 
 			<div class="grid grid-cols-3">
-				<label for="baseDirectory">Base Directory</label>
+				<label for="baseDirectory" class="pt-2">Base Directory</label>
 				<div class="col-span-2">
 					<input
 						readonly={!$session.isAdmin}
@@ -356,7 +353,7 @@
 			</div>
 			{#if !notNodeDeployments.includes($appConfiguration.configuration.buildPack)}
 				<div class="grid grid-cols-3">
-					<label for="publishDirectory">Publish Directory</label>
+					<label for="publishDirectory" class="pt-2">Publish Directory</label>
 					<div class="col-span-2">
 						<input
 							readonly={!$session.isAdmin}
@@ -366,7 +363,7 @@
 							placeholder=" default: /"
 						/>
 						<Explainer
-							text="Directory containing all the assets for deployment. <br> For example: dist or _site or public"
+							text="Directory containing all the assets for deployment. <br> For example: <span class='text-green-600'>dist</span>,<span class='text-green-600'>_site</span> or <span class='text-green-600'>public</span>."
 						/>
 					</div>
 				</div>
@@ -377,14 +374,14 @@
 		<div class="text-xl tracking-tight mr-4">Features</div>
 	</div>
 	<div class="px-4 sm:px-6 pb-10">
-		<ul class="mt-2 divide-y divide-stone-800">
+		<!-- <ul class="mt-2 divide-y divide-stone-800">
 			<Setting
 				bind:setting={forceSSL}
 				on:click={() => changeSettings('forceSSL')}
 				title="Force https"
 				description="Creates a https redirect for all requests from http and also generates a https certificate for the domain through Let's Encrypt."
 			/>
-		</ul>
+		</ul> -->
 		<ul class="mt-2 divide-y divide-stone-800">
 			<Setting
 				bind:setting={previews}
