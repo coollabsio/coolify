@@ -1,4 +1,4 @@
-import { getUserDetails } from '$lib/common';
+import { getDomain, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { listSettings, PrismaErrorHandler } from '$lib/database';
 import { configureCoolifyProxyOff, configureCoolifyProxyOn } from '$lib/haproxy';
@@ -54,14 +54,17 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     const value = request.body.get('value') || undefined
 
     try {
-        let oldDomain;
-        if (name === 'domain') {
-            oldDomain = await db.prisma.setting.findUnique({ where: { name }, rejectOnNotFound: false })
+        let oldFqdn;
+        if (name === 'fqdn') {
+            oldFqdn = await db.prisma.setting.findUnique({ where: { name }, rejectOnNotFound: false })
         }
         await db.prisma.setting.upsert({ where: { name }, update: { value }, create: { name, value } })
-        if (name === 'domain') {
-            if (oldDomain) await configureCoolifyProxyOff({ domain: oldDomain.value })
-            if (value) await configureCoolifyProxyOn({ domain: value })
+        
+        if (name === 'fqdn') {
+            const domain = getDomain(value)
+            const oldDomain = getDomain(oldFqdn.value)
+            if (oldFqdn) await configureCoolifyProxyOff({ domain: oldDomain })
+            if (value) await configureCoolifyProxyOn({ domain })
         }
         return {
             status: 200,

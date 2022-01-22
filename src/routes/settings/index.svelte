@@ -29,10 +29,10 @@
 	let isRegistrationEnabled =
 		settings.find((setting) => setting.name === 'isRegistrationEnabled')?.value === 'true';
 
-	let domain = settings.find((setting) => setting.name === 'domain')?.value;
-	let domainConfigured = !!domain;
-	async function removeDomain(name) {
-		if (domainConfigured) {
+	let fqdn = settings.find((setting) => setting.name === 'fqdn')?.value;
+	let fqdnConfigured = !!fqdn;
+	async function removeFqdn(name) {
+		if (fqdnConfigured) {
 			const form = new FormData();
 			form.append('name', name);
 
@@ -55,8 +55,8 @@
 			isRegistrationEnabled = !isRegistrationEnabled;
 			form.append('value', isRegistrationEnabled.toString());
 		}
-		if (name === 'domain') {
-			form.append('value', domain.toString());
+		if (name === 'fqdn') {
+			form.append('value', fqdn.toString());
 		}
 		try {
 			await fetch('/settings.json', {
@@ -75,45 +75,46 @@
 </div>
 {#if $session.teamId === '0'}
 	<div class="max-w-2xl mx-auto">
-		<div class="font-bold flex space-x-1 py-5 px-6">
-			<div class="text-xl tracking-tight mr-4">Global Settings</div>
-		</div>
-		<div class="px-4 sm:px-6">
-			<div class="py-4 flex items-center">
-				<form class="flex" on:submit|preventDefault={() => changeSettings('domain')}>
-					<div class="flex flex-col">
-						<div class="flex">
-							<p class="text-base font-bold text-stone-100">Domain</p>
-							<button type="submit" class="mx-2 bg-green-600 hover:bg-green-500">Save</button>
-						</div>
-						<Explainer text="Set the domain that you could use to access Coolify." />
-					</div>
+		<form on:submit|preventDefault={() => changeSettings('domain')}>
+			<div class="font-bold flex space-x-1 py-5 px-6">
+				<div class="text-xl tracking-tight mr-4">Global Settings</div>
+				<button type="submit" class="mx-2 bg-green-600 hover:bg-green-500">Save</button>
+			</div>
+			<div class="px-4 sm:px-6">
+				<div class="py-4 flex  space-x-4 px-4">
+							<p class="text-base font-bold text-stone-100">Domain (FQDN)</p>
 
 					<div class="justify-center text-center space-y-2">
 						<input
-							bind:value={domain}
+							bind:value={fqdn}
 							readonly={!$session.isAdmin}
-							name="domain"
-							id="domain"
+							name="fqdn"
+							id="fqdn"
 							pattern="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-							placeholder="eg: coolify.io"
+							placeholder="eg: https://coolify.io"
 							required
 						/>
+						<Explainer
+							text="Set the fully qualified domain name for your Coolify instance. If you specify <span class='text-green-600'>https</span>, it will be accessible only over https. SSL certificate will be generated for you."
+						/>
 
-						{#if domainConfigured}
-							<button on:click|preventDefault={() => removeDomain('domain')} class="bg-red-600 hover:bg-red-500">Remove domain</button>
+						{#if fqdnConfigured}
+							<button
+								on:click|preventDefault={() => removeFqdn('fqdn')}
+								class="bg-red-600 hover:bg-red-500">Remove Domain</button
+							>
 						{/if}
 					</div>
-				</form>
+				</div>
+				<ul class="mt-2 divide-y divide-stone-800">
+					<Setting
+						bind:setting={isRegistrationEnabled}
+						title="Registration allowed?"
+						description="Allow further registrations to the application. <br>It's turned off after the first registration. "
+						on:click={() => changeSettings('isRegistrationEnabled')}
+					/>
+				</ul>
 			</div>
-			<ul class="mt-2 divide-y divide-stone-800">
-				<Setting
-					bind:setting={isRegistrationEnabled}
-					title="Registration allowed?"
-					description="Allow further registrations to the application. <br>It's turned off after the first registration. "
-					on:click={() => changeSettings('isRegistrationEnabled')}
-				/>
-			</ul>
-		</div>
+		</form>
 	</div>
 {/if}

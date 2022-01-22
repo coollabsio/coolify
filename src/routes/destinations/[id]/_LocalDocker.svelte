@@ -1,6 +1,6 @@
 <script lang="ts">
 	export let destination;
-	export let state;
+	// export let state;
 	import { toast } from '@zerodevx/svelte-toast';
 	import { page } from '$app/stores';
 	import Setting from '$lib/components/Setting.svelte';
@@ -16,7 +16,7 @@
 		network: undefined,
 		isCoolifyProxyUsed: false
 	};
-	let scannedApps = [];
+	// let scannedApps = [];
 	let loading = false;
 	if (destination) {
 		payload = {
@@ -46,12 +46,12 @@
 		}
 		window.location.reload();
 	}
-	async function scanApps() {
-		scannedApps = [];
-		const data = await fetch(`/destinations/${id}/scan.json`);
-		const { containers } = await data.json();
-		scannedApps = containers;
-	}
+	// async function scanApps() {
+	// 	scannedApps = [];
+	// 	const data = await fetch(`/destinations/${id}/scan.json`);
+	// 	const { containers } = await data.json();
+	// 	scannedApps = containers;
+	// }
 	async function changeProxySetting() {
 		if (payload.isCoolifyProxyUsed === true) {
 			const sure = confirm(
@@ -153,9 +153,9 @@
 				disabled={loading}
 				>{loading ? 'Saving...' : 'Save'}
 			</button>
-			<button type="button" class="bg-coollabs hover:bg-coollabs-100" on:click={scanApps}
+			<!-- <button type="button" class="bg-coollabs hover:bg-coollabs-100" on:click={scanApps}
 				>Scan for applications</button
-			>
+			> -->
 		</div>
 		<div class="grid grid-cols-3 items-center">
 			<label for="name">Name</label>
@@ -214,7 +214,7 @@
 	{/if}
 </div> -->
 
-{#if scannedApps.length > 0}
+<!-- {#if scannedApps.length > 0}
 	<div class="flex justify-center px-6 pb-10">
 		<div class="flex space-x-2 h-8 items-center">
 			<div class="font-bold text-xl text-white">Found applications</div>
@@ -227,4 +227,4 @@
 			{/each}
 		</div>
 	</div>
-{/if}
+{/if} -->

@@ -3,8 +3,7 @@ import { forceSSLOffApplication, forceSSLOnApplication, getNextTransactionId, re
 import { asyncExecShell, getEngine } from "./common"
 import * as db from '$lib/database';
 
-export async function letsEncrypt({ domain, isCoolify = false, id }) {
-    const { destinationDocker, destinationDockerId } = await db.prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
+export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
     try {
         if (dev) {
             return await forceSSLOnApplication({ domain })
@@ -17,6 +16,7 @@ export async function letsEncrypt({ domain, isCoolify = false, id }) {
                 await reloadConfiguration()
                 return
             }
+            const { destinationDocker, destinationDockerId } = await db.prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
             // Set SSL with Let's encrypt
             if (destinationDockerId && destinationDocker) {
                 const host = getEngine(destinationDocker.engine)

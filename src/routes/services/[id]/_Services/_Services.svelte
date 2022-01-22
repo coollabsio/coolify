@@ -107,7 +107,7 @@
 					<label for="fqdn" class="pt-2">Domain (FQDN)</label>
 					<div class="col-span-2 ">
 						<CopyPasswordField
-							placeholder="eg: analytics.coollabs.io"
+							placeholder="eg: https://analytics.coollabs.io"
 							readonly={!$session.isAdmin}
 							name="fqdn"
 							id="fqdn"
