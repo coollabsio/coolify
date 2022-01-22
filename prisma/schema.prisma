@@ -214,8 +214,6 @@ model Database {
   teams               Team[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
-  service             Service?           @relation(fields: [serviceId], references: [id])
-  serviceId           String?
 }
 
 model DatabaseSettings {
@@ -233,15 +231,15 @@ model Service {
   fqdn                String?
   type                String?
   version             String?
-  databaseId          String?             @unique
   teams               Team[]
   destinationDockerId String?
   destinationDocker   DestinationDocker?  @relation(fields: [destinationDockerId], references: [id])
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
-  Database            Database[]
   plausibleAnalytics  PlausibleAnalytics?
   minio               Minio?
+  vscodeserver        Vscodeserver?
+  wordpress           Wordpress?
 }
 
 model PlausibleAnalytics {
@@ -269,4 +267,29 @@ model Minio {
   service          Service  @relation(fields: [serviceId], references: [id])
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+model Vscodeserver {
+  id        String   @id @default(cuid())
+  password  String
+  serviceId String   @unique
+  service   Service  @relation(fields: [serviceId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Wordpress {
+  id                    String   @id @default(cuid())
+  extraConfig           String?
+  tablePrefix           String?
+  mysqlUser             String
+  mysqlPassword         String
+  mysqlRootUser         String
+  mysqlRootUserPassword String
+  mysqlDatabase         String?
+  mysqlPublicPort       Int?
+  serviceId             String   @unique
+  service               Service  @relation(fields: [serviceId], references: [id])
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }

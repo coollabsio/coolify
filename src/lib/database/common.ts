@@ -72,7 +72,6 @@ export const supportedDatabaseTypesAndVersions = [
     { name: 'postgresql', fancyName: 'PostgreSQL', baseImage: 'bitnami/postgresql', versions: ['14.1.0', '13.5.0', '12.9.0', '11.14.0', '10.19.0', '9.6.24'] },
     { name: 'redis', fancyName: 'Redis', baseImage: 'bitnami/redis', versions: ['6.2.6', '6.0.16', '5.0.14'] },
     { name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] },
-    // { name: 'clickhouse', versions: ['21.12', '21.11', ''] }
 ];
 export const supportedServiceTypesAndVersions = [
     { name: 'plausibleanalytics', fancyName: 'Plausible Analytics', baseImage: 'plausible/analytics', versions: ['latest'] },

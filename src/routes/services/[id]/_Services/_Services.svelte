@@ -87,7 +87,7 @@
 				</div>
 			</div>
 			<div class="grid grid-cols-3">
-				{#if service.type === 'plausibleanalytics' || service.type === 'nocodb'}
+				<!-- {#if service.type === 'plausibleanalytics' || service.type === 'nocodb'} -->
 					<label for="fqdn" class="pt-2">Domain (FQDN)</label>
 					<div class="col-span-2 ">
 						<CopyPasswordField
@@ -96,6 +96,7 @@
 							disabled={!$session.isAdmin || isRunning}
 							name="fqdn"
 							id="fqdn"
+							pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 							bind:value={service.fqdn}
 							required
 						/>
@@ -103,7 +104,7 @@
 							text="If you specify <span class='text-green-600'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you."
 						/>
 					</div>
-				{:else}
+				<!-- {:else}
 					<label for="fqdn" class="pt-2">Domain (FQDN)</label>
 					<div class="col-span-2 ">
 						<CopyPasswordField
@@ -118,7 +119,7 @@
 							text="If you specify <span class='text-green-600'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you."
 						/>
 					</div>
-				{/if}
+				{/if} -->
 			</div>
 			{#if service.type === 'plausibleanalytics'}
 				<PlausibleAnalytics {service} />
@@ -127,7 +128,7 @@
 			{:else if service.type === 'vscodeserver'}
 				<VsCodeServer {service} />
 			{:else if service.type === 'wordpress'}
-				<Wordpress {service} />
+				<Wordpress {service} {isRunning} />
 			{/if}
 		</div>
 	</form>

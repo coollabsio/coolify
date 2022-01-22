@@ -14,7 +14,7 @@ export default async function () {
                 console.log(error)
             }
             try {
-                await asyncExecShell(`DOCKER_HOST=${host} docker image prune --all -f`)
+                await asyncExecShell(`DOCKER_HOST=${host} docker image prune -f`)
             } catch (error) {
                 //
                 console.log(error)

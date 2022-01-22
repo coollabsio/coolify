@@ -18,7 +18,7 @@ input {
 	@apply text-xs px-2  py-2 rounded bg-transparent border border-transparent bg-coolgray-200 text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500 placeholder-stone-600 w-96 select-all disabled:bg-transparent;
 }
 textarea {
-	@apply text-xs px-2 py-2 rounded bg-transparent border border-transparent bg-coolgray-200 text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500 placeholder-stone-600 w-96 select-all;
+	@apply text-xs px-2 py-2 rounded bg-transparent border border-transparent bg-coolgray-200 text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500 placeholder-stone-600 w-96 select-all disabled:bg-transparent;
 }
 
 

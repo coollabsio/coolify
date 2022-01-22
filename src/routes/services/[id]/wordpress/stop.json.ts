@@ -2,7 +2,7 @@ import { getUserDetails } from '$lib/common';
 import { getDomain } from '$lib/components/common';
 import * as db from '$lib/database';
 import { dockerInstance } from '$lib/docker';
-import { configureSimpleServiceProxyOff, stopTcpHttpProxy } from '$lib/haproxy';
+import { configureSimpleServiceProxyOff } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
@@ -13,22 +13,30 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
     try {
         const service = await db.getService({ id, teamId })
-        const { destinationDockerId, destinationDocker, fqdn, minio: { publicPort } } = service
-        await db.updateMinioService({ id, publicPort: null })
+        const { destinationDockerId, destinationDocker, fqdn } = service
         const domain = getDomain(fqdn)
         if (destinationDockerId) {
             const docker = dockerInstance({ destinationDocker })
-            const container = docker.engine.getContainer(id)
+            const wordpress = docker.engine.getContainer(id)
+            const mysql = docker.engine.getContainer(`${id}-mysql`)
 
             try {
-                if (container) {
-                    await container.stop()
-                    await container.remove()
+                if (wordpress) {
+                    await wordpress.stop()
+                    await wordpress.remove()
                 }
             } catch (error) {
                 console.error(error)
             }
-            await stopTcpHttpProxy(destinationDocker, publicPort)
+            try {
+                if (mysql) {
+                    await mysql.stop()
+                    await mysql.remove()
+                }
+            } catch (error) {
+                console.error(error)
+            }
+
             await configureSimpleServiceProxyOff({ domain })
         }
 

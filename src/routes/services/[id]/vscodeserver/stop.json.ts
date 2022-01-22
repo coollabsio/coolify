@@ -2,7 +2,7 @@ import { getUserDetails } from '$lib/common';
 import { getDomain } from '$lib/components/common';
 import * as db from '$lib/database';
 import { dockerInstance } from '$lib/docker';
-import { configureSimpleServiceProxyOff, stopTcpHttpProxy } from '$lib/haproxy';
+import { configureSimpleServiceProxyOff } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
@@ -13,8 +13,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
     try {
         const service = await db.getService({ id, teamId })
-        const { destinationDockerId, destinationDocker, fqdn, minio: { publicPort } } = service
-        await db.updateMinioService({ id, publicPort: null })
+        const { destinationDockerId, destinationDocker, fqdn } = service
         const domain = getDomain(fqdn)
         if (destinationDockerId) {
             const docker = dockerInstance({ destinationDocker })
@@ -28,7 +27,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             } catch (error) {
                 console.error(error)
             }
-            await stopTcpHttpProxy(destinationDocker, publicPort)
+
             await configureSimpleServiceProxyOff({ domain })
         }
 

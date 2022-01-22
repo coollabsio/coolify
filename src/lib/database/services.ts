@@ -19,13 +19,18 @@ export async function newService({ name, teamId }) {
 
 export async function getService({ id, teamId }) {
     try {
-        const body = await prisma.service.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true, plausibleAnalytics: true, minio: true } })
+        const body = await prisma.service.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true, plausibleAnalytics: true, minio: true, vscodeserver: true, wordpress: true } })
 
         if (body.plausibleAnalytics?.postgresqlPassword) body.plausibleAnalytics.postgresqlPassword = decrypt(body.plausibleAnalytics.postgresqlPassword)
         if (body.plausibleAnalytics?.password) body.plausibleAnalytics.password = decrypt(body.plausibleAnalytics.password)
         if (body.plausibleAnalytics?.secretKeyBase) body.plausibleAnalytics.secretKeyBase = decrypt(body.plausibleAnalytics.secretKeyBase)
 
         if (body.minio?.rootUserPassword) body.minio.rootUserPassword = decrypt(body.minio.rootUserPassword)
+
+        if (body.vscodeserver?.password) body.vscodeserver.password = decrypt(body.vscodeserver.password)
+
+        if (body.wordpress?.mysqlPassword) body.wordpress.mysqlPassword = decrypt(body.wordpress.mysqlPassword)
+        if (body.wordpress?.mysqlRootUserPassword) body.wordpress.mysqlRootUserPassword = decrypt(body.wordpress.mysqlRootUserPassword)
 
         return { ...body }
     } catch (e) {
@@ -58,6 +63,22 @@ export async function configureServiceType({ id, type }) {
                 where: { id },
                 data: { type, minio: { create: { rootUser, rootUserPassword } } }
             })
+        } else if (type === 'vscodeserver') {
+            const password = encrypt(generatePassword())
+            await prisma.service.update({
+                where: { id },
+                data: { type, vscodeserver: { create: { password } } }
+            })
+        } else if (type === 'wordpress') {
+            const mysqlUser = cuid()
+            const mysqlPassword = encrypt(generatePassword())
+            const mysqlRootUser = cuid()
+            const mysqlRootUserPassword = encrypt(generatePassword())
+            await prisma.service.update({
+                where: { id },
+                data: { type, wordpress: { create: { mysqlPassword, mysqlRootUserPassword, mysqlRootUser, mysqlUser } } }
+            })
+
         }
 
         return { status: 200 }
@@ -93,7 +114,22 @@ export async function updateNocoDbService({ id, fqdn, name }) {
         throw PrismaErrorHandler(e)
     }
 }
-
+export async function updateVsCodeServer({ id, fqdn, name }) {
+    try {
+        await prisma.service.update({ where: { id }, data: { fqdn, name } })
+        return { status: 200 }
+    } catch (e) {
+        throw PrismaErrorHandler(e)
+    }
+}
+export async function updateWordpress({ id, fqdn, name, mysqlDatabase, extraConfig }) {
+    try {
+        await prisma.service.update({ where: { id }, data: { fqdn, name, wordpress: { update: { mysqlDatabase, extraConfig } } } })
+        return { status: 200 }
+    } catch (e) {
+        throw PrismaErrorHandler(e)
+    }
+}
 export async function updateMinioService({ id, publicPort }) {
     try {
         await prisma.minio.update({ where: { serviceId: id }, data: { publicPort } })

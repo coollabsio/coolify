@@ -13,6 +13,8 @@
 		<input
 			name="email"
 			id="email"
+			disabled={service.plausibleAnalytics.email}
+			readonly={service.plausibleAnalytics.email}
 			placeholder="Email address"
 			value={service.plausibleAnalytics.email}
 			required
@@ -25,6 +27,8 @@
 		<input
 			name="username"
 			id="username"
+			disabled={service.plausibleAnalytics.username}
+			readonly={service.plausibleAnalytics.username}
 			placeholder="User to login"
 			value={service.plausibleAnalytics.username}
 			required

@@ -9,7 +9,7 @@
 	export let readonly = false;
 	export let textarea = false;
 	export let required = false;
-
+	export let pattern = '';
 	export let id;
 	export let name;
 	export let placeholder = '';
@@ -45,6 +45,7 @@
 				{placeholder}
 				type="text"
 				{id}
+				{pattern}
 				{required}
 				{readonly}
 				{disabled}
@@ -57,6 +58,7 @@
 				{id}
 				{name}
 				{required}
+				{pattern}
 				{readonly}
 				bind:value
 				{disabled}
@@ -70,6 +72,7 @@
 			{id}
 			{name}
 			{readonly}
+			{pattern}
 			{required}
 			bind:value
 			{disabled}

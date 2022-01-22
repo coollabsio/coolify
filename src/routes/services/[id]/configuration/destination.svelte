@@ -32,6 +32,7 @@
 
 	import { page } from '$app/stores';
 	import { enhance } from '$lib/form';
+import { goto } from '$app/navigation';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -73,7 +74,7 @@
 						method="post"
 						use:enhance={{
 							result: async () => {
-								window.location.assign(from || `/services/${id}`);
+								goto(from || `/services/${id}`)
 							}
 						}}
 					>

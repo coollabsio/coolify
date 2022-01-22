@@ -1,3 +1,4 @@
+import { getDomain } from "$lib/common"
 import { prisma, PrismaErrorHandler } from "./common"
 
 export async function isBranchAlreadyUsed({ repository, branch, id }) {
@@ -41,21 +42,12 @@ export async function isSecretExists({ id, name }) {
 }
 
 export async function isDomainConfigured({ id, fqdn }) {
-    console.log(fqdn)
+    const domain = getDomain(fqdn)
     try {
-        const applicationDomains = await prisma.application.findMany({ where: { fqdn: { not: null }, id: { not: id } }, select: { fqdn: true } })
-        const serviceDomains = await prisma.service.findMany({ where: { fqdn: { not: null }, id: { not: id } }, select: { fqdn: true } })
-        let foundApplicationDomain = null
-        let foundServiceDomain = null
-        if (applicationDomains.length > 0) {
-            foundApplicationDomain = applicationDomains.find(applicationDomain => applicationDomain.fqdn === fqdn)
+        const foundApplication = await prisma.application.findMany({ where: { fqdn: { endsWith: domain }, id: { not: id } }, select: { fqdn: true } })
+        const foundService = await prisma.service.findMany({ where: { fqdn: { endsWith: domain }, id: { not: id } }, select: { fqdn: true } })
 
-        }
-        if (serviceDomains.length > 0) {
-            foundServiceDomain = serviceDomains.find(serviceDomain => serviceDomain.fqdn === fqdn)
-
-        }
-        if (foundApplicationDomain || foundServiceDomain) {
+        if (foundApplication.length > 0 || foundService.length > 0) {
             return {
                 status: 500,
                 body: {
