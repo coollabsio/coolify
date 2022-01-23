@@ -4,6 +4,7 @@ import cuid from "cuid"
 import { generatePassword } from "."
 import { prisma, PrismaErrorHandler } from "./common"
 import getPort from 'get-port';
+import { asyncExecShell, getEngine, removeContainer } from "$lib/common"
 
 export async function listDatabases(teamId) {
     return await prisma.database.findMany({ where: { teams: { every: { id: teamId } } } })
@@ -114,17 +115,15 @@ export async function setDatabaseSettings({ id, isPublic }) {
 
 export async function stopDatabase(database) {
     let everStarted = false
-    const { id, destinationDockerId, destinationDocker } = database
+    const { id, destinationDockerId, destinationDocker: { engine } } = database
     if (destinationDockerId) {
-        const docker = dockerInstance({ destinationDocker })
         try {
-            const container = docker.engine.getContainer(id)
-            if (container) {
+            const host = getEngine(engine)
+            const { stdout } = await asyncExecShell(`DOCKER_HOST=${host} docker inspect --format '{{json .State}}' ${id}`)
+            if (stdout) {
                 everStarted = true
-                await container.stop()
-                await container.remove()
+                await removeContainer(id, engine)
             }
-
         } catch (error) {
             console.log(error)
         }

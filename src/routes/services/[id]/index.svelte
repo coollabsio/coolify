@@ -34,6 +34,7 @@
 	import VsCodeServer from '$lib/components/svg/services/VSCodeServer.svelte';
 	import Wordpress from '$lib/components/svg/services/Wordpress.svelte';
 	import Services from './_Services/_Services.svelte';
+	import { getDomain } from '$lib/components/common';
 
 	export let service;
 	export let isRunning;
@@ -45,7 +46,7 @@
 	</div>
 	{#if service.fqdn}
 		<span class="px-1 arrow-right-applications md:block hidden">></span>
-		<a href={service.fqdn} target="_blank" class="pr-2">{service.fqdn}</a>
+		<a href={service.fqdn} target="_blank" class="pr-2">{getDomain(service.fqdn)}</a>
 	{/if}
 	<span class="px-1 arrow-right-applications md:block hidden">></span>
 	{#if service.type === 'plausibleanalytics'}

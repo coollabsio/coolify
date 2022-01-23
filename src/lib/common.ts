@@ -100,56 +100,37 @@ export function getEngine(engine) {
     return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : `tcp://${engine}:2375`
 }
 
-export const removeDestinationDocker = async ({ id, destinationDocker }) => {
-    const docker = dockerInstance({ destinationDocker })
+export async function removeContainer(id, engine) {
+    const host = getEngine(engine)
     try {
-        const container = docker.engine.getContainer(id)
-        if (container) {
-            await container.stop()
-            await container.remove()
+        const { stdout } = await asyncExecShell(`DOCKER_HOST=${host} docker inspect --format '{{json .State}}' ${id}`)
+        if (JSON.parse(stdout).Running) {
+            await asyncExecShell(`DOCKER_HOST=${host} docker stop -t 0 ${id}`)
+            await asyncExecShell(`DOCKER_HOST=${host} docker rm ${id}`)
         }
     } catch (error) {
         console.log(error)
     }
 }
 
-export const removePreviewDestinationDocker = async ({ id, destinationDocker, pullmergeRequestId }) => {
-    try {
-        const docker = dockerInstance({ destinationDocker })
-        await docker.engine.getContainer(`${id}-${pullmergeRequestId}`).stop()
-        await docker.engine.getContainer(`${id}-${pullmergeRequestId}`).remove()
-    } catch (error) {
-        if (error.statusCode === 404) {
-            throw {
-                message: 'Nothing to do.'
-            }
-        }
-        throw error
-    }
+export const removeDestinationDocker = async ({ id, engine }) => {
+    return await removeContainer(id, engine)
+}
 
+export const removePreviewDestinationDocker = async ({ id, destinationDocker, pullmergeRequestId }) => {
+    return removeContainer(`${id}-${pullmergeRequestId}`, destinationDocker.engine)
 }
 
 export const removeAllPreviewsDestinationDocker = async ({ id, destinationDocker }) => {
-    const docker = dockerInstance({ destinationDocker })
-    const listContainers = await docker.engine.listContainers({ filters: { network: [destinationDocker.network] } })
-    const containers = listContainers.filter((container) => {
-        return container.Image.startsWith(id)
-    })
-    const previews = []
+    const host = getEngine(destinationDocker.engine)
+    const { stdout: containers } = await asyncExecShell(`DOCKER_HOST=${host} docker ps -a --filter network=${destinationDocker.network} --filter name=${id} --format '{{.ID}}'`)
+    let previews = []
     for (const container of containers) {
-        const preview = container.Image.split('-')[1]
+        const preview = container.split('-')[1]
         if (preview) previews.push(preview)
-        try {
-            if (docker.engine.getContainer(container.Id)) {
-                await docker.engine.getContainer(container.Id).stop()
-                await docker.engine.getContainer(container.Id).remove()
-            }
-        } catch (error) {
-            console.log(error)
-        }
-
+        await removeContainer(id, destinationDocker.engine)
     }
-    return previews
+    return previews || []
 }
 
 export const createDirectories = async ({ repository, buildId }) => {

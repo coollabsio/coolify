@@ -29,21 +29,17 @@ export async function configureDestinationForDatabase({ id, destinationId }) {
     try {
         await prisma.database.update({ where: { id }, data: { destinationDocker: { connect: { id: destinationId } } } })
 
-        const { destinationDockerId, destinationDocker, version, type } = await prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
+        const { destinationDockerId, destinationDocker: { engine }, version, type } = await prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
 
         if (destinationDockerId) {
-            const docker = dockerInstance({ destinationDocker })
-            try {
-                if (type && version) {
-                    const baseImage = getDatabaseImage(type)
-                    docker.engine.pull(`${baseImage}:${version}`)
-                    docker.engine.pull(`coollabsio/${defaultProxyImageTcp}`)
-                    docker.engine.pull(`coollabsio/${defaultProxyImageHttp}`)
-                    docker.engine.pull(`certbot/certbot:latest`)
-                    docker.engine.pull(`alpine:latest`)
-                }
-            } catch (error) {
-                // console.log(error)
+            const host = getEngine(engine)
+            if (type && version) {
+                const baseImage = getDatabaseImage(type)
+                asyncExecShell(`DOCKER_HOST=${host} docker pull ${baseImage}:${version}`)
+                asyncExecShell(`DOCKER_HOST=${host} docker pull coollabsio/${defaultProxyImageTcp}`)
+                asyncExecShell(`DOCKER_HOST=${host} docker pull coollabsio/${defaultProxyImageHttp}`)
+                asyncExecShell(`DOCKER_HOST=${host} docker pull certbot/certbot:latest`)
+                asyncExecShell(`DOCKER_HOST=${host} docker pull alpine:latest`)
             }
         }
         return { status: 201 }
@@ -63,14 +59,11 @@ export async function updateDestination({ id, name, isSwarm, engine, network }) 
 
 export async function newDestination({ name, teamId, isSwarm, engine, network, isCoolifyProxyUsed }) {
     try {
-        const destinationDocker = {
-            engine,
-            network
+        const host = getEngine(engine)
+        const { stdout: found } = await asyncExecShell(`DOCKER_HOST=${host} docker network ls --filter name=${network} --format '{{json .Name}}'`)
+        if (!found) {
+            await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable ${network}`)
         }
-        const docker = dockerInstance({ destinationDocker })
-        const networks = await docker.engine.listNetworks()
-        const  found = networks.find(network => network.Name === destinationDocker.network)
-        if (!found) await docker.engine.createNetwork({ name: network, attachable: true })
         await prisma.destinationDocker.create({ data: { name, teams: { connect: { id: teamId } }, isSwarm, engine, network, isCoolifyProxyUsed } })
         const destinations = await prisma.destinationDocker.findMany({ where: { engine } })
         const destination = destinations.find(destination => destination.network === network)
@@ -86,7 +79,6 @@ export async function newDestination({ name, teamId, isSwarm, engine, network, i
             }
             await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } })
         }
-
         if (isCoolifyProxyUsed) await startCoolifyProxy(engine)
         return {
             status: 201, body: { id: destination.id }
@@ -100,8 +92,13 @@ export async function removeDestination({ id }) {
         const destination = await prisma.destinationDocker.delete({ where: { id } })
         if (destination.isCoolifyProxyUsed) {
             const host = getEngine(destination.engine)
-            await asyncExecShell(`DOCKER_HOST="${host}" docker network disconnect ${destination.network} coolify-haproxy`)
-            await asyncExecShell(`DOCKER_HOST="${host}" docker network rm ${destination.network}`)
+            const { network } = destination
+            const { stdout: found } = await asyncExecShell(`DOCKER_HOST=${host} docker ps -a --filter network=${network} --filter name=coolify-haproxy --format '{{.}}'`)
+            if (found) {
+                await asyncExecShell(`DOCKER_HOST="${host}" docker network disconnect ${network} coolify-haproxy`)
+                await asyncExecShell(`DOCKER_HOST="${host}" docker network rm ${network}`)
+            }
+
         }
         return { status: 200 }
     } catch (e) {

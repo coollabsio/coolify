@@ -29,21 +29,23 @@ export async function importApplication({ name, teamId, fqdn, port, buildCommand
 export async function removeApplication({ id, teamId }) {
     try {
         const { fqdn, destinationDockerId, destinationDocker } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
-        
+
         const domain = getDomain(fqdn)
 
         await prisma.applicationSettings.deleteMany({ where: { application: { id } } })
         await prisma.buildLog.deleteMany({ where: { applicationId: id } })
         await prisma.secret.deleteMany({ where: { applicationId: id } })
         await prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } })
+        
         let previews = []
         if (destinationDockerId) {
-            await removeDestinationDocker({ id, destinationDocker })
+            await removeDestinationDocker({ id, engine: destinationDocker.engine })
             previews = await removeAllPreviewsDestinationDocker({ id, destinationDocker })
         }
         if (domain) {
             try {
                 await removeProxyConfiguration({ domain })
+                console.log(previews)
                 if (previews.length > 0) {
                     previews.forEach(async preview => {
                         await removeProxyConfiguration({ domain: `${preview}.${domain}` })

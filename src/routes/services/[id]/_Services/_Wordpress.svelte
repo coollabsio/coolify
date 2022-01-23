@@ -2,7 +2,6 @@
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 
 	export let service;
-	console.log(service.wordpress)
 	export let isRunning;
 </script>
 

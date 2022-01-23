@@ -34,7 +34,7 @@
 	import MinIo from '$lib/components/svg/services/MinIO.svelte';
 	import VsCodeServer from '$lib/components/svg/services/VSCodeServer.svelte';
 	import Wordpress from '$lib/components/svg/services/Wordpress.svelte';
-import { goto } from '$app/navigation';
+	import { goto } from '$app/navigation';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -54,7 +54,7 @@ import { goto } from '$app/navigation';
 				method="post"
 				use:enhance={{
 					result: async () => {
-						goto(from || `/services/${id}`)
+						goto(from || `/services/${id}`);
 					}
 				}}
 			>
