@@ -1,11 +1,16 @@
 import { base64Encode } from '$lib/crypto';
-import { saveBuildLog, version } from '$lib/common';
+import { getDomain, saveBuildLog, version } from '$lib/common';
 import * as db from '$lib/database';
 import templates from '$lib/components/templates';
 import { promises as fs } from 'fs';
 import { staticDeployments } from '$lib/components/common';
 
 export function makeLabelForStandaloneApplication({ applicationId, fqdn, name, type, pullmergeRequestId = null, buildPack, repository, branch, projectId, port, commit, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
+    if (pullmergeRequestId) {
+        const protocol = fqdn.startsWith('https://') ? 'https' : 'http';
+        const domain = getDomain(fqdn)
+        fqdn = `${protocol}://${pullmergeRequestId}.${domain}`;
+    }
     return [
         '--label coolify.managed=true',
         `--label coolify.version=${version}`,

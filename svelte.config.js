@@ -9,10 +9,6 @@ const config = {
 		prerender: {
             enabled: false,
         },
-		headers: {
-			host: 'X-Forwarded-Host',
-			protocol: 'X-Forwarded-Proto',
-		},
 		floc: true,
 		vite: {
 			optimizeDeps: {

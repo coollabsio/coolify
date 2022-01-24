@@ -24,12 +24,11 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
 
     const { id } = request.params
     const name = request.body.get('name') || undefined
-    const isSwarm = request.body.get('isSwarm') || undefined
     const engine = request.body.get('engine') || undefined
     const network = request.body.get('network') || undefined
     return {
         body: {
-            destination: await db.updateDestination({ id, name, isSwarm, engine, network })
+            destination: await db.updateDestination({ id, name, engine, network })
         }
     };
 }

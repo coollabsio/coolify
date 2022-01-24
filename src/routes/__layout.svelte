@@ -133,6 +133,9 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Coolify</title>
+</svelte:head>
 <SvelteToast options={{ intro: { y: -64 }, duration: 3000, pausable: true }} />
 {#if $session.uid}
 	<nav class="nav-main">

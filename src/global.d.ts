@@ -1,4 +1,9 @@
 /// <reference types="@sveltejs/kit" />
+interface Cookies {
+    teamId?: string;
+    gitlabToken?: string;
+    'kit.session'?: string;
+}
 interface Locals {
     user: {
         teamId: string;

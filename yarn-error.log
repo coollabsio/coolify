@@ -1,0 +1,104 @@
+Arguments: 
+  /usr/local/bin/node /opt/yarn-v1.22.15/bin/yarn.js install
+
+PATH: 
+  /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+Yarn version: 
+  1.22.15
+
+Node version: 
+  16.11.1
+
+Platform: 
+  linux x64
+
+Trace: 
+  Error: ENOENT: no such file or directory, copyfile '/usr/local/share/.cache/yarn/v6/npm-ignore-5.2.0-6d3bac8fa7fe0d45d9f9be7bac2fc279577e345a-integrity/node_modules/ignore/LICENSE-MIT' -> '/app/node_modules/@typescript-eslint/eslint-plugin/node_modules/ignore/LICENSE-MIT'
+
+npm manifest: 
+  {
+  	"name": "coolify",
+  	"description": "An open-source, hassle-free, self-hostable Heroku & Netlify alternative.",
+  	"version": "2.0.0-rc.1",
+  	"license": "AGPL-3.0",
+  	"scripts": {
+  		"dev": "docker-compose -f docker-compose-dev.yaml up -d",
+  		"dev:stop": "docker-compose -f docker-compose-dev.yaml down",
+  		"dev:logs": "docker-compose -f docker-compose-dev.yaml logs -f --tail 10",
+  		"studio": "npx prisma studio",
+  		"start": "npx prisma migrate deploy && npx prisma generate && npx prisma db seed && node index.js",
+  		"build": "svelte-kit build",
+  		"preview": "svelte-kit preview",
+  		"check": "svelte-check --tsconfig ./tsconfig.json",
+  		"check:watch": "svelte-check --tsconfig ./tsconfig.json --watch",
+  		"lint": "prettier --ignore-path .gitignore --check --plugin-search-dir=. . && eslint --ignore-path .gitignore .",
+  		"format": "prettier --ignore-path .gitignore --write --plugin-search-dir=. .",
+  		"db:generate": "prisma generate",
+  		"db:push": "prisma db push && prisma generate",
+  		"db:seed": "prisma db seed",
+  		"release:coolify": "cross-var docker build -t coollabsio/coolify:$npm_package_version -t coollabsio/coolify:latest . && docker push coollabsio/coolify:$npm_package_version && docker image push coollabsio/coolify:$npm_package_version && docker push coollabsio/coolify:latest",
+  		"release:haproxy": "docker build -f haproxy.Dockerfile -t coollabsio/coolify-haproxy-alpine:1.0.0-rc.1 -t coollabsio/coolify-haproxy-alpine:latest . && docker image push --all-tags coollabsio/coolify-haproxy-alpine",
+  		"release:haproxy:tcp": "docker build -f haproxy-tcp.Dockerfile -t coollabsio/coolify-haproxy-tcp-alpine:1.0.0-rc.1 -t coollabsio/coolify-haproxy-tcp-alpine:latest . && docker image push --all-tags coollabsio/coolify-haproxy-tcp-alpine",
+  		"release:haproxy:http": "docker build -f haproxy-http.Dockerfile -t coollabsio/coolify-haproxy-http-alpine:1.0.0-rc.1 -t coollabsio/coolify-haproxy-http-alpine:latest . && docker image push --all-tags coollabsio/coolify-haproxy-http-alpine"
+  	},
+  	"devDependencies": {
+  		"@sveltejs/adapter-node": "^1.0.0-next.62",
+  		"@sveltejs/adapter-static": "^1.0.0-next.26",
+  		"@sveltejs/kit": "^1.0.0-next.232",
+  		"@types/bcrypt": "^5.0.0",
+  		"@types/js-cookie": "^3.0.1",
+  		"@types/node": "^17.0.10",
+  		"@types/node-forge": "^1.0.0",
+  		"@typescript-eslint/eslint-plugin": "^4.31.1",
+  		"@typescript-eslint/parser": "^4.31.1",
+  		"@zerodevx/svelte-toast": "^0.6.3",
+  		"autoprefixer": "^10.4.2",
+  		"cross-var": "^1.1.0",
+  		"eslint": "^7.32.0",
+  		"eslint-config-prettier": "^8.3.0",
+  		"eslint-plugin-svelte3": "^3.2.1",
+  		"postcss": "^8.3.11",
+  		"prettier": "^2.4.1",
+  		"prettier-plugin-svelte": "^2.4.0",
+  		"prisma": "3.8.1",
+  		"svelte": "^3.46.2",
+  		"svelte-check": "^2.3.0",
+  		"svelte-preprocess": "^4.10.2",
+  		"tailwindcss": "^3.0.15",
+  		"ts-node": "^10.4.0",
+  		"tslib": "^2.3.1",
+  		"typescript": "^4.5.4"
+  	},
+  	"type": "module",
+  	"dependencies": {
+  		"@iarna/toml": "^2.2.5",
+  		"@prisma/client": "3.8.1",
+  		"@sentry/node": "^6.16.1",
+  		"bcrypt": "^5.0.1",
+  		"bullmq": "^1.64.3",
+  		"compare-versions": "^4.1.3",
+  		"cuid": "^2.1.8",
+  		"dayjs": "^1.10.7",
+  		"dockerode": "^3.3.1",
+  		"dotenv-extended": "^2.9.0",
+  		"generate-password": "^1.7.0",
+  		"get-port": "^6.0.0",
+  		"got": "^12.0.1",
+  		"js-cookie": "^3.0.1",
+  		"js-yaml": "^4.1.0",
+  		"jsonwebtoken": "^8.5.1",
+  		"node-forge": "^1.2.1",
+  		"svelte-kit-cookie-session": "^1.4.0",
+  		"unique-names-generator": "^4.6.0"
+  	},
+  	"prisma": {
+  		"seed": "node prisma/seed.cjs"
+  	}
+  }
+
+yarn manifest: 
+  No manifest
+
+Lockfile: 
+  No lockfile

@@ -8,13 +8,12 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
     if (status === 401) return { status, body }
 
     const name = request.body.get('name') || undefined
-    const isSwarm = request.body.get('isSwarm') || false
     const engine = request.body.get('engine') || undefined
     const network = request.body.get('network') || undefined
     const isCoolifyProxyUsed = request.body.get('isCoolifyProxyUsed') === 'true' ? true : false
 
     try {
-        const { body } = await db.newDestination({ name, teamId, isSwarm, engine, network, isCoolifyProxyUsed })
+        const { body } = await db.newDestination({ name, teamId, engine, network, isCoolifyProxyUsed })
 
         return { status: 200, body: { message: 'Destination created', id: body.id } }
     } catch (err) {

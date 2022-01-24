@@ -289,7 +289,7 @@ export async function configureProxyForApplication({ domain, applicationId, port
             }
         }
     } catch (error) {
-        console.log('error getting backend or server', error.response.body)
+        console.log('error getting backend or server', error?.response?.body)
         //
     }
     try {
@@ -307,7 +307,7 @@ export async function configureProxyForApplication({ domain, applicationId, port
             await letsEncrypt({ domain, id: applicationId })
         }
     } catch (error) {
-        console.log('error getting http_request_rules', error.response.body)
+        console.log('error getting http_request_rules', error?.response?.body)
         //
     }
 
@@ -324,7 +324,7 @@ export async function configureProxyForApplication({ domain, applicationId, port
             },
         }).json()
     } catch (error) {
-        console.log('error deleting backend', error.response.body)
+        console.log('error deleting backend', error?.response?.body)
     }
     try {
         await haproxy.post('v2/services/haproxy/configuration/backends', {
@@ -352,8 +352,8 @@ export async function configureProxyForApplication({ domain, applicationId, port
         })
 
     } catch (error) {
-        console.log(error.response.body)
-        throw error.response.body
+        console.log(error?.response?.body)
+        throw error?.response?.body
     } finally {
         await completeTransaction(transactionId)
     }

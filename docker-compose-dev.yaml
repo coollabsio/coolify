@@ -1,6 +1,21 @@
 version: '3.8'
 
 services:
+  haproxy: 
+    image: coollabsio/coolify-haproxy-alpine:latest
+    container_name: coolify-haproxy
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    networks:
+      - coolify-infra
+    volumes:
+      - coolify-ssl-certs:/usr/local/etc/haproxy/ssl
+    ports: 
+      - "80:80"
+      - "443:443"
+      - "8404:8404"
+      - "5555:5555"
+
   redis:
     image: 'bitnami/redis:6.2'
     container_name: coolify-redis
@@ -18,3 +33,9 @@ networks:
   coolify-infra:
     attachable: true
     name: coolify-infra
+
+volumes:
+  coolify-ssl-certs:  
+    name: coolify-ssl-certs
+  coolify-letsencrypt:
+    name: coolify-letsencrypt

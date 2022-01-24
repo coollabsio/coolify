@@ -47,9 +47,9 @@ export async function configureDestinationForDatabase({ id, destinationId }) {
         throw PrismaErrorHandler(e)
     }
 }
-export async function updateDestination({ id, name, isSwarm, engine, network }) {
+export async function updateDestination({ id, name, engine, network }) {
     try {
-        await prisma.destinationDocker.update({ where: { id }, data: { name, isSwarm, engine, network, } })
+        await prisma.destinationDocker.update({ where: { id }, data: { name, engine, network, } })
         return { status: 200 }
     } catch (e) {
         throw PrismaErrorHandler(e)
@@ -57,14 +57,14 @@ export async function updateDestination({ id, name, isSwarm, engine, network }) 
 }
 
 
-export async function newDestination({ name, teamId, isSwarm, engine, network, isCoolifyProxyUsed }) {
+export async function newDestination({ name, teamId, engine, network, isCoolifyProxyUsed }) {
     try {
         const host = getEngine(engine)
         const { stdout: found } = await asyncExecShell(`DOCKER_HOST=${host} docker network ls --filter name=${network} --format '{{json .Name}}'`)
         if (!found) {
             await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable ${network}`)
         }
-        await prisma.destinationDocker.create({ data: { name, teams: { connect: { id: teamId } }, isSwarm, engine, network, isCoolifyProxyUsed } })
+        await prisma.destinationDocker.create({ data: { name, teams: { connect: { id: teamId } }, engine, network, isCoolifyProxyUsed } })
         const destinations = await prisma.destinationDocker.findMany({ where: { engine } })
         const destination = destinations.find(destination => destination.network === network)
 
