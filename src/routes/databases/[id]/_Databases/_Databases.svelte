@@ -53,6 +53,7 @@
 				body: form
 			});
 			databaseUrl = generateUrl();
+
 		} catch (e) {
 			console.error(e);
 		}

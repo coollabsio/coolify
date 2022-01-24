@@ -1690,6 +1690,7 @@ packages:
         optional: true
     dependencies:
       ms: 2.1.2
+    dev: true
 
   /debug/4.3.3:
     resolution: {integrity: sha512-/zxw5+vh1Tfv+4Qn7a5nsbcJKPaSvCDhojn6FEl9vupwK2VCSDtEiEtqr8DFtzYFOdz63LBkxec7DYuc2jon6Q==}
@@ -1790,7 +1791,7 @@ packages:
     resolution: {integrity: sha512-Tgkn2a+yiNP9FoZgMa/D9Wk+D2Db///0KOyKSYZRJa8w4+DzKyzQMkczKSdR/adQ0x46BOpeNkoyEOKjPhCzjw==}
     engines: {node: '>= 8.0'}
     dependencies:
-      debug: 4.3.2
+      debug: 4.3.3
       readable-stream: 3.6.0
       split-ca: 1.0.1
       ssh2: 1.5.0

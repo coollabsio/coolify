@@ -117,14 +117,6 @@
 	<span class="pr-2">{team.name}</span>
 </div>
 <div class="max-w-2xl mx-auto">
-	{#if team.id === '0'}
-		<div class="text-center">
-			<Explainer
-				maxWidthClass="w-full"
-				text="This is the <span class='text-red-500 font-bold'>root</span> team. <br><br>That means members of this group can manage instance wide settings and have all the priviliges in Coolify. <br>(imagine like root user on Linux)"
-			/>
-		</div>
-	{/if}
 	<form
 		action="/teams/{id}.json"
 		method="post"
@@ -147,9 +139,17 @@
 			<label for="name">Name</label>
 			<input id="name" name="name" placeholder="name" bind:value={team.name} />
 		</div>
+		{#if team.id === '0'}
+			<div class="text-center pt-4">
+				<Explainer
+					maxWidthClass="w-full"
+					text="This is the <span class='text-red-500 font-bold'>root</span> team. <br><br>That means members of this group can manage instance wide settings and have all the priviliges in Coolify. <br>(imagine like root user on Linux)"
+				/>
+			</div>
+		{/if}
 	</form>
 
-	<div class="font-bold flex space-x-1 py-5 px-6 pt-24">
+	<div class="font-bold flex space-x-1 py-5 px-6 pt-10">
 		<div class="text-xl tracking-tight mr-4">Members</div>
 	</div>
 	<div class="px-4 sm:px-6">

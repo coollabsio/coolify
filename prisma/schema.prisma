@@ -140,7 +140,7 @@ model DestinationDocker {
   network            String        @unique
   name               String
   engine             String
-  isSwarm            Boolean?      @default(false)
+  remoteEngine       Boolean       @default(false)
   isCoolifyProxyUsed Boolean?      @default(false)
   teams              Team[]
   application        Application[]

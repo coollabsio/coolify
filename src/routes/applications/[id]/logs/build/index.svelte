@@ -1,7 +1,6 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, params,url, stuff }) => {
-
+	export const load: Load = async ({ fetch, params, url, stuff }) => {
 		let endpoint = `/applications/${params.id}/logs/build.json?skip=0`;
 		const res = await fetch(endpoint);
 		if (res.ok) {
@@ -22,7 +21,7 @@
 
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { dateOptions } from '$lib/components/common';
+	import { dateOptions, getDomain } from '$lib/components/common';
 
 	import BuildLog from './_BuildLog.svelte';
 
@@ -80,7 +79,7 @@
 
 <div class="font-bold flex space-x-1 py-6 px-6">
 	<div class="text-2xl tracking-tight mr-4">
-		Build logs of <a href="{application.fqdn}" target="_blank">{application.fqdn}</a>
+		Build logs of <a href={application.fqdn} target="_blank">{getDomain(application.fqdn)}</a>
 	</div>
 </div>
 <div class="flex flex-row px-10 justify-start pt-6 space-x-2 ">

@@ -10,8 +10,11 @@
 			case 'docker':
 				payload = {
 					name: 'Docker',
-					isSwarm: false,
 					engine: '/var/run/docker.sock',
+					remoteEngine: false,
+					user: 'root',
+					port: 22,
+					privateKey: null,
 					network: 'coolify',
 					isCoolifyProxyUsed: true
 				};

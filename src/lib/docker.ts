@@ -60,6 +60,7 @@ export async function buildImage({ applicationId, tag, workdir, docker, buildId,
 }
 
 export function dockerInstance({ destinationDocker }): { engine: Dockerode, network: string } {
+    // new Docker({protocol:"ssh",  host: '188.34.164.25',port: 22, username:'root', sshOptions: {agentForward: true, agent:process.env.SSH_AUTH_SOCK}})
     return {
         engine: new Dockerode({
             socketPath: destinationDocker.engine,

@@ -11,8 +11,11 @@
 	let formEl: HTMLFormElement;
 	let payload = {
 		name: undefined,
-		isSwarm: false,
+		remoteEngine: false,
 		engine: undefined,
+		user: 'root',
+		port: 22,
+		privateKey: null,
 		network: undefined,
 		isCoolifyProxyUsed: false
 	};
@@ -21,8 +24,11 @@
 	if (destination) {
 		payload = {
 			name: destination.name,
-			isSwarm: destination.isSwarm,
+			remoteEngine: destination.remoteEngine,
 			engine: destination.engine,
+			user: destination.user,
+			port: destination.port,
+			privateKey: destination.privateKey,
 			network: destination.network,
 			isCoolifyProxyUsed: destination.isCoolifyProxyUsed
 		};
@@ -97,7 +103,7 @@
 				const err = await saveFormResponse.json();
 				return errorNotification(err.message);
 			}
-			await startProxy()
+			await startProxy();
 		}
 	}
 	async function stopProxy() {
@@ -163,23 +169,22 @@
 				<input name="name" placeholder="name" bind:value={payload.name} />
 			</div>
 		</div>
-		<!-- <div class="flex items-center">
-			<label for="isSwarm">Is it a Docker Swarm?</label>
-			<div class="text-left">
-				<input name="isSwarm" type="checkbox" checked={payload.isSwarm} />
-			</div>
-		</div> -->
+
 		<div class="grid grid-cols-3 items-center">
 			<label for="engine">Engine</label>
 			<div class="col-span-2">
 				<input
 					readonly
 					name="engine"
-					placeholder="/var/run/docker.sock"
+					placeholder="eg: /var/run/docker.sock"
 					bind:value={payload.engine}
 				/>
 			</div>
 		</div>
+		<!-- <div class="flex items-center">
+			<label for="remoteEngine">Remote Engine?</label>
+			<input name="remoteEngine" type="checkbox" bind:checked={payload.remoteEngine} />
+		</div> -->
 		<div class="grid grid-cols-3 items-center">
 			<label for="network">Network</label>
 			<div class="col-span-2">

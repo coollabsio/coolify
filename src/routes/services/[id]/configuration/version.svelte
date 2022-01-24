@@ -54,7 +54,7 @@
 				}}
 			>
 				<input class="hidden" name="version" value={version} />
-				<button type="submit" class="box-selection text-xl font-bold">{version}</button>
+				<button type="submit" class="box-selection text-xl font-bold hover:bg-pink-600">{version}</button>
 			</form>
 		</div>
 	{/each}

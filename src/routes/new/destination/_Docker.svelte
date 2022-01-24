@@ -1,9 +1,10 @@
 <script lang="ts">
-import { goto } from '$app/navigation';
+	import { goto } from '$app/navigation';
 
 	export let payload;
 
 	import { page } from '$app/stores';
+	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 	import { enhance, errorNotification } from '$lib/form';
 
@@ -40,7 +41,7 @@ import { goto } from '$app/navigation';
 			return errorNotification(await saveFormResponse.json());
 		}
 		const { id } = await saveFormResponse.json();
-		goto(`/destinations/${id}`)
+		goto(`/destinations/${id}`);
 		// window.location.assign(`/destinations/${id}`);
 	}
 </script>
@@ -77,23 +78,37 @@ import { goto } from '$app/navigation';
 				<input required name="name" placeholder="name" bind:value={payload.name} />
 			</div>
 		</div>
-		<!-- <div class="flex items-center">
-			<label for="isSwarm">Is it a Docker Swarm?</label>
-			<div class="text-left">
-				<input name="isSwarm" type="checkbox" checked={payload.isSwarm} />
-			</div>
-		</div> -->
+
 		<div class="grid grid-cols-3 items-center">
 			<label for="engine">Engine</label>
 			<div class="col-span-2">
 				<input
 					required
 					name="engine"
-					placeholder="/var/run/docker.sock"
+					placeholder="eg: /var/run/docker.sock"
 					bind:value={payload.engine}
 				/>
+				<!-- <Explainer text="You can use remote Docker Engine with over SSH." /> -->
 			</div>
 		</div>
+		<!-- <div class="flex items-center">
+			<label for="remoteEngine">Remote Docker Engine?</label>
+			<input name="remoteEngine" type="checkbox" bind:checked={payload.remoteEngine} />
+		</div>
+		{#if payload.remoteEngine}
+			<div class="grid grid-cols-3 items-center">
+				<label for="user">User</label>
+				<div class="col-span-2">
+					<input required name="user" placeholder="eg: root" bind:value={payload.user} />
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center">
+				<label for="port">Port</label>
+				<div class="col-span-2">
+					<input required name="port" placeholder="eg: 22" bind:value={payload.port} />
+				</div>
+			</div>
+		{/if} -->
 		<div class="grid grid-cols-3 items-center">
 			<label for="network">Network</label>
 			<div class="col-span-2">

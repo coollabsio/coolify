@@ -22,12 +22,13 @@
 	export let secrets;
 	import { appConfiguration } from '$lib/store';
 	import Secret from './_Secret.svelte';
+	import { getDomain } from '$lib/components/common';
 </script>
 
 <div class="font-bold flex space-x-1 py-6 px-6">
 	<div class="text-2xl tracking-tight mr-4">
-		Secrets for <a href="http://{$appConfiguration.configuration.domain}" target="_blank"
-			>{$appConfiguration.configuration.domain}</a
+		Secrets for <a href={$appConfiguration.configuration.fqdn} target="_blank"
+			>{getDomain($appConfiguration.configuration.fqdn)}</a
 		>
 	</div>
 </div>

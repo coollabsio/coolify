@@ -59,7 +59,7 @@
 				}}
 			>
 				<input class="hidden" name="type" value={type.name} />
-				<button type="submit" class="box-selection text-xl font-bold hover:bg-pink-700 relative">
+				<button type="submit" class="box-selection text-xl font-bold hover:bg-pink-600 relative">
 					{#if type.name === 'plausibleanalytics'}
 						<PlausibleAnalytics />
 					{:else if type.name === 'nocodb'}

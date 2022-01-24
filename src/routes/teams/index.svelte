@@ -107,15 +107,16 @@
 		{#each teams as team}
 			<a href="/teams/{team.teamId}" class="no-underline p-2 ">
 				<div
-					class="box-selection h-32 hover:bg-cyan-600"
+					class="box-selection h-32  relative"
+					class:hover:bg-cyan-600={team.team?.id !== '0'}
+					class:hover:bg-red-500={team.team?.id === '0'}
 				>
 					<div class="font-bold text-xl text-center truncate">{team.team.name}</div>
-					<div class="text-center text-xs">({team.permission})</div>
-					{#if team.team?.id === '0'}
-						<div class="text-center font-bold text-red-100 uppercase">root team</div>
-					{/if}
-					<div class="text-center mt-1">{team.team._count.users} member(s)</div>
+					<div class="text-center text-xs">
+						({team.team?.id === '0' ? 'root team - ' : ''}{team.permission})
+					</div>
 
+					<div class="text-center mt-1">{team.team._count.users} member(s)</div>
 				</div>
 			</a>
 		{/each}
