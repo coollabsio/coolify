@@ -2,14 +2,15 @@ import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const email = request.body.get('email')
-    const password = request.body.get('password')
+export const post: RequestHandler<Locals> = async ({ request, locals }) => {
+    const data = await request.formData()
+    const email = data.get('email')
+    const password = data.get('password')
     try {
         const response = await db.login({ email, password })
         if (response.status === 200) {
             const { body } = response
-            request.locals.session.data = body
+            locals.session.data = body
         } else {
             return {
                 status: response.status,
@@ -19,7 +20,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             }
         }
         return response
-    } catch(err) {
+    } catch (err) {
         return err
     }
 

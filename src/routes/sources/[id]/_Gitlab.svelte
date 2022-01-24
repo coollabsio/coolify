@@ -4,6 +4,7 @@
 	import { enhance, errorNotification } from '$lib/form';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
+	import { post } from '$lib/api';
 	const { id } = $page.params;
 
 	let loading = false;
@@ -20,18 +21,10 @@
 	});
 	async function checkOauthId() {
 		if (payload.oauthId) {
-			const form = new FormData();
-			form.append('oauthId', payload.oauthId);
-			const response = await fetch(`/sources/${id}/check.json`, {
-				method: 'post',
-				body: form
-			});
-			if (response.ok) {
-				payload.oauthId = '';
-				errorNotification(
-					'OAuthID is already used by another GitLab OAuth Application. Contact the administrator of that OAuth Application.'
-				);
-				oauthIdEl.focus();
+			try {
+				await post(`/sources/${id}/check.json`, { oauthId: payload.oauthId });
+			} catch (error) {
+				return errorNotification(error);
 			}
 		}
 	}
@@ -49,6 +42,14 @@
 				break;
 			default:
 				break;
+		}
+	}
+	async function handleSubmit() {
+		try {
+			await post(`/sources/${id}.json`, { ...payload });
+			window.location.reload()
+		} catch(error) {
+			return errorNotification(error);
 		}
 	}
 </script>
@@ -91,22 +92,7 @@
 	<br>- email (Allows read-only access to the user's primary email address using OpenID Connect)"
 			/>
 		</form>
-		<form
-			action={`/sources/${id}.json`}
-			method="post"
-			use:enhance={{
-				result: async () => {
-					setTimeout(async () => {
-						loading = false;
-						window.location.reload();
-					}, 200);
-				},
-				pending: async () => {
-					loading = true;
-				}
-			}}
-			class="grid grid-flow-row gap-2 py-4 pt-10"
-		>
+		<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4 pt-10">
 			<div class="flex space-x-2 h-8 items-center">
 				<div class="font-bold text-xl text-white">Configuration</div>
 				<button

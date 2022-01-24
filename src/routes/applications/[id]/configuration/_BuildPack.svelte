@@ -2,44 +2,29 @@
 	import { goto } from '$app/navigation';
 
 	import { page } from '$app/stores';
-	import { enhance } from '$lib/form';
+	import { post } from '$lib/api';
+	import { errorNotification } from '$lib/form';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
+
 	export let buildPack;
 	export let foundConfig;
 	export let scanning;
+
+	async function handleSubmit(buildPack) {
+		try {
+			if (foundConfig.buildPack !== buildPack)
+				await post(`/applications/${id}.json`, { ...foundConfig });
+			await post(`/applications/${id}/configuration/buildpack.json`, { buildPack });
+			return await goto(from || `/applications/${id}`);
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
-<form
-	action="/applications/{id}/configuration/buildpack.json"
-	method="post"
-	use:enhance={{
-		beforeSubmit: async () => {
-			const form = new FormData();
-			form.append('buildPack', foundConfig.buildPack);
-			if (foundConfig.installCommand) form.append('installCommand', foundConfig.installCommand);
-			if (foundConfig.startCommand) form.append('startCommand', foundConfig.startCommand);
-			if (foundConfig.buildCommand) form.append('buildCommand', foundConfig.buildCommand);
-			if (foundConfig.publishDirectory) {
-				form.append('publishDirectory', foundConfig.publishDirectory);
-			}
-			form.append('port', foundConfig.port);
-			try {
-				await fetch(`/applications/${id}.json`, {
-					method: 'POST',
-					body: form
-				});
-			} catch (e) {
-				console.error(e);
-			}
-		},
-		result: async () => {
-			window.location.assign(from || `/applications/${id}`);
-		}
-	}}
->
-	<input class="hidden" name="buildPack" value={buildPack.name} />
+<form on:submit={() => handleSubmit(buildPack.name)}>
 	<button
 		type="submit"
 		class="relative box-selection text-xl font-bold flex {buildPack.hoverColor} {foundConfig?.buildPack ===

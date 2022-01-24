@@ -16,16 +16,22 @@ export function enhance(
         pending?: (data: FormData, form: HTMLFormElement) => void;
         error?: (res: Response, error: Error, form: HTMLFormElement) => void;
         result?: (res: Response, form: HTMLFormElement) => void;
-        
+
     }
 ): { destroy: () => void } {
     let current_token: unknown;
 
     async function handle_submit(e: Event) {
         const token = (current_token = {});
-
         e.preventDefault();
-        const body = new FormData(form);
+
+        let body = new FormData(form);
+        let parsedData = body
+        
+        body.forEach((data, key) => {
+            if (data === '' || data === null) parsedData.delete(key)
+        })
+        body = parsedData
 
         if (beforeSubmit) await beforeSubmit()
         if (pending) pending(body, form);

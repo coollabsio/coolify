@@ -30,13 +30,25 @@
 	import type Prisma from '@prisma/client';
 
 	import { page } from '$app/stores';
-	import { enhance } from '$lib/form';
+	import { enhance, errorNotification } from '$lib/form';
 	import { goto } from '$app/navigation';
+	import { post } from '$lib/api';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
 
-	export let sources: Prisma.GitSource[];
+ 	export let sources: Prisma.GitSource[] & {
+		gitlabApp: Prisma.GitlabApp;
+	};
+
+	async function handleSubmit(gitSourceId) {
+		try {
+			await post(`/applications/${id}/configuration/source.json`, { gitSourceId });
+			return await goto(from || `/applications/${id}/configuration/repository`);
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
@@ -68,17 +80,7 @@
 		<div class="flex flex-wrap justify-center">
 			{#each sources as source}
 				<div class="p-2">
-					<form
-						action="/applications/{id}/configuration/source.json"
-						method="post"
-						use:enhance={{
-							result: async () => {
-								goto(from || `/applications/${id}/configuration/repository`);
-								// window.location.assign(from || `/applications/${id}/configuration/destination`);
-							}
-						}}
-					>
-						<input class="hidden" name="gitSourceId" value={source.id} />
+					<form on:submit|preventDefault={() => handleSubmit(source.id)}>
 						<button
 							disabled={source.gitlabApp && !source.gitlabAppId}
 							type="submit"

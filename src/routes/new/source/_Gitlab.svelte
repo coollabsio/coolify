@@ -1,8 +1,9 @@
 <script lang="ts">
+	export let gitSource;
 	import { goto } from '$app/navigation';
+	import { post } from '$lib/api';
 
-	import { enhance } from '$lib/form';
-	import { gitSourcePayload } from '$lib/store';
+	import { errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
 
 	let nameEl;
@@ -10,21 +11,18 @@
 	onMount(() => {
 		nameEl.focus();
 	});
+	async function handleSubmit() {
+		try {
+			const { id } = await post(`/new/source.json`, { ...gitSource });
+			return await goto(`/sources/${id}/`);
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 <div class="flex justify-center pb-8">
-	<form
-		action="/new/source.json"
-		method="post"
-		use:enhance={{
-			result: async (res) => {
-				const { id } = await res.json();
-				goto(`/sources/${id}`);
-				// window.location.assign(`/sources/${id}`);
-			}
-		}}
-		class="grid grid-flow-row gap-2 py-4"
-	>
+	<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
 		<div class="flex space-x-2 h-8 items-center">
 			<div class="font-bold text-xl text-white">Configuration</div>
 			<button type="submit" class="bg-orange-600 hover:bg-orange-500">Save</button>
@@ -33,7 +31,7 @@
 			<label for="type">Type</label>
 
 			<div class="col-span-2">
-				<select name="type" id="type" class="w-96" bind:value={$gitSourcePayload.type}>
+				<select name="type" id="type" class="w-96" bind:value={gitSource.type}>
 					<option value="github">GitHub</option>
 					<option value="gitlab">GitLab</option>
 					<option value="bitbucket">BitBucket</option>
@@ -49,7 +47,7 @@
 					placeholder="GitHub.com"
 					required
 					bind:this={nameEl}
-					bind:value={$gitSourcePayload.name}
+					bind:value={gitSource.name}
 				/>
 			</div>
 		</div>
@@ -63,7 +61,7 @@
 					id="htmlUrl"
 					placeholder="eg: https://github.com"
 					required
-					bind:value={$gitSourcePayload.htmlUrl}
+					bind:value={gitSource.htmlUrl}
 				/>
 			</div>
 		</div>
@@ -76,7 +74,7 @@
 					id="apiUrl"
 					placeholder="eg: https://api.github.com"
 					required
-					bind:value={$gitSourcePayload.apiUrl}
+					bind:value={gitSource.apiUrl}
 				/>
 			</div>
 		</div>

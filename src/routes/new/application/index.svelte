@@ -1,7 +1,7 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, session }) => {
-		const url = `/new/application.json`;
+	export const load: Load = async ({ fetch }) => {
+		const url = `/common/getUniqueName.json`;
 		const res = await fetch(url);
 
 		if (res.ok) {
@@ -21,37 +21,32 @@
 
 <script lang="ts">
 	export let name;
-	import { enhance } from '$lib/form';
 	import { onMount } from 'svelte';
-import { goto } from '$app/navigation';
-	let autofocus;
+	import { goto } from '$app/navigation';
+	import { post } from '$lib/api';
+	import { errorNotification } from '$lib/form';
+
+	let nameEl: HTMLInputElement;
 	onMount(() => {
-		autofocus.focus();
+		nameEl.focus();
 	});
+	async function handleSubmit() {
+		try {
+			const { id } = await post('/new/application.json', { name });
+			return await goto(`/application/${id}`);
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
 	<div class="text-2xl tracking-tight mr-4">Add New Application</div>
 </div>
 <div class="pt-10">
-	<form
-		action="/new/application.json"
-		method="post"
-		use:enhance={{
-			result: async (res) => {
-				const { id } = await res.json();
-				goto(`/applications/${id}`)
-			}
-		}}
-	>
+	<form on:submit|preventDefault={handleSubmit}>
 		<div class="flex flex-col items-center space-y-4">
-			<input
-				name="name"
-				placeholder="Application name"
-				required
-				bind:this={autofocus}
-				value={name}
-			/>
+			<input name="name" placeholder="Application name" bind:this={nameEl} bind:value={name} />
 			<button type="submit" class="bg-green-600 hover:bg-green-500">Save</button>
 		</div>
 	</form>

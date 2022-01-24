@@ -1,7 +1,7 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ fetch, session }) => {
-		const url = `/new/team.json`;
+		const url = `/common/getUniqueName.json`;
 		const res = await fetch(url);
 
 		if (res.ok) {
@@ -23,7 +23,7 @@
 	export let name;
 	import { enhance } from '$lib/form';
 	import { onMount } from 'svelte';
-import { goto } from '$app/navigation';
+	import { goto } from '$app/navigation';
 
 	let autofocus;
 	onMount(() => {
@@ -43,7 +43,6 @@ import { goto } from '$app/navigation';
 			result: async (res) => {
 				const { id } = await res.json();
 				goto(`/teams/${id}`);
-				// window.location.assign(`/teams/${id}`);
 			}
 		}}
 	>

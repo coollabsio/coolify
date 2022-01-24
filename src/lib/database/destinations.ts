@@ -18,12 +18,7 @@ export async function configureDestinationForService({ id, destinationId }) {
     }
 }
 export async function configureDestinationForApplication({ id, destinationId }) {
-    try {
-        await prisma.application.update({ where: { id }, data: { destinationDocker: { connect: { id: destinationId } } } })
-        return { status: 201 }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
-    }
+    return await prisma.application.update({ where: { id }, data: { destinationDocker: { connect: { id: destinationId } } } })
 }
 export async function configureDestinationForDatabase({ id, destinationId }) {
     try {

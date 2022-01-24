@@ -17,7 +17,7 @@
 		const endpoint = `/applications/${params.id}.json`;
 		const res = await fetch(endpoint);
 		if (res.ok) {
-			const { application, githubToken, gitlabToken, ghToken } = await res.json();
+			const { application, githubToken, ghToken } = await res.json();
 			if (!application || Object.entries(application).length === 0) {
 				return {
 					status: 302,
@@ -42,7 +42,6 @@
 				stuff: {
 					ghToken,
 					githubToken,
-					gitlabToken,
 					application
 				}
 			};
@@ -56,17 +55,22 @@
 </script>
 
 <script lang="ts">
+	export let application;
 	import { page, session } from '$app/stores';
 	import { enhance, errorNotification } from '$lib/form';
 	import { appConfiguration } from '$lib/store';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import Loading from '$lib/components/Loading.svelte';
+	import { post } from '$lib/api';
+	import { goto } from '$app/navigation';
 
-	export let application;
 	let loading = false;
-
 	const { id } = $page.params;
-	$appConfiguration.configuration = application;
+
+	async function handleDeploySubmit() {
+		const { buildId } = await post(`/applications/{id}/deploy.json`, { ...application });
+		return await goto(`/applications/${id}/logs/build?buildId=${buildId}`);
+	}
 
 	async function deleteApplication(name) {
 		const sure = confirm(`Are you sure you would like to delete '${name}'?`);
@@ -91,49 +95,16 @@
 	{#if loading}
 		<Loading fullscreen cover />
 	{:else}
-		{#if application.fqdn && $appConfiguration.configuration.gitSource && $appConfiguration.configuration.repository && $appConfiguration.configuration.destinationDocker && $appConfiguration.configuration.buildPack}
-			<!-- svelte-ignore missing-declaration -->
-			<form
-				action="/applications/{id}/deploy.json"
-				method="post"
-				use:enhance={{
-					beforeSubmit: async () => {
-						const form = new FormData();
-						form.append('fqdn', $appConfiguration.configuration.fqdn);
-						form.append('port', $appConfiguration?.configuration?.port?.toString() || '');
-						form.append('installCommand', $appConfiguration.configuration.installCommand || '');
-						form.append('buildCommand', $appConfiguration.configuration.buildCommand || '');
-						form.append('startCommand', $appConfiguration.configuration.startCommand || '');
-						form.append('baseDirectory', $appConfiguration.configuration.baseDirectory || '');
-						form.append('publishDirectory', $appConfiguration.configuration.publishDirectory || '');
-						const response = await fetch(`/applications/${id}.json`, {
-							method: 'POST',
-							headers: {
-								accept: 'application/json'
-							},
-							body: form
-						});
-						if (!response.ok) {
-							errorNotification(
-								`Application configuration '${$appConfiguration.configuration.name}' failed to update!`
-							);
-							throw new Error(await response.json());
-						}
-					},
-					result: async (res) => {
-						const { buildId } = await res.json();
-						window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
-					}
-				}}
-			>
+		{#if application.fqdn && application.gitSource && application.repository && application.destinationDocker && application.buildPack}
+			<form on:submit|preventDefault={handleDeploySubmit}>
 				<button
 					title="Queue for deployment"
 					type="submit"
 					disabled={!$session.isAdmin}
 					class:text-green-500={$session.isAdmin &&
-						$appConfiguration.configuration.gitSource &&
-						$appConfiguration.configuration.repository &&
-						$appConfiguration.configuration.destinationDocker}
+						application.gitSource &&
+						application.repository &&
+						application.destinationDocker}
 					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-green-600 hover:text-white"
 					data-tooltip={$session.isAdmin
 						? 'Queue for deployment'
@@ -257,37 +228,36 @@
 			>
 			<div class="border border-stone-700 h-8" />
 			<a
-			href="/applications/{id}/logs"
-			sveltekit:prefetch
-			class="hover:text-sky-500 rounded"
-			class:text-sky-500={$page.url.pathname === `/applications/${id}/logs`}
-			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs`}
-		>
-			<button
-				title="Application Logs"
-				class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500 "
-				data-tooltip="Application Logs"
+				href="/applications/{id}/logs"
+				sveltekit:prefetch
+				class="hover:text-sky-500 rounded"
+				class:text-sky-500={$page.url.pathname === `/applications/${id}/logs`}
+				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs`}
 			>
-			<svg
-			xmlns="http://www.w3.org/2000/svg"
-			class="h-6 w-6"
-			viewBox="0 0 24 24"
-			stroke-width="1.5"
-			stroke="currentColor"
-			fill="none"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-		>
-			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-			<path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
-			<path d="M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
-			<line x1="3" y1="6" x2="3" y2="19" />
-			<line x1="12" y1="6" x2="12" y2="19" />
-			<line x1="21" y1="6" x2="21" y2="19" />
-		</svg>
-			</button
-			></a
-		>
+				<button
+					title="Application Logs"
+					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500 "
+					data-tooltip="Application Logs"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-6 w-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
+						<path d="M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
+						<line x1="3" y1="6" x2="3" y2="19" />
+						<line x1="12" y1="6" x2="12" y2="19" />
+						<line x1="21" y1="6" x2="21" y2="19" />
+					</svg>
+				</button></a
+			>
 			<a
 				href="/applications/{id}/logs/build"
 				sveltekit:prefetch
@@ -300,25 +270,33 @@
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500 "
 					data-tooltip="Build Logs"
 				>
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-					<path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-					<circle cx="19" cy="13" r="2" />
-					<circle cx="4" cy="17" r="2" />
-					<circle cx="13" cy="17" r="2" />
-					<line x1="13" y1="19" x2="4" y2="19" />
-					<line x1="4" y1="15" x2="13" y2="15" />
-					<path d="M8 12v-5h2a3 3 0 0 1 3 3v5" />
-					<path d="M5 15v-2a1 1 0 0 1 1 -1h7" />
-					<path d="M19 11v-7l-6 7" />
-				  </svg>
-				</button
-				></a
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-6 w-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<circle cx="19" cy="13" r="2" />
+						<circle cx="4" cy="17" r="2" />
+						<circle cx="13" cy="17" r="2" />
+						<line x1="13" y1="19" x2="4" y2="19" />
+						<line x1="4" y1="15" x2="13" y2="15" />
+						<path d="M8 12v-5h2a3 3 0 0 1 3 3v5" />
+						<path d="M5 15v-2a1 1 0 0 1 1 -1h7" />
+						<path d="M19 11v-7l-6 7" />
+					</svg>
+				</button></a
 			>
 			<div class="border border-stone-700 h-8" />
 		{/if}
 
 		<button
-			on:click={() => deleteApplication($appConfiguration.configuration.name)}
+			on:click={() => deleteApplication(application.name)}
 			title="Delete application"
 			type="submit"
 			disabled={!$session.isAdmin}

@@ -1,10 +1,11 @@
 <script lang="ts">
-import { goto } from '$app/navigation';
+	import { goto } from '$app/navigation';
 
 	export let githubToken;
 	export let application;
 
 	import { page } from '$app/stores';
+	import { post } from '$lib/api';
 	import { getGithubToken } from '$lib/components/common';
 	import { enhance, errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
@@ -80,6 +81,17 @@ import { goto } from '$app/navigation';
 	onMount(async () => {
 		await loadRepositories();
 	});
+	async function handleSubmit() {
+		try {
+			await post(`/applications/${id}/configuration/repository.json`, { ...selected });
+			if (to) {
+				return await goto(`${to}?from=${from}`);
+			}
+			return await goto(from || `/applications/${id}/configuration/destination`);
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 {#if repositories.length === 0 && loading.repositories === false}
@@ -88,20 +100,7 @@ import { goto } from '$app/navigation';
 		<a href={`/sources/${application.gitSource.id}`}><button>Configure it now</button></a>
 	</div>
 {:else}
-	<form
-		action="/applications/{id}/configuration/repository.json"
-		method="post"
-		use:enhance={{
-			result: async () => {
-				if (to) {
-					window.location.assign(`${to}?from=${from}`);
-					return
-				}
-				goto(from || `/applications/${id}/configuration/destination`);
-				// window.location.assign(from || `/applications/${id}/configuration/buildpack`);
-			}
-		}}
-	>
+	<form on:submit={handleSubmit}>
 		<div>
 			{#if loading.repositories}
 				<select name="repository" disabled class="w-96">
@@ -120,7 +119,7 @@ import { goto } from '$app/navigation';
 					{/each}
 				</select>
 			{/if}
-			<input class="hidden" value={selected.projectId} name="projectId" />
+			<input class="hidden" bind:value={selected.projectId} name="projectId" />
 			{#if loading.branches}
 				<select name="branch" disabled class="w-96">
 					<option selected value="">Loading branches...</option>

@@ -1,33 +1,40 @@
 <script lang="ts">
-	import { gitSourcePayload } from '$lib/store';
-
 	import Github from './_Github.svelte';
 	import Gitlab from './_Gitlab.svelte';
-
+	let gitSource = {
+		name: undefined,
+		type: 'github',
+		htmlUrl: undefined,
+		apiUrl: undefined,
+		organization: undefined
+	};
 	function setPredefined(type) {
 		switch (type) {
 			case 'github':
-				$gitSourcePayload = {
+				gitSource = {
 					name: 'GitHub.com',
 					type,
 					htmlUrl: 'https://github.com',
-					apiUrl: 'https://api.github.com'
+					apiUrl: 'https://api.github.com',
+					organization: undefined
 				};
 				break;
 			case 'gitlab':
-				$gitSourcePayload = {
+				gitSource = {
 					name: 'GitLab.com',
 					type,
 					htmlUrl: 'https://gitlab.com',
-					apiUrl: 'https://gitlab.com/api'
+					apiUrl: 'https://gitlab.com/api',
+					organization: undefined
 				};
 				break;
 			case 'bitbucket':
-				$gitSourcePayload = {
+				gitSource = {
 					name: 'BitBucket.com',
 					type,
 					htmlUrl: 'https://bitbucket.com',
-					apiUrl: 'https://bitbucket.com'
+					apiUrl: 'https://bitbucket.com',
+					organization: undefined
 				};
 				break;
 			default:
@@ -49,11 +56,11 @@
 	</div>
 </div>
 <div class="px-6">
-	{#if $gitSourcePayload.type === 'github'}
-		<Github />
-	{:else if $gitSourcePayload.type === 'gitlab'}
-		<Gitlab />
-	{:else if $gitSourcePayload.type === 'bitbucket'}
+	{#if gitSource.type === 'github'}
+		<Github {gitSource} />
+	{:else if gitSource.type === 'gitlab'}
+		<Gitlab {gitSource} />
+	{:else if gitSource.type === 'bitbucket'}
 		<div class="text-center font-bold text-4xl py-10">Not implemented yet</div>
 	{/if}
 </div>

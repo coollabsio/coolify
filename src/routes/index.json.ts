@@ -28,13 +28,14 @@ export const get: RequestHandler = async (request) => {
 	}
 }
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-	const { status, body } = await getUserDetails(request, false);
+export const post: RequestHandler<Locals> = async (event) => {
+	const { status, body } = await getUserDetails(event, false);
 	if (status === 401) return { status, body }
-
-	const cookie = request.body.get('cookie')
-	const value = request.body.get('value')
-	const from = request.url.searchParams.get('from') || '/'
+	
+	const data = await event.request.formData();
+	const cookie = data.get('cookie');
+	const value = data.get('value')
+	const from = event.url.searchParams.get('from') || '/'
 
 	return {
 		status: 302,

@@ -1,7 +1,7 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ fetch, params, url, stuff }) => {
-		const { application, gitlabToken, ghToken } = stuff;
+		const { application, ghToken } = stuff;
 		if (application?.buildPack && !url.searchParams.get('from')) {
 			return {
 				status: 302,
@@ -14,7 +14,6 @@
 			return {
 				props: {
 					...(await res.json()),
-					gitlabToken,
 					ghToken
 				}
 			};
@@ -32,6 +31,7 @@
 
 	import templates from '$lib/components/templates';
 	import BuildPack from './_BuildPack.svelte';
+	import { session } from '$app/stores';
 
 	let scanning = true;
 	let foundConfig = {
@@ -43,7 +43,6 @@
 	export let projectId;
 	export let repository;
 	export let branch;
-	export let gitlabToken;
 	export let ghToken;
 	export let type;
 
@@ -63,7 +62,7 @@
 			const response = await fetch(`${apiUrl}/v4/projects/${projectId}/repository/tree`, {
 				method: 'GET',
 				headers: {
-					Authorization: `Bearer ${gitlabToken}`
+					Authorization: `Bearer ${$session.gitlabToken}`
 				}
 			});
 			if (!response.ok) {
@@ -90,7 +89,7 @@
 					{
 						method: 'GET',
 						headers: {
-							Authorization: `Bearer ${gitlabToken}`
+							Authorization: `Bearer ${$session.gitlabToken}`
 						}
 					}
 				);
@@ -110,7 +109,7 @@
 				foundConfig.buildPack = 'static';
 			} else if (indexPHP) {
 				foundConfig.buildPack = 'php';
-			} 
+			}
 			scanning = false;
 		} else if (type === 'github') {
 			const response = await fetch(`${apiUrl}/repos/${repository}/contents?ref=${branch}`, {
@@ -159,7 +158,7 @@
 				foundConfig.buildPack = 'static';
 			} else if (indexPHP) {
 				foundConfig.buildPack = 'php';
-			} 
+			}
 			scanning = false;
 		}
 	});

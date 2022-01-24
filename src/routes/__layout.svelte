@@ -85,7 +85,7 @@
 		form.append('cookie', 'teamId');
 		form.append('value', selectedTeamId);
 		const response = await fetch(`/index.json?from=${$page.url.pathname}`, {
-			method: 'post',
+			method: 'POST',
 			body: form
 		});
 		if (!response.ok) {

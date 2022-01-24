@@ -1,12 +1,13 @@
 import * as db from '$lib/database';
+import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const { id } = request.params
+export const post: RequestHandler<Locals> = async (event) => {
+    const { id } = event.params
     try {
         return await db.generateSshKey({ id });
-    } catch(err) {
-        return err
+    } catch(error) {
+        throw PrismaErrorHandler(error)
     }
 }
 

@@ -5,6 +5,7 @@ interface Cookies {
     'kit.session'?: string;
 }
 interface Locals {
+    gitlabToken?: string;
     user: {
         teamId: string;
         permission: string;
@@ -12,7 +13,6 @@ interface Locals {
     }
     session: {
         data: {
-            token?: string;
             uid?: string;
             teams?: string[];
             expires?: string;

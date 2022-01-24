@@ -27,19 +27,23 @@
 </script>
 
 <script lang="ts">
-	export let application: Application & {
-		settings: ApplicationSettings;
+	export let application: Prisma.Application & {
+		settings: Prisma.ApplicationSettings;
+		gitlabApp: Prisma.GitlabApp;
+		gitSource: Prisma.GitSource;
+		destinationDocker: Prisma.DestinationDocker;
 	};
 	import { page, session } from '$app/stores';
 	import { enhance, errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
 
 	import Explainer from '$lib/components/Explainer.svelte';
-	import { appConfiguration } from '$lib/store';
 	import Setting from '$lib/components/Setting.svelte';
-	import type { Application, ApplicationSettings } from '@prisma/client';
+	import type Prisma from '@prisma/client';
 	import { getDomain, notNodeDeployments, staticDeployments } from '$lib/components/common';
 	import { toast } from '@zerodevx/svelte-toast';
+	import { post } from '$lib/api';
+	import { goto } from '$app/navigation';
 	const { id } = $page.params;
 
 	let domainEl: HTMLInputElement;
@@ -77,27 +81,33 @@
 			throw new Error(e.message || e);
 		}
 	}
+	async function handleSubmit() {
+		try {
+			await post(`/applications/${id}/check.json`, { fqdn: application.fqdn });
+			await post(`/applications/${id}.json`, { ...application });
+			// return await goto(from || `/applications/${id}/configuration/repository`);
+		} catch (error) {
+			return errorNotification(error.message || error);
+		}
+	}
 </script>
 
 <div class="font-bold flex space-x-1 p-5 px-6 text-2xl items-center">
 	<div class="tracking-tight truncate md:max-w-64 lg:block hidden">
-		{$appConfiguration.configuration.name}
+		{application.name}
 	</div>
-	{#if $appConfiguration.configuration.fqdn}
+	{#if application.fqdn}
 		<span class="px-1 arrow-right-applications lg:block hidden">></span>
 		<span class="pr-2"
-			><a href={$appConfiguration.configuration.fqdn} target="_blank"
-				>{getDomain($appConfiguration.configuration.fqdn)}</a
-			></span
+			><a href={application.fqdn} target="_blank">{getDomain(application.fqdn)}</a></span
 		>
 	{/if}
 	<a
-		href="{$appConfiguration.configuration.gitSource.htmlUrl}/{$appConfiguration.configuration
-			.repository}/tree/{$appConfiguration.configuration.branch}"
+		href="{application.gitSource.htmlUrl}/{application.repository}/tree/{application.branch}"
 		target="_blank"
 		class="w-10"
 	>
-		{#if $appConfiguration.configuration.gitSource?.type === 'gitlab'}
+		{#if application.gitSource?.type === 'gitlab'}
 			<svg viewBox="0 0 128 128" class="icons">
 				<path
 					fill="#FC6D26"
@@ -119,7 +129,7 @@
 					d="M119.58 50.663H87.145l13.94-42.902c.717-2.206 3.84-2.206 4.557 0l13.94 42.903z"
 				/>
 			</svg>
-		{:else if $appConfiguration.configuration.gitSource?.type === 'github'}
+		{:else if application.gitSource?.type === 'github'}
 			<svg viewBox="0 0 128 128" class="icons">
 				<g fill="#ffffff"
 					><path
@@ -138,6 +148,7 @@
 <div class="max-w-4xl mx-auto px-6">
 	<!-- svelte-ignore missing-declaration -->
 	<form
+		on:submit={handleSubmit}
 		action="/applications/{id}.json"
 		use:enhance={{
 			beforeSubmit: async () => {
@@ -188,7 +199,7 @@
 						readonly={!$session.isAdmin}
 						name="name"
 						id="name"
-						value={$appConfiguration.configuration.name}
+						bind:value={application.name}
 						required
 					/>
 				</div>
@@ -202,7 +213,7 @@
 							: ''}
 						class="no-underline"
 						><span class="arrow-right-applications">></span><input
-							value={$appConfiguration.configuration.gitSource.name}
+							value={application.gitSource.name}
 							id="gitSource"
 							disabled
 							class="bg-coolgray-200 hover:bg-coolgray-500 cursor-pointer"
@@ -219,8 +230,7 @@
 							: ''}
 						class="no-underline"
 						><span class="arrow-right-applications">></span><input
-							value="{$appConfiguration.configuration.repository}/{$appConfiguration.configuration
-								.branch}"
+							value="{application.repository}/{application.branch}"
 							id="repository"
 							disabled
 							class="bg-coolgray-200 hover:bg-coolgray-500 cursor-pointer"
@@ -238,7 +248,7 @@
 						class="no-underline "
 						><span class="arrow-right-applications">></span>
 						<input
-							value={$appConfiguration.configuration.buildPack}
+							value={application.buildPack}
 							id="buildPack"
 							disabled
 							class="bg-coolgray-200 hover:bg-coolgray-500 cursor-pointer -ml-1"
@@ -251,7 +261,7 @@
 				<div class="col-span-2">
 					<div class="no-underline">
 						<input
-							value={$appConfiguration.configuration.destinationDocker.name}
+							value={application.destinationDocker.name}
 							id="destination"
 							disabled
 							class="bg-transparent "
@@ -272,7 +282,7 @@
 						bind:this={domainEl}
 						name="fqdn"
 						id="fqdn"
-						value={$appConfiguration.configuration.fqdn}
+						bind:value={application.fqdn}
 						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 						placeholder="eg: https://coollabs.io"
 						required
@@ -283,7 +293,7 @@
 				</div>
 			</div>
 
-			{#if !staticDeployments.includes($appConfiguration.configuration.buildPack)}
+			{#if !staticDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-3 items-center">
 					<label for="port">Port</label>
 					<div class="col-span-2">
@@ -291,13 +301,13 @@
 							readonly={!$session.isAdmin}
 							name="port"
 							id="port"
-							bind:value={$appConfiguration.configuration.port}
+							bind:value={application.port}
 							placeholder="default: 3000"
 						/>
 					</div>
 				</div>
 			{/if}
-			{#if !notNodeDeployments.includes($appConfiguration.configuration.buildPack)}
+			{#if !notNodeDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-3 items-center">
 					<label for="installCommand">Install Command</label>
 					<div class="col-span-2">
@@ -305,7 +315,7 @@
 							readonly={!$session.isAdmin}
 							name="installCommand"
 							id="installCommand"
-							bind:value={$appConfiguration.configuration.installCommand}
+							bind:value={application.installCommand}
 							placeholder="default: yarn install"
 						/>
 					</div>
@@ -317,7 +327,7 @@
 							readonly={!$session.isAdmin}
 							name="buildCommand"
 							id="buildCommand"
-							bind:value={$appConfiguration.configuration.buildCommand}
+							bind:value={application.buildCommand}
 							placeholder="default: yarn build"
 						/>
 					</div>
@@ -329,7 +339,7 @@
 							readonly={!$session.isAdmin}
 							name="startCommand"
 							id="startCommand"
-							bind:value={$appConfiguration.configuration.startCommand}
+							bind:value={application.startCommand}
 							placeholder="default: yarn start"
 						/>
 					</div>
@@ -343,7 +353,7 @@
 						readonly={!$session.isAdmin}
 						name="baseDirectory"
 						id="baseDirectory"
-						bind:value={$appConfiguration.configuration.baseDirectory}
+						bind:value={application.baseDirectory}
 						placeholder="default: /"
 					/>
 					<Explainer
@@ -351,7 +361,7 @@
 					/>
 				</div>
 			</div>
-			{#if !notNodeDeployments.includes($appConfiguration.configuration.buildPack)}
+			{#if !notNodeDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-3">
 					<label for="publishDirectory" class="pt-2">Publish Directory</label>
 					<div class="col-span-2">
@@ -359,7 +369,7 @@
 							readonly={!$session.isAdmin}
 							name="publishDirectory"
 							id="publishDirectory"
-							bind:value={$appConfiguration.configuration.publishDirectory}
+							bind:value={application.publishDirectory}
 							placeholder=" default: /"
 						/>
 						<Explainer

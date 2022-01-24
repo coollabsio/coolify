@@ -1,13 +1,19 @@
+import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
+import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const { id } = request.params
-    const gitSourceId = request.body.get('gitSourceId') || undefined
+export const post: RequestHandler<Locals> = async (event) => {
+    const { teamId, status, body } = await getUserDetails(event);
+    if (status === 401) return { status, body }
+
+    const { id } = event.params
+    const { gitSourceId } = await event.request.json()
     try {
-        return await db.configureGitsource({ id, gitSourceId })
-    } catch(err) {
-        return err
+        await db.configureGitsource({ id, gitSourceId })
+        return { status: 201 }
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
 }
 

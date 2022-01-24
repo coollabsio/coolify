@@ -1,16 +1,17 @@
 <script lang="ts">
 	export let application;
-	export let gitlabToken;
-	import { page } from '$app/stores';
+	import { page, session } from '$app/stores';
 	import { onMount } from 'svelte';
-
 	import { enhance, errorNotification } from '$lib/form';
 	import { dev } from '$app/env';
 	import cuid from 'cuid';
 	import { goto } from '$app/navigation';
+	import { get, post } from '$lib/api';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
+
+	const updateDeployKeyIdUrl = `/applications/${id}/configuration/deploykey.json`;
 
 	let loading = {
 		base: true,
@@ -34,44 +35,28 @@
 		branch: undefined
 	};
 	onMount(async () => {
-		if (!gitlabToken) {
+		if (!$session.gitlabToken) {
 			getGitlabToken();
 		} else {
 			loading.base = true;
-
-			let response = await fetch(`${apiUrl}/v4/user`, {
-				method: 'GET',
-				headers: {
-					Authorization: `Bearer ${gitlabToken}`
-				}
-			});
-
-			if (response.ok) {
-				const user = await response.json();
+			try {
+				const user = await get(`${apiUrl}/v4/user`, {
+					Authorization: `Bearer ${$session.gitlabToken}`
+				});
 				username = user.username;
-			} else {
-				if (response.status === 401) {
-					getGitlabToken();
-				} else {
-					errorNotification(response);
-					throw new Error(response.statusText);
-				}
+			} catch (error) {
+				getGitlabToken();
+			} 
+			try {
+				groups = await get(`${apiUrl}/v4/groups?per_page=5000`, {
+					Authorization: `Bearer ${$session.gitlabToken}`
+				});
+			} catch (error) {
+				errorNotification(error);
+				throw new Error(error);
+			} finally {
+				loading.base = false;
 			}
-
-			response = await fetch(`${apiUrl}/v4/groups?per_page=5000`, {
-				method: 'GET',
-				headers: {
-					Authorization: `Bearer ${gitlabToken}`
-				}
-			});
-			if (response.ok) {
-				const data = await response.json();
-				groups = data;
-			} else {
-				console.error(response);
-				throw new Error(response.statusText);
-			}
-			loading.base = false;
 		}
 	});
 
@@ -98,173 +83,118 @@
 	async function loadProjects() {
 		loading.projects = true;
 		if (username === selected.group.name) {
-			const response = await fetch(
-				`${apiUrl}/v4/users/${selected.group.name}/projects?min_access_level=40&page=1&per_page=25&archived=false`,
-				{
-					method: 'GET',
-					headers: {
-						Authorization: `Bearer ${gitlabToken}`
+			try {
+				projects = await get(
+					`${apiUrl}/v4/users/${selected.group.name}/projects?min_access_level=40&page=1&per_page=25&archived=false`,
+					{
+						Authorization: `Bearer ${$session.gitlabToken}`
 					}
-				}
-			);
-
-			if (response.ok) {
-				const data = await response.json();
-				projects = data;
-			} else {
-				console.error(response);
-				throw new Error(response.statusText);
+				);
+			} catch (error) {
+				errorNotification(error);
+				throw new Error(error);
+			} finally {
+				loading.projects = false;
 			}
 		} else {
-			const response = await fetch(
-				`${apiUrl}/v4/groups/${selected.group.id}/projects?page=1&per_page=25&archived=false`,
-				{
-					method: 'GET',
-					headers: {
-						Authorization: `Bearer ${gitlabToken}`
+			try {
+				projects = await get(
+					`${apiUrl}/v4/groups/${selected.group.id}/projects?page=1&per_page=25&archived=false`,
+					{
+						Authorization: `Bearer ${$session.gitlabToken}`
 					}
-				}
-			);
-
-			if (response.ok) {
-				const data = await response.json();
-				projects = data;
-			} else {
-				console.error(response);
+				);
+			} catch (error) {
+				errorNotification(error);
+				throw new Error(error);
+			} finally {
 				loading.projects = false;
-				throw new Error(response.statusText);
 			}
 		}
-		loading.projects = false;
 	}
 
 	async function loadBranches() {
 		loading.branches = true;
-		const response = await fetch(
-			`${apiUrl}/v4/projects/${selected.project.id}/repository/branches?per_page=100&page=1`,
-			{
-				method: 'GET',
-				headers: {
-					Authorization: `Bearer ${gitlabToken}`
+		try {
+			branches = await get(
+				`${apiUrl}/v4/projects/${selected.project.id}/repository/branches?per_page=100&page=1`,
+				{
+					Authorization: `Bearer ${$session.gitlabToken}`
 				}
-			}
-		);
-
-		if (response.ok) {
-			const data = await response.json();
-			branches = data;
-		} else {
-			console.error(response);
+			);
+		} catch (error) {
+			errorNotification(error);
+			throw new Error(error);
+		} finally {
 			loading.branches = false;
-			throw new Error(response.statusText);
 		}
-		loading.branches = false;
 	}
 
 	async function isBranchAlreadyUsed() {
 		const url = `/applications/${id}/configuration/repository.json?repository=${selected.project.path_with_namespace}&branch=${selected.branch.name}`;
-		const res = await fetch(url);
-		if (res.ok) {
-			errorNotification('Branch already configured');
-			return;
-		}
-		showSave = true;
-	}
-	async function checkDeployKey(deployKeyUrl, updateDeployKeyIdUrl) {
-		const response = await fetch(deployKeyUrl, {
-			method: 'GET',
-			headers: {
-				Authorization: `Bearer ${gitlabToken}`
-			}
-		});
-		if (response.ok) {
-			const deployKeys = await response.json();
-			const deployKey = deployKeys.find((key) => key.title === 'coolify-deploy-key');
-			if (deployKey) {
-				return await saveDeployKey(updateDeployKeyIdUrl, deployKey.id);
-			}
-		}
-		return;
-	}
-	async function saveDeployKey(updateDeployKeyIdUrl, deployKeyId) {
-		const form = new FormData();
-		form.append('deployKeyId', deployKeyId);
 
-		const response = await fetch(updateDeployKeyIdUrl, {
-			method: 'POST',
-			body: form
-		});
-		if (!response.ok) {
-			throw new Error(response.statusText);
+		try {
+			return await get(url);
+		} catch (error) {
+			console.log(error);
+			return errorNotification('Branch already configured');
+		} finally {
+			showSave = true;
 		}
-		return;
 	}
-	async function checkSSHKey(sshkeyUrl, deployKeyUrl, updateDeployKeyIdUrl) {
-		let response = await fetch(sshkeyUrl, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				accept: 'application/json'
-			},
-			body: JSON.stringify({})
-		});
-		if (!response.ok) {
-			throw new Error(response.statusText);
+	async function saveDeployKey(deployKeyId: number) {
+		try {
+			await post(updateDeployKeyIdUrl, { deployKeyId });
+		} catch (error) {
+			errorNotification(error);
+			throw new Error(error);
 		}
-		const { publicKey } = await response.json();
-		response = await fetch(deployKeyUrl, {
-			method: 'POST',
-			body: JSON.stringify({
-				title: 'coolify-deploy-key',
-				key: publicKey,
-				can_push: false
-			}),
-			headers: {
-				Authorization: `Bearer ${gitlabToken}`,
-				'Content-Type': 'application/json'
-			}
-		});
-		if (!response.ok) {
-			throw new Error(response.statusText);
+	}
+	async function checkSSHKey(sshkeyUrl, deployKeyUrl) {
+		try {
+			const { publicKey } = await post(sshkeyUrl, {});
+			const { id } = await post(
+				deployKeyUrl,
+				{
+					title: 'coolify-deploy-key',
+					key: publicKey,
+					can_push: false
+				},
+				{
+					Authorization: `Bearer ${$session.gitlabToken}`
+				}
+			);
+			return await saveDeployKey(id);
+		} catch (error) {
+			errorNotification(error);
+			throw new Error(error);
 		}
-		const { id } = await response.json();
-		if (!id) {
-			throw new Error('No id');
-		}
-		return await saveDeployKey(updateDeployKeyIdUrl, id);
 	}
 	async function setWebhook(url, webhookToken) {
 		const host = window.location.origin;
-		const response = await fetch(url, {
-			method: 'GET',
-			headers: {
-				Authorization: `Bearer ${gitlabToken}`,
-				'Content-Type': 'application/json'
-			}
+		const urls = await get(url, {
+			Authorization: `Bearer ${$session.gitlabToken}`
 		});
-		const urls = await response.json();
 		const found = urls.find((url) => url.url.startsWith(host));
 		if (!found) {
-			const response = await fetch(url, {
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${gitlabToken}`,
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					id: selected.project.id,
-					url: dev
-						? 'https://webhook.site/9f1710a3-54a3-41b2-9917-3286383cc0ee'
-						: `${host}/webhooks/gitlab/events`,
-					token: webhookToken,
-					push_events: true,
-					enable_ssl_verification: true,
-					merge_requests_events: true
-				})
-			});
-			if (!response.ok) {
-				const error = await response.json();
-				console.log({ error });
+			try {
+				await post(
+					url,
+					{
+						id: selected.project.id,
+						url: dev
+							? 'https://webhook.site/9f1710a3-54a3-41b2-9917-3286383cc0ee'
+							: `${host}/webhooks/gitlab/events`,
+						token: webhookToken,
+						push_events: true,
+						enable_ssl_verification: true,
+						merge_requests_events: true
+					},
+					{
+						Authorization: `Bearer ${$session.gitlabToken}`
+					}
+				);
+			} catch (error) {
 				errorNotification(error);
 				throw error;
 			}
@@ -275,14 +205,14 @@
 		let privateSshKey = application.gitSource.gitlabApp.privateSshKey;
 
 		const deployKeyUrl = `${apiUrl}/v4/projects/${selected.project.id}/deploy_keys`;
-		const updateDeployKeyIdUrl = `/applications/${id}/configuration/deploykey.json`;
+
 		const sshkeyUrl = `/applications/${id}/configuration/sshkey.json`;
 		const webhookUrl = `${apiUrl}/v4/projects/${selected.project.id}/hooks`;
 		const webhookToken = cuid();
 
 		try {
 			if (!privateSshKey) {
-				await checkSSHKey(sshkeyUrl, deployKeyUrl, updateDeployKeyIdUrl);
+				await checkSSHKey(sshkeyUrl, deployKeyUrl);
 			}
 		} catch (error) {
 			console.log(error);
@@ -297,40 +227,29 @@
 		}
 
 		const url = `/applications/${id}/configuration/repository.json`;
-		const form = new FormData();
-		form.append('repository', `${selected.group.full_path}/${selected.project.name}`);
-		form.append('branch', selected.branch.name);
-		form.append('projectId', selected.project.id);
-		form.append('webhookToken', webhookToken);
-
-		const response = await fetch(url, {
-			method: 'POST',
-			headers: {
-				accept: 'application/json'
-			},
-			body: form
-		});
-		if (response.ok) {
-			loading.save = false;
-			window.location.replace(from || `/applications/${id}/configuration/buildpack`);
+		try {
+			await post(url, {
+				repository: `${selected.group.full_path}/${selected.project.name}`,
+				branch: selected.branch.name,
+				projectId: selected.project.id,
+				webhookToken
+			});
+			return await goto(from || `/applications/${id}/configuration/buildpack`);
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
+	async function handleSubmit() {
+		try {
+			await post(`/applications/{id}/configuration/repository.json`, { ...selected });
+			return await goto(from || `/applications/${id}/configuration/destination`);
+		} catch (error) {
+			return errorNotification(error);
 		}
 	}
 </script>
 
-<form
-	action="/applications/{id}/configuration/repository.json"
-	method="post"
-	use:enhance={{
-		result: async () => {
-			loading.save = false;
-			goto(from || `/applications/${id}/configuration/destination`);
-			// window.location.assign(from || `/applications/${id}/configuration/buildpack`);
-		},
-		pending: async () => {
-			loading.save = true;
-		}
-	}}
->
+<form on:submit={handleSubmit}>
 	<div class="px-4 space-y-2 xl:space-y-0 flex xl:flex-row flex-col xl:space-x-2 ">
 		{#if loading.base}
 			<select name="group" disabled class="w-96">

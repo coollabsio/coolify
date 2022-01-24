@@ -5,7 +5,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import compare from 'compare-versions';
 import got from "got"
 
-export const get: RequestHandler = async (request) => {
+export const get: RequestHandler = async () => {
     try {
         const currentVersion = version;
         const versions = await got.get(`https://get.coollabs.io/version.json?appId=${process.env['COOLIFY_APP_ID']}`).json()

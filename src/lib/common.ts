@@ -10,6 +10,7 @@ import { buildLogQueue } from './queues'
 import { version as currentVersion } from '../../package.json';
 import { dockerInstance } from './docker';
 import dayjs from 'dayjs';
+import Cookie from 'cookie'
 
 try {
     if (!dev) {
@@ -51,20 +52,20 @@ export const isTeamIdTokenAvailable = (request) => {
     }
 }
 
-export const getTeam = (request) => {
-    const teamIdCookie = request.headers.cookie?.split(';').map(s => s.trim()).find(s => s.startsWith('teamId='))?.split('=')[1]
-    if (teamIdCookie) { return teamIdCookie }
-
-    const teamIdSession = request.locals.session.data.teamId
-    if (teamIdSession) { return teamIdSession }
-
+export const getTeam = (event) => {
+    const cookies: Cookies = Cookie.parse(event.request.headers.get('cookie'))
+    if (cookies.teamId) {
+        return cookies.teamId
+    } else if (event.locals.session.data.teamId) {
+        return event.locals.session.data.teamId
+    }
     return null
 }
 
-export const getUserDetails = async (request, isAdminRequired = true) => {
+export const getUserDetails = async (event, isAdminRequired = true) => {
     try {
-        const teamId = getTeam(request)
-        const userId = request.locals.session.data.uid || null
+        const teamId = getTeam(event)
+        const userId = event.locals.session.data.uid || null
         const { permission = 'read' } = await db.prisma.permission.findFirst({ where: { teamId, userId }, select: { permission: true }, rejectOnNotFound: true })
         const payload = {
             teamId,
@@ -82,7 +83,7 @@ export const getUserDetails = async (request, isAdminRequired = true) => {
 
         return payload
     } catch (err) {
-        // console.log(err)
+        console.log(err)
         return {
             teamId: null,
             userId: null,

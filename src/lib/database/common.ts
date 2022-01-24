@@ -19,12 +19,12 @@ if (!dev) {
     P = ProdPrisma.Prisma
 }
 let prismaOptions = {
-    rejectOnNotFound: true,
+    rejectOnNotFound: false,
 }
 if (dev) {
     prismaOptions = {
         errorFormat: 'pretty',
-        rejectOnNotFound: true,
+        rejectOnNotFound: false,
         log: [{
             emit: 'event',
             level: 'query',
@@ -49,7 +49,7 @@ export function PrismaErrorHandler(e) {
             payload.body.message = "Already exists. Choose another name."
         }
     }
-    console.error(e)
+    // console.error(e)
     return payload
 }
 export async function generateSshKeyPair(): Promise<{ publicKey: string, privateKey: string }> {

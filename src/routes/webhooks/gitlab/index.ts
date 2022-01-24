@@ -3,6 +3,7 @@ import { getTeam } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import got from 'got';
+import cookie from 'cookie'
 
 export const options = async () => {
     return {
@@ -16,10 +17,10 @@ export const options = async () => {
     }
 }
 
-export const get: RequestHandler = async (request) => {
+export const get: RequestHandler = async (event) => {
     const teamId = undefined
-    const code = request.url.searchParams.get('code')
-    const state = request.url.searchParams.get('state')
+    const code = event.url.searchParams.get('code')
+    const state = event.url.searchParams.get('state')
 
     try {
         // TODO: Solve somehow the http/https thing below
@@ -33,7 +34,7 @@ export const get: RequestHandler = async (request) => {
                 code,
                 state,
                 grant_type: 'authorization_code',
-                redirect_uri: `http://${request.headers.host}/webhooks/gitlab`
+                redirect_uri: `${event.url.origin}/webhooks/gitlab`
             }
         }).json()
 

@@ -9,12 +9,8 @@ export async function listApplications(teamId) {
 }
 
 export async function newApplication({ name, teamId }) {
-    try {
-        const app = await prisma.application.create({ data: { name, teams: { connect: { id: teamId } }, settings: { create: { debug: false, previews: false } } } })
-        return { status: 201, body: { id: app.id } }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
-    }
+    const app = await prisma.application.create({ data: { name, teams: { connect: { id: teamId } }, settings: { create: { debug: false, previews: false } } } })
+    return { status: 201, body: { id: app.id } }
 }
 
 export async function importApplication({ name, teamId, fqdn, port, buildCommand, startCommand, installCommand }) {
@@ -36,7 +32,7 @@ export async function removeApplication({ id, teamId }) {
         await prisma.buildLog.deleteMany({ where: { applicationId: id } })
         await prisma.secret.deleteMany({ where: { applicationId: id } })
         await prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } })
-        
+
         let previews = []
         if (destinationDockerId) {
             await removeDestinationDocker({ id, engine: destinationDocker.engine })
@@ -95,70 +91,54 @@ export async function getApplicationWebhook({ projectId, branch }) {
     }
 }
 export async function getApplication({ id, teamId }) {
-    try {
-        let body = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true, settings: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, secrets: true } })
+    let body = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } }, include: { destinationDocker: true, settings: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, secrets: true } })
 
-        if (body.gitSource?.githubApp?.clientSecret) {
-            body.gitSource.githubApp.clientSecret = decrypt(body.gitSource.githubApp.clientSecret)
-        }
-        if (body.gitSource?.githubApp?.webhookSecret) {
-            body.gitSource.githubApp.webhookSecret = decrypt(body.gitSource.githubApp.webhookSecret)
-        }
-        if (body.gitSource?.githubApp?.privateKey) {
-            body.gitSource.githubApp.privateKey = decrypt(body.gitSource.githubApp.privateKey)
-        }
-        if (body?.gitSource?.gitlabApp?.appSecret) {
-            body.gitSource.gitlabApp.appSecret = decrypt(body.gitSource.gitlabApp.appSecret)
-        }
-        if (body?.secrets.length > 0) {
-            body.secrets = body.secrets.map(s => {
-                s.value = decrypt(s.value)
-                return s
-            })
-        }
-
-        return { ...body }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
+    if (body.gitSource?.githubApp?.clientSecret) {
+        body.gitSource.githubApp.clientSecret = decrypt(body.gitSource.githubApp.clientSecret)
     }
+    if (body.gitSource?.githubApp?.webhookSecret) {
+        body.gitSource.githubApp.webhookSecret = decrypt(body.gitSource.githubApp.webhookSecret)
+    }
+    if (body.gitSource?.githubApp?.privateKey) {
+        body.gitSource.githubApp.privateKey = decrypt(body.gitSource.githubApp.privateKey)
+    }
+    if (body?.gitSource?.gitlabApp?.appSecret) {
+        body.gitSource.gitlabApp.appSecret = decrypt(body.gitSource.gitlabApp.appSecret)
+    }
+    if (body?.secrets.length > 0) {
+        body.secrets = body.secrets.map(s => {
+            s.value = decrypt(s.value)
+            return s
+        })
+    }
+
+    return { ...body }
 }
 
 
 export async function configureGitRepository({ id, repository, branch, projectId, webhookToken }) {
-    try {
-        if (webhookToken) {
-            const encryptedWebhookToken = encrypt(webhookToken)
-            await prisma.application.update({ where: { id }, data: { repository, branch, projectId, gitSource: { update: { gitlabApp: { update: { webhookToken: encryptedWebhookToken } } } } } })
-        } else {
-            await prisma.application.update({ where: { id }, data: { repository, branch, projectId } })
-        }
-        return { status: 201 }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
+    if (webhookToken) {
+        const encryptedWebhookToken = encrypt(webhookToken)
+        await prisma.application.update({ where: { id }, data: { repository, branch, projectId, gitSource: { update: { gitlabApp: { update: { webhookToken: encryptedWebhookToken } } } } } })
+    } else {
+        await prisma.application.update({ where: { id }, data: { repository, branch, projectId } })
     }
+    return { status: 201 }
 }
 
 export async function configureBuildPack({ id, buildPack }) {
-    try {
-        await prisma.application.update({ where: { id }, data: { buildPack } })
-        return { status: 201 }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
-    }
+    return await prisma.application.update({ where: { id }, data: { buildPack } })
 }
 
 export async function configureApplication({ id, name, teamId, fqdn, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory }) {
-    try {
-        let application = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } } })
-        if (application.fqdn !== fqdn && !application.oldFqdn) {
-            application = await prisma.application.update({ where: { id }, data: { fqdn, oldFqdn: application.fqdn, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory, name } })
-        } else {
-            application = await prisma.application.update({ where: { id }, data: { fqdn, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory, name } })
-        }
-        return { status: 201, body: { application } }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
+    let application = await prisma.application.findFirst({ where: { id, teams: { every: { id: teamId } } } })
+    if (application.fqdn !== fqdn && !application.oldFqdn) {
+        application = await prisma.application.update({ where: { id }, data: { fqdn, oldFqdn: application.fqdn, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory, name } })
+    } else {
+        application = await prisma.application.update({ where: { id }, data: { fqdn, port, installCommand, buildCommand, startCommand, baseDirectory, publishDirectory, name } })
     }
+    return application
+
 }
 
 export async function setApplicationSettings({ id, debug, previews }) {

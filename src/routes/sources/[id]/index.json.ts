@@ -1,20 +1,22 @@
 import { getTeam, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
+import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 export const get: RequestHandler = async (request) => {
     const { teamId, status, body } = await getUserDetails(request);
     if (status === 401) return { status, body }
-    
+
     const { id } = request.params
     try {
         const source = await db.getSource({ id, teamId })
         return {
+            status: 200,
             body: {
                 source
             }
         };
-    } catch (err) {
-        return err
+    } catch (error) {
+        throw PrismaErrorHandler(error)
     }
 
 }
@@ -38,26 +40,18 @@ export const del: RequestHandler = async (request) => {
 
 }
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    // TODO: Do we really need groupName?
-    const { teamId, status, body } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+    const { teamId, status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
-
-    const { id } = request.params
-    const name = request.body.get('name') || undefined
-    const oauthId = Number(request.body.get('oauthId')) || undefined
-    const groupName = request.body.get('groupName') || undefined
-    const appId = request.body.get('appId') || undefined
-    const appSecret = request.body.get('appSecret') || undefined
+    const { id } = event.params
 
     try {
-        const source = await db.addSource({ id, name, teamId, oauthId, groupName, appId, appSecret })
-        return {
-            body: {
-                source
-            }
-        };
-    } catch (err) {
-        return err
+        let { oauthId, groupName, appId, appSecret } = await event.request.json()
+
+        oauthId = Number(oauthId)
+
+        return await db.addSource({ id, teamId, oauthId, groupName, appId, appSecret })
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
 }

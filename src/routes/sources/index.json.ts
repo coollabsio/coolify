@@ -1,5 +1,6 @@
 import { getTeam, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
+import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (request) => {
@@ -8,13 +9,9 @@ export const get: RequestHandler = async (request) => {
 
     try {
         const sources = await db.listSources(teamId)
-        return {
-            body: {
-                sources
-            }
-        };
+        return { status: 200, body: { sources } }
     } catch (err) {
-        return err
+        return PrismaErrorHandler(err)
     }
 
 }

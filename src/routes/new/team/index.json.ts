@@ -3,18 +3,13 @@ import * as db from '$lib/database';
 import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const get: RequestHandler = async (request) => {
-	return {
-		body: {
-			name: uniqueName()
-		}
-	};
-}
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-	const { userId, status, body } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+	const { userId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body }
 
-	const name = request.body.get('name') || undefined
+	const data = await event.request.formData();
+	const name = data.get('name')
+
 	try {
 		return await db.newTeam({ name, userId })
 	} catch (err) {

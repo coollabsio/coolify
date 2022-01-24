@@ -1,7 +1,7 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ fetch, session }) => {
-		const url = `/new/service.json`;
+		const url = `/common/getUniqueName.json`;
 		const res = await fetch(url);
 
 		if (res.ok) {

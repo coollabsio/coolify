@@ -1,7 +1,7 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ params,url, stuff }) => {
-		const { application, githubToken, gitlabToken } = stuff;
+		const { application, githubToken } = stuff;
 		if (application?.branch && application?.repository && !url.searchParams.get('from')) {
 			return {
 				status: 302,
@@ -11,7 +11,6 @@
 		return {
 			props: {
 				githubToken,
-				gitlabToken,
 				application
 			}
 		};
@@ -21,7 +20,6 @@
 <script lang="ts">
 	export let application;
 	export let githubToken;
-	export let gitlabToken;
 	import GithubRepositories from './_GithubRepositories.svelte';
 	import GitlabRepositories from './_GitlabRepositories.svelte';
 </script>
@@ -33,6 +31,6 @@
 	{#if application.gitSource.type === 'github'}
 		<GithubRepositories {application} {githubToken} />
 	{:else if application.gitSource.type === 'gitlab'}
-		<GitlabRepositories {application} {gitlabToken} />
+		<GitlabRepositories {application} />
 	{/if}
 </div>
