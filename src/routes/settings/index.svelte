@@ -90,7 +90,7 @@
 							readonly={!$session.isAdmin}
 							name="fqdn"
 							id="fqdn"
-							pattern="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+							pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 							placeholder="eg: https://coolify.io"
 							required
 						/>
