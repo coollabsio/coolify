@@ -15,7 +15,7 @@
 			placeholder="Generated automatically after start"
 			id="dbUser"
 			name="dbUser"
-			value={database.dbUser}
+			bind:value={database.dbUser}
 		/>
 	</div>
 </div>

@@ -28,7 +28,7 @@
 
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { enhance } from '$lib/form';
+	import { errorNotification } from '$lib/form';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -41,6 +41,15 @@
 	import PostgreSQL from '$lib/components/svg/databases/PostgreSQL.svelte';
 	import Redis from '$lib/components/svg/databases/Redis.svelte';
 	import { goto } from '$app/navigation';
+	import { post } from '$lib/api';
+	async function handleSubmit(type) {
+		try {
+			await post(`/databases/${id}/configuration/type.json`, { type });
+			return await goto(from || `/databases/${id}/configuration/version`);
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
@@ -50,17 +59,7 @@
 <div class="flex flex-wrap justify-center">
 	{#each types as type}
 		<div class="p-2">
-			<form
-				action="/databases/{id}/configuration/type.json"
-				method="post"
-				use:enhance={{
-					result: async () => {
-						goto(from || `/databases/${id}/configuration/version` || `/databases/${id}`);
-						// window.location.assign(from || `/databases/${id}`);
-					}
-				}}
-			>
-				<input class="hidden" name="type" value={type.name} />
+			<form on:submit|preventDefault={() => handleSubmit(type.name)}>
 				<button type="submit" class="box-selection text-xl font-bold hover:bg-purple-700 relative">
 					{#if type.name === 'clickhouse'}
 						<Clickhouse />

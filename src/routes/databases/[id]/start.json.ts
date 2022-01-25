@@ -1,17 +1,17 @@
 import { asyncExecShell, createDirectories, getEngine, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { generateDatabaseConfiguration } from '$lib/database';
+import { generateDatabaseConfiguration, PrismaErrorHandler } from '$lib/database';
 import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
 import { makeLabelForStandaloneDatabase } from '$lib/buildPacks/common';
 import { startTcpProxy } from '$lib/haproxy';
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const { teamId, status, body } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+    const { teamId, status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
 
-    const { id } = request.params
+    const { id } = event.params
 
     try {
         const database = await db.getDatabase({ id, teamId })
@@ -74,8 +74,8 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             }
         }
 
-    } catch (err) {
-        return err
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
 
 }

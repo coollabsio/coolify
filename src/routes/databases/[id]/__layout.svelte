@@ -60,6 +60,8 @@
 	import { errorNotification } from '$lib/form';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import Loading from '$lib/components/Loading.svelte';
+	import { del, post } from '$lib/api';
+	import { goto } from '$app/navigation';
 
 	export let database;
 	export let state;
@@ -69,16 +71,13 @@
 		const sure = confirm(`Are you sure you would like to delete '${database.name}'?`);
 		if (sure) {
 			loading = true;
-			const response = await fetch(`/databases/${database.id}/delete.json`, {
-				method: 'delete',
-				body: JSON.stringify({ id: database.id })
-			});
-			if (!response.ok) {
-				const { message } = await response.json();
+			try {
+				await del(`/databases/${database.id}/delete.json`, { id: database.id });
+				return await goto('/databases');
+			} catch ({ error }) {
+				return errorNotification(error);
+			} finally {
 				loading = false;
-				errorNotification(message);
-			} else {
-				window.location.assign('/databases');
 			}
 		}
 	}
@@ -86,29 +85,25 @@
 		const sure = confirm(`Are you sure you would like to stop '${database.name}'?`);
 		if (sure) {
 			loading = true;
-			const response = await fetch(`/databases/${database.id}/stop.json`, {
-				method: 'POST'
-			});
-			if (!response.ok) {
+			try {
+				await post(`/databases/${database.id}/stop.json`, {});
+				return window.location.reload();
+			} catch ({ error }) {
+				return errorNotification(error);
+			} finally {
 				loading = false;
-				const { message } = await response.json();
-				errorNotification(message);
-			} else {
-				window.location.reload();
 			}
 		}
 	}
 	async function startDatabase() {
 		loading = true;
-		const response = await fetch(`/databases/${database.id}/start.json`, {
-			method: 'POST'
-		});
-		if (!response.ok) {
+		try {
+			await post(`/databases/${database.id}/start.json`, {});
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
+		} finally {
 			loading = false;
-			const { message } = await response.json();
-			errorNotification(message);
-		} else {
-			window.location.reload();
 		}
 	}
 </script>
@@ -121,7 +116,7 @@
 			{#if state === 'running'}
 				<button
 					on:click={stopDatabase}
-					title="Stop Database"
+					title="Stop database"
 					type="submit"
 					disabled={!$session.isAdmin}
 					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-purple-600 hover:text-white"
@@ -147,12 +142,12 @@
 			{:else if state === 'not started'}
 				<button
 					on:click={startDatabase}
-					title="Start Database"
+					title="Start database"
 					type="submit"
 					disabled={!$session.isAdmin}
 					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-purple-600 hover:text-white"
 					data-tooltip={$session.isAdmin
-						? 'Start Database'
+						? 'Start database'
 						: 'You do not have permission to start the database.'}
 					><svg
 						xmlns="http://www.w3.org/2000/svg"

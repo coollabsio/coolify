@@ -42,4 +42,4 @@
 	<span class="pr-2">{database.type}</span>
 </div>
 
-<Databases {database} {privatePort} />
+<Databases bind:database {privatePort} />

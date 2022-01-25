@@ -16,7 +16,7 @@
 			placeholder="eg: mydb"
 			id="defaultDatabase"
 			name="defaultDatabase"
-			value={database.defaultDatabase}
+			bind:value={database.defaultDatabase}
 		/>
 	</div>
 </div>

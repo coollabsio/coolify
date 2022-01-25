@@ -28,13 +28,22 @@
 
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { enhance } from '$lib/form';
+	import { enhance, errorNotification } from '$lib/form';
 	import { goto } from '$app/navigation';
+	import { post } from '$lib/api';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
 
 	export let versions;
+	async function handleSubmit(version) {
+		try {
+			await post(`/databases/${id}/configuration/version.json`, { version });
+			return await goto(from || `/databases/${id}/configuration/destination`);
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
@@ -44,17 +53,7 @@
 <div class="flex flex-wrap justify-center">
 	{#each versions as version}
 		<div class="p-2">
-			<form
-				action="/databases/{id}/configuration/version.json"
-				method="post"
-				use:enhance={{
-					result: async () => {
-						goto(from || `/databases/${id}/configuration/destination`);
-						// window.location.assign(from || `/databases/${id}`);
-					}
-				}}
-			>
-				<input class="hidden" name="version" value={version} />
+			<form on:submit|preventDefault={() => handleSubmit(version)}>
 				<button type="submit" class="box-selection text-xl font-bold">{version}</button>
 			</form>
 		</div>

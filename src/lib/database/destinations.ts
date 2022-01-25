@@ -21,25 +21,20 @@ export async function configureDestinationForApplication({ id, destinationId }) 
     return await prisma.application.update({ where: { id }, data: { destinationDocker: { connect: { id: destinationId } } } })
 }
 export async function configureDestinationForDatabase({ id, destinationId }) {
-    try {
-        await prisma.database.update({ where: { id }, data: { destinationDocker: { connect: { id: destinationId } } } })
+    await prisma.database.update({ where: { id }, data: { destinationDocker: { connect: { id: destinationId } } } })
 
-        const { destinationDockerId, destinationDocker: { engine }, version, type } = await prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
+    const { destinationDockerId, destinationDocker: { engine }, version, type } = await prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
 
-        if (destinationDockerId) {
-            const host = getEngine(engine)
-            if (type && version) {
-                const baseImage = getDatabaseImage(type)
-                asyncExecShell(`DOCKER_HOST=${host} docker pull ${baseImage}:${version}`)
-                asyncExecShell(`DOCKER_HOST=${host} docker pull coollabsio/${defaultProxyImageTcp}`)
-                asyncExecShell(`DOCKER_HOST=${host} docker pull coollabsio/${defaultProxyImageHttp}`)
-                asyncExecShell(`DOCKER_HOST=${host} docker pull certbot/certbot:latest`)
-                asyncExecShell(`DOCKER_HOST=${host} docker pull alpine:latest`)
-            }
+    if (destinationDockerId) {
+        const host = getEngine(engine)
+        if (type && version) {
+            const baseImage = getDatabaseImage(type)
+            asyncExecShell(`DOCKER_HOST=${host} docker pull ${baseImage}:${version}`)
+            asyncExecShell(`DOCKER_HOST=${host} docker pull coollabsio/${defaultProxyImageTcp}`)
+            asyncExecShell(`DOCKER_HOST=${host} docker pull coollabsio/${defaultProxyImageHttp}`)
+            asyncExecShell(`DOCKER_HOST=${host} docker pull certbot/certbot:latest`)
+            asyncExecShell(`DOCKER_HOST=${host} docker pull alpine:latest`)
         }
-        return { status: 201 }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
     }
 }
 export async function updateDestination({ id, name, engine, network }) {

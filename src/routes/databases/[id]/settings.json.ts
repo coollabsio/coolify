@@ -1,19 +1,18 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { generateDatabaseConfiguration } from '$lib/database';
+import { generateDatabaseConfiguration, PrismaErrorHandler } from '$lib/database';
 import { startTcpProxy, stopTcpHttpProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const { status, body, teamId } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+    const { status, body, teamId } = await getUserDetails(event);
     if (status === 401) return { status, body }
 
-    const { id } = request.params
-    const isPublic = request.body.get('isPublic') === 'true' ? true : false
+    const { id } = event.params
+    const { isPublic } = await event.request.json()
 
     try {
         await db.setDatabase({ id, isPublic })
-
         const database = await db.getDatabase({ id, teamId })
         const { destinationDockerId, destinationDocker, publicPort } = database
         const { privatePort } = generateDatabaseConfiguration(database)
@@ -29,9 +28,8 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         return {
             status: 201
         }
-    } catch (err) {
-        console.log(err)
-        return err
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
 
 }

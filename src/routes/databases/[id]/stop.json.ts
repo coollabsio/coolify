@@ -1,14 +1,14 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { stopDatabase } from '$lib/database';
+import { PrismaErrorHandler, stopDatabase } from '$lib/database';
 import { stopTcpHttpProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const { teamId, status, body } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+    const { teamId, status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
 
-    const { id } = request.params
+    const { id } = event.params
 
     try {
         const database = await db.getDatabase({ id, teamId })
@@ -19,13 +19,8 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
         return {
             status: 200
         }
-    } catch (err) {
-        return {
-            status: 500,
-            body: {
-                message: err.message || err
-            }
-        }
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
 
 }

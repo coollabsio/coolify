@@ -4,7 +4,7 @@
 	import { page, session } from '$app/stores';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Setting from '$lib/components/Setting.svelte';
-	import { enhance } from '$lib/form';
+	import { errorNotification } from '$lib/form';
 
 	import MySql from './_MySQL.svelte';
 	import MongoDb from './_MongoDB.svelte';
@@ -12,6 +12,7 @@
 	import Redis from './_Redis.svelte';
 	import CouchDb from './_CouchDb.svelte';
 	import { browser } from '$app/env';
+	import { post } from '$lib/api';
 
 	const { id } = $page.params;
 	let loading = false;
@@ -42,44 +43,29 @@
 	}
 
 	async function changeSettings(name) {
-		const form = new FormData();
 		if (name === 'isPublic') {
 			isPublic = !isPublic;
 		}
-		form.append('isPublic', isPublic.toString());
 		try {
-			await fetch(`/databases/${id}/settings.json`, {
-				method: 'POST',
-				body: form
-			});
+			await post(`/databases/${id}/settings.json`, { isPublic });
 			databaseUrl = generateUrl();
-
-		} catch (e) {
-			console.error(e);
+			return;
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
+	async function handleSubmit() {
+		try {
+			await post(`/databases/${id}.json`, { ...database });
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
 	}
 </script>
 
 <div class="max-w-4xl mx-auto px-6">
-	<form
-		action="/databases/{id}.json"
-		use:enhance={{
-			result: async () => {
-				setTimeout(() => {
-					loading = false;
-					window.location.reload();
-				}, 200);
-			},
-			pending: async () => {
-				loading = true;
-			},
-			final: async () => {
-				loading = false;
-			}
-		}}
-		method="post"
-		class="py-4"
-	>
+	<form on:submit|preventDefault={handleSubmit} class="py-4">
 		<div class="font-bold flex space-x-1 pb-5">
 			<div class="text-xl tracking-tight mr-4">General</div>
 			{#if $session.isAdmin}
@@ -100,7 +86,7 @@
 						readonly={!$session.isAdmin}
 						name="name"
 						id="name"
-						value={database.name}
+						bind:value={database.name}
 						required
 					/>
 				</div>
@@ -159,15 +145,15 @@
 				</div>
 			</div>
 			{#if database.type === 'mysql'}
-				<MySql {database} />
+				<MySql bind:database />
 			{:else if database.type === 'postgresql'}
-				<PostgreSql {database} />
+				<PostgreSql bind:database />
 			{:else if database.type === 'mongodb'}
 				<MongoDb {database} />
 			{:else if database.type === 'redis'}
 				<Redis {database} />
 			{:else if database.type === 'couchdb'}
-				<CouchDb {database} />
+				<CouchDb bind:database />
 			{/if}
 			<div class="grid grid-cols-3 items-center pb-8">
 				<label for="url">Connection String</label>
