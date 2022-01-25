@@ -27,65 +27,40 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
 	import { toast } from '@zerodevx/svelte-toast';
+	import { del, post } from '$lib/api';
 
-	let isRegistrationEnabled =
-		settings.find((setting) => setting.name === 'isRegistrationEnabled')?.value === 'true';
+	let isRegistrationEnabled = settings.isRegistrationEnabled;
+	let fqdn = settings.fqdn;
 
-	let fqdn = settings.find((setting) => setting.name === 'fqdn')?.value;
-	let fqdnConfigured = !!fqdn;
-
-	async function removeFqdn(name) {
-		if (fqdnConfigured) {
-			const form = new FormData();
-			form.append('name', name);
-
+	async function removeFqdn() {
+		if (fqdn) {
 			try {
-				await fetch('/settings.json', {
-					method: 'DELETE',
-					body: form
-				});
-				window.location.reload();
-			} catch (e) {
-				console.error(e);
+				await del(`/settings.json`, { fqdn });
+				return window.location.reload();
+			} catch ({ error }) {
+				return errorNotification(error);
 			}
 		}
 	}
 	async function changeSettings(name) {
-		toast.push('Checking domain...');
-		let form = new FormData();
-		form.append('fqdn', fqdn.toString());
-		const response = await fetch(`/settings/check.json`, {
-			method: 'POST',
-			headers: {
-				accept: 'application/json'
-			},
-			body: form
-		});
-		if (!response.ok) {
-			const error = await response.json();
-			errorNotification(error.message || error);
-			throw new Error(error.message || error);
-		}
-
-		form = new FormData();
-		form.append('name', name);
-
-		if (name === 'isRegistrationEnabled') {
-			isRegistrationEnabled = !isRegistrationEnabled;
-			form.append('value', isRegistrationEnabled.toString());
-		}
-		if (name === 'fqdn') {
-			form.append('value', fqdn.toString());
-		}
 		try {
-			toast.push('Setting domain. It will take a while...');
-			await fetch('/settings.json', {
-				method: 'POST',
-				body: form
-			});
-			window.location.reload();
-		} catch (e) {
-			console.error(e);
+			if (name === 'isRegistrationEnabled') {
+				isRegistrationEnabled = !isRegistrationEnabled;
+			}
+			return await post(`/settings.json`, { isRegistrationEnabled });
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
+	async function handleSubmit() {
+		try {
+			if (fqdn) {
+				await post(`/settings/check.json`, { fqdn });
+				await post(`/settings.json`, { fqdn });
+				return window.location.reload();
+			}
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
 	}
 </script>
@@ -95,19 +70,18 @@
 </div>
 {#if $session.teamId === '0'}
 	<div class="max-w-2xl mx-auto">
-		<form on:submit|preventDefault={() => changeSettings('fqdn')}>
+		<form on:submit|preventDefault={handleSubmit}>
 			<div class="font-bold flex space-x-1 py-5 px-6">
 				<div class="text-xl tracking-tight mr-4">Global Settings</div>
 				<button type="submit" class="mx-2 bg-green-600 hover:bg-green-500">Save</button>
-				{#if fqdnConfigured}
-					<button
-						on:click|preventDefault={() => removeFqdn('fqdn')}
-						class="bg-red-600 hover:bg-red-500">Remove Domain</button
+				{#if !!fqdn}
+					<button on:click|preventDefault={removeFqdn} class="bg-red-600 hover:bg-red-500"
+						>Remove Domain</button
 					>
 				{/if}
 			</div>
 			<div class="px-4 sm:px-6">
-				<div class="py-4 flex  space-x-4 px-4">
+				<div class="py-4 flex space-x-4 px-4">
 					<p class="text-base font-bold text-stone-100">Domain (FQDN)</p>
 
 					<div class="justify-center text-center space-y-2">

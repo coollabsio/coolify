@@ -3,6 +3,7 @@
 
 	export let service;
 	export let isRunning;
+	export let readOnly;
 </script>
 
 <div class="font-bold flex space-x-1 py-5">
@@ -37,9 +38,9 @@ define('SUBDOMAIN_INSTALL', false);` : null}>{service.wordpress.extraConfig}</te
 			name="mysqlDatabase"
 			id="mysqlDatabase"
 			required
-			readonly={service.wordpress.mysqlDatabase}
-			disabled={service.wordpress.mysqlDatabase}
-			value={service.wordpress.mysqlDatabase}
+			readonly={readOnly}
+			disabled={readOnly}
+			bind:value={service.wordpress.mysqlDatabase}
 			placeholder="eg: wordpress_db"
 		/>
 	</div>

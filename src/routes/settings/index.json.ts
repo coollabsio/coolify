@@ -9,13 +9,15 @@ export const get: RequestHandler = async (event) => {
     if (status === 401) return { status, body }
 
     try {
+        const settings = await listSettings()
         return {
+            status: 200,
             body: {
-                settings: await listSettings()
+                settings
             }
         };
-    } catch (err) {
-        return err
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
 }
 
@@ -25,23 +27,17 @@ export const del: RequestHandler<Locals> = async (event) => {
     if (teamId !== '0') return { status: 401, body: { message: 'You do not have permission to do this. \nAsk an admin to modify your permissions.' } }
     if (status === 401) return { status, body }
 
-    const { name } = await event.request.json()
+    const { fqdn } = await event.request.json()
 
     try {
-        if (name === 'fqdn') {
-            const data = await db.prisma.setting.findUnique({ where: { name: 'fqdn' } })
-            await db.prisma.setting.delete({ where: { name: 'fqdn' } })
-            const domain = getDomain(data.value)
-            await configureCoolifyProxyOff({ domain })
-        }
+        await db.prisma.setting.update({ where: { fqdn }, data: { fqdn: null } })
+        const domain = getDomain(fqdn)
+        await configureCoolifyProxyOff({ domain })
         return {
-            status: 200
+            status: 201
         }
     } catch (error) {
-        console.error(error)
-        return {
-            status: 500
-        }
+        return PrismaErrorHandler(error)
     }
 
 }
@@ -50,24 +46,26 @@ export const post: RequestHandler<Locals> = async (event) => {
     if (teamId !== '0') return { status: 401, body: { message: 'You do not have permission to do this. \nAsk an admin to modify your permissions.' } }
     if (status === 401) return { status, body }
 
-    const { name, value } = await event.request.json()
+    const { fqdn, isRegistrationEnabled } = await event.request.json()
     try {
-        let oldFqdn;
-        if (name === 'fqdn') {
-            oldFqdn = await db.prisma.setting.findUnique({ where: { name }, rejectOnNotFound: false })
+        const { id, fqdn: oldFqdn, isRegistrationEnabled: oldIsRegistrationEnabled } = await db.prisma.setting.findFirst({})
+        if (oldIsRegistrationEnabled !== isRegistrationEnabled) {
+            await db.prisma.setting.update({ where: { id }, data: { isRegistrationEnabled } })
         }
-        await db.prisma.setting.upsert({ where: { name }, update: { value }, create: { name, value } })
-
-        if (name === 'fqdn') {
-            const domain = getDomain(value)
-            const oldDomain = getDomain(oldFqdn?.value)
+        if (oldFqdn !== fqdn) {
+            const oldDomain = getDomain(oldFqdn)
             if (oldFqdn) await configureCoolifyProxyOff({ domain: oldDomain })
+        }
+        if (fqdn) {
+            await db.prisma.setting.update({ where: { id }, data: { fqdn } })
+            const domain = getDomain(fqdn)
             if (domain) await configureCoolifyProxyOn({ domain })
         }
+
         return {
-            status: 200,
+            status: 201,
         }
-    } catch (err) {
-        return PrismaErrorHandler(err)
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
 }

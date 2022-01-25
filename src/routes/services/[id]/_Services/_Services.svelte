@@ -1,56 +1,46 @@
 <script lang="ts">
 	export let service;
 	export let isRunning;
+	export let readOnly;
+
 	import { page, session } from '$app/stores';
+	import { post } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
-	import { enhance, errorNotification } from '$lib/form';
+	import { errorNotification } from '$lib/form';
 	import MinIo from './_MinIO.svelte';
 	import PlausibleAnalytics from './_PlausibleAnalytics.svelte';
 	import VsCodeServer from './_VSCodeServer.svelte';
 	import Wordpress from './_Wordpress.svelte';
 
 	const { id } = $page.params;
+
 	let loading = false;
+	let loadingVerification = false;
+
+	async function handleSubmit() {
+		try {
+			await post(`/services/${id}/check.json`, { fqdn: service.fqdn });
+			await post(`/services/${id}/${service.type}.json`, { ...service });
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
+	async function setEmailsToVerified() {
+		loadingVerification = true;
+		try {
+			await post(`/services/${id}/${service.type}/activate.json`, { id: service.id });
+		} catch ({ error }) {
+			return errorNotification(error);
+		} finally {
+			loadingVerification = false;
+		}
+	}
 </script>
 
 <div class="max-w-4xl mx-auto px-6">
-	<!-- svelte-ignore missing-declaration -->
-	<form
-		action="/services/{id}/{service.type}.json"
-		use:enhance={{
-			beforeSubmit: async () => {
-				const form = new FormData();
-				form.append('fqdn', service.fqdn);
-				const response = await fetch(`/services/${id}/check.json`, {
-					method: 'POST',
-					headers: {
-						accept: 'application/json'
-					},
-					body: form
-				});
-				if (!response.ok) {
-					const error = await response.json();
-					errorNotification(error.message || error);
-					throw new Error(error.message || error);
-				}
-			},
-			result: async () => {
-				setTimeout(() => {
-					loading = false;
-					window.location.reload();
-				}, 200);
-			},
-			pending: async () => {
-				loading = true;
-			},
-			final: async () => {
-				loading = false;
-			}
-		}}
-		method="post"
-		class="py-4"
-	>
+	<form on:submit|preventDefault={handleSubmit} class="py-4">
 		<div class="font-bold flex space-x-1 pb-5">
 			<div class="text-xl tracking-tight mr-4">General</div>
 			{#if $session.isAdmin}
@@ -61,13 +51,27 @@
 					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
 				>
 			{/if}
+			{#if service.type === 'plausibleanalytics'}
+				<button
+					on:click|preventDefault={setEmailsToVerified}
+					class:bg-pink-600={!loadingVerification}
+					class:hover:bg-pink-500={!loadingVerification}
+					disabled={loadingVerification}>{loadingVerification ? 'Verifying' : 'Verify emails without SMTP'}</button
+				>
+			{/if}
 		</div>
 
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="grid grid-cols-3 items-center">
 				<label for="name">Name</label>
 				<div class="col-span-2 ">
-					<input readonly={!$session.isAdmin} name="name" id="name" value={service.name} required />
+					<input
+						readonly={!$session.isAdmin}
+						name="name"
+						id="name"
+						bind:value={service.name}
+						required
+					/>
 				</div>
 			</div>
 
@@ -87,23 +91,22 @@
 				</div>
 			</div>
 			<div class="grid grid-cols-3">
-				<!-- {#if service.type === 'plausibleanalytics' || service.type === 'nocodb'} -->
-					<label for="fqdn" class="pt-2">Domain (FQDN)</label>
-					<div class="col-span-2 ">
-						<CopyPasswordField
-							placeholder="eg: https://analytics.coollabs.io"
-							readonly={!$session.isAdmin && !isRunning}
-							disabled={!$session.isAdmin || isRunning}
-							name="fqdn"
-							id="fqdn"
-							pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-							bind:value={service.fqdn}
-							required
-						/>
-						<Explainer
-							text="If you specify <span class='text-green-600'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you."
-						/>
-					</div>
+				<label for="fqdn" class="pt-2">Domain (FQDN)</label>
+				<div class="col-span-2 ">
+					<CopyPasswordField
+						placeholder="eg: https://analytics.coollabs.io"
+						readonly={!$session.isAdmin && !isRunning}
+						disabled={!$session.isAdmin || isRunning}
+						name="fqdn"
+						id="fqdn"
+						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+						bind:value={service.fqdn}
+						required
+					/>
+					<Explainer
+						text="If you specify <span class='text-green-600'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you."
+					/>
+				</div>
 				<!-- {:else}
 					<label for="fqdn" class="pt-2">Domain (FQDN)</label>
 					<div class="col-span-2 ">
@@ -122,13 +125,13 @@
 				{/if} -->
 			</div>
 			{#if service.type === 'plausibleanalytics'}
-				<PlausibleAnalytics {service} />
+				<PlausibleAnalytics bind:service {readOnly} />
 			{:else if service.type === 'minio'}
 				<MinIo {service} />
 			{:else if service.type === 'vscodeserver'}
 				<VsCodeServer {service} />
 			{:else if service.type === 'wordpress'}
-				<Wordpress {service} {isRunning} />
+				<Wordpress bind:service {isRunning} {readOnly} />
 			{/if}
 		</div>
 	</form>

@@ -1,17 +1,19 @@
 import { getUserDetails, uniqueName } from '$lib/common';
 import * as db from '$lib/database';
+import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-	const { teamId, status, body } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body }
 
-	const name = request.body.get('name') || undefined
-	
+	const { name } = await event.request.json()
+
 	try {
-		return await db.newService({ name, teamId })
-	} catch(err) {
-		return err
+		const { id } = await db.newService({ name, teamId })
+		return { status: 201, body: { id } }
+	} catch (error) {
+		return PrismaErrorHandler(error)
 	}
 }
 

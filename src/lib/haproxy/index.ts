@@ -604,7 +604,7 @@ export async function configureSimpleServiceProxyOff({ domain }) {
         }).json()
         await completeTransaction(transactionId)
     } catch (error) {
-        console.log(error)
+        // console.log(error)
     }
 }
 

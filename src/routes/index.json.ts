@@ -1,10 +1,11 @@
 import { getTeam, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
+import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const get: RequestHandler = async (request) => {
-	const { teamId, status, body } = await getUserDetails(request);
-    if (status === 401) return { status, body }
+export const get: RequestHandler = async (event) => {
+	const { teamId, status, body } = await getUserDetails(event);
+	if (status === 401) return { status, body }
 
 	try {
 		const applicationsCount = await (await db.listApplications(teamId)).length
@@ -23,22 +24,21 @@ export const get: RequestHandler = async (request) => {
 				servicesCount
 			}
 		};
-	} catch (err) {
-		return err
+	} catch (error) {
+		return PrismaErrorHandler(error);
 	}
 }
 
 export const post: RequestHandler<Locals> = async (event) => {
 	const { status, body } = await getUserDetails(event, false);
 	if (status === 401) return { status, body }
-	
-	const data = await event.request.formData();
-	const cookie = data.get('cookie');
-	const value = data.get('value')
+
+	const { cookie, value } = await event.request.json()
 	const from = event.url.searchParams.get('from') || '/'
 
 	return {
 		status: 302,
+		body: {},
 		headers: {
 			"set-cookie": [
 				`${cookie}=${value}; HttpOnly; Path=/; Max-Age=15778800;`,

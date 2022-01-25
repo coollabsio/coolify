@@ -25,7 +25,8 @@
 	export let invitations;
 	import { page, session } from '$app/stores';
 	import Explainer from '$lib/components/Explainer.svelte';
-	import { enhance, errorNotification } from '$lib/form';
+	import { errorNotification } from '$lib/form';
+	import { post } from '$lib/api';
 	const { id } = $page.params;
 
 	let invitation = {
@@ -43,71 +44,53 @@
 	}
 
 	async function sendInvitation() {
-		const form = new FormData();
-		form.append('teamId', team.id);
-		form.append('teamName', invitation.teamName);
-		form.append('email', invitation.email);
-		form.append('permission', invitation.permission);
-		const response = await fetch(`/teams/${id}/invitation/invite.json`, {
-			method: 'post',
-			body: form
-		});
-		if (!response.ok) {
-			const { message } = await response.json();
-			errorNotification(message);
-			invitation.email = null;
-			return;
+		try {
+			await post(`/teams/${id}/invitation/invite.json`, {
+				teamId: team.id,
+				teamName: invitation.teamName,
+				email: invitation.email,
+				permission: invitation.permission
+			});
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
-		window.location.reload();
 	}
 	async function revokeInvitation(id) {
-		const form = new FormData();
-		form.append('id', id);
-		const response = await fetch(`/teams/${id}/invitation/revoke.json`, {
-			method: 'post',
-			body: form
-		});
-		if (!response.ok) {
-			const { message } = await response.json();
-			errorNotification(message);
-			return;
+		try {
+			await post(`/teams/${id}/invitation/revoke.json`, { id });
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
-		window.location.reload();
 	}
 	async function removeFromTeam(uid) {
-		const form = new FormData();
-		form.append('teamId', team.id);
-		form.append('uid', uid);
-		const response = await fetch(`/teams/${id}/remove/user.json`, {
-			method: 'post',
-			body: form
-		});
-		if (!response.ok) {
-			const { message } = await response.json();
-			errorNotification(message);
-			return;
+		try {
+			await post(`/teams/${id}/remove/user.json`, { teamId: team.id, uid });
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
-		window.location.reload();
 	}
 	async function changePermission(userId, permissionId, currentPermission) {
 		let newPermission = 'read';
 		if (currentPermission === 'read') {
 			newPermission = 'admin';
 		}
-		const form = new FormData();
-		form.append('userId', userId);
-		form.append('newPermission', newPermission);
-		form.append('permissionId', permissionId);
-		const response = await fetch(`/teams/${id}/permission/change.json`, {
-			method: 'post',
-			body: form
-		});
-		if (!response.ok) {
-			const { message } = await response.json();
-			errorNotification(message);
-			return;
+		try {
+			await post(`/teams/${id}/permission/change.json`, { userId, newPermission, permissionId });
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
-		window.location.reload();
+	}
+	async function handleSubmit() {
+		try {
+			await post(`/teams/${id}.json`, { ...team });
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
 	}
 </script>
 
@@ -117,17 +100,7 @@
 	<span class="pr-2">{team.name}</span>
 </div>
 <div class="max-w-2xl mx-auto">
-	<form
-		action="/teams/{id}.json"
-		method="post"
-		use:enhance={{
-			result: async () => {
-				window.location.reload();
-			},
-			pending: async () => {},
-			final: async () => {}
-		}}
-	>
+	<form on:submit|preventDefault={handleSubmit}>
 		<div class="font-bold flex space-x-1 py-5 px-6">
 			<div class="text-xl tracking-tight mr-4">Settings</div>
 			<div class="text-center">

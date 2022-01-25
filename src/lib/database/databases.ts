@@ -28,9 +28,7 @@ export async function newDatabase({ name, teamId }) {
     while (i < 10);
     if (i === 9) {
         throw {
-            body: {
                 message: 'No free port found!? Is it possible?'
-            }
         }
     }
     return await prisma.database.create({ data: { name, publicPort, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, teams: { connect: { id: teamId } }, settings: { create: { isPublic: false } } } })

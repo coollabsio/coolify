@@ -1,15 +1,16 @@
 import { getUserDetails } from '$lib/common';
 import { getDomain } from '$lib/components/common';
 import * as db from '$lib/database';
+import { PrismaErrorHandler } from '$lib/database';
 import { dockerInstance } from '$lib/docker';
 import { configureSimpleServiceProxyOff } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const { teamId, status, body } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+    const { teamId, status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
 
-    const { id } = request.params
+    const { id } = event.params
 
     try {
         const service = await db.getService({ id, teamId })
@@ -27,20 +28,13 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             } catch (error) {
                 console.error(error)
             }
-
             await configureSimpleServiceProxyOff({ domain })
         }
-
         return {
             status: 200
         }
-    } catch (err) {
-        return {
-            status: 500,
-            body: {
-                message: err.message || err
-            }
-        }
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
 
 }

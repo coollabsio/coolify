@@ -21,33 +21,38 @@
 
 <script lang="ts">
 	export let name;
-	import { enhance } from '$lib/form';
+	import { enhance, errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
-import { goto } from '$app/navigation';
+	import { goto } from '$app/navigation';
+	import { post } from '$lib/api';
 	let autofocus;
 
 	onMount(() => {
 		autofocus.focus();
 	});
+	async function handleSubmit() {
+		try {
+			const { id } = await post(`/new/service.json`, { name });
+			return await goto(`/services/${id}`);
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
 	<div class="text-2xl tracking-tight mr-4">Add New Service</div>
 </div>
 <div class="pt-10">
-	<form
-		action="/new/service.json"
-		method="post"
-		use:enhance={{
-			result: async (res) => {
-				const { id } = await res.json();
-				goto(`/services/${id}`);
-				// window.location.assign(`/services/${id}`);
-			}
-		}}
-	>
+	<form on:submit|preventDefault={handleSubmit}>
 		<div class="flex flex-col items-center space-y-4">
-			<input name="name" placeholder="Service name" required bind:this={autofocus} value={name} />
+			<input
+				name="name"
+				placeholder="Service name"
+				required
+				bind:this={autofocus}
+				bind:value={name}
+			/>
 			<button type="submit" class="bg-pink-600 hover:bg-pink-500">Save</button>
 		</div>
 	</form>

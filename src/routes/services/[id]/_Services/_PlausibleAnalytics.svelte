@@ -1,7 +1,7 @@
 <script lang="ts">
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-
 	export let service;
+	export let readOnly;
 </script>
 
 <div class="font-bold flex space-x-1 py-5">
@@ -13,10 +13,10 @@
 		<input
 			name="email"
 			id="email"
-			disabled={service.plausibleAnalytics.email}
-			readonly={service.plausibleAnalytics.email}
+			disabled={readOnly}
+			readonly={readOnly}
 			placeholder="Email address"
-			value={service.plausibleAnalytics.email}
+			bind:value={service.plausibleAnalytics.email}
 			required
 		/>
 	</div>
@@ -27,10 +27,10 @@
 		<input
 			name="username"
 			id="username"
-			disabled={service.plausibleAnalytics.username}
-			readonly={service.plausibleAnalytics.username}
+			disabled={readOnly}
+			readonly={readOnly}
 			placeholder="User to login"
-			value={service.plausibleAnalytics.username}
+			bind:value={service.plausibleAnalytics.username}
 			required
 		/>
 	</div>

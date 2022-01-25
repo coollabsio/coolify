@@ -3,18 +3,21 @@ import * as db from '$lib/database';
 import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const get: RequestHandler = async (request) => {
-    const { userId, status, body } = await getUserDetails(request, false);
+export const get: RequestHandler = async (event) => {
+    const { userId, status, body } = await getUserDetails(event, false);
     if (status === 401) return { status, body }
+
+    const { id } = event.params
+
     try {
-        const user = await db.prisma.user.findFirst({ where: { id: userId, teams: { some: { id: request.params.id } } }, include: { permission: true } })
+        const user = await db.prisma.user.findFirst({ where: { id: userId, teams: { some: { id } } }, include: { permission: true } })
         if (!user) {
             return {
                 status: 401
             }
         }
-        const permissions = await db.prisma.permission.findMany({ where: { teamId: request.params.id }, include: { user: { select: { id: true, email: true } } } })
-        const team = await db.prisma.team.findUnique({ where: { id: request.params.id }, include: { permissions: true } })
+        const permissions = await db.prisma.permission.findMany({ where: { teamId: id }, include: { user: { select: { id: true, email: true } } } })
+        const team = await db.prisma.team.findUnique({ where: { id }, include: { permissions: true } })
         const invitations = await db.prisma.teamInvitation.findMany({ where: { teamId: team.id } })
         return {
             body: {
@@ -23,25 +26,25 @@ export const get: RequestHandler = async (request) => {
                 invitations
             }
         };
-    } catch (err) {
-        return PrismaErrorHandler(err);
+    } catch (error) {
+        return PrismaErrorHandler(error);
     }
 }
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const { status, body } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+    const { status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
 
-    const { id } = request.params
-    const name = request.body.get('name')
-    
+    const { id } = event.params
+    const { name } = await event.request.json()
+
     try {
         await db.prisma.team.update({ where: { id }, data: { name: { set: name } } })
         return {
-            status: 200
+            status: 201
         }
-    } catch (err) {
-        return PrismaErrorHandler(err);
+    } catch (error) {
+        return PrismaErrorHandler(error);
     }
 
 }

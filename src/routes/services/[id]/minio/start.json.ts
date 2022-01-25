@@ -7,12 +7,13 @@ import { letsEncrypt } from '$lib/letsencrypt';
 import { configureSimpleServiceProxyOn, startHttpProxy, startTcpProxy } from '$lib/haproxy';
 import getPort from 'get-port';
 import { getDomain } from '$lib/components/common';
+import { PrismaErrorHandler } from '$lib/database';
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const { teamId, status, body } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+    const { teamId, status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
 
-    const { id } = request.params
+    const { id } = event.params
 
     try {
         const service = await db.getService({ id, teamId })
@@ -85,16 +86,11 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             }
         } catch (error) {
             console.log(error)
-            return {
-                status: 500,
-                body: {
-                    message: error
-                }
-            }
+            return PrismaErrorHandler(error)
         }
 
-    } catch (err) {
-        return err
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
 
 }

@@ -39,6 +39,7 @@
 	import { onMount } from 'svelte';
 	import { errorNotification } from '$lib/form';
 	import { asyncSleep } from '$lib/components/common';
+	import { del, get, post } from '$lib/api';
 
 	let isUpdateAvailable = false;
 	let updateStatus = {
@@ -48,88 +49,78 @@
 
 	onMount(async () => {
 		if ($session.uid) {
-			const response = await fetch(`/login.json`, {
-				method: 'GET',
-				headers: {
-					'Content-Type': 'application/json'
-				}
-			});
-			if (!response.ok) {
-				await fetch(`/logout.json`, {
-					method: 'delete'
-				});
-				browser && window.location.reload();
+			try {
+				await get(`/login.json`);
+			} catch ({ error }) {
+				await del(`/logout.json`, {});
+				window.location.reload();
+				return errorNotification(error);
 			}
 		}
 		if (!dev) {
-			const response = await fetch(`/update.json`, {
-				method: 'GET',
-				headers: {
-					'Content-Type': 'application/json'
-				}
-			});
-			const data = await response.json();
-			isUpdateAvailable = data.isUpdateAvailable;
+			try {
+				const data = await get(`/update.json`);
+				isUpdateAvailable = data.isUpdateAvailable;
+				return;
+			} catch ({ error }) {
+				await del(`/logout.json`, {});
+				window.location.reload();
+				return errorNotification(error);
+			}
 		} else {
 			isUpdateAvailable = true;
 		}
 	});
 	async function logout() {
-		await fetch(`/logout.json`, {
-			method: 'delete'
-		});
-		window.location.reload();
+		try {
+			await del(`/logout.json`, {});
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
 	}
 	async function switchTeam() {
-		const form = new FormData();
-		form.append('cookie', 'teamId');
-		form.append('value', selectedTeamId);
-		const response = await fetch(`/index.json?from=${$page.url.pathname}`, {
-			method: 'POST',
-			body: form
-		});
-		if (!response.ok) {
-			const { message } = await response.json();
-			errorNotification(message);
-			return;
+		try {
+			await post(`/index.json?from=${$page.url.pathname}`, {
+				cookie: 'teamId',
+				value: selectedTeamId
+			});
+			return window.location.reload();
+		} catch (error) {
+			return window.location.reload();
 		}
-		window.location.reload();
 	}
 
 	async function update() {
 		updateStatus.loading = true;
-		const response = await fetch(`/update.json`, {
-			method: 'post'
-		});
-		if (!response.ok) {
-			const { message } = await response.json();
-			errorNotification(message);
+		try {
+			await post(`/update.json`, {});
+			toast.push('Update completed.');
+			toast.push('Waiting for the new version to start...');
+			let reachable = false;
+			let tries = 0;
+			do {
+				await asyncSleep(1000);
+				try {
+					const data = await get(`/undead.json`, {});
+					reachable = data.ok;
+				} catch (_) {
+					reachable = false;
+				}
+				if (reachable) break;
+				tries++;
+			} while (!reachable || tries < 120);
+			toast.push('New version reachable. Reloading...');
+			updateStatus.loading = false;
+			updateStatus.success = true;
+			await asyncSleep(3000);
+			window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
+		} finally {
 			updateStatus.success = false;
 			updateStatus.loading = false;
-			return;
 		}
-
-		toast.push('Update completed.');
-		toast.push('Waiting for the new version to start...');
-
-		let reachable = false;
-		let tries = 0;
-		do {
-			await asyncSleep(1000);
-			try {
-				const response = await fetch(`/undead.json`);
-				reachable = response.ok;
-			} catch (error) {
-				reachable = false;
-			}
-			if (reachable) break;
-			tries++;
-		} while (!reachable || tries < 120);
-		toast.push('New version reachable. Reloading...');
-		updateStatus.loading = false;
-		updateStatus.success = true;
-		await asyncSleep(3000);
-		window.location.reload();
 	}
 </script>
 

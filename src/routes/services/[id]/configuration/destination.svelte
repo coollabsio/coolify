@@ -31,13 +31,22 @@
 	import type Prisma from '@prisma/client';
 
 	import { page } from '$app/stores';
-	import { enhance } from '$lib/form';
+	import { enhance, errorNotification } from '$lib/form';
 	import { goto } from '$app/navigation';
+	import { post } from '$lib/api';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
 
 	export let destinations: Prisma.DestinationDocker[];
+	async function handleSubmit(destinationId) {
+		try {
+			await post(`/services/${id}/configuration/destination.json`, { destinationId });
+			return await goto(from || `/services/${id}`);
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
@@ -69,16 +78,7 @@
 		<div class="flex flex-wrap justify-center">
 			{#each destinations as destination}
 				<div class="p-2">
-					<form
-						action="/services/{id}/configuration/destination.json"
-						method="post"
-						use:enhance={{
-							result: async () => {
-								goto(from || `/services/${id}`);
-							}
-						}}
-					>
-						<input class="hidden" name="destinationId" value={destination.id} />
+					<form on:submit|preventDefault={() => handleSubmit(destination.id)}>
 						<button type="submit" class="box-selection hover:bg-sky-700 font-bold">
 							<div class="font-bold text-xl text-center truncate">{destination.name}</div>
 							<div class="text-center truncate">{destination.network}</div>

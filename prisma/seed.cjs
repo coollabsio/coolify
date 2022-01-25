@@ -2,9 +2,8 @@ const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient();
 
 async function main() {
-	// Create default settings
-	const found = await prisma.setting.findUnique({ where: { name: 'isRegistrationEnabled' } })
-	if (!found) await prisma.setting.create({ data: { name: 'isRegistrationEnabled', value: 'true' } });
+	const found = await prisma.setting.findFirst({ where: { isRegistrationEnabled: { not: null } } })
+	if (!found) await prisma.setting.create({ data: { isRegistrationEnabled: false } });
 }
 main()
 	.catch((e) => {

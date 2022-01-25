@@ -1,21 +1,23 @@
-import {  getUserDetails } from '$lib/common';
+import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
+import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const { status, body } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+    const { status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
-    const { id } = request.params
 
-    const name = request.body.get('name') || undefined
-    const fqdn = request.body.get('fqdn')?.toLocaleLowerCase() || undefined
-    const email = request.body.get('email')?.toLocaleLowerCase() || undefined
-    const username = request.body.get('username') || undefined
+    const { id } = event.params
+    let { name, fqdn, plausibleAnalytics: { email, username } } = await event.request.json()
+
+    if (fqdn) fqdn = fqdn.toLowerCase()
+    if (email) email = email.toLowerCase()
 
     try {
-        return await db.updatePlausibleAnalyticsService({ id, fqdn, name, email, username })
-    } catch (err) {
-        return err
+        await db.updatePlausibleAnalyticsService({ id, fqdn, name, email, username })
+        return { status: 201 }
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
 
 }

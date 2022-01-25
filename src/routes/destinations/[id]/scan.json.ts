@@ -13,28 +13,28 @@ export const get: RequestHandler = async (request) => {
     const docker = dockerInstance({ destinationDocker })
     const listContainers = await docker.engine.listContainers({ filters: { network: [destinationDocker.network] } })
     const containers = listContainers.filter((container) => {
-        return container.Labels['coolify.configuration']  
+        return container.Labels['coolify.configuration']
     })
     const jsonContainers = containers.map(container => JSON.parse(Buffer.from(container.Labels['coolify.configuration'], 'base64').toString())).filter(container => container.type === 'manual')
     return {
         body: {
-            containers:jsonContainers
+            containers: jsonContainers
         }
     };
 }
 
 export const post: RequestHandler<Locals, FormData> = async (request) => {
-        const { teamId, status, body } = await getUserDetails(request);
+    const { teamId, status, body } = await getUserDetails(request);
     if (status === 401) return { status, body }
-    
+
     const { id } = request.params
     const fqdn = request.body.get('fqdn')?.toLocaleLowerCase() || undefined
     const projectId = Number(request.body.get('projectId')) || undefined
     const repository = request.body.get('repository') || undefined
     const branch = request.body.get('branch') || undefined
     try {
-        const foundByDomain = await db.prisma.application.findFirst({ where: { fqdn }, rejectOnNotFound: false })
-        const foundByRepository = await db.prisma.application.findFirst({ where: { repository, branch, projectId }, rejectOnNotFound: false })
+        const foundByDomain = await db.prisma.application.findFirst({ where: { fqdn } })
+        const foundByRepository = await db.prisma.application.findFirst({ where: { repository, branch, projectId } })
         if (foundByDomain) {
             return {
                 status: 200,

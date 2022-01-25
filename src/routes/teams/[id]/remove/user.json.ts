@@ -3,21 +3,20 @@ import * as db from '$lib/database';
 import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const { userId, status, body } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+    const { userId, status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
 
-    const teamId = request.body.get('teamId')
-    const uid = request.body.get('uid')
-
+    const { teamId, uid } = await event.request.json()
+    
     try {
         await db.prisma.team.update({ where: { id: teamId }, data: { users: { disconnect: { id: uid } } } })
         await db.prisma.permission.deleteMany({ where: { userId: uid, teamId } })
         return {
-            status: 200
+            status: 201
         }
-    } catch(err) {
-        return PrismaErrorHandler(err)
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
-    
+
 }

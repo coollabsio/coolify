@@ -22,37 +22,26 @@
 <script lang="ts">
 	import { errorNotification } from '$lib/form';
 	import { session } from '$app/stores';
+	import { post } from '$lib/api';
 
 	export let teams;
 	export let invitations;
 
 	async function acceptInvitation(id, teamId) {
-		const form = new FormData();
-		form.append('id', id);
-		const response = await fetch(`/teams/${teamId}/invitation/accept.json`, {
-			method: 'post',
-			body: form
-		});
-		if (!response.ok) {
-			const { message } = await response.json();
-			errorNotification(message);
-			return;
+		try {
+			await post(`/teams/${teamId}/invitation/accept.json`, { id });
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
-		window.location.reload();
 	}
 	async function revokeInvitation(id, teamId) {
-		const form = new FormData();
-		form.append('id', id);
-		const response = await fetch(`/teams/${teamId}/invitation/revoke.json`, {
-			method: 'post',
-			body: form
-		});
-		if (!response.ok) {
-			const { message } = await response.json();
-			errorNotification(message);
-			return;
+		try {
+			await post(`/teams/${teamId}/invitation/revoke.json`, { id });
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
-		window.location.reload();
 	}
 </script>
 

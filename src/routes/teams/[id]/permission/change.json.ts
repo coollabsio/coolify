@@ -1,24 +1,21 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { PrismaErrorHandler } from '$lib/database';
-import { dayjs } from '$lib/dayjs';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const { status, body } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+    const { status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
 
-    const userId = request.body.get('userId')
-    const newPermission = request.body.get('newPermission')
-    const permissionId = request.body.get('permissionId')
-    
+    const { userId, newPermission, permissionId } = await event.request.json()
+
     try {
         await db.prisma.permission.updateMany({ where: { id: permissionId, userId }, data: { permission: { set: newPermission } } })
         return {
-            status: 200
+            status: 201
         }
-    } catch (err) {
-        return PrismaErrorHandler(err)
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
 
 }

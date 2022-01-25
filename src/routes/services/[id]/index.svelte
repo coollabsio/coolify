@@ -5,7 +5,8 @@
 			return {
 				props: {
 					service: stuff.service,
-					isRunning: stuff.isRunning
+					isRunning: stuff.isRunning,
+					readOnly: stuff.readOnly
 				}
 			};
 		}
@@ -38,6 +39,7 @@
 
 	export let service;
 	export let isRunning;
+	export let readOnly;
 </script>
 
 <div class="font-bold flex space-x-1 p-5 px-6 text-2xl items-center">
@@ -62,4 +64,4 @@
 	{/if}
 </div>
 
-<Services {service} {isRunning} />
+<Services bind:service {isRunning} {readOnly} />

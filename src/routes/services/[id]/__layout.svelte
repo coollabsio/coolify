@@ -12,6 +12,7 @@
 		return configurationPhase;
 	}
 	export const load: Load = async ({ fetch, params, url }) => {
+		let readOnly = false;
 		const endpoint = `/services/${params.id}.json`;
 		const res = await fetch(endpoint);
 		if (res.ok) {
@@ -32,6 +33,9 @@
 					redirect: `/services/${params.id}/configuration/${configurationPhase}`
 				};
 			}
+			if (service.plausibleAnalytics?.email && service.plausibleAnalytics.username) readOnly = true;
+			if (service.wordpress?.mysqlDatabase) readOnly = true;
+
 			return {
 				props: {
 					service,
@@ -39,7 +43,8 @@
 				},
 				stuff: {
 					service,
-					isRunning
+					isRunning,
+					readOnly
 				}
 			};
 		}
@@ -56,34 +61,26 @@
 	import { errorNotification } from '$lib/form';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import Loading from '$lib/components/Loading.svelte';
+	import { del, post } from '$lib/api';
+	import { goto } from '$app/navigation';
 
 	export let service;
 	export let isRunning;
+
 	let loading = false;
 
 	async function deleteService() {
 		const sure = confirm(`Are you sure you would like to delete '${service.name}'?`);
 		if (sure) {
 			loading = true;
-			const responseStop = await fetch(`/services/${service.id}/${service.type}/stop.json`, {
-				method: 'POST'
-			});
-			if (!responseStop.ok) {
+			try {
+				await post(`/services/${service.id}/${service.type}/stop.json`, {});
+				await del(`/services/${service.id}/delete.json`, { id: service.id });
+				return await goto(`/services`);
+			} catch ({ error }) {
+				return errorNotification(error);
+			} finally {
 				loading = false;
-				const { message } = await responseStop.json();
-				errorNotification(message);
-			} else {
-				const responseDelete = await fetch(`/services/${service.id}/delete.json`, {
-					method: 'delete',
-					body: JSON.stringify({ id: service.id })
-				});
-				if (!responseDelete.ok) {
-					const { message } = await responseDelete.json();
-					loading = false;
-					errorNotification(message);
-				} else {
-					window.location.assign('/services');
-				}
 			}
 		}
 	}
@@ -91,29 +88,25 @@
 		const sure = confirm(`Are you sure you would like to stop '${service.name}'?`);
 		if (sure) {
 			loading = true;
-			const response = await fetch(`/services/${service.id}/${service.type}/stop.json`, {
-				method: 'POST'
-			});
-			if (!response.ok) {
+			try {
+				await post(`/services/${service.id}/${service.type}/stop.json`, {});
+				return window.location.reload();
+			} catch ({ error }) {
+				return errorNotification(error);
+			} finally {
 				loading = false;
-				const { message } = await response.json();
-				errorNotification(message);
-			} else {
-				window.location.reload();
 			}
 		}
 	}
 	async function startService() {
 		loading = true;
-		const response = await fetch(`/services/${service.id}/${service.type}/start.json`, {
-			method: 'POST'
-		});
-		if (!response.ok) {
+		try {
+			await post(`/services/${service.id}/${service.type}/start.json`, {});
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
+		} finally {
 			loading = false;
-			const { message } = await response.json();
-			errorNotification(message);
-		} else {
-			window.location.reload();
 		}
 	}
 </script>

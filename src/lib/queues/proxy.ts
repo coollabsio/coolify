@@ -23,11 +23,12 @@ export default async function () {
             }
         }
     }
-    const domain = await prisma.setting.findUnique({ where: { name: 'domain' }, rejectOnNotFound: false })
-    if (domain) {
+    const { fqdn } = await prisma.setting.findFirst({})
+    if (fqdn) {
+        const domain = getDomain(fqdn)
         const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy')
         if (!found) await startCoolifyProxy('/var/run/docker.sock')
-        await configureCoolifyProxyOn({ domain: domain.value })
+        await configureCoolifyProxyOn({ domain })
     }
 
 }
