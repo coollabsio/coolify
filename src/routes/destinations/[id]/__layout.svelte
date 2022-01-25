@@ -34,20 +34,18 @@
 	import { session } from '$app/stores';
 	import { errorNotification } from '$lib/form';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
+	import { del } from '$lib/api';
+	import { goto } from '$app/navigation';
 
 	export let destination;
 	async function deleteDestination(destination) {
 		const sure = confirm(`Are you sure you would like to delete '${destination.name}'?`);
 		if (sure) {
-			const response = await fetch(`/destinations/${destination.id}.json`, {
-				method: 'delete',
-				body: JSON.stringify({ id: destination.id })
-			});
-			if (!response.ok) {
-				const { message } = await response.json();
-				errorNotification(message);
-			} else {
-				window.location.assign('/destinations');
+			try {
+				await del(`/destinations/${destination.id}.json`, { id: destination.id });
+				return await goto('/destinations');
+			} catch ({ error }) {
+				return errorNotification(error);
 			}
 		}
 	}

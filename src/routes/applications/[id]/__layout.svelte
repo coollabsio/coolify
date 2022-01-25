@@ -17,7 +17,7 @@
 		const endpoint = `/applications/${params.id}.json`;
 		const res = await fetch(endpoint);
 		if (res.ok) {
-			const { application, githubToken, ghToken } = await res.json();
+			const { application, githubToken, ghToken, isRunning } = await res.json();
 			if (!application || Object.entries(application).length === 0) {
 				return {
 					status: 302,
@@ -37,9 +37,11 @@
 
 			return {
 				props: {
-					application
+					application,
+					isRunning
 				},
 				stuff: {
+					isRunning,
 					ghToken,
 					githubToken,
 					application
@@ -56,37 +58,44 @@
 
 <script lang="ts">
 	export let application;
+	export let isRunning;
 	import { page, session } from '$app/stores';
-	import { enhance, errorNotification } from '$lib/form';
-	import { appConfiguration } from '$lib/store';
+	import { errorNotification } from '$lib/form';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import Loading from '$lib/components/Loading.svelte';
-	import { post } from '$lib/api';
+	import { del, post } from '$lib/api';
 	import { goto } from '$app/navigation';
 
 	let loading = false;
 	const { id } = $page.params;
 
 	async function handleDeploySubmit() {
-		const { buildId } = await post(`/applications/{id}/deploy.json`, { ...application });
-		return await goto(`/applications/${id}/logs/build?buildId=${buildId}`);
+		try {
+			const { buildId } = await post(`/applications/${id}/deploy.json`, { ...application });
+			return await goto(`/applications/${id}/logs/build?buildId=${buildId}`);
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
 	}
 
 	async function deleteApplication(name) {
 		const sure = confirm(`Are you sure you would like to delete '${name}'?`);
 		if (sure) {
 			loading = true;
-			const response = await fetch(`/applications/${id}/delete.json`, {
-				method: 'delete',
-				body: JSON.stringify({ id })
-			});
-			if (!response.ok) {
-				const { message } = await response.json();
-				loading = false;
-				errorNotification(message);
-			} else {
-				window.location.assign('/applications');
+			try {
+				await del(`/applications/${id}/delete.json`, { id });
+				return await goto(`/applications`);
+			} catch ({ error }) {
+				return errorNotification(error);
 			}
+		}
+	}
+	async function stopApplication() {
+		try {
+			await post(`/applications/${id}/stop.json`, {});
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
 	}
 </script>
@@ -96,19 +105,16 @@
 		<Loading fullscreen cover />
 	{:else}
 		{#if application.fqdn && application.gitSource && application.repository && application.destinationDocker && application.buildPack}
-			<form on:submit|preventDefault={handleDeploySubmit}>
+			{#if isRunning}
 				<button
-					title="Queue for deployment"
+					on:click={stopApplication}
+					title="Stop application"
 					type="submit"
 					disabled={!$session.isAdmin}
-					class:text-green-500={$session.isAdmin &&
-						application.gitSource &&
-						application.repository &&
-						application.destinationDocker}
 					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-green-600 hover:text-white"
 					data-tooltip={$session.isAdmin
-						? 'Queue for deployment'
-						: 'You do not have permission to deploy.'}
+						? 'Stop application'
+						: 'You do not have permission to stop the application.'}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -121,12 +127,65 @@
 						stroke-linejoin="round"
 					>
 						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-1" />
-						<polyline points="9 15 12 12 15 15" />
-						<line x1="12" y1="12" x2="12" y2="21" />
+						<rect x="6" y="5" width="4" height="14" rx="1" />
+						<rect x="14" y="5" width="4" height="14" rx="1" />
 					</svg>
 				</button>
-			</form>
+				<form on:submit|preventDefault={handleDeploySubmit}>
+					<button
+						title="Rebuild application"
+						type="submit"
+						disabled={!$session.isAdmin}
+						class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-green-600 hover:text-white"
+						data-tooltip={$session.isAdmin
+							? 'Rebuild application'
+							: 'You do not have permission to rebuild application.'}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="w-6 h-6"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<path
+								d="M16.3 5h.7a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h5l-2.82 -2.82m0 5.64l2.82 -2.82"
+								transform="rotate(-45 12 12)"
+							/>
+						</svg>
+					</button>
+				</form>
+			{:else}
+				<form on:submit|preventDefault={handleDeploySubmit}>
+					<button
+						title="Build and start application"
+						type="submit"
+						disabled={!$session.isAdmin}
+						class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-green-600 hover:text-white"
+						data-tooltip={$session.isAdmin
+							? 'Build and start application'
+							: 'You do not have permission to Build and start application.'}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="w-6 h-6"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<path d="M7 4v16l13 -8z" />
+						</svg>
+					</button>
+				</form>
+			{/if}
 
 			<div class="border border-stone-700 h-8" />
 			<a

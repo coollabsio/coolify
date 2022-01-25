@@ -5,52 +5,21 @@
 	import { page } from '$app/stores';
 	import Setting from '$lib/components/Setting.svelte';
 	import { errorNotification } from '$lib/form';
-	import FoundApp from './_FoundApp.svelte';
+	import { post } from '$lib/api';
+	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	const { id } = $page.params;
 
-	let formEl: HTMLFormElement;
-	let payload = {
-		name: undefined,
-		remoteEngine: false,
-		engine: undefined,
-		user: 'root',
-		port: 22,
-		privateKey: null,
-		network: undefined,
-		isCoolifyProxyUsed: false
-	};
 	// let scannedApps = [];
 	let loading = false;
-	if (destination) {
-		payload = {
-			name: destination.name,
-			remoteEngine: destination.remoteEngine,
-			engine: destination.engine,
-			user: destination.user,
-			port: destination.port,
-			privateKey: destination.privateKey,
-			network: destination.network,
-			isCoolifyProxyUsed: destination.isCoolifyProxyUsed
-		};
-	}
-
-	async function submitForm() {
+	async function handleSubmit() {
 		loading = true;
-		const saveForm = new FormData(formEl);
-		saveForm.append('isCoolifyProxyUsed', payload.isCoolifyProxyUsed.toString());
-
-		const saveFormResponse = await fetch(`/destinations/${id}.json`, {
-			method: 'POST',
-			headers: {
-				accept: 'application/json'
-			},
-			body: saveForm
-		});
-		if (!saveFormResponse.ok) {
-			const err = await saveFormResponse.json();
-			return errorNotification(err.message);
+		try {
+			return await post(`/destinations/${id}.json`, { ...destination });
+		} catch ({ error }) {
+			return errorNotification(error);
+		} finally {
+			loading = false;
 		}
-		window.location.reload();
 	}
 	// async function scanApps() {
 	// 	scannedApps = [];
@@ -59,96 +28,52 @@
 	// 	scannedApps = containers;
 	// }
 	async function changeProxySetting() {
-		if (payload.isCoolifyProxyUsed === true) {
+		const isProxyActivated = destination.isCoolifyProxyUsed;
+		if (isProxyActivated) {
 			const sure = confirm(
 				`Are you sure you want to ${
-					payload.isCoolifyProxyUsed ? 'disable' : 'enable'
+					destination.isCoolifyProxyUsed ? 'disable' : 'enable'
 				} Coolify proxy? It will remove the proxy for all configured networks and all deployments on '${
-					payload.engine
+					destination.engine
 				}'! Nothing will be reachable if you do it!`
 			);
-			if (sure) {
-				payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed;
-				const saveForm = new FormData(formEl);
-				saveForm.append('isCoolifyProxyUsed', payload.isCoolifyProxyUsed.toString());
-				saveForm.append('engine', payload.engine);
-
-				const saveFormResponse = await fetch(`/destinations/${id}/settings.json`, {
-					method: 'POST',
-					headers: {
-						accept: 'application/json'
-					},
-					body: saveForm
-				});
-				if (!saveFormResponse.ok) {
-					const err = await saveFormResponse.json();
-					return errorNotification(err.message);
-				}
-				await stopProxy();
-			}
-		} else {
-			payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed;
-			const saveForm = new FormData(formEl);
-			saveForm.append('isCoolifyProxyUsed', payload.isCoolifyProxyUsed.toString());
-			saveForm.append('engine', payload.engine);
-
-			const saveFormResponse = await fetch(`/destinations/${id}/settings.json`, {
-				method: 'POST',
-				headers: {
-					accept: 'application/json'
-				},
-				body: saveForm
+			if (!sure) return;
+		}
+		destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
+		try {
+			await post(`/destinations/${id}/settings.json`, {
+				isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
+				engine: destination.engine
 			});
-			if (!saveFormResponse.ok) {
-				const err = await saveFormResponse.json();
-				return errorNotification(err.message);
+			if (isProxyActivated) {
+				await stopProxy();
+			} else {
+				await startProxy();
 			}
-			await startProxy();
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
 	}
 	async function stopProxy() {
-		const saveForm = new FormData(formEl);
-		saveForm.append('engine', payload.engine);
-
-		const saveFormResponse = await fetch(`/destinations/${id}/stop.json`, {
-			method: 'POST',
-			headers: {
-				accept: 'application/json'
-			},
-			body: saveForm
-		});
-		if (!saveFormResponse.ok) {
-			const err = await saveFormResponse.json();
-			return errorNotification(err.message);
+		try {
+			await post(`/destinations/${id}/stop.json`, { engine: destination.engine });
+			return toast.push('Coolify Proxy stopped!');
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
-		toast.push('Coolify Proxy stopped!');
 	}
 	async function startProxy() {
-		const saveForm = new FormData(formEl);
-		saveForm.append('engine', payload.engine);
-
-		const saveFormResponse = await fetch(`/destinations/${id}/start.json`, {
-			method: 'POST',
-			headers: {
-				accept: 'application/json'
-			},
-			body: saveForm
-		});
-		if (!saveFormResponse.ok) {
-			const err = await saveFormResponse.json();
-			return errorNotification(err.message);
+		try {
+			await post(`/destinations/${id}/start.json`, { engine: destination.engine });
+			return toast.push('Coolify Proxy started!');
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
-		toast.push('Coolify Proxy started!');
 	}
 </script>
 
 <div class="flex justify-center pb-8 px-6">
-	<form
-		on:submit|preventDefault={submitForm}
-		bind:this={formEl}
-		method="post"
-		class="grid grid-flow-row gap-2 py-4"
-	>
+	<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
 		<div class="flex space-x-2 h-8 items-center">
 			<div class="font-bold text-xl text-white">Configuration</div>
 			<button
@@ -166,18 +91,20 @@
 		<div class="grid grid-cols-3 items-center">
 			<label for="name">Name</label>
 			<div class="col-span-2">
-				<input name="name" placeholder="name" bind:value={payload.name} />
+				<input name="name" placeholder="name" bind:value={destination.name} />
 			</div>
 		</div>
 
 		<div class="grid grid-cols-3 items-center">
 			<label for="engine">Engine</label>
 			<div class="col-span-2">
-				<input
+				<CopyPasswordField
+					id="engine"
 					readonly
+					disabled
 					name="engine"
 					placeholder="eg: /var/run/docker.sock"
-					bind:value={payload.engine}
+					value={destination.engine}
 				/>
 			</div>
 		</div>
@@ -188,22 +115,24 @@
 		<div class="grid grid-cols-3 items-center">
 			<label for="network">Network</label>
 			<div class="col-span-2">
-				<input
+				<CopyPasswordField
+					id="network"
 					readonly
+					disabled
 					name="network"
 					placeholder="default: coolify"
-					bind:value={payload.network}
+					value={destination.network}
 				/>
 			</div>
 		</div>
 		<div class="flex justify-start">
 			<ul class="mt-2 divide-y divide-stone-800">
 				<Setting
-					bind:setting={payload.isCoolifyProxyUsed}
+					bind:setting={destination.isCoolifyProxyUsed}
 					on:click={changeProxySetting}
 					isPadding={false}
 					title="Use Coolify Proxy?"
-					description="This will install a proxy on the destination to allow you to access your applications and services without any manual configuration (recommended for Docker). Databases will have their own proxy."
+					description="This will install a proxy on the destination to allow you to access your applications and services without any manual configuration. Databases will have their own proxy."
 				/>
 			</ul>
 		</div>

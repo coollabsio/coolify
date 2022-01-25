@@ -33,7 +33,7 @@
 	async function handleSubmit() {
 		try {
 			const { id } = await post('/new/application.json', { name });
-			return await goto(`/application/${id}`);
+			return await goto(`/applications/${id}`);
 		} catch ({ error }) {
 			return errorNotification(error);
 		}

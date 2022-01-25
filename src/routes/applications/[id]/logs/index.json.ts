@@ -1,14 +1,15 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
+import { PrismaErrorHandler } from '$lib/database';
 import { dayjs } from '$lib/dayjs';
 import { dockerInstance } from '$lib/docker';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const get: RequestHandler = async (request) => {
-    const { status, body } = await getUserDetails(request);
+export const get: RequestHandler = async (event) => {
+    const { status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
 
-    const { id } = request.params
+    const { id } = event.params
     try {
         const { destinationDockerId, destinationDocker } = await db.prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
         if (destinationDockerId) {
@@ -35,20 +36,15 @@ export const get: RequestHandler = async (request) => {
                     }
                 }
             }
-
         }
-    } catch (err) {
         return {
-            status: 500,
+            status: 200,
             body: {
-                message: err.message || err || 'An error occurred while fetching logs.'
+                message: 'No logs found.'
             }
         }
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
-    return {
-        status: 500,
-        body: {
-            message: 'No logs found.'
-        }
-    }
+
 }

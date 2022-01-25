@@ -4,46 +4,26 @@
 	export let isBuildSecret = false;
 	export let isNewSecret = false;
 	import { page } from '$app/stores';
+	import { del, post } from '$lib/api';
 	import { errorNotification } from '$lib/form';
 
 	if (name) value = 'ENCRYPTED';
 	const { id } = $page.params;
 
 	async function removeSecret() {
-		const form = new FormData();
-		form.append('name', name);
-
 		try {
-			const response = await fetch(`/applications/${id}/secrets.json`, {
-				method: 'DELETE',
-				body: form
-			});
-			if (!response.ok) {
-				const error = await response.json();
-				return errorNotification(error.message || 'An error occurred while deleting the secret');
-			}
-			window.location.reload();
-		} catch (err) {
-			return errorNotification(err.message || 'An error occurred while deleting the secret');
+			await del(`/applications/${id}/secrets.json`, { name });
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
 	}
 	async function saveSecret() {
-		const form = new FormData();
-		form.append('name', name);
-		form.append('value', value);
-		form.append('isBuildSecret', isBuildSecret.toString());
 		try {
-			const response = await fetch(`/applications/${id}/secrets.json`, {
-				method: 'POST',
-				body: form
-			});
-			if (!response.ok) {
-				const error = await response.json();
-				return errorNotification(error.message || 'An error occurred while saving the secret');
-			}
-			window.location.reload();
-		} catch (err) {
-			return errorNotification(err.message || 'An error occurred while saving the secret');
+			await post(`/applications/${id}/secrets.json`, { name, value, isBuildSecret });
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
 	}
 	function setSecretValue() {
@@ -62,8 +42,8 @@
 				bind:value={name}
 				placeholder="EXAMPLE_VARIABLE"
 				class="w-64 border-2 border-transparent"
-                readonly={!isNewSecret}
-                class:hover:bg-coolgray-200={!isNewSecret}
+				readonly={!isNewSecret}
+				class:hover:bg-coolgray-200={!isNewSecret}
 				class:cursor-not-allowed={!isNewSecret}
 			/>
 		</div>

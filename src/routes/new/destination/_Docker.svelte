@@ -3,61 +3,27 @@
 
 	export let payload;
 
-	import { page } from '$app/stores';
-	import Explainer from '$lib/components/Explainer.svelte';
+	import { post } from '$lib/api';
 	import Setting from '$lib/components/Setting.svelte';
 	import { enhance, errorNotification } from '$lib/form';
 
-	let formEl: HTMLFormElement;
 	let loading = false;
 
-	async function submitForm() {
-		const networkCheckForm = new FormData();
-		networkCheckForm.append('network', payload.network);
-
-		const networkCheckResponse = await fetch(`/new/destination/check.json`, {
-			method: 'POST',
-			headers: {
-				accept: 'application/json'
-			},
-			body: networkCheckForm
-		});
-		if (networkCheckResponse.ok) {
-			return errorNotification(
-				`A destination with '${payload.network}' network is already configured.`
-			);
+	async function handleSubmit() {
+		try {
+			await post('/new/destination/check.json', { network: payload.network });
+			const { id } = await post('/new/destination/docker.json', {
+				...payload
+			});
+			return await goto(`/destinations/${id}`);
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
-		const saveForm = new FormData(formEl);
-		saveForm.append('isCoolifyProxyUsed', payload.isCoolifyProxyUsed.toString());
-
-		const saveFormResponse = await fetch(`/new/destination/docker.json`, {
-			method: 'POST',
-			headers: {
-				accept: 'application/json'
-			},
-			body: saveForm
-		});
-		if (!saveFormResponse.ok) {
-			return errorNotification(await saveFormResponse.json());
-		}
-		const { id } = await saveFormResponse.json();
-		goto(`/destinations/${id}`);
-		// window.location.assign(`/destinations/${id}`);
 	}
 </script>
 
 <div class="flex justify-center pb-8 px-6">
-	<form
-		on:submit|preventDefault={submitForm}
-		bind:this={formEl}
-		method="post"
-		class="grid grid-flow-row gap-2 py-4"
-		use:enhance={{
-			pending: async () => {
-				loading = true;
-			}
-		}}
-	>
+	<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
 		<div class="flex space-x-2 h-8 items-center">
 			<div class="font-bold text-xl text-white">Configuration</div>
 			<button

@@ -24,7 +24,7 @@
 	}
 </script>
 
-<form on:submit={() => handleSubmit(buildPack.name)}>
+<form on:submit|preventDefault={() => handleSubmit(buildPack.name)}>
 	<button
 		type="submit"
 		class="relative box-selection text-xl font-bold flex {buildPack.hoverColor} {foundConfig?.buildPack ===

@@ -13,7 +13,13 @@ export const get: RequestHandler<Locals> = async (event) => {
     const branch = event.url.searchParams.get('branch')?.toLocaleLowerCase() || undefined
 
     try {
-        return await db.isBranchAlreadyUsed({ repository, branch, id })
+        const found = await db.isBranchAlreadyUsed({ repository, branch, id })
+        return {
+            status: found ? 500 : 200,
+            body: {
+                error: found && 'Branch already used.'
+            }
+        }
     } catch (error) {
         return PrismaErrorHandler(error)
     }
@@ -31,7 +37,8 @@ export const post: RequestHandler<Locals> = async (event) => {
     projectId = Number(projectId)
 
     try {
-        return await db.configureGitRepository({ id, repository, branch, projectId, webhookToken })
+        await db.configureGitRepository({ id, repository, branch, projectId, webhookToken })
+        return { status: 201 }
     } catch (error) {
         return PrismaErrorHandler(error)
     }

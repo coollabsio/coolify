@@ -4,7 +4,7 @@ async function send({ method, path, data = {}, headers }) {
 		let parsedData = data
 		for (const [key, value] of Object.entries(data)) {
 			if (value === '') {
-				parsedData[key] = undefined
+				parsedData[key] = null
 			}
 		}
 		if (parsedData) {
@@ -29,8 +29,8 @@ export function get(path, headers = {}) {
 	return send({ method: 'GET', path, headers });
 }
 
-export function del(path, headers = {}) {
-	return send({ method: 'DELETE', path, headers });
+export function del(path, data, headers = {}) {
+	return send({ method: 'DELETE', path, data, headers });
 }
 
 export function post(path, data, headers = {}) {

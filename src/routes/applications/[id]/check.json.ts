@@ -13,10 +13,14 @@ export const post: RequestHandler<Locals> = async (event) => {
     fqdn = fqdn.toLowerCase()
 
     try {
-        return await db.isDomainConfigured({ id, fqdn })
-
+        const found = await db.isDomainConfigured({ id, fqdn })
+        return {
+            status: found ? 500 : 200,
+            body: {
+                error: found && `Domain ${fqdn} is already configured`
+            }
+        }
     } catch (error) {
-        console.log(error)
         return PrismaErrorHandler(error)
     }
 }

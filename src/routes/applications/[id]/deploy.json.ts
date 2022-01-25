@@ -3,13 +3,14 @@ import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid'
 import crypto from 'crypto';
 import { buildQueue } from '$lib/queues';
-import { getTeam, getUserDetails } from '$lib/common';
+import { getUserDetails } from '$lib/common';
+import { PrismaErrorHandler } from '$lib/database';
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const { teamId, status, body } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+    const { teamId, status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
-    
-    const { id } = request.params
+
+    const { id } = event.params
     try {
         const buildId = cuid()
         const applicationFound = await db.getApplication({ id, teamId })
@@ -36,11 +37,6 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             }
         }
     } catch (error) {
-        return {
-            status: 302,
-            headers: {
-                Location: `/applications/${id}`
-            }
-        }
+        return PrismaErrorHandler(error)
     }
 }

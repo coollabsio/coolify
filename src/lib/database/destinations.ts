@@ -43,104 +43,78 @@ export async function configureDestinationForDatabase({ id, destinationId }) {
     }
 }
 export async function updateDestination({ id, name, engine, network }) {
-    try {
-        await prisma.destinationDocker.update({ where: { id }, data: { name, engine, network, } })
-        return { status: 200 }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
-    }
+    return await prisma.destinationDocker.update({ where: { id }, data: { name, engine, network } })
 }
 
 
 export async function newDestination({ name, teamId, engine, network, isCoolifyProxyUsed }) {
-    try {
-        const host = getEngine(engine)
-        const { stdout: found } = await asyncExecShell(`DOCKER_HOST=${host} docker network ls --filter name=${network} --format '{{json .Name}}'`)
-        if (!found) {
-            await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable ${network}`)
-        }
-        await prisma.destinationDocker.create({ data: { name, teams: { connect: { id: teamId } }, engine, network, isCoolifyProxyUsed } })
-        const destinations = await prisma.destinationDocker.findMany({ where: { engine } })
-        const destination = destinations.find(destination => destination.network === network)
-
-        if (destinations.length > 0) {
-            const proxyConfigured = destinations.find(destination => destination.network !== network && destination.isCoolifyProxyUsed === true)
-            if (proxyConfigured) {
-                if (proxyConfigured.isCoolifyProxyUsed) {
-                    isCoolifyProxyUsed = true
-                } else {
-                    isCoolifyProxyUsed = false
-                }
-            }
-            await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } })
-        }
-        if (isCoolifyProxyUsed) await startCoolifyProxy(engine)
-        return {
-            status: 201, body: { id: destination.id }
-        }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
+    const host = getEngine(engine)
+    const docker = dockerInstance({ destinationDocker: { engine, network } })
+    const found = await docker.engine.listNetworks({ filters: { name: [`^${network}$`] } })
+    console.log(found)
+    if (found.length === 0) {
+        await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable ${network}`)
     }
+    await prisma.destinationDocker.create({ data: { name, teams: { connect: { id: teamId } }, engine, network, isCoolifyProxyUsed } })
+    const destinations = await prisma.destinationDocker.findMany({ where: { engine } })
+    const destination = destinations.find(destination => destination.network === network)
+
+    if (destinations.length > 0) {
+        const proxyConfigured = destinations.find(destination => destination.network !== network && destination.isCoolifyProxyUsed === true)
+        if (proxyConfigured) {
+            if (proxyConfigured.isCoolifyProxyUsed) {
+                isCoolifyProxyUsed = true
+            } else {
+                isCoolifyProxyUsed = false
+            }
+        }
+        await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } })
+    }
+    if (isCoolifyProxyUsed) await startCoolifyProxy(engine)
+    return destination.id
 }
 export async function removeDestination({ id }) {
-    try {
-        const destination = await prisma.destinationDocker.delete({ where: { id } })
-        if (destination.isCoolifyProxyUsed) {
-            const host = getEngine(destination.engine)
-            const { network } = destination
-            const { stdout: found } = await asyncExecShell(`DOCKER_HOST=${host} docker ps -a --filter network=${network} --filter name=coolify-haproxy --format '{{.}}'`)
-            if (found) {
-                await asyncExecShell(`DOCKER_HOST="${host}" docker network disconnect ${network} coolify-haproxy`)
-                await asyncExecShell(`DOCKER_HOST="${host}" docker network rm ${network}`)
-            }
-
+    const destination = await prisma.destinationDocker.delete({ where: { id } })
+    if (destination.isCoolifyProxyUsed) {
+        const host = getEngine(destination.engine)
+        const { network } = destination
+        const { stdout: found } = await asyncExecShell(`DOCKER_HOST=${host} docker ps -a --filter network=${network} --filter name=coolify-haproxy --format '{{.}}'`)
+        if (found) {
+            await asyncExecShell(`DOCKER_HOST="${host}" docker network disconnect ${network} coolify-haproxy`)
+            await asyncExecShell(`DOCKER_HOST="${host}" docker network rm ${network}`)
         }
-        return { status: 200 }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
+
     }
 }
 
 export async function getDestination({ id, teamId }) {
-    try {
-        const body = await prisma.destinationDocker.findFirst({ where: { id, teams: { every: { id: teamId } } } })
-        return { ...body }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
-    }
+    return await prisma.destinationDocker.findFirst({ where: { id, teams: { every: { id: teamId } } } })
 }
 export async function getDestinationByApplicationId({ id, teamId }) {
-    try {
-        const body = await prisma.destinationDocker.findFirst({ where: { application: { some: { id } }, teams: { every: { id: teamId } } } })
-        return { ...body }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
-    }
+    return await prisma.destinationDocker.findFirst({ where: { application: { some: { id } }, teams: { every: { id: teamId } } } })
 }
 
 export async function setDestinationSettings({ engine, isCoolifyProxyUsed }) {
-    try {
-        await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } })
 
-        // if (isCoolifyProxyUsed) {
-        //     await installCoolifyProxy(engine)
-        //     await configureNetworkCoolifyProxy(engine)
-        // } else {
-        //     // TODO: must check if other destination is using the proxy??? or not?
-        //     const domain = await prisma.setting.findUnique({ where: { name: 'domain' }, rejectOnNotFound: false })
-        //     if (!domain) {
-        //         await uninstallCoolifyProxy(engine)
-        //     } else {
-        //         return {
-        //             stastus: 500,
-        //             body: {
-        //                 message: 'You can not disable the Coolify proxy while the domain is set for Coolify itself.'
-        //             }
-        //         }
-        //     }
-        // }
-        return { status: 200 }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
-    }
+    return await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } })
+
+    // if (isCoolifyProxyUsed) {
+    //     await installCoolifyProxy(engine)
+    //     await configureNetworkCoolifyProxy(engine)
+    // } else {
+    //     // TODO: must check if other destination is using the proxy??? or not?
+    //     const domain = await prisma.setting.findUnique({ where: { name: 'domain' }, rejectOnNotFound: false })
+    //     if (!domain) {
+    //         await uninstallCoolifyProxy(engine)
+    //     } else {
+    //         return {
+    //             stastus: 500,
+    //             body: {
+    //                 message: 'You can not disable the Coolify proxy while the domain is set for Coolify itself.'
+    //             }
+    //         }
+    //     }
+    // }
+
+
 }

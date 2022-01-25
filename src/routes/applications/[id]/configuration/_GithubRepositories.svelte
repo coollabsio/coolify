@@ -5,7 +5,7 @@
 	export let application;
 
 	import { page } from '$app/stores';
-	import { post } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import { getGithubToken } from '$lib/components/common';
 	import { enhance, errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
@@ -33,12 +33,13 @@
 	let token = null;
 
 	async function loadRepositoriesByPage(page = 0) {
-		const response = await fetch(`${apiUrl}/installation/repositories?per_page=100&page=${page}`, {
-			headers: {
+		try {
+			return await get(`${apiUrl}/installation/repositories?per_page=100&page=${page}`, {
 				Authorization: `token ${token}`
-			}
-		});
-		return await response.json();
+			});
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
 	}
 	async function loadRepositories() {
 		token = await getGithubToken({ apiUrl, githubToken, application });
@@ -60,22 +61,27 @@
 		loading.branches = true;
 		selected.branch = undefined;
 		selected.projectId = repositories.find((repo) => repo.full_name === selected.repository).id;
-		const response = await fetch(`${apiUrl}/repos/${selected.repository}/branches`, {
-			headers: {
+		try {
+			branches = await get(`${apiUrl}/repos/${selected.repository}/branches`, {
 				Authorization: `token ${token}`
-			}
-		});
-		branches = await response.json();
-		loading.branches = false;
+			});
+			return;
+		} catch ({ error }) {
+			return errorNotification(error);
+		} finally {
+			loading.branches = false;
+		}
 	}
 	async function isBranchAlreadyUsed() {
-		const url = `/applications/${id}/configuration/repository.json?repository=${selected.repository}&branch=${selected.branch}`;
-		const res = await fetch(url);
-		if (res.ok) {
-			errorNotification('Branch already configured');
-			return;
+		try {
+			return await get(
+				`/applications/${id}/configuration/repository.json?repository=${selected.repository}&branch=${selected.branch}`
+			);
+		} catch ({ error }) {
+			return errorNotification(error);
+		} finally {
+			showSave = true;
 		}
-		showSave = true;
 	}
 
 	onMount(async () => {
@@ -100,7 +106,7 @@
 		<a href={`/sources/${application.gitSource.id}`}><button>Configure it now</button></a>
 	</div>
 {:else}
-	<form on:submit={handleSubmit}>
+	<form on:submit|preventDefault={handleSubmit}>
 		<div>
 			{#if loading.repositories}
 				<select name="repository" disabled class="w-96">

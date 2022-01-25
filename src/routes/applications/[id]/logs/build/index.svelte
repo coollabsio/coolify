@@ -24,6 +24,8 @@
 	import { dateOptions, getDomain } from '$lib/components/common';
 
 	import BuildLog from './_BuildLog.svelte';
+	import { get } from '$lib/api';
+	import { errorNotification } from '$lib/form';
 
 	export let builds;
 	export let application;
@@ -41,18 +43,20 @@
 	async function updateBuildStatus({ detail }) {
 		const { status } = detail;
 		if (status !== 'running') {
-			let url = `/applications/${id}/logs/build.json?buildId=${buildId}`;
-			const res = await fetch(url);
-			if (res.ok) {
-				const data = await res.json();
+			try {
+				const data = await get(`/applications/${id}/logs/build.json?buildId=${buildId}`);
 				builds = builds.filter((build) => {
 					if (build.id === data.builds[0].id) {
 						build.status = data.builds[0].status;
 						build.took = data.builds[0].took;
 						build.since = data.builds[0].since;
 					}
+					window.location.reload()
 					return build;
 				});
+				return;
+			} catch ({ error }) {
+				return errorNotification(error);
 			}
 		} else {
 			builds = builds.filter((build) => {
@@ -65,11 +69,12 @@
 		if (buildCount >= skip) {
 			skip = skip + 5;
 			noMoreBuilds = buildCount >= skip;
-			let url = `/applications/${id}/logs/build.json?skip=${skip}`;
-			const res = await fetch(url);
-			if (res.ok) {
-				const data = await res.json();
+			try {
+				const data = await get(`/applications/${id}/logs/build.json?skip=${skip}`);
 				builds = builds.concat(data.builds);
+				return;
+			} catch ({ error }) {
+				return errorNotification(error);
 			}
 		} else {
 			noMoreBuilds = true;

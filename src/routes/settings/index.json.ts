@@ -4,8 +4,8 @@ import { listSettings, PrismaErrorHandler } from '$lib/database';
 import { configureCoolifyProxyOff, configureCoolifyProxyOn } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const get: RequestHandler = async (request) => {
-    const { status, body } = await getUserDetails(request);
+export const get: RequestHandler = async (event) => {
+    const { status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
 
     try {
@@ -20,12 +20,12 @@ export const get: RequestHandler = async (request) => {
 }
 
 
-export const del: RequestHandler<Locals, FormData> = async (request) => {
-    const { teamId, status, body } = await getUserDetails(request);
+export const del: RequestHandler<Locals> = async (event) => {
+    const { teamId, status, body } = await getUserDetails(event);
     if (teamId !== '0') return { status: 401, body: { message: 'You do not have permission to do this. \nAsk an admin to modify your permissions.' } }
     if (status === 401) return { status, body }
 
-    const name = request.body.get('name') || undefined
+    const { name } = await event.request.json()
 
     try {
         if (name === 'fqdn') {
@@ -45,13 +45,12 @@ export const del: RequestHandler<Locals, FormData> = async (request) => {
     }
 
 }
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const { teamId, status, body } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+    const { teamId, status, body } = await getUserDetails(event);
     if (teamId !== '0') return { status: 401, body: { message: 'You do not have permission to do this. \nAsk an admin to modify your permissions.' } }
     if (status === 401) return { status, body }
 
-    const name = request.body.get('name') || undefined
-    const value = request.body.get('value') || undefined
+    const { name, value } = await event.request.json()
     try {
         let oldFqdn;
         if (name === 'fqdn') {

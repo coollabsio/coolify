@@ -1,56 +1,69 @@
 import { getTeam, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
+import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const get: RequestHandler = async (request) => {
-    const { teamId, status, body } = await getUserDetails(request);
+export const get: RequestHandler = async (event) => {
+    const { teamId, status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
 
-    const secrets = await db.listSecrets({ applicationId: request.params.id });
-    return { status: 200, body: { secrets } };
+    try {
+        const secrets = await db.listSecrets({ applicationId: event.params.id });
+        return {
+            status: 200, body: {
+                secrets: secrets.sort((a, b) => {
+                    return ('' + a.name).localeCompare(b.name);
+                })
+            }
+        };
+    } catch (error) {
+        return PrismaErrorHandler(error)
+    }
 
 }
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const { teamId, status, body } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+    const { teamId, status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
 
-    const { id } = request.params;
-    const name = request.body.get('name');
-    const value = request.body.get('value');
-    const isBuildSecret = request.body.get('isBuildSecret') === 'true';
+    const { id } = event.params;
+    const { name, value, isBuildSecret } = await event.request.json()
+
     try {
-        await db.isSecretExists({ id, name })
-        return {
-            status: 500,
-            body: {
-                message: "Secret already exists"
+        const found = await db.isSecretExists({ id, name })
+        if (found) {
+            return {
+                status: 500,
+                body: {
+                    error: "Secret already exists"
+                }
+            }
+        } else {
+            await db.createSecret({ id, name, value, isBuildSecret });
+            return {
+                status: 201
             }
         }
-    } catch (err) {
-        await db.createSecret({ id, name, value, isBuildSecret });
-        return {
-            status: 201
-        }
 
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
 }
-export const del: RequestHandler = async (request) => {
-    const { teamId, status, body } = await getUserDetails(request);
+export const del: RequestHandler = async (event) => {
+    const { teamId, status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
-    
-    const { id } = request.params;
-    const name = request.body.get('name');
+
+    const { id } = event.params;
+    const { name } = await event.request.json()
 
     try {
         await db.removeSecret({ id, name });
         return {
             status: 200
         }
-    } catch (err) {
-        return {
-            status: 500
-        };
+    } catch (error) {
+        throw PrismaErrorHandler(error)
+
     }
 
 }

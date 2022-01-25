@@ -32,6 +32,8 @@
 	import templates from '$lib/components/templates';
 	import BuildPack from './_BuildPack.svelte';
 	import { session } from '$app/stores';
+	import { get } from '$lib/api';
+	import { errorNotification } from '$lib/form';
 
 	let scanning = true;
 	let foundConfig = {
@@ -59,107 +61,89 @@
 
 	onMount(async () => {
 		if (type === 'gitlab') {
-			const response = await fetch(`${apiUrl}/v4/projects/${projectId}/repository/tree`, {
-				method: 'GET',
-				headers: {
+			try {
+				const files = await get(`${apiUrl}/v4/projects/${projectId}/repository/tree`, {
 					Authorization: `Bearer ${$session.gitlabToken}`
-				}
-			});
-			if (!response.ok) {
-				scanning = false;
-				throw new Error(`Could not load ${apiUrl}/v4/projects/${projectId}/repository/tree`);
-			}
-			const files = await response.json();
-			const packageJson = files.find(
-				(file) => file.name === 'package.json' && file.type === 'blob'
-			);
-			const dockerfile = files.find((file) => file.name === 'Dockerfile' && file.type === 'blob');
-			const cargoToml = files.find((file) => file.name === 'Cargo.toml' && file.type === 'blob');
-			const requirementsTxt = files.find(
-				(file) => file.name === 'requirements.txt' && file.type === 'blob'
-			);
-			const indexHtml = files.find((file) => file.name === 'index.html' && file.type === 'blob');
-			const indexPHP = files.find((file) => file.name === 'index.php' && file.type === 'blob');
-			if (dockerfile) {
-				foundConfig.buildPack = 'docker';
-			} else if (packageJson) {
-				const path = packageJson.path;
-				const response = await fetch(
-					`${apiUrl}/v4/projects/${projectId}/repository/files/${path}/raw?ref=${branch}`,
-					{
-						method: 'GET',
-						headers: {
-							Authorization: `Bearer ${$session.gitlabToken}`
-						}
-					}
-				);
-				if (!response.ok) {
-					scanning = false;
-					throw new Error(
-						`Could not load ${apiUrl}/v4/projects/${projectId}/repository/files/${path}`
-					);
-				}
-				const json = await response.json();
-				checkTemplates({ json });
-			} else if (cargoToml) {
-				foundConfig.buildPack = 'rust';
-			} else if (requirementsTxt) {
-				foundConfig.buildPack = 'python';
-			} else if (indexHtml) {
-				foundConfig.buildPack = 'static';
-			} else if (indexPHP) {
-				foundConfig.buildPack = 'php';
-			}
-			scanning = false;
-		} else if (type === 'github') {
-			const response = await fetch(`${apiUrl}/repos/${repository}/contents?ref=${branch}`, {
-				method: 'GET',
-				headers: {
-					Authorization: `token ${ghToken}`
-				}
-			});
-			if (!response.ok) {
-				console.log(await response.json());
-				scanning = false;
-				throw new Error(`Could not load ${apiUrl}/repos/${repository}/contents?ref=${branch}`);
-			}
-			const files = await response.json();
-			const packageJson = files.find(
-				(file) => file.name === 'package.json' && file.type === 'file'
-			);
-			const dockerfile = files.find((file) => file.name === 'Dockerfile' && file.type === 'file');
-			const cargoToml = files.find((file) => file.name === 'Cargo.toml' && file.type === 'file');
-			const requirementsTxt = files.find(
-				(file) => file.name === 'requirements.txt' && file.type === 'file'
-			);
-			const indexHtml = files.find((file) => file.name === 'index.html' && file.type === 'file');
-			const indexPHP = files.find((file) => file.name === 'index.php' && file.type === 'file');
-			if (dockerfile) {
-				foundConfig.buildPack = 'docker';
-			} else if (packageJson) {
-				const response = await fetch(`${packageJson.git_url}`, {
-					method: 'GET',
-					headers: {
-						Accept: 'application/vnd.github.v3.raw+json',
-						Authorization: `token ${ghToken}`
-					}
 				});
-				if (!response.ok) {
-					scanning = false;
-					throw new Error(`Could not load ${packageJson.git_url}`);
+				const packageJson = files.find(
+					(file) => file.name === 'package.json' && file.type === 'blob'
+				);
+				const dockerfile = files.find((file) => file.name === 'Dockerfile' && file.type === 'blob');
+				const cargoToml = files.find((file) => file.name === 'Cargo.toml' && file.type === 'blob');
+				const requirementsTxt = files.find(
+					(file) => file.name === 'requirements.txt' && file.type === 'blob'
+				);
+				const indexHtml = files.find((file) => file.name === 'index.html' && file.type === 'blob');
+				const indexPHP = files.find((file) => file.name === 'index.php' && file.type === 'blob');
+				if (dockerfile) {
+					foundConfig.buildPack = 'docker';
+				} else if (packageJson) {
+					const path = packageJson.path;
+					try {
+						const json = await get(
+							`${apiUrl}/v4/projects/${projectId}/repository/files/${path}/raw?ref=${branch}`,
+							{
+								Authorization: `Bearer ${$session.gitlabToken}`
+							}
+						);
+						return checkTemplates({ json });
+					} catch ({ error }) {
+						return errorNotification(error);
+					} finally {
+						scanning = false;
+					}
+				} else if (cargoToml) {
+					foundConfig.buildPack = 'rust';
+				} else if (requirementsTxt) {
+					foundConfig.buildPack = 'python';
+				} else if (indexHtml) {
+					foundConfig.buildPack = 'static';
+				} else if (indexPHP) {
+					foundConfig.buildPack = 'php';
 				}
-				const json = await response.json();
-				checkTemplates({ json });
-			} else if (cargoToml) {
-				foundConfig.buildPack = 'rust';
-			} else if (requirementsTxt) {
-				foundConfig.buildPack = 'python';
-			} else if (indexHtml) {
-				foundConfig.buildPack = 'static';
-			} else if (indexPHP) {
-				foundConfig.buildPack = 'php';
+			} catch ({ error }) {
+				return errorNotification(error);
+			} finally {
+				scanning = false;
 			}
-			scanning = false;
+		} else if (type === 'github') {
+			try {
+				const files = await get(`${apiUrl}/repos/${repository}/contents?ref=${branch}`);
+				const packageJson = files.find(
+					(file) => file.name === 'package.json' && file.type === 'file'
+				);
+				const dockerfile = files.find((file) => file.name === 'Dockerfile' && file.type === 'file');
+				const cargoToml = files.find((file) => file.name === 'Cargo.toml' && file.type === 'file');
+				const requirementsTxt = files.find(
+					(file) => file.name === 'requirements.txt' && file.type === 'file'
+				);
+				const indexHtml = files.find((file) => file.name === 'index.html' && file.type === 'file');
+				const indexPHP = files.find((file) => file.name === 'index.php' && file.type === 'file');
+				if (dockerfile) {
+					foundConfig.buildPack = 'docker';
+				} else if (packageJson) {
+					try {
+						const json = await get(`${packageJson.git_url}`);
+						return checkTemplates({ json });
+					} catch ({ error }) {
+						return errorNotification(error);
+					} finally {
+						scanning = false;
+					}
+				} else if (cargoToml) {
+					foundConfig.buildPack = 'rust';
+				} else if (requirementsTxt) {
+					foundConfig.buildPack = 'python';
+				} else if (indexHtml) {
+					foundConfig.buildPack = 'static';
+				} else if (indexPHP) {
+					foundConfig.buildPack = 'php';
+				}
+			} catch ({ error }) {
+				return errorNotification(error);
+			} finally {
+				scanning = false;
+			}
 		}
 	});
 </script>

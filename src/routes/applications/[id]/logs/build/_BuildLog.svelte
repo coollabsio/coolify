@@ -8,18 +8,21 @@
 
 	import Loading from '$lib/components/Loading.svelte';
 	import LoadingLogs from '../_Loading.svelte';
+	import { get } from '$lib/api';
+	import { errorNotification } from '$lib/form';
 
 	let logs = [];
 	let loading = true;
 	let currentStatus;
-	const { id } = $page.params;
 	let streamInterval;
+	
+	const { id } = $page.params;
+
 	async function streamLogs(sequence = 0) {
-		const response = await fetch(
-			`/applications/${id}/logs/build/build.json?buildId=${buildId}&sequence=${sequence}`
-		);
-		if (response.ok) {
-			let { logs: responseLogs, status } = await response.json();
+		try {
+			let { logs: responseLogs, status } = await get(
+				`/applications/${id}/logs/build/build.json?buildId=${buildId}&sequence=${sequence}`
+			);
 			currentStatus = status;
 			logs = logs.concat(responseLogs);
 			loading = false;
@@ -29,17 +32,20 @@
 					return;
 				}
 				const nextSequence = logs[logs.length - 1].time;
-				const res = await fetch(
-					`/applications/${id}/logs/build/build.json?buildId=${buildId}&sequence=${nextSequence}`
-				);
-				if (res.ok) {
-					const data = await res.json();
+				try {
+					const data = await get(
+						`/applications/${id}/logs/build/build.json?buildId=${buildId}&sequence=${nextSequence}`
+					);
 					status = data.status;
 					currentStatus = status;
 					logs = logs.concat(data.logs);
 					dispatch('updateBuildStatus', { status });
+				} catch ({ error }) {
+					return errorNotification(error);
 				}
 			}, 1000);
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
 	}
 	onDestroy(() => {

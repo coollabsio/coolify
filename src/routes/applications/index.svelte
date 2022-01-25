@@ -1,8 +1,8 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ fetch }) => {
-		const url = '/applications.json';
-		const res = await fetch(url);
+		const endpoint = '/applications.json';
+		const res = await fetch(endpoint);
 
 		if (res.ok) {
 			return {
@@ -14,7 +14,7 @@
 
 		return {
 			status: res.status,
-			error: new Error(`Could not load ${url}`)
+			error: new Error(`Could not load ${endpoint}`)
 		};
 	};
 </script>

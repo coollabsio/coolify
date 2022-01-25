@@ -31,8 +31,10 @@ export const get: RequestHandler<Locals> = async (event) => {
 export const post: RequestHandler<Locals> = async (event) => {
     const { teamId, status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
+
     const { id } = event.params
     const { buildPack } = await event.request.json()
+    
     try {
         await db.configureBuildPack({ id, buildPack })
         return { status: 201 }

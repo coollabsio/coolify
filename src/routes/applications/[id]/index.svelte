@@ -4,7 +4,8 @@
 		if (stuff?.application?.id) {
 			return {
 				props: {
-					application: stuff.application
+					application: stuff.application,
+					isRunning: stuff.isRunning,
 				}
 			};
 		}
@@ -33,8 +34,9 @@
 		gitSource: Prisma.GitSource;
 		destinationDocker: Prisma.DestinationDocker;
 	};
+	export let isRunning;
 	import { page, session } from '$app/stores';
-	import { enhance, errorNotification } from '$lib/form';
+	import { errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
 
 	import Explainer from '$lib/components/Explainer.svelte';
@@ -43,7 +45,6 @@
 	import { getDomain, notNodeDeployments, staticDeployments } from '$lib/components/common';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { post } from '$lib/api';
-	import { goto } from '$app/navigation';
 	const { id } = $page.params;
 
 	let domainEl: HTMLInputElement;
@@ -57,37 +58,29 @@
 	});
 
 	async function changeSettings(name) {
-		const form = new FormData();
 		if (name === 'debug') {
 			debug = !debug;
 		}
 		if (name === 'previews') {
 			previews = !previews;
 		}
-		form.append('previews', previews.toString());
-		form.append('debug', debug.toString());
 		try {
-			const response = await fetch(`/applications/${id}/settings.json`, {
-				method: 'POST',
-				body: form
-			});
-			if (!response.ok) {
-				const error = await response.json();
-				errorNotification(error.message || error);
-				return;
-			} else toast.push('Settings saved.');
-		} catch (e) {
-			errorNotification(e.message || e);
-			throw new Error(e.message || e);
+			await post(`/applications/${id}/settings.json`, { previews, debug });
+			return toast.push('Settings saved.');
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
 	}
 	async function handleSubmit() {
+		loading = true;
 		try {
 			await post(`/applications/${id}/check.json`, { fqdn: application.fqdn });
 			await post(`/applications/${id}.json`, { ...application });
-			// return await goto(from || `/applications/${id}/configuration/repository`);
-		} catch (error) {
-			return errorNotification(error.message || error);
+			return window.location.reload()
+		} catch ({ error }) {
+			return errorNotification(error);
+		} finally {
+			loading = false;
 		}
 	}
 </script>
@@ -147,39 +140,7 @@
 
 <div class="max-w-4xl mx-auto px-6">
 	<!-- svelte-ignore missing-declaration -->
-	<form
-		on:submit={handleSubmit}
-		action="/applications/{id}.json"
-		use:enhance={{
-			beforeSubmit: async () => {
-				const form = new FormData();
-				form.append('domain', domainEl.value);
-				const response = await fetch(`/applications/${id}/check.json`, {
-					method: 'POST',
-					headers: {
-						accept: 'application/json'
-					},
-					body: form
-				});
-				if (!response.ok) {
-					const error = await response.json();
-					errorNotification(error.message || error);
-					throw new Error(error.message || error);
-				}
-			},
-			result: async () => {
-				window.location.reload();
-			},
-			pending: async () => {
-				loading = true;
-			},
-			final: async () => {
-				loading = false;
-			}
-		}}
-		method="post"
-		class=" py-4"
-	>
+	<form on:submit|preventDefault={handleSubmit} class="py-4">
 		<div class="font-bold flex space-x-1 pb-5">
 			<div class="text-xl tracking-tight mr-4">General</div>
 			{#if $session.isAdmin}
@@ -278,7 +239,8 @@
 				<label for="fqdn" class="pt-2">Domain (FQDN)</label>
 				<div class="col-span-2">
 					<input
-						readonly={!$session.isAdmin}
+						readonly={!$session.isAdmin || isRunning}
+						disabled={!$session.isAdmin || isRunning}
 						bind:this={domainEl}
 						name="fqdn"
 						id="fqdn"
@@ -288,7 +250,7 @@
 						required
 					/>
 					<Explainer
-						text="If you specify <span class='text-green-600'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you."
+						text="If you specify <span class='text-green-600'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>To modify the domain, you must first stop the application."
 					/>
 				</div>
 			</div>

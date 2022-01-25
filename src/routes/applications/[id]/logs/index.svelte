@@ -25,6 +25,8 @@
 	import { page } from '$app/stores';
 	import LoadingLogs from './_Loading.svelte';
 	import { getDomain } from '$lib/components/common';
+	import { get } from '$lib/api';
+	import { errorNotification } from '$lib/form';
 	let loadLogsInterval = null;
 	let logs = [];
 
@@ -40,11 +42,12 @@
 		clearInterval(loadLogsInterval);
 	});
 	async function loadLogs() {
-		let url = `/applications/${id}/logs.json`;
-		const res = await fetch(url);
-		if (res.ok) {
-			const newLogs = await res.json();
+		try {
+			const newLogs = await get(`/applications/${id}/logs.json`);
 			logs = newLogs.logs;
+			return;
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
 	}
 </script>

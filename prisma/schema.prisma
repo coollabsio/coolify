@@ -69,7 +69,6 @@ model Application {
   id                  String               @id @default(cuid())
   name                String
   fqdn                String?              @unique
-  oldFqdn             String?
   repository          String?
   configHash          String?
   branch              String?

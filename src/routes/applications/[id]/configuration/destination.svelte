@@ -78,7 +78,7 @@
 		<div class="flex flex-wrap justify-center">
 			{#each destinations as destination}
 				<div class="p-2">
-					<form on:submit={() => handleSubmit(destination.id)}>
+					<form on:submit|preventDefault={() => handleSubmit(destination.id)}>
 						<button type="submit" class="box-selection hover:bg-sky-700 font-bold">
 							<div class="font-bold text-xl text-center truncate">{destination.name}</div>
 							<div class="text-center truncate">{destination.network}</div>
