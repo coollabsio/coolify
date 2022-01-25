@@ -309,7 +309,7 @@
 			<div class="flex-1" />
 
 			<div class="flex flex-col space-y-4 py-2">
-				{#if isUpdateAvailable}
+				{#if isUpdateAvailable && $session.teamId === '0'}
 					<button
 						disabled={updateStatus.success === false}
 						in:fade={{ duration: 150 }}

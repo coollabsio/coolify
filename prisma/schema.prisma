@@ -8,7 +8,7 @@ datasource db {
 }
 
 model Setting {
-  id                    String   @id @default('settings')
+  id                    String   @id @default(cuid())
   fqdn                  String?  @unique
   isRegistrationEnabled Boolean? @default(false)
   createdAt             DateTime @default(now())
