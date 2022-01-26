@@ -31,14 +31,22 @@
 
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
 	let fqdn = settings.fqdn;
+	let isFqdnSet = settings.fqdn;
+	let loading = {
+		save: false,
+		remove: false
+	};
 
 	async function removeFqdn() {
 		if (fqdn) {
+			loading.remove = true;
 			try {
 				await del(`/settings.json`, { fqdn });
 				return window.location.reload();
 			} catch ({ error }) {
 				return errorNotification(error);
+			} finally {
+				loading.remove = false;
 			}
 		}
 	}
@@ -54,13 +62,17 @@
 	}
 	async function handleSubmit() {
 		try {
+			loading.save = true;
 			if (fqdn) {
+				toast.push('Setting domain.');
 				await post(`/settings/check.json`, { fqdn });
 				await post(`/settings.json`, { fqdn });
 				return window.location.reload();
 			}
 		} catch ({ error }) {
 			return errorNotification(error);
+		} finally {
+			loading.save = false;
 		}
 	}
 </script>
@@ -73,10 +85,20 @@
 		<form on:submit|preventDefault={handleSubmit}>
 			<div class="font-bold flex space-x-1 py-5 px-6">
 				<div class="text-xl tracking-tight mr-4">Global Settings</div>
-				<button type="submit" class="mx-2 bg-green-600 hover:bg-green-500">Save</button>
-				{#if !!fqdn}
-					<button on:click|preventDefault={removeFqdn} class="bg-red-600 hover:bg-red-500"
-						>Remove Domain</button
+				<button
+					type="submit"
+					disabled={loading.save}
+					class:bg-green-600={!loading.save}
+					class:hover:bg-green-500={!loading.save}
+					class="mx-2 ">{loading.save ? 'Saving...' : 'Save'}</button
+				>
+				{#if isFqdnSet}
+					<button
+						on:click|preventDefault={removeFqdn}
+						disabled={loading.remove}
+						class:bg-red-600={!loading.remove}
+						class:hover:bg-red-500={!loading.remove}
+						>{loading.remove ? 'Removing...' : 'Remove domain'}</button
 					>
 				{/if}
 			</div>
