@@ -43,14 +43,14 @@
 		try {
 			await post(`/applications/${id}/configuration/destination.json`, { destinationId });
 			return await goto(from || `/applications/${id}/configuration/buildpack`);
-		} catch ({error}) {
+		} catch ({ error }) {
 			return errorNotification(error);
 		}
 	}
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Configure Destination</div>
+<div class="flex space-x-1 py-5 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Configure Destination</div>
 </div>
 <div class="flex justify-center">
 	{#if !destinations || destinations.length === 0}
@@ -68,9 +68,7 @@
 							stroke-linecap="round"
 							stroke-linejoin="round"
 							stroke-width="2"
-							d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-						/></svg
-					>
+							d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
 				</a>
 			</div>
 		</div>

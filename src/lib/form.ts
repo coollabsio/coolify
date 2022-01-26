@@ -1,77 +1,76 @@
 import { toast } from '@zerodevx/svelte-toast';
 export function errorNotification(message) {
-    toast.push(message);
+	toast.push(message);
 }
 export function enhance(
-    form: HTMLFormElement,
-    {
-        beforeSubmit,
-        final,
-        pending,
-        error,
-        result
-    }: {
-        beforeSubmit?: () => Promise<void>,
-        final?: () => Promise<void>,
-        pending?: (data: FormData, form: HTMLFormElement) => void;
-        error?: (res: Response, error: Error, form: HTMLFormElement) => void;
-        result?: (res: Response, form: HTMLFormElement) => void;
-
-    }
+	form: HTMLFormElement,
+	{
+		beforeSubmit,
+		final,
+		pending,
+		error,
+		result
+	}: {
+		beforeSubmit?: () => Promise<void>;
+		final?: () => Promise<void>;
+		pending?: (data: FormData, form: HTMLFormElement) => void;
+		error?: (res: Response, error: Error, form: HTMLFormElement) => void;
+		result?: (res: Response, form: HTMLFormElement) => void;
+	}
 ): { destroy: () => void } {
-    let current_token: unknown;
+	let current_token: unknown;
 
-    async function handle_submit(e: Event) {
-        const token = (current_token = {});
-        e.preventDefault();
+	async function handle_submit(e: Event) {
+		const token = (current_token = {});
+		e.preventDefault();
 
-        let body = new FormData(form);
-        let parsedData = body
-        
-        body.forEach((data, key) => {
-            if (data === '' || data === null) parsedData.delete(key)
-        })
-        body = parsedData
+		let body = new FormData(form);
+		let parsedData = body;
 
-        if (beforeSubmit) await beforeSubmit()
-        if (pending) pending(body, form);
+		body.forEach((data, key) => {
+			if (data === '' || data === null) parsedData.delete(key);
+		});
+		body = parsedData;
 
-        try {
-            const res = await fetch(form.action, {
-                method: form.method,
-                headers: {
-                    accept: 'application/json'
-                },
-                body
-            });
+		if (beforeSubmit) await beforeSubmit();
+		if (pending) pending(body, form);
 
-            if (token !== current_token) return;
+		try {
+			const res = await fetch(form.action, {
+				method: form.method,
+				headers: {
+					accept: 'application/json'
+				},
+				body
+			});
 
-            if (res.ok) {
-                if (result) result(res, form);
-            } else if (error) {
-                error(res, null, form);
-            } else {
-                // TODO: Add error frontend here
-                const { message } = await res.json()
-                errorNotification(message)
-            }
-        } catch (e) {
-            if (error) {
-                error(null, e, form);
-            } else {
-                throw e;
-            }
-        } finally {
-            if (final) final()
-        }
-    }
+			if (token !== current_token) return;
 
-    form.addEventListener('submit', handle_submit);
+			if (res.ok) {
+				if (result) result(res, form);
+			} else if (error) {
+				error(res, null, form);
+			} else {
+				// TODO: Add error frontend here
+				const { message } = await res.json();
+				errorNotification(message);
+			}
+		} catch (e) {
+			if (error) {
+				error(null, e, form);
+			} else {
+				throw e;
+			}
+		} finally {
+			if (final) final();
+		}
+	}
 
-    return {
-        destroy() {
-            form.removeEventListener('submit', handle_submit);
-        }
-    };
+	form.addEventListener('submit', handle_submit);
+
+	return {
+		destroy() {
+			form.removeEventListener('submit', handle_submit);
+		}
+	};
 }

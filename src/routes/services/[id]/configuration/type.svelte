@@ -52,15 +52,15 @@
 	}
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Select a Service</div>
+<div class="flex space-x-1 py-5 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Select a Service</div>
 </div>
 
 <div class="flex flex-wrap justify-center">
 	{#each types as type}
 		<div class="p-2">
 			<form on:submit|preventDefault={() => handleSubmit(type.name)}>
-				<button type="submit" class="box-selection text-xl font-bold hover:bg-pink-600 relative">
+				<button type="submit" class="box-selection relative text-xl font-bold hover:bg-pink-600">
 					{#if type.name === 'plausibleanalytics'}
 						<PlausibleAnalytics />
 					{:else if type.name === 'nocodb'}

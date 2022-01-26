@@ -5,10 +5,10 @@ global
 defaults 
   mode http
   log global
-  timeout http-request 10s
-  timeout connect 5s
-  timeout client 10s
-  timeout server 10s
+  timeout http-request 60s
+  timeout connect 10s
+  timeout client 60s
+  timeout server 60s
 
 userlist haproxy-dataplaneapi 
   user admin insecure-password mypassword

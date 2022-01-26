@@ -250,7 +250,7 @@
 </script>
 
 <form on:submit={handleSubmit}>
-	<div class="px-4 space-y-2 xl:space-y-0 flex xl:flex-row flex-col xl:space-x-2 ">
+	<div class="flex flex-col space-y-2 px-4 xl:flex-row xl:space-y-0 xl:space-x-2 ">
 		{#if loading.base}
 			<select name="group" disabled class="w-96">
 				<option selected value="">Loading groups...</option>
@@ -273,8 +273,7 @@
 				class="w-96"
 				bind:value={selected.project}
 				on:change={loadBranches}
-				disabled={!selected.group}
-			>
+				disabled={!selected.group}>
 				<option value="" disabled selected>Please select a project</option>
 				{#each projects as project}
 					<option value={project}>{project.name}</option>
@@ -296,8 +295,7 @@
 				class="w-96"
 				bind:value={selected.branch}
 				on:change={isBranchAlreadyUsed}
-				disabled={!selected.project}
-			>
+				disabled={!selected.project}>
 				<option value="" disabled selected>Please select a branch</option>
 				{#each branches as branch}
 					<option value={branch}>{branch.name}</option>
@@ -309,7 +307,7 @@
 			</select>
 		{/if}
 	</div>
-	<div class="pt-5 flex-col flex justify-center items-center space-y-4">
+	<div class="flex flex-col items-center justify-center space-y-4 pt-5">
 		<button
 			on:click|preventDefault={save}
 			class="w-40"
@@ -317,7 +315,6 @@
 			disabled={!showSave || loading.save}
 			class:bg-orange-600={showSave && !loading.save}
 			class:hover:bg-orange-500={showSave && !loading.save}
-			>{loading.save ? 'Saving...' : 'Save'}</button
-		>
+			>{loading.save ? 'Saving...' : 'Save'}</button>
 	</div>
 </form>

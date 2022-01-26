@@ -26,12 +26,12 @@
 	import { getDomain } from '$lib/components/common';
 </script>
 
-<div class="font-bold flex space-x-1 py-6 px-6">
-	<div class="text-2xl tracking-tight mr-4">
+<div class="flex space-x-1 py-6 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">
 		Secrets for <a href={application.fqdn} target="_blank">{getDomain(application.fqdn)}</a>
 	</div>
 </div>
-<div class="max-w-4xl mx-auto px-6">
+<div class="mx-auto max-w-4xl px-6">
 	<div class="flex-col justify-start space-y-1">
 		{#each secrets as secret}
 			<Secret name={secret.name} value={secret.value} isBuildSecret={secret.isBuildSecret} />

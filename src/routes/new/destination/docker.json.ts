@@ -5,16 +5,15 @@ import { dockerInstance } from '$lib/docker';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler<Locals> = async (event) => {
-    const { teamId, status, body } = await getUserDetails(event)
-    if (status === 401) return { status, body }
+	const { teamId, status, body } = await getUserDetails(event);
+	if (status === 401) return { status, body };
 
-    const { name, engine, network, isCoolifyProxyUsed } = await event.request.json()
+	const { name, engine, network, isCoolifyProxyUsed } = await event.request.json();
 
-    try {
-        const id = await db.newDestination({ name, teamId, engine, network, isCoolifyProxyUsed })
-        return { status: 200, body: { id } }
-    } catch (error) {
-        return PrismaErrorHandler(error)
-    }
-}
-
+	try {
+		const id = await db.newDestination({ name, teamId, engine, network, isCoolifyProxyUsed });
+		return { status: 200, body: { id } };
+	} catch (error) {
+		return PrismaErrorHandler(error);
+	}
+};

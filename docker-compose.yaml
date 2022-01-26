@@ -5,7 +5,7 @@ services:
     image: coollabsio/coolify:latest
     restart: always
     container_name: coolify
-    ports: 
+    ports:
       - target: 3000
         published: 3000
         protocol: tcp
@@ -16,7 +16,7 @@ services:
       - 'coolify-letsencrypt:/etc/letsencrypt'
       - '/var/run/docker.sock:/var/run/docker.sock'
     env_file:
-      - ".env"
+      - '.env'
     networks:
       - coolify-infra
   redis:

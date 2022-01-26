@@ -42,15 +42,15 @@
 	export let readOnly;
 </script>
 
-<div class="font-bold flex space-x-1 p-5 px-6 text-2xl items-center">
-	<div class="tracking-tight truncate md:max-w-64 md:block hidden">
+<div class="flex items-center space-x-1 p-5 px-6 text-2xl font-bold">
+	<div class="md:max-w-64 hidden truncate tracking-tight md:block">
 		{service.name}
 	</div>
 	{#if service.fqdn}
-		<span class="px-1 arrow-right-applications md:block hidden">></span>
+		<span class="arrow-right-applications hidden px-1 md:block">></span>
 		<a href={service.fqdn} target="_blank" class="pr-2">{getDomain(service.fqdn)}</a>
 	{/if}
-	<span class="px-1 arrow-right-applications md:block hidden">></span>
+	<span class="arrow-right-applications hidden px-1 md:block">></span>
 	{#if service.type === 'plausibleanalytics'}
 		<PlausibleAnalytics />
 	{:else if service.type === 'nocodb'}

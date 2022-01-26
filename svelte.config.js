@@ -7,12 +7,12 @@ const config = {
 		target: '#svelte',
 		adapter: adapter(),
 		prerender: {
-            enabled: false,
-        },
+			enabled: false
+		},
 		floc: true,
 		vite: {
 			optimizeDeps: {
-				exclude: ['svelte-kit-cookie-session'],
+				exclude: ['svelte-kit-cookie-session']
 			}
 		}
 	}

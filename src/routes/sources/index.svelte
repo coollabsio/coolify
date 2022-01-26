@@ -24,8 +24,8 @@
 	import { session } from '$app/stores';
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Git Sources</div>
+<div class="flex space-x-1 py-5 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Git Sources</div>
 	{#if $session.isAdmin}
 		<a href="/new/source" sveltekit:prefetch class="add-icon bg-orange-600 hover:bg-orange-500">
 			<svg
@@ -38,16 +38,14 @@
 					stroke-linecap="round"
 					stroke-linejoin="round"
 					stroke-width="2"
-					d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-				/></svg
-			>
+					d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
 		</a>
 	{/if}
 </div>
 <div class="flex justify-center">
 	{#if !sources || sources.length === 0}
 		<div class="flex-col">
-			<div class="text-center font-bold text-xl">No git sources found</div>
+			<div class="text-center text-xl font-bold">No git sources found</div>
 		</div>
 	{:else}
 		<div class="flex flex-wrap justify-center">
@@ -57,8 +55,7 @@
 						class="box-selection hover:bg-orange-600"
 						class:border-red-500={source.gitlabApp && !source.gitlabAppId}
 						class:border-0={source.gitlabApp && !source.gitlabAppId}
-						class:border-l-4={source.gitlabApp && !source.gitlabAppId}
-					>
+						class:border-l-4={source.gitlabApp && !source.gitlabAppId}>
 						<div class="font-bold text-xl text-center truncate">{source.name}</div>
 						{#if source.gitlabApp && !source.gitlabAppId}
 							<div class="font-bold text-center truncate">Configuration missing</div>

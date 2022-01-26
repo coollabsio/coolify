@@ -46,8 +46,8 @@
 	}
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Select a Service version</div>
+<div class="flex space-x-1 py-5 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Select a Service version</div>
 </div>
 
 <div class="flex flex-wrap justify-center">
@@ -55,8 +55,7 @@
 		<div class="p-2">
 			<form on:submit|preventDefault={() => handleSubmit(version)}>
 				<button type="submit" class="box-selection text-xl font-bold hover:bg-pink-600"
-					>{version}</button
-				>
+					>{version}</button>
 			</form>
 		</div>
 	{/each}

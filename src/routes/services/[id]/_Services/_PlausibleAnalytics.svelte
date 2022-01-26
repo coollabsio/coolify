@@ -4,8 +4,8 @@
 	export let readOnly;
 </script>
 
-<div class="font-bold flex space-x-1 py-5">
-	<div class="text-xl tracking-tight mr-4">Plausible Analytics</div>
+<div class="flex space-x-1 py-5 font-bold">
+	<div class="mr-4 text-xl tracking-tight">Plausible Analytics</div>
 </div>
 <div class="grid grid-cols-3 items-center">
 	<label for="email">Email Address</label>
@@ -17,8 +17,7 @@
 			readonly={readOnly}
 			placeholder="Email address"
 			bind:value={service.plausibleAnalytics.email}
-			required
-		/>
+			required />
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -31,8 +30,7 @@
 			readonly={readOnly}
 			placeholder="User to login"
 			bind:value={service.plausibleAnalytics.username}
-			required
-		/>
+			required />
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -44,12 +42,11 @@
 			readonly
 			disabled
 			name="password"
-			value={service.plausibleAnalytics.password}
-		/>
+			value={service.plausibleAnalytics.password} />
 	</div>
 </div>
-<div class="font-bold flex space-x-1 py-5">
-	<div class="text-xl tracking-tight mr-4">PostgreSQL</div>
+<div class="flex space-x-1 py-5 font-bold">
+	<div class="mr-4 text-xl tracking-tight">PostgreSQL</div>
 </div>
 <div class="grid grid-cols-3 items-center">
 	<label for="postgresqlUser">Username</label>
@@ -59,8 +56,7 @@
 			id="postgresqlUser"
 			value={service.plausibleAnalytics.postgresqlUser}
 			readonly
-			disabled
-		/>
+			disabled />
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -72,8 +68,7 @@
 			readonly
 			disabled
 			name="postgresqlPassword"
-			value={service.plausibleAnalytics.postgresqlPassword}
-		/>
+			value={service.plausibleAnalytics.postgresqlPassword} />
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -84,8 +79,7 @@
 			id="postgresqlDatabase"
 			value={service.plausibleAnalytics.postgresqlDatabase}
 			readonly
-			disabled
-		/>
+			disabled />
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -97,7 +91,6 @@
 			disabled
 			id="postgresqlPublicPort"
 			name="postgresqlPublicPort"
-			value={service.plausibleAnalytics.postgresqlPublicPort}
-		/>
+			value={service.plausibleAnalytics.postgresqlPublicPort} />
 	</div>
 </div>

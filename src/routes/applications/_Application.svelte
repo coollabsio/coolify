@@ -13,11 +13,11 @@
 	import Nextjs from '$lib/components/svg/applications/Nextjs.svelte';
 	import Gatsby from '$lib/components/svg/applications/Gatsby.svelte';
 	import Docker from '$lib/components/svg/applications/Docker.svelte';
-	
-	const buildPack = application?.buildPack?.toLowerCase()
+
+	const buildPack = application?.buildPack?.toLowerCase();
 </script>
 
-<a href="/applications/{application.id}" class="no-underline p-2">
+<a href="/applications/{application.id}" class="p-2 no-underline">
 	<div class="box-selection relative hover:bg-green-600">
 		{#if buildPack === 'rust'}
 			<Rust />
@@ -47,12 +47,12 @@
 			<Docker />
 		{/if}
 
-		<div class="font-bold text-xl text-center truncate">{application.name}</div>
+		<div class="truncate text-center text-xl font-bold">{application.name}</div>
 		{#if application.fqdn}
-			<div class="text-center truncate">{application.fqdn}</div>
+			<div class="truncate text-center">{application.fqdn}</div>
 		{/if}
 		{#if !application.gitSourceId || !application.destinationDockerId}
-			<div class="font-bold text-center truncate">Configuration missing</div>
+			<div class="truncate text-center font-bold">Configuration missing</div>
 		{/if}
 	</div>
 </a>

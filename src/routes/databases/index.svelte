@@ -29,8 +29,8 @@
 	import Redis from '$lib/components/svg/databases/Redis.svelte';
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Databases</div>
+<div class="flex space-x-1 py-5 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Databases</div>
 	<a href="/new/database" class="add-icon bg-purple-600 hover:bg-purple-500">
 		<svg
 			class="w-6"
@@ -42,16 +42,14 @@
 				stroke-linecap="round"
 				stroke-linejoin="round"
 				stroke-width="2"
-				d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-			/></svg
-		>
+				d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
 	</a>
 </div>
 
 <div class="flex flex-wrap justify-center space-x-4">
 	{#if !databases || databases.length === 0}
 		<div class="flex-col">
-			<div class="text-center font-bold text-xl">No databases found</div>
+			<div class="text-center text-xl font-bold">No databases found</div>
 		</div>
 	{:else}
 		{#each databases as database}

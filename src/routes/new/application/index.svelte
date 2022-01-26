@@ -40,8 +40,8 @@
 	}
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Add New Application</div>
+<div class="flex space-x-1 py-5 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Add New Application</div>
 </div>
 <div class="pt-10">
 	<form on:submit|preventDefault={handleSubmit}>

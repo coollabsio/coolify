@@ -26,12 +26,12 @@
 	}
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Add New Destination</div>
+<div class="flex space-x-1 py-5 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Add New Destination</div>
 </div>
-<div class="flex-col text-center space-y-2 pb-10">
-	<div class="font-bold text-xl text-white">Predefined destinations</div>
-	<div class="flex space-x-2 justify-center">
+<div class="flex-col space-y-2 pb-10 text-center">
+	<div class="text-xl font-bold text-white">Predefined destinations</div>
+	<div class="flex justify-center space-x-2">
 		<button class="w-32" on:click={() => setPredefined('docker')}>Docker</button>
 		<button class="w-32" on:click={() => setPredefined('kubernetes')}>Kubernetes</button>
 	</div>

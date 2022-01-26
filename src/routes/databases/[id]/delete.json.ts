@@ -6,17 +6,16 @@ import { deleteProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const del: RequestHandler<Locals> = async (event) => {
-    const { teamId, status, body } = await getUserDetails(event);
-    if (status === 401) return { status, body }
-    const { id } = event.params
-    try {
-        const database = await db.getDatabase({ id, teamId })
-        const everStarted = await stopDatabase(database)
-        await db.removeDatabase({ id })
-        if (everStarted) await deleteProxy({ id })
-        return { status: 200 }
-    } catch (error) {
-        return PrismaErrorHandler(error)
-    }
-
-}
+	const { teamId, status, body } = await getUserDetails(event);
+	if (status === 401) return { status, body };
+	const { id } = event.params;
+	try {
+		const database = await db.getDatabase({ id, teamId });
+		const everStarted = await stopDatabase(database);
+		await db.removeDatabase({ id });
+		if (everStarted) await deleteProxy({ id });
+		return { status: 200 };
+	} catch (error) {
+		return PrismaErrorHandler(error);
+	}
+};

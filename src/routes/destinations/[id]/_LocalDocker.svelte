@@ -72,10 +72,10 @@
 	}
 </script>
 
-<div class="flex justify-center pb-8 px-6">
+<div class="flex justify-center px-6 pb-8">
 	<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
-		<div class="flex space-x-2 h-8 items-center">
-			<div class="font-bold text-xl text-white">Configuration</div>
+		<div class="flex h-8 items-center space-x-2">
+			<div class="text-xl font-bold text-white">Configuration</div>
 			<button
 				type="submit"
 				class="bg-sky-600 hover:bg-sky-500"
@@ -104,8 +104,7 @@
 					disabled
 					name="engine"
 					placeholder="eg: /var/run/docker.sock"
-					value={destination.engine}
-				/>
+					value={destination.engine} />
 			</div>
 		</div>
 		<!-- <div class="flex items-center">
@@ -121,8 +120,7 @@
 					disabled
 					name="network"
 					placeholder="default: coolify"
-					value={destination.network}
-				/>
+					value={destination.network} />
 			</div>
 		</div>
 		<div class="flex justify-start">
@@ -132,8 +130,7 @@
 					on:click={changeProxySetting}
 					isPadding={false}
 					title="Use Coolify Proxy?"
-					description="This will install a proxy on the destination to allow you to access your applications and services without any manual configuration. Databases will have their own proxy."
-				/>
+					description="This will install a proxy on the destination to allow you to access your applications and services without any manual configuration. Databases will have their own proxy." />
 			</ul>
 		</div>
 	</form>

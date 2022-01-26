@@ -3,8 +3,8 @@
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 </script>
 
-<div class="font-bold flex space-x-1 py-5">
-	<div class="text-xl tracking-tight mr-4">CouchDB</div>
+<div class="flex space-x-1 py-5 font-bold">
+	<div class="mr-4 text-xl tracking-tight">CouchDB</div>
 </div>
 <div class="grid grid-cols-3 items-center">
 	<label for="defaultDatabase">Default Database</label>
@@ -16,8 +16,7 @@
 			placeholder="eg: mydb"
 			id="defaultDatabase"
 			name="defaultDatabase"
-			bind:value={database.defaultDatabase}
-		/>
+			bind:value={database.defaultDatabase} />
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -29,8 +28,7 @@
 			placeholder="Generated automatically after start"
 			id="dbUser"
 			name="dbUser"
-			value={database.dbUser}
-		/>
+			value={database.dbUser} />
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -43,8 +41,7 @@
 			isPasswordField
 			id="dbUserPassword"
 			name="dbUserPassword"
-			value={database.dbUserPassword}
-		/>
+			value={database.dbUserPassword} />
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -56,8 +53,7 @@
 			placeholder="Generated automatically after start"
 			id="rootUser"
 			name="rootUser"
-			value={database.rootUser}
-		/>
+			value={database.rootUser} />
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -70,7 +66,6 @@
 			isPasswordField
 			id="rootUserPassword"
 			name="rootUserPassword"
-			value={database.rootUserPassword}
-		/>
+			value={database.rootUserPassword} />
 	</div>
 </div>

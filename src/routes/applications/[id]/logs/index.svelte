@@ -52,12 +52,12 @@
 	}
 </script>
 
-<div class="font-bold flex space-x-1 py-6 px-6">
-	<div class="text-2xl tracking-tight mr-4">
+<div class="flex space-x-1 py-6 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">
 		Application logs of <a href={application.fqdn} target="_blank">{getDomain(application.fqdn)}</a>
 	</div>
 </div>
-<div class="flex flex-row px-10 justify-center pt-6 space-x-2">
+<div class="flex flex-row justify-center space-x-2 px-10 pt-6">
 	{#if logs.length === 0}
 		<div class="text-xl font-bold tracking-tighter">Waiting for the logs...</div>
 	{:else}

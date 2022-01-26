@@ -55,10 +55,10 @@
 	}
 </script>
 
-<div class="box-selection hover:bg-coolgray-200 hover:border-transparent">
-	<div class="font-bold text-xl text-center truncate pb-2">{app.domain}</div>
+<div class="box-selection hover:border-transparent hover:bg-coolgray-200">
+	<div class="truncate pb-2 text-center text-xl font-bold">{app.domain}</div>
 	{#if loading}
-		<div class="font-bold w-full text-center">Loading...</div>
+		<div class="w-full text-center font-bold">Loading...</div>
 	{:else if app.foundByDomain}
 		<div class="w-full bg-coolgray-200 text-xs">
 			<span class="text-red-500">Domain</span> already configured for
@@ -71,7 +71,6 @@
 		</div>
 	{:else}
 		<button class="bg-green-600 hover:bg-green-500 w-full" on:click={addToCoolify}
-			>Add to Coolify</button
-		>
+			>Add to Coolify</button>
 	{/if}
 </div>

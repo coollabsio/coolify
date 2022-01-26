@@ -51,7 +51,7 @@
 						build.took = data.builds[0].took;
 						build.since = data.builds[0].since;
 					}
-					window.location.reload()
+					window.location.reload();
 					return build;
 				});
 				return;
@@ -82,12 +82,12 @@
 	}
 </script>
 
-<div class="font-bold flex space-x-1 py-6 px-6">
-	<div class="text-2xl tracking-tight mr-4">
+<div class="flex space-x-1 py-6 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">
 		Build logs of <a href={application.fqdn} target="_blank">{getDomain(application.fqdn)}</a>
 	</div>
 </div>
-<div class="flex flex-row px-10 justify-start pt-6 space-x-2 ">
+<div class="flex flex-row justify-start space-x-2 px-10 pt-6 ">
 	<div class="min-w-[16rem] space-y-2">
 		{#each builds as build (build.id)}
 			<div
@@ -95,14 +95,13 @@
 					new Date(build.createdAt)
 				) + `\n${build.status}`}
 				on:click={() => (buildId = build.id)}
-				class="flex justify-center items-center py-4 cursor-pointer transition-all duration-100 border-l-2 hover:shadow-xl no-underline hover:bg-coolgray-400 border-transparent tooltip-top rounded-r"
+				class="tooltip-top flex cursor-pointer items-center justify-center rounded-r border-l-2 border-transparent py-4 no-underline transition-all duration-100 hover:bg-coolgray-400 hover:shadow-xl"
 				class:bg-coolgray-400={buildId === build.id}
 				class:border-red-500={build.status === 'failed'}
 				class:border-green-500={build.status === 'success'}
-				class:border-yellow-500={build.status === 'inprogress'}
-			>
+				class:border-yellow-500={build.status === 'inprogress'}>
 				<div class="flex-col px-2">
-					<div class="font-bold text-sm">
+					<div class="text-sm font-bold">
 						{application.branch}
 					</div>
 					<div class="text-xs">
@@ -125,7 +124,7 @@
 			<button class="w-full" on:click={loadMoreBuilds}>Load More</button>
 		{/if}
 	</div>
-	<div class="flex-1 w-96">
+	<div class="w-96 flex-1">
 		{#if buildId}
 			{#key buildId}
 				<svelte:component this={BuildLog} {buildId} on:updateBuildStatus={updateBuildStatus} />
@@ -134,5 +133,5 @@
 	</div>
 </div>
 {#if buildCount === 0}
-	<div class="text-center font-bold text-xl">No logs found</div>
+	<div class="text-center text-xl font-bold">No logs found</div>
 {/if}

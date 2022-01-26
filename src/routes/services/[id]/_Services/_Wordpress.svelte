@@ -6,8 +6,8 @@
 	export let readOnly;
 </script>
 
-<div class="font-bold flex space-x-1 py-5">
-	<div class="text-xl tracking-tight mr-4">Wordpress</div>
+<div class="flex space-x-1 py-5 font-bold">
+	<div class="mr-4 text-xl tracking-tight">Wordpress</div>
 </div>
 
 <div class="grid grid-cols-3 items-center">
@@ -20,16 +20,17 @@
 			rows={isRunning ? 1 : 5}
 			name="extraConfig"
 			id="extraConfig"
-			placeholder={!isRunning ? `eg:
+			placeholder={!isRunning
+				? `eg:
 
 define('WP_ALLOW_MULTISITE', true);
 define('MULTISITE', true);
-define('SUBDOMAIN_INSTALL', false);` : null}>{service.wordpress.extraConfig}</textarea
-		>
+define('SUBDOMAIN_INSTALL', false);`
+				: null}>{service.wordpress.extraConfig}</textarea>
 	</div>
 </div>
-<div class="font-bold flex space-x-1 py-5">
-	<div class="text-xl tracking-tight mr-4">MySQL</div>
+<div class="flex space-x-1 py-5 font-bold">
+	<div class="mr-4 text-xl tracking-tight">MySQL</div>
 </div>
 <div class="grid grid-cols-3 items-center">
 	<label for="mysqlDatabase">Database</label>
@@ -41,8 +42,7 @@ define('SUBDOMAIN_INSTALL', false);` : null}>{service.wordpress.extraConfig}</te
 			readonly={readOnly}
 			disabled={readOnly}
 			bind:value={service.wordpress.mysqlDatabase}
-			placeholder="eg: wordpress_db"
-		/>
+			placeholder="eg: wordpress_db" />
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -54,8 +54,7 @@ define('SUBDOMAIN_INSTALL', false);` : null}>{service.wordpress.extraConfig}</te
 			placeholder="MySQL Root User"
 			value={service.wordpress.mysqlRootUser}
 			disabled
-			readonly
-		/>
+			readonly />
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -67,8 +66,7 @@ define('SUBDOMAIN_INSTALL', false);` : null}>{service.wordpress.extraConfig}</te
 			readonly
 			disabled
 			name="mysqlRootUserPassword"
-			value={service.wordpress.mysqlRootUserPassword}
-		/>
+			value={service.wordpress.mysqlRootUserPassword} />
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -86,7 +84,6 @@ define('SUBDOMAIN_INSTALL', false);` : null}>{service.wordpress.extraConfig}</te
 			readonly
 			disabled
 			name="mysqlPassword"
-			value={service.wordpress.mysqlPassword}
-		/>
+			value={service.wordpress.mysqlPassword} />
 	</div>
 </div>

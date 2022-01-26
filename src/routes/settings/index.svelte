@@ -77,48 +77,45 @@
 	}
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Settings</div>
+<div class="flex space-x-1 py-5 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Settings</div>
 </div>
 {#if $session.teamId === '0'}
-	<div class="max-w-2xl mx-auto">
+	<div class="mx-auto max-w-2xl">
 		<form on:submit|preventDefault={handleSubmit}>
-			<div class="font-bold flex space-x-1 py-5 px-6">
-				<div class="text-xl tracking-tight mr-4">Global Settings</div>
+			<div class="flex space-x-1 py-5 px-6 font-bold">
+				<div class="mr-4 text-xl tracking-tight">Global Settings</div>
 				<button
 					type="submit"
 					disabled={loading.save}
 					class:bg-green-600={!loading.save}
 					class:hover:bg-green-500={!loading.save}
-					class="mx-2 ">{loading.save ? 'Saving...' : 'Save'}</button
-				>
+					class="mx-2 ">{loading.save ? 'Saving...' : 'Save'}</button>
 				{#if isFqdnSet}
 					<button
 						on:click|preventDefault={removeFqdn}
 						disabled={loading.remove}
 						class:bg-red-600={!loading.remove}
 						class:hover:bg-red-500={!loading.remove}
-						>{loading.remove ? 'Removing...' : 'Remove domain'}</button
-					>
+						>{loading.remove ? 'Removing...' : 'Remove domain'}</button>
 				{/if}
 			</div>
 			<div class="px-4 sm:px-6">
-				<div class="py-4 flex space-x-4 px-4">
+				<div class="flex space-x-4 py-4 px-4">
 					<p class="text-base font-bold text-stone-100">Domain (FQDN)</p>
 
-					<div class="justify-center text-center space-y-2">
+					<div class="justify-center space-y-2 text-center">
 						<input
 							bind:value={fqdn}
-							readonly={!$session.isAdmin}
+							readonly={!$session.isAdmin || isFqdnSet}
+							disabled={!$session.isAdmin || isFqdnSet}
 							name="fqdn"
 							id="fqdn"
 							pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 							placeholder="eg: https://coolify.io"
-							required
-						/>
+							required />
 						<Explainer
-							text="Set the fully qualified domain name for your Coolify instance. If you specify <span class='text-green-600'>https</span>, it will be accessible only over https. SSL certificate will be generated for you."
-						/>
+							text="Set the fully qualified domain name for your Coolify instance. <br>If you specify <span class='text-green-600'>https</span>, it will be accessible only over https. <br>SSL certificate will be generated for you." />
 					</div>
 				</div>
 				<ul class="mt-2 divide-y divide-stone-800">
@@ -126,8 +123,7 @@
 						bind:setting={isRegistrationEnabled}
 						title="Registration allowed?"
 						description="Allow further registrations to the application. <br>It's turned off after the first registration. "
-						on:click={() => changeSettings('isRegistrationEnabled')}
-					/>
+						on:click={() => changeSettings('isRegistrationEnabled')} />
 				</ul>
 			</div>
 		</form>

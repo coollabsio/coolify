@@ -9,7 +9,7 @@ export const dateOptions: DateTimeFormatOptions = {
 	hour12: false
 };
 
-export async function getGithubToken({apiUrl, application, githubToken}): Promise<void> {
+export async function getGithubToken({ apiUrl, application, githubToken }): Promise<void> {
 	const response = await fetch(
 		`${apiUrl}/app/installations/${application.gitSource.githubApp.installationId}/access_tokens`,
 		{
@@ -26,8 +26,8 @@ export async function getGithubToken({apiUrl, application, githubToken}): Promis
 	return data.token;
 }
 export const staticDeployments = ['react', 'vuejs', 'static', 'svelte', 'gatsby', 'php'];
-export const notNodeDeployments = ['php', 'docker', 'rust']
+export const notNodeDeployments = ['php', 'docker', 'rust'];
 
 export function getDomain(domain) {
-    return domain?.replace('https://', '').replace('http://', '')
+	return domain?.replace('https://', '').replace('http://', '');
 }

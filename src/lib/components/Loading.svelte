@@ -5,9 +5,8 @@
 
 {#if fullscreen}
 	<div
-		class="main fixed left-0 top-0 flex flex-wrap content-center h-full"
-		class:bg-coolblack={cover}
-	>
+		class="main fixed left-0 top-0 flex h-full flex-wrap content-center"
+		class:bg-coolblack={cover}>
 		<span class="loader" />
 	</div>
 {:else}

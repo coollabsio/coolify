@@ -15,7 +15,7 @@
 	let loading = true;
 	let currentStatus;
 	let streamInterval;
-	
+
 	const { id } = $page.params;
 
 	async function streamLogs(sequence = 0) {

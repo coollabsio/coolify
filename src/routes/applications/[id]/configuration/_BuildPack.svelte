@@ -27,11 +27,11 @@
 <form on:submit|preventDefault={() => handleSubmit(buildPack.name)}>
 	<button
 		type="submit"
-		class="relative box-selection text-xl font-bold flex {buildPack.hoverColor} {foundConfig?.buildPack ===
+		class="box-selection relative flex text-xl font-bold {buildPack.hoverColor} {foundConfig?.buildPack ===
 			buildPack.name && buildPack.color}"
 		><span>{buildPack.fancyName}</span>
 		{#if !scanning && foundConfig?.buildPack === buildPack.name}
-			<span class="text-xs absolute bottom-0 pb-2">This one...</span>
+			<span class="absolute bottom-0 pb-2 text-xs">This one...</span>
 		{/if}
 	</button>
 </form>

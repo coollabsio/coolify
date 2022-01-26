@@ -40,8 +40,8 @@
 	}
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Add New Service</div>
+<div class="flex space-x-1 py-5 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Add New Service</div>
 </div>
 <div class="pt-10">
 	<form on:submit|preventDefault={handleSubmit}>
@@ -51,8 +51,7 @@
 				placeholder="Service name"
 				required
 				bind:this={autofocus}
-				bind:value={name}
-			/>
+				bind:value={name} />
 			<button type="submit" class="bg-pink-600 hover:bg-pink-500">Save</button>
 		</div>
 	</form>

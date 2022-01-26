@@ -7,54 +7,53 @@ import { configureSimpleServiceProxyOff } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler<Locals> = async (event) => {
-    const { teamId, status, body } = await getUserDetails(event);
-    if (status === 401) return { status, body }
+	const { teamId, status, body } = await getUserDetails(event);
+	if (status === 401) return { status, body };
 
-    const { id } = event.params
+	const { id } = event.params;
 
-    try {
-        const service = await db.getService({ id, teamId })
-        const { destinationDockerId, destinationDocker, fqdn } = service
-        const domain = getDomain(fqdn)
+	try {
+		const service = await db.getService({ id, teamId });
+		const { destinationDockerId, destinationDocker, fqdn } = service;
+		const domain = getDomain(fqdn);
 
-        if (destinationDockerId) {
-            const docker = dockerInstance({ destinationDocker })
-            const container = docker.engine.getContainer(id)
-            const postgresqlContainer = docker.engine.getContainer(`${id}-postgresql`)
-            const clickhouseContainer = docker.engine.getContainer(`${id}-clickhouse`)
-            try {
-                if (container) {
-                    await container.stop()
-                    await container.remove()
-                }
-            } catch (error) {
-                console.error(error)
-            }
-            try {
-                if (postgresqlContainer) {
-                    await postgresqlContainer.stop()
-                    await postgresqlContainer.remove()
-                }
-            } catch (error) {
-                console.error(error)
-            }
-            try {
-                if (postgresqlContainer) {
-                    await clickhouseContainer.stop()
-                    await clickhouseContainer.remove()
-                }
-            } catch (error) {
-                console.error(error)
-            }
+		if (destinationDockerId) {
+			const docker = dockerInstance({ destinationDocker });
+			const container = docker.engine.getContainer(id);
+			const postgresqlContainer = docker.engine.getContainer(`${id}-postgresql`);
+			const clickhouseContainer = docker.engine.getContainer(`${id}-clickhouse`);
+			try {
+				if (container) {
+					await container.stop();
+					await container.remove();
+				}
+			} catch (error) {
+				console.error(error);
+			}
+			try {
+				if (postgresqlContainer) {
+					await postgresqlContainer.stop();
+					await postgresqlContainer.remove();
+				}
+			} catch (error) {
+				console.error(error);
+			}
+			try {
+				if (postgresqlContainer) {
+					await clickhouseContainer.stop();
+					await clickhouseContainer.remove();
+				}
+			} catch (error) {
+				console.error(error);
+			}
 
-            await configureSimpleServiceProxyOff({ domain })
-        }
+			await configureSimpleServiceProxyOff({ domain });
+		}
 
-        return {
-            status: 200
-        }
-    } catch (error) {
-        return PrismaErrorHandler(error)
-    }
-
-}
+		return {
+			status: 200
+		};
+	} catch (error) {
+		return PrismaErrorHandler(error);
+	}
+};

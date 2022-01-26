@@ -51,8 +51,8 @@
 	}
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Select a Git Source</div>
+<div class="flex space-x-1 py-5 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Select a Git Source</div>
 </div>
 <div class="flex justify-center">
 	{#if !sources || sources.length === 0}
@@ -70,9 +70,7 @@
 							stroke-linecap="round"
 							stroke-linejoin="round"
 							stroke-width="2"
-							d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-						/></svg
-					>
+							d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
 				</a>
 			</div>
 		</div>
@@ -87,8 +85,7 @@
 							class="disabled:opacity-95 bg-coolgray-200 disabled:text-white box-selection hover:bg-orange-700"
 							class:border-red-500={source.gitlabApp && !source.gitlabAppId}
 							class:border-0={source.gitlabApp && !source.gitlabAppId}
-							class:border-l-4={source.gitlabApp && !source.gitlabAppId}
-						>
+							class:border-l-4={source.gitlabApp && !source.gitlabAppId}>
 							<div class="font-bold text-xl text-center truncate">{source.name}</div>
 							{#if source.gitlabApp && !source.gitlabAppId}
 								<div class="font-bold text-center truncate">Configuration missing</div>

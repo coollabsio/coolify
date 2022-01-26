@@ -28,22 +28,21 @@
 	export let servicesCount: number;
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Dashboard</div>
+<div class="flex space-x-1 py-5 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Dashboard</div>
 </div>
 
-<div class="mt-10 pb-12 sm:pb-16 tracking-tight">
+<div class="mt-10 pb-12 tracking-tight sm:pb-16">
 	<div class="relative">
 		<div class="absolute inset-0 h-1/2" />
 		<div class="relative mx-auto px-4 sm:px-6 lg:px-8">
-			<div class="max-w-4xl mx-auto">
-				<dl class="sm:grid sm:grid-cols-3 gap-5 gap-y-16">
+			<div class="mx-auto max-w-4xl">
+				<dl class="gap-5 gap-y-16 sm:grid sm:grid-cols-3">
 					<a
 						href="/applications"
 						sveltekit:prefetch
-						class="flex rounded flex-col p-6 text-center hover:bg-green-500 hover:text-white text-green-500 transition duration-150 cursor-pointer no-underline"
-					>
-						<dt class="order-2 mt-2 text-sm leading-6 font-bold text-white uppercase">
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-green-500 no-underline transition duration-150 hover:bg-green-500 hover:text-white">
+						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
 							Applications
 						</dt>
 						<dd class="order-1 text-5xl font-extrabold ">
@@ -53,9 +52,8 @@
 					<a
 						href="/destinations"
 						sveltekit:prefetch
-						class="flex rounded flex-col p-6 text-center hover:bg-sky-500 hover:text-white text-sky-500 transition duration-150 cursor-pointer no-underline"
-					>
-						<dt class="order-2 mt-2 text-sm leading-6 font-bold text-white uppercase">
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-sky-500 no-underline transition duration-150 hover:bg-sky-500 hover:text-white">
+						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
 							Destinations
 						</dt>
 						<dd class="order-1 text-5xl font-extrabold ">
@@ -65,9 +63,8 @@
 					<a
 						href="/sources"
 						sveltekit:prefetch
-						class="flex rounded flex-col p-6 text-center hover:bg-orange-500 hover:text-white text-orange-500 transition duration-150 cursor-pointer no-underline"
-					>
-						<dt class="order-2 mt-2 text-sm leading-6 font-bold text-white uppercase">
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-orange-500 no-underline transition duration-150 hover:bg-orange-500 hover:text-white">
+						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
 							Git Sources
 						</dt>
 						<dd class="order-1 text-5xl font-extrabold ">
@@ -77,26 +74,23 @@
 					<a
 						href="/databases"
 						sveltekit:prefetch
-						class="flex flex-col rounded p-6 text-center hover:bg-purple-500 hover:text-white text-purple-500 transition duration-150 cursor-pointer no-underline"
-					>
-						<dt class="order-2 mt-2 text-sm leading-6 font-bold text-white uppercase">Databases</dt>
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-purple-500 no-underline transition duration-150 hover:bg-purple-500 hover:text-white">
+						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">Databases</dt>
 						<dd class="order-1 text-5xl font-extrabold ">{databasesCount}</dd>
 					</a>
 					<a
 						href="/services"
 						sveltekit:prefetch
-						class="flex flex-col rounded p-6 text-center hover:bg-pink-500 hover:text-white text-pink-500 transition duration-150 cursor-pointer no-underline"
-					>
-						<dt class="order-2 mt-2 text-sm leading-6 font-bold text-white uppercase">Services</dt>
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-pink-500 no-underline transition duration-150 hover:bg-pink-500 hover:text-white">
+						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">Services</dt>
 						<dd class="order-1 text-5xl font-extrabold ">{servicesCount}</dd>
 					</a>
 
 					<a
 						href="/teams"
 						sveltekit:prefetch
-						class="flex rounded flex-col p-6 text-center hover:bg-cyan-500 hover:text-white text-cyan-500 transition duration-150 cursor-pointer no-underline"
-					>
-						<dt class="order-2 mt-2 text-sm leading-6 font-bold text-white uppercase">Teams</dt>
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-cyan-500 no-underline transition duration-150 hover:bg-cyan-500 hover:text-white">
+						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">Teams</dt>
 						<dd class="order-1 text-5xl font-extrabold ">
 							{teamsCount}
 						</dd>

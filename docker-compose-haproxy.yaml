@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  haproxy: 
+  haproxy:
     image: coollabsio/coolify-haproxy-alpine:latest
     container_name: coolify-haproxy
     extra_hosts:
@@ -10,12 +10,12 @@ services:
       - coolify
     volumes:
       - './data/haproxy/:/usr/local/etc/haproxy/'
-    ports: 
-      - "80:80"
-      - "443:443"
-      - "8404:8404"
-      - "5555:5555"
-      - "3306:3306"
+    ports:
+      - '80:80'
+      - '443:443'
+      - '8404:8404'
+      - '5555:5555'
+      - '3306:3306'
 
 networks:
   coolify:

@@ -1,10 +1,12 @@
-async function send({ method, path, data = {}, headers }) {
-	const opts = { method, headers: {}, body: null };
+async function send({ method, path, data = {}, headers, timeout = 30000 }) {
+	const controller = new AbortController();
+	const id = setTimeout(() => controller.abort(), timeout);
+	const opts = { method, headers: {}, body: null, signal: controller.signal };
 	if (Object.keys(data).length > 0) {
-		let parsedData = data
+		let parsedData = data;
 		for (const [key, value] of Object.entries(data)) {
 			if (value === '') {
-				parsedData[key] = null
+				parsedData[key] = null;
 			}
 		}
 		if (parsedData) {
@@ -17,12 +19,22 @@ async function send({ method, path, data = {}, headers }) {
 		opts.headers = {
 			...opts.headers,
 			...headers
-		}
+		};
 	}
-	const response = await fetch(`${path}`, opts)
-	const responseData = await response.json()
-	if (!response.ok) throw responseData
-	return responseData
+	const response = await fetch(`${path}`, opts);
+
+	clearTimeout(id);
+
+	const contentType = response.headers.get('content-type');
+
+	let responseData = {};
+	if (contentType?.indexOf('application/json') !== -1) {
+		responseData = await response.json();
+	} else {
+		responseData = await response.text();
+	}
+	if (!response.ok) throw responseData;
+	return responseData;
 }
 
 export function get(path, headers = {}) {

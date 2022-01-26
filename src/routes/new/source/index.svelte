@@ -43,13 +43,13 @@
 	}
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Add New Git Source</div>
+<div class="flex space-x-1 py-5 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Add New Git Source</div>
 </div>
 
-<div class="flex-col text-center space-y-2 pb-10">
-	<div class="font-bold text-xl text-white">Offical providers</div>
-	<div class="flex space-x-2 justify-center">
+<div class="flex-col space-y-2 pb-10 text-center">
+	<div class="text-xl font-bold text-white">Offical providers</div>
+	<div class="flex justify-center space-x-2">
 		<button class="w-32" on:click={() => setPredefined('github')}>GitHub.com</button>
 		<button class="w-32" on:click={() => setPredefined('gitlab')}>GitLab.com</button>
 		<button class="w-32" on:click={() => setPredefined('bitbucket')}>Bitbucket.com</button>

@@ -3,35 +3,35 @@
 @tailwind utilities;
 
 html {
-	@apply h-full ;
+	@apply h-full;
 }
 body {
-	@apply text-sm text-white bg-coolblack overflow-x-hidden min-h-screen;
+	@apply min-h-screen overflow-x-hidden bg-coolblack text-sm text-white;
 }
 
-main, .main {
+main,
+.main {
 	width: calc(100% - 4rem);
 	margin-left: 4rem;
 }
 
 input {
-	@apply text-xs px-2  py-2 rounded bg-transparent border border-transparent bg-coolgray-200 text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500 placeholder-stone-600 w-96 select-all disabled:bg-transparent;
+	@apply w-96 select-all  rounded border border-transparent bg-transparent bg-coolgray-200 px-2 py-2 text-xs text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:bg-transparent;
 }
 textarea {
-	@apply text-xs px-2 py-2 rounded bg-transparent border border-transparent bg-coolgray-200 text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500 placeholder-stone-600 w-96 select-all disabled:bg-transparent;
+	@apply w-96 select-all rounded border border-transparent bg-transparent bg-coolgray-200 px-2 py-2 text-xs text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:bg-transparent;
 }
 
-
 select {
-	@apply text-xs px-2 py-2 rounded font-bold bg-coolgray-200  text-white transition duration-150 outline-none hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:text-stone-600;
+	@apply rounded bg-coolgray-200 px-2 py-2 text-xs font-bold  text-white outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:text-stone-600;
 }
 
 label {
-	@apply w-64 inline-block text-xs;
+	@apply inline-block w-64 text-xs;
 }
 
 button {
-	@apply transition-all duration-100 rounded text-xs font-medium outline-none hover:bg-coolgray-500 disabled:text-stone-600 disabled:cursor-not-allowed disabled:bg-coolblack bg-coolgray-200 px-4 p-1;
+	@apply rounded bg-coolgray-200 p-1 px-4 text-xs font-medium outline-none transition-all duration-100 hover:bg-coolgray-500 disabled:cursor-not-allowed disabled:bg-coolblack disabled:text-stone-600;
 }
 
 a {
@@ -43,11 +43,11 @@ a {
 }
 
 .nav-main {
-	@apply w-16 bg-coolgray-200 top-0 left-0 fixed min-w-[4rem] min-h-screen border-r border-stone-800;
+	@apply fixed top-0 left-0 min-h-screen w-16 min-w-[4rem] border-r border-stone-800 bg-coolgray-200;
 }
 
 .nav-side {
-	@apply flex text-white justify-end items-center m-5 fixed right-0 top-0 space-x-2 z-50 bg-coolblack/40;
+	@apply fixed right-0 top-0 z-50 m-5 flex items-center justify-end space-x-2 bg-coolblack/40 text-white;
 }
 
 .add-icon {
@@ -55,11 +55,11 @@ a {
 }
 
 .icons {
-	@apply rounded p-2 transition duration-200 disabled:bg-coolblack hover:bg-coolgray-500 !important;
+	@apply rounded p-2 transition duration-200 hover:bg-coolgray-500 disabled:bg-coolblack !important;
 }
 
 .arrow-right-applications {
-	@apply text-green-500 px-2 -ml-6 font-bold;
+	@apply -ml-6 px-2 font-bold text-green-500;
 }
 
 .border-gradient {
@@ -70,7 +70,7 @@ a {
 		rgba(255, 0, 128),
 		rgba(56, 2, 155, 0)
 	);
-	   border-image: linear-gradient(
+	border-image: linear-gradient(
 		0.25turn,
 		rgba(255, 249, 34),
 		rgba(255, 0, 128),
@@ -86,7 +86,7 @@ a {
 		rgba(255, 0, 128),
 		rgba(56, 2, 155, 0)
 	);
-	   border-image: linear-gradient(
+	border-image: linear-gradient(
 		0.25turn,
 		rgba(255, 249, 34),
 		rgba(255, 0, 128),
@@ -148,7 +148,7 @@ a {
 	padding: 8px;
 	color: #fff;
 	content: attr(data-tooltip);
-	@apply bg-coollabs rounded text-center min-w-[100px] font-normal;
+	@apply min-w-[100px] rounded bg-coollabs text-center font-normal;
 }
 
 /* Directions */
@@ -244,10 +244,10 @@ a {
 }
 
 .box-selection {
-	@apply min-w-[16rem] max-w-[24rem] bg-coolgray-200 hover:bg-coolgray-400 rounded-lg justify-center p-6 shadow-lg border-transparent hover:border-transparent hover:scale-105 transition duration-150;
+	@apply min-w-[16rem] max-w-[24rem] justify-center rounded-lg border-transparent bg-coolgray-200 p-6 shadow-lg transition duration-150 hover:scale-105 hover:border-transparent hover:bg-coolgray-400;
 }
 
-._toastBar  {
+._toastBar {
 	@apply hidden !important;
 }
 ._toastMsg {
@@ -261,56 +261,56 @@ a {
 }
 
 .lds-heart {
-  display: inline-block;
-  position: relative;
-  width: 32px;
-  height: 32px;
-  transform: rotate(45deg);
-  transform-origin: 16px 16px;
+	display: inline-block;
+	position: relative;
+	width: 32px;
+	height: 32px;
+	transform: rotate(45deg);
+	transform-origin: 16px 16px;
 }
 .lds-heart div {
-  top: 12px;
-  left: 12px;
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  background: #fff;
-  animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+	top: 12px;
+	left: 12px;
+	position: absolute;
+	width: 12px;
+	height: 12px;
+	background: #fff;
+	animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 .lds-heart div:after,
 .lds-heart div:before {
-  content: " ";
-  position: absolute;
-  display: block;
-  width: 12px;
-  height: 12px;
-  background: #fff;
+	content: ' ';
+	position: absolute;
+	display: block;
+	width: 12px;
+	height: 12px;
+	background: #fff;
 }
 .lds-heart div:before {
-  left: -8px;
-  border-radius: 50% 0 0 50%;
+	left: -8px;
+	border-radius: 50% 0 0 50%;
 }
 .lds-heart div:after {
-  top: -8px;
-  border-radius: 50% 50% 0 0;
+	top: -8px;
+	border-radius: 50% 50% 0 0;
 }
 @keyframes lds-heart {
-  0% {
-    transform: scale(0.95);
-  }
-  5% {
-    transform: scale(1.1);
-  }
-  39% {
-    transform: scale(0.85);
-  }
-  45% {
-    transform: scale(1);
-  }
-  60% {
-    transform: scale(0.95);
-  }
-  100% {
-    transform: scale(0.9);
-  }
+	0% {
+		transform: scale(0.95);
+	}
+	5% {
+		transform: scale(1.1);
+	}
+	39% {
+		transform: scale(0.85);
+	}
+	45% {
+		transform: scale(1);
+	}
+	60% {
+		transform: scale(0.95);
+	}
+	100% {
+		transform: scale(0.9);
+	}
 }

@@ -1,4 +1,4 @@
-import github from './github'
-import gitlab from './gitlab'
+import github from './github';
+import gitlab from './gitlab';
 
-export { github, gitlab }
+export { github, gitlab };

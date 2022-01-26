@@ -16,14 +16,14 @@
 	export let error;
 </script>
 
-<div class="flex flex-col justify-center items-center mx-auto h-screen px-4">
-	<div class="text-7xl font-bold pb-10">{status}</div>
+<div class="mx-auto flex h-screen flex-col items-center justify-center px-4">
+	<div class="pb-10 text-7xl font-bold">{status}</div>
 	<div class="text-3xl font-bold">Ooops you are lost! But don't be afraid!</div>
 	<div class="text-xl">
-		You can find your way back <a href="/" class="text-sky-400 font-bold uppercase">here</a>
+		You can find your way back <a href="/" class="font-bold uppercase text-sky-400">here</a>
 	</div>
 	<div class="py-10 text-xs font-bold">
 		<pre
-			class="text-left text-xs tracking-tighter whitespace-pre-wrap break-words w-full">{error.message} {error.stack}</pre>
+			class="w-full whitespace-pre-wrap break-words text-left text-xs tracking-tighter">{error.message} {error.stack}</pre>
 	</div>
 </div>

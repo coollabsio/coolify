@@ -4,8 +4,8 @@
 	export let service;
 </script>
 
-<div class="font-bold flex space-x-1 py-5">
-	<div class="text-xl tracking-tight mr-4">MinIO Server</div>
+<div class="flex space-x-1 py-5 font-bold">
+	<div class="mr-4 text-xl tracking-tight">MinIO Server</div>
 </div>
 <div class="grid grid-cols-3 items-center">
 	<label for="rootUser">Root User</label>
@@ -16,8 +16,7 @@
 			placeholder="User to login"
 			value={service.minio.rootUser}
 			disabled
-			readonly
-		/>
+			readonly />
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -29,8 +28,7 @@
 			readonly
 			disabled
 			name="rootUserPassword"
-			value={service.minio.rootUserPassword}
-		/>
+			value={service.minio.rootUserPassword} />
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -42,7 +40,6 @@
 			value={service.minio.publicPort}
 			disabled
 			readonly
-			placeholder="Generated automatically after start"
-		/>
+			placeholder="Generated automatically after start" />
 	</div>
 </div>

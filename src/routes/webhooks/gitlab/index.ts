@@ -3,55 +3,54 @@ import { getTeam } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import got from 'got';
-import cookie from 'cookie'
+import cookie from 'cookie';
 
 export const options = async () => {
-    return {
-        status: 200,
-        headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-
-        }
-    }
-}
+	return {
+		status: 200,
+		headers: {
+			'Access-Control-Allow-Origin': '*',
+			'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+			'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
+		}
+	};
+};
 
 export const get: RequestHandler = async (event) => {
-    const teamId = undefined
-    const code = event.url.searchParams.get('code')
-    const state = event.url.searchParams.get('state')
+	const teamId = undefined;
+	const code = event.url.searchParams.get('code');
+	const state = event.url.searchParams.get('state');
 
-    try {
-        // TODO: Solve somehow the http/https thing below
-        const application = await db.getApplication({ id: state, teamId })
-        const { appId, appSecret } = application.gitSource.gitlabApp
-        const { htmlUrl } = application.gitSource
-        const { access_token } = await got.post(`${htmlUrl}/oauth/token`, {
-            searchParams: {
-                client_id: appId,
-                client_secret: appSecret,
-                code,
-                state,
-                grant_type: 'authorization_code',
-                redirect_uri: `${event.url.origin}/webhooks/gitlab`
-            }
-        }).json()
+	try {
+		// TODO: Solve somehow the http/https thing below
+		const application = await db.getApplication({ id: state, teamId });
+		const { appId, appSecret } = application.gitSource.gitlabApp;
+		const { htmlUrl } = application.gitSource;
+		const { access_token } = await got
+			.post(`${htmlUrl}/oauth/token`, {
+				searchParams: {
+					client_id: appId,
+					client_secret: appSecret,
+					code,
+					state,
+					grant_type: 'authorization_code',
+					redirect_uri: `${event.url.origin}/webhooks/gitlab`
+				}
+			})
+			.json();
 
-        return {
-            status: 302,
-            headers: {
-                Location: `/webhooks/success`, "Set-Cookie": [
-                    `gitlabToken=${access_token}; HttpOnly; Path=/; Max-Age=15778800;`
-                ]
-            }
-        }
-    } catch (err) {
-        console.log(err)
-        return {
-            status: 500,
-            body: err.message
-        }
-    }
-
-}
+		return {
+			status: 302,
+			headers: {
+				Location: `/webhooks/success`,
+				'Set-Cookie': [`gitlabToken=${access_token}; HttpOnly; Path=/; Max-Age=15778800;`]
+			}
+		};
+	} catch (err) {
+		console.log(err);
+		return {
+			status: 500,
+			body: err.message
+		};
+	}
+};

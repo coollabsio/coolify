@@ -1,12 +1,12 @@
 <script lang="ts">
-import { dev } from '$app/env';
+	import { dev } from '$app/env';
 
 	import { dashify } from '$lib/github';
 
 	export let source;
 
 	async function installRepositories(source) {
-		const {htmlUrl} = source
+		const { htmlUrl } = source;
 		const left = screen.width / 2 - 1020 / 2;
 		const top = screen.height / 2 - 618 / 2;
 		const newWindow = open(
@@ -21,14 +21,14 @@ import { dev } from '$app/env';
 		const timer = setInterval(() => {
 			if (newWindow?.closed) {
 				clearInterval(timer);
-				window.location.reload()
+				window.location.reload();
 			}
 		}, 100);
 	}
 
 	function newGithubApp(source) {
 		const { organization, id, htmlUrl, type } = source;
-        const protocol = 'http'
+		const protocol = 'http';
 
 		if (type === 'github') {
 			let url = 'settings/apps/new';

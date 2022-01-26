@@ -26,8 +26,8 @@
 
 <div class="flex justify-center pb-8">
 	<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
-		<div class="flex space-x-2 h-8 items-center">
-			<div class="font-bold text-xl text-white">Configuration</div>
+		<div class="flex h-8 items-center space-x-2">
+			<div class="text-xl font-bold text-white">Configuration</div>
 			<button type="submit" class="bg-orange-600 hover:bg-orange-500">Save</button>
 		</div>
 		<div class="grid grid-cols-3 items-center">
@@ -50,8 +50,7 @@
 					placeholder="GitHub.com"
 					required
 					bind:this={nameEl}
-					bind:value={gitSource.name}
-				/>
+					bind:value={gitSource.name} />
 			</div>
 		</div>
 
@@ -64,8 +63,7 @@
 					id="htmlUrl"
 					placeholder="eg: https://github.com"
 					required
-					bind:value={gitSource.htmlUrl}
-				/>
+					bind:value={gitSource.htmlUrl} />
 			</div>
 		</div>
 		<div class="grid grid-cols-3 items-center">
@@ -77,8 +75,7 @@
 					id="apiUrl"
 					placeholder="eg: https://api.github.com"
 					required
-					bind:value={gitSource.apiUrl}
-				/>
+					bind:value={gitSource.apiUrl} />
 			</div>
 		</div>
 		<div class="grid grid-cols-3">
@@ -89,12 +86,10 @@
 					id="organization"
 					placeholder="eg: coollabsio"
 					bind:value={gitSource.organization}
-					bind:this={organizationEl}
-				/>
+					bind:this={organizationEl} />
 				<Explainer
 					text="Fill it if you would like to use an organization's as your Git Source. Otherwise your
-				user will be used."
-				/>
+				user will be used." />
 			</div>
 		</div>
 	</form>

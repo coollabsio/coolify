@@ -1,5 +1,5 @@
-import { prisma } from "./common";
+import { prisma } from './common';
 
 export async function listSettings() {
-    return await prisma.setting.findFirst({})
+	return await prisma.setting.findFirst({});
 }

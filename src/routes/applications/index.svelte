@@ -25,8 +25,8 @@
 	import Application from './_Application.svelte';
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Applications</div>
+<div class="flex space-x-1 py-5 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Applications</div>
 	{#if $session.isAdmin}
 		<a href="/new/application" class="add-icon bg-green-600 hover:bg-green-500">
 			<svg
@@ -39,16 +39,14 @@
 					stroke-linecap="round"
 					stroke-linejoin="round"
 					stroke-width="2"
-					d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-				/></svg
-			>
+					d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
 		</a>
 	{/if}
 </div>
 <div class="flex flex-wrap justify-center space-x-4">
 	{#if !applications || applications.length === 0}
 		<div class="flex-col">
-			<div class="text-center font-bold text-xl">No applications found</div>
+			<div class="text-center text-xl font-bold">No applications found</div>
 		</div>
 	{:else}
 		{#each applications as application}

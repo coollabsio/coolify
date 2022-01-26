@@ -2,8 +2,9 @@
 	export let database;
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 </script>
-<div class="font-bold flex space-x-1 py-5">
-	<div class="text-xl tracking-tight mr-4">MongoDB</div>
+
+<div class="flex space-x-1 py-5 font-bold">
+	<div class="mr-4 text-xl tracking-tight">MongoDB</div>
 </div>
 <div class="grid grid-cols-3 items-center">
 	<label for="rootUser">Root User</label>
@@ -14,8 +15,7 @@
 			readonly
 			disabled
 			name="rootUser"
-			value={database.rootUser}
-		/>
+			value={database.rootUser} />
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -28,7 +28,6 @@
 			disabled
 			id="rootUserPassword"
 			name="rootUserPassword"
-			value={database.rootUserPassword}
-		/>
+			value={database.rootUserPassword} />
 	</div>
 </div>

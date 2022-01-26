@@ -148,12 +148,12 @@
 	});
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Configure Build Pack</div>
+<div class="flex space-x-1 py-5 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Configure Build Pack</div>
 </div>
 
 {#if scanning}
-	<div class="font-bold flex space-x-1 py-5 px-6 justify-center">
+	<div class="flex justify-center space-x-1 py-5 px-6 font-bold">
 		<div class="text-xl tracking-tight">Scanning repository to suggest a build pack for you...</div>
 	</div>
 {:else}

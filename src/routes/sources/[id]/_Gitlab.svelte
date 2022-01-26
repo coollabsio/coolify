@@ -47,8 +47,8 @@
 	async function handleSubmit() {
 		try {
 			await post(`/sources/${id}.json`, { ...payload });
-			window.location.reload()
-		} catch(error) {
+			window.location.reload();
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}
@@ -79,9 +79,8 @@
 			{/if}
 
 			<div class="w-full pt-10 text-center">
-				<button class="bg-orange-600 hover:bg-orange-500 w-96" type="submit"
-					>Register new OAuth application on GitLab</button
-				>
+				<button class="w-96 bg-orange-600 hover:bg-orange-500" type="submit"
+					>Register new OAuth application on GitLab</button>
 			</div>
 
 			<Explainer
@@ -89,18 +88,16 @@
 				text="<span class='font-bold text-base'>Scopes required:</span> 	
 	<br>- api (Access the authenticated user's API)
 	<br>- read_repository (Allows read-only access to the repository)
-	<br>- email (Allows read-only access to the user's primary email address using OpenID Connect)"
-			/>
+	<br>- email (Allows read-only access to the user's primary email address using OpenID Connect)" />
 		</form>
 		<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4 pt-10">
-			<div class="flex space-x-2 h-8 items-center">
-				<div class="font-bold text-xl text-white">Configuration</div>
+			<div class="flex h-8 items-center space-x-2">
+				<div class="text-xl font-bold text-white">Configuration</div>
 				<button
 					type="submit"
 					class:bg-orange-600={!loading}
 					class:hover:bg-orange-500={!loading}
-					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
-				>
+					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button>
 			</div>
 
 			<div class="grid grid-cols-3 items-start">
@@ -112,11 +109,9 @@
 						name="oauthId"
 						id="oauthId"
 						required
-						bind:value={payload.oauthId}
-					/>
+						bind:value={payload.oauthId} />
 					<Explainer
-						text="The OAuth ID is the unique identifier of the GitLab application. <br>You can find it <span class='underline'>in the URL</span> of your GitLab OAuth Application."
-					/>
+						text="The OAuth ID is the unique identifier of the GitLab application. <br>You can find it <span class='underline'>in the URL</span> of your GitLab OAuth Application." />
 				</div>
 			</div>
 			{#if payload.applicationType === 'group'}
@@ -141,14 +136,12 @@
 						id="appSecret"
 						type="password"
 						required
-						bind:value={payload.appSecret}
-					/>
+						bind:value={payload.appSecret} />
 				</div>
 			</div>
 		</form>
 	{:else}
 		<a href={`${source.htmlUrl}/oauth/applications/${source.gitlabApp.oauthId}`}
-			><button>Check OAuth Application</button></a
-		>
+			><button>Check OAuth Application</button></a>
 	{/if}
 </div>

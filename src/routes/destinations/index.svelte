@@ -26,8 +26,8 @@
 	export let destinations: Prisma.DestinationDocker[];
 </script>
 
-<div class="font-bold flex space-x-1 py-5 px-6">
-	<div class="text-2xl tracking-tight mr-4">Destinations</div>
+<div class="flex space-x-1 py-5 px-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Destinations</div>
 	{#if $session.isAdmin}
 		<a href="/new/destination" class="add-icon bg-sky-600 hover:bg-sky-500">
 			<svg
@@ -40,16 +40,14 @@
 					stroke-linecap="round"
 					stroke-linejoin="round"
 					stroke-width="2"
-					d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-				/></svg
-			>
+					d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
 		</a>
 	{/if}
 </div>
 <div class="flex justify-center">
 	{#if !destinations || destinations.length === 0}
 		<div class="flex-col">
-			<div class="text-center font-bold text-xl">No destination found</div>
+			<div class="text-center text-xl font-bold">No destination found</div>
 		</div>
 	{:else}
 		<div class="flex flex-wrap justify-center">
