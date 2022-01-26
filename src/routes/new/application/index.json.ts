@@ -9,9 +9,10 @@ export const post: RequestHandler<Locals> = async (event) => {
 
 	const { name } = await event.request.json()
 	if (!name) return { status: 400, body: { error: 'Missing name.' } }
-	
+
 	try {
-		return await db.newApplication({ name, teamId })
+		const { id } = await db.newApplication({ name, teamId })
+		return { status: 201, body: { id } }
 	} catch (error) {
 		return PrismaErrorHandler(error)
 	}

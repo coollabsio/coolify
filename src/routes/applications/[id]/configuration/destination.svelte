@@ -30,7 +30,7 @@
 	import type Prisma from '@prisma/client';
 
 	import { page } from '$app/stores';
-	import { enhance, errorNotification } from '$lib/form';
+	import { errorNotification } from '$lib/form';
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/api';
 
@@ -43,7 +43,7 @@
 		try {
 			await post(`/applications/${id}/configuration/destination.json`, { destinationId });
 			return await goto(from || `/applications/${id}/configuration/buildpack`);
-		} catch (error) {
+		} catch ({error}) {
 			return errorNotification(error);
 		}
 	}

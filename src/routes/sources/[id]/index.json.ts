@@ -2,7 +2,8 @@ import { getTeam, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
-export const get: RequestHandler = async (request) => {
+
+export const get: RequestHandler<Locals> = async (request) => {
     const { teamId, status, body } = await getUserDetails(request);
     if (status === 401) return { status, body }
 
@@ -16,28 +17,23 @@ export const get: RequestHandler = async (request) => {
             }
         };
     } catch (error) {
-        throw PrismaErrorHandler(error)
+        return PrismaErrorHandler(error)
     }
 
 }
 
-export const del: RequestHandler = async (request) => {
+export const del: RequestHandler<Locals> = async (request) => {
     const { status, body } = await getUserDetails(request);
     if (status === 401) return { status, body }
 
     const { id } = request.params
 
     try {
-        const source = await db.removeSource({ id })
-        return {
-            body: {
-                source
-            }
-        };
-    } catch (err) {
-        return err
+        await db.removeSource({ id })
+        return { status: 200 }
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
-
 }
 
 export const post: RequestHandler<Locals> = async (event) => {
@@ -50,7 +46,8 @@ export const post: RequestHandler<Locals> = async (event) => {
 
         oauthId = Number(oauthId)
 
-        return await db.addSource({ id, teamId, oauthId, groupName, appId, appSecret })
+        await db.addSource({ id, teamId, oauthId, groupName, appId, appSecret })
+        return { status: 201 }
     } catch (error) {
         return PrismaErrorHandler(error)
     }

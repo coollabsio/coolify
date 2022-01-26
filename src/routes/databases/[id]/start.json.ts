@@ -65,12 +65,8 @@ export const post: RequestHandler<Locals> = async (event) => {
                 status: 200
             }
         } catch (error) {
-            console.log(error)
-            return {
-                status: 500,
-                body: {
-                    message: error
-                }
+            throw {
+                error
             }
         }
 

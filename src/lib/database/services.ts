@@ -76,8 +76,8 @@ export async function setService({ id, version }) {
         where: { id },
         data: { version }
     })
-
 }
+
 export async function updatePlausibleAnalyticsService({ id, fqdn, email, username, name }) {
     await prisma.plausibleAnalytics.update({ where: { serviceId: id }, data: { email, username } })
     await prisma.service.update({ where: { id }, data: { name, fqdn } })
@@ -100,5 +100,4 @@ export async function removeService({ id }) {
     await prisma.plausibleAnalytics.deleteMany({ where: { serviceId: id } })
     await prisma.minio.deleteMany({ where: { serviceId: id } })
     await prisma.service.delete({ where: { id } })
-
 }

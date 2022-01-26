@@ -21,14 +21,23 @@
 
 <script lang="ts">
 	export let name;
-	import { enhance } from '$lib/form';
+	import { errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { post } from '$lib/api';
 
 	let autofocus;
 	onMount(() => {
 		autofocus.focus();
 	});
+	async function handleSubmit() {
+		try {
+			const { id } = await post('/new/team.json', { name });
+			return await goto(`/teams/${id}`);
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 <div class="font-bold flex space-x-1 py-5 px-6">
@@ -36,18 +45,9 @@
 </div>
 
 <div class="pt-10">
-	<form
-		action="/new/team.json"
-		method="post"
-		use:enhance={{
-			result: async (res) => {
-				const { id } = await res.json();
-				goto(`/teams/${id}`);
-			}
-		}}
-	>
+	<form on:submit|preventDefault={handleSubmit}>
 		<div class="flex flex-col items-center space-y-4">
-			<input name="name" placeholder="Team name" required bind:this={autofocus} value={name} />
+			<input name="name" placeholder="Team name" required bind:this={autofocus} bind:value={name} />
 			<button type="submit" class="bg-green-600 hover:bg-green-500">Save</button>
 		</div>
 	</form>

@@ -18,27 +18,27 @@ export const post: RequestHandler<Locals> = async (event) => {
         const userFound = await db.prisma.user.findUnique({ where: { email } })
         if (!userFound) {
             throw {
-                message: `No user found with '${email}' email address.`
+                error: `No user found with '${email}' email address.`
             };
         }
         const uid = userFound.id
         // Invitation to yourself?!
         if (uid === userId) {
             throw {
-                message: `Invitation to yourself? Whaaaaat?`
+                error: `Invitation to yourself? Whaaaaat?`
             };
         }
         const alreadyInTeam = await db.prisma.team.findFirst({ where: { id: teamId, users: { some: { id: uid } } } })
         if (alreadyInTeam) {
             throw {
-                message: `Already in the team.`
+                error: `Already in the team.`
             };
         }
         const invitationFound = await db.prisma.teamInvitation.findFirst({ where: { uid, teamId } })
         if (invitationFound) {
             if (dayjs().toDate() < dayjs(invitationFound.createdAt).add(1, 'day').toDate()) {
                 throw {
-                    message: "Invitiation already pending on user confirmation."
+                    error: "Invitiation already pending on user confirmation."
                 };
             } else {
                 await db.prisma.teamInvitation.delete({ where: { id: invitationFound.id } })

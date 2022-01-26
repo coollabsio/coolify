@@ -7,13 +7,13 @@ export const post: RequestHandler<Locals> = async (event) => {
 	const { userId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body }
 
-	const data = await event.request.formData();
-	const name = data.get('name')
+	const { name } = await event.request.json()
 
 	try {
-		return await db.newTeam({ name, userId })
-	} catch (err) {
-		return err
+		const { id } = await db.newTeam({ name, userId })
+		return { status: 201, body: { id } }
+	} catch (error) {
+		return PrismaErrorHandler(error)
 	}
 }
 

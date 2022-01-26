@@ -1,4 +1,5 @@
 import * as db from '$lib/database';
+import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const options = async () => {
@@ -17,14 +18,13 @@ export const get: RequestHandler = async (request) => {
     const gitSourceId = request.url.searchParams.get('gitSourceId')
     const installation_id = request.url.searchParams.get('installation_id')
 
-    const dbresponse = await db.addInstallation({ gitSourceId, installation_id })
-    if (dbresponse.status !== 201) {
+    try {
+        await db.addInstallation({ gitSourceId, installation_id })
         return {
-            ...dbresponse
+            status: 302,
+            headers: { Location: `/webhooks/success` }
         }
-    }
-    return {
-        status: 302,
-        headers: { Location: `/webhooks/success` }
+    } catch (error) {
+        return PrismaErrorHandler(error)
     }
 }

@@ -40,18 +40,6 @@ enum GitSource {
     Gitlab = 'gitlab', 
     Bitbucket = 'bitbucket'
 }
-interface NewGitSource {
-    name: string,
-    type: string,
-    htmlUrl: string,
-    apiUrl: string,
-    organization?: string
-    applicationType?: string
-}
-
-interface AppConfiguration {
-    configuration: any
-}
 
 type RawHaproxyConfiguration = {
     _version: number;

@@ -24,7 +24,7 @@ export async function login({ email, password }) {
             const passwordMatch = await bcrypt.compare(password, userFound.password)
             if (!passwordMatch) {
                 throw {
-                    message: 'Wrong password or email address.'
+                    error: 'Wrong password or email address.'
                 };
             }
             uid = userFound.id
@@ -33,7 +33,7 @@ export async function login({ email, password }) {
         // If registration disabled, return 403
         if (!isRegistrationEnabled) {
             throw {
-                message: 'Registration disabled by administrator.'
+                error: 'Registration disabled by administrator.'
             }
         }
 

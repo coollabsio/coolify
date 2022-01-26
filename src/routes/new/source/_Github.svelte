@@ -5,8 +5,7 @@
 
 	import Explainer from '$lib/components/Explainer.svelte';
 
-	import { enhance, errorNotification } from '$lib/form';
-	import { gitSourcePayload } from '$lib/store';
+	import { errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
 
 	let nameEl;
@@ -19,7 +18,7 @@
 		try {
 			const { id } = await post(`/new/source.json`, { ...gitSource });
 			return await goto(`/sources/${id}/`);
-		} catch (error) {
+		} catch ({ error }) {
 			return errorNotification(error);
 		}
 	}

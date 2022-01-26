@@ -46,7 +46,7 @@
 				username = user.username;
 			} catch (error) {
 				getGitlabToken();
-			} 
+			}
 			try {
 				groups = await get(`${apiUrl}/v4/groups?per_page=5000`, {
 					Authorization: `Bearer ${$session.gitlabToken}`
@@ -235,7 +235,7 @@
 				webhookToken
 			});
 			return await goto(from || `/applications/${id}/configuration/buildpack`);
-		} catch (error) {
+		} catch ({ error }) {
 			return errorNotification(error);
 		}
 	}
@@ -243,7 +243,7 @@
 		try {
 			await post(`/applications/{id}/configuration/repository.json`, { ...selected });
 			return await goto(from || `/applications/${id}/configuration/destination`);
-		} catch (error) {
+		} catch ({ error }) {
 			return errorNotification(error);
 		}
 	}

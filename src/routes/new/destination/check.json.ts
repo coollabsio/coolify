@@ -9,11 +9,13 @@ export const post: RequestHandler<Locals> = async (event) => {
     const { network } = await event.request.json()
     try {
         const found = await isDockerNetworkExists({ network })
-        return {
-            status: found ? 500 : 200,
-            body: {
-                error: found && 'Network already configured on the destination.'
+        if (found) {
+            throw {
+                error: `Network ${network} already configured on the destination.`,
             }
+        }
+        return {
+            status: 200
         }
     } catch (error) {
         return PrismaErrorHandler(error)

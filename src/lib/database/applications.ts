@@ -2,37 +2,28 @@ import { decrypt, encrypt } from "$lib/crypto"
 import { removeProxyConfiguration } from "$lib/haproxy"
 
 import { getDomain, removeAllPreviewsDestinationDocker, removeDestinationDocker } from "$lib/common"
-import { prisma, PrismaErrorHandler } from "./common"
+import { prisma } from "./common"
 
 export async function listApplications(teamId) {
     return await prisma.application.findMany({ where: { teams: { every: { id: teamId } } } })
 }
 
 export async function newApplication({ name, teamId }) {
-    const app = await prisma.application.create({ data: { name, teams: { connect: { id: teamId } }, settings: { create: { debug: false, previews: false } } } })
-    return { status: 201, body: { id: app.id } }
+    return await prisma.application.create({ data: { name, teams: { connect: { id: teamId } }, settings: { create: { debug: false, previews: false } } } })
+
 }
 
 export async function importApplication({ name, teamId, fqdn, port, buildCommand, startCommand, installCommand }) {
-    try {
-        const app = await prisma.application.create({ data: { name, fqdn, port, buildCommand, startCommand, installCommand, teams: { connect: { id: teamId } } } })
-        return { status: 201, body: { id: app.id } }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
-    }
+    return await prisma.application.create({ data: { name, fqdn, port, buildCommand, startCommand, installCommand, teams: { connect: { id: teamId } } } })
 }
 
 export async function removeApplication({ id, teamId }) {
-
     const { fqdn, destinationDockerId, destinationDocker } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
-
     const domain = getDomain(fqdn)
-
     await prisma.applicationSettings.deleteMany({ where: { application: { id } } })
     await prisma.buildLog.deleteMany({ where: { applicationId: id } })
     await prisma.secret.deleteMany({ where: { applicationId: id } })
     await prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } })
-
     let previews = []
     if (destinationDockerId) {
         await removeDestinationDocker({ id, engine: destinationDocker.engine })
@@ -51,7 +42,6 @@ export async function removeApplication({ id, teamId }) {
             console.log(error)
         }
     }
-
 }
 
 export async function getApplicationWebhook({ projectId, branch }) {
@@ -133,21 +123,16 @@ export async function setApplicationSettings({ id, debug, previews }) {
 }
 
 export async function createBuild({ id, applicationId, destinationDockerId, gitSourceId, githubAppId, gitlabAppId, type }) {
-    try {
-        return await prisma.build.create({
-            data: {
-                id,
-                applicationId,
-                destinationDockerId,
-                gitSourceId,
-                githubAppId,
-                gitlabAppId,
-                status: 'running',
-                type,
-            }
-        })
-    } catch (e) {
-        throw PrismaErrorHandler(e)
-    }
-
+    return await prisma.build.create({
+        data: {
+            id,
+            applicationId,
+            destinationDockerId,
+            gitSourceId,
+            githubAppId,
+            gitlabAppId,
+            status: 'running',
+            type,
+        }
+    })
 }

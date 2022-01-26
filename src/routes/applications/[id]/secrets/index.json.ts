@@ -32,12 +32,10 @@ export const post: RequestHandler<Locals> = async (event) => {
     try {
         const found = await db.isSecretExists({ id, name })
         if (found) {
-            return {
-                status: 500,
-                body: {
-                    error: "Secret already exists"
-                }
+            throw {
+                error: `Secret ${name} already exists`
             }
+
         } else {
             await db.createSecret({ id, name, value, isBuildSecret });
             return {
@@ -62,8 +60,7 @@ export const del: RequestHandler = async (event) => {
             status: 200
         }
     } catch (error) {
-        throw PrismaErrorHandler(error)
-
+        return PrismaErrorHandler(error)
     }
 
 }

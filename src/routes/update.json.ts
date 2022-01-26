@@ -1,6 +1,7 @@
 import { dev } from '$app/env';
 import { asyncExecShell, version } from '$lib/common';
 import { asyncSleep } from '$lib/components/common';
+import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import compare from 'compare-versions';
 import got from "got"
@@ -26,7 +27,7 @@ export const get: RequestHandler = async () => {
     }
 }
 
-export const post: RequestHandler<Locals, FormData> = async () => {
+export const post: RequestHandler<Locals> = async () => {
     try {
         if (!dev) {
             await asyncExecShell(`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db-sqlite coollabsio/coolify:latest /bin/sh -c "env | grep COOLIFY > .env && docker compose up -d --force-recreate"`)
@@ -40,11 +41,6 @@ export const post: RequestHandler<Locals, FormData> = async () => {
             }
         }
     } catch (error) {
-        return {
-            status: 500,
-            body: {
-                message: error.message || error
-            }
-        }
+        return PrismaErrorHandler(error)
     }
 }

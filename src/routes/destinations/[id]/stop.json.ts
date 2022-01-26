@@ -1,4 +1,5 @@
 import { getUserDetails } from '$lib/common';
+import { PrismaErrorHandler } from '$lib/database';
 import { stopCoolifyProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
@@ -13,12 +14,7 @@ export const post: RequestHandler<Locals> = async (event) => {
             status: 200,
         };
     } catch (error) {
-        return {
-            status: 500,
-            body: {
-                message: error.message || error
-            }
-        }
+        return PrismaErrorHandler(error);
     }
 
 }

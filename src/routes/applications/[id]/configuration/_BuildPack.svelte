@@ -18,7 +18,7 @@
 				await post(`/applications/${id}.json`, { ...foundConfig });
 			await post(`/applications/${id}/configuration/buildpack.json`, { buildPack });
 			return await goto(from || `/applications/${id}`);
-		} catch (error) {
+		} catch ({ error }) {
 			return errorNotification(error);
 		}
 	}

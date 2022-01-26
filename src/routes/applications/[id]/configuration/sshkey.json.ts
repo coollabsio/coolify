@@ -7,7 +7,7 @@ export const post: RequestHandler<Locals> = async (event) => {
     try {
         return await db.generateSshKey({ id });
     } catch(error) {
-        throw PrismaErrorHandler(error)
+        return PrismaErrorHandler(error)
     }
 }
 

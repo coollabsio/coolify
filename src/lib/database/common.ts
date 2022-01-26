@@ -35,10 +35,10 @@ export const prisma = new PrismaClient(prismaOptions)
 
 export function PrismaErrorHandler(e) {
     const payload = {
-        status: 500,
+        status: e.status || 500,
         body: {
             message: 'Ooops, something is not okay, are you okay?',
-            error: e.message
+            error: e.error || e.message
         }
     }
     if (e.name === 'NotFoundError') {

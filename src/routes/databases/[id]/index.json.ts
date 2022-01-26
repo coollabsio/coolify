@@ -40,8 +40,6 @@ export const get: RequestHandler = async (event) => {
     } catch (error) {
         return PrismaErrorHandler(error)
     }
-
-
 }
 
 

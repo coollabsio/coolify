@@ -37,7 +37,7 @@
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
 
- 	export let sources: Prisma.GitSource[] & {
+	export let sources: Prisma.GitSource[] & {
 		gitlabApp: Prisma.GitlabApp;
 	};
 
@@ -45,7 +45,7 @@
 		try {
 			await post(`/applications/${id}/configuration/source.json`, { gitSourceId });
 			return await goto(from || `/applications/${id}/configuration/repository`);
-		} catch (error) {
+		} catch ({ error }) {
 			return errorNotification(error);
 		}
 	}

@@ -14,11 +14,13 @@ export const get: RequestHandler<Locals> = async (event) => {
 
     try {
         const found = await db.isBranchAlreadyUsed({ repository, branch, id })
-        return {
-            status: found ? 500 : 200,
-            body: {
-                error: found && 'Branch already used.'
+        if (found) {
+            throw {
+                error: `Branch ${branch} is already used by another application`
             }
+        }
+        return {
+            status: 200
         }
     } catch (error) {
         return PrismaErrorHandler(error)

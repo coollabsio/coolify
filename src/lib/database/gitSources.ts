@@ -18,15 +18,10 @@ export async function newSource({ name, teamId, type, htmlUrl, apiUrl, organizat
     })
 }
 export async function removeSource({ id }) {
-    try {
-        // TODO: Disconnect application with this sourceId! Maybe not needed?
-        const source = await prisma.gitSource.delete({ where: { id }, include: { githubApp: true, gitlabApp: true } })
-        if (source.githubAppId) await prisma.githubApp.delete({ where: { id: source.githubAppId } })
-        if (source.gitlabAppId) await prisma.gitlabApp.delete({ where: { id: source.gitlabAppId } })
-        return { status: 200 }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
-    }
+    // TODO: Disconnect application with this sourceId! Maybe not needed?
+    const source = await prisma.gitSource.delete({ where: { id }, include: { githubApp: true, gitlabApp: true } })
+    if (source.githubAppId) await prisma.githubApp.delete({ where: { id: source.githubAppId } })
+    if (source.gitlabAppId) await prisma.gitlabApp.delete({ where: { id: source.gitlabAppId } })
 }
 
 export async function getSource({ id, teamId }) {
@@ -35,12 +30,11 @@ export async function getSource({ id, teamId }) {
     if (body?.githubApp?.webhookSecret) body.githubApp.webhookSecret = decrypt(body.githubApp.webhookSecret)
     if (body?.githubApp?.privateKey) body.githubApp.privateKey = decrypt(body.githubApp.privateKey)
     if (body?.gitlabApp?.appSecret) body.gitlabApp.appSecret = decrypt(body.gitlabApp.appSecret)
-    return { ...body }
+    return body
 }
 export async function addSource({ id, appId, teamId, oauthId, groupName, appSecret }) {
     const encrptedAppSecret = encrypt(appSecret)
-    await prisma.gitlabApp.create({ data: { teams: { connect: { id: teamId } }, appId, oauthId, groupName, appSecret: encrptedAppSecret, gitSource: { connect: { id } } } })
-    return { status: 201 }
+    return await prisma.gitlabApp.create({ data: { teams: { connect: { id: teamId } }, appId, oauthId, groupName, appSecret: encrptedAppSecret, gitSource: { connect: { id } } } })
 }
 
 export async function configureGitsource({ id, gitSourceId }) {

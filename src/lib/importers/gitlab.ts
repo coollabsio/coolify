@@ -1,6 +1,7 @@
 import { asyncExecShell, saveBuildLog } from "$lib/common";
+import { PrismaErrorHandler } from "$lib/database";
 
-export default async function ({ applicationId, debug, workdir, repodir, repository, branch, buildId, privateSshKey }): Promise<string> {
+export default async function ({ applicationId, debug, workdir, repodir, repository, branch, buildId, privateSshKey }): Promise<any> {
     try {
         saveBuildLog({ line: 'GitLab importer started.', buildId, applicationId })
         await asyncExecShell(`echo '${privateSshKey}' > ${repodir}/id.rsa`)
@@ -12,7 +13,7 @@ export default async function ({ applicationId, debug, workdir, repodir, reposit
         const { stdout: commit } = await asyncExecShell(`cd ${workdir}/ && git rev-parse HEAD`)
         return commit.replace('\n', '')
     } catch (error) {
-        throw new Error(error)
+        return PrismaErrorHandler(error)
     }
 
 }

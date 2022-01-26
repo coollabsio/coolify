@@ -28,12 +28,10 @@ export async function newDatabase({ name, teamId }) {
     while (i < 10);
     if (i === 9) {
         throw {
-                message: 'No free port found!? Is it possible?'
+            error: 'No free port found!? Is it possible?'
         }
     }
     return await prisma.database.create({ data: { name, publicPort, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, teams: { connect: { id: teamId } }, settings: { create: { isPublic: false } } } })
-
-
 }
 
 export async function getDatabase({ id, teamId }) {
@@ -52,10 +50,6 @@ export async function removeDatabase({ id }) {
 }
 
 export async function configureDatabaseType({ id, type }) {
-    // let defaultDatabase = undefined
-    // if (type === 'mysql' || type === 'postgresql' || type === 'couchdb') {
-    //     defaultDatabase = ''
-    // }
     return await prisma.database.update({
         where: { id },
         data: { type }
@@ -74,14 +68,14 @@ export async function updateDatabase({ id, name, defaultDatabase, dbUser, dbUser
     return await prisma.database.update({ where: { id }, data: { name, defaultDatabase, dbUser, dbUserPassword: encryptedDbUserPassword, rootUser, rootUserPassword: encryptedRootUserPassword, version } })
 }
 
-export async function setDatabaseSettings({ id, isPublic }) {
-    try {
-        await prisma.databaseSettings.update({ where: { databaseId: id }, data: { isPublic } })
-        return { status: 201 }
-    } catch (e) {
-        throw PrismaErrorHandler(e)
-    }
-}
+// export async function setDatabaseSettings({ id, isPublic }) {
+//     try {
+//         await prisma.databaseSettings.update({ where: { databaseId: id }, data: { isPublic } })
+//         return { status: 201 }
+//     } catch (e) {
+//         throw PrismaErrorHandler(e)
+//     }
+// }
 
 export async function stopDatabase(database) {
     let everStarted = false

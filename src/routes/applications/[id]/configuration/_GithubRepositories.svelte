@@ -94,7 +94,7 @@
 				return await goto(`${to}?from=${from}`);
 			}
 			return await goto(from || `/applications/${id}/configuration/destination`);
-		} catch (error) {
+		} catch ({ error }) {
 			return errorNotification(error);
 		}
 	}

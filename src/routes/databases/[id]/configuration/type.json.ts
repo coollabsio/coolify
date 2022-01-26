@@ -20,7 +20,7 @@ export const post: RequestHandler<Locals> = async (event) => {
 
     const { id } = event.params
     const { type } = await event.request.json()
-    console.log(type)
+
     try {
         await db.configureDatabaseType({ id, type })
         return {

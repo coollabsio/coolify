@@ -2,8 +2,9 @@ import { asyncExecShell, saveBuildLog } from "$lib/common";
 import got from "got"
 import jsonwebtoken from 'jsonwebtoken'
 import * as db from '$lib/database'
+import { PrismaErrorHandler } from "$lib/database";
 
-export default async function ({ applicationId, debug, workdir, githubAppId, repository, branch, buildId }): Promise<string> {
+export default async function ({ applicationId, debug, workdir, githubAppId, repository, branch, buildId }): Promise<any> {
     try {
         saveBuildLog({ line: 'GitHub importer started', buildId, applicationId })
         const { privateKey, appId, installationId } = await db.getUniqueGithubApp({ githubAppId })
@@ -28,7 +29,7 @@ export default async function ({ applicationId, debug, workdir, githubAppId, rep
         const { stdout: commit } = await asyncExecShell(`cd ${workdir}/ && git rev-parse HEAD`)
         return commit.replace('\n', '')
     } catch (error) {
-        throw new Error(error)
+        return PrismaErrorHandler(error)
     }
 
 }

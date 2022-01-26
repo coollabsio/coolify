@@ -1,5 +1,6 @@
 import { asyncExecShell, getTeam, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
+import { PrismaErrorHandler } from '$lib/database';
 import { dockerInstance } from '$lib/docker';
 import type { RequestHandler } from '@sveltejs/kit';
 
@@ -23,15 +24,14 @@ export const get: RequestHandler = async (request) => {
     };
 }
 
-export const post: RequestHandler<Locals, FormData> = async (request) => {
-    const { teamId, status, body } = await getUserDetails(request);
+export const post: RequestHandler<Locals> = async (event) => {
+    const { teamId, status, body } = await getUserDetails(event);
     if (status === 401) return { status, body }
+   
+    let { fqdn, projectId, repository, branch } = await event.request.json()
+    if (fqdn) fqdn = fqdn.toLowerCase()
+    if (projectId) projectId = Number(projectId)
 
-    const { id } = request.params
-    const fqdn = request.body.get('fqdn')?.toLocaleLowerCase() || undefined
-    const projectId = Number(request.body.get('projectId')) || undefined
-    const repository = request.body.get('repository') || undefined
-    const branch = request.body.get('branch') || undefined
     try {
         const foundByDomain = await db.prisma.application.findFirst({ where: { fqdn } })
         const foundByRepository = await db.prisma.application.findFirst({ where: { repository, branch, projectId } })
@@ -51,10 +51,7 @@ export const post: RequestHandler<Locals, FormData> = async (request) => {
             status: 404
         }
     } catch (error) {
-        console.log(error)
-        return {
-            status: 404
-        }
+        return PrismaErrorHandler(error)
     }
 }
 

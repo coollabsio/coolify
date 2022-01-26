@@ -15,7 +15,7 @@
 		try {
 			const { id } = await post(`/new/source.json`, { ...gitSource });
 			return await goto(`/sources/${id}/`);
-		} catch (error) {
+		} catch ({ error }) {
 			return errorNotification(error);
 		}
 	}
