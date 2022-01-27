@@ -35,7 +35,7 @@ export default async function ({
 			})
 			.json();
 		saveBuildLog({
-			line: `Cloning ${repository} repository ${branch} branch...`,
+			line: `Cloning ${repository}:${branch} branch.`,
 			buildId,
 			applicationId
 		});
