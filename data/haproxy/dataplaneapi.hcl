@@ -12,7 +12,7 @@ dataplaneapi {
 
   user "haproxy-dataplaneapi" {
     insecure = true
-    password = "adminpwd"
+    password = "mypassword"
   }
 
   transaction {

@@ -7,6 +7,7 @@ import {
 	configureProxyForApplication,
 	startCoolifyProxy
 } from '$lib/haproxy';
+import * as db from '$lib/database';
 
 export default async function () {
 	const destinationDockers = await prisma.destinationDocker.findMany({});
@@ -30,7 +31,7 @@ export default async function () {
 			}
 		}
 	}
-	const { fqdn } = await prisma.setting.findFirst({});
+	const { fqdn } = await db.listSettings()
 	if (fqdn) {
 		const domain = getDomain(fqdn);
 		const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy');

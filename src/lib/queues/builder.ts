@@ -42,7 +42,7 @@ export default async function (job) {
 		sourceBranch = null,
 		settings
 	} = job.data;
-	const { debug, forceSSL } = settings;
+	const { debug } = settings;
 
 	let imageId = applicationId;
 	let domain = getDomain(fqdn);

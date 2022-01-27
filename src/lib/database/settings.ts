@@ -1,5 +1,8 @@
+import { decrypt } from '$lib/crypto';
 import { prisma } from './common';
 
 export async function listSettings() {
-	return await prisma.setting.findFirst({});
+	let settings = await prisma.setting.findFirst({});
+	settings.proxyPassword = decrypt(settings.proxyPassword)
+	return settings
 }

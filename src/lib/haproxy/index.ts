@@ -10,19 +10,21 @@ export const defaultProxyImage = `coolify-haproxy-alpine:latest`;
 export const defaultProxyImageTcp = `coolify-haproxy-tcp-alpine:latest`;
 export const defaultProxyImageHttp = `coolify-haproxy-http-alpine:latest`;
 
-export function haproxyInstance() {
+
+export async function haproxyInstance() {
+	const { proxyPassword } = await db.listSettings()
 	return got.extend({
 		prefixUrl: url,
 		username: 'haproxy-dataplaneapi',
-		password: 'adminpwd'
+		password: proxyPassword
 	});
 }
 export async function getRawConfiguration(): Promise<RawHaproxyConfiguration> {
-	return await haproxyInstance().get(`v2/services/haproxy/configuration/raw`).json();
+	return await (await haproxyInstance()).get(`v2/services/haproxy/configuration/raw`).json();
 }
 
 export async function reloadConfiguration(): Promise<any> {
-	return await haproxyInstance().get(`v2/services/haproxy/reloads`);
+	return await (await haproxyInstance()).get(`v2/services/haproxy/reloads`);
 }
 export async function getNextTransactionVersion(): Promise<number> {
 	const raw = await getRawConfiguration();
@@ -34,7 +36,7 @@ export async function getNextTransactionVersion(): Promise<number> {
 
 export async function getNextTransactionId(): Promise<string> {
 	const version = await getNextTransactionVersion();
-	const newTransaction: NewTransaction = await haproxyInstance()
+	const newTransaction: NewTransaction = await (await haproxyInstance())
 		.post('v2/services/haproxy/transactions', {
 			searchParams: {
 				version
@@ -45,12 +47,12 @@ export async function getNextTransactionId(): Promise<string> {
 }
 
 export async function completeTransaction(transactionId) {
-	const haproxy = haproxyInstance();
+	const haproxy = await haproxyInstance();
 	return await haproxy.put(`v2/services/haproxy/transactions/${transactionId}`);
 }
 
 export async function removeProxyConfiguration({ domain }) {
-	const haproxy = haproxyInstance();
+	const haproxy = await haproxyInstance();
 	const transactionId = await getNextTransactionId();
 	const backendFound = await haproxy
 		.get(`v2/services/haproxy/configuration/backends/${domain}`)
@@ -68,7 +70,7 @@ export async function removeProxyConfiguration({ domain }) {
 }
 export async function forceSSLOffApplication({ domain }) {
 	if (!dev) {
-		const haproxy = haproxyInstance();
+		const haproxy = await haproxyInstance();
 		await checkHAProxy();
 		const transactionId = await getNextTransactionId();
 		try {
@@ -105,7 +107,7 @@ export async function forceSSLOffApplication({ domain }) {
 }
 export async function forceSSLOnApplication({ domain }) {
 	if (!dev) {
-		const haproxy = haproxyInstance();
+		const haproxy = await haproxyInstance();
 		await checkHAProxy();
 		const transactionId = await getNextTransactionId();
 
@@ -153,7 +155,7 @@ export async function forceSSLOnApplication({ domain }) {
 }
 
 export async function deleteProxy({ id }) {
-	const haproxy = haproxyInstance();
+	const haproxy = await haproxyInstance();
 	try {
 		await checkHAProxy();
 	} catch (error) {
@@ -184,7 +186,7 @@ export async function deleteProxy({ id }) {
 	}
 }
 // export async function configureProxyForDatabase({ id, port, isPublic, privatePort }) {
-//     const haproxy = haproxyInstance()
+//     const haproxy = await haproxyInstance()
 //     try {
 //         await checkHAProxy()
 //     } catch (error) {
@@ -272,7 +274,7 @@ export async function deleteProxy({ id }) {
 //     await configureDatabaseVisibility({ id, isPublic })
 // }
 export async function configureProxyForApplication({ domain, applicationId, port, isHttps }) {
-	const haproxy = haproxyInstance();
+	const haproxy = await haproxyInstance();
 	let serverConfigured = false;
 	let sslConfigured = false;
 
@@ -371,7 +373,7 @@ export async function configureProxyForApplication({ domain, applicationId, port
 }
 
 export async function configureCoolifyProxyOff({ domain }) {
-	const haproxy = haproxyInstance();
+	const haproxy = await haproxyInstance();
 	try {
 		await checkHAProxy();
 	} catch (error) {
@@ -396,7 +398,7 @@ export async function configureCoolifyProxyOff({ domain }) {
 	}
 }
 export async function checkHAProxy() {
-	const haproxy = haproxyInstance();
+	const haproxy = await haproxyInstance();
 	try {
 		await haproxy.get('v2/info');
 	} catch (error) {
@@ -404,7 +406,7 @@ export async function checkHAProxy() {
 	}
 }
 export async function configureCoolifyProxyOn({ domain }) {
-	const haproxy = haproxyInstance();
+	const haproxy = await haproxyInstance();
 	try {
 		await checkHAProxy();
 	} catch (error) {
@@ -414,7 +416,7 @@ export async function configureCoolifyProxyOn({ domain }) {
 	try {
 		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
 		return;
-	} catch (error) {}
+	} catch (error) { }
 	try {
 		const transactionId = await getNextTransactionId();
 		await haproxy.post('v2/services/haproxy/configuration/backends', {
@@ -503,9 +505,10 @@ export async function startHttpProxy(destinationDocker, id, publicPort, privateP
 export async function startCoolifyProxy(engine) {
 	const host = getEngine(engine);
 	const found = await checkContainer(engine, 'coolify-haproxy');
+	const { proxyPassword } = await db.listSettings()
 	if (!found) {
 		await asyncExecShell(
-			`DOCKER_HOST="${host}" docker run --restart always --add-host 'host.docker.internal:host-gateway' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "5000:5000" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`
+			`DOCKER_HOST="${host}" docker run -e PASSWORD=${proxyPassword} --restart always --add-host 'host.docker.internal:host-gateway' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "5000:5000" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`
 		);
 	}
 	await configureNetworkCoolifyProxy(engine);
@@ -538,6 +541,7 @@ export async function checkContainer(engine, container) {
 export async function stopCoolifyProxy(engine) {
 	const host = getEngine(engine);
 	const found = await checkContainer(engine, 'coolify-haproxy');
+	await db.setDestinationSettings({ engine, isCoolifyProxyUsed: false });
 	try {
 		if (found) {
 			await asyncExecShell(
@@ -564,7 +568,7 @@ export async function configureNetworkCoolifyProxy(engine) {
 }
 
 export async function configureSimpleServiceProxyOn({ id, domain, port }) {
-	const haproxy = haproxyInstance();
+	const haproxy = await haproxyInstance();
 	try {
 		await checkHAProxy();
 	} catch (error) {
@@ -573,7 +577,7 @@ export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 	try {
 		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
 		return;
-	} catch (error) {}
+	} catch (error) { }
 	try {
 		const transactionId = await getNextTransactionId();
 		await haproxy.post('v2/services/haproxy/configuration/backends', {
@@ -606,7 +610,7 @@ export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 }
 
 export async function configureSimpleServiceProxyOff({ domain }) {
-	const haproxy = haproxyInstance();
+	const haproxy = await haproxyInstance();
 	try {
 		await checkHAProxy();
 	} catch (error) {

@@ -62,7 +62,7 @@ export const post: RequestHandler<Locals> = async (event) => {
 			id,
 			fqdn: oldFqdn,
 			isRegistrationEnabled: oldIsRegistrationEnabled
-		} = await db.prisma.setting.findFirst({});
+		} = await db.listSettings();
 		if (oldIsRegistrationEnabled !== isRegistrationEnabled) {
 			await db.prisma.setting.update({ where: { id }, data: { isRegistrationEnabled } });
 		}

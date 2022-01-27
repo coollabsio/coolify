@@ -52,6 +52,13 @@ const templates = {
 		port: 80,
 		name: 'Vue'
 	},
+	vuejs: {
+		buildPack: 'vuejs',
+		...defaultBuildAndDeploy,
+		publishDirectory: 'dist',
+		port: 80,
+		name: 'Vue'
+	},
 	gatsby: {
 		buildPack: 'gatsby',
 		...defaultBuildAndDeploy,

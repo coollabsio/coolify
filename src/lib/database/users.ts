@@ -4,6 +4,8 @@ import bcrypt from 'bcrypt';
 import { prisma, PrismaErrorHandler } from './common';
 import { uniqueName } from '$lib/common';
 
+import * as db from '$lib/database';
+
 export async function login({ email, password }) {
 	const saltRounds = 15;
 	const users = await prisma.user.count();
@@ -13,7 +15,7 @@ export async function login({ email, password }) {
 		rejectOnNotFound: false
 	});
 	// Registration disabled if database is not seeded properly
-	const { isRegistrationEnabled, id } = await prisma.setting.findFirst();
+	const { isRegistrationEnabled, id } = await db.listSettings();
 
 	let uid = cuid();
 	// Disable registration if we are registering the first user.

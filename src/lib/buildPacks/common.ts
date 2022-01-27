@@ -100,7 +100,6 @@ export async function makeLabelForPlausibleAnalytics({ id, images, volume }) {
 export const setDefaultConfiguration = async (data) => {
 	let { buildPack, port, installCommand, startCommand, buildCommand, publishDirectory } = data;
 	const template = templates[buildPack];
-
 	if (!port) {
 		port = template?.port || 3000;
 
@@ -112,7 +111,7 @@ export const setDefaultConfiguration = async (data) => {
 	if (!startCommand) startCommand = template?.startCommand || 'yarn start';
 	if (!buildCommand) buildCommand = template?.buildCommand || null;
 	if (!publishDirectory) publishDirectory = template?.publishDirectory || null;
-
+	
 	return {
 		buildPack,
 		port,

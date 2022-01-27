@@ -6,7 +6,7 @@
 	export let description;
 	export let isPadding = true;
 	export let disabled = false;
-	export let disabledReason = '';
+	// export let disabledReason = '';
 </script>
 
 <li class="flex items-center py-4">
@@ -21,11 +21,9 @@
 	{:else} -->
 	<div
 		type="button"
-		data-tooltip={disabledReason && disabledReason}
 		on:click
 		aria-pressed="false"
 		class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 mx-20"
-		class:tooltip-bottom={disabled}
 		class:opacity-50={disabled}
 		class:bg-green-600={setting}
 		class:bg-stone-700={!setting}
