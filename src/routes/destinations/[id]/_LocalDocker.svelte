@@ -1,6 +1,8 @@
 <script lang="ts">
 	export let destination;
+	export let settings;
 	// export let state;
+
 	import { toast } from '@zerodevx/svelte-toast';
 	import { page } from '$app/stores';
 	import Setting from '$lib/components/Setting.svelte';
@@ -104,7 +106,8 @@
 					disabled
 					name="engine"
 					placeholder="eg: /var/run/docker.sock"
-					value={destination.engine} />
+					value={destination.engine}
+				/>
 			</div>
 		</div>
 		<!-- <div class="flex items-center">
@@ -120,17 +123,21 @@
 					disabled
 					name="network"
 					placeholder="default: coolify"
-					value={destination.network} />
+					value={destination.network}
+				/>
 			</div>
 		</div>
 		<div class="flex justify-start">
 			<ul class="mt-2 divide-y divide-stone-800">
 				<Setting
+					disabled={settings.fqdn}
+					disabledReason={settings.fqdn && "You cannot disable proxy if you are set FQDN for Coolify."}
 					bind:setting={destination.isCoolifyProxyUsed}
-					on:click={changeProxySetting}
+					on:click={settings.fqdn || changeProxySetting}
 					isPadding={false}
 					title="Use Coolify Proxy?"
-					description="This will install a proxy on the destination to allow you to access your applications and services without any manual configuration. Databases will have their own proxy." />
+					description="This will install a proxy on the destination to allow you to access your applications and services without any manual configuration. Databases will have their own proxy."
+				/>
 			</ul>
 		</div>
 	</form>

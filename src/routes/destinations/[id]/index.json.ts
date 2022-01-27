@@ -11,12 +11,14 @@ export const get: RequestHandler = async (event) => {
 	const { id } = event.params;
 	try {
 		const destination = await db.getDestination({ id, teamId });
+		const settings = await db.listSettings();
 		const state = await checkContainer(destination.engine, 'coolify-haproxy');
 		return {
 			status: 200,
 			body: {
 				destination,
-				state
+				settings,
+				state,
 			}
 		};
 	} catch (error) {
