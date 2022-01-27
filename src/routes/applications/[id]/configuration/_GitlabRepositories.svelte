@@ -1,7 +1,6 @@
 <script lang="ts">
 	export let application;
 	export let appId;
-	console.log(appId);
 	import { page, session } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { errorNotification } from '$lib/form';
@@ -196,7 +195,6 @@
 		let publicSshKey = application.gitSource.gitlabApp.publicSshKey;
 
 		const deployKeyUrl = `${apiUrl}/v4/projects/${selected.project.id}/deploy_keys`;
-
 		const sshkeyUrl = `/applications/${id}/configuration/sshkey.json`;
 		const webhookUrl = `${apiUrl}/v4/projects/${selected.project.id}/hooks`;
 		const webhookToken = cuid();
@@ -211,8 +209,6 @@
 			});
 			const deployKeyFound = deployKeys.filter((dk) => dk.title === `${appId}-coolify-deploy-key`);
 			if (deployKeyFound.length === 0) {
-				if (!publicSshKey) {
-				}
 				const { id } = await post(
 					deployKeyUrl,
 					{
