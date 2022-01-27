@@ -10,7 +10,7 @@
 	import { post } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	const { id } = $page.params;
-
+	let cannotDisable = settings.fqdn && destination.engine === '/var/run/docker.sock';
 	// let scannedApps = [];
 	let loading = false;
 	async function handleSubmit() {
@@ -30,30 +30,32 @@
 	// 	scannedApps = containers;
 	// }
 	async function changeProxySetting() {
-		const isProxyActivated = destination.isCoolifyProxyUsed;
-		if (isProxyActivated) {
-			const sure = confirm(
-				`Are you sure you want to ${
-					destination.isCoolifyProxyUsed ? 'disable' : 'enable'
-				} Coolify proxy? It will remove the proxy for all configured networks and all deployments on '${
-					destination.engine
-				}'! Nothing will be reachable if you do it!`
-			);
-			if (!sure) return;
-		}
-		destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
-		try {
-			await post(`/destinations/${id}/settings.json`, {
-				isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
-				engine: destination.engine
-			});
+		if (!cannotDisable) {
+			const isProxyActivated = destination.isCoolifyProxyUsed;
 			if (isProxyActivated) {
-				await stopProxy();
-			} else {
-				await startProxy();
+				const sure = confirm(
+					`Are you sure you want to ${
+						destination.isCoolifyProxyUsed ? 'disable' : 'enable'
+					} Coolify proxy? It will remove the proxy for all configured networks and all deployments on '${
+						destination.engine
+					}'! Nothing will be reachable if you do it!`
+				);
+				if (!sure) return;
 			}
-		} catch ({ error }) {
-			return errorNotification(error);
+			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
+			try {
+				await post(`/destinations/${id}/settings.json`, {
+					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
+					engine: destination.engine
+				});
+				if (isProxyActivated) {
+					await stopProxy();
+				} else {
+					await startProxy();
+				}
+			} catch ({ error }) {
+				return errorNotification(error);
+			}
 		}
 	}
 	async function stopProxy() {
@@ -130,10 +132,10 @@
 		<div class="flex justify-start">
 			<ul class="mt-2 divide-y divide-stone-800">
 				<Setting
-					disabled={settings.fqdn}
-					disabledReason={settings.fqdn && "You cannot disable proxy if you are set FQDN for Coolify."}
+					disabled={cannotDisable}
+					disabledReason={cannotDisable && 'You cannot disable proxy if you set FQDN for Coolify.'}
 					bind:setting={destination.isCoolifyProxyUsed}
-					on:click={settings.fqdn || changeProxySetting}
+					on:click={changeProxySetting}
 					isPadding={false}
 					title="Use Coolify Proxy?"
 					description="This will install a proxy on the destination to allow you to access your applications and services without any manual configuration. Databases will have their own proxy."
