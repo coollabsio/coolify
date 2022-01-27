@@ -5,16 +5,17 @@ const defaultBuildAndDeploy = {
 };
 export const buildPacks = [
 	{
-		name: 'node', 
+		name: 'node',
 		installCommand: null,
 		buildCommand: null,
-		startCommand: null, 
+		startCommand: null,
 		publishDirectory: null,
 		port: null,
-		fancyName: 'Node.js', 
-		hoverColor: 'hover:bg-green-700', 
+		fancyName: 'Node.js',
+		hoverColor: 'hover:bg-green-700',
 		color: 'bg-green-700'
 	},
+
 	{
 		name: 'static',
 		...defaultBuildAndDeploy,
@@ -24,7 +25,17 @@ export const buildPacks = [
 		hoverColor: 'hover:bg-orange-700',
 		color: 'bg-orange-700'
 	},
-	{ name: 'docker', fancyName: 'Docker', hoverColor: 'hover:bg-sky-700', color: 'bg-sky-700' },
+	{
+		name: 'docker',
+		installCommand: null,
+		buildCommand: null,
+		startCommand: null,
+		publishDirectory: null,
+		port: null,
+		fancyName: 'Docker',
+		hoverColor: 'hover:bg-sky-700',
+		color: 'bg-sky-700'
+	},
 	{
 		name: 'svelte',
 		...defaultBuildAndDeploy,
@@ -96,7 +107,7 @@ export const buildPacks = [
 		color: 'bg-blue-700'
 	},
 
-	{ name: 'php', fancyName: 'PHP', hoverColor: 'hover:bg-indigo-700', color: 'bg-indigo-700' },
+	{ name: 'php', port: 80, fancyName: 'PHP', hoverColor: 'hover:bg-indigo-700', color: 'bg-indigo-700' },
 	{ name: 'rust', fancyName: 'Rust', hoverColor: 'hover:bg-pink-700', color: 'bg-pink-700' }
 ];
 export const scanningTemplates = {

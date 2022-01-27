@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 html {
-	@apply h-full;
+	@apply h-full min-h-full;
 }
 body {
 	@apply min-h-screen overflow-x-hidden bg-coolblack text-sm text-white;

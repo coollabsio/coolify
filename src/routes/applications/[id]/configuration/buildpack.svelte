@@ -57,8 +57,8 @@
 	}
 
 	onMount(async () => {
-		if (type === 'gitlab') {
-			try {
+		try {
+			if (type === 'gitlab') {
 				const files = await get(`${apiUrl}/v4/projects/${projectId}/repository/tree`, {
 					Authorization: `Bearer ${$session.gitlabToken}`
 				});
@@ -76,37 +76,24 @@
 					foundConfig.buildPack = 'docker';
 				} else if (packageJson) {
 					const path = packageJson.path;
-					try {
-						const data = await get(
-							`${apiUrl}/v4/projects/${projectId}/repository/files/${path}/raw?ref=${branch}`,
-							{
-								Authorization: `Bearer ${$session.gitlabToken}`
-							}
-						);
-						const json = JSON.parse(data) || {};
-						return checkTemplates({ json });
-					} catch ({ error }) {
-						return errorNotification(error);
-					} finally {
-						scanning = false;
-					}
+					const data = await get(
+						`${apiUrl}/v4/projects/${projectId}/repository/files/${path}/raw?ref=${branch}`,
+						{
+							Authorization: `Bearer ${$session.gitlabToken}`
+						}
+					);
+					const json = JSON.parse(data) || {};
+					return checkTemplates({ json });
 				} else if (cargoToml) {
-					foundConfig.buildPack = 'rust';
+					foundConfig = buildPacks.find((bp) => bp.name === 'rust');
 				} else if (requirementsTxt) {
-					foundConfig.buildPack = 'python';
+					foundConfig = buildPacks.find((bp) => bp.name === 'python');
 				} else if (indexHtml) {
-					foundConfig.buildPack = 'static';
+					foundConfig = buildPacks.find((bp) => bp.name === 'static');
 				} else if (indexPHP) {
-					foundConfig.buildPack = 'php';
+					foundConfig = buildPacks.find((bp) => bp.name === 'php');
 				}
-			} catch ({ error }) {
-				return errorNotification(error);
-			} finally {
-				if (!foundConfig) foundConfig = buildPacks.find((bp) => bp.name === 'node');
-				scanning = false;
-			}
-		} else if (type === 'github') {
-			try {
+			} else if (type === 'github') {
 				const files = await get(`${apiUrl}/repos/${repository}/contents?ref=${branch}`, {
 					Authorization: `Bearer ${ghToken}`,
 					Accept: 'application/vnd.github.v2.json'
@@ -124,33 +111,27 @@
 				if (dockerfile) {
 					foundConfig.buildPack = 'docker';
 				} else if (packageJson) {
-					try {
-						const data = await get(`${packageJson.git_url}`, {
-							Authorization: `Bearer ${ghToken}`,
-							Accept: 'application/vnd.github.v2.raw'
-						});
-						const json = JSON.parse(data) || {};
-						return checkTemplates({ json });
-					} catch ({ error }) {
-						return errorNotification(error);
-					} finally {
-						scanning = false;
-					}
+					const data = await get(`${packageJson.git_url}`, {
+						Authorization: `Bearer ${ghToken}`,
+						Accept: 'application/vnd.github.v2.raw'
+					});
+					const json = JSON.parse(data) || {};
+					return checkTemplates({ json });
 				} else if (cargoToml) {
-					foundConfig.buildPack = 'rust';
+					foundConfig = buildPacks.find((bp) => bp.name === 'rust');
 				} else if (requirementsTxt) {
-					foundConfig.buildPack = 'python';
+					foundConfig = buildPacks.find((bp) => bp.name === 'python');
 				} else if (indexHtml) {
-					foundConfig.buildPack = 'static';
+					foundConfig = buildPacks.find((bp) => bp.name === 'static');
 				} else if (indexPHP) {
-					foundConfig.buildPack = 'php';
+					foundConfig = buildPacks.find((bp) => bp.name === 'php');
 				}
-			} catch ({ error }) {
-				return errorNotification(error);
-			} finally {
-				if (!foundConfig) foundConfig = buildPacks.find((bp) => bp.name === 'node');
-				scanning = false;
 			}
+		} catch (error) {
+			return errorNotification(error);
+		} finally {
+			if (!foundConfig) foundConfig = buildPacks.find((bp) => bp.name === 'node');
+			scanning = false;
 		}
 	});
 </script>
@@ -164,7 +145,7 @@
 		<div class="text-xl tracking-tight">Scanning repository to suggest a build pack for you...</div>
 	</div>
 {:else}
-	<div class="max-w-5xl mx-auto flex flex-wrap justify-center">
+	<div class="max-w-7xl mx-auto flex flex-wrap justify-center">
 		{#each buildPacks as buildPack}
 			<div class="p-2">
 				<BuildPack {buildPack} {scanning} {foundConfig} />
