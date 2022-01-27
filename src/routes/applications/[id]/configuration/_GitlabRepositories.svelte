@@ -46,7 +46,7 @@
 				});
 				username = user.username;
 			} catch (error) {
-				getGitlabToken();
+				return getGitlabToken();
 			}
 			try {
 				groups = await get(`${apiUrl}/v4/groups?per_page=5000`, {
@@ -135,12 +135,11 @@
 		const url = `/applications/${id}/configuration/repository.json?repository=${selected.project.path_with_namespace}&branch=${selected.branch.name}`;
 
 		try {
-			return await get(url);
-		} catch (error) {
-			console.log(error);
-			return errorNotification('Branch already configured');
-		} finally {
+			await get(url);
 			showSave = true;
+		} catch (error) {
+			showSave = false;
+			return errorNotification('Branch already configured');
 		}
 	}
 	// async function saveDeployKey(deployKeyId: number) {
