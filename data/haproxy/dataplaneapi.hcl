@@ -1,19 +1,11 @@
 config_version = 2
-
 name = "easy_gar"
-
 mode = "single"
-
-status = ""
+status = "null"
 
 dataplaneapi {
   host = "0.0.0.0"
   port = 5555
-
-  user "haproxy-dataplaneapi" {
-    insecure = true
-    password = "mypassword"
-  }
 
   transaction {
     transaction_dir = "/tmp/haproxy"
@@ -30,7 +22,7 @@ haproxy {
   haproxy_bin = "/usr/local/sbin/haproxy"
 
   reload {
-    reload_delay = 5
+    reload_delay = 2
     reload_cmd   = "kill -SIGUSR2 1"
     restart_cmd  = "kill -SIGUSR2 1"
   }

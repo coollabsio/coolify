@@ -1,7 +1,7 @@
 import { base64Encode } from '$lib/crypto';
 import { getDomain, saveBuildLog, version } from '$lib/common';
 import * as db from '$lib/database';
-import templates from '$lib/components/templates';
+import { scanningTemplates } from '$lib/components/templates';
 import { promises as fs } from 'fs';
 import { staticDeployments } from '$lib/components/common';
 
@@ -99,7 +99,7 @@ export async function makeLabelForPlausibleAnalytics({ id, images, volume }) {
 
 export const setDefaultConfiguration = async (data) => {
 	let { buildPack, port, installCommand, startCommand, buildCommand, publishDirectory } = data;
-	const template = templates[buildPack];
+	const template = scanningTemplates[buildPack];
 	if (!port) {
 		port = template?.port || 3000;
 
@@ -111,7 +111,7 @@ export const setDefaultConfiguration = async (data) => {
 	if (!startCommand) startCommand = template?.startCommand || 'yarn start';
 	if (!buildCommand) buildCommand = template?.buildCommand || null;
 	if (!publishDirectory) publishDirectory = template?.publishDirectory || null;
-	
+
 	return {
 		buildPack,
 		port,
@@ -121,31 +121,6 @@ export const setDefaultConfiguration = async (data) => {
 		publishDirectory
 	};
 };
-
-export const buildPacks = [
-	{ name: 'node', fancyName: 'Node.js', hoverColor: 'hover:bg-green-700', color: 'bg-green-700' },
-	{
-		name: 'static',
-		fancyName: 'Static',
-		hoverColor: 'hover:bg-orange-700',
-		color: 'bg-orange-700'
-	},
-	{ name: 'docker', fancyName: 'Docker', hoverColor: 'hover:bg-sky-700', color: 'bg-sky-700' },
-	{
-		name: 'svelte',
-		fancyName: 'Svelte',
-		hoverColor: 'hover:bg-orange-700',
-		color: 'bg-orange-700'
-	},
-	{ name: 'nestjs', fancyName: 'NestJS', hoverColor: 'hover:bg-red-700', color: 'bg-red-700' },
-	{ name: 'react', fancyName: 'React', hoverColor: 'hover:bg-blue-700', color: 'bg-blue-700' },
-	{ name: 'nextjs', fancyName: 'NextJS', hoverColor: 'hover:bg-blue-700', color: 'bg-blue-700' },
-	{ name: 'gatsby', fancyName: 'Gatsby', hoverColor: 'hover:bg-blue-700', color: 'bg-blue-700' },
-	{ name: 'vuejs', fancyName: 'VueJS', hoverColor: 'hover:bg-green-700', color: 'bg-green-700' },
-	{ name: 'nuxtjs', fancyName: 'NuxtJS', hoverColor: 'hover:bg-green-700', color: 'bg-green-700' },
-	{ name: 'php', fancyName: 'PHP', hoverColor: 'hover:bg-indigo-700', color: 'bg-indigo-700' },
-	{ name: 'rust', fancyName: 'Rust', hoverColor: 'hover:bg-pink-700', color: 'bg-pink-700' }
-];
 
 export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId) {
 	try {

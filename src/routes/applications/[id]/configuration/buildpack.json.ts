@@ -1,5 +1,4 @@
 import { getUserDetails } from '$lib/common';
-import { buildPacks } from '$lib/buildPacks/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import { PrismaErrorHandler } from '$lib/database';
@@ -14,7 +13,6 @@ export const get: RequestHandler<Locals> = async (event) => {
 		return {
 			status: 200,
 			body: {
-				buildPacks,
 				type: application.gitSource.type,
 				projectId: application.projectId,
 				repository: application.repository,

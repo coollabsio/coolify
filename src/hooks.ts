@@ -13,40 +13,44 @@ export const handle = handleSession(
 		expires: 30
 	},
 	async function ({ event, resolve }) {
-		let isSessionValid = false;
-		const cookies: Cookies = cookie.parse(event.request.headers.get('cookie') || '');
+		let response
+		try {
+			const cookies: Cookies = cookie.parse(event.request.headers.get('cookie') || '');
+			if (cookies['kit.session']) {
+				const { permission, teamId } = await getUserDetails(event, false);
+				event.locals.user = {
+					teamId,
+					permission,
+					isAdmin: permission === 'admin' || permission === 'owner'
+				};
+			}
+			if (cookies.gitlabToken) {
+				event.locals.gitlabToken = cookies.gitlabToken;
+			}
+			response = await resolve(event, {
+				ssr: !event.url.pathname.startsWith('/webhooks/success')
+			});
 
-		if (cookies['kit.session']) {
-			const { permission, teamId } = await getUserDetails(event, false);
-			isSessionValid = true;
-			event.locals.user = {
-				teamId,
-				permission,
-				isAdmin: permission === 'admin' || permission === 'owner'
-			};
-		}
-		if (cookies.gitlabToken) {
-			event.locals.gitlabToken = cookies.gitlabToken;
+		} catch (error) {
+			response = await resolve(event, {
+				ssr: !event.url.pathname.startsWith('/webhooks/success')
+			});
+			response.headers.append('Set-Cookie', cookie.serialize('kit.session', '', {
+				path: '/',
+				expires: new Date('Thu, 01 Jan 1970 00:00:01 GMT'),
+			}))
+			response.headers.append('Set-Cookie', cookie.serialize('teamId', '', {
+				path: '/',
+				expires: new Date('Thu, 01 Jan 1970 00:00:01 GMT')
+			}))
+			response.headers.append('Set-Cookie', cookie.serialize('gitlabToken', '', {
+				path: '/',
+				expires: new Date('Thu, 01 Jan 1970 00:00:01 GMT')
+			}))
+		} finally {
+			return response;
 		}
 
-		let response = await resolve(event, {
-			ssr: !event.url.pathname.startsWith('/webhooks/success')
-		});
-		// if (!isSessionValid) {
-		//     response.headers.append('Set-Cookie', cookie.serialize('kit.session', '', {
-		//         path: '/',
-		//         expires: new Date('Thu, 01 Jan 1970 00:00:01 GMT'),
-		//     }))
-		//     response.headers.append('Set-Cookie', cookie.serialize('teamId', '', {
-		//         path: '/',
-		//         expires: new Date('Thu, 01 Jan 1970 00:00:01 GMT')
-		//     }))
-		//     response.headers.append('Set-Cookie', cookie.serialize('gitlabToken', '', {
-		//         path: '/',
-		//         expires: new Date('Thu, 01 Jan 1970 00:00:01 GMT')
-		//     }))
-		// }
-		return response;
 	}
 );
 

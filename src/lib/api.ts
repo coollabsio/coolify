@@ -37,18 +37,18 @@ async function send({ method, path, data = {}, headers, timeout = 30000 }) {
 	return responseData;
 }
 
-export function get(path, headers = {}) {
+export function get(path, headers = {}): Promise<any> {
 	return send({ method: 'GET', path, headers });
 }
 
-export function del(path, data, headers = {}) {
+export function del(path, data, headers = {}): Promise<any> {
 	return send({ method: 'DELETE', path, data, headers });
 }
 
-export function post(path, data, headers = {}) {
+export function post(path, data, headers = {}): Promise<any> {
 	return send({ method: 'POST', path, data, headers });
 }
 
-export function put(path, data, headers = {}) {
+export function put(path, data, headers = {}): Promise<any> {
 	return send({ method: 'PUT', path, data, headers });
 }

@@ -53,6 +53,7 @@ export const post: RequestHandler<Locals> = async (event) => {
 	const { id } = event.params;
 	let {
 		name,
+		buildPack,
 		fqdn,
 		port,
 		installCommand,
@@ -67,6 +68,7 @@ export const post: RequestHandler<Locals> = async (event) => {
 	try {
 		await db.configureApplication({
 			id,
+			buildPack,
 			name,
 			fqdn,
 			port,

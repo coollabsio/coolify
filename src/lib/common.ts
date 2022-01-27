@@ -66,7 +66,7 @@ export const getTeam = (event) => {
 };
 
 export const getUserDetails = async (event, isAdminRequired = true) => {
-	try {
+	// try {
 		const teamId = getTeam(event);
 		const userId = event.locals.session.data.uid || null;
 		const { permission = 'read' } = await db.prisma.permission.findFirst({
@@ -90,18 +90,18 @@ export const getUserDetails = async (event, isAdminRequired = true) => {
 		}
 
 		return payload;
-	} catch (err) {
-		console.log(err);
-		return {
-			teamId: null,
-			userId: null,
-			permission: 'read',
-			status: 401,
-			body: {
-				message: 'You do not have permission to do this. \nAsk an admin to modify your permissions.'
-			}
-		};
-	}
+	// } catch (err) {
+	// 	console.log(err);
+	// 	return {
+	// 		teamId: null,
+	// 		userId: null,
+	// 		permission: 'read',
+	// 		status: 401,
+	// 		body: {
+	// 			message: 'You do not have permission to do this. \nAsk an admin to modify your permissions.'
+	// 		}
+	// 	};
+	// }
 };
 
 export function getEngine(engine) {

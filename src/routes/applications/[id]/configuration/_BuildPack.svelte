@@ -12,11 +12,12 @@
 	export let foundConfig;
 	export let scanning;
 
-	async function handleSubmit(buildPack) {
+	async function handleSubmit(name) {
 		try {
-			if (foundConfig.buildPack !== buildPack)
-				await post(`/applications/${id}.json`, { ...foundConfig });
-			await post(`/applications/${id}/configuration/buildpack.json`, { buildPack });
+			if (foundConfig.buildPack !== name) {
+				await post(`/applications/${id}.json`, { ...buildPack });
+			}
+			await post(`/applications/${id}/configuration/buildpack.json`, { buildPack: name });
 			return await goto(from || `/applications/${id}`);
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -27,11 +28,11 @@
 <form on:submit|preventDefault={() => handleSubmit(buildPack.name)}>
 	<button
 		type="submit"
-		class="box-selection relative flex text-xl font-bold {buildPack.hoverColor} {foundConfig?.buildPack ===
+		class="box-selection relative flex text-xl font-bold {buildPack.hoverColor} {foundConfig?.name ===
 			buildPack.name && buildPack.color}"
 		><span>{buildPack.fancyName}</span>
-		{#if !scanning && foundConfig?.buildPack === buildPack.name}
-			<span class="absolute bottom-0 pb-2 text-xs">This one...</span>
+		{#if !scanning && foundConfig?.name === buildPack.name}
+			<span class="absolute bottom-0 pb-2 text-xs">Choose this one...</span>
 		{/if}
 	</button>
 </form>

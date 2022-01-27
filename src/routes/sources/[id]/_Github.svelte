@@ -38,7 +38,9 @@
 				name: `coolify-${host}`,
 				url: `${protocol}://${window.location.host}`,
 				hook_attributes: {
-					url: `${protocol}://${window.location.host}/webhooks/github/events`
+					url: dev
+						? 'https://webhook.site/0e5beb2c-4e9b-40e2-a89e-32295e570c21/events'
+						: `${protocol}://${window.location.host}/webhooks/github/events`
 				},
 				redirect_url: `${protocol}://${window.location.host}/webhooks/github`,
 				callback_urls: [`${protocol}://${window.location.host}/login/github/app`],
@@ -54,6 +56,7 @@
 				},
 				default_events: ['pull_request', 'push']
 			});
+			console.log(data)
 			const form = document.createElement('form');
 			form.setAttribute('method', 'post');
 			form.setAttribute('action', `${htmlUrl}/${url}?state=${id}`);

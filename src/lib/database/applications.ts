@@ -172,6 +172,7 @@ export async function configureBuildPack({ id, buildPack }) {
 
 export async function configureApplication({
 	id,
+	buildPack,
 	name,
 	fqdn,
 	port,
@@ -184,6 +185,7 @@ export async function configureApplication({
 	return await prisma.application.update({
 		where: { id },
 		data: {
+			buildPack,
 			fqdn,
 			port,
 			installCommand,

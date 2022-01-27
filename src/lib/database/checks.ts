@@ -29,6 +29,10 @@ export async function isDomainConfigured({ id, fqdn }) {
 		where: { fqdn: { endsWith: domain }, id: { not: id } },
 		select: { fqdn: true }
 	});
-	if (foundApp || foundService) return true;
+	const coolifyFqdn = await prisma.setting.findFirst({
+		where: { fqdn: { endsWith: domain }, id: { not: id } },
+		select: { fqdn: true }
+	});
+	if (foundApp || foundService || coolifyFqdn) return true;
 	return false;
 }

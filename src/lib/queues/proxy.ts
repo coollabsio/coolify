@@ -10,6 +10,7 @@ import {
 import * as db from '$lib/database';
 
 export default async function () {
+	// Check destination containers and configure proxy if needed
 	const destinationDockers = await prisma.destinationDocker.findMany({});
 	for (const destination of destinationDockers) {
 		if (destination.isCoolifyProxyUsed) {
@@ -31,6 +32,7 @@ export default async function () {
 			}
 		}
 	}
+	// Check Coolify FQDN and configure proxy if needed
 	const { fqdn } = await db.listSettings()
 	if (fqdn) {
 		const domain = getDomain(fqdn);

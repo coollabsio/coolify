@@ -11,7 +11,7 @@ defaults
   timeout server 60s
 
 userlist haproxy-dataplaneapi 
-  user admin insecure-password mypassword
+  user admin insecure-password "${HAPROXY_PASSWORD}"
 
 frontend http
   mode http
@@ -34,5 +34,5 @@ backend backend-certbot
   server certbot host.docker.internal:9080
 
 program api 
-  command /usr/bin/dataplaneapi -f /usr/local/etc/haproxy/dataplaneapi.hcl
+  command /usr/bin/dataplaneapi -f /usr/local/etc/haproxy/dataplaneapi.hcl --userlist haproxy-dataplaneapi
   no option start-on-reload

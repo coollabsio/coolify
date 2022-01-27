@@ -29,18 +29,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	import templates from '$lib/components/templates';
+	import { buildPacks, scanningTemplates } from '$lib/components/templates';
 	import BuildPack from './_BuildPack.svelte';
 	import { session } from '$app/stores';
 	import { get } from '$lib/api';
 	import { errorNotification } from '$lib/form';
 
 	let scanning = true;
-	let foundConfig = {
-		buildPack: 'node'
-	};
+	let foundConfig;
 
-	export let buildPacks: BuildPack[];
 	export let apiUrl;
 	export let projectId;
 	export let repository;
@@ -48,13 +45,13 @@
 	export let ghToken;
 	export let type;
 
-	function checkPackageJSONContents({ dep, json }) {
-		return json?.dependencies?.hasOwnProperty(dep) || json?.devDependencies?.hasOwnProperty(dep);
+	function checkPackageJSONContents({ key, json }) {
+		return json?.dependencies?.hasOwnProperty(key) || json?.devDependencies?.hasOwnProperty(key);
 	}
 	function checkTemplates({ json }) {
-		Object.keys(templates).forEach((dep) => {
-			if (checkPackageJSONContents({ dep, json })) {
-				foundConfig = templates[dep];
+		Object.entries(scanningTemplates).forEach(([key, value]) => {
+			if (checkPackageJSONContents({ key, json })) {
+				foundConfig = buildPacks.find((bp) => bp.name === value.buildPack);
 			}
 		});
 	}
@@ -80,12 +77,13 @@
 				} else if (packageJson) {
 					const path = packageJson.path;
 					try {
-						const json = await get(
+						const data = await get(
 							`${apiUrl}/v4/projects/${projectId}/repository/files/${path}/raw?ref=${branch}`,
 							{
 								Authorization: `Bearer ${$session.gitlabToken}`
 							}
 						);
+						const json = JSON.parse(data) || {};
 						return checkTemplates({ json });
 					} catch ({ error }) {
 						return errorNotification(error);
@@ -104,11 +102,15 @@
 			} catch ({ error }) {
 				return errorNotification(error);
 			} finally {
+				if (!foundConfig) foundConfig = buildPacks.find((bp) => bp.name === 'node');
 				scanning = false;
 			}
 		} else if (type === 'github') {
 			try {
-				const files = await get(`${apiUrl}/repos/${repository}/contents?ref=${branch}`);
+				const files = await get(`${apiUrl}/repos/${repository}/contents?ref=${branch}`, {
+					Authorization: `Bearer ${ghToken}`,
+					Accept: 'application/vnd.github.v2.json'
+				});
 				const packageJson = files.find(
 					(file) => file.name === 'package.json' && file.type === 'file'
 				);
@@ -123,7 +125,11 @@
 					foundConfig.buildPack = 'docker';
 				} else if (packageJson) {
 					try {
-						const json = await get(`${packageJson.git_url}`);
+						const data = await get(`${packageJson.git_url}`, {
+							Authorization: `Bearer ${ghToken}`,
+							Accept: 'application/vnd.github.v2.raw'
+						});
+						const json = JSON.parse(data) || {};
 						return checkTemplates({ json });
 					} catch ({ error }) {
 						return errorNotification(error);
@@ -142,6 +148,7 @@
 			} catch ({ error }) {
 				return errorNotification(error);
 			} finally {
+				if (!foundConfig) foundConfig = buildPacks.find((bp) => bp.name === 'node');
 				scanning = false;
 			}
 		}

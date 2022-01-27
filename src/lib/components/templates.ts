@@ -3,76 +3,131 @@ const defaultBuildAndDeploy = {
 	buildCommand: 'yarn build',
 	startCommand: 'yarn start'
 };
-
-const templates = {
-	svelte: {
-		buildPack: 'svelte',
+export const buildPacks = [
+	{
+		name: 'node', 
+		installCommand: null,
+		buildCommand: null,
+		startCommand: null, 
+		publishDirectory: null,
+		port: null,
+		fancyName: 'Node.js', 
+		hoverColor: 'hover:bg-green-700', 
+		color: 'bg-green-700'
+	},
+	{
+		name: 'static',
+		...defaultBuildAndDeploy,
+		publishDirectory: 'dist',
+		port: 80,
+		fancyName: 'Static',
+		hoverColor: 'hover:bg-orange-700',
+		color: 'bg-orange-700'
+	},
+	{ name: 'docker', fancyName: 'Docker', hoverColor: 'hover:bg-sky-700', color: 'bg-sky-700' },
+	{
+		name: 'svelte',
 		...defaultBuildAndDeploy,
 		publishDirectory: 'public',
 		port: 80,
-		name: 'Svelte'
+		fancyName: 'Svelte',
+		hoverColor: 'hover:bg-orange-700',
+		color: 'bg-orange-700'
 	},
-	'@nestjs/core': {
-		buildPack: 'nestjs',
+	{
+		name: 'nestjs',
 		...defaultBuildAndDeploy,
 		startCommand: 'yarn start:prod',
 		port: 3000,
-		name: 'NestJS'
+		fancyName: 'NestJS',
+		hoverColor: 'hover:bg-red-700',
+		color: 'bg-red-700'
 	},
-	next: {
-		buildPack: 'nextjs',
-		...defaultBuildAndDeploy,
-		port: 3000,
-		name: 'NextJS'
-	},
-	nuxt: {
-		buildPack: 'nuxtjs',
-		...defaultBuildAndDeploy,
-		port: 3000,
-		name: 'NuxtJS'
-	},
-	'react-scripts': {
-		buildPack: 'react',
+	{
+		name: 'react',
 		...defaultBuildAndDeploy,
 		publishDirectory: 'build',
 		port: 80,
-		name: 'React'
+		fancyName: 'React',
+		hoverColor: 'hover:bg-blue-700',
+		color: 'bg-blue-700'
 	},
-	'parcel-bundler': {
-		buildPack: 'static',
+	{
+		name: 'nextjs',
 		...defaultBuildAndDeploy,
-		publishDirectory: 'dist',
-		port: 80,
-		name: 'Parcel'
+		port: 3000,
+		fancyName: 'NextJS',
+		hoverColor: 'hover:bg-blue-700',
+		color: 'bg-blue-700'
 	},
-	'@vue/cli-service': {
-		buildPack: 'vuejs',
-		...defaultBuildAndDeploy,
-		publishDirectory: 'dist',
-		port: 80,
-		name: 'Vue'
-	},
-	vuejs: {
-		buildPack: 'vuejs',
-		...defaultBuildAndDeploy,
-		publishDirectory: 'dist',
-		port: 80,
-		name: 'Vue'
-	},
-	gatsby: {
-		buildPack: 'gatsby',
+	{
+		name: 'gatsby',
 		...defaultBuildAndDeploy,
 		publishDirectory: 'public',
 		port: 80,
-		name: 'Gatsby'
+		fancyName: 'Gatsby',
+		hoverColor: 'hover:bg-blue-700',
+		color: 'bg-blue-700'
 	},
-	'preact-cli': {
-		buildPack: 'react',
+	{
+		name: 'vuejs',
+		...defaultBuildAndDeploy,
+		publishDirectory: 'dist',
+		port: 80,
+		fancyName: 'VueJS',
+		hoverColor: 'hover:bg-green-700',
+		color: 'bg-green-700'
+	},
+	{
+		name: 'nuxtjs',
+		...defaultBuildAndDeploy,
+		port: 3000,
+		fancyName: 'NuxtJS',
+		hoverColor: 'hover:bg-green-700',
+		color: 'bg-green-700'
+	},
+	{
+		name: 'preact',
 		...defaultBuildAndDeploy,
 		publishDirectory: 'build',
 		port: 80,
-		name: 'Preact'
+		fancyName: 'Preact',
+		hoverColor: 'hover:bg-blue-700',
+		color: 'bg-blue-700'
+	},
+
+	{ name: 'php', fancyName: 'PHP', hoverColor: 'hover:bg-indigo-700', color: 'bg-indigo-700' },
+	{ name: 'rust', fancyName: 'Rust', hoverColor: 'hover:bg-pink-700', color: 'bg-pink-700' }
+];
+export const scanningTemplates = {
+	svelte: {
+		buildPack: 'svelte',
+	},
+	'@nestjs/core': {
+		buildPack: 'nestjs',
+	},
+	next: {
+		buildPack: 'nextjs',
+	},
+	nuxt: {
+		buildPack: 'nuxtjs',
+	},
+	'react-scripts': {
+		buildPack: 'react',
+	},
+	'parcel-bundler': {
+		buildPack: 'static',
+	},
+	'@vue/cli-service': {
+		buildPack: 'vuejs',
+	},
+	vuejs: {
+		buildPack: 'vuejs',
+	},
+	gatsby: {
+		buildPack: 'gatsby',
+	},
+	'preact-cli': {
+		buildPack: 'react',
 	}
 };
-
-export default templates;

@@ -183,7 +183,7 @@
 					{
 						id: selected.project.id,
 						url: dev
-							? 'https://webhook.site/9f1710a3-54a3-41b2-9917-3286383cc0ee'
+							? 'https://webhook.site/0e5beb2c-4e9b-40e2-a89e-32295e570c21'
 							: `${host}/webhooks/gitlab/events`,
 						token: webhookToken,
 						push_events: true,

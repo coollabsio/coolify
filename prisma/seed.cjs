@@ -2,9 +2,8 @@ const dotEnvExtended = require('dotenv-extended')
 dotEnvExtended.load();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const cuid = require('cuid')
 const crypto = require('crypto')
-const generator = require('generate-password')
+const generator = require('generate-password');
 
 function generatePassword(length = 24) {
 	return generator.generate({
@@ -16,11 +15,15 @@ function generatePassword(length = 24) {
 const algorithm = 'aes-256-ctr';
 
 async function main() {
-	// Disable registration
-	// Set Proxy password
-	const settingsFound = await db.listSettings();
+	// Enable registration for the first user
+	// Set initial HAProxy password
+	const settingsFound = await prisma.setting.findFirst({});
 	if (!settingsFound) {
-		await prisma.setting.create({ data: { isRegistrationEnabled: true, proxyPassword: encrypt('mypassword') } });
+		await prisma.setting.create({ data: { isRegistrationEnabled: true, proxyPassword: encrypt(generatePassword()) } });
+	}
+	const localDocker = await prisma.destinationDocker.findFirst({ where: { engine: '/var/run/docker.sock' } })
+	if (!localDocker) {
+		await prisma.destinationDocker.create({ data: { engine: '/var/run/docker.sock', name: 'Local Docker', isCoolifyProxyUsed: true, network: 'coolify' } })
 	}
 
 }

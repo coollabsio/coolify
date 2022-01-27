@@ -53,7 +53,6 @@ export async function newDestination({ name, teamId, engine, network, isCoolifyP
 	const host = getEngine(engine);
 	const docker = dockerInstance({ destinationDocker: { engine, network } });
 	const found = await docker.engine.listNetworks({ filters: { name: [`^${network}$`] } });
-	console.log(found);
 	if (found.length === 0) {
 		await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable ${network}`);
 	}

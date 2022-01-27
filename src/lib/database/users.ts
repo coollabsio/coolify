@@ -2,9 +2,10 @@ import cuid from 'cuid';
 import bcrypt from 'bcrypt';
 
 import { prisma, PrismaErrorHandler } from './common';
-import { uniqueName } from '$lib/common';
+import { asyncExecShell, uniqueName } from '$lib/common';
 
 import * as db from '$lib/database';
+import { startCoolifyProxy } from '$lib/haproxy';
 
 export async function login({ email, password }) {
 	const saltRounds = 15;
@@ -21,6 +22,15 @@ export async function login({ email, password }) {
 	// Disable registration if we are registering the first user.
 	if (users === 0) {
 		await prisma.setting.update({ where: { id }, data: { isRegistrationEnabled: false } });
+		// Start Coolify Proxy
+		try {
+			await startCoolifyProxy('/var/run/docker.sock');
+			await asyncExecShell(`docker network create --attachable coolify`);
+		} catch(error) {
+			console.error(error);
+		}
+
+
 		uid = '0';
 	}
 
