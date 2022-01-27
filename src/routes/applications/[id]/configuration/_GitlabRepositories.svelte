@@ -1,8 +1,10 @@
 <script lang="ts">
 	export let application;
+	export let appId;
+	console.log(appId);
 	import { page, session } from '$app/stores';
 	import { onMount } from 'svelte';
-	import { enhance, errorNotification } from '$lib/form';
+	import { errorNotification } from '$lib/form';
 	import { dev } from '$app/env';
 	import cuid from 'cuid';
 	import { goto } from '$app/navigation';
@@ -142,49 +144,37 @@
 			showSave = true;
 		}
 	}
-	async function saveDeployKey(deployKeyId: number) {
+	// async function saveDeployKey(deployKeyId: number) {
+	// 	try {
+	// 		await post(updateDeployKeyIdUrl, { deployKeyId });
+	// 	} catch (error) {
+	// 		errorNotification(error);
+	// 		throw new Error(error);
+	// 	}
+	// }
+	async function checkSSHKey(sshkeyUrl) {
 		try {
-			await post(updateDeployKeyIdUrl, { deployKeyId });
-		} catch (error) {
-			errorNotification(error);
-			throw new Error(error);
-		}
-	}
-	async function checkSSHKey(sshkeyUrl, deployKeyUrl) {
-		try {
-			const { publicKey } = await post(sshkeyUrl, {});
-			const { id } = await post(
-				deployKeyUrl,
-				{
-					title: 'coolify-deploy-key',
-					key: publicKey,
-					can_push: false
-				},
-				{
-					Authorization: `Bearer ${$session.gitlabToken}`
-				}
-			);
-			return await saveDeployKey(id);
+			return await post(sshkeyUrl, {});
 		} catch (error) {
 			errorNotification(error);
 			throw new Error(error);
 		}
 	}
 	async function setWebhook(url, webhookToken) {
-		const host = window.location.origin;
+		const host = dev
+			? 'https://webhook.site/0e5beb2c-4e9b-40e2-a89e-32295e570c21'
+			: `${window.location.origin}/webhooks/gitlab/events`;
 		const urls = await get(url, {
 			Authorization: `Bearer ${$session.gitlabToken}`
 		});
-		const found = urls.find((url) => url.url.startsWith(host));
+		const found = urls.find((url) => url.url === host);
 		if (!found) {
 			try {
 				await post(
 					url,
 					{
 						id: selected.project.id,
-						url: dev
-							? 'https://webhook.site/0e5beb2c-4e9b-40e2-a89e-32295e570c21'
-							: `${host}/webhooks/gitlab/events`,
+						url: host,
 						token: webhookToken,
 						push_events: true,
 						enable_ssl_verification: true,
@@ -203,6 +193,7 @@
 	async function save() {
 		loading.save = true;
 		let privateSshKey = application.gitSource.gitlabApp.privateSshKey;
+		let publicSshKey = application.gitSource.gitlabApp.publicSshKey;
 
 		const deployKeyUrl = `${apiUrl}/v4/projects/${selected.project.id}/deploy_keys`;
 
@@ -211,8 +202,29 @@
 		const webhookToken = cuid();
 
 		try {
-			if (!privateSshKey) {
-				await checkSSHKey(sshkeyUrl, deployKeyUrl);
+			if (!privateSshKey || !publicSshKey) {
+				const { publicKey } = await checkSSHKey(sshkeyUrl);
+				publicSshKey = publicKey;
+			}
+			const deployKeys = await get(deployKeyUrl, {
+				Authorization: `Bearer ${$session.gitlabToken}`
+			});
+			const deployKeyFound = deployKeys.filter((dk) => dk.title === `${appId}-coolify-deploy-key`);
+			if (deployKeyFound.length === 0) {
+				if (!publicSshKey) {
+				}
+				const { id } = await post(
+					deployKeyUrl,
+					{
+						title: `${appId}-coolify-deploy-key`,
+						key: publicSshKey,
+						can_push: false
+					},
+					{
+						Authorization: `Bearer ${$session.gitlabToken}`
+					}
+				);
+				await post(updateDeployKeyIdUrl, { deployKeyId: id });
 			}
 		} catch (error) {
 			console.log(error);
@@ -273,7 +285,8 @@
 				class="w-96"
 				bind:value={selected.project}
 				on:change={loadBranches}
-				disabled={!selected.group}>
+				disabled={!selected.group}
+			>
 				<option value="" disabled selected>Please select a project</option>
 				{#each projects as project}
 					<option value={project}>{project.name}</option>
@@ -295,7 +308,8 @@
 				class="w-96"
 				bind:value={selected.branch}
 				on:change={isBranchAlreadyUsed}
-				disabled={!selected.project}>
+				disabled={!selected.project}
+			>
 				<option value="" disabled selected>Please select a branch</option>
 				{#each branches as branch}
 					<option value={branch}>{branch.name}</option>
@@ -315,6 +329,7 @@
 			disabled={!showSave || loading.save}
 			class:bg-orange-600={showSave && !loading.save}
 			class:hover:bg-orange-500={showSave && !loading.save}
-			>{loading.save ? 'Saving...' : 'Save'}</button>
+			>{loading.save ? 'Saving...' : 'Save'}</button
+		>
 	</div>
 </form>

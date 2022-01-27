@@ -7,7 +7,7 @@ export async function isBranchAlreadyUsed({ repository, branch, id }) {
 		include: { gitSource: true }
 	});
 	return await prisma.application.findFirst({
-		where: { branch, repository, gitSource: { type: application.gitSource.type } }
+		where: { branch, repository, gitSource: { type: application.gitSource.type }, id: { not: id } }
 	});
 }
 

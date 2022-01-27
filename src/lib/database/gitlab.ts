@@ -11,6 +11,13 @@ export async function updateDeployKey({ id, deployKeyId }) {
 		data: { deployKeyId }
 	});
 }
+export async function getSshKey({ id }) {
+	const application = await prisma.application.findUnique({
+		where: { id },
+		include: { gitSource: { include: { gitlabApp: true } } }
+	});
+	return { status: 200, body: { publicKey: application.gitSource.gitlabApp.publicSshKey } };
+}
 export async function generateSshKey({ id }) {
 	const application = await prisma.application.findUnique({
 		where: { id },
@@ -21,7 +28,7 @@ export async function generateSshKey({ id }) {
 		const encryptedPrivateKey = encrypt(keys.privateKey);
 		await prisma.gitlabApp.update({
 			where: { id: application.gitSource.gitlabApp.id },
-			data: { privateSshKey: encryptedPrivateKey }
+			data: { privateSshKey: encryptedPrivateKey, publicSshKey: keys.publicKey }
 		});
 		return { status: 201, body: { publicKey: keys.publicKey } };
 	} else {

@@ -10,7 +10,7 @@ datasource db {
 model Setting {
   id                    String   @id @default(cuid())
   fqdn                  String?  @unique
-  isRegistrationEnabled Boolean @default(false)
+  isRegistrationEnabled Boolean  @default(false)
   proxyPassword         String
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
@@ -189,6 +189,7 @@ model GitlabApp {
   teams         Team[]
   deployKeyId   Int?
   privateSshKey String?
+  publicSshKey  String?
   webhookToken  String?
   appId         String?
   appSecret     String?

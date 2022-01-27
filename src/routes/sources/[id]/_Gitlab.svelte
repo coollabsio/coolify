@@ -92,7 +92,9 @@
 				text="<span class='font-bold text-base'>Scopes required:</span> 	
 	<br>- api (Access the authenticated user's API)
 	<br>- read_repository (Allows read-only access to the repository)
-	<br>- email (Allows read-only access to the user's primary email address using OpenID Connect)"
+	<br>- email (Allows read-only access to the user's primary email address using OpenID Connect)
+	<br>
+	<br>For extra security, you can add Expire access tokens!"
 			/>
 		</form>
 		<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4 pt-10">
