@@ -106,9 +106,8 @@ export const buildPacks = [
 		hoverColor: 'hover:bg-blue-700',
 		color: 'bg-blue-700'
 	},
-
 	{ name: 'php', port: 80, fancyName: 'PHP', hoverColor: 'hover:bg-indigo-700', color: 'bg-indigo-700' },
-	{ name: 'rust', fancyName: 'Rust', hoverColor: 'hover:bg-pink-700', color: 'bg-pink-700' }
+	{ name: 'rust', port: 3000, fancyName: 'Rust', hoverColor: 'hover:bg-pink-700', color: 'bg-pink-700' }
 ];
 export const scanningTemplates = {
 	svelte: {

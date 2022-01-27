@@ -14,8 +14,14 @@
 
 	async function handleSubmit(name) {
 		try {
+			const tempBuildPack = JSON.parse(JSON.stringify(buildPack))
+			delete tempBuildPack.name
+			delete tempBuildPack.fancyName
+			delete tempBuildPack.color
+			delete tempBuildPack.hoverColor
+
 			if (foundConfig.buildPack !== name) {
-				await post(`/applications/${id}.json`, { ...buildPack });
+				await post(`/applications/${id}.json`, { ...tempBuildPack });
 			}
 			await post(`/applications/${id}/configuration/buildpack.json`, { buildPack: name });
 			return await goto(from || `/applications/${id}`);

@@ -36,8 +36,8 @@
 	import { errorNotification } from '$lib/form';
 
 	let scanning = true;
-	let foundConfig;
-
+	let foundConfig = null;
+	
 	export let apiUrl;
 	export let projectId;
 	export let repository;
@@ -51,12 +51,11 @@
 	function checkTemplates({ json }) {
 		Object.entries(scanningTemplates).forEach(([key, value]) => {
 			if (checkPackageJSONContents({ key, json })) {
-				foundConfig = buildPacks.find((bp) => bp.name === value.buildPack);
+				return buildPacks.find((bp) => bp.name === value.buildPack);
 			}
 		});
 	}
-
-	onMount(async () => {
+	async function scanRepository() {
 		try {
 			if (type === 'gitlab') {
 				const files = await get(`${apiUrl}/v4/projects/${projectId}/repository/tree`, {
@@ -83,7 +82,7 @@
 						}
 					);
 					const json = JSON.parse(data) || {};
-					return checkTemplates({ json });
+					foundConfig = checkTemplates({ json });
 				} else if (cargoToml) {
 					foundConfig = buildPacks.find((bp) => bp.name === 'rust');
 				} else if (requirementsTxt) {
@@ -116,7 +115,7 @@
 						Accept: 'application/vnd.github.v2.raw'
 					});
 					const json = JSON.parse(data) || {};
-					return checkTemplates({ json });
+					foundConfig = checkTemplates({ json });
 				} else if (cargoToml) {
 					foundConfig = buildPacks.find((bp) => bp.name === 'rust');
 				} else if (requirementsTxt) {
@@ -133,6 +132,9 @@
 			if (!foundConfig) foundConfig = buildPacks.find((bp) => bp.name === 'node');
 			scanning = false;
 		}
+	}
+	onMount(async () => {
+		await scanRepository();
 	});
 </script>
 
@@ -148,7 +150,7 @@
 	<div class="max-w-7xl mx-auto flex flex-wrap justify-center">
 		{#each buildPacks as buildPack}
 			<div class="p-2">
-				<BuildPack {buildPack} {scanning} {foundConfig} />
+				<BuildPack {buildPack} {scanning} bind:foundConfig />
 			</div>
 		{/each}
 	</div>
