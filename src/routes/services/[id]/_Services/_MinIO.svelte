@@ -16,7 +16,8 @@
 			placeholder="User to login"
 			value={service.minio.rootUser}
 			disabled
-			readonly />
+			readonly
+		/>
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -28,7 +29,8 @@
 			readonly
 			disabled
 			name="rootUserPassword"
-			value={service.minio.rootUserPassword} />
+			value={service.minio.rootUserPassword}
+		/>
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -40,6 +42,7 @@
 			value={service.minio.publicPort}
 			disabled
 			readonly
-			placeholder="Generated automatically after start" />
+			placeholder="Generated automatically after start"
+		/>
 	</div>
 </div>

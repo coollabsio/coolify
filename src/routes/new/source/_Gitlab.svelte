@@ -47,7 +47,8 @@
 					placeholder="GitHub.com"
 					required
 					bind:this={nameEl}
-					bind:value={gitSource.name} />
+					bind:value={gitSource.name}
+				/>
 			</div>
 		</div>
 
@@ -60,7 +61,8 @@
 					id="htmlUrl"
 					placeholder="eg: https://github.com"
 					required
-					bind:value={gitSource.htmlUrl} />
+					bind:value={gitSource.htmlUrl}
+				/>
 			</div>
 		</div>
 		<div class="grid grid-cols-3 items-center">
@@ -72,7 +74,8 @@
 					id="apiUrl"
 					placeholder="eg: https://api.github.com"
 					required
-					bind:value={gitSource.apiUrl} />
+					bind:value={gitSource.apiUrl}
+				/>
 			</div>
 		</div>
 	</form>

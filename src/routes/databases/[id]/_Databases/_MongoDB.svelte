@@ -15,7 +15,8 @@
 			readonly
 			disabled
 			name="rootUser"
-			value={database.rootUser} />
+			value={database.rootUser}
+		/>
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -28,6 +29,7 @@
 			disabled
 			id="rootUserPassword"
 			name="rootUserPassword"
-			value={database.rootUserPassword} />
+			value={database.rootUserPassword}
+		/>
 	</div>
 </div>

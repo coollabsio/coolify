@@ -106,38 +106,50 @@ export const buildPacks = [
 		hoverColor: 'hover:bg-blue-700',
 		color: 'bg-blue-700'
 	},
-	{ name: 'php', port: 80, fancyName: 'PHP', hoverColor: 'hover:bg-indigo-700', color: 'bg-indigo-700' },
-	{ name: 'rust', port: 3000, fancyName: 'Rust', hoverColor: 'hover:bg-pink-700', color: 'bg-pink-700' }
+	{
+		name: 'php',
+		port: 80,
+		fancyName: 'PHP',
+		hoverColor: 'hover:bg-indigo-700',
+		color: 'bg-indigo-700'
+	},
+	{
+		name: 'rust',
+		port: 3000,
+		fancyName: 'Rust',
+		hoverColor: 'hover:bg-pink-700',
+		color: 'bg-pink-700'
+	}
 ];
 export const scanningTemplates = {
 	svelte: {
-		buildPack: 'svelte',
+		buildPack: 'svelte'
 	},
 	'@nestjs/core': {
-		buildPack: 'nestjs',
+		buildPack: 'nestjs'
 	},
 	next: {
-		buildPack: 'nextjs',
+		buildPack: 'nextjs'
 	},
 	nuxt: {
-		buildPack: 'nuxtjs',
+		buildPack: 'nuxtjs'
 	},
 	'react-scripts': {
-		buildPack: 'react',
+		buildPack: 'react'
 	},
 	'parcel-bundler': {
-		buildPack: 'static',
+		buildPack: 'static'
 	},
 	'@vue/cli-service': {
-		buildPack: 'vuejs',
+		buildPack: 'vuejs'
 	},
 	vuejs: {
-		buildPack: 'vuejs',
+		buildPack: 'vuejs'
 	},
 	gatsby: {
-		buildPack: 'gatsby',
+		buildPack: 'gatsby'
 	},
 	'preact-cli': {
-		buildPack: 'react',
+		buildPack: 'react'
 	}
 };

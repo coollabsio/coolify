@@ -73,7 +73,8 @@
 					type="submit"
 					class:bg-purple-600={!loading}
 					class:hover:bg-purple-500={!loading}
-					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button>
+					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
+				>
 			{/if}
 		</div>
 
@@ -86,7 +87,8 @@
 						name="name"
 						id="name"
 						bind:value={database.name}
-						required />
+						required
+					/>
 				</div>
 			</div>
 			<div class="grid grid-cols-3 items-center">
@@ -99,7 +101,8 @@
 								id="destination"
 								disabled
 								readonly
-								class="bg-transparent " />
+								class="bg-transparent "
+							/>
 						</div>
 					{/if}
 				</div>
@@ -124,7 +127,8 @@
 						disabled
 						id="host"
 						name="host"
-						value={database.id} />
+						value={database.id}
+					/>
 				</div>
 			</div>
 			<div class="grid grid-cols-3 items-center">
@@ -136,7 +140,8 @@
 						readonly
 						disabled
 						name="publicPort"
-						value={isPublic ? database.publicPort : privatePort} />
+						value={isPublic ? database.publicPort : privatePort}
+					/>
 				</div>
 			</div>
 			{#if database.type === 'mysql'}
@@ -161,7 +166,8 @@
 						name="url"
 						readonly
 						disabled
-						value={databaseUrl} />
+						value={databaseUrl}
+					/>
 				</div>
 			</div>
 		</div>
@@ -175,7 +181,8 @@
 				bind:setting={isPublic}
 				on:click={() => changeSettings('isPublic')}
 				title="Set it public"
-				description="Your database will be reachable over the internet. <br>Take security seriously in this case!" />
+				description="Your database will be reachable over the internet. <br>Take security seriously in this case!"
+			/>
 		</ul>
 	</div>
 </div>

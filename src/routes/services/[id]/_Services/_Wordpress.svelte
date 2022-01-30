@@ -26,7 +26,8 @@
 define('WP_ALLOW_MULTISITE', true);
 define('MULTISITE', true);
 define('SUBDOMAIN_INSTALL', false);`
-				: null}>{service.wordpress.extraConfig}</textarea>
+				: null}>{service.wordpress.extraConfig}</textarea
+		>
 	</div>
 </div>
 <div class="flex space-x-1 py-5 font-bold">
@@ -42,7 +43,8 @@ define('SUBDOMAIN_INSTALL', false);`
 			readonly={readOnly}
 			disabled={readOnly}
 			bind:value={service.wordpress.mysqlDatabase}
-			placeholder="eg: wordpress_db" />
+			placeholder="eg: wordpress_db"
+		/>
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -54,7 +56,8 @@ define('SUBDOMAIN_INSTALL', false);`
 			placeholder="MySQL Root User"
 			value={service.wordpress.mysqlRootUser}
 			disabled
-			readonly />
+			readonly
+		/>
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -66,7 +69,8 @@ define('SUBDOMAIN_INSTALL', false);`
 			readonly
 			disabled
 			name="mysqlRootUserPassword"
-			value={service.wordpress.mysqlRootUserPassword} />
+			value={service.wordpress.mysqlRootUserPassword}
+		/>
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -84,6 +88,7 @@ define('SUBDOMAIN_INSTALL', false);`
 			readonly
 			disabled
 			name="mysqlPassword"
-			value={service.wordpress.mysqlPassword} />
+			value={service.wordpress.mysqlPassword}
+		/>
 	</div>
 </div>

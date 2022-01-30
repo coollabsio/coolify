@@ -38,7 +38,9 @@
 					stroke-linecap="round"
 					stroke-linejoin="round"
 					stroke-width="2"
-					d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+					d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+				/></svg
+			>
 		</a>
 	{/if}
 </div>
@@ -55,7 +57,8 @@
 						class="box-selection hover:bg-orange-600"
 						class:border-red-500={source.gitlabApp && !source.gitlabAppId}
 						class:border-0={source.gitlabApp && !source.gitlabAppId}
-						class:border-l-4={source.gitlabApp && !source.gitlabAppId}>
+						class:border-l-4={source.gitlabApp && !source.gitlabAppId}
+					>
 						<div class="font-bold text-xl text-center truncate">{source.name}</div>
 						{#if source.gitlabApp && !source.gitlabAppId}
 							<div class="font-bold text-center truncate">Configuration missing</div>

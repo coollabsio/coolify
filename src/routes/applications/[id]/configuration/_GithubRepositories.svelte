@@ -117,7 +117,8 @@
 					name="repository"
 					class="w-96"
 					bind:value={selected.repository}
-					on:change={loadBranches}>
+					on:change={loadBranches}
+				>
 					<option value="" disabled selected>Please select a repository</option>
 					{#each repositories as repository}
 						<option value={repository.full_name}>{repository.name}</option>
@@ -135,7 +136,8 @@
 					class="w-96"
 					disabled={!selected.repository}
 					bind:value={selected.branch}
-					on:change={isBranchAlreadyUsed}>
+					on:change={isBranchAlreadyUsed}
+				>
 					{#if !selected.repository}
 						<option value="" disabled selected>Select a repository first</option>
 					{:else}
@@ -154,7 +156,8 @@
 				type="submit"
 				disabled={!showSave}
 				class:bg-orange-600={showSave}
-				class:hover:bg-orange-500={showSave}>Save</button>
+				class:hover:bg-orange-500={showSave}>Save</button
+			>
 			<!-- <button class="w-40"
 				><a
 					class="no-underline"

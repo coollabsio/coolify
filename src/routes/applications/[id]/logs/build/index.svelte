@@ -99,7 +99,8 @@
 				class:bg-coolgray-400={buildId === build.id}
 				class:border-red-500={build.status === 'failed'}
 				class:border-green-500={build.status === 'success'}
-				class:border-yellow-500={build.status === 'inprogress'}>
+				class:border-yellow-500={build.status === 'inprogress'}
+			>
 				<div class="flex-col px-2">
 					<div class="text-sm font-bold">
 						{application.branch}

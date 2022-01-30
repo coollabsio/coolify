@@ -10,9 +10,8 @@ export const defaultProxyImage = `coolify-haproxy-alpine:latest`;
 export const defaultProxyImageTcp = `coolify-haproxy-tcp-alpine:latest`;
 export const defaultProxyImageHttp = `coolify-haproxy-http-alpine:latest`;
 
-
 export async function haproxyInstance() {
-	const { proxyPassword } = await db.listSettings()
+	const { proxyPassword } = await db.listSettings();
 	return got.extend({
 		prefixUrl: url,
 		username: 'admin',
@@ -36,7 +35,9 @@ export async function getNextTransactionVersion(): Promise<number> {
 
 export async function getNextTransactionId(): Promise<string> {
 	const version = await getNextTransactionVersion();
-	const newTransaction: NewTransaction = await (await haproxyInstance())
+	const newTransaction: NewTransaction = await (
+		await haproxyInstance()
+	)
 		.post('v2/services/haproxy/transactions', {
 			searchParams: {
 				version
@@ -416,7 +417,7 @@ export async function configureCoolifyProxyOn({ domain }) {
 	try {
 		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
 		return;
-	} catch (error) { }
+	} catch (error) {}
 	try {
 		const transactionId = await getNextTransactionId();
 		await haproxy.post('v2/services/haproxy/configuration/backends', {
@@ -505,7 +506,7 @@ export async function startHttpProxy(destinationDocker, id, publicPort, privateP
 export async function startCoolifyProxy(engine) {
 	const host = getEngine(engine);
 	const found = await checkContainer(engine, 'coolify-haproxy');
-	const { proxyPassword } = await db.listSettings()
+	const { proxyPassword } = await db.listSettings();
 	if (!found) {
 		await asyncExecShell(
 			`DOCKER_HOST="${host}" docker run -e HAPROXY_PASSWORD=${proxyPassword} --restart always --add-host 'host.docker.internal:host-gateway' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "5000:5000" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`
@@ -577,7 +578,7 @@ export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 	try {
 		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
 		return;
-	} catch (error) { }
+	} catch (error) {}
 	try {
 		const transactionId = await getNextTransactionId();
 		await haproxy.post('v2/services/haproxy/configuration/backends', {

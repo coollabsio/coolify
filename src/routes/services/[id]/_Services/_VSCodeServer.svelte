@@ -16,6 +16,7 @@
 			readonly
 			disabled
 			name="password"
-			value={service.vscodeserver.password} />
+			value={service.vscodeserver.password}
+		/>
 	</div>
 </div>

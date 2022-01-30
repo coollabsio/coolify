@@ -137,7 +137,11 @@
 					on:click={changeProxySetting}
 					isPadding={false}
 					title="Use Coolify Proxy?"
-					description={`This will install a proxy on the destination to allow you to access your applications and services without any manual configuration. Databases will have their own proxy. <br><br>${cannotDisable ? '<span class="font-bold text-white">You cannot disable this proxy as FQDN is configured for Coolify.</span>' : ''}`}
+					description={`This will install a proxy on the destination to allow you to access your applications and services without any manual configuration. Databases will have their own proxy. <br><br>${
+						cannotDisable
+							? '<span class="font-bold text-white">You cannot disable this proxy as FQDN is configured for Coolify.</span>'
+							: ''
+					}`}
 				/>
 			</ul>
 		</div>

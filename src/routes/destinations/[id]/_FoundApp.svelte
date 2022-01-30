@@ -71,6 +71,7 @@
 		</div>
 	{:else}
 		<button class="bg-green-600 hover:bg-green-500 w-full" on:click={addToCoolify}
-			>Add to Coolify</button>
+			>Add to Coolify</button
+		>
 	{/if}
 </div>

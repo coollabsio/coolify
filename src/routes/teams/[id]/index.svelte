@@ -116,7 +116,8 @@
 			<div class="pt-4 text-center">
 				<Explainer
 					maxWidthClass="w-full"
-					text="This is the <span class='text-red-500 font-bold'>root</span> team. <br><br>That means members of this group can manage instance wide settings and have all the priviliges in Coolify. <br>(imagine like root user on Linux)" />
+					text="This is the <span class='text-red-500 font-bold'>root</span> team. <br><br>That means members of this group can manage instance wide settings and have all the priviliges in Coolify. <br>(imagine like root user on Linux)"
+				/>
 			</div>
 		{/if}
 	</form>
@@ -135,18 +136,21 @@
 				<tr class="text-xs">
 					<td class="py-4"
 						>{permission.user.email}
-						<span class="font-bold">{permission.user.id === $session.uid ? '(You)' : ''}</span></td>
+						<span class="font-bold">{permission.user.id === $session.uid ? '(You)' : ''}</span></td
+					>
 					<td class="py-4">{permission.permission}</td>
 					{#if $session.isAdmin && permission.user.id !== $session.uid && permission.permission !== 'owner'}
 						<td class="flex flex-col items-center justify-center space-y-2 py-4 text-center">
 							<button
 								class="w-52 bg-red-600 hover:bg-red-500"
-								on:click={() => removeFromTeam(permission.user.id)}>Remove</button>
+								on:click={() => removeFromTeam(permission.user.id)}>Remove</button
+							>
 							<button
 								class="w-52"
 								on:click={() =>
 									changePermission(permission.user.id, permission.id, permission.permission)}
-								>Promote to {permission.permission === 'admin' ? 'read' : 'admin'}</button>
+								>Promote to {permission.permission === 'admin' ? 'read' : 'admin'}</button
+							>
 						</td>
 					{:else}
 						<td class="text-center py-4 flex-col space-y-2"> No actions available </td>
@@ -162,7 +166,8 @@
 						<td class="flex-col space-y-2 py-4 text-center">
 							<button
 								class="w-52 bg-red-600 hover:bg-red-500"
-								on:click={() => revokeInvitation(invitation.id)}>Revoke invitation</button>
+								on:click={() => revokeInvitation(invitation.id)}>Revoke invitation</button
+							>
 						</td>
 					{:else}
 						<td class="text-center py-4 flex-col space-y-2">Pending invitation</td>
@@ -187,18 +192,21 @@
 						bind:value={invitation.email}
 						placeholder="Email address"
 						class="mr-2 w-full"
-						required />
+						required
+					/>
 					<div class="flex-1" />
 					<button
 						on:click={() => (invitation.permission = 'read')}
 						class="rounded-none rounded-l"
 						type="button"
-						class:bg-pink-500={invitation.permission === 'read'}>Read</button>
+						class:bg-pink-500={invitation.permission === 'read'}>Read</button
+					>
 					<button
 						on:click={() => (invitation.permission = 'admin')}
 						class="rounded-none rounded-r"
 						type="button"
-						class:bg-red-500={invitation.permission === 'admin'}>Admin</button>
+						class:bg-red-500={invitation.permission === 'admin'}>Admin</button
+					>
 				</div>
 			</div>
 		</form>

@@ -5,7 +5,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 export const get: RequestHandler<Locals> = async (event) => {
 	const { id } = event.params;
 	try {
-		return await db.getSshKey({ id })
+		return await db.getSshKey({ id });
 	} catch (error) {
 		return PrismaErrorHandler(error);
 	}

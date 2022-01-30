@@ -56,7 +56,7 @@
 				},
 				default_events: ['pull_request', 'push']
 			});
-			console.log(data)
+			console.log(data);
 			const form = document.createElement('form');
 			form.setAttribute('method', 'post');
 			form.setAttribute('action', `${htmlUrl}/${url}?state=${id}`);

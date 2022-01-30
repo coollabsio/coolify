@@ -122,7 +122,8 @@
 					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-purple-600 hover:text-white"
 					data-tooltip={$session.isAdmin
 						? 'Stop database'
-						: 'You do not have permission to stop the database.'}>
+						: 'You do not have permission to stop the database.'}
+				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="w-6 h-6"
@@ -131,7 +132,8 @@
 						stroke="currentColor"
 						fill="none"
 						stroke-linecap="round"
-						stroke-linejoin="round">
+						stroke-linejoin="round"
+					>
 						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 						<rect x="6" y="5" width="4" height="14" rx="1" />
 						<rect x="14" y="5" width="4" height="14" rx="1" />
@@ -155,7 +157,8 @@
 						stroke="currentColor"
 						fill="none"
 						stroke-linecap="round"
-						stroke-linejoin="round">
+						stroke-linejoin="round"
+					>
 						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 						<path d="M7 4v16l13 -8z" />
 					</svg>
@@ -171,7 +174,8 @@
 			class="icons bg-transparent tooltip-bottom text-sm"
 			data-tooltip={$session.isAdmin
 				? 'Delete Database'
-				: 'You do not have permission to delete a Database'}><DeleteIcon /></button>
+				: 'You do not have permission to delete a Database'}><DeleteIcon /></button
+		>
 	{/if}
 </nav>
 <slot />

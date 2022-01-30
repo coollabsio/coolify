@@ -35,7 +35,8 @@
 					? payload.isCoolifyProxyUsed
 						? 'Saving and configuring proxy...'
 						: 'Saving...'
-					: 'Save'}</button>
+					: 'Save'}</button
+			>
 		</div>
 		<div class="grid grid-cols-3 items-center">
 			<label for="name">Name</label>
@@ -51,7 +52,8 @@
 					required
 					name="engine"
 					placeholder="eg: /var/run/docker.sock"
-					bind:value={payload.engine} />
+					bind:value={payload.engine}
+				/>
 				<!-- <Explainer text="You can use remote Docker Engine with over SSH." /> -->
 			</div>
 		</div>
@@ -80,7 +82,8 @@
 					required
 					name="network"
 					placeholder="default: coolify"
-					bind:value={payload.network} />
+					bind:value={payload.network}
+				/>
 			</div>
 		</div>
 		<div class="flex justify-start">
@@ -90,7 +93,8 @@
 					on:click={() => (payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed)}
 					isPadding={false}
 					title="Use Coolify Proxy?"
-					description="This will install a proxy on the destination to allow you to access your applications and services without any manual configuration (recommended for Docker). Databases will have their own proxy." />
+					description="This will install a proxy on the destination to allow you to access your applications and services without any manual configuration (recommended for Docker). Databases will have their own proxy."
+				/>
 			</ul>
 		</div>
 	</form>

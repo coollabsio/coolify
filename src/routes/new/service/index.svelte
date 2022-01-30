@@ -51,7 +51,8 @@
 				placeholder="Service name"
 				required
 				bind:this={autofocus}
-				bind:value={name} />
+				bind:value={name}
+			/>
 			<button type="submit" class="bg-pink-600 hover:bg-pink-500">Save</button>
 		</div>
 	</form>

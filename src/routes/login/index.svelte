@@ -48,13 +48,15 @@
 					autocomplete="off"
 					required
 					bind:this={emailEl}
-					bind:value={email} />
+					bind:value={email}
+				/>
 				<input
 					type="password"
 					name="password"
 					placeholder="Password"
 					bind:value={password}
-					required />
+					required
+				/>
 
 				<div class="flex space-x-2 h-8 items-center justify-center pt-14">
 					<button
@@ -63,7 +65,8 @@
 						class="hover:opacity-90 text-white"
 						class:bg-transparent={loading}
 						class:text-stone-600={loading}
-						class:bg-coollabs={!loading}>{loading ? 'Authenticating...' : 'Login'}</button>
+						class:bg-coollabs={!loading}>{loading ? 'Authenticating...' : 'Login'}</button
+					>
 				</div>
 			</form>
 		</div>

@@ -48,7 +48,8 @@
 					type="submit"
 					class:bg-pink-600={!loading}
 					class:hover:bg-pink-500={!loading}
-					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button>
+					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
+				>
 			{/if}
 			{#if service.type === 'plausibleanalytics'}
 				<button
@@ -56,7 +57,8 @@
 					class:bg-pink-600={!loadingVerification}
 					class:hover:bg-pink-500={!loadingVerification}
 					disabled={loadingVerification}
-					>{loadingVerification ? 'Verifying' : 'Verify emails without SMTP'}</button>
+					>{loadingVerification ? 'Verifying' : 'Verify emails without SMTP'}</button
+				>
 			{/if}
 		</div>
 
@@ -69,7 +71,8 @@
 						name="name"
 						id="name"
 						bind:value={service.name}
-						required />
+						required
+					/>
 				</div>
 			</div>
 
@@ -82,7 +85,8 @@
 								value={service.destinationDocker.name}
 								id="destination"
 								disabled
-								class="bg-transparent " />
+								class="bg-transparent "
+							/>
 						</div>
 					{/if}
 				</div>
@@ -98,9 +102,11 @@
 						id="fqdn"
 						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 						bind:value={service.fqdn}
-						required />
+						required
+					/>
 					<Explainer
-						text="If you specify <span class='text-green-600'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you." />
+						text="If you specify <span class='text-green-600'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you."
+					/>
 				</div>
 				<!-- {:else}
 					<label for="fqdn" class="pt-2">Domain (FQDN)</label>

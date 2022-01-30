@@ -115,7 +115,8 @@
 					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-green-600 hover:text-white"
 					data-tooltip={$session.isAdmin
 						? 'Stop application'
-						: 'You do not have permission to stop the application.'}>
+						: 'You do not have permission to stop the application.'}
+				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="w-6 h-6"
@@ -124,7 +125,8 @@
 						stroke="currentColor"
 						fill="none"
 						stroke-linecap="round"
-						stroke-linejoin="round">
+						stroke-linejoin="round"
+					>
 						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 						<rect x="6" y="5" width="4" height="14" rx="1" />
 						<rect x="14" y="5" width="4" height="14" rx="1" />
@@ -138,7 +140,8 @@
 						class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-green-600 hover:text-white"
 						data-tooltip={$session.isAdmin
 							? 'Rebuild application'
-							: 'You do not have permission to rebuild application.'}>
+							: 'You do not have permission to rebuild application.'}
+					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							class="w-6 h-6"
@@ -147,11 +150,13 @@
 							stroke="currentColor"
 							fill="none"
 							stroke-linecap="round"
-							stroke-linejoin="round">
+							stroke-linejoin="round"
+						>
 							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 							<path
 								d="M16.3 5h.7a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h5l-2.82 -2.82m0 5.64l2.82 -2.82"
-								transform="rotate(-45 12 12)" />
+								transform="rotate(-45 12 12)"
+							/>
 						</svg>
 					</button>
 				</form>
@@ -164,7 +169,8 @@
 						class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-green-600 hover:text-white"
 						data-tooltip={$session.isAdmin
 							? 'Build and start application'
-							: 'You do not have permission to Build and start application.'}>
+							: 'You do not have permission to Build and start application.'}
+					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							class="w-6 h-6"
@@ -173,7 +179,8 @@
 							stroke="currentColor"
 							fill="none"
 							stroke-linecap="round"
-							stroke-linejoin="round">
+							stroke-linejoin="round"
+						>
 							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 							<path d="M7 4v16l13 -8z" />
 						</svg>
@@ -187,11 +194,13 @@
 				sveltekit:prefetch
 				class="hover:text-yellow-500 rounded"
 				class:text-yellow-500={$page.url.pathname === `/applications/${id}`}
-				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}`}>
+				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}`}
+			>
 				<button
 					title="Configurations"
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-					data-tooltip="Configurations">
+					data-tooltip="Configurations"
+				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="h-6 w-6"
@@ -200,7 +209,8 @@
 						stroke="currentColor"
 						fill="none"
 						stroke-linecap="round"
-						stroke-linejoin="round">
+						stroke-linejoin="round"
+					>
 						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 						<rect x="4" y="8" width="4" height="4" />
 						<line x1="6" y1="4" x2="6" y2="8" />
@@ -212,17 +222,20 @@
 						<line x1="18" y1="4" x2="18" y2="5" />
 						<line x1="18" y1="9" x2="18" y2="20" />
 					</svg></button
-				></a>
+				></a
+			>
 			<a
 				href="/applications/{id}/secrets"
 				sveltekit:prefetch
 				class="hover:text-pink-500 rounded"
 				class:text-pink-500={$page.url.pathname === `/applications/${id}/secrets`}
-				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/secrets`}>
+				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/secrets`}
+			>
 				<button
 					title="Secrets"
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-					data-tooltip="Secrets">
+					data-tooltip="Secrets"
+				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="w-6 h-6"
@@ -231,24 +244,29 @@
 						stroke="currentColor"
 						fill="none"
 						stroke-linecap="round"
-						stroke-linejoin="round">
+						stroke-linejoin="round"
+					>
 						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 						<path
-							d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3" />
+							d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"
+						/>
 						<circle cx="12" cy="11" r="1" />
 						<line x1="12" y1="12" x2="12" y2="14.5" />
 					</svg></button
-				></a>
+				></a
+			>
 			<a
 				href="/applications/{id}/previews"
 				sveltekit:prefetch
 				class="hover:text-orange-500 rounded"
 				class:text-orange-500={$page.url.pathname === `/applications/${id}/previews`}
-				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/previews`}>
+				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/previews`}
+			>
 				<button
 					title="Previews"
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-					data-tooltip="Previews">
+					data-tooltip="Previews"
+				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="w-6 h-6"
@@ -257,7 +275,8 @@
 						stroke="currentColor"
 						fill="none"
 						stroke-linecap="round"
-						stroke-linejoin="round">
+						stroke-linejoin="round"
+					>
 						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 						<circle cx="7" cy="18" r="2" />
 						<circle cx="7" cy="6" r="2" />
@@ -265,18 +284,21 @@
 						<line x1="7" y1="8" x2="7" y2="16" />
 						<path d="M7 8a4 4 0 0 0 4 4h4" />
 					</svg></button
-				></a>
+				></a
+			>
 			<div class="border border-stone-700 h-8" />
 			<a
 				href="/applications/{id}/logs"
 				sveltekit:prefetch
 				class="hover:text-sky-500 rounded"
 				class:text-sky-500={$page.url.pathname === `/applications/${id}/logs`}
-				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs`}>
+				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs`}
+			>
 				<button
 					title="Application Logs"
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500 "
-					data-tooltip="Application Logs">
+					data-tooltip="Application Logs"
+				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="h-6 w-6"
@@ -285,7 +307,8 @@
 						stroke="currentColor"
 						fill="none"
 						stroke-linecap="round"
-						stroke-linejoin="round">
+						stroke-linejoin="round"
+					>
 						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 						<path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
 						<path d="M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
@@ -293,17 +316,20 @@
 						<line x1="12" y1="6" x2="12" y2="19" />
 						<line x1="21" y1="6" x2="21" y2="19" />
 					</svg>
-				</button></a>
+				</button></a
+			>
 			<a
 				href="/applications/{id}/logs/build"
 				sveltekit:prefetch
 				class="hover:text-red-500 rounded"
 				class:text-red-500={$page.url.pathname === `/applications/${id}/logs/build`}
-				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs/build`}>
+				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs/build`}
+			>
 				<button
 					title="Build Logs"
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500 "
-					data-tooltip="Build Logs">
+					data-tooltip="Build Logs"
+				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="h-6 w-6"
@@ -312,7 +338,8 @@
 						stroke="currentColor"
 						fill="none"
 						stroke-linecap="round"
-						stroke-linejoin="round">
+						stroke-linejoin="round"
+					>
 						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 						<circle cx="19" cy="13" r="2" />
 						<circle cx="4" cy="17" r="2" />
@@ -323,7 +350,8 @@
 						<path d="M5 15v-2a1 1 0 0 1 1 -1h7" />
 						<path d="M19 11v-7l-6 7" />
 					</svg>
-				</button></a>
+				</button></a
+			>
 			<div class="border border-stone-700 h-8" />
 		{/if}
 
@@ -336,7 +364,8 @@
 			class="icons bg-transparent  tooltip-bottom text-sm"
 			data-tooltip={$session.isAdmin
 				? 'Delete application'
-				: 'You do not have permission to delete this application'}>
+				: 'You do not have permission to delete this application'}
+		>
 			<DeleteIcon />
 		</button>
 	{/if}

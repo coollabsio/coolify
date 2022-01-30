@@ -18,7 +18,7 @@ export const get: RequestHandler = async (event) => {
 			body: {
 				destination,
 				settings,
-				state,
+				state
 			}
 		};
 	} catch (error) {

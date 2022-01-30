@@ -41,7 +41,8 @@
 					<a
 						href="/applications"
 						sveltekit:prefetch
-						class="flex cursor-pointer flex-col rounded p-6 text-center text-green-500 no-underline transition duration-150 hover:bg-green-500 hover:text-white">
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-green-500 no-underline transition duration-150 hover:bg-green-500 hover:text-white"
+					>
 						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
 							Applications
 						</dt>
@@ -52,7 +53,8 @@
 					<a
 						href="/destinations"
 						sveltekit:prefetch
-						class="flex cursor-pointer flex-col rounded p-6 text-center text-sky-500 no-underline transition duration-150 hover:bg-sky-500 hover:text-white">
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-sky-500 no-underline transition duration-150 hover:bg-sky-500 hover:text-white"
+					>
 						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
 							Destinations
 						</dt>
@@ -63,7 +65,8 @@
 					<a
 						href="/sources"
 						sveltekit:prefetch
-						class="flex cursor-pointer flex-col rounded p-6 text-center text-orange-500 no-underline transition duration-150 hover:bg-orange-500 hover:text-white">
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-orange-500 no-underline transition duration-150 hover:bg-orange-500 hover:text-white"
+					>
 						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
 							Git Sources
 						</dt>
@@ -74,14 +77,16 @@
 					<a
 						href="/databases"
 						sveltekit:prefetch
-						class="flex cursor-pointer flex-col rounded p-6 text-center text-purple-500 no-underline transition duration-150 hover:bg-purple-500 hover:text-white">
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-purple-500 no-underline transition duration-150 hover:bg-purple-500 hover:text-white"
+					>
 						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">Databases</dt>
 						<dd class="order-1 text-5xl font-extrabold ">{databasesCount}</dd>
 					</a>
 					<a
 						href="/services"
 						sveltekit:prefetch
-						class="flex cursor-pointer flex-col rounded p-6 text-center text-pink-500 no-underline transition duration-150 hover:bg-pink-500 hover:text-white">
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-pink-500 no-underline transition duration-150 hover:bg-pink-500 hover:text-white"
+					>
 						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">Services</dt>
 						<dd class="order-1 text-5xl font-extrabold ">{servicesCount}</dd>
 					</a>
@@ -89,7 +94,8 @@
 					<a
 						href="/teams"
 						sveltekit:prefetch
-						class="flex cursor-pointer flex-col rounded p-6 text-center text-cyan-500 no-underline transition duration-150 hover:bg-cyan-500 hover:text-white">
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-cyan-500 no-underline transition duration-150 hover:bg-cyan-500 hover:text-white"
+					>
 						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">Teams</dt>
 						<dd class="order-1 text-5xl font-extrabold ">
 							{teamsCount}

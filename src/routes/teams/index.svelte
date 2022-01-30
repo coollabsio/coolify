@@ -59,7 +59,9 @@
 					stroke-linecap="round"
 					stroke-linejoin="round"
 					stroke-width="2"
-					d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+					d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+				/></svg
+			>
 		</a>
 	{/if}
 </div>
@@ -78,10 +80,12 @@
 					</div>
 					<button
 						class="hover:bg-green-500"
-						on:click={() => acceptInvitation(invitation.id, invitation.teamId)}>Accept</button>
+						on:click={() => acceptInvitation(invitation.id, invitation.teamId)}>Accept</button
+					>
 					<button
 						class="hover:bg-red-600"
-						on:click={() => revokeInvitation(invitation.id, invitation.teamId)}>Delete</button>
+						on:click={() => revokeInvitation(invitation.id, invitation.teamId)}>Delete</button
+					>
 				</div>
 			{/each}
 		</div>
@@ -94,7 +98,8 @@
 				<div
 					class="box-selection relative  h-32"
 					class:hover:bg-cyan-600={team.team?.id !== '0'}
-					class:hover:bg-red-500={team.team?.id === '0'}>
+					class:hover:bg-red-500={team.team?.id === '0'}
+				>
 					<div class="truncate text-center text-xl font-bold">{team.team.name}</div>
 					<div class="text-center text-xs">
 						({team.team?.id === '0' ? 'root team - ' : ''}{team.permission})

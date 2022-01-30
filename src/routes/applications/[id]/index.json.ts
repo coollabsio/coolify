@@ -10,7 +10,7 @@ export const get: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 
-	const appId = process.env['COOLIFY_APP_ID']
+	const appId = process.env['COOLIFY_APP_ID'];
 	let githubToken = null;
 	let ghToken = null;
 	let isRunning = false;

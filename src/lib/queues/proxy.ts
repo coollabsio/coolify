@@ -33,7 +33,7 @@ export default async function () {
 		}
 	}
 	// Check Coolify FQDN and configure proxy if needed
-	const { fqdn } = await db.listSettings()
+	const { fqdn } = await db.listSettings();
 	if (fqdn) {
 		const domain = getDomain(fqdn);
 		const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy');

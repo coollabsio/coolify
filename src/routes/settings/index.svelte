@@ -90,14 +90,16 @@
 					disabled={loading.save}
 					class:bg-green-600={!loading.save}
 					class:hover:bg-green-500={!loading.save}
-					class="mx-2 ">{loading.save ? 'Saving...' : 'Save'}</button>
+					class="mx-2 ">{loading.save ? 'Saving...' : 'Save'}</button
+				>
 				{#if isFqdnSet}
 					<button
 						on:click|preventDefault={removeFqdn}
 						disabled={loading.remove}
 						class:bg-red-600={!loading.remove}
 						class:hover:bg-red-500={!loading.remove}
-						>{loading.remove ? 'Removing...' : 'Remove domain'}</button>
+						>{loading.remove ? 'Removing...' : 'Remove domain'}</button
+					>
 				{/if}
 			</div>
 			<div class="px-4 sm:px-6">
@@ -113,9 +115,11 @@
 							id="fqdn"
 							pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 							placeholder="eg: https://coolify.io"
-							required />
+							required
+						/>
 						<Explainer
-							text="Set the fully qualified domain name for your Coolify instance. <br>If you specify <span class='text-green-600'>https</span>, it will be accessible only over https. <br>SSL certificate will be generated for you." />
+							text="Set the fully qualified domain name for your Coolify instance. <br>If you specify <span class='text-green-600'>https</span>, it will be accessible only over https. <br>SSL certificate will be generated for you."
+						/>
 					</div>
 				</div>
 				<ul class="mt-2 divide-y divide-stone-800">
@@ -123,7 +127,8 @@
 						bind:setting={isRegistrationEnabled}
 						title="Registration allowed?"
 						description="Allow further registrations to the application. <br>It's turned off after the first registration. "
-						on:click={() => changeSettings('isRegistrationEnabled')} />
+						on:click={() => changeSettings('isRegistrationEnabled')}
+					/>
 				</ul>
 			</div>
 		</form>

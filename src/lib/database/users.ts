@@ -26,10 +26,9 @@ export async function login({ email, password }) {
 		try {
 			await startCoolifyProxy('/var/run/docker.sock');
 			await asyncExecShell(`docker network create --attachable coolify`);
-		} catch(error) {
+		} catch (error) {
 			console.error(error);
 		}
-
 
 		uid = '0';
 	}

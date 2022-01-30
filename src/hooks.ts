@@ -13,7 +13,7 @@ export const handle = handleSession(
 		expires: 30
 	},
 	async function ({ event, resolve }) {
-		let response
+		let response;
 		try {
 			const cookies: Cookies = cookie.parse(event.request.headers.get('cookie') || '');
 			if (cookies['kit.session']) {
@@ -30,27 +30,34 @@ export const handle = handleSession(
 			response = await resolve(event, {
 				ssr: !event.url.pathname.startsWith('/webhooks/success')
 			});
-
 		} catch (error) {
 			response = await resolve(event, {
 				ssr: !event.url.pathname.startsWith('/webhooks/success')
 			});
-			response.headers.append('Set-Cookie', cookie.serialize('kit.session', '', {
-				path: '/',
-				expires: new Date('Thu, 01 Jan 1970 00:00:01 GMT'),
-			}))
-			response.headers.append('Set-Cookie', cookie.serialize('teamId', '', {
-				path: '/',
-				expires: new Date('Thu, 01 Jan 1970 00:00:01 GMT')
-			}))
-			response.headers.append('Set-Cookie', cookie.serialize('gitlabToken', '', {
-				path: '/',
-				expires: new Date('Thu, 01 Jan 1970 00:00:01 GMT')
-			}))
+			response.headers.append(
+				'Set-Cookie',
+				cookie.serialize('kit.session', '', {
+					path: '/',
+					expires: new Date('Thu, 01 Jan 1970 00:00:01 GMT')
+				})
+			);
+			response.headers.append(
+				'Set-Cookie',
+				cookie.serialize('teamId', '', {
+					path: '/',
+					expires: new Date('Thu, 01 Jan 1970 00:00:01 GMT')
+				})
+			);
+			response.headers.append(
+				'Set-Cookie',
+				cookie.serialize('gitlabToken', '', {
+					path: '/',
+					expires: new Date('Thu, 01 Jan 1970 00:00:01 GMT')
+				})
+			);
 		} finally {
 			return response;
 		}
-
 	}
 );
 

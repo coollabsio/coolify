@@ -17,7 +17,8 @@
 			readonly={readOnly}
 			placeholder="Email address"
 			bind:value={service.plausibleAnalytics.email}
-			required />
+			required
+		/>
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -30,7 +31,8 @@
 			readonly={readOnly}
 			placeholder="User to login"
 			bind:value={service.plausibleAnalytics.username}
-			required />
+			required
+		/>
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -42,7 +44,8 @@
 			readonly
 			disabled
 			name="password"
-			value={service.plausibleAnalytics.password} />
+			value={service.plausibleAnalytics.password}
+		/>
 	</div>
 </div>
 <div class="flex space-x-1 py-5 font-bold">
@@ -56,7 +59,8 @@
 			id="postgresqlUser"
 			value={service.plausibleAnalytics.postgresqlUser}
 			readonly
-			disabled />
+			disabled
+		/>
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -68,7 +72,8 @@
 			readonly
 			disabled
 			name="postgresqlPassword"
-			value={service.plausibleAnalytics.postgresqlPassword} />
+			value={service.plausibleAnalytics.postgresqlPassword}
+		/>
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -79,7 +84,8 @@
 			id="postgresqlDatabase"
 			value={service.plausibleAnalytics.postgresqlDatabase}
 			readonly
-			disabled />
+			disabled
+		/>
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -91,6 +97,7 @@
 			disabled
 			id="postgresqlPublicPort"
 			name="postgresqlPublicPort"
-			value={service.plausibleAnalytics.postgresqlPublicPort} />
+			value={service.plausibleAnalytics.postgresqlPublicPort}
+		/>
 	</div>
 </div>

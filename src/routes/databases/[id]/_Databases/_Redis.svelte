@@ -15,7 +15,8 @@
 			placeholder="Generated automatically after start"
 			id="dbUser"
 			name="dbUser"
-			bind:value={database.dbUser} />
+			bind:value={database.dbUser}
+		/>
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -28,7 +29,8 @@
 			isPasswordField
 			id="dbUserPassword"
 			name="dbUserPassword"
-			value={database.dbUserPassword} />
+			value={database.dbUserPassword}
+		/>
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -40,7 +42,8 @@
 			placeholder="Generated automatically after start"
 			id="rootUser"
 			name="rootUser"
-			value={database.rootUser} />
+			value={database.rootUser}
+		/>
 	</div>
 </div>
 <div class="grid grid-cols-3 items-center">
@@ -53,6 +56,7 @@
 			isPasswordField
 			id="rootUserPassword"
 			name="rootUserPassword"
-			value={database.rootUserPassword} />
+			value={database.rootUserPassword}
+		/>
 	</div>
 </div>

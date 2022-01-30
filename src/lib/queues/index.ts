@@ -47,8 +47,8 @@ cleanupQueue.drain().then(() => {
 
 const sslRenewalCronQueue = new Queue('cron', connectionOptions);
 const sslRenewalCronWorker = new Worker('cron', async () => await sslrenewal(), connectionOptions);
-sslRenewalCronWorker.on('failed', async (job: Bullmq.Job, failedReason: string) => {
-	console.log(failedReason);
+sslRenewalCronWorker.on('failed', async (job: Bullmq.Job, error) => {
+	console.log(error);
 });
 sslRenewalCronQueue.drain().then(() => {
 	sslRenewalCronQueue.add('cron', {}, { repeat: { every: 1800000 } });

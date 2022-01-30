@@ -37,7 +37,7 @@
 
 	let scanning = true;
 	let foundConfig = null;
-	
+
 	export let apiUrl;
 	export let projectId;
 	export let repository;
