@@ -127,13 +127,6 @@ export const removeDestinationDocker = async ({ id, engine }) => {
 	return await removeContainer(id, engine);
 };
 
-export const removePreviewDestinationDocker = async ({
-	id,
-	destinationDocker,
-	pullmergeRequestId
-}) => {
-	return removeContainer(`${id}-${pullmergeRequestId}`, destinationDocker.engine);
-};
 
 export const createDirectories = async ({ repository, buildId }) => {
 	const repodir = `/tmp/build-sources/${repository}/`;

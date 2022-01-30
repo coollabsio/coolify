@@ -1,4 +1,5 @@
-import { getTeam, getUserDetails, removePreviewDestinationDocker } from '$lib/common';
+import { getTeam, getUserDetails, getDomain, removeDestinationDocker } from '$lib/common';
+import { removeProxyConfiguration } from '$lib/haproxy';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
@@ -124,11 +125,9 @@ export const post: RequestHandler = async (event) => {
 						};
 					} else if (action === 'close') {
 						if (applicationFound.destinationDockerId) {
-							await removePreviewDestinationDocker({
-								id: applicationFound.id,
-								destinationDocker: applicationFound.destinationDocker,
-								pullmergeRequestId
-							});
+							const domain = getDomain(applicationFound.fqdn)
+							await removeDestinationDocker({ id: applicationFound.id, engine: applicationFound.destinationDocker.engine});
+							await removeProxyConfiguration({ domain: `${pullmergeRequestId}.${domain}` });
 						}
 
 						return {

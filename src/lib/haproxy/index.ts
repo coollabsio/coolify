@@ -274,7 +274,7 @@ export async function deleteProxy({ id }) {
 //     }
 //     await configureDatabaseVisibility({ id, isPublic })
 // }
-export async function configureProxyForApplication({ domain, applicationId, port, isHttps }) {
+export async function configureProxyForApplication({ domain, imageId, applicationId, port, isHttps }) {
 	const haproxy = await haproxyInstance();
 	let serverConfigured = false;
 	let sslConfigured = false;
@@ -289,7 +289,7 @@ export async function configureProxyForApplication({ domain, applicationId, port
 			.get(`v2/services/haproxy/configuration/backends/${domain}`)
 			.json();
 		const server: any = await haproxy
-			.get(`v2/services/haproxy/configuration/servers/${applicationId}`, {
+			.get(`v2/services/haproxy/configuration/servers/${imageId}`, {
 				searchParams: {
 					backend: domain
 				}
@@ -320,7 +320,8 @@ export async function configureProxyForApplication({ domain, applicationId, port
 			await letsEncrypt({ domain, id: applicationId });
 		}
 	} catch (error) {
-		console.log('error getting http_request_rules', error?.response?.body);
+		console.log(error)
+		console.log('error getting lets encrypt', error);
 		//
 	}
 
@@ -359,12 +360,12 @@ export async function configureProxyForApplication({ domain, applicationId, port
 				backend: domain
 			},
 			json: {
-				address: applicationId,
+				address: imageId,
 				check: 'enabled',
 				inter: 2,
 				fall: 200,
 				rise: 1,
-				name: applicationId,
+				name: imageId,
 				port: port
 			}
 		});
@@ -450,7 +451,7 @@ export async function configureCoolifyProxyOn({ domain }) {
 			json: {
 				address: dev ? 'host.docker.internal' : 'coolify',
 				check: 'enabled',
-				inter: 2,
+				inter: 10,
 				fall: 200,
 				rise: 1,
 				name: 'coolify',

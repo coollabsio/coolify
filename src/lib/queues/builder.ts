@@ -241,8 +241,7 @@ export default async function (job) {
 		saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
 
 		if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-			applicationId = imageId;
-			await configureProxyForApplication({ domain, applicationId, port, isHttps });
+			await configureProxyForApplication({ domain, imageId, applicationId, port, isHttps });
 		} else {
 			saveBuildLog({
 				line: 'Coolify Proxy is not configured for this destination. Nothing else to do.',
