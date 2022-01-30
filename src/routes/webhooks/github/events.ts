@@ -21,8 +21,8 @@ export const post: RequestHandler = async (event) => {
 		const buildId = cuid();
 		const allowedGithubEvents = ['push', 'pull_request'];
 		const allowedActions = ['opened', 'reopened', 'synchronize', 'closed'];
-		const githubEvent = event.request.headers['x-github-event'].toLowerCase();
-		const githubSignature = event.request.headers['x-hub-signature-256'].toLowerCase();
+		const githubEvent = event.request.headers.get('x-github-event').toLowerCase();
+		const githubSignature = event.request.headers.get('x-hub-signature-256').toLowerCase();
 		if (!allowedGithubEvents.includes(githubEvent)) {
 			return {
 				status: 500,

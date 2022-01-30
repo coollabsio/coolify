@@ -59,8 +59,8 @@ export const post: RequestHandler = async (event) => {
 				};
 			}
 		} else if (objectKind === 'merge_request') {
-			console.log('asd')
-			const webhookToken = event.request.headers['x-gitlab-token'];
+			const webhookToken = event.request.headers.get('x-gitlab-token');
+			console.log(webhookToken)
 			if (!webhookToken) {
 				return {
 					status: 500,
