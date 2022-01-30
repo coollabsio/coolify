@@ -7,7 +7,7 @@
 	import { dev } from '$app/env';
 	import cuid from 'cuid';
 	import { goto } from '$app/navigation';
-	import { get, post } from '$lib/api';
+	import { get, post, put } from '$lib/api';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -162,11 +162,11 @@
 		const host = dev
 			? 'https://webhook.site/0e5beb2c-4e9b-40e2-a89e-32295e570c21'
 			: `${window.location.origin}/webhooks/gitlab/events`;
-		const urls = await get(url, {
-			Authorization: `Bearer ${$session.gitlabToken}`
-		});
-		const found = urls.find((url) => url.url === host);
-		if (!found) {
+		// const urls = await get(url, {
+		// 	Authorization: `Bearer ${$session.gitlabToken}`
+		// });
+		// const found = urls.find((url) => url.url === host);
+		// if (!found) {
 			try {
 				await post(
 					url,
@@ -186,7 +186,27 @@
 				errorNotification(error);
 				throw error;
 			}
-		}
+		// } else {
+		// 	try {
+		// 		await put(
+		// 			`${url}/${found.id}`,
+		// 			{
+		// 				id: selected.project.id,
+		// 				url: host,
+		// 				token: webhookToken,
+		// 				push_events: true,
+		// 				enable_ssl_verification: true,
+		// 				merge_requests_events: true
+		// 			},
+		// 			{
+		// 				Authorization: `Bearer ${$session.gitlabToken}`
+		// 			}
+		// 		);
+		// 	} catch (error) {
+		// 		errorNotification(error);
+		// 		throw error;
+		// 	}
+		// }
 	}
 	async function save() {
 		loading.save = true;

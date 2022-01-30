@@ -60,7 +60,6 @@ export const post: RequestHandler = async (event) => {
 			}
 		} else if (objectKind === 'merge_request') {
 			const webhookToken = event.request.headers.get('x-gitlab-token');
-			console.log(webhookToken)
 			if (!webhookToken) {
 				return {
 					status: 500,

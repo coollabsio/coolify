@@ -141,6 +141,7 @@ export const removeAllPreviewsDestinationDocker = async ({ id, destinationDocker
 		`DOCKER_HOST=${host} docker ps -a --filter network=${destinationDocker.network} --filter name=${id} --format '{{.ID}}'`
 	);
 	let previews = [];
+	console.log(containers)
 	for (const container of containers) {
 		const preview = container.split('-')[1];
 		if (preview) previews.push(preview);
