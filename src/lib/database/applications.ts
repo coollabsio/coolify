@@ -60,6 +60,8 @@ export async function removeApplication({ id, teamId }) {
 			await removeDestinationDocker({ id, engine: destinationDocker.engine });
 			if (preview) {
 				await removeProxyConfiguration({ domain: `${preview}.${domain}` });
+			} else {
+				await removeProxyConfiguration({ domain });
 			}
 		}
 	}
