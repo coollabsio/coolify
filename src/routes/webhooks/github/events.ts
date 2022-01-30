@@ -5,7 +5,7 @@ import cuid from 'cuid';
 import crypto from 'crypto';
 import { buildQueue } from '$lib/queues';
 
-export const options = async () => {
+export const options: RequestHandler = async () => {
 	return {
 		status: 200,
 		headers: {
@@ -16,13 +16,13 @@ export const options = async () => {
 	};
 };
 
-export const post = async (request) => {
+export const post: RequestHandler = async (event) => {
 	try {
 		const buildId = cuid();
 		const allowedGithubEvents = ['push', 'pull_request'];
 		const allowedActions = ['opened', 'reopened', 'synchronize', 'closed'];
-		const githubEvent = request.headers['x-github-event'].toLowerCase();
-		const githubSignature = request.headers['x-hub-signature-256'].toLowerCase();
+		const githubEvent = event.request.headers['x-github-event'].toLowerCase();
+		const githubSignature = event.request.headers['x-hub-signature-256'].toLowerCase();
 		if (!allowedGithubEvents.includes(githubEvent)) {
 			return {
 				status: 500,
@@ -32,15 +32,16 @@ export const post = async (request) => {
 			};
 		}
 		let repository, projectId, branch;
+		const body = await event.request.json();
 
 		if (githubEvent === 'push') {
-			repository = request.body.repository;
+			repository = body.repository;
 			projectId = repository.id;
-			branch = request.body.ref.split('/')[2];
+			branch = body.ref.split('/')[2];
 		} else if (githubEvent === 'pull_request') {
-			repository = request.body.pull_request.head.repo;
+			repository = body.pull_request.head.repo;
 			projectId = repository.id;
-			branch = request.body.pull_request.head.ref.split('/')[2];
+			branch = body.pull_request.head.ref.split('/')[2];
 		}
 
 		const applicationFound = await db.getApplicationWebhook({ projectId, branch });
@@ -48,7 +49,7 @@ export const post = async (request) => {
 			const webhookSecret = applicationFound.gitSource.githubApp.webhookSecret;
 			const hmac = crypto.createHmac('sha256', webhookSecret);
 			const digest = Buffer.from(
-				'sha256=' + hmac.update(JSON.stringify(request.body)).digest('hex'),
+				'sha256=' + hmac.update(JSON.stringify(body)).digest('hex'),
 				'utf8'
 			);
 			const checksum = Buffer.from(githubSignature, 'utf8');
@@ -91,9 +92,9 @@ export const post = async (request) => {
 					}
 				};
 			} else if (githubEvent === 'pull_request') {
-				const pullmergeRequestId = request.body.number;
-				const pullmergeRequestAction = request.body.action;
-				const sourceBranch = request.body.pull_request.head.ref;
+				const pullmergeRequestId = body.number;
+				const pullmergeRequestAction = body.action;
+				const sourceBranch = body.pull_request.head.ref;
 				if (!allowedActions.includes(pullmergeRequestAction)) {
 					return {
 						status: 500,

@@ -5,7 +5,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import got from 'got';
 import cookie from 'cookie';
 
-export const options = async () => {
+export const options: RequestHandler = async () => {
 	return {
 		status: 200,
 		headers: {

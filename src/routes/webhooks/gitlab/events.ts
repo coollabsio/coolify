@@ -5,7 +5,7 @@ import cuid from 'cuid';
 import crypto from 'crypto';
 import { buildQueue } from '$lib/queues';
 
-export const options = async () => {
+export const options: RequestHandler = async () => {
 	return {
 		status: 200,
 		headers: {
@@ -16,14 +16,15 @@ export const options = async () => {
 	};
 };
 
-export const post = async (request) => {
+export const post: RequestHandler = async (event) => {
 	const allowedActions = ['opened', 'reopen', 'close', 'open', 'update'];
-	const { object_kind: objectKind } = request.body;
+	const body = await event.request.json();
 	const buildId = cuid();
 	try {
+		const { object_kind: objectKind } = body
 		if (objectKind === 'push') {
-			const { ref } = request.body;
-			const projectId = Number(request.body['project_id']);
+			const { ref } = body;
+			const projectId = Number(body['project_id']);
 			const branch = ref.split('/')[2];
 			const applicationFound = await db.getApplicationWebhook({ projectId, branch });
 			if (applicationFound) {
@@ -58,7 +59,8 @@ export const post = async (request) => {
 				};
 			}
 		} else if (objectKind === 'merge_request') {
-			const webhookToken = request.headers['x-gitlab-token'];
+			console.log('asd')
+			const webhookToken = event.request.headers['x-gitlab-token'];
 			if (!webhookToken) {
 				return {
 					status: 500,
@@ -68,12 +70,12 @@ export const post = async (request) => {
 				};
 			}
 
-			const isDraft = request.body.object_attributes.work_in_progress;
-			const action = request.body.object_attributes.action;
-			const projectId = Number(request.body.project.id);
-			const sourceBranch = request.body.object_attributes.source_branch;
-			const targetBranch = request.body.object_attributes.target_branch;
-			const pullmergeRequestId = request.body.object_attributes.iid;
+			const isDraft = body.object_attributes.work_in_progress;
+			const action = body.object_attributes.action;
+			const projectId = Number(body.project.id);
+			const sourceBranch = body.object_attributes.source_branch;
+			const targetBranch = body.object_attributes.target_branch;
+			const pullmergeRequestId = body.object_attributes.iid;
 			if (!allowedActions.includes(action)) {
 				return {
 					status: 500,
