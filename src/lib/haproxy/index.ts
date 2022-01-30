@@ -360,7 +360,10 @@ export async function configureProxyForApplication({ domain, applicationId, port
 			},
 			json: {
 				address: applicationId,
-				check: 'disabled',
+				check: 'enabled',
+				inter: 2,
+				fall: 200,
+				rise: 1,
 				name: applicationId,
 				port: port
 			}
@@ -425,7 +428,16 @@ export async function configureCoolifyProxyOn({ domain }) {
 				transaction_id: transactionId
 			},
 			json: {
+				'adv_check':'httpchk',
 				'init-addr': 'last,libc,none',
+				'httpchk_params': {
+					method: 'GET',
+					uri: '/undead.json'
+				},
+				'http-check': {
+					type: 'send-state',
+
+				},
 				forwardfor: { enabled: 'enabled' },
 				name: domain
 			}
@@ -437,7 +449,10 @@ export async function configureCoolifyProxyOn({ domain }) {
 			},
 			json: {
 				address: dev ? 'host.docker.internal' : 'coolify',
-				check: 'disabled',
+				check: 'enabled',
+				inter: 2,
+				fall: 200,
+				rise: 1,
 				name: 'coolify',
 				port: 3000
 			}
@@ -600,6 +615,8 @@ export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 				address: id,
 				check: 'enabled',
 				inter: 2,
+				fall: 200,
+				rise: 1,
 				name: id,
 				port: port
 			}
