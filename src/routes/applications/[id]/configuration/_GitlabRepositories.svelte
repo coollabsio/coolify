@@ -167,25 +167,25 @@
 		// });
 		// const found = urls.find((url) => url.url === host);
 		// if (!found) {
-			try {
-				await post(
-					url,
-					{
-						id: selected.project.id,
-						url: host,
-						token: webhookToken,
-						push_events: true,
-						enable_ssl_verification: true,
-						merge_requests_events: true
-					},
-					{
-						Authorization: `Bearer ${$session.gitlabToken}`
-					}
-				);
-			} catch (error) {
-				errorNotification(error);
-				throw error;
-			}
+		try {
+			await post(
+				url,
+				{
+					id: selected.project.id,
+					url: host,
+					token: webhookToken,
+					push_events: true,
+					enable_ssl_verification: true,
+					merge_requests_events: true
+				},
+				{
+					Authorization: `Bearer ${$session.gitlabToken}`
+				}
+			);
+		} catch (error) {
+			errorNotification(error);
+			throw error;
+		}
 		// } else {
 		// 	try {
 		// 		await put(

@@ -1,11 +1,8 @@
 import { decrypt, encrypt } from '$lib/crypto';
 import { removeProxyConfiguration } from '$lib/haproxy';
+import { asyncExecShell, getEngine, removeContainer } from '$lib/common';
 
-import {
-	getDomain,
-	removeAllPreviewsDestinationDocker,
-	removeDestinationDocker
-} from '$lib/common';
+import { getDomain, removeDestinationDocker } from '$lib/common';
 import { prisma } from './common';
 
 export async function listApplications(teamId) {
@@ -50,28 +47,27 @@ export async function removeApplication({ id, teamId }) {
 		include: { destinationDocker: true }
 	});
 	const domain = getDomain(fqdn);
+	if (destinationDockerId) {
+		const host = getEngine(destinationDocker.engine);
+		const { stdout: containers } = await asyncExecShell(
+			`DOCKER_HOST=${host} docker ps -a --filter network=${destinationDocker.network} --filter name=${id} --format '{{json .}}'`
+		);
+		const containersArray = containers.trim().split('\n');
+		for (const container of containersArray) {
+			const containerObj = JSON.parse(container);
+			const id = containerObj.ID;
+			const preview = containerObj.Image.split('-')[1];
+			await removeDestinationDocker({ id, engine: destinationDocker.engine });
+			if (preview) {
+				await removeProxyConfiguration({ domain: `${preview}.${domain}` });
+			}
+		}
+	}
+
 	await prisma.applicationSettings.deleteMany({ where: { application: { id } } });
 	await prisma.buildLog.deleteMany({ where: { applicationId: id } });
 	await prisma.secret.deleteMany({ where: { applicationId: id } });
 	await prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } });
-	let previews = [];
-	if (destinationDockerId) {
-		await removeDestinationDocker({ id, engine: destinationDocker.engine });
-		previews = await removeAllPreviewsDestinationDocker({ id, destinationDocker });
-	}
-	if (domain) {
-		try {
-			await removeProxyConfiguration({ domain });
-			console.log(previews);
-			if (previews.length > 0) {
-				previews.forEach(async (preview) => {
-					await removeProxyConfiguration({ domain: `${preview}.${domain}` });
-				});
-			}
-		} catch (error) {
-			console.log(error);
-		}
-	}
 }
 
 export async function getApplicationWebhook({ projectId, branch }) {

@@ -135,21 +135,6 @@ export const removePreviewDestinationDocker = async ({
 	return removeContainer(`${id}-${pullmergeRequestId}`, destinationDocker.engine);
 };
 
-export const removeAllPreviewsDestinationDocker = async ({ id, destinationDocker }) => {
-	const host = getEngine(destinationDocker.engine);
-	const { stdout: containers } = await asyncExecShell(
-		`DOCKER_HOST=${host} docker ps -a --filter network=${destinationDocker.network} --filter name=${id} --format '{{.ID}}'`
-	);
-	let previews = [];
-	console.log(containers)
-	for (const container of containers) {
-		const preview = container.split('-')[1];
-		if (preview) previews.push(preview);
-		await removeContainer(id, destinationDocker.engine);
-	}
-	return previews || [];
-};
-
 export const createDirectories = async ({ repository, buildId }) => {
 	const repodir = `/tmp/build-sources/${repository}/`;
 	const workdir = `/tmp/build-sources/${repository}/${buildId}`;

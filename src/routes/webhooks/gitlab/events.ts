@@ -21,7 +21,7 @@ export const post: RequestHandler = async (event) => {
 	const body = await event.request.json();
 	const buildId = cuid();
 	try {
-		const { object_kind: objectKind } = body
+		const { object_kind: objectKind } = body;
 		if (objectKind === 'push') {
 			const { ref } = body;
 			const projectId = Number(body['project_id']);
