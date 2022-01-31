@@ -62,7 +62,7 @@ const cron = async () => {
 	});
 
 	await queue.proxy.add('proxy', {}, { repeat: { every: 10000 } });
-	await queue.ssl.add('ssl', {}, { repeat: { every: 10000 } });
+	// await queue.ssl.add('ssl', {}, { repeat: { every: 10000 } });
 	await queue.cleanup.add('cleanup', {}, { repeat: { every: 3600000 } });
 	await queue.sslRenew.add('sslRenew', {}, { repeat: { every: 1800000 } });
 	

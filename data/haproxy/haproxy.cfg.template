@@ -16,9 +16,7 @@ userlist haproxy-dataplaneapi
 frontend http
   mode http
   bind :80
-  bind :::80
   bind :443 ssl crt /usr/local/etc/haproxy/ssl/ alpn h2,http/1.1
-  bind :::443 ssl crt /usr/local/etc/haproxy/ssl/ alpn h2,http/1.1
   acl is_certbot path_beg /.well-known/acme-challenge/
   use_backend backend-certbot if is_certbot
   use_backend %[req.hdr(host),lower]
