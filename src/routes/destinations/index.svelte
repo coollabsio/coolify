@@ -22,7 +22,7 @@
 <script lang="ts">
 	import type Prisma from '@prisma/client';
 
-	import { page, session } from '$app/stores';
+	import { session } from '$app/stores';
 	export let destinations: Prisma.DestinationDocker[];
 </script>
 
@@ -54,7 +54,7 @@
 	{:else}
 		<div class="flex flex-wrap justify-center">
 			{#each destinations as destination}
-				<a href="/destinations/{destination.id}" class="no-underline p-2">
+				<a href="/destinations/{destination.id}" class="no-underline p-2 w-96">
 					<div class="box-selection hover:bg-sky-600">
 						<div class="font-bold text-xl text-center truncate">{destination.name}</div>
 						<div class="text-center truncate">{destination.network}</div>

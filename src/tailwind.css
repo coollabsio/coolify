@@ -16,7 +16,7 @@ main,
 }
 
 input {
-	@apply w-96 select-all  rounded border border-transparent bg-transparent bg-coolgray-200 px-2 py-2 text-xs text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:bg-transparent;
+	@apply w-96 select-all rounded border border-transparent bg-transparent bg-coolgray-200 px-2 py-2 text-xs text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:bg-transparent;
 }
 textarea {
 	@apply w-96 select-all rounded border border-transparent bg-transparent bg-coolgray-200 px-2 py-2 text-xs text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:bg-transparent;

@@ -1,6 +1,6 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, session }) => {
+	export const load: Load = async ({ fetch }) => {
 		const url = `/teams.json`;
 		const res = await fetch(url);
 
@@ -94,9 +94,9 @@
 <div class="mx-auto max-w-2xl">
 	<div class="flex flex-wrap justify-center">
 		{#each teams as team}
-			<a href="/teams/{team.teamId}" class="p-2 no-underline ">
+			<a href="/teams/{team.teamId}" class="w-96 p-2 no-underline">
 				<div
-					class="box-selection relative  h-32"
+					class="box-selection relative"
 					class:hover:bg-cyan-600={team.team?.id !== '0'}
 					class:hover:bg-red-500={team.team?.id === '0'}
 				>

@@ -1,6 +1,6 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, session }) => {
+	export const load: Load = async ({ fetch }) => {
 		const url = `/settings.json`;
 		const res = await fetch(url);
 
@@ -104,9 +104,8 @@
 			</div>
 			<div class="px-4 sm:px-6">
 				<div class="flex space-x-4 py-4 px-4">
-					<p class="text-base font-bold text-stone-100">Domain (FQDN)</p>
-
-					<div class="justify-center space-y-2 text-center">
+					<p class="pt-2 text-base font-bold text-stone-100">Domain (FQDN)</p>
+					<div class="justify-center text-center">
 						<input
 							bind:value={fqdn}
 							readonly={!$session.isAdmin || isFqdnSet}
@@ -142,7 +141,7 @@
 				} target="_blank">stats</a> page.`}
 			/>
 
-			<div class="grid grid-cols-3 items-center pt-5">
+			<div class="grid grid-cols-3 items-center px-4 pt-5">
 				<label for="proxyUser">User</label>
 
 				<div class="col-span-2 ">
@@ -155,7 +154,7 @@
 					/>
 				</div>
 			</div>
-			<div class="grid grid-cols-3 items-center">
+			<div class="grid grid-cols-3 items-center px-4">
 				<label for="proxyPassword">Password</label>
 				<div class="col-span-2 ">
 					<CopyPasswordField

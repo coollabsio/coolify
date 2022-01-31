@@ -17,7 +17,7 @@
 	const buildPack = application?.buildPack?.toLowerCase();
 </script>
 
-<a href="/applications/{application.id}" class="p-2 no-underline">
+<a href="/applications/{application.id}" class="w-96 p-2 no-underline">
 	<div class="box-selection relative hover:bg-green-600">
 		{#if buildPack === 'rust'}
 			<Rust />

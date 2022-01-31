@@ -7,7 +7,7 @@ RUN yarn build
 
 FROM node:16.13.2-alpine
 WORKDIR /app
-RUN apk add --no-cache git openssh-client curl jq
+RUN apk add --no-cache git openssh-client curl jq cmake
 
 COPY --from=0 /app/docker-compose.yaml .
 COPY --from=0 /app/build .

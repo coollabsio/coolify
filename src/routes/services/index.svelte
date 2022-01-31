@@ -1,6 +1,6 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, session }) => {
+	export const load: Load = async ({ fetch }) => {
 		const url = `/services.json`;
 		const res = await fetch(url);
 
@@ -48,14 +48,14 @@
 	</a>
 </div>
 
-<div class="flex flex-wrap justify-center space-x-4">
+<div class="flex flex-wrap justify-center">
 	{#if !services || services.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">No services found</div>
 		</div>
 	{:else}
 		{#each services as service}
-			<a href="/services/{service.id}" class="no-underline p-2">
+			<a href="/services/{service.id}" class="no-underline p-2 w-96">
 				<div class="box-selection relative hover:bg-pink-600">
 					{#if service.type === 'plausibleanalytics'}
 						<PlausibleAnalytics isAbsolute />
