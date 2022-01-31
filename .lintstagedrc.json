@@ -1,4 +1,4 @@
 {
-	"src/**/*.{js,jsx,ts,tsx,cjs,svelte}": ["eslint --fix --max-warnings=0", "prettier --write"],
-	"src/**/*.{json,css,scss,md,yaml}": ["prettier --write"]
+	"src/**/*.{js,jsx,ts,tsx,cjs,svelte}": ["eslint --fix --max-warnings=0", "prettier --ignore-path .gitignore --write --plugin-search-dir=. ."],
+	"src/**/*.{json,css,scss,md,yaml}": ["prettier --ignore-path .gitignore --write --plugin-search-dir=. ."]
 }
