@@ -438,6 +438,7 @@ export async function configureCoolifyProxyOn({ domain }) {
 			json: {
 				address: dev ? 'host.docker.internal' : 'coolify',
 				check: 'enabled',
+				fall: 10,
 				name: 'coolify',
 				port: 3000
 			}
