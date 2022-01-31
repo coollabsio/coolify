@@ -80,16 +80,5 @@
 	},
 	"prisma": {
 		"seed": "node prisma/seed.cjs"
-	},
-	"husky": {
-		"hooks": {
-			"pre-commit": "lint-staged"
-		}
-	},
-	"lint-staged": {
-		"**/*.ts": [
-			"yarn format",
-			"git add"
-		]
 	}
 }
