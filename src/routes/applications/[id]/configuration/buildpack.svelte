@@ -51,11 +51,11 @@
 		return json?.dependencies?.hasOwnProperty(key) || json?.devDependencies?.hasOwnProperty(key);
 	}
 	function checkTemplates({ json }) {
-		Object.entries(scanningTemplates).forEach(([key, value]) => {
+		for (const [key, value] of Object.entries(scanningTemplates)) {
 			if (checkPackageJSONContents({ key, json })) {
 				return buildPacks.find((bp) => bp.name === value.buildPack);
 			}
-		});
+		};
 	}
 	async function scanRepository() {
 		try {
@@ -130,9 +130,10 @@
 			}
 		} catch (error) {
 			if (
-				error.error === 'invalid_token' &&
+				error.error === 'invalid_token' ||
 				error.error_description ===
-					'Token is expired. You can either do re-authorization or token refresh.'
+					'Token is expired. You can either do re-authorization or token refresh.' ||
+				error.message === '401 Unauthorized'
 			) {
 				if (application.gitSource.gitlabAppId) {
 					let htmlUrl = application.gitSource.htmlUrl;
@@ -157,6 +158,7 @@
 			}
 			return errorNotification(error);
 		} finally {
+
 			if (!foundConfig) foundConfig = buildPacks.find((bp) => bp.name === 'node');
 			scanning = false;
 		}

@@ -28,10 +28,16 @@ async function send({ method, path, data = {}, headers, timeout = 30000 }) {
 	const contentType = response.headers.get('content-type');
 
 	let responseData = {};
-	if (contentType?.indexOf('application/json') !== -1) {
-		responseData = await response.json();
+	if (contentType) {
+		if (contentType?.indexOf('application/json') !== -1) {
+			responseData = await response.json();
+		} else if (contentType?.indexOf('text/plain') !== -1) {
+			responseData = await response.text();
+		} else {
+			return {}
+		}
 	} else {
-		responseData = await response.text();
+		return {}
 	}
 	if (!response.ok) throw responseData;
 	return responseData;
@@ -41,7 +47,7 @@ export function get(path, headers = {}): Promise<any> {
 	return send({ method: 'GET', path, headers });
 }
 
-export function del(path, data, headers = {}): Promise<any> {
+export function del(path, data = {}, headers = {}): Promise<any> {
 	return send({ method: 'DELETE', path, data, headers });
 }
 
