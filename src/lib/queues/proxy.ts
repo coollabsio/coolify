@@ -5,6 +5,7 @@ import {
 	checkContainer,
 	configureCoolifyProxyOn,
 	configureProxyForApplication,
+	reloadHaproxy,
 	startCoolifyProxy
 } from '$lib/haproxy';
 import * as db from '$lib/database';
@@ -17,7 +18,9 @@ export default async function () {
 			if (destination.isCoolifyProxyUsed) {
 				const docker = dockerInstance({ destinationDocker: destination });
 				const containers = await docker.engine.listContainers();
-				const configurations = containers.filter((container) => container.Labels['coolify.managed']);
+				const configurations = containers.filter(
+					(container) => container.Labels['coolify.managed']
+				);
 				for (const configuration of configurations) {
 					const parsedConfiguration = JSON.parse(
 						Buffer.from(configuration.Labels['coolify.configuration'], 'base64').toString()
@@ -28,11 +31,12 @@ export default async function () {
 							const domain = getDomain(fqdn);
 							await configureProxyForApplication({
 								domain,
-								imageId: pullmergeRequestId ? `${applicationId}-${pullmergeRequestId}` : applicationId,
+								imageId: pullmergeRequestId
+									? `${applicationId}-${pullmergeRequestId}`
+									: applicationId,
 								applicationId,
 								port
 							});
-
 						}
 					}
 				}
@@ -45,10 +49,10 @@ export default async function () {
 			const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy');
 			if (!found) await startCoolifyProxy('/var/run/docker.sock');
 			await configureCoolifyProxyOn({ domain });
+			await reloadHaproxy('/var/run/docker.sock');
 		}
 	} catch (error) {
 		console.log(error);
-		throw error
+		throw error;
 	}
-
 }

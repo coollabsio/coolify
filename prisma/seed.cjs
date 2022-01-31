@@ -4,7 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const crypto = require('crypto');
 const generator = require('generate-password');
-const cuid = require('cuid')
+const cuid = require('cuid');
 
 function generatePassword(length = 24) {
 	return generator.generate({
@@ -21,7 +21,11 @@ async function main() {
 	const settingsFound = await prisma.setting.findFirst({});
 	if (!settingsFound) {
 		await prisma.setting.create({
-			data: { isRegistrationEnabled: true, proxyPassword: encrypt(generatePassword()), proxyUser: cuid() }
+			data: {
+				isRegistrationEnabled: true,
+				proxyPassword: encrypt(generatePassword()),
+				proxyUser: cuid()
+			}
 		});
 	}
 	const localDocker = await prisma.destinationDocker.findFirst({

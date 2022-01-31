@@ -4,7 +4,12 @@ import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
 import { letsEncrypt } from '$lib/letsencrypt';
-import { configureSimpleServiceProxyOn, startHttpProxy, startTcpProxy } from '$lib/haproxy';
+import {
+	configureSimpleServiceProxyOn,
+	reloadHaproxy,
+	startHttpProxy,
+	startTcpProxy
+} from '$lib/haproxy';
 import getPort from 'get-port';
 import { getDomain } from '$lib/components/common';
 import { PrismaErrorHandler } from '$lib/database';
@@ -88,6 +93,7 @@ export const post: RequestHandler<Locals> = async (event) => {
 			if (isHttps) {
 				await letsEncrypt({ domain, id });
 			}
+			await reloadHaproxy(destinationDocker.engine);
 			return {
 				status: 200
 			};

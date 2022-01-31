@@ -55,7 +55,7 @@
 			if (checkPackageJSONContents({ key, json })) {
 				return buildPacks.find((bp) => bp.name === value.buildPack);
 			}
-		};
+		}
 	}
 	async function scanRepository() {
 		try {
@@ -158,7 +158,6 @@
 			}
 			return errorNotification(error);
 		} finally {
-
 			if (!foundConfig) foundConfig = buildPacks.find((bp) => bp.name === 'node');
 			scanning = false;
 		}

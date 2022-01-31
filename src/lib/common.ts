@@ -120,14 +120,13 @@ export async function removeContainer(id, engine) {
 		}
 	} catch (error) {
 		console.log(error);
-		throw error
+		throw error;
 	}
 }
 
 export const removeDestinationDocker = async ({ id, engine }) => {
 	return await removeContainer(id, engine);
 };
-
 
 export const createDirectories = async ({ repository, buildId }) => {
 	const repodir = `/tmp/build-sources/${repository}/`;

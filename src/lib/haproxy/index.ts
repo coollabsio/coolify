@@ -22,9 +22,6 @@ export async function getRawConfiguration(): Promise<RawHaproxyConfiguration> {
 	return await (await haproxyInstance()).get(`v2/services/haproxy/configuration/raw`).json();
 }
 
-export async function reloadConfiguration(): Promise<any> {
-	return await (await haproxyInstance()).get(`v2/services/haproxy/reloads`);
-}
 export async function getNextTransactionVersion(): Promise<number> {
 	const raw = await getRawConfiguration();
 	if (raw?._version) {
@@ -275,12 +272,16 @@ export async function deleteProxy({ id }) {
 //     }
 //     await configureDatabaseVisibility({ id, isPublic })
 // }
+export async function reloadHaproxy(engine) {
+	const host = getEngine(engine);
+	return await asyncExecShell(`DOCKER_HOST=${host} docker exec coolify-haproxy kill -SIGUSR2 1`);
+}
 export async function configureProxyForApplication({ domain, imageId, applicationId, port }) {
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
 
 	let serverConfigured = false;
-	let backendAvailable: any = null
+	let backendAvailable: any = null;
 
 	try {
 		backendAvailable = await haproxy
@@ -344,9 +345,6 @@ export async function configureProxyForApplication({ domain, imageId, applicatio
 			json: {
 				address: imageId,
 				check: 'enabled',
-				inter: 2,
-				fall: 200,
-				rise: 1,
 				name: imageId,
 				port: port
 			}
@@ -391,7 +389,7 @@ export async function checkHAProxy(haproxy) {
 export async function configureCoolifyProxyOn({ domain }) {
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
-	let serverConfigured = false
+	let serverConfigured = false;
 	let backendAvailable: any = null;
 	try {
 		backendAvailable = await haproxy
@@ -418,8 +416,7 @@ export async function configureCoolifyProxyOn({ domain }) {
 				}
 			}
 		}
-	} catch (error) {
-	}
+	} catch (error) {}
 	if (serverConfigured) return;
 	const transactionId = await getNextTransactionId();
 	try {
@@ -441,16 +438,13 @@ export async function configureCoolifyProxyOn({ domain }) {
 			json: {
 				address: dev ? 'host.docker.internal' : 'coolify',
 				check: 'enabled',
-				inter: 10,
-				fall: 200,
-				rise: 1,
 				name: 'coolify',
 				port: 3000
 			}
 		});
 	} catch (error) {
 		console.log(error);
-		throw error
+		throw error;
 	} finally {
 		await completeTransaction(transactionId);
 	}
@@ -582,7 +576,7 @@ export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 	try {
 		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
 		return;
-	} catch (error) { }
+	} catch (error) {}
 	try {
 		const transactionId = await getNextTransactionId();
 		await haproxy.post('v2/services/haproxy/configuration/backends', {
@@ -603,9 +597,6 @@ export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 			json: {
 				address: id,
 				check: 'enabled',
-				inter: 2,
-				fall: 200,
-				rise: 1,
 				name: id,
 				port: port
 			}
@@ -630,5 +621,4 @@ export async function configureSimpleServiceProxyOff({ domain }) {
 		})
 		.json();
 	await completeTransaction(transactionId);
-
 }

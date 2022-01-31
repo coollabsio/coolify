@@ -136,8 +136,12 @@
 			<div class="flex space-x-1 pt-5 font-bold">
 				<div class="mr-4 text-xl tracking-tight">HAProxy Settings</div>
 			</div>
-			<Explainer text={`Credentials for <a class="text-white" href=${browser && 'http://' + window.location.hostname + ':8404'} target="_blank">stats</a> page.`} />
-			
+			<Explainer
+				text={`Credentials for <a class="text-white" href=${
+					browser && 'http://' + window.location.hostname + ':8404'
+				} target="_blank">stats</a> page.`}
+			/>
+
 			<div class="grid grid-cols-3 items-center pt-5">
 				<label for="proxyUser">User</label>
 

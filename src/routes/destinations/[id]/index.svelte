@@ -32,7 +32,7 @@
 	export let destination: Prisma.DestinationDocker;
 	export let settings;
 	export let state;
-	
+
 	import type Prisma from '@prisma/client';
 	import LocalDocker from './_LocalDocker.svelte';
 </script>

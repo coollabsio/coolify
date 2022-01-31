@@ -1,10 +1,5 @@
 import { dev } from '$app/env';
-import {
-	forceSSLOffApplication,
-	forceSSLOnApplication,
-	getNextTransactionId,
-	reloadConfiguration
-} from '$lib/haproxy';
+import { forceSSLOffApplication, forceSSLOnApplication, getNextTransactionId } from '$lib/haproxy';
 import { asyncExecShell, getEngine } from './common';
 import * as db from '$lib/database';
 
@@ -22,7 +17,6 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 					`docker run --rm -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" alpine:latest cat /etc/letsencrypt/live/${domain}/fullchain.pem /etc/letsencrypt/live/${domain}/privkey.pem > /app/ssl/${domain}.pem`
 				);
 				if (stderr) throw new Error(stderr);
-				await reloadConfiguration();
 				return;
 			}
 			const { destinationDocker, destinationDockerId } = await db.prisma.application.findUnique({
@@ -40,7 +34,6 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 				);
 				if (stderr) throw new Error(stderr);
 				await forceSSLOnApplication({ domain });
-				await reloadConfiguration();
 			}
 		}
 	} catch (error) {

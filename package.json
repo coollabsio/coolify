@@ -21,7 +21,8 @@
 		"release:coolify": "cross-var docker build -t coollabsio/coolify:$npm_package_version -t coollabsio/coolify:latest . && docker push coollabsio/coolify:$npm_package_version && docker image push coollabsio/coolify:$npm_package_version && docker push coollabsio/coolify:latest",
 		"release:haproxy": "docker build -f haproxy.Dockerfile -t coollabsio/coolify-haproxy-alpine:1.0.0-rc.1 -t coollabsio/coolify-haproxy-alpine:latest . && docker image push --all-tags coollabsio/coolify-haproxy-alpine",
 		"release:haproxy:tcp": "docker build -f haproxy-tcp.Dockerfile -t coollabsio/coolify-haproxy-tcp-alpine:1.0.0-rc.1 -t coollabsio/coolify-haproxy-tcp-alpine:latest . && docker image push --all-tags coollabsio/coolify-haproxy-tcp-alpine",
-		"release:haproxy:http": "docker build -f haproxy-http.Dockerfile -t coollabsio/coolify-haproxy-http-alpine:1.0.0-rc.1 -t coollabsio/coolify-haproxy-http-alpine:latest . && docker image push --all-tags coollabsio/coolify-haproxy-http-alpine"
+		"release:haproxy:http": "docker build -f haproxy-http.Dockerfile -t coollabsio/coolify-haproxy-http-alpine:1.0.0-rc.1 -t coollabsio/coolify-haproxy-http-alpine:latest . && docker image push --all-tags coollabsio/coolify-haproxy-http-alpine",
+		"prepare": "husky install"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-node": "^1.0.0-next.67",
@@ -39,6 +40,7 @@
 		"eslint": "^7.32.0",
 		"eslint-config-prettier": "^8.3.0",
 		"eslint-plugin-svelte3": "^3.2.1",
+		"husky": "^7.0.0",
 		"postcss": "^8.4.5",
 		"prettier": "^2.5.1",
 		"prettier-plugin-svelte": "^2.6.0",

@@ -1,7 +1,12 @@
 import { getDomain, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { listSettings, PrismaErrorHandler } from '$lib/database';
-import { checkContainer, configureCoolifyProxyOff, configureCoolifyProxyOn, startCoolifyProxy } from '$lib/haproxy';
+import {
+	checkContainer,
+	configureCoolifyProxyOff,
+	configureCoolifyProxyOn,
+	startCoolifyProxy
+} from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (event) => {
@@ -76,7 +81,10 @@ export const post: RequestHandler<Locals> = async (event) => {
 			const domain = getDomain(fqdn);
 			if (domain) await configureCoolifyProxyOn({ domain });
 			await db.prisma.setting.update({ where: { id }, data: { fqdn } });
-			await db.prisma.destinationDocker.updateMany({ where: { engine: '/var/run/docker.sock' }, data: { isCoolifyProxyUsed: true } })
+			await db.prisma.destinationDocker.updateMany({
+				where: { engine: '/var/run/docker.sock' },
+				data: { isCoolifyProxyUsed: true }
+			});
 		}
 
 		return {

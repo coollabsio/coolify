@@ -80,6 +80,7 @@ export const post: RequestHandler<Locals> = async (event) => {
 			if (isHttps) {
 				await letsEncrypt({ domain, id });
 			}
+			await reloadHaproxy(destinationDocker.engine);
 			return {
 				status: 200
 			};

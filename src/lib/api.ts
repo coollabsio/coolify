@@ -34,10 +34,10 @@ async function send({ method, path, data = {}, headers, timeout = 30000 }) {
 		} else if (contentType?.indexOf('text/plain') !== -1) {
 			responseData = await response.text();
 		} else {
-			return {}
+			return {};
 		}
 	} else {
-		return {}
+		return {};
 	}
 	if (!response.ok) throw responseData;
 	return responseData;

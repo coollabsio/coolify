@@ -25,7 +25,7 @@ frontend stats
   bind *:8404
   stats enable
   stats uri /
-  stats refresh 2s
+  stats refresh 5s
   stats admin if TRUE
   stats auth "${HAPROXY_USERNAME}:${HAPROXY_PASSWORD}"
 

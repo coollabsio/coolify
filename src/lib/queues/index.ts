@@ -39,37 +39,61 @@ const cron = async () => {
 		cleanup: new Queue('cleanup', { ...connectionOptions }),
 		ssl: new Queue('ssl', { ...connectionOptions }),
 		sslRenew: new Queue('sslRenew', { ...connectionOptions })
-	}
-	await queue.proxy.drain()
-	await queue.cleanup.drain()
-	await queue.ssl.drain()
-	await queue.sslRenew.drain()
+	};
+	await queue.proxy.drain();
+	await queue.cleanup.drain();
+	await queue.ssl.drain();
+	await queue.sslRenew.drain();
 
-	new Worker('proxy', async () => { await proxy() }, {
-		...connectionOptions,
-	});
+	new Worker(
+		'proxy',
+		async () => {
+			await proxy();
+		},
+		{
+			...connectionOptions
+		}
+	);
 
-	new Worker('ssl', async () => { await ssl() }, {
-		...connectionOptions,
-	});
+	new Worker(
+		'ssl',
+		async () => {
+			await ssl();
+		},
+		{
+			...connectionOptions
+		}
+	);
 
-	new Worker('cleanup', async () => { await cleanup() }, {
-		...connectionOptions,
-	});
+	new Worker(
+		'cleanup',
+		async () => {
+			await cleanup();
+		},
+		{
+			...connectionOptions
+		}
+	);
 
-	new Worker('sslRenew', async () => { await sslrenewal() }, {
-		...connectionOptions,
-	});
+	new Worker(
+		'sslRenew',
+		async () => {
+			await sslrenewal();
+		},
+		{
+			...connectionOptions
+		}
+	);
 
 	await queue.proxy.add('proxy', {}, { repeat: { every: 10000 } });
 	// await queue.ssl.add('ssl', {}, { repeat: { every: 10000 } });
 	await queue.cleanup.add('cleanup', {}, { repeat: { every: 3600000 } });
 	await queue.sslRenew.add('sslRenew', {}, { repeat: { every: 1800000 } });
-	
+
 	const events = {
 		proxy: new QueueEvents('proxy', { ...connectionOptions }),
-		ssl: new QueueEvents('ssl', { ...connectionOptions }),
-	}
+		ssl: new QueueEvents('ssl', { ...connectionOptions })
+	};
 
 	events.proxy.on('completed', (data) => {
 		// console.log(data)
@@ -77,13 +101,11 @@ const cron = async () => {
 	events.ssl.on('completed', (data) => {
 		// console.log(data)
 	});
-}
-cron()
-	.catch(error => {
-		console.log('cron failed to start')
-		console.log(error)
-	})
-
+};
+cron().catch((error) => {
+	console.log('cron failed to start');
+	console.log(error);
+});
 
 const buildQueueName = dev ? cuid() : 'build_queue';
 const buildQueue = new Queue(buildQueueName, connectionOptions);

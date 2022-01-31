@@ -66,7 +66,6 @@ export async function removeApplication({ id, teamId }) {
 				}
 			}
 		}
-
 	}
 
 	await prisma.applicationSettings.deleteMany({ where: { application: { id } } });

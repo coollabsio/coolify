@@ -3,7 +3,7 @@ import * as buildpacks from '../buildPacks';
 import * as importers from '../importers';
 import { dockerInstance } from '../docker';
 import { asyncExecShell, createDirectories, getDomain, getEngine, saveBuildLog } from '../common';
-import { configureProxyForApplication } from '../haproxy';
+import { configureProxyForApplication, reloadHaproxy } from '../haproxy';
 import * as db from '$lib/database';
 import { decrypt } from '$lib/crypto';
 import {
@@ -244,6 +244,7 @@ export default async function (job) {
 		if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
 			await configureProxyForApplication({ domain, imageId, applicationId, port });
 			if (isHttps) await letsEncrypt({ domain, id: applicationId });
+			await reloadHaproxy(destinationDocker.engine);
 		} else {
 			saveBuildLog({
 				line: 'Coolify Proxy is not configured for this destination. Nothing else to do.',

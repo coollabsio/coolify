@@ -229,7 +229,7 @@
 			const deployKeyFound = deployKeys.filter((dk) => dk.title === `${appId}-coolify-deploy-key`);
 			if (deployKeyFound.length > 0) {
 				for (const deployKey of deployKeyFound) {
-					console.log(`${deployKeyUrl}/${deployKey.id}`)
+					console.log(`${deployKeyUrl}/${deployKey.id}`);
 					await del(
 						`${deployKeyUrl}/${deployKey.id}`,
 						{},
