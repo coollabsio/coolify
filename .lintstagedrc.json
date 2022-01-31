@@ -1,9 +1,7 @@
 {
-	"**/*.{js,jsx,ts,tsx,cjs,svelte}": [
+	"*.{js,jsx,ts,tsx,cjs,svelte}": [
 		"eslint --fix --max-warnings=0",
 		"prettier --ignore-path .gitignore --write --plugin-search-dir=. ."
 	],
-	"**/*.{json,css,scss,md,yaml}": [
-		"prettier --ignore-path .gitignore --write --plugin-search-dir=. ."
-	]
+	"*.{json,css,scss,md,yaml}": ["prettier --ignore-path .gitignore --write --plugin-search-dir=. ."]
 }
