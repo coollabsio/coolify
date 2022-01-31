@@ -4,7 +4,8 @@
 		if (stuff?.source) {
 			return {
 				props: {
-					source: stuff.source
+					source: stuff.source,
+					settings: stuff.settings
 				}
 			};
 		}
@@ -28,6 +29,7 @@
 
 <script lang="ts">
 	export let source: Prisma.GitSource;
+	export let settings;
 	import type Prisma from '@prisma/client';
 	import { page } from '$app/stores';
 	import Github from './_Github.svelte';
@@ -43,7 +45,7 @@
 </div>
 <div class="flex justify-center space-x-2 px-6">
 	{#if source.type === 'github'}
-		<Github {source} />
+		<Github {source} {settings} />
 	{:else if source.type === 'gitlab'}
 		<Gitlab {source} />
 	{/if}

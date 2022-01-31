@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { dev } from '$app/env';
+	import { getDomain } from '$lib/components/common';
 
 	import { dashify } from '$lib/github';
 
 	export let source;
+	export let settings;
 
 	async function installRepositories(source) {
 		const { htmlUrl } = source;
@@ -28,25 +30,27 @@
 
 	function newGithubApp(source) {
 		const { organization, id, htmlUrl, type } = source;
-		const protocol = 'http';
+		const { fqdn } = settings;
+		const host = dev ? 'http://localhost:3000' : fqdn ? fqdn : `http://${window.location.host}`;
+		const domain = getDomain(fqdn);
 
 		if (type === 'github') {
 			let url = 'settings/apps/new';
 			if (organization) url = `organizations/${organization}/settings/apps/new`;
-			const host = dashify(window.location.host);
+			const name = dashify(domain);
 			const data = JSON.stringify({
-				name: `coolify-${host}`,
-				url: `${protocol}://${window.location.host}`,
+				name: `coolify-${name}`,
+				url: host,
 				hook_attributes: {
 					url: dev
 						? 'https://webhook.site/0e5beb2c-4e9b-40e2-a89e-32295e570c21/events'
-						: `${protocol}://${window.location.host}/webhooks/github/events`
+						: `${host}/webhooks/github/events`
 				},
-				redirect_url: `${protocol}://${window.location.host}/webhooks/github`,
-				callback_urls: [`${protocol}://${window.location.host}/login/github/app`],
+				redirect_url: `${host}/webhooks/github`,
+				callback_urls: [`${host}/login/github/app`],
 				public: false,
 				request_oauth_on_install: false,
-				setup_url: `${protocol}://${window.location.host}/webhooks/github/install?gitSourceId=${id}`,
+				setup_url: `${host}/webhooks/github/install?gitSourceId=${id}`,
 				setup_on_update: true,
 				default_permissions: {
 					contents: 'read',
@@ -56,8 +60,8 @@
 				},
 				default_events: ['pull_request', 'push']
 			});
-			console.log(data);
 			const form = document.createElement('form');
+			form.target = '_blank';
 			form.setAttribute('method', 'post');
 			form.setAttribute('action', `${htmlUrl}/${url}?state=${id}`);
 			const input = document.createElement('input');

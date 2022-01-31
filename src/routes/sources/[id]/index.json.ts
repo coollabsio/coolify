@@ -10,10 +10,12 @@ export const get: RequestHandler<Locals> = async (request) => {
 	const { id } = request.params;
 	try {
 		const source = await db.getSource({ id, teamId });
+		const settings = await db.listSettings();
 		return {
 			status: 200,
 			body: {
-				source
+				source,
+				settings
 			}
 		};
 	} catch (error) {

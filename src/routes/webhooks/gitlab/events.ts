@@ -95,7 +95,6 @@ export const post: RequestHandler = async (event) => {
 
 			const applicationFound = await db.getApplicationWebhook({ projectId, branch: targetBranch });
 			if (applicationFound) {
-				console.log(applicationFound.settings.previews);
 				if (applicationFound.settings.previews) {
 					if (applicationFound.gitSource.gitlabApp.webhookToken !== webhookToken) {
 						return {
@@ -107,7 +106,7 @@ export const post: RequestHandler = async (event) => {
 					}
 					if (
 						action === 'opened' ||
-						action === 'reopened' ||
+						action === 'reopen' ||
 						action === 'open' ||
 						action === 'update'
 					) {
@@ -129,8 +128,8 @@ export const post: RequestHandler = async (event) => {
 							const domain = getDomain(applicationFound.fqdn);
 							const id = `${applicationFound.id}-${pullmergeRequestId}`;
 							const engine = applicationFound.destinationDocker.engine;
-							await removeDestinationDocker({ id, engine });
 							await removeProxyConfiguration({ domain: `${pullmergeRequestId}.${domain}` });
+							await removeDestinationDocker({ id, engine });
 						}
 
 						return {

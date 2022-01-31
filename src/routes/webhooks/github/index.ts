@@ -33,7 +33,7 @@ export const get: RequestHandler = async (request) => {
 		await db.createGithubApp({ id, client_id, slug, client_secret, pem, webhook_secret, state });
 		return {
 			status: 302,
-			headers: { Location: `/sources/${state}` }
+			headers: { Location: `/webhooks/success` }
 		};
 	} catch (error) {
 		return PrismaErrorHandler(error);

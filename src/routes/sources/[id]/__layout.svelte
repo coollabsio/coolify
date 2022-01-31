@@ -4,7 +4,7 @@
 		const url = `/sources/${params.id}.json`;
 		const res = await fetch(url);
 		if (res.ok) {
-			const { source } = await res.json();
+			const { source, settings } = await res.json();
 			if (!source || Object.entries(source).length === 0) {
 				return {
 					status: 302,
@@ -16,7 +16,8 @@
 					source
 				},
 				stuff: {
-					source
+					source,
+					settings
 				}
 			};
 		}
