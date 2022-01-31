@@ -1,9 +1,10 @@
-import { getTeam, getUserDetails, removePreviewDestinationDocker } from '$lib/common';
+import { getDomain, getTeam, getUserDetails, removeDestinationDocker } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
 import crypto from 'crypto';
 import { buildQueue } from '$lib/queues';
+import { removeProxyConfiguration } from '$lib/haproxy';
 
 export const options: RequestHandler = async () => {
 	return {
@@ -121,11 +122,11 @@ export const post: RequestHandler = async (event) => {
 						};
 					} else if (pullmergeRequestAction === 'closed') {
 						if (applicationFound.destinationDockerId) {
-							await removePreviewDestinationDocker({
-								id: applicationFound.id,
-								destinationDocker: applicationFound.destinationDocker,
-								pullmergeRequestId
-							});
+							const domain = getDomain(applicationFound.fqdn)
+							const id = `${applicationFound.id}-${pullmergeRequestId}`;
+							const engine = applicationFound.destinationDocker.engine
+							await removeDestinationDocker({ id, engine });
+							await removeProxyConfiguration({ domain: `${pullmergeRequestId}.${domain}` });
 						}
 						return {
 							status: 200,

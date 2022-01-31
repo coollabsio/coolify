@@ -1,7 +1,7 @@
 <script lang="ts">
 	export let destination;
 	export let settings;
-	// export let state;
+	export let state;
 
 	import { toast } from '@zerodevx/svelte-toast';
 	import { page } from '$app/stores';
@@ -9,6 +9,7 @@
 	import { errorNotification } from '$lib/form';
 	import { post } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
+	import { onMount } from 'svelte';
 	const { id } = $page.params;
 	let cannotDisable = settings.fqdn && destination.engine === '/var/run/docker.sock';
 	// let scannedApps = [];
@@ -29,6 +30,20 @@
 	// 	const { containers } = await data.json();
 	// 	scannedApps = containers;
 	// }
+	onMount(async () => {
+		if (state === false && destination.isCoolifyProxyUsed === true) {
+			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
+			try {
+				await post(`/destinations/${id}/settings.json`, {
+					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
+					engine: destination.engine
+				});
+				await stopProxy();
+			} catch ({ error }) {
+				return errorNotification(error);
+			}
+		}
+	});
 	async function changeProxySetting() {
 		if (!cannotDisable) {
 			const isProxyActivated = destination.isCoolifyProxyUsed;

@@ -6,6 +6,6 @@ export default async function () {
 			`docker run --rm --name certbot-renewal -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs renew`
 		);
 	} catch (error) {
-		console.log(error);
+		throw (error);
 	}
 }

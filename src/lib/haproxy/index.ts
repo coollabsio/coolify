@@ -72,7 +72,7 @@ export async function removeProxyConfiguration({ domain }) {
 export async function forceSSLOffApplication({ domain }) {
 	if (!dev) {
 		const haproxy = await haproxyInstance();
-		await checkHAProxy();
+		await checkHAProxy(haproxy);
 		const transactionId = await getNextTransactionId();
 		try {
 			const rules: any = await haproxy
@@ -109,7 +109,7 @@ export async function forceSSLOffApplication({ domain }) {
 export async function forceSSLOnApplication({ domain }) {
 	if (!dev) {
 		const haproxy = await haproxyInstance();
-		await checkHAProxy();
+		await checkHAProxy(haproxy);
 		const transactionId = await getNextTransactionId();
 
 		try {
@@ -147,6 +147,7 @@ export async function forceSSLOnApplication({ domain }) {
 				.json();
 		} catch (error) {
 			console.log(error);
+			throw error;
 		} finally {
 			await completeTransaction(transactionId);
 		}
@@ -158,7 +159,7 @@ export async function forceSSLOnApplication({ domain }) {
 export async function deleteProxy({ id }) {
 	const haproxy = await haproxyInstance();
 	try {
-		await checkHAProxy();
+		await checkHAProxy(haproxy);
 	} catch (error) {
 		return;
 	}
@@ -274,18 +275,15 @@ export async function deleteProxy({ id }) {
 //     }
 //     await configureDatabaseVisibility({ id, isPublic })
 // }
-export async function configureProxyForApplication({ domain, imageId, applicationId, port, isHttps }) {
+export async function configureProxyForApplication({ domain, imageId, applicationId, port }) {
 	const haproxy = await haproxyInstance();
+	await checkHAProxy(haproxy);
+
 	let serverConfigured = false;
-	let sslConfigured = false;
+	let backendAvailable: any = null
 
 	try {
-		await checkHAProxy();
-	} catch (error) {
-		return;
-	}
-	try {
-		const backend: any = await haproxy
+		backendAvailable = await haproxy
 			.get(`v2/services/haproxy/configuration/backends/${domain}`)
 			.json();
 		const server: any = await haproxy
@@ -296,14 +294,13 @@ export async function configureProxyForApplication({ domain, imageId, applicatio
 			})
 			.json();
 
-		if (backend && server) {
+		if (backendAvailable && server) {
 			// Very sophisticated way to check if the server is already configured in proxy
-			if (backend.data.forwardfor.enabled === 'enabled') {
-				if (backend.data.name === domain) {
+			if (backendAvailable.data.forwardfor.enabled === 'enabled') {
+				if (backendAvailable.data.name === domain) {
 					if (server.data.check === 'enabled') {
 						if (server.data.address === applicationId) {
 							if (server.data.port === port) {
-								// console.log('proxy already configured for this application', domain, applicationId, port)
 								serverConfigured = true;
 							}
 						}
@@ -312,26 +309,13 @@ export async function configureProxyForApplication({ domain, imageId, applicatio
 			}
 		}
 	} catch (error) {
-		console.log('error getting backend or server', error?.response?.body);
-		//
-	}
-	try {
-		if (isHttps) {
-			await letsEncrypt({ domain, id: applicationId });
-		}
-	} catch (error) {
-		console.log(error)
-		console.log('error getting lets encrypt', error);
+		//console.log('error getting backend or server', error?.response?.body);
 		//
 	}
 
 	if (serverConfigured) return;
-
 	const transactionId = await getNextTransactionId();
-
-	// Try to delete old backend
-	try {
-		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
+	if (backendAvailable) {
 		await haproxy
 			.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
 				searchParams: {
@@ -339,8 +323,6 @@ export async function configureProxyForApplication({ domain, imageId, applicatio
 				}
 			})
 			.json();
-	} catch (error) {
-		console.log('error deleting backend', error?.response?.body);
 	}
 	try {
 		await haproxy.post('v2/services/haproxy/configuration/backends', {
@@ -370,8 +352,7 @@ export async function configureProxyForApplication({ domain, imageId, applicatio
 			}
 		});
 	} catch (error) {
-		console.log(error?.response?.body);
-		throw error?.response?.body;
+		throw error?.response?.body || error;
 	} finally {
 		await completeTransaction(transactionId);
 	}
@@ -379,11 +360,8 @@ export async function configureProxyForApplication({ domain, imageId, applicatio
 
 export async function configureCoolifyProxyOff({ domain }) {
 	const haproxy = await haproxyInstance();
-	try {
-		await checkHAProxy();
-	} catch (error) {
-		return;
-	}
+	await checkHAProxy(haproxy);
+
 	try {
 		const transactionId = await getNextTransactionId();
 		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
@@ -399,11 +377,11 @@ export async function configureCoolifyProxyOff({ domain }) {
 			await forceSSLOffApplication({ domain });
 		}
 	} catch (error) {
-		console.log(error);
+		throw error?.response?.body || error;
 	}
 }
-export async function checkHAProxy() {
-	const haproxy = await haproxyInstance();
+export async function checkHAProxy(haproxy) {
+	if (!haproxy) haproxy = await haproxyInstance();
 	try {
 		await haproxy.get('v2/info');
 	} catch (error) {
@@ -412,33 +390,45 @@ export async function checkHAProxy() {
 }
 export async function configureCoolifyProxyOn({ domain }) {
 	const haproxy = await haproxyInstance();
+	await checkHAProxy(haproxy);
+	let serverConfigured = false
+	let backendAvailable: any = null;
 	try {
-		await checkHAProxy();
+		backendAvailable = await haproxy
+			.get(`v2/services/haproxy/configuration/backends/${domain}`)
+			.json();
+		const server: any = await haproxy
+			.get(`v2/services/haproxy/configuration/servers/coolify`, {
+				searchParams: {
+					backend: domain
+				}
+			})
+			.json();
+		if (backendAvailable && server) {
+			// Very sophisticated way to check if the server is already configured in proxy
+			if (backendAvailable.data.forwardfor.enabled === 'enabled') {
+				if (backendAvailable.data.name === domain) {
+					if (server.data.check === 'enabled') {
+						if (server.data.address === dev ? 'host.docker.internal' : 'coolify') {
+							if (server.data.port === 3000) {
+								serverConfigured = true;
+							}
+						}
+					}
+				}
+			}
+		}
 	} catch (error) {
-		return;
 	}
-
+	if (serverConfigured) return;
+	const transactionId = await getNextTransactionId();
 	try {
-		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
-		return;
-	} catch (error) {}
-	try {
-		const transactionId = await getNextTransactionId();
 		await haproxy.post('v2/services/haproxy/configuration/backends', {
 			searchParams: {
 				transaction_id: transactionId
 			},
 			json: {
-				'adv_check':'httpchk',
 				'init-addr': 'last,libc,none',
-				'httpchk_params': {
-					method: 'GET',
-					uri: '/undead.json'
-				},
-				'http-check': {
-					type: 'send-state',
-
-				},
 				forwardfor: { enabled: 'enabled' },
 				name: domain
 			}
@@ -458,13 +448,11 @@ export async function configureCoolifyProxyOn({ domain }) {
 				port: 3000
 			}
 		});
-		await completeTransaction(transactionId);
-		if (!dev) {
-			await letsEncrypt({ domain, isCoolify: true });
-			await forceSSLOnApplication({ domain });
-		}
 	} catch (error) {
 		console.log(error);
+		throw error
+	} finally {
+		await completeTransaction(transactionId);
 	}
 }
 
@@ -522,10 +510,10 @@ export async function startHttpProxy(destinationDocker, id, publicPort, privateP
 export async function startCoolifyProxy(engine) {
 	const host = getEngine(engine);
 	const found = await checkContainer(engine, 'coolify-haproxy');
-	const { proxyPassword } = await db.listSettings();
+	const { proxyPassword, proxyUser } = await db.listSettings();
 	if (!found) {
 		await asyncExecShell(
-			`DOCKER_HOST="${host}" docker run -e HAPROXY_PASSWORD=${proxyPassword} --restart always --add-host 'host.docker.internal:host-gateway' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "5000:5000" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`
+			`DOCKER_HOST="${host}" docker run -e HAPROXY_USERNAME=${proxyUser} -e HAPROXY_PASSWORD=${proxyPassword} --restart always --add-host 'host.docker.internal:host-gateway' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "5000:5000" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`
 		);
 	}
 	await configureNetworkCoolifyProxy(engine);
@@ -587,14 +575,14 @@ export async function configureNetworkCoolifyProxy(engine) {
 export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 	const haproxy = await haproxyInstance();
 	try {
-		await checkHAProxy();
+		await checkHAProxy(haproxy);
 	} catch (error) {
 		return;
 	}
 	try {
 		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
 		return;
-	} catch (error) {}
+	} catch (error) { }
 	try {
 		const transactionId = await getNextTransactionId();
 		await haproxy.post('v2/services/haproxy/configuration/backends', {
@@ -630,23 +618,17 @@ export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 
 export async function configureSimpleServiceProxyOff({ domain }) {
 	const haproxy = await haproxyInstance();
-	try {
-		await checkHAProxy();
-	} catch (error) {
-		return;
-	}
-	try {
-		const transactionId = await getNextTransactionId();
-		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
-		await haproxy
-			.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
-				searchParams: {
-					transaction_id: transactionId
-				}
-			})
-			.json();
-		await completeTransaction(transactionId);
-	} catch (error) {
-		// console.log(error)
-	}
+	await checkHAProxy(haproxy);
+
+	const transactionId = await getNextTransactionId();
+	await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
+	await haproxy
+		.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
+			searchParams: {
+				transaction_id: transactionId
+			}
+		})
+		.json();
+	await completeTransaction(transactionId);
+
 }

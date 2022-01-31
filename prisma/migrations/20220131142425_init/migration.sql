@@ -1,8 +1,10 @@
 -- CreateTable
 CREATE TABLE "Setting" (
     "id" TEXT NOT NULL PRIMARY KEY,
-    "name" TEXT NOT NULL,
-    "value" TEXT NOT NULL,
+    "fqdn" TEXT,
+    "isRegistrationEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "proxyPassword" TEXT NOT NULL,
+    "proxyUser" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
@@ -57,7 +59,6 @@ CREATE TABLE "Application" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "fqdn" TEXT,
-    "oldFqdn" TEXT,
     "repository" TEXT,
     "configHash" TEXT,
     "branch" TEXT,
@@ -130,7 +131,7 @@ CREATE TABLE "DestinationDocker" (
     "network" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "engine" TEXT NOT NULL,
-    "isSwarm" BOOLEAN DEFAULT false,
+    "remoteEngine" BOOLEAN NOT NULL DEFAULT false,
     "isCoolifyProxyUsed" BOOLEAN DEFAULT false,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
@@ -173,6 +174,7 @@ CREATE TABLE "GitlabApp" (
     "groupName" TEXT,
     "deployKeyId" INTEGER,
     "privateSshKey" TEXT,
+    "publicSshKey" TEXT,
     "webhookToken" TEXT,
     "appId" TEXT,
     "appSecret" TEXT,
@@ -195,9 +197,7 @@ CREATE TABLE "Database" (
     "destinationDockerId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    "serviceId" TEXT,
-    CONSTRAINT "Database_destinationDockerId_fkey" FOREIGN KEY ("destinationDockerId") REFERENCES "DestinationDocker" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT "Database_serviceId_fkey" FOREIGN KEY ("serviceId") REFERENCES "Service" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "Database_destinationDockerId_fkey" FOREIGN KEY ("destinationDockerId") REFERENCES "DestinationDocker" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -217,7 +217,6 @@ CREATE TABLE "Service" (
     "fqdn" TEXT,
     "type" TEXT,
     "version" TEXT,
-    "databaseId" TEXT,
     "destinationDockerId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
@@ -251,6 +250,33 @@ CREATE TABLE "Minio" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "Minio_serviceId_fkey" FOREIGN KEY ("serviceId") REFERENCES "Service" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Vscodeserver" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "password" TEXT NOT NULL,
+    "serviceId" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Vscodeserver_serviceId_fkey" FOREIGN KEY ("serviceId") REFERENCES "Service" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Wordpress" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "extraConfig" TEXT,
+    "tablePrefix" TEXT,
+    "mysqlUser" TEXT NOT NULL,
+    "mysqlPassword" TEXT NOT NULL,
+    "mysqlRootUser" TEXT NOT NULL,
+    "mysqlRootUserPassword" TEXT NOT NULL,
+    "mysqlDatabase" TEXT,
+    "mysqlPublicPort" INTEGER,
+    "serviceId" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Wordpress_serviceId_fkey" FOREIGN KEY ("serviceId") REFERENCES "Service" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -318,7 +344,7 @@ CREATE TABLE "_ServiceToTeam" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Setting_name_key" ON "Setting"("name");
+CREATE UNIQUE INDEX "Setting_fqdn_key" ON "Setting"("fqdn");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_id_key" ON "User"("id");
@@ -357,13 +383,16 @@ CREATE UNIQUE INDEX "GitlabApp_groupName_key" ON "GitlabApp"("groupName");
 CREATE UNIQUE INDEX "DatabaseSettings_databaseId_key" ON "DatabaseSettings"("databaseId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Service_databaseId_key" ON "Service"("databaseId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "PlausibleAnalytics_serviceId_key" ON "PlausibleAnalytics"("serviceId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Minio_serviceId_key" ON "Minio"("serviceId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Vscodeserver_serviceId_key" ON "Vscodeserver"("serviceId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Wordpress_serviceId_key" ON "Wordpress"("serviceId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "_TeamToUser_AB_unique" ON "_TeamToUser"("A", "B");

@@ -2,7 +2,7 @@ import cuid from 'cuid';
 import bcrypt from 'bcrypt';
 
 import { prisma, PrismaErrorHandler } from './common';
-import { asyncExecShell, uniqueName } from '$lib/common';
+import { asyncExecShell, removeContainer, uniqueName } from '$lib/common';
 
 import * as db from '$lib/database';
 import { startCoolifyProxy } from '$lib/haproxy';
@@ -25,7 +25,7 @@ export async function login({ email, password }) {
 		// Start Coolify Proxy
 		try {
 			await startCoolifyProxy('/var/run/docker.sock');
-			await asyncExecShell(`docker network create --attachable coolify`);
+			// await asyncExecShell(`docker network create --attachable coolify`);
 		} catch (error) {
 			console.error(error);
 		}
@@ -61,7 +61,8 @@ export async function login({ email, password }) {
 				teams: {
 					create: {
 						id: uid,
-						name: uniqueName()
+						name: uniqueName(),
+						destinationDocker: { connect: { network: 'coolify' } }
 					}
 				},
 				permission: { create: { teamId: uid, permission: 'owner' } }

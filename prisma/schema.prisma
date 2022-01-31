@@ -12,6 +12,7 @@ model Setting {
   fqdn                  String?  @unique
   isRegistrationEnabled Boolean  @default(false)
   proxyPassword         String
+  proxyUser             String
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }

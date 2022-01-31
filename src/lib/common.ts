@@ -120,6 +120,7 @@ export async function removeContainer(id, engine) {
 		}
 	} catch (error) {
 		console.log(error);
+		throw error
 	}
 }
 

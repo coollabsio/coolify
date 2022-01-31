@@ -7,7 +7,7 @@
 	import { dev } from '$app/env';
 	import cuid from 'cuid';
 	import { goto } from '$app/navigation';
-	import { get, post, put } from '$lib/api';
+	import { del, get, post, put } from '$lib/api';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -227,20 +227,30 @@
 				Authorization: `Bearer ${$session.gitlabToken}`
 			});
 			const deployKeyFound = deployKeys.filter((dk) => dk.title === `${appId}-coolify-deploy-key`);
-			if (deployKeyFound.length === 0) {
-				const { id } = await post(
-					deployKeyUrl,
-					{
-						title: `${appId}-coolify-deploy-key`,
-						key: publicSshKey,
-						can_push: false
-					},
-					{
-						Authorization: `Bearer ${$session.gitlabToken}`
-					}
-				);
-				await post(updateDeployKeyIdUrl, { deployKeyId: id });
+			if (deployKeyFound.length > 0) {
+				for (const deployKey of deployKeyFound) {
+					console.log(`${deployKeyUrl}/${deployKey.id}`)
+					await del(
+						`${deployKeyUrl}/${deployKey.id}`,
+						{},
+						{
+							Authorization: `Bearer ${$session.gitlabToken}`
+						}
+					);
+				}
 			}
+			const { id } = await post(
+				deployKeyUrl,
+				{
+					title: `${appId}-coolify-deploy-key`,
+					key: publicSshKey,
+					can_push: false
+				},
+				{
+					Authorization: `Bearer ${$session.gitlabToken}`
+				}
+			);
+			await post(updateDeployKeyIdUrl, { deployKeyId: id });
 		} catch (error) {
 			console.log(error);
 			throw new Error(error);

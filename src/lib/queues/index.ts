@@ -1,5 +1,5 @@
 import * as Bullmq from 'bullmq';
-import { default as ProdBullmq, Job, QueueScheduler } from 'bullmq';
+import { default as ProdBullmq, Job, QueueEvents, QueueScheduler } from 'bullmq';
 import cuid from 'cuid';
 import { dev } from '$app/env';
 import { prisma } from '$lib/database';
@@ -7,8 +7,9 @@ import { prisma } from '$lib/database';
 import builder from './builder';
 import logger from './logger';
 import cleanup from './cleanup';
-import sslrenewal from './sslrenewal';
 import proxy from './proxy';
+import ssl from './ssl';
+import sslrenewal from './sslrenewal';
 
 import { asyncExecShell, saveBuildLog } from '$lib/common';
 
@@ -26,33 +27,63 @@ const connectionOptions = {
 		host: redisHost
 	}
 };
-new QueueScheduler('cron', connectionOptions);
-const proxyCronQueue = new Queue('cron', connectionOptions);
 
-const proxyCronWorker = new Worker('cron', async () => await proxy(), connectionOptions);
-proxyCronWorker.on('failed', async (_job: Bullmq.Job, error) => {
-	console.log(error);
-});
-proxyCronQueue.drain().then(() => {
-	proxyCronQueue.add('cron', {}, { repeat: { every: 10000 } });
-});
-const cleanupQueue = new Queue('cron', connectionOptions);
-const cleanupWorker = new Worker('cron', async () => await cleanup(), connectionOptions);
-cleanupWorker.on('failed', async (job: Bullmq.Job, error) => {
-	console.log(error);
-});
-cleanupQueue.drain().then(() => {
-	cleanupQueue.add('cron', {}, { repeat: { every: 3600000 } });
-});
+const cron = async () => {
+	new QueueScheduler('proxy', connectionOptions);
+	new QueueScheduler('cleanup', connectionOptions);
+	new QueueScheduler('ssl', connectionOptions);
+	new QueueScheduler('sslRenew', connectionOptions);
 
-const sslRenewalCronQueue = new Queue('cron', connectionOptions);
-const sslRenewalCronWorker = new Worker('cron', async () => await sslrenewal(), connectionOptions);
-sslRenewalCronWorker.on('failed', async (job: Bullmq.Job, error) => {
-	console.log(error);
-});
-sslRenewalCronQueue.drain().then(() => {
-	sslRenewalCronQueue.add('cron', {}, { repeat: { every: 1800000 } });
-});
+	const queue = {
+		proxy: new Queue('proxy', { ...connectionOptions }),
+		cleanup: new Queue('cleanup', { ...connectionOptions }),
+		ssl: new Queue('ssl', { ...connectionOptions }),
+		sslRenew: new Queue('sslRenew', { ...connectionOptions })
+	}
+	await queue.proxy.drain()
+	await queue.cleanup.drain()
+	await queue.ssl.drain()
+	await queue.sslRenew.drain()
+
+	new Worker('proxy', async () => { await proxy() }, {
+		...connectionOptions,
+	});
+
+	new Worker('ssl', async () => { await ssl() }, {
+		...connectionOptions,
+	});
+
+	new Worker('cleanup', async () => { await cleanup() }, {
+		...connectionOptions,
+	});
+
+	new Worker('sslRenew', async () => { await sslrenewal() }, {
+		...connectionOptions,
+	});
+
+	await queue.proxy.add('proxy', {}, { repeat: { every: 10000 } });
+	await queue.ssl.add('ssl', {}, { repeat: { every: 10000 } });
+	await queue.cleanup.add('cleanup', {}, { repeat: { every: 3600000 } });
+	await queue.sslRenew.add('sslRenew', {}, { repeat: { every: 1800000 } });
+	
+	const events = {
+		proxy: new QueueEvents('proxy', { ...connectionOptions }),
+		ssl: new QueueEvents('ssl', { ...connectionOptions }),
+	}
+
+	events.proxy.on('completed', (data) => {
+		console.log(data)
+	});
+	events.ssl.on('completed', (data) => {
+		console.log(data)
+	});
+}
+cron()
+	.catch(error => {
+		console.log('cron failed to start')
+		console.log(error)
+	})
+
 
 const buildQueueName = dev ? cuid() : 'build_queue';
 const buildQueue = new Queue(buildQueueName, connectionOptions);
@@ -72,7 +103,7 @@ buildWorker.on('completed', async (job: Bullmq.Job) => {
 	return;
 });
 
-buildWorker.on('failed', async (job: Bullmq.Job, failedReason: string) => {
+buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
 	console.log(failedReason);
 	try {
 		await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'failed' } });
@@ -118,4 +149,4 @@ const buildLogWorker = new Worker(buildLogQueueName, async (job) => await logger
 	...connectionOptions
 });
 
-export { buildQueue, buildLogQueue, proxyCronQueue };
+export { buildQueue, buildLogQueue };

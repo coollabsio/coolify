@@ -52,18 +52,21 @@ export async function removeApplication({ id, teamId }) {
 		const { stdout: containers } = await asyncExecShell(
 			`DOCKER_HOST=${host} docker ps -a --filter network=${destinationDocker.network} --filter name=${id} --format '{{json .}}'`
 		);
-		const containersArray = containers.trim().split('\n');
-		for (const container of containersArray) {
-			const containerObj = JSON.parse(container);
-			const id = containerObj.ID;
-			const preview = containerObj.Image.split('-')[1];
-			await removeDestinationDocker({ id, engine: destinationDocker.engine });
-			if (preview) {
-				await removeProxyConfiguration({ domain: `${preview}.${domain}` });
-			} else {
-				await removeProxyConfiguration({ domain });
+		if (containers) {
+			const containersArray = containers.trim().split('\n');
+			for (const container of containersArray) {
+				const containerObj = JSON.parse(container);
+				const id = containerObj.ID;
+				const preview = containerObj.Image.split('-')[1];
+				await removeDestinationDocker({ id, engine: destinationDocker.engine });
+				if (preview) {
+					await removeProxyConfiguration({ domain: `${preview}.${domain}` });
+				} else {
+					await removeProxyConfiguration({ domain });
+				}
 			}
 		}
+
 	}
 
 	await prisma.applicationSettings.deleteMany({ where: { application: { id } } });

@@ -14,6 +14,7 @@
 			return {
 				props: {
 					...(await res.json()),
+					application,
 					ghToken
 				}
 			};
@@ -31,7 +32,7 @@
 
 	import { buildPacks, scanningTemplates } from '$lib/components/templates';
 	import BuildPack from './_BuildPack.svelte';
-	import { session } from '$app/stores';
+	import { page, session } from '$app/stores';
 	import { get } from '$lib/api';
 	import { errorNotification } from '$lib/form';
 
@@ -44,6 +45,7 @@
 	export let branch;
 	export let ghToken;
 	export let type;
+	export let application;
 
 	function checkPackageJSONContents({ key, json }) {
 		return json?.dependencies?.hasOwnProperty(key) || json?.devDependencies?.hasOwnProperty(key);
@@ -127,6 +129,32 @@
 				}
 			}
 		} catch (error) {
+			if (
+				error.error === 'invalid_token' &&
+				error.error_description ===
+					'Token is expired. You can either do re-authorization or token refresh.'
+			) {
+				if (application.gitSource.gitlabAppId) {
+					let htmlUrl = application.gitSource.htmlUrl;
+					const left = screen.width / 2 - 1020 / 2;
+					const top = screen.height / 2 - 618 / 2;
+					const newWindow = open(
+						`${htmlUrl}/oauth/authorize?client_id=${application.gitSource.gitlabApp.appId}&redirect_uri=${window.location.origin}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${$page.params.id}`,
+						'GitLab',
+						'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
+							top +
+							', left=' +
+							left +
+							', toolbar=0, menubar=0, status=0'
+					);
+					const timer = setInterval(() => {
+						if (newWindow?.closed) {
+							clearInterval(timer);
+							window.location.reload();
+						}
+					}, 100);
+				}
+			}
 			return errorNotification(error);
 		} finally {
 			if (!foundConfig) foundConfig = buildPacks.find((bp) => bp.name === 'node');

@@ -26,8 +26,9 @@
 	import Setting from '$lib/components/Setting.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { del, post } from '$lib/api';
+	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
+	import { browser } from '$app/env';
 
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
 	let fqdn = settings.fqdn;
@@ -64,7 +65,6 @@
 		try {
 			loading.save = true;
 			if (fqdn) {
-				toast.push('Setting domain.');
 				await post(`/settings/check.json`, { fqdn });
 				await post(`/settings.json`, { fqdn });
 				return window.location.reload();
@@ -132,5 +132,38 @@
 				</ul>
 			</div>
 		</form>
+		<div class="mx-auto max-w-4xl px-6">
+			<div class="flex space-x-1 pt-5 font-bold">
+				<div class="mr-4 text-xl tracking-tight">HAProxy Settings</div>
+			</div>
+			<Explainer text={`Credentials for <a class="text-white" href=${browser && 'http://' + window.location.hostname + ':8404'} target="_blank">stats</a> page.`} />
+			
+			<div class="grid grid-cols-3 items-center pt-5">
+				<label for="proxyUser">User</label>
+
+				<div class="col-span-2 ">
+					<CopyPasswordField
+						readonly
+						disabled
+						id="proxyUser"
+						name="proxyUser"
+						value={settings.proxyUser}
+					/>
+				</div>
+			</div>
+			<div class="grid grid-cols-3 items-center">
+				<label for="proxyPassword">Password</label>
+				<div class="col-span-2 ">
+					<CopyPasswordField
+						readonly
+						disabled
+						id="proxyPassword"
+						name="proxyPassword"
+						isPasswordField
+						value={settings.proxyPassword}
+					/>
+				</div>
+			</div>
+		</div>
 	</div>
 {/if}

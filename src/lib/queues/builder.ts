@@ -11,11 +11,12 @@ import {
 	makeLabelForStandaloneApplication,
 	setDefaultConfiguration
 } from '$lib/buildPacks/common';
+import { letsEncrypt } from '$lib/letsencrypt';
 
 export default async function (job) {
 	/*
-    Edge cases:
-    1 - Change build pack and redeploy, what should happen?
+	Edge cases:
+	1 - Change build pack and redeploy, what should happen?
   */
 	let {
 		id: applicationId,
@@ -241,7 +242,8 @@ export default async function (job) {
 		saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
 
 		if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-			await configureProxyForApplication({ domain, imageId, applicationId, port, isHttps });
+			await configureProxyForApplication({ domain, imageId, applicationId, port });
+			if (isHttps) await letsEncrypt({ domain, id: applicationId });
 		} else {
 			saveBuildLog({
 				line: 'Coolify Proxy is not configured for this destination. Nothing else to do.',

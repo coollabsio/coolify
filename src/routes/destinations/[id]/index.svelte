@@ -31,6 +31,8 @@
 <script lang="ts">
 	export let destination: Prisma.DestinationDocker;
 	export let settings;
+	export let state;
+	
 	import type Prisma from '@prisma/client';
 	import LocalDocker from './_LocalDocker.svelte';
 </script>
@@ -41,4 +43,4 @@
 	<span class="pr-2">{destination.name}</span>
 </div>
 
-<LocalDocker bind:destination {settings} />
+<LocalDocker bind:destination {settings} {state} />

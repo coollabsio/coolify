@@ -1,7 +1,7 @@
 import { getDomain, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { listSettings, PrismaErrorHandler } from '$lib/database';
-import { configureCoolifyProxyOff, configureCoolifyProxyOn } from '$lib/haproxy';
+import { checkContainer, configureCoolifyProxyOff, configureCoolifyProxyOn, startCoolifyProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (event) => {
@@ -66,14 +66,17 @@ export const post: RequestHandler<Locals> = async (event) => {
 		if (oldIsRegistrationEnabled !== isRegistrationEnabled) {
 			await db.prisma.setting.update({ where: { id }, data: { isRegistrationEnabled } });
 		}
-		if (oldFqdn !== fqdn) {
+		if (oldFqdn && oldFqdn !== fqdn) {
 			const oldDomain = getDomain(oldFqdn);
 			if (oldFqdn) await configureCoolifyProxyOff({ domain: oldDomain });
 		}
 		if (fqdn) {
-			await db.prisma.setting.update({ where: { id }, data: { fqdn } });
+			const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy');
+			if (!found) await startCoolifyProxy('/var/run/docker.sock');
 			const domain = getDomain(fqdn);
 			if (domain) await configureCoolifyProxyOn({ domain });
+			await db.prisma.setting.update({ where: { id }, data: { fqdn } });
+			await db.prisma.destinationDocker.updateMany({ where: { engine: '/var/run/docker.sock' }, data: { isCoolifyProxyUsed: true } })
 		}
 
 		return {
