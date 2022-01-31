@@ -72,10 +72,10 @@ const cron = async () => {
 	}
 
 	events.proxy.on('completed', (data) => {
-		console.log(data)
+		// console.log(data)
 	});
 	events.ssl.on('completed', (data) => {
-		console.log(data)
+		// console.log(data)
 	});
 }
 cron()
