@@ -72,6 +72,6 @@ export const getSession: GetSession<Locals> = function (request) {
 	};
 };
 
-// export async function handleError({ error, request }) {
-//     sentry.captureException(error, { request });
-// }
+export async function handleError({ error, event }) {
+    sentry.captureException(error, { event });
+}
