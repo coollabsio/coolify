@@ -131,5 +131,7 @@ export async function updateMinioService({ id, publicPort }) {
 export async function removeService({ id }) {
 	await prisma.plausibleAnalytics.deleteMany({ where: { serviceId: id } });
 	await prisma.minio.deleteMany({ where: { serviceId: id } });
+	await prisma.vscodeserver.deleteMany({ where: { serviceId: id } });
+	await prisma.wordpress.deleteMany({ where: { serviceId: id } });
 	await prisma.service.delete({ where: { id } });
 }
