@@ -7,6 +7,7 @@ import {
 	configureCoolifyProxyOn,
 	startCoolifyProxy
 } from '$lib/haproxy';
+import { letsEncrypt } from '$lib/letsencrypt';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (event) => {
@@ -79,7 +80,11 @@ export const post: RequestHandler<Locals> = async (event) => {
 			const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy');
 			if (!found) await startCoolifyProxy('/var/run/docker.sock');
 			const domain = getDomain(fqdn);
-			if (domain) await configureCoolifyProxyOn({ domain });
+			if (domain) {
+				await configureCoolifyProxyOn({ domain });
+				await letsEncrypt({ domain, isCoolify: true });
+			}
+
 			await db.prisma.setting.update({ where: { id }, data: { fqdn } });
 			await db.prisma.destinationDocker.updateMany({
 				where: { engine: '/var/run/docker.sock' },
