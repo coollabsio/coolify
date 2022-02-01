@@ -196,21 +196,16 @@ export const post: RequestHandler<Locals> = async (event) => {
 		} catch (error) {
 			console.log(error);
 		}
-		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
-			await configureSimpleServiceProxyOn({ id, domain, port: 8000 });
+		await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+		await configureSimpleServiceProxyOn({ id, domain, port: 8000 });
 
-			if (isHttps) {
-				await letsEncrypt({ domain, id });
-			}
-			await reloadHaproxy(destinationDocker.engine);
-			return {
-				status: 200
-			};
-		} catch (error) {
-			console.log(error);
-			return PrismaErrorHandler(error);
+		if (isHttps) {
+			await letsEncrypt({ domain, id });
 		}
+		await reloadHaproxy(destinationDocker.engine);
+		return {
+			status: 200
+		};
 	} catch (error) {
 		return PrismaErrorHandler(error);
 	}
