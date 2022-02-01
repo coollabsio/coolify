@@ -37,7 +37,7 @@
 	import LocalDocker from './_LocalDocker.svelte';
 </script>
 
-<div class="flex space-x-1 p-5 px-6 text-2xl font-bold">
+<div class="flex space-x-1 p-6 text-2xl font-bold">
 	<div class="tracking-tight">Destination</div>
 	<span class="arrow-right-applications px-1">></span>
 	<span class="pr-2">{destination.name}</span>

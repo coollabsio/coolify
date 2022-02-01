@@ -42,7 +42,7 @@
 	export let readOnly;
 </script>
 
-<div class="flex items-center space-x-1 p-5 px-6 text-2xl font-bold">
+<div class="flex items-center space-x-1 p-6 text-2xl font-bold">
 	<div class="md:max-w-64 hidden truncate tracking-tight md:block">
 		{service.name}
 	</div>

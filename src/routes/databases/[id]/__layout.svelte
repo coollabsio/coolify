@@ -15,7 +15,7 @@
 		const endpoint = `/databases/${params.id}.json`;
 		const res = await fetch(endpoint);
 		if (res.ok) {
-			const { database, state, versions, privatePort } = await res.json();
+			const { database, state, versions, privatePort, settings } = await res.json();
 			if (!database || Object.entries(database).length === 0) {
 				return {
 					status: 302,
@@ -43,7 +43,8 @@
 					database,
 					state,
 					versions,
-					privatePort
+					privatePort,
+					settings
 				}
 			};
 		}

@@ -101,7 +101,7 @@
 </div>
 <div class="mx-auto max-w-2xl">
 	<form on:submit|preventDefault={handleSubmit}>
-		<div class="flex space-x-1 py-5 px-6 font-bold">
+		<div class="flex space-x-1 p-6 font-bold">
 			<div class="mr-4 text-xl tracking-tight">Settings</div>
 			<div class="text-center">
 				<button class="bg-green-600 hover:bg-green-500" type="submit">Save</button>
@@ -180,7 +180,7 @@
 {#if $session.isAdmin}
 	<div class="mx-auto max-w-2xl pt-8">
 		<form on:submit|preventDefault={sendInvitation}>
-			<div class="flex space-x-1 py-5 px-6 font-bold">
+			<div class="flex space-x-1 p-6 font-bold">
 				<div class="mr-4 text-xl tracking-tight">Invite new member</div>
 				<div class="text-center">
 					<button class="bg-green-600 hover:bg-green-500" type="submit">Send invitation</button>

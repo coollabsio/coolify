@@ -82,7 +82,7 @@
 	}
 </script>
 
-<div class="flex space-x-1 py-6 px-6 font-bold">
+<div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">
 		Build logs of <a href={application.fqdn} target="_blank">{getDomain(application.fqdn)}</a>
 	</div>

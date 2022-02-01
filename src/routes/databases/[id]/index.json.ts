@@ -31,12 +31,14 @@ export const get: RequestHandler = async (event) => {
 			}
 		}
 		const configuration = generateDatabaseConfiguration(database);
+		const settings = await db.listSettings();
 		return {
 			body: {
 				privatePort: configuration?.privatePort,
 				database,
 				state,
-				versions: getVersions(database.type)
+				versions: getVersions(database.type),
+				settings
 			}
 		};
 	} catch (error) {

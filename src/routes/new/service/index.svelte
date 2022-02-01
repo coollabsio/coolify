@@ -40,7 +40,7 @@
 	}
 </script>
 
-<div class="flex space-x-1 py-5 px-6 font-bold">
+<div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">Add New Service</div>
 </div>
 <div class="pt-10">

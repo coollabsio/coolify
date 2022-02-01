@@ -1,6 +1,7 @@
 <script lang="ts">
 	export let database;
 	export let privatePort;
+	export let settings;
 	import { page, session } from '$app/stores';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Setting from '$lib/components/Setting.svelte';
@@ -33,11 +34,7 @@
 	function generateUrl() {
 		return browser
 			? `${database.type}://${databaseDbUser}:${databaseDbUserPassword}@${
-					isPublic
-						? window.location.hostname === 'localhost'
-							? '127.0.0.1'
-							: window.location.hostname
-						: database.id
+					isPublic ? (settings.fqdn ? settings.fqdn : window.location.hostname) : database.id
 			  }:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`
 			: 'Loading...';
 	}

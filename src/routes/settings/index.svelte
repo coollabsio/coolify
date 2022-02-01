@@ -77,13 +77,13 @@
 	}
 </script>
 
-<div class="flex space-x-1 py-5 px-6 font-bold">
+<div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">Settings</div>
 </div>
 {#if $session.teamId === '0'}
 	<div class="mx-auto max-w-2xl">
 		<form on:submit|preventDefault={handleSubmit}>
-			<div class="flex space-x-1 py-5 px-6 font-bold">
+			<div class="flex space-x-1 p-6 font-bold">
 				<div class="mr-4 text-xl tracking-tight">Global Settings</div>
 				<button
 					type="submit"
@@ -137,7 +137,7 @@
 			</div>
 			<Explainer
 				text={`Credentials for <a class="text-white" href=${
-					browser && 'http://' + window.location.hostname + ':8404'
+					settings.fqdn ? settings.fqnd : browser && 'http://' + window.location.hostname + ':8404'
 				} target="_blank">stats</a> page.`}
 			/>
 

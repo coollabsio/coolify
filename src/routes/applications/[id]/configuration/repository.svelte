@@ -26,7 +26,7 @@
 	import GitlabRepositories from './_GitlabRepositories.svelte';
 </script>
 
-<div class="flex space-x-1 py-5 px-6 font-bold">
+<div class="flex space-x-1 p-5 px-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">Select a Repository / Project</div>
 </div>
 <div class="flex flex-wrap justify-center">
