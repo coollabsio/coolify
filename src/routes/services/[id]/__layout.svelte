@@ -74,7 +74,7 @@
 		if (sure) {
 			loading = true;
 			try {
-				await post(`/services/${service.id}/${service.type}/stop.json`, {});
+				if (service.type) await post(`/services/${service.id}/${service.type}/stop.json`, {});
 				await del(`/services/${service.id}/delete.json`, { id: service.id });
 				return await goto(`/services`);
 			} catch ({ error }) {
