@@ -13,10 +13,17 @@ import dayjs from 'dayjs';
 import Cookie from 'cookie';
 
 try {
-	if (!dev) {
+	if (dev) {
 		Sentry.init({
 			dsn: process.env['COOLIFY_SENTRY_DSN'],
-			tracesSampleRate: 0
+			tracesSampleRate: 0,
+			environment: 'dev'
+		});
+	} else {
+		Sentry.init({
+			dsn: process.env['COOLIFY_SENTRY_DSN'],
+			tracesSampleRate: 0,
+			environment: 'production'
 		});
 	}
 } catch (err) {

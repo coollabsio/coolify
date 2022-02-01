@@ -1,4 +1,5 @@
 import { dev } from '$app/env';
+import { sentry } from '$lib/common';
 import * as Prisma from '@prisma/client';
 import { default as ProdPrisma } from '@prisma/client';
 import generator from 'generate-password';
@@ -36,6 +37,7 @@ if (dev) {
 export const prisma = new PrismaClient(prismaOptions);
 
 export function PrismaErrorHandler(e) {
+	sentry.captureException(e);
 	const payload = {
 		status: e.status || 500,
 		body: {
