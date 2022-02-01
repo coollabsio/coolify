@@ -29,13 +29,9 @@
 
 <script lang="ts">
 	export let source: Prisma.GitSource;
-	export let settings;
 	import type Prisma from '@prisma/client';
-	import { page } from '$app/stores';
 	import Github from './_Github.svelte';
 	import Gitlab from './_Gitlab.svelte';
-
-	const { id } = $page.params;
 </script>
 
 <div class="flex space-x-1 p-5 px-6 text-2xl font-bold">
@@ -43,9 +39,9 @@
 	<span class="arrow-right-applications px-1">></span>
 	<span class="pr-2">{source.name}</span>
 </div>
-<div class="flex justify-center space-x-2 px-6">
+<div class="flex justify-center space-x-2 px-6 py-3">
 	{#if source.type === 'github'}
-		<Github {source} {settings} />
+		<Github {source} />
 	{:else if source.type === 'gitlab'}
 		<Gitlab {source} />
 	{/if}

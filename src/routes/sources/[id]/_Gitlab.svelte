@@ -19,6 +19,28 @@
 	onMount(() => {
 		oauthIdEl && oauthIdEl.focus();
 	});
+	async function changeSettings() {
+		const {
+			htmlUrl,
+			gitlabApp: { oauthId }
+		} = source;
+		const left = screen.width / 2 - 1020 / 2;
+		const top = screen.height / 2 - 1000 / 2;
+		const newWindow = open(
+			`${htmlUrl}/oauth/applications/${oauthId}`,
+			'GitLab',
+			'resizable=1, scrollbars=1, fullscreen=0, height=1000, width=1020,top=' +
+				top +
+				', left=' +
+				left +
+				', toolbar=0, menubar=0, status=0'
+		);
+		const timer = setInterval(() => {
+			if (newWindow?.closed) {
+				clearInterval(timer);
+			}
+		}, 100);
+	}
 	async function checkOauthId() {
 		if (payload.oauthId) {
 			try {
@@ -57,7 +79,7 @@
 	}
 </script>
 
-<div class="flex flex-col justify-center pb-8">
+<div class="flex flex-col justify-center">
 	{#if !source.gitlabApp?.appId}
 		<form class="grid grid-flow-row gap-2 py-4" on:submit|preventDefault={newApp}>
 			<div class="grid grid-cols-3 items-center">
@@ -152,8 +174,8 @@
 			</div>
 		</form>
 	{:else}
-		<a href={`${source.htmlUrl}/oauth/applications/${source.gitlabApp.oauthId}`}
-			><button>Check OAuth Application</button></a
+		<button class="box-selection font-bold text-xl text-center truncate" on:click={changeSettings}
+			>Change GitLab App Settings</button
 		>
 	{/if}
 </div>

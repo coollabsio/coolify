@@ -1,19 +1,36 @@
 <script lang="ts">
-	import { dev } from '$app/env';
-	import { getDomain } from '$lib/components/common';
-
-	import { dashify } from '$lib/github';
-
 	export let source;
-	export let settings;
+
+	import { page } from '$app/stores';
+
+	const { id } = $page.params;
 
 	async function installRepositories(source) {
 		const { htmlUrl } = source;
 		const left = screen.width / 2 - 1020 / 2;
-		const top = screen.height / 2 - 618 / 2;
+		const top = screen.height / 2 - 1000 / 2;
 		const newWindow = open(
 			`${htmlUrl}/apps/${source.githubApp.name}/installations/new`,
 			'GitHub',
+			'resizable=1, scrollbars=1, fullscreen=0, height=1000, width=1020,top=' +
+				top +
+				', left=' +
+				left +
+				', toolbar=0, menubar=0, status=0'
+		);
+		const timer = setInterval(() => {
+			if (newWindow?.closed) {
+				clearInterval(timer);
+			}
+		}, 100);
+	}
+
+	function newGithubApp() {
+		const left = screen.width / 2 - 1020 / 2;
+		const top = screen.height / 2 - 618 / 2;
+		const newWindow = open(
+			`/sources/${id}/newGithubApp`,
+			'New Github App',
 			'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
 				top +
 				', left=' +
@@ -27,59 +44,20 @@
 			}
 		}, 100);
 	}
-
-	function newGithubApp(source) {
-		const { organization, id, htmlUrl, type } = source;
-		const { fqdn } = settings;
-		const host = dev ? 'http://localhost:3000' : fqdn ? fqdn : `http://${window.location.host}`;
-		const domain = getDomain(fqdn);
-
-		if (type === 'github') {
-			let url = 'settings/apps/new';
-			if (organization) url = `organizations/${organization}/settings/apps/new`;
-			const name = dashify(domain);
-			const data = JSON.stringify({
-				name: `coolify-${name}`,
-				url: host,
-				hook_attributes: {
-					url: dev
-						? 'https://webhook.site/0e5beb2c-4e9b-40e2-a89e-32295e570c21/events'
-						: `${host}/webhooks/github/events`
-				},
-				redirect_url: `${host}/webhooks/github`,
-				callback_urls: [`${host}/login/github/app`],
-				public: false,
-				request_oauth_on_install: false,
-				setup_url: `${host}/webhooks/github/install?gitSourceId=${id}`,
-				setup_on_update: true,
-				default_permissions: {
-					contents: 'read',
-					metadata: 'read',
-					pull_requests: 'read',
-					emails: 'read'
-				},
-				default_events: ['pull_request', 'push']
-			});
-			const form = document.createElement('form');
-			form.target = '_blank';
-			form.setAttribute('method', 'post');
-			form.setAttribute('action', `${htmlUrl}/${url}?state=${id}`);
-			const input = document.createElement('input');
-			input.setAttribute('id', 'manifest');
-			input.setAttribute('name', 'manifest');
-			input.setAttribute('type', 'hidden');
-			input.setAttribute('value', data);
-			form.appendChild(input);
-			document.getElementsByTagName('body')[0].appendChild(form);
-			form.submit();
-		}
-	}
 </script>
 
 {#if !source.githubAppId}
-	<button on:click={() => newGithubApp(source)}>Create new GitHub App</button>
+	<button class="box-selection truncate text-center text-xl font-bold" on:click={newGithubApp}
+		>Create new GitHub App</button
+	>
 {:else if source.githubApp?.installationId}
-	<button on:click={() => installRepositories(source)}>Update Repositories</button>
+	<button
+		class="box-selection font-bold text-xl text-center truncate"
+		on:click={() => installRepositories(source)}>Change GitHub App Settings</button
+	>
 {:else}
-	<button on:click={() => installRepositories(source)}>Install Repositories</button>
+	<button
+		class="box-selection font-bold text-xl text-center truncate"
+		on:click={() => installRepositories(source)}>Install Repositories</button
+	>
 {/if}
