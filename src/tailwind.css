@@ -261,45 +261,14 @@ a {
 }
 
 .lds-heart {
-	display: inline-block;
-	position: relative;
-	width: 32px;
-	height: 32px;
-	transform: rotate(45deg);
-	transform-origin: 16px 16px;
-}
-.lds-heart div {
-	top: 12px;
-	left: 12px;
-	position: absolute;
-	width: 12px;
-	height: 12px;
-	background: #fff;
 	animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
-}
-.lds-heart div:after,
-.lds-heart div:before {
-	content: ' ';
-	position: absolute;
-	display: block;
-	width: 12px;
-	height: 12px;
-	background: #fff;
-}
-.lds-heart div:before {
-	left: -8px;
-	border-radius: 50% 0 0 50%;
-}
-.lds-heart div:after {
-	top: -8px;
-	border-radius: 50% 50% 0 0;
 }
 @keyframes lds-heart {
 	0% {
-		transform: scale(0.95);
+		transform: scale(1);
 	}
 	5% {
-		transform: scale(1.1);
+		transform: scale(1.2);
 	}
 	39% {
 		transform: scale(0.85);
