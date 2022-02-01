@@ -4,14 +4,14 @@ import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (event) => {
-	const { teamId, status, body } = await getUserDetails(event);
+	const { userId, teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 
 	try {
 		const applicationsCount = await (await db.listApplications(teamId)).length;
 		const sourcesCount = await (await db.listSources(teamId)).length;
 		const destinationsCount = await (await db.listDestinations(teamId)).length;
-		const teamsCount = await (await db.listTeams()).length;
+		const teamsCount = await (await db.getMyTeams({ userId })).length;
 		const databasesCount = await (await db.listDatabases(teamId)).length;
 		const servicesCount = await (await db.listServices(teamId)).length;
 		return {

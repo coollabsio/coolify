@@ -56,13 +56,15 @@
 				window.location.reload();
 				return errorNotification(error);
 			}
-			try {
-				const data = await get(`/update.json`);
-				if (data?.isUpdateAvailable) {
-					await post(`/update.json`, { type: 'pull' });
-				}
-				isUpdateAvailable = data?.isUpdateAvailable;
-			} catch (error) {}
+			if ($session.teamId === '0') {
+				try {
+					const data = await get(`/update.json`);
+					if (data?.isUpdateAvailable) {
+						await post(`/update.json`, { type: 'pull' });
+					}
+					isUpdateAvailable = data?.isUpdateAvailable;
+				} catch (error) {}
+			}
 		}
 	});
 	async function logout() {

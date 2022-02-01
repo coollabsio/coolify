@@ -11,7 +11,7 @@ export const post: RequestHandler<Locals> = async (event) => {
 		const found = await isDockerNetworkExists({ network });
 		if (found) {
 			throw {
-				error: `Network ${network} already configured on the destination.`
+				error: `Network ${network} already configured for another team!`
 			};
 		}
 		return {

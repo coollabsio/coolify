@@ -12,3 +12,9 @@ export async function newTeam({ name, userId }) {
 		}
 	});
 }
+export async function getMyTeams({ userId }) {
+	return await prisma.permission.findMany({
+		where: { userId },
+		include: { team: { include: { _count: { select: { users: true } } } } }
+	});
+}

@@ -9,7 +9,7 @@
 		switch (type) {
 			case 'docker':
 				payload = {
-					name: 'Docker',
+					name: 'Local Docker',
 					engine: '/var/run/docker.sock',
 					remoteEngine: false,
 					user: 'root',
