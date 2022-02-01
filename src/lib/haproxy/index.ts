@@ -612,14 +612,18 @@ export async function configureSimpleServiceProxyOff({ domain }) {
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
 
-	const transactionId = await getNextTransactionId();
-	await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
-	await haproxy
-		.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
-			searchParams: {
-				transaction_id: transactionId
-			}
-		})
-		.json();
-	await completeTransaction(transactionId);
+	try {
+		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
+		const transactionId = await getNextTransactionId();
+
+		await haproxy
+			.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
+				searchParams: {
+					transaction_id: transactionId
+				}
+			})
+			.json();
+		await completeTransaction(transactionId);
+	} catch (error) {}
+	return;
 }
