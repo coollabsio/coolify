@@ -11,5 +11,3 @@ node_modules
 /db/*.db-journal
 /data/haproxy/haproxy.cfg
 /data/haproxy/haproxy.cfg.lkg
-test-results/
-playwright-report/

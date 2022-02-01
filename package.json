@@ -20,14 +20,12 @@
 		"release:haproxy": "docker build -f haproxy.Dockerfile -t coollabsio/coolify-haproxy-alpine:1.0.0-rc.1 -t coollabsio/coolify-haproxy-alpine:latest . && docker image push --all-tags coollabsio/coolify-haproxy-alpine",
 		"release:haproxy:tcp": "docker build -f haproxy-tcp.Dockerfile -t coollabsio/coolify-haproxy-tcp-alpine:1.0.0-rc.1 -t coollabsio/coolify-haproxy-tcp-alpine:latest . && docker image push --all-tags coollabsio/coolify-haproxy-tcp-alpine",
 		"release:haproxy:http": "docker build -f haproxy-http.Dockerfile -t coollabsio/coolify-haproxy-http-alpine:1.0.0-rc.1 -t coollabsio/coolify-haproxy-http-alpine:latest . && docker image push --all-tags coollabsio/coolify-haproxy-http-alpine",
-		"prepare": "husky install",
-		"test": "playwright test -c tests --config=playwright.config.ts"
+		"prepare": "husky install"
 	},
 	"devDependencies": {
-		"@playwright/test": "^1.18.1",
 		"@sveltejs/adapter-node": "^1.0.0-next.67",
 		"@sveltejs/adapter-static": "^1.0.0-next.26",
-		"@sveltejs/kit": "^1.0.0-next.251",
+		"@sveltejs/kit": "^1.0.0-next.253",
 		"@types/bcrypt": "^5.0.0",
 		"@types/js-cookie": "^3.0.1",
 		"@types/node": "^17.0.13",
@@ -46,7 +44,7 @@
 		"prettier": "^2.5.1",
 		"prettier-plugin-svelte": "^2.6.0",
 		"prettier-plugin-tailwindcss": "^0.1.4",
-		"prisma": "3.8.1",
+		"prisma": "3.9.0",
 		"svelte": "^3.46.3",
 		"svelte-check": "^2.4.0",
 		"svelte-preprocess": "^4.10.2",
@@ -58,7 +56,7 @@
 	"type": "module",
 	"dependencies": {
 		"@iarna/toml": "^2.2.5",
-		"@prisma/client": "3.8.1",
+		"@prisma/client": "3.9.0",
 		"@sentry/node": "^6.17.3",
 		"bcrypt": "^5.0.1",
 		"bullmq": "^1.68.0",
