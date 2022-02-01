@@ -62,15 +62,15 @@
 			<form on:submit|preventDefault={() => handleSubmit(type.name)}>
 				<button type="submit" class="box-selection relative text-xl font-bold hover:bg-pink-600">
 					{#if type.name === 'plausibleanalytics'}
-						<PlausibleAnalytics />
+						<PlausibleAnalytics isAbsolute />
 					{:else if type.name === 'nocodb'}
-						<NocoDb />
+						<NocoDb isAbsolute />
 					{:else if type.name === 'minio'}
-						<MinIo />
+						<MinIo isAbsolute />
 					{:else if type.name === 'vscodeserver'}
-						<VsCodeServer />
+						<VsCodeServer isAbsolute />
 					{:else if type.name === 'wordpress'}
-						<Wordpress />
+						<Wordpress isAbsolute />
 					{/if}{type.fancyName}
 				</button>
 			</form>
