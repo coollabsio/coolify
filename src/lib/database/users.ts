@@ -52,23 +52,42 @@ export async function login({ email, password }) {
 		}
 
 		const hashedPassword = await bcrypt.hash(password, saltRounds);
-		await prisma.user.create({
-			data: {
-				id: uid,
-				email,
-				password: hashedPassword,
-				type: 'email',
-				teams: {
-					create: {
-						id: uid,
-						name: uniqueName(),
-						destinationDocker: { connect: { network: 'coolify' } }
-					}
+		if (users === 0) {
+			await prisma.user.create({
+				data: {
+					id: uid,
+					email,
+					password: hashedPassword,
+					type: 'email',
+					teams: {
+						create: {
+							id: uid,
+							name: uniqueName(),
+							destinationDocker: { connect: { network: 'coolify' } }
+						}
+					},
+					permission: { create: { teamId: uid, permission: 'owner' } }
 				},
-				permission: { create: { teamId: uid, permission: 'owner' } }
-			},
-			include: { teams: true }
-		});
+				include: { teams: true }
+			});
+		} else {
+			await prisma.user.create({
+				data: {
+					id: uid,
+					email,
+					password: hashedPassword,
+					type: 'email',
+					teams: {
+						create: {
+							id: uid,
+							name: uniqueName()
+						}
+					},
+					permission: { create: { teamId: uid, permission: 'owner' } }
+				},
+				include: { teams: true }
+			});
+		}
 	}
 
 	// const token = jsonwebtoken.sign({}, secretKey, {

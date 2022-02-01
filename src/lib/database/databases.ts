@@ -7,7 +7,7 @@ import getPort from 'get-port';
 import { asyncExecShell, getEngine, removeContainer } from '$lib/common';
 
 export async function listDatabases(teamId) {
-	return await prisma.database.findMany({ where: { teams: { every: { id: teamId } } } });
+	return await prisma.database.findMany({ where: { teams: { some: { id: teamId } } } });
 }
 export async function newDatabase({ name, teamId }) {
 	const dbUser = cuid();
@@ -47,7 +47,7 @@ export async function newDatabase({ name, teamId }) {
 
 export async function getDatabase({ id, teamId }) {
 	const body = await prisma.database.findFirst({
-		where: { id, teams: { every: { id: teamId } } },
+		where: { id, teams: { some: { id: teamId } } },
 		include: { destinationDocker: true, settings: true }
 	});
 

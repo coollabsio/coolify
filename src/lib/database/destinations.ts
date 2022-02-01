@@ -5,7 +5,7 @@ import { getDatabaseImage } from '.';
 import { prisma, PrismaErrorHandler } from './common';
 
 export async function listDestinations(teamId) {
-	return await prisma.destinationDocker.findMany({ where: { teams: { every: { id: teamId } } } });
+	return await prisma.destinationDocker.findMany({ where: { teams: { some: { id: teamId } } } });
 }
 
 export async function configureDestinationForService({ id, destinationId }) {
@@ -97,12 +97,12 @@ export async function removeDestination({ id }) {
 
 export async function getDestination({ id, teamId }) {
 	return await prisma.destinationDocker.findFirst({
-		where: { id, teams: { every: { id: teamId } } }
+		where: { id, teams: { some: { id: teamId } } }
 	});
 }
 export async function getDestinationByApplicationId({ id, teamId }) {
 	return await prisma.destinationDocker.findFirst({
-		where: { application: { some: { id } }, teams: { every: { id: teamId } } }
+		where: { application: { some: { id } }, teams: { some: { id: teamId } } }
 	});
 }
 

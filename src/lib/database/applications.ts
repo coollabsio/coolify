@@ -6,7 +6,7 @@ import { getDomain, removeDestinationDocker } from '$lib/common';
 import { prisma } from './common';
 
 export async function listApplications(teamId) {
-	return await prisma.application.findMany({ where: { teams: { every: { id: teamId } } } });
+	return await prisma.application.findMany({ where: { teams: { some: { id: teamId } } } });
 }
 
 export async function newApplication({ name, teamId }) {
@@ -115,7 +115,7 @@ export async function getApplicationWebhook({ projectId, branch }) {
 }
 export async function getApplication({ id, teamId }) {
 	let body = await prisma.application.findFirst({
-		where: { id, teams: { every: { id: teamId } } },
+		where: { id, teams: { some: { id: teamId } } },
 		include: {
 			destinationDocker: true,
 			settings: true,

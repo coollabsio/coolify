@@ -3,7 +3,7 @@ import { prisma, PrismaErrorHandler } from './common';
 
 export async function listSources(teamId) {
 	return await prisma.gitSource.findMany({
-		where: { teams: { every: { id: teamId } } },
+		where: { teams: { some: { id: teamId } } },
 		include: { githubApp: true, gitlabApp: true }
 	});
 }
@@ -32,7 +32,7 @@ export async function removeSource({ id }) {
 
 export async function getSource({ id, teamId }) {
 	let body = await prisma.gitSource.findFirst({
-		where: { id, teams: { every: { id: teamId } } },
+		where: { id, teams: { some: { id: teamId } } },
 		include: { githubApp: true, gitlabApp: true }
 	});
 	if (body?.githubApp?.clientSecret)

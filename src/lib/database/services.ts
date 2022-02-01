@@ -5,7 +5,7 @@ import { generatePassword } from '.';
 import { prisma, PrismaErrorHandler } from './common';
 
 export async function listServices(teamId) {
-	return await prisma.service.findMany({ where: { teams: { every: { id: teamId } } } });
+	return await prisma.service.findMany({ where: { teams: { some: { id: teamId } } } });
 }
 
 export async function newService({ name, teamId }) {
@@ -14,7 +14,7 @@ export async function newService({ name, teamId }) {
 
 export async function getService({ id, teamId }) {
 	const body = await prisma.service.findFirst({
-		where: { id, teams: { every: { id: teamId } } },
+		where: { id, teams: { some: { id: teamId } } },
 		include: {
 			destinationDocker: true,
 			plausibleAnalytics: true,
