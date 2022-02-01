@@ -102,7 +102,7 @@
 				let reachable = false;
 				let tries = 0;
 				do {
-					await asyncSleep(1000);
+					await asyncSleep(4000);
 					try {
 						await get(`/undead.json`);
 						reachable = true;
