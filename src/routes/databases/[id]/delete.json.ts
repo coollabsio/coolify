@@ -1,7 +1,6 @@
-import { asyncExecShell, getEngine, getUserDetails } from '$lib/common';
+import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { PrismaErrorHandler, stopDatabase } from '$lib/database';
-import { dockerInstance } from '$lib/docker';
 import { deleteProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
@@ -11,15 +10,11 @@ export const del: RequestHandler<Locals> = async (event) => {
 	const { id } = event.params;
 	try {
 		const database = await db.getDatabase({ id, teamId });
-		const everStarted = await stopDatabase(database);
+		if (database.destinationDockerId) {
+			const everStarted = await stopDatabase(database);
+			if (everStarted) await deleteProxy({ id });
+		}
 		await db.removeDatabase({ id });
-		if (everStarted) await deleteProxy({ id });
-		// const database = await db.getDatabase({ id, teamId });
-		// if (database.destinationDockerId) {
-		// 	const everStarted = await stopDatabase(database);
-		// 	if (everStarted) await deleteProxy({ id });
-		// }
-		// await db.removeDatabase({ id });
 		return { status: 200 };
 	} catch (error) {
 		return PrismaErrorHandler(error);
