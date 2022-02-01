@@ -105,19 +105,6 @@ export const post: RequestHandler<Locals> = async (event) => {
           </profiles>
       </yandex>`;
 
-		const clickhouseConfigs = [
-			{
-				source: 'plausible-clickhouse-user-config.xml',
-				target: '/etc/clickhouse-server/users.d/logging.xml'
-			},
-			{
-				source: 'plausible-clickhouse-config.xml',
-				target: '/etc/clickhouse-server/config.d/logging.xml'
-			},
-			{ source: 'plausible-init.query', target: '/docker-entrypoint-initdb.d/init.query' },
-			{ source: 'plausible-init-db.sh', target: '/docker-entrypoint-initdb.d/init-db.sh' }
-		];
-
 		const initQuery = 'CREATE DATABASE IF NOT EXISTS plausible;';
 		const initScript = 'clickhouse client --queries-file /docker-entrypoint-initdb.d/init.query';
 		await fs.writeFile(`${workdir}/clickhouse-config.xml`, clickhouseConfigXml);
@@ -151,9 +138,14 @@ export const post: RequestHandler<Locals> = async (event) => {
 					image: config.clickhouse.image,
 					networks: [network],
 					environment: config.clickhouse.environmentVariables,
-					volumes: [config.clickhouse.volume],
-					restart: 'always',
-					configs: [...clickhouseConfigs]
+					volumes: [
+						config.clickhouse.volume,
+						`${workdir}/clickhouse-user-config.xml:/etc/clickhouse-server/users.d/logging.xml`,
+						`${workdir}/clickhouse-config.xml:/etc/clickhouse-server/config.d/logging.xml`,
+						`${workdir}/init.query:/docker-entrypoint-initdb.d/init.query`,
+						`${workdir}/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh`
+					],
+					restart: 'always'
 				}
 			},
 			networks: {
@@ -167,20 +159,6 @@ export const post: RequestHandler<Locals> = async (event) => {
 				},
 				[config.clickhouse.volume.split(':')[0]]: {
 					external: true
-				}
-			},
-			configs: {
-				'plausible-clickhouse-user-config.xml': {
-					file: `${workdir}/clickhouse-user-config.xml`
-				},
-				'plausible-clickhouse-config.xml': {
-					file: `${workdir}/clickhouse-config.xml`
-				},
-				'plausible-init.query': {
-					file: `${workdir}/init.query`
-				},
-				'plausible-init-db.sh': {
-					file: `${workdir}/init-db.sh`
 				}
 			}
 		};

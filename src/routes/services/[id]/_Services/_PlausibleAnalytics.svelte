@@ -88,7 +88,7 @@
 		/>
 	</div>
 </div>
-<div class="grid grid-cols-3 items-center">
+<!-- <div class="grid grid-cols-3 items-center">
 	<label for="postgresqlPublicPort">Public Port</label>
 	<div class="col-span-2 ">
 		<CopyPasswordField
@@ -100,4 +100,4 @@
 			value={service.plausibleAnalytics.postgresqlPublicPort}
 		/>
 	</div>
-</div>
+</div> -->

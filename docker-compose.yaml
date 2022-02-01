@@ -19,6 +19,7 @@ services:
       - '.env'
     networks:
       - coolify-infra
+    depends_on: ['redis']
   redis:
     image: bitnami/redis:6.2
     restart: always
