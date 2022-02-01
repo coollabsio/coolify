@@ -26,6 +26,7 @@
 	import BuildLog from './_BuildLog.svelte';
 	import { get } from '$lib/api';
 	import { errorNotification } from '$lib/form';
+	import { goto } from '$app/navigation';
 
 	export let builds;
 	export let application;
@@ -80,6 +81,10 @@
 			noMoreBuilds = true;
 		}
 	}
+	async function loadBuild(build) {
+		buildId = build;
+		goto(`/applications/${id}/logs/build?buildId=${buildId}`);
+	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -94,7 +99,7 @@
 				data-tooltip={new Intl.DateTimeFormat('default', dateOptions).format(
 					new Date(build.createdAt)
 				) + `\n${build.status}`}
-				on:click={() => (buildId = build.id)}
+				on:click={() => loadBuild(build.id)}
 				class="tooltip-top flex cursor-pointer items-center justify-center rounded-r border-l-2 border-transparent py-4 no-underline transition-all duration-100 hover:bg-coolgray-400 hover:shadow-xl"
 				class:bg-coolgray-400={buildId === build.id}
 				class:border-red-500={build.status === 'failed'}
