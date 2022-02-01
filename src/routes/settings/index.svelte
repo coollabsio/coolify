@@ -29,6 +29,7 @@
 	import { del, post } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { browser } from '$app/env';
+	import { getDomain } from '$lib/components/common';
 
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
 	let fqdn = settings.fqdn;
@@ -137,7 +138,7 @@
 			</div>
 			<Explainer
 				text={`Credentials for <a class="text-white" href=${
-					settings.fqdn ? settings.fqnd : browser && 'http://' + window.location.hostname + ':8404'
+					fqdn ? getDomain(fqdn) : browser && 'http://' + window.location.hostname + ':8404'
 				} target="_blank">stats</a> page.`}
 			/>
 

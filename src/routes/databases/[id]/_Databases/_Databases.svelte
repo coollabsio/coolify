@@ -14,6 +14,7 @@
 	import CouchDb from './_CouchDb.svelte';
 	import { browser } from '$app/env';
 	import { post } from '$lib/api';
+	import { getDomain } from '$lib/components/common';
 
 	const { id } = $page.params;
 	let loading = false;
@@ -34,7 +35,11 @@
 	function generateUrl() {
 		return browser
 			? `${database.type}://${databaseDbUser}:${databaseDbUserPassword}@${
-					isPublic ? (settings.fqdn ? settings.fqdn : window.location.hostname) : database.id
+					isPublic
+						? settings.fqdn
+							? getDomain(settings.fqdn)
+							: window.location.hostname
+						: database.id
 			  }:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`
 			: 'Loading...';
 	}
