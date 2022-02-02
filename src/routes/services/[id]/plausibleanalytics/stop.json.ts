@@ -1,9 +1,9 @@
-import { getUserDetails } from '$lib/common';
+import { getUserDetails, removeDestinationDocker } from '$lib/common';
 import { getDomain } from '$lib/components/common';
 import * as db from '$lib/database';
 import { PrismaErrorHandler } from '$lib/database';
 import { dockerInstance } from '$lib/docker';
-import { configureSimpleServiceProxyOff } from '$lib/haproxy';
+import { checkContainer, configureSimpleServiceProxyOff } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler<Locals> = async (event) => {
@@ -18,30 +18,20 @@ export const post: RequestHandler<Locals> = async (event) => {
 		const domain = getDomain(fqdn);
 
 		if (destinationDockerId) {
-			const docker = dockerInstance({ destinationDocker });
-			const container = docker.engine.getContainer(id);
-			const postgresqlContainer = docker.engine.getContainer(`${id}-postgresql`);
-			const clickhouseContainer = docker.engine.getContainer(`${id}-clickhouse`);
+			const engine = destinationDocker.engine;
+
 			try {
-				if (container) {
-					await container.stop();
-					await container.remove();
+				let found = await checkContainer(engine, id);
+				if (found) {
+					await removeDestinationDocker({ id, engine });
 				}
-			} catch (error) {
-				console.error(error);
-			}
-			try {
-				if (postgresqlContainer) {
-					await postgresqlContainer.stop();
-					await postgresqlContainer.remove();
+				found = await checkContainer(engine, `${id}-postgresql`);
+				if (found) {
+					await removeDestinationDocker({ id: `${id}-postgresql`, engine });
 				}
-			} catch (error) {
-				console.error(error);
-			}
-			try {
-				if (postgresqlContainer) {
-					await clickhouseContainer.stop();
-					await clickhouseContainer.remove();
+				found = await checkContainer(engine, `${id}-clickhouse`);
+				if (found) {
+					await removeDestinationDocker({ id: `${id}-clickhouse`, engine });
 				}
 			} catch (error) {
 				console.error(error);

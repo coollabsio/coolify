@@ -1,9 +1,9 @@
-import { getUserDetails } from '$lib/common';
+import { getEngine, getUserDetails, removeDestinationDocker } from '$lib/common';
 import { getDomain } from '$lib/components/common';
 import * as db from '$lib/database';
 import { PrismaErrorHandler } from '$lib/database';
 import { dockerInstance } from '$lib/docker';
-import { configureSimpleServiceProxyOff, stopTcpHttpProxy } from '$lib/haproxy';
+import { checkContainer, configureSimpleServiceProxyOff, stopTcpHttpProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler<Locals> = async (event) => {
@@ -23,13 +23,12 @@ export const post: RequestHandler<Locals> = async (event) => {
 		await db.updateMinioService({ id, publicPort: null });
 		const domain = getDomain(fqdn);
 		if (destinationDockerId) {
-			const docker = dockerInstance({ destinationDocker });
-			const container = docker.engine.getContainer(id);
+			const engine = destinationDocker.engine;
 
 			try {
-				if (container) {
-					await container.stop();
-					await container.remove();
+				const found = await checkContainer(engine, id);
+				if (found) {
+					await removeDestinationDocker({ id, engine });
 				}
 			} catch (error) {
 				console.error(error);

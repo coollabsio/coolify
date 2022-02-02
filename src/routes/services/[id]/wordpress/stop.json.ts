@@ -1,9 +1,9 @@
-import { getUserDetails } from '$lib/common';
+import { getUserDetails, removeDestinationDocker } from '$lib/common';
 import { getDomain } from '$lib/components/common';
 import * as db from '$lib/database';
 import { PrismaErrorHandler } from '$lib/database';
 import { dockerInstance } from '$lib/docker';
-import { configureSimpleServiceProxyOff } from '$lib/haproxy';
+import { checkContainer, configureSimpleServiceProxyOff } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler<Locals> = async (event) => {
@@ -17,27 +17,19 @@ export const post: RequestHandler<Locals> = async (event) => {
 		const { destinationDockerId, destinationDocker, fqdn } = service;
 		const domain = getDomain(fqdn);
 		if (destinationDockerId) {
-			const docker = dockerInstance({ destinationDocker });
-			const wordpress = docker.engine.getContainer(id);
-			const mysql = docker.engine.getContainer(`${id}-mysql`);
-
+			const engine = destinationDocker.engine;
 			try {
-				if (wordpress) {
-					await wordpress.stop();
-					await wordpress.remove();
+				let found = await checkContainer(engine, id);
+				if (found) {
+					await removeDestinationDocker({ id, engine });
+				}
+				found = await checkContainer(engine, `${id}-mysql`);
+				if (found) {
+					await removeDestinationDocker({ id: `${id}-mysql`, engine });
 				}
 			} catch (error) {
 				console.error(error);
 			}
-			try {
-				if (mysql) {
-					await mysql.stop();
-					await mysql.remove();
-				}
-			} catch (error) {
-				console.error(error);
-			}
-
 			await configureSimpleServiceProxyOff({ domain });
 		}
 
