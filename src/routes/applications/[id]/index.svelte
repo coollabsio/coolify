@@ -270,7 +270,7 @@
 						required
 					/>
 					<Explainer
-						text="If you specify <span class='text-green-600'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>To modify the domain, you must first stop the application."
+						text="If you specify <span class='text-green-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>To modify the domain, you must first stop the application."
 					/>
 				</div>
 			</div>
@@ -355,7 +355,7 @@
 							placeholder=" default: /"
 						/>
 						<Explainer
-							text="Directory containing all the assets for deployment. <br> For example: <span class='text-green-600'>dist</span>,<span class='text-green-600'>_site</span> or <span class='text-green-600'>public</span>."
+							text="Directory containing all the assets for deployment. <br> For example: <span class='text-green-600 font-bold'>dist</span>,<span class='text-green-600 font-bold'>_site</span> or <span class='text-green-600 font-bold'>public</span>."
 						/>
 					</div>
 				</div>

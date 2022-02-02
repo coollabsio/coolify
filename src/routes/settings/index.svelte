@@ -118,7 +118,7 @@
 							required
 						/>
 						<Explainer
-							text="Set the fully qualified domain name for your Coolify instance. <br>If you specify <span class='text-green-600'>https</span>, it will be accessible only over https. <br>SSL certificate will be generated for you."
+							text="Set the fully qualified domain name for your Coolify instance. <br>If you specify <span class='text-green-600 font-bold'>https</span>, it will be accessible only over https. <br>SSL certificate will be generated for you."
 						/>
 					</div>
 				</div>
@@ -137,7 +137,7 @@
 				<div class="mr-4 text-xl tracking-tight">HAProxy Settings</div>
 			</div>
 			<Explainer
-				text={`Credentials for <a class="text-white" href=${
+				text={`Credentials for <a class="text-white font-bold" href=${
 					fqdn ? getDomain(fqdn) : browser && 'http://' + window.location.hostname + ':8404'
 				} target="_blank">stats</a> page.`}
 			/>

@@ -110,7 +110,7 @@
 						required
 					/>
 					<Explainer
-						text="If you specify <span class='text-green-600'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you."
+						text="If you specify <span class='text-green-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you."
 					/>
 				</div>
 				<!-- {:else}
