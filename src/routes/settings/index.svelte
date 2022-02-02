@@ -138,7 +138,9 @@
 			</div>
 			<Explainer
 				text={`Credentials for <a class="text-white font-bold" href=${
-					fqdn ? fqdn + ':8404' : browser && 'http://' + window.location.hostname + ':8404'
+					fqdn
+						? 'http://' + getDomain(fqdn) + ':8404'
+						: browser && 'http://' + window.location.hostname + ':8404'
 				} target="_blank">stats</a> page.`}
 			/>
 
