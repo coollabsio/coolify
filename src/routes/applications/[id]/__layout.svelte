@@ -93,10 +93,13 @@
 	}
 	async function stopApplication() {
 		try {
+			loading = true;
 			await post(`/applications/${id}/stop.json`, {});
 			return window.location.reload();
 		} catch ({ error }) {
 			return errorNotification(error);
+		} finally {
+			loading = false;
 		}
 	}
 </script>
