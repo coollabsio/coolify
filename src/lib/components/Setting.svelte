@@ -10,7 +10,7 @@
 </script>
 
 <li class="flex items-center py-4">
-	<div class="flex flex-col" class:px-4={isPadding} class:pr-32={!isPadding}>
+	<div class="flex w-96 flex-col" class:px-4={isPadding} class:pr-32={!isPadding}>
 		<p class="text-base font-bold text-stone-100">{title}</p>
 		<Explainer text={description} />
 	</div>
