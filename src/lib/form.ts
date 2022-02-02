@@ -1,10 +1,10 @@
 import { toast } from '@zerodevx/svelte-toast';
-export function errorNotification(message) {
+export function errorNotification(message: string) {
 	console.error(message);
-	if (typeof message.error !== 'string') {
+	if (typeof message !== 'string') {
 		toast.push('Ooops, something is not okay, are you okay?');
 	} else {
-		toast.push(message.error || message);
+		toast.push(message);
 	}
 }
 export function enhance(

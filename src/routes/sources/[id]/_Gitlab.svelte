@@ -45,7 +45,7 @@
 		if (payload.oauthId) {
 			try {
 				await post(`/sources/${id}/check.json`, { oauthId: payload.oauthId });
-			} catch (error) {
+			} catch ({ error }) {
 				payload.oauthId = null;
 				oauthIdEl.focus();
 				return errorNotification(error);
@@ -73,7 +73,7 @@
 		try {
 			await post(`/sources/${id}.json`, { ...payload });
 			return window.location.reload();
-		} catch (error) {
+		} catch ({ error }) {
 			return errorNotification(error);
 		} finally {
 			loading = false;
