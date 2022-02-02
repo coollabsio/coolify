@@ -46,6 +46,8 @@
 			try {
 				await post(`/sources/${id}/check.json`, { oauthId: payload.oauthId });
 			} catch (error) {
+				payload.oauthId = null;
+				oauthIdEl.focus();
 				return errorNotification(error);
 			}
 		}
@@ -138,6 +140,7 @@
 						bind:this={oauthIdEl}
 						name="oauthId"
 						id="oauthId"
+						type="number"
 						required
 						bind:value={payload.oauthId}
 					/>

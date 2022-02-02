@@ -8,7 +8,12 @@ export const post: RequestHandler<Locals> = async (event) => {
 	if (status === 401) return { status, body };
 	try {
 		const { oauthId } = await event.request.json();
-		await db.prisma.gitlabApp.findFirst({ where: { oauthId: Number(oauthId) } });
+		const found = await db.prisma.gitlabApp.findFirst({ where: { oauthId: Number(oauthId) } });
+		if (found) {
+			throw {
+				message: `GitLab App is already configured.`
+			};
+		}
 		return { status: 200 };
 	} catch (error) {
 		return PrismaErrorHandler(error);
