@@ -1,4 +1,4 @@
-import { asyncExecShell, getEngine, getUserDetails } from '$lib/common';
+import { asyncExecShell, getDomain, getEngine, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
@@ -17,7 +17,7 @@ export const post: RequestHandler<Locals> = async (event) => {
 		return {
 			status: found ? 500 : 200,
 			body: {
-				error: found && `Domain ${fqdn} is already configured`
+				error: found && `Domain ${getDomain(fqdn)} is already configured`
 			}
 		};
 	} catch (error) {

@@ -42,26 +42,62 @@
 	export let readOnly;
 </script>
 
-<div class="flex items-center space-x-1 p-6 text-2xl font-bold">
-	<div class="md:max-w-64 hidden truncate tracking-tight md:block">
+<div
+	class="flex items-center space-x-1 px-6 text-2xl font-bold"
+	class:p-5={service.fqdn}
+	class:p-6={!service.fqdn}
+>
+	<div class="md:max-w-64 hidden truncate tracking-tight lg:block">
 		{service.name}
 	</div>
 	{#if service.fqdn}
-		<span class="arrow-right-applications hidden px-1 md:block">></span>
-		<a href={service.fqdn} target="_blank" class="pr-2">{getDomain(service.fqdn)}</a>
+		<span class="arrow-right-applications hidden pl-4 pr-1 lg:block">></span>
+		<span class="pr-3"
+			><a
+				href={service.fqdn}
+				target="_blank"
+				class="icons tooltip-bottom flex items-center bg-transparent text-sm"
+				><svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-6 w-6"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
+					<line x1="10" y1="14" x2="20" y2="4" />
+					<polyline points="15 4 20 4 20 9" />
+				</svg></a
+			></span
+		>
 	{/if}
-	<span class="arrow-right-applications hidden px-1 md:block">></span>
-	{#if service.type === 'plausibleanalytics'}
-		<PlausibleAnalytics />
-	{:else if service.type === 'nocodb'}
-		<NocoDb />
-	{:else if service.type === 'minio'}
-		<MinIo />
-	{:else if service.type === 'vscodeserver'}
-		<VsCodeServer />
-	{:else if service.type === 'wordpress'}
-		<Wordpress />
-	{/if}
+	<div>
+		{#if service.type === 'plausibleanalytics'}
+			<a href="https://plausible.io" target="_blank">
+				<PlausibleAnalytics />
+			</a>
+		{:else if service.type === 'nocodb'}
+			<a href="https://nocodb.com" target="_blank">
+				<NocoDb />
+			</a>
+		{:else if service.type === 'minio'}
+			<a href="https://min.io" target="_blank">
+				<MinIo />
+			</a>
+		{:else if service.type === 'vscodeserver'}
+			<a href="https://coder.com" target="_blank">
+				<VsCodeServer />
+			</a>
+		{:else if service.type === 'wordpress'}
+			<a href="https://wordpress.org" target="_blank">
+				<Wordpress />
+			</a>
+		{/if}
+	</div>
 </div>
 
 <Services bind:service {isRunning} {readOnly} />

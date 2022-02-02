@@ -167,7 +167,7 @@
 	});
 </script>
 
-<div class="p-6font-bold flex space-x-1">
+<div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">Configure Build Pack</div>
 </div>
 

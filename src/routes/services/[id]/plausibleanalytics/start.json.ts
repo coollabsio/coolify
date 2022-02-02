@@ -105,25 +105,21 @@ export const post: RequestHandler<Locals> = async (event) => {
           </profiles>
       </yandex>`;
 
-		const clickhouseConfigs = [
-			{
-				source: 'plausible-clickhouse-user-config.xml',
-				target: '/etc/clickhouse-server/users.d/logging.xml'
-			},
-			{
-				source: 'plausible-clickhouse-config.xml',
-				target: '/etc/clickhouse-server/config.d/logging.xml'
-			},
-			{ source: 'plausible-init.query', target: '/docker-entrypoint-initdb.d/init.query' },
-			{ source: 'plausible-init-db.sh', target: '/docker-entrypoint-initdb.d/init-db.sh' }
-		];
-
 		const initQuery = 'CREATE DATABASE IF NOT EXISTS plausible;';
 		const initScript = 'clickhouse client --queries-file /docker-entrypoint-initdb.d/init.query';
 		await fs.writeFile(`${workdir}/clickhouse-config.xml`, clickhouseConfigXml);
 		await fs.writeFile(`${workdir}/clickhouse-user-config.xml`, clickhouseUserConfigXml);
 		await fs.writeFile(`${workdir}/init.query`, initQuery);
 		await fs.writeFile(`${workdir}/init-db.sh`, initScript);
+
+		const Dockerfile = `
+FROM ${config.clickhouse.image}
+COPY ./clickhouse-config.xml /etc/clickhouse-server/users.d/logging.xml
+COPY ./clickhouse-user-config.xml /etc/clickhouse-server/config.d/logging.xml
+COPY ./init.query /docker-entrypoint-initdb.d/init.query
+COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
+
+		await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile);
 		const composeFile = {
 			version: '3.8',
 			services: {
@@ -147,13 +143,12 @@ export const post: RequestHandler<Locals> = async (event) => {
 					restart: 'always'
 				},
 				[`${id}-clickhouse`]: {
+					build: workdir,
 					container_name: `${id}-clickhouse`,
-					image: config.clickhouse.image,
 					networks: [network],
 					environment: config.clickhouse.environmentVariables,
 					volumes: [config.clickhouse.volume],
-					restart: 'always',
-					configs: [...clickhouseConfigs]
+					restart: 'always'
 				}
 			},
 			networks: {
@@ -167,20 +162,6 @@ export const post: RequestHandler<Locals> = async (event) => {
 				},
 				[config.clickhouse.volume.split(':')[0]]: {
 					external: true
-				}
-			},
-			configs: {
-				'plausible-clickhouse-user-config.xml': {
-					file: `${workdir}/clickhouse-user-config.xml`
-				},
-				'plausible-clickhouse-config.xml': {
-					file: `${workdir}/clickhouse-config.xml`
-				},
-				'plausible-init.query': {
-					file: `${workdir}/init.query`
-				},
-				'plausible-init-db.sh': {
-					file: `${workdir}/init-db.sh`
 				}
 			}
 		};
@@ -196,21 +177,18 @@ export const post: RequestHandler<Locals> = async (event) => {
 		} catch (error) {
 			console.log(error);
 		}
-		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
-			await configureSimpleServiceProxyOn({ id, domain, port: 8000 });
+		await asyncExecShell(
+			`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up --build -d`
+		);
+		await configureSimpleServiceProxyOn({ id, domain, port: 8000 });
 
-			if (isHttps) {
-				await letsEncrypt({ domain, id });
-			}
-			await reloadHaproxy(destinationDocker.engine);
-			return {
-				status: 200
-			};
-		} catch (error) {
-			console.log(error);
-			return PrismaErrorHandler(error);
+		if (isHttps) {
+			await letsEncrypt({ domain, id });
 		}
+		await reloadHaproxy(destinationDocker.engine);
+		return {
+			status: 200
+		};
 	} catch (error) {
 		return PrismaErrorHandler(error);
 	}

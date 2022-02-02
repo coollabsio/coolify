@@ -8,6 +8,7 @@
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
+	import { toast } from '@zerodevx/svelte-toast';
 	import MinIo from './_MinIO.svelte';
 	import PlausibleAnalytics from './_PlausibleAnalytics.svelte';
 	import VsCodeServer from './_VSCodeServer.svelte';
@@ -19,18 +20,22 @@
 	let loadingVerification = false;
 
 	async function handleSubmit() {
+		loading = true;
 		try {
 			await post(`/services/${id}/check.json`, { fqdn: service.fqdn });
 			await post(`/services/${id}/${service.type}.json`, { ...service });
 			return window.location.reload();
 		} catch ({ error }) {
 			return errorNotification(error);
+		} finally {
+			loading = false;
 		}
 	}
 	async function setEmailsToVerified() {
 		loadingVerification = true;
 		try {
 			await post(`/services/${id}/${service.type}/activate.json`, { id: service.id });
+			toast.push('All email verified. You can login now.');
 		} catch ({ error }) {
 			return errorNotification(error);
 		} finally {
