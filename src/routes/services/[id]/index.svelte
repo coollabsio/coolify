@@ -43,7 +43,7 @@
 </script>
 
 <div
-	class="flex items-center space-x-1 px-6 text-2xl font-bold"
+	class="flex items-center space-x-3 px-6 text-2xl font-bold"
 	class:p-5={service.fqdn}
 	class:p-6={!service.fqdn}
 >
@@ -51,30 +51,28 @@
 		{service.name}
 	</div>
 	{#if service.fqdn}
-		<span class="arrow-right-applications hidden pl-4 pr-1 lg:block">></span>
-		<span class="pr-3"
-			><a
-				href={service.fqdn}
-				target="_blank"
-				class="icons tooltip-bottom flex items-center bg-transparent text-sm"
-				><svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="h-6 w-6"
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
-					<line x1="10" y1="14" x2="20" y2="4" />
-					<polyline points="15 4 20 4 20 9" />
-				</svg></a
-			></span
+		<a
+			href={service.fqdn}
+			target="_blank"
+			class="icons tooltip-bottom flex items-center bg-transparent text-sm"
+			><svg
+				xmlns="http://www.w3.org/2000/svg"
+				class="h-6 w-6"
+				viewBox="0 0 24 24"
+				stroke-width="1.5"
+				stroke="currentColor"
+				fill="none"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+				<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
+				<line x1="10" y1="14" x2="20" y2="4" />
+				<polyline points="15 4 20 4 20 9" />
+			</svg></a
 		>
 	{/if}
+
 	<div>
 		{#if service.type === 'plausibleanalytics'}
 			<a href="https://plausible.io" target="_blank">

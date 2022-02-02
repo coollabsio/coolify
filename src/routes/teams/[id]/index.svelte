@@ -94,9 +94,9 @@
 	}
 </script>
 
-<div class="flex space-x-1 p-5 px-6 text-2xl font-bold">
+<div class="flex space-x-1 p-6 px-6 text-2xl font-bold">
 	<div class="tracking-tight">Team</div>
-	<span class="arrow-right-applications px-1">></span>
+	<span class="arrow-right-applications px-1 text-cyan-500">></span>
 	<span class="pr-2">{team.name}</span>
 </div>
 <div class="mx-auto max-w-2xl">
@@ -104,7 +104,7 @@
 		<div class="flex space-x-1 p-6 font-bold">
 			<div class="mr-4 text-xl tracking-tight">Settings</div>
 			<div class="text-center">
-				<button class="bg-green-600 hover:bg-green-500" type="submit">Save</button>
+				<button class="bg-cyan-600 hover:bg-cyan-500" type="submit">Save</button>
 			</div>
 		</div>
 
@@ -183,7 +183,7 @@
 			<div class="flex space-x-1 p-6 font-bold">
 				<div class="mr-4 text-xl tracking-tight">Invite new member</div>
 				<div class="text-center">
-					<button class="bg-green-600 hover:bg-green-500" type="submit">Send invitation</button>
+					<button class="bg-cyan-600 hover:bg-cyan-500" type="submit">Send invitation</button>
 				</div>
 			</div>
 			<div class="flex-col space-y-2 px-4 sm:px-6">

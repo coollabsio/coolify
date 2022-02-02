@@ -34,9 +34,9 @@
 	import Gitlab from './_Gitlab.svelte';
 </script>
 
-<div class="flex space-x-1 p-5 px-6 text-2xl font-bold">
+<div class="flex space-x-1 p-6 px-6 text-2xl font-bold">
 	<div class="tracking-tight">Git Source</div>
-	<span class="arrow-right-applications px-1">></span>
+	<span class="arrow-right-applications px-1 text-orange-500">></span>
 	<span class="pr-2">{source.name}</span>
 </div>
 <div class="flex justify-center space-x-2 px-6 py-3">

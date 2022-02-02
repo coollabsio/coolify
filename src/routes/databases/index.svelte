@@ -58,17 +58,17 @@
 			<a href="/databases/{database.id}" class="no-underline p-2 w-96">
 				<div class="box-selection relative hover:bg-purple-600">
 					{#if database.type === 'clickhouse'}
-						<Clickhouse />
+						<Clickhouse isAbsolute />
 					{:else if database.type === 'couchdb'}
-						<CouchDB />
+						<CouchDB isAbsolute />
 					{:else if database.type === 'mongodb'}
-						<MongoDB />
+						<MongoDB isAbsolute />
 					{:else if database.type === 'mysql'}
-						<MySQL />
+						<MySQL isAbsolute />
 					{:else if database.type === 'postgresql'}
-						<PostgreSQL />
+						<PostgreSQL isAbsolute />
 					{:else if database.type === 'redis'}
-						<Redis />
+						<Redis isAbsolute />
 					{/if}
 					<div class="font-bold text-xl text-center truncate">
 						{database.name}

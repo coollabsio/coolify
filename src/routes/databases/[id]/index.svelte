@@ -43,11 +43,10 @@
 	export let privatePort;
 </script>
 
-<div class="flex items-center space-x-1 p-6 text-2xl font-bold">
+<div class="flex items-center space-x-2 p-6 text-2xl font-bold">
 	<div class="md:max-w-64 hidden truncate tracking-tight md:block">
 		{database.name}
 	</div>
-	<span class="arrow-right-applications hidden px-1 pr-5 md:block">></span>
 	<span class="relative">
 		{#if database.type === 'clickhouse'}
 			<Clickhouse />

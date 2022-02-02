@@ -56,7 +56,7 @@
 					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
 				>
 			{/if}
-			{#if service.type === 'plausibleanalytics'}
+			{#if service.type === 'plausibleanalytics' && isRunning}
 				<button
 					on:click|preventDefault={setEmailsToVerified}
 					class:bg-pink-600={!loadingVerification}
@@ -68,7 +68,7 @@
 		</div>
 
 		<div class="grid grid-flow-row gap-2 px-10">
-			<div class="grid grid-cols-3 items-center">
+			<div class="mt-2 grid grid-cols-3 items-center">
 				<label for="name">Name</label>
 				<div class="col-span-2 ">
 					<input

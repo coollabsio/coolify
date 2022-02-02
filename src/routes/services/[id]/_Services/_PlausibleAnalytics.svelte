@@ -9,7 +9,7 @@
 </div>
 <div class="grid grid-cols-3 items-center">
 	<label for="email">Email Address</label>
-	<div class="col-span-2 ">
+	<div class="col-span-2">
 		<input
 			name="email"
 			id="email"
@@ -23,8 +23,8 @@
 </div>
 <div class="grid grid-cols-3 items-center">
 	<label for="username">Username</label>
-	<div class="col-span-2 ">
-		<input
+	<div class="col-span-2">
+		<CopyPasswordField
 			name="username"
 			id="username"
 			disabled={readOnly}
@@ -54,7 +54,7 @@
 <div class="grid grid-cols-3 items-center">
 	<label for="postgresqlUser">Username</label>
 	<div class="col-span-2 ">
-		<input
+		<CopyPasswordField
 			name="postgresqlUser"
 			id="postgresqlUser"
 			value={service.plausibleAnalytics.postgresqlUser}
@@ -79,7 +79,7 @@
 <div class="grid grid-cols-3 items-center">
 	<label for="postgresqlDatabase">Database</label>
 	<div class="col-span-2 ">
-		<input
+		<CopyPasswordField
 			name="postgresqlDatabase"
 			id="postgresqlDatabase"
 			value={service.plausibleAnalytics.postgresqlDatabase}

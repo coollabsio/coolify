@@ -26,7 +26,7 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Applications</div>
+	<div class="mr-4 text-2xl ">Applications</div>
 	{#if $session.isAdmin}
 		<a href="/new/application" class="add-icon bg-green-600 hover:bg-green-500">
 			<svg

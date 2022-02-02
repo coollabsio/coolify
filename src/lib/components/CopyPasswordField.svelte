@@ -9,7 +9,7 @@
 	export let readonly = false;
 	export let textarea = false;
 	export let required = false;
-	export let pattern = '';
+	export let pattern = null;
 	export let id;
 	export let name;
 	export let placeholder = '';
