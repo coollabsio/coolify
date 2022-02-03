@@ -54,7 +54,7 @@ export const post: RequestHandler<Locals> = async (event) => {
 		try {
 			if (!dev) {
 				await asyncExecShell(
-					`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:latest /bin/sh -c "env | grep COOLIFY > .env && docker compose up -d --force-recreate"`
+					`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:latest /bin/sh -c "env | grep COOLIFY > .env && docker stop -t 0 coolify && docker stop -t 0 coolify-redis && docker compose up -d --force-recreate"`
 				);
 				return {
 					status: 200,
