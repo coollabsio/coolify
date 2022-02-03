@@ -11,7 +11,7 @@ services:
         protocol: tcp
         mode: host
     volumes:
-      - 'coolify-db-sqlite:/app/db'
+      - 'coolify-db:/app/db'
       - 'coolify-ssl-certs:/app/ssl'
       - 'coolify-letsencrypt:/etc/letsencrypt'
       - '/var/run/docker.sock:/var/run/docker.sock'
@@ -35,9 +35,9 @@ networks:
     name: coolify-infra
 
 volumes:
-  coolify-db-sqlite:
-    external: true
+  coolify-db:
+    name: coolify-db
   coolify-ssl-certs:
-    external: true
+    name: coolify-ssl-certs
   coolify-letsencrypt:
-    external: true
+    name: coolify-letsencrypt

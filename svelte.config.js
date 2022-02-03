@@ -4,7 +4,6 @@ import adapter from '@sveltejs/adapter-node';
 const config = {
 	preprocess: preprocess(),
 	kit: {
-		target: '#svelte',
 		adapter: adapter(),
 		prerender: {
 			enabled: false
