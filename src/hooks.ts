@@ -5,6 +5,7 @@ import { handleSession } from 'svelte-kit-cookie-session';
 import { getUserDetails, isTeamIdTokenAvailable, sentry } from '$lib/common';
 import { version } from '$lib/common';
 import cookie from 'cookie';
+import { dev } from '$app/env';
 
 // EDGE case: Same COOLIFY_SECRET_KEY, but different database. Permission not found.
 export const handle = handleSession(
@@ -73,5 +74,5 @@ export const getSession: GetSession<Locals> = function (request) {
 };
 
 export async function handleError({ error, event }) {
-	sentry.captureException(error, { event });
+	if (!dev) sentry.captureException(error, { event });
 }
