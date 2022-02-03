@@ -274,7 +274,7 @@ export async function deleteProxy({ id }) {
 // }
 export async function reloadHaproxy(engine) {
 	const host = getEngine(engine);
-	return await asyncExecShell(`DOCKER_HOST=${host} docker exec coolify-haproxy kill -SIGUSR2 1`);
+	return await asyncExecShell(`DOCKER_HOST=${host} docker exec coolify-haproxy kill -HUP 1`);
 }
 export async function configureProxyForApplication({ domain, imageId, applicationId, port }) {
 	const haproxy = await haproxyInstance();
@@ -425,6 +425,11 @@ export async function configureCoolifyProxyOn({ domain }) {
 				transaction_id: transactionId
 			},
 			json: {
+				adv_check: 'httpchk',
+				httpchk_params: {
+					method: 'GET',
+					uri: '/undead.json'
+				},
 				'init-addr': 'last,libc,none',
 				forwardfor: { enabled: 'enabled' },
 				name: domain

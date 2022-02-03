@@ -62,17 +62,17 @@
 			<form on:submit|preventDefault={() => handleSubmit(type.name)}>
 				<button type="submit" class="box-selection relative text-xl font-bold hover:bg-purple-700">
 					{#if type.name === 'clickhouse'}
-						<Clickhouse />
+						<Clickhouse isAbsolute />
 					{:else if type.name === 'couchdb'}
-						<CouchDB />
+						<CouchDB isAbsolute />
 					{:else if type.name === 'mongodb'}
-						<MongoDB />
+						<MongoDB isAbsolute />
 					{:else if type.name === 'mysql'}
-						<MySQL />
+						<MySQL isAbsolute />
 					{:else if type.name === 'postgresql'}
-						<PostgreSQL />
+						<PostgreSQL isAbsolute />
 					{:else if type.name === 'redis'}
-						<Redis />
+						<Redis isAbsolute />
 					{/if}{type.fancyName}
 				</button>
 			</form>

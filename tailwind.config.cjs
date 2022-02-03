@@ -15,7 +15,7 @@ module.exports = {
 				wiggle: 'wiggle 0.5s ease-in-out infinite'
 			},
 			fontFamily: {
-				sans: ['Inter', ...defaultTheme.fontFamily.sans]
+				sans: ['Poppins', ...defaultTheme.fontFamily.sans]
 			},
 			colors: {
 				...colors,

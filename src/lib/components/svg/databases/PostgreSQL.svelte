@@ -3,7 +3,7 @@
 </script>
 
 <svg
-	class={isAbsolute ? 'absolute top-0 left-0 -m-5 h-10 w-10' : 'w-4 mx-auto'}
+	class={isAbsolute ? 'absolute top-0 left-0 -m-5 h-10 w-10' : 'mx-auto w-8 h-8'}
 	xmlns="http://www.w3.org/2000/svg"
 	viewBox="0 0 432.071 445.383"
 	xml:space="preserve"

@@ -49,10 +49,11 @@ export default async function () {
 			const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy');
 			if (!found) await startCoolifyProxy('/var/run/docker.sock');
 			await configureCoolifyProxyOn({ domain });
-			await reloadHaproxy('/var/run/docker.sock');
 		}
 	} catch (error) {
 		console.log(error);
 		throw error;
+	} finally {
+		// await reloadHaproxy('/var/run/docker.sock');
 	}
 }

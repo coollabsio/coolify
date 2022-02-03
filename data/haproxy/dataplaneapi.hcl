@@ -23,7 +23,7 @@ haproxy {
 
   reload {
     reload_delay = 2
-    reload_cmd   = "kill -SIGUSR2 1"
+    reload_cmd   = "kill -HUP 1"
     restart_cmd  = "kill -SIGUSR2 1"
   }
 }
