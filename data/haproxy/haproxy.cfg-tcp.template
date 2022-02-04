@@ -4,10 +4,6 @@ global
 defaults 
   mode tcp
   log global
-  timeout http-request 60s
-  timeout connect 10s
-  timeout client 60s
-  timeout server 60s
 
 frontend "${APP}"
   mode tcp
