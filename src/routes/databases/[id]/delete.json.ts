@@ -12,11 +12,13 @@ export const del: RequestHandler<Locals> = async (event) => {
 		const database = await db.getDatabase({ id, teamId });
 		if (database.destinationDockerId) {
 			const everStarted = await stopDatabase(database);
+			console.log(everStarted);
 			if (everStarted) await deleteProxy({ id });
 		}
 		await db.removeDatabase({ id });
 		return { status: 200 };
 	} catch (error) {
+		console.log(error);
 		return PrismaErrorHandler(error);
 	}
 };

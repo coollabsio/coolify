@@ -131,6 +131,7 @@ export async function stopDatabase(database) {
 			const { stdout } = await asyncExecShell(
 				`DOCKER_HOST=${host} docker inspect --format '{{json .State}}' ${id}`
 			);
+			console.log(stdout);
 			if (stdout) {
 				everStarted = true;
 				await removeContainer(id, engine);
