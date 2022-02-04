@@ -16,6 +16,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 		});
 	}
 	Dockerfile.push(`COPY ./${baseDirectory || ''}package*.json ./`);
+	Dockerfile.push(`COPY ./${baseDirectory || ''}*.lock ./`);
 	Dockerfile.push(`RUN ${installCommand}`);
 	Dockerfile.push(`COPY ./${baseDirectory || ''} ./`);
 	if (buildCommand) {

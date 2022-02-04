@@ -28,6 +28,7 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 	// TODO: If build command defined, install command should be the default yarn install
 	if (installCommand) {
 		Dockerfile.push(`COPY ./${baseDirectory || ''}package*.json ./`);
+		Dockerfile.push(`COPY ./${baseDirectory || ''}*.lock ./`);
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
 	Dockerfile.push(`COPY ./${baseDirectory || ''} ./`);
