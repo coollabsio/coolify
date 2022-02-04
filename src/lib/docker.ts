@@ -28,12 +28,14 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 	// TODO: If build command defined, install command should be the default yarn install
 	if (installCommand) {
 		Dockerfile.push(`COPY ./${baseDirectory || ''}package*.json ./`);
-		fs.stat(`${workdir}/yarn.lock`).then(() => {
+		try {
+			await fs.stat(`${workdir}/yarn.lock`);
 			Dockerfile.push(`COPY ./${baseDirectory || ''}yarn.lock ./`);
-		});
-		fs.stat(`${workdir}/pnpm-lock.yaml`).then(() => {
+		} catch (error) {}
+		try {
+			await fs.stat(`${workdir}/pnpm-lock.yaml`);
 			Dockerfile.push(`COPY ./${baseDirectory || ''}pnpm-lock.yaml ./`);
-		});
+		} catch (error) {}
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
 	Dockerfile.push(`COPY ./${baseDirectory || ''} ./`);
