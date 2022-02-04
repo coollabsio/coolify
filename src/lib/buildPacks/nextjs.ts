@@ -16,7 +16,12 @@ const createDockerfile = async (data, image): Promise<void> => {
 		});
 	}
 	Dockerfile.push(`COPY ./${baseDirectory || ''}package*.json ./`);
-	Dockerfile.push(`COPY ./${baseDirectory || ''}*.lock ./`);
+	if (await fs.stat(`${workdir}/yarn.lock`)) {
+		Dockerfile.push(`COPY ./${baseDirectory || ''}yarn.lock ./`);
+	}
+	if (await fs.stat(`${workdir}/pnpm.lock`)) {
+		Dockerfile.push(`COPY ./${baseDirectory || ''}pnpm.lock ./`);
+	}
 	Dockerfile.push(`RUN ${installCommand}`);
 	Dockerfile.push(`COPY ./${baseDirectory || ''} ./`);
 	if (buildCommand) {
