@@ -31,8 +31,8 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 		fs.stat(`${workdir}/yarn.lock`).then(() => {
 			Dockerfile.push(`COPY ./${baseDirectory || ''}yarn.lock ./`);
 		});
-		fs.stat(`${workdir}/pnpm.lock`).then(() => {
-			Dockerfile.push(`COPY ./${baseDirectory || ''}pnpm.lock ./`);
+		fs.stat(`${workdir}/pnpm-lock.yaml`).then(() => {
+			Dockerfile.push(`COPY ./${baseDirectory || ''}pnpm-lock.yaml ./`);
 		});
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
