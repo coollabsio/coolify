@@ -63,12 +63,13 @@
 	{:else}
 		<div class="relative w-full">
 			<LoadingLogs />
-			<pre
-				class="leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 p-6 whitespace-pre-wrap break-words w-full">
+			<div
+				class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 p-6 whitespace-pre-wrap break-words w-full"
+			>
 				{#each logs as log}
 					{log + '\n'}
 				{/each}
-  			</pre>
+			</div>
 		</div>
 	{/if}
 </div>

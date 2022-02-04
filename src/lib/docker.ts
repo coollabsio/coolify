@@ -74,17 +74,17 @@ export async function buildImage({
 	isCache = false,
 	debug = false
 }) {
-	if (!debug) {
+	if (isCache) {
+		saveBuildLog({ line: `Building cache image started.`, buildId, applicationId });
+	} else {
+		saveBuildLog({ line: `Building image started.`, buildId, applicationId });
+	}
+	if (!debug && isCache) {
 		saveBuildLog({
-			line: `Debug turned off. To see more details, allow it.`,
+			line: `Debug turned off. To see more details, allow it in the configuration.`,
 			buildId,
 			applicationId
 		});
-	}
-	if (isCache) {
-		saveBuildLog({ line: `Building cache image started...`, buildId, applicationId });
-	} else {
-		saveBuildLog({ line: `Building image started...`, buildId, applicationId });
 	}
 
 	const stream = await docker.engine.buildImage(

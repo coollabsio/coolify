@@ -203,8 +203,6 @@ export default async function (job) {
 			await asyncExecShell(`DOCKER_HOST=${host} docker rm ${imageId}`);
 		} catch (error) {
 			//
-		} finally {
-			saveBuildLog({ line: 'Removing old deployments.', buildId, applicationId });
 		}
 		const envs = [];
 		if (secrets.length > 0) {
@@ -242,9 +240,11 @@ export default async function (job) {
 		saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
 
 		if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
+			saveBuildLog({ line: 'Proxy configuration started!', buildId, applicationId });
 			await configureProxyForApplication({ domain, imageId, applicationId, port });
 			if (isHttps) await letsEncrypt({ domain, id: applicationId });
 			await reloadHaproxy(destinationDocker.engine);
+			saveBuildLog({ line: 'Proxy configuration successful!', buildId, applicationId });
 		} else {
 			saveBuildLog({
 				line: 'Coolify Proxy is not configured for this destination. Nothing else to do.',

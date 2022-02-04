@@ -64,11 +64,12 @@
 		{#if currentStatus === 'running'}
 			<LoadingLogs />
 		{/if}
-		<pre
-			class="leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 p-6 whitespace-pre-wrap break-words">
+		<div
+			class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words"
+		>
 			{#each logs as log}
 				<div>{log.line + '\n'}</div>
 			{/each}
-    	</pre>
+		</div>
 	</div>
 {/if}
