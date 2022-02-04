@@ -5,6 +5,7 @@ import {
 	checkContainer,
 	configureCoolifyProxyOn,
 	configureProxyForApplication,
+	forceSSLOnApplication,
 	reloadHaproxy,
 	startCoolifyProxy
 } from '$lib/haproxy';
@@ -37,6 +38,8 @@ export default async function () {
 								applicationId,
 								port
 							});
+							const isHttps = fqdn.startsWith('https://');
+							if (isHttps) await forceSSLOnApplication({ domain });
 						}
 					}
 				}
@@ -49,6 +52,8 @@ export default async function () {
 			const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy');
 			if (!found) await startCoolifyProxy('/var/run/docker.sock');
 			await configureCoolifyProxyOn({ domain });
+			const isHttps = fqdn.startsWith('https://');
+			if (isHttps) await forceSSLOnApplication({ domain });
 		}
 	} catch (error) {
 		console.log(error);
