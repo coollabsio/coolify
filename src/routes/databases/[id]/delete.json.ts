@@ -4,7 +4,7 @@ import { PrismaErrorHandler, stopDatabase } from '$lib/database';
 import { deleteProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const del: RequestHandler<Locals> = async (event) => {
+export const del: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 	const { id } = event.params;

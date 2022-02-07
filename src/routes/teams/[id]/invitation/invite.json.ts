@@ -10,7 +10,7 @@ async function createInvitation({ email, uid, teamId, teamName, permission }) {
 	});
 }
 
-export const post: RequestHandler<Locals> = async (event) => {
+export const post: RequestHandler = async (event) => {
 	const { userId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 

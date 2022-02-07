@@ -4,7 +4,7 @@ import { generateDatabaseConfiguration, PrismaErrorHandler } from '$lib/database
 import { startTcpProxy, stopTcpHttpProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const post: RequestHandler<Locals> = async (event) => {
+export const post: RequestHandler = async (event) => {
 	const { status, body, teamId } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 

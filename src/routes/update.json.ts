@@ -29,7 +29,7 @@ export const get: RequestHandler = async () => {
 	}
 };
 
-export const post: RequestHandler<Locals> = async (event) => {
+export const post: RequestHandler = async (event) => {
 	const { type } = await event.request.json();
 	if (type === 'pull') {
 		try {

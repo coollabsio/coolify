@@ -46,7 +46,7 @@ export const get: RequestHandler = async (event) => {
 	}
 };
 
-export const post: RequestHandler<Locals> = async (event) => {
+export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 	const { id } = event.params;

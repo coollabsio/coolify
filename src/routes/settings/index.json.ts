@@ -27,7 +27,7 @@ export const get: RequestHandler = async (event) => {
 	}
 };
 
-export const del: RequestHandler<Locals> = async (event) => {
+export const del: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (teamId !== '0')
 		return {
@@ -51,7 +51,7 @@ export const del: RequestHandler<Locals> = async (event) => {
 		return PrismaErrorHandler(error);
 	}
 };
-export const post: RequestHandler<Locals> = async (event) => {
+export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (teamId !== '0')
 		return {

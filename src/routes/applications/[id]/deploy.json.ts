@@ -6,7 +6,7 @@ import { buildQueue } from '$lib/queues';
 import { getUserDetails } from '$lib/common';
 import { PrismaErrorHandler } from '$lib/database';
 
-export const post: RequestHandler<Locals> = async (event) => {
+export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 

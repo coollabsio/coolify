@@ -62,7 +62,7 @@ export const handle = handleSession(
 	}
 );
 
-export const getSession: GetSession<Locals> = function (request) {
+export const getSession: GetSession = function (request) {
 	return {
 		version,
 		gitlabToken: request.locals?.gitlabToken || null,

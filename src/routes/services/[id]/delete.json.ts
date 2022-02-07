@@ -3,7 +3,7 @@ import * as db from '$lib/database';
 import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const del: RequestHandler<Locals> = async (events) => {
+export const del: RequestHandler = async (events) => {
 	const { teamId, status, body } = await getUserDetails(events);
 	if (status === 401) return { status, body };
 

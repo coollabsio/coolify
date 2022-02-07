@@ -7,7 +7,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { makeLabelForStandaloneDatabase } from '$lib/buildPacks/common';
 import { startTcpProxy } from '$lib/haproxy';
 
-export const post: RequestHandler<Locals> = async (event) => {
+export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 

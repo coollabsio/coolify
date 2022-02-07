@@ -3,7 +3,7 @@ import * as db from '$lib/database';
 import { PrismaErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
-export const post: RequestHandler<Locals> = async (event) => {
+export const post: RequestHandler = async (event) => {
 	const { email, password } = await event.request.json();
 
 	try {
@@ -17,7 +17,7 @@ export const post: RequestHandler<Locals> = async (event) => {
 	}
 };
 
-export const get: RequestHandler<Locals> = async (event) => {
+export const get: RequestHandler = async (event) => {
 	const { userId } = await getUserDetails(event, false);
 	if (!userId) {
 		return {
