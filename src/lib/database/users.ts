@@ -22,14 +22,22 @@ export async function login({ email, password }) {
 	// Disable registration if we are registering the first user.
 	if (users === 0) {
 		await prisma.setting.update({ where: { id }, data: { isRegistrationEnabled: false } });
-		// Start Coolify Proxy
-		try {
-			await startCoolifyProxy('/var/run/docker.sock');
-			// await asyncExecShell(`docker network create --attachable coolify`);
-		} catch (error) {
-			console.error(error);
-		}
+		// Create default network & start Coolify Proxy
+		asyncExecShell(`docker network create --attachable coolify`)
+			.then(() => {
+				console.log('Network created');
+			})
+			.catch(() => {
+				console.log('Network already exists');
+			});
 
+		startCoolifyProxy('/var/run/docker.sock')
+			.then(() => {
+				console.log('Coolify Proxy Started');
+			})
+			.catch((err) => {
+				console.log(err);
+			});
 		uid = '0';
 	}
 
