@@ -4,7 +4,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
 import crypto from 'crypto';
 import { buildQueue } from '$lib/queues';
-import { removeProxyConfiguration } from '$lib/haproxy';
+import { checkContainer, removeProxyConfiguration } from '$lib/haproxy';
 
 export const options: RequestHandler = async () => {
 	return {
@@ -106,6 +106,20 @@ export const post: RequestHandler = async (event) => {
 				}
 
 				if (applicationFound.settings.previews) {
+					if (applicationFound.destinationDockerId) {
+						const isRunning = await checkContainer(
+							applicationFound.destinationDocker.engine,
+							applicationFound.id
+						);
+						if (!isRunning) {
+							return {
+								status: 500,
+								body: {
+									message: 'Application not running.'
+								}
+							};
+						}
+					}
 					if (pullmergeRequestAction === 'opened' || pullmergeRequestAction === 'reopened') {
 						await buildQueue.add(buildId, {
 							build_id: buildId,

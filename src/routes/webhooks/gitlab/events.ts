@@ -1,10 +1,11 @@
 import { getTeam, getUserDetails, getDomain, removeDestinationDocker } from '$lib/common';
-import { removeProxyConfiguration } from '$lib/haproxy';
+import { checkContainer, removeProxyConfiguration } from '$lib/haproxy';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
 import crypto from 'crypto';
 import { buildQueue } from '$lib/queues';
+import { dev } from '$app/env';
 
 export const options: RequestHandler = async () => {
 	return {
@@ -96,7 +97,21 @@ export const post: RequestHandler = async (event) => {
 			const applicationFound = await db.getApplicationWebhook({ projectId, branch: targetBranch });
 			if (applicationFound) {
 				if (applicationFound.settings.previews) {
-					if (applicationFound.gitSource.gitlabApp.webhookToken !== webhookToken) {
+					if (applicationFound.destinationDockerId) {
+						const isRunning = await checkContainer(
+							applicationFound.destinationDocker.engine,
+							applicationFound.id
+						);
+						if (!isRunning) {
+							return {
+								status: 500,
+								body: {
+									message: 'Application not running.'
+								}
+							};
+						}
+					}
+					if (!dev && applicationFound.gitSource.gitlabApp.webhookToken !== webhookToken) {
 						return {
 							status: 500,
 							body: {
