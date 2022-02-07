@@ -38,7 +38,11 @@
 	onMount(() => {
 		const { organization, id, htmlUrl } = source;
 		const { fqdn } = settings;
-		const host = dev ? 'http://localhost:3000' : fqdn ? fqdn : `http://${window.location.host}`;
+		const host = dev
+			? 'http://localhost:3000'
+			: fqdn
+			? fqdn
+			: `http://${window.location.host}` || '';
 		const domain = getDomain(fqdn);
 
 		let url = 'settings/apps/new';
