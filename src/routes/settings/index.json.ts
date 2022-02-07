@@ -1,3 +1,4 @@
+import { dev } from '$app/env';
 import { getDomain, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { listSettings, PrismaErrorHandler } from '$lib/database';
@@ -5,6 +6,9 @@ import {
 	checkContainer,
 	configureCoolifyProxyOff,
 	configureCoolifyProxyOn,
+	forceSSLOffApplication,
+	forceSSLOnApplication,
+	reloadHaproxy,
 	startCoolifyProxy
 } from '$lib/haproxy';
 import { letsEncrypt } from '$lib/letsencrypt';
@@ -74,15 +78,22 @@ export const post: RequestHandler = async (event) => {
 		}
 		if (oldFqdn && oldFqdn !== fqdn) {
 			const oldDomain = getDomain(oldFqdn);
-			if (oldFqdn) await configureCoolifyProxyOff({ domain: oldDomain });
+			if (oldFqdn) {
+				await configureCoolifyProxyOff({ domain: oldDomain });
+			}
 		}
 		if (fqdn) {
 			const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy');
 			if (!found) await startCoolifyProxy('/var/run/docker.sock');
 			const domain = getDomain(fqdn);
+			const isHttps = fqdn.startsWith('https://');
 			if (domain) {
 				await configureCoolifyProxyOn({ domain });
-				await letsEncrypt({ domain, isCoolify: true });
+				if (isHttps && !dev) {
+					await letsEncrypt({ domain, isCoolify: true });
+					await forceSSLOnApplication({ domain });
+					await reloadHaproxy('/var/run/docker.sock');
+				}
 			}
 
 			await db.prisma.setting.update({ where: { id }, data: { fqdn } });
