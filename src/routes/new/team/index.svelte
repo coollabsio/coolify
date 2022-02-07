@@ -31,11 +31,13 @@
 		autofocus.focus();
 	});
 	async function handleSubmit() {
-		try {
-			const { id } = await post('/new/team.json', { name });
-			return await goto(`/teams/${id}`);
-		} catch ({ error }) {
-			return errorNotification(error);
+		if (name) {
+			try {
+				const { id } = await post('/new/team.json', { name });
+				return await goto(`/teams/${id}`);
+			} catch ({ error }) {
+				return errorNotification(error);
+			}
 		}
 	}
 </script>
