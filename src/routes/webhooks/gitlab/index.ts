@@ -20,12 +20,15 @@ export const get: RequestHandler = async (event) => {
 	const teamId = undefined;
 	const code = event.url.searchParams.get('code');
 	const state = event.url.searchParams.get('state');
-
 	try {
-		// TODO: Solve somehow the http/https thing below
 		const application = await db.getApplication({ id: state, teamId });
+		const { fqdn } = application;
 		const { appId, appSecret } = application.gitSource.gitlabApp;
 		const { htmlUrl } = application.gitSource;
+
+		let domain = `http://${event.url.host}`;
+		if (fqdn) domain = fqdn;
+
 		const { access_token } = await got
 			.post(`${htmlUrl}/oauth/token`, {
 				searchParams: {
@@ -34,7 +37,7 @@ export const get: RequestHandler = async (event) => {
 					code,
 					state,
 					grant_type: 'authorization_code',
-					redirect_uri: `${event.url.protocol}//${event.url.host}/webhooks/gitlab`
+					redirect_uri: `${domain}/webhooks/gitlab`
 				}
 			})
 			.json();
