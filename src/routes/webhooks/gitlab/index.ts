@@ -34,7 +34,7 @@ export const get: RequestHandler = async (event) => {
 					code,
 					state,
 					grant_type: 'authorization_code',
-					redirect_uri: `${event.url.origin}/webhooks/gitlab`
+					redirect_uri: `${event.url.protocol}//${event.url.host}/webhooks/gitlab`
 				}
 			})
 			.json();
