@@ -5,7 +5,7 @@
 </script>
 
 <div class="flex space-x-1 py-5 font-bold">
-	<div class="mr-4 text-xl tracking-tight">Plausible Analytics</div>
+	<div class="title">Plausible Analytics</div>
 </div>
 <div class="grid grid-cols-3 items-center">
 	<label for="email">Email Address</label>
@@ -49,7 +49,7 @@
 	</div>
 </div>
 <div class="flex space-x-1 py-5 font-bold">
-	<div class="mr-4 text-xl tracking-tight">PostgreSQL</div>
+	<div class="title">PostgreSQL</div>
 </div>
 <div class="grid grid-cols-3 items-center">
 	<label for="postgresqlUser">Username</label>

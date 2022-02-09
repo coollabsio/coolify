@@ -7,7 +7,7 @@
 </script>
 
 <div class="flex space-x-1 py-5 font-bold">
-	<div class="mr-4 text-xl tracking-tight">Wordpress</div>
+	<div class="title">Wordpress</div>
 </div>
 
 <div class="grid grid-cols-3 items-center">
@@ -31,7 +31,7 @@ define('SUBDOMAIN_INSTALL', false);`
 	</div>
 </div>
 <div class="flex space-x-1 py-5 font-bold">
-	<div class="mr-4 text-xl tracking-tight">MySQL</div>
+	<div class="title">MySQL</div>
 </div>
 <div class="grid grid-cols-3 items-center">
 	<label for="mysqlDatabase">Database</label>

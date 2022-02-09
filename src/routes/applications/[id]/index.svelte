@@ -85,8 +85,8 @@
 	}
 </script>
 
-<div class="flex items-center space-x-2 p-5 px-6 text-2xl font-bold">
-	<div class="md:max-w-64 hidden truncate tracking-tight lg:block">
+<div class="flex items-center space-x-2 p-5 px-6 font-bold">
+	<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
 		{application.name}
 	</div>
 	{#if application.fqdn}
@@ -158,7 +158,7 @@
 	<!-- svelte-ignore missing-declaration -->
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
 		<div class="flex space-x-1 pb-5 font-bold">
-			<div class="mr-4 text-xl tracking-tight">General</div>
+			<div class="title">General</div>
 			{#if $session.isAdmin}
 				<button
 					type="submit"
@@ -246,11 +246,11 @@
 					</div>
 				</div>
 			</div>
-
-			<div class="flex space-x-1 py-5 font-bold">
-				<div class="mr-4 text-xl tracking-tight">Application</div>
-			</div>
-
+		</div>
+		<div class="flex space-x-1 py-5 font-bold">
+			<div class="title">Application</div>
+		</div>
+		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="grid grid-cols-3">
 				<label for="fqdn" class="pt-2">Domain (FQDN)</label>
 				<div class="col-span-2">
@@ -359,7 +359,7 @@
 		</div>
 	</form>
 	<div class="flex space-x-1 pb-5 font-bold">
-		<div class="mr-4 text-xl tracking-tight">Features</div>
+		<div class="title">Features</div>
 	</div>
 	<div class="px-4 pb-10 sm:px-6">
 		<!-- <ul class="mt-2 divide-y divide-stone-800">

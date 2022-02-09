@@ -69,7 +69,7 @@
 <div class="mx-auto max-w-4xl px-6">
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
 		<div class="flex space-x-1 pb-5 font-bold">
-			<div class="mr-4 text-xl tracking-tight">General</div>
+			<div class="title">General</div>
 			{#if $session.isAdmin}
 				<button
 					type="submit"
@@ -146,6 +146,8 @@
 					/>
 				</div>
 			</div>
+		</div>
+		<div class="grid grid-flow-row gap-2">
 			{#if database.type === 'mysql'}
 				<MySql bind:database />
 			{:else if database.type === 'postgresql'}
@@ -157,7 +159,7 @@
 			{:else if database.type === 'couchdb'}
 				<CouchDb bind:database />
 			{/if}
-			<div class="grid grid-cols-3 items-center pb-8">
+			<div class="grid grid-cols-3 items-center px-10 pb-8">
 				<label for="url">Connection String</label>
 				<div class="col-span-2 ">
 					<CopyPasswordField
@@ -175,7 +177,7 @@
 		</div>
 	</form>
 	<div class="flex space-x-1 pb-5 font-bold">
-		<div class="mr-4 text-xl tracking-tight">Features</div>
+		<div class="title">Features</div>
 	</div>
 	<div class="px-4 pb-10 sm:px-6">
 		<ul class="mt-2 divide-y divide-stone-800">

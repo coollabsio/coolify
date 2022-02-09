@@ -102,7 +102,7 @@
 <div class="mx-auto max-w-2xl">
 	<form on:submit|preventDefault={handleSubmit}>
 		<div class="flex space-x-1 p-6 font-bold">
-			<div class="mr-4 text-xl tracking-tight">Settings</div>
+			<div class="title">Settings</div>
 			<div class="text-center">
 				<button class="bg-cyan-600 hover:bg-cyan-500" type="submit">Save</button>
 			</div>
@@ -113,17 +113,17 @@
 			<input id="name" name="name" placeholder="name" bind:value={team.name} />
 		</div>
 		{#if team.id === '0'}
-			<div class="pt-4 text-center">
+			<div class="px-20 pt-4 text-center">
 				<Explainer
 					maxWidthClass="w-full"
-					text="This is the <span class='text-red-500 font-bold'>root</span> team. <br><br>That means members of this group can manage instance wide settings and have all the priviliges in Coolify. <br>(imagine like root user on Linux)"
+					text="This is the <span class='text-red-500 font-bold'>root</span> team. <br><br>That means members of this group can manage instance wide settings and have all the priviliges in Coolify. (imagine like root user on Linux)"
 				/>
 			</div>
 		{/if}
 	</form>
 
 	<div class="flex space-x-1 py-5 px-6 pt-10 font-bold">
-		<div class="mr-4 text-xl tracking-tight">Members</div>
+		<div class="title">Members</div>
 	</div>
 	<div class="px-4 sm:px-6">
 		<table class="mx-2 w-full table-auto text-left">
@@ -181,7 +181,7 @@
 	<div class="mx-auto max-w-2xl pt-8">
 		<form on:submit|preventDefault={sendInvitation}>
 			<div class="flex space-x-1 p-6 font-bold">
-				<div class="mr-4 text-xl tracking-tight">Invite new member</div>
+				<div class="title">Invite new member</div>
 				<div class="text-center">
 					<button class="bg-cyan-600 hover:bg-cyan-500" type="submit">Send invitation</button>
 				</div>

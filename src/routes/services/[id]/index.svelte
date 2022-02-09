@@ -47,7 +47,7 @@
 	class:p-5={service.fqdn}
 	class:p-6={!service.fqdn}
 >
-	<div class="md:max-w-64 hidden truncate tracking-tight lg:block">
+	<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
 		{service.name}
 	</div>
 	{#if service.fqdn}

@@ -11,7 +11,7 @@
 
 <li class="flex items-center py-4">
 	<div class="flex w-96 flex-col" class:px-4={isPadding} class:pr-32={!isPadding}>
-		<p class="text-base font-bold text-stone-100">{title}</p>
+		<p class="text-xs font-bold text-stone-100 md:text-base">{title}</p>
 		<Explainer text={description} />
 	</div>
 	<!-- {#if disabled}

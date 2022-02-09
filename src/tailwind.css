@@ -16,22 +16,22 @@ main,
 }
 
 input {
-	@apply w-96 select-all rounded border border-transparent bg-transparent bg-coolgray-200 p-2 text-sm tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:bg-transparent;
+	@apply w-96 select-all rounded border border-transparent bg-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:bg-transparent md:text-sm;
 }
 textarea {
-	@apply w-96 select-all rounded border border-transparent bg-transparent bg-coolgray-200 p-2 text-sm tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:bg-transparent;
+	@apply w-96 select-all rounded border border-transparent bg-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:bg-transparent md:text-sm;
 }
 
 select {
-	@apply rounded bg-coolgray-200 p-2 text-sm font-bold tracking-tight text-white outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:text-stone-600;
+	@apply rounded bg-coolgray-200 p-2 text-xs font-bold tracking-tight text-white outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:text-stone-600 md:text-sm;
 }
 
 label {
-	@apply inline-block w-64 text-sm tracking-tight;
+	@apply inline-block w-64 text-xs tracking-tight md:text-sm;
 }
 
 button {
-	@apply rounded bg-coolgray-200 p-1 px-4 text-sm font-bold outline-none transition-all duration-100 hover:bg-coolgray-500 disabled:cursor-not-allowed disabled:bg-coolblack disabled:text-stone-600;
+	@apply rounded bg-coolgray-200 p-1 px-4 py-2 text-xs font-bold outline-none transition-all duration-100 hover:bg-coolgray-500 disabled:cursor-not-allowed disabled:bg-coolblack disabled:text-stone-600 md:text-sm;
 }
 
 a {
@@ -42,6 +42,9 @@ a {
 	@apply p-2 px-4;
 }
 
+.title {
+	@apply mr-4 text-base tracking-tight md:text-2xl;
+}
 .nav-main {
 	@apply fixed top-0 left-0 min-h-screen w-16 min-w-[4rem] border-r border-stone-800 bg-coolgray-200;
 }

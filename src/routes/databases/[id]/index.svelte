@@ -44,7 +44,7 @@
 </script>
 
 <div class="flex items-center space-x-2 p-6 text-2xl font-bold">
-	<div class="md:max-w-64 hidden truncate tracking-tight md:block">
+	<div class="md:max-w-64 truncate text-base tracking-tight md:block md:text-2xl">
 		{database.name}
 	</div>
 	<span class="relative">

@@ -69,7 +69,7 @@
 {#if invitations.length > 0}
 	<div class="mx-auto max-w-2xl pb-10">
 		<div class="flex space-x-1 p-6 font-bold">
-			<div class="mr-4 text-xl tracking-tight">Pending invitations</div>
+			<div class="title">Pending invitations</div>
 		</div>
 		<div class="text-center">
 			{#each invitations as invitation}

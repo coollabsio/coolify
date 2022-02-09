@@ -85,7 +85,7 @@
 	<div class="mx-auto max-w-2xl">
 		<form on:submit|preventDefault={handleSubmit}>
 			<div class="flex space-x-1 p-6 font-bold">
-				<div class="mr-4 text-xl tracking-tight">Global Settings</div>
+				<div class="title">Global Settings</div>
 				<button
 					type="submit"
 					disabled={loading.save}
@@ -134,7 +134,7 @@
 		</form>
 		<div class="mx-auto max-w-4xl px-6">
 			<div class="flex space-x-1 pt-5 font-bold">
-				<div class="mr-4 text-xl tracking-tight">HAProxy Settings</div>
+				<div class="title">HAProxy Settings</div>
 			</div>
 			<Explainer
 				text={`Credentials for <a class="text-white font-bold" href=${

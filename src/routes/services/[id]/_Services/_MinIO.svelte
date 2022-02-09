@@ -5,7 +5,7 @@
 </script>
 
 <div class="flex space-x-1 py-5 font-bold">
-	<div class="mr-4 text-xl tracking-tight">MinIO Server</div>
+	<div class="title">MinIO Server</div>
 </div>
 <div class="grid grid-cols-3 items-center">
 	<label for="rootUser">Root User</label>
