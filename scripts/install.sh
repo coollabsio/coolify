@@ -24,6 +24,13 @@ function errorchecker() {
 }
 trap 'errorchecker' EXIT
 
+echo -e "Welcome to Coolify installer! \n"
+echo "This script will install all the required packages and services to run Coolify."
+echo -e "If you want to install Coolify on a different OS, please open an issue on Github to get supported version.\n\n"
+
+echo -e "To see what I'm doing, please check:"
+echo -e "https://github.com/coollabsio/get.coollabs.io/blob/main/static/coolify/install_v2.sh\n\n"
+
 if [ $WHO != 'root' ]; then
     echo 'Run as root please: sudo sh -c "$(curl -fsSL https://get.coollabs.io/coolify/install.sh)"'
     exit 1
@@ -31,7 +38,7 @@ fi
 
 if [ ! -x "$(command -v docker)" ]; then
     while true; do
-        read -p "Docker not found, should I install it automatically? [Yy/Nn] " yn
+        read -p "Docker Engine not found, should I install it automatically? [Yy/Nn] " yn
         case $yn in
         [Yy]*)
             sh -c "$(curl -fsSL https://get.docker.com)"
@@ -44,8 +51,6 @@ if [ ! -x "$(command -v docker)" ]; then
         *) echo "Please answer Y or N." ;;
         esac
     done
-
-    exit 1
 fi
 
 SERVER_VERSION=$(docker version -f "{{.Server.Version}}")
@@ -90,12 +95,18 @@ if [ ! -d coolify ]; then
     mkdir coolify
 fi
 
-echo "COOLIFY_APP_ID=$APP_ID
+if [ -f coolify/.env ]; then
+    echo -e "Coolify is already installed, using some of the existing settings."
+else
+    echo "COOLIFY_APP_ID=$APP_ID
 COOLIFY_SECRET_KEY=$RANDOM_SECRET
 COOLIFY_DATABASE_URL=file:../db/prod.db
 COOLIFY_SENTRY_DSN=$SENTRY_DSN
-COOLIFY_HOSTED_ON=docker" >coolify/.env
+COOLIFY_HOSTED_ON=docker" > coolify/.env
+fi
 
 cd coolify && docker run -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db-sqlite coollabsio/coolify:latest /bin/sh -c "env | grep COOLIFY > .env && docker compose up -d --force-recreate"
 
-echo 'Congratulations! Your coolify is ready to use. Please visit http://<Your Public IP Address>:3000/ to get started. It will take a few minutes to start up, don\'t worry.'
+echo -e "Congratulations! Your coolify is ready to use.\n"
+echo "Please visit http://<Your Public IP Address>:3000/ to get started."
+echo "It will take a few minutes to start up, don't worry."
