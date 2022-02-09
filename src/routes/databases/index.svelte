@@ -56,7 +56,7 @@
 	{:else}
 		{#each databases as database}
 			<a href="/databases/{database.id}" class="no-underline p-2 w-96">
-				<div class="box-selection relative hover:bg-purple-600">
+				<div class="box-selection relative hover:bg-purple-600 group">
 					{#if database.type === 'clickhouse'}
 						<Clickhouse isAbsolute />
 					{:else if database.type === 'couchdb'}
@@ -74,7 +74,9 @@
 						{database.name}
 					</div>
 					{#if !database.type}
-						<div class="font-bold text-center truncate">Configuration missing</div>
+						<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
+							Configuration missing
+						</div>
 					{:else}
 						<div class="text-center truncate">{database.type}</div>
 					{/if}

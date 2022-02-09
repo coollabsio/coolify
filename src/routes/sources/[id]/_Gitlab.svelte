@@ -2,7 +2,7 @@
 	export let source;
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { enhance, errorNotification } from '$lib/form';
-	import { page } from '$app/stores';
+	import { page, session } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { post } from '$lib/api';
 	const { id } = $page.params;
@@ -19,6 +19,16 @@
 	onMount(() => {
 		oauthIdEl && oauthIdEl.focus();
 	});
+	async function handleSubmitSave() {
+		loading = true;
+		try {
+			return await post(`/sources/${id}.json`, { name: source.name });
+		} catch ({ error }) {
+			return errorNotification(error);
+		} finally {
+			loading = false;
+		}
+	}
 	async function changeSettings() {
 		const {
 			htmlUrl,
@@ -71,7 +81,7 @@
 	async function handleSubmit() {
 		loading = true;
 		try {
-			await post(`/sources/${id}.json`, { ...payload });
+			await post(`/sources/${id}/gitlab.json`, { ...payload });
 			return window.location.reload();
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -177,8 +187,29 @@
 			</div>
 		</form>
 	{:else}
-		<button class="box-selection font-bold text-xl text-center truncate" on:click={changeSettings}
-			>Change GitLab App Settings</button
-		>
+		<div class="mx-auto max-w-4xl px-6">
+			<form on:submit|preventDefault={handleSubmitSave} class="py-4">
+				<div class="flex space-x-1 pb-5 font-bold">
+					<div class="mr-4 text-xl tracking-tight">General</div>
+					{#if $session.isAdmin}
+						<button
+							type="submit"
+							class:bg-orange-600={!loading}
+							class:hover:bg-orange-500={!loading}
+							disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
+						>
+						<button on:click|preventDefault={changeSettings}>Change GitLab App Settings</button>
+					{/if}
+				</div>
+				<div class="grid grid-flow-row gap-2 px-10">
+					<div class="mt-2 grid grid-cols-3 items-center">
+						<label for="name">Name</label>
+						<div class="col-span-2 ">
+							<input name="name" id="name" required bind:value={source.name} />
+						</div>
+					</div>
+				</div>
+			</form>
+		</div>
 	{/if}
 </div>

@@ -39,10 +39,11 @@
 	<span class="arrow-right-applications px-1 text-orange-500">></span>
 	<span class="pr-2">{source.name}</span>
 </div>
+
 <div class="flex justify-center space-x-2 px-6 py-3">
 	{#if source.type === 'github'}
-		<Github {source} />
+		<Github bind:source />
 	{:else if source.type === 'gitlab'}
-		<Gitlab {source} />
+		<Gitlab bind:source />
 	{/if}
 </div>

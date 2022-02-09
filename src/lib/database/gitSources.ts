@@ -63,3 +63,9 @@ export async function configureGitsource({ id, gitSourceId }) {
 		data: { gitSource: { connect: { id: gitSourceId } } }
 	});
 }
+export async function updateGitsource({ id, name }) {
+	return await prisma.gitSource.update({
+		where: { id },
+		data: { name }
+	});
+}

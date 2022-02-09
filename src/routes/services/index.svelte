@@ -56,7 +56,7 @@
 	{:else}
 		{#each services as service}
 			<a href="/services/{service.id}" class="no-underline p-2 w-96">
-				<div class="box-selection relative hover:bg-pink-600">
+				<div class="box-selection relative hover:bg-pink-600 group">
 					{#if service.type === 'plausibleanalytics'}
 						<PlausibleAnalytics isAbsolute />
 					{:else if service.type === 'nocodb'}
@@ -72,7 +72,9 @@
 						{service.name}
 					</div>
 					{#if !service.type || !service.fqdn}
-						<div class="font-bold text-center truncate">Configuration missing</div>
+						<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
+							Configuration missing
+						</div>
 					{:else}
 						<div class="text-center truncate">{service.type}</div>
 					{/if}

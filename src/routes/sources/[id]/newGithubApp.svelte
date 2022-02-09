@@ -47,7 +47,7 @@
 
 		let url = 'settings/apps/new';
 		if (organization) url = `organizations/${organization}/settings/apps/new`;
-		const name = dashify(domain);
+		const name = dashify(domain) || 'app';
 		const data = JSON.stringify({
 			name: `coolify-${name}`,
 			url: host,

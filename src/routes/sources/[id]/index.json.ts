@@ -40,14 +40,13 @@ export const del: RequestHandler = async (request) => {
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
+
 	const { id } = event.params;
 
+	const { name } = await event.request.json();
+
 	try {
-		let { oauthId, groupName, appId, appSecret } = await event.request.json();
-
-		oauthId = Number(oauthId);
-
-		await db.addSource({ id, teamId, oauthId, groupName, appId, appSecret });
+		await db.updateGitsource({ id, name });
 		return { status: 201 };
 	} catch (error) {
 		return PrismaErrorHandler(error);

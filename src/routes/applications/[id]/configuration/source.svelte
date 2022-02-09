@@ -39,8 +39,13 @@
 
 	export let sources: Prisma.GitSource[] & {
 		gitlabApp: Prisma.GitlabApp;
+		githubApp: Prisma.GithubApp;
 	};
-
+	sources = sources.filter(
+		(source) =>
+			(source.type === 'github' && source.githubAppId && source.githubApp.installationId) ||
+			(source.type === 'gitlab' && source.gitlabAppId)
+	);
 	async function handleSubmit(gitSourceId) {
 		try {
 			await post(`/applications/${id}/configuration/source.json`, { gitSourceId });
@@ -84,14 +89,16 @@
 						<button
 							disabled={source.gitlabApp && !source.gitlabAppId}
 							type="submit"
-							class="disabled:opacity-95 bg-coolgray-200 disabled:text-white box-selection hover:bg-orange-700"
+							class="disabled:opacity-95 bg-coolgray-200 disabled:text-white box-selection hover:bg-orange-700 group"
 							class:border-red-500={source.gitlabApp && !source.gitlabAppId}
 							class:border-0={source.gitlabApp && !source.gitlabAppId}
 							class:border-l-4={source.gitlabApp && !source.gitlabAppId}
 						>
 							<div class="font-bold text-xl text-center truncate">{source.name}</div>
 							{#if source.gitlabApp && !source.gitlabAppId}
-								<div class="font-bold text-center truncate">Configuration missing</div>
+								<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
+									Configuration missing
+								</div>
 							{/if}
 						</button>
 					</form>

@@ -18,7 +18,7 @@
 </script>
 
 <a href="/applications/{application.id}" class="w-96 p-2 no-underline">
-	<div class="box-selection relative hover:bg-green-600">
+	<div class="box-selection group relative hover:bg-green-600">
 		{#if buildPack === 'rust'}
 			<Rust />
 		{:else if buildPack === 'node'}
@@ -52,7 +52,9 @@
 			<div class="truncate text-center">{application.fqdn}</div>
 		{/if}
 		{#if !application.gitSourceId || !application.destinationDockerId}
-			<div class="truncate text-center font-bold">Configuration missing</div>
+			<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
+				Configuration missing
+			</div>
 		{/if}
 	</div>
 </a>
