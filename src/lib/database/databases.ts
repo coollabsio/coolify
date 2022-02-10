@@ -126,13 +126,17 @@ export async function stopDatabase(database) {
 		destinationDocker: { engine }
 	} = database;
 	if (destinationDockerId) {
-		const host = getEngine(engine);
-		const { stdout } = await asyncExecShell(
-			`DOCKER_HOST=${host} docker inspect --format '{{json .State}}' ${id}`
-		);
-		if (stdout) {
-			everStarted = true;
-			await removeContainer(id, engine);
+		try {
+			const host = getEngine(engine);
+			const { stdout } = await asyncExecShell(
+				`DOCKER_HOST=${host} docker inspect --format '{{json .State}}' ${id}`
+			);
+			if (stdout) {
+				everStarted = true;
+				await removeContainer(id, engine);
+			}
+		} catch (error) {
+			//
 		}
 	}
 	return everStarted;
