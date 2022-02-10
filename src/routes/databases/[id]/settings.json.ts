@@ -9,10 +9,10 @@ export const post: RequestHandler = async (event) => {
 	if (status === 401) return { status, body };
 
 	const { id } = event.params;
-	const { isPublic } = await event.request.json();
+	const { isPublic, appendOnly = true } = await event.request.json();
 
 	try {
-		await db.setDatabase({ id, isPublic });
+		await db.setDatabase({ id, isPublic, appendOnly });
 		const database = await db.getDatabase({ id, teamId });
 		const { destinationDockerId, destinationDocker, publicPort } = database;
 		const { privatePort } = generateDatabaseConfiguration(database);

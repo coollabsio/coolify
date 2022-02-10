@@ -19,6 +19,7 @@
 	const { id } = $page.params;
 	let loading = false;
 	let isPublic = database.settings.isPublic || false;
+	let appendOnly = database.settings.appendOnly;
 
 	let databaseDefault = database.defaultDatabase;
 	let databaseDbUser = database.dbUser;
@@ -51,8 +52,11 @@
 		if (name === 'isPublic') {
 			isPublic = !isPublic;
 		}
+		if (name === 'appendOnly') {
+			appendOnly = !appendOnly;
+		}
 		try {
-			await post(`/databases/${id}/settings.json`, { isPublic });
+			await post(`/databases/${id}/settings.json`, { isPublic, appendOnly });
 			databaseUrl = generateUrl();
 			return;
 		} catch ({ error }) {
@@ -191,5 +195,15 @@
 				description="Your database will be reachable over the internet. <br>Take security seriously in this case!"
 			/>
 		</ul>
+		{#if database.type === 'redis'}
+			<ul class="mt-2 divide-y divide-stone-800">
+				<Setting
+					bind:setting={appendOnly}
+					on:click={() => changeSettings('appendOnly')}
+					title="Change append only mode"
+					description="Useful if you would like to restore redis data from a backup.<br><span class='font-bold text-white'>Database restart is required.</span>"
+				/>
+			</ul>
+		{/if}
 	</div>
 </div>

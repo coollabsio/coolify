@@ -223,6 +223,7 @@ model DatabaseSettings {
   database   Database @relation(fields: [databaseId], references: [id])
   databaseId String   @unique
   isPublic   Boolean  @default(false)
+  appendOnly Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }

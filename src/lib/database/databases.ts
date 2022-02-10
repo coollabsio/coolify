@@ -72,15 +72,20 @@ export async function configureDatabaseType({ id, type }) {
 export async function setDatabase({
 	id,
 	version,
-	isPublic
+	isPublic,
+	appendOnly
 }: {
 	id: string;
 	version?: string;
 	isPublic?: boolean;
+	appendOnly?: boolean;
 }) {
 	return await prisma.database.update({
 		where: { id },
-		data: { version, settings: { upsert: { update: { isPublic }, create: { isPublic } } } }
+		data: {
+			version,
+			settings: { upsert: { update: { isPublic, appendOnly }, create: { isPublic, appendOnly } } }
+		}
 	});
 }
 export async function updateDatabase({

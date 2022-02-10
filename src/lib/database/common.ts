@@ -138,8 +138,17 @@ export function getServiceImage(type) {
 	return '';
 }
 export function generateDatabaseConfiguration(database) {
-	const { id, dbUser, dbUserPassword, rootUser, rootUserPassword, defaultDatabase, version, type } =
-		database;
+	const {
+		id,
+		dbUser,
+		dbUserPassword,
+		rootUser,
+		rootUserPassword,
+		defaultDatabase,
+		version,
+		type,
+		settings: { appendOnly }
+	} = database;
 	const baseImage = getDatabaseImage(type);
 	if (type === 'mysql') {
 		return {
@@ -186,7 +195,8 @@ export function generateDatabaseConfiguration(database) {
 			// url: `redis://${dbUser}:${dbUserPassword}@${id}:${isPublic ? port : 6379}/${defaultDatabase}`,
 			privatePort: 6379,
 			environmentVariables: {
-				REDIS_PASSWORD: dbUserPassword
+				REDIS_PASSWORD: dbUserPassword,
+				REDIS_AOF_ENABLED: appendOnly ? 'yes' : 'no'
 			},
 			image: `${baseImage}:${version}`,
 			volume: `${id}-${type}-data:/bitnami/redis/data`,
