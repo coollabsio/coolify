@@ -37,6 +37,9 @@ if (dev) {
 export const prisma = new PrismaClient(prismaOptions);
 
 export function PrismaErrorHandler(e) {
+	if (e! instanceof Error) {
+		e = new Error(e.toString());
+	}
 	sentry.captureException(e);
 	const payload = {
 		status: e.status || 500,

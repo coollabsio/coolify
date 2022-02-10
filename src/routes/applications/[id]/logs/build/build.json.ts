@@ -14,12 +14,12 @@ export const get: RequestHandler = async (event) => {
 			where: { buildId, time: { gt: sequence } },
 			orderBy: { time: 'asc' }
 		});
-		const { status } = await db.prisma.build.findFirst({ where: { id: buildId } });
+		const data = await db.prisma.build.findFirst({ where: { id: buildId } });
 
 		return {
 			body: {
 				logs,
-				status
+				status: data?.status || 'running'
 			}
 		};
 	} catch (error) {
