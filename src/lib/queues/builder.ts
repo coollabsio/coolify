@@ -232,7 +232,7 @@ export default async function (job) {
 		});
 		saveBuildLog({ line: 'Deployment started.', buildId, applicationId });
 		const { stderr } = await asyncExecShell(
-			`DOCKER_HOST=${host} docker run ${envs.join()} ${labels.join(
+			`DOCKER_HOST=${host} docker run ${envs.join(' ')} ${labels.join(
 				' '
 			)} --name ${imageId} --network ${docker.network} --restart always -d ${applicationId}:${tag}`
 		);
