@@ -120,7 +120,9 @@ buildWorker.on('completed', async (job: Bullmq.Job) => {
 	} catch (err) {
 		console.log(err);
 	} finally {
-		await asyncExecShell(`rm -fr ${job.data.workdir}`);
+		const workdir = `/tmp/build-sources/${job.data.repository}/${job.data.build_id}`;
+		await asyncExecShell(`rm -fr ${workdir}`);
+		await asyncExecShell(`rm /tmp/build-sources/${job.data.repository}/id.rsa`);
 	}
 	return;
 });
@@ -132,7 +134,9 @@ buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
 	} catch (error) {
 		console.log(error);
 	} finally {
-		await asyncExecShell(`rm -fr ${job.data.workdir}`);
+		const workdir = `/tmp/build-sources/${job.data.repository}/${job.data.build_id}`;
+		await asyncExecShell(`rm -fr ${workdir}`);
+		await asyncExecShell(`rm /tmp/build-sources/${job.data.repository}/id.rsa`);
 	}
 	saveBuildLog({ line: 'Failed build!', buildId: job.data.build_id, applicationId: job.data.id });
 	saveBuildLog({

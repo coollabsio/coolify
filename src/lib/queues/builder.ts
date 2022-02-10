@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import fs from 'fs/promises';
 import * as buildpacks from '../buildPacks';
 import * as importers from '../importers';
 import { dockerInstance } from '../docker';
@@ -208,10 +209,11 @@ export default async function (job) {
 		if (secrets.length > 0) {
 			secrets.forEach((secret) => {
 				if (!secret.isBuildSecret) {
-					envs.push(`--env ${secret.name}=${secret.value}`);
+					envs.push(`${secret.name}=${secret.value}`);
 				}
 			});
 		}
+		await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
 		const labels = makeLabelForStandaloneApplication({
 			applicationId,
 			fqdn,
@@ -230,14 +232,20 @@ export default async function (job) {
 			baseDirectory,
 			publishDirectory
 		});
-		saveBuildLog({ line: 'Deployment started.', buildId, applicationId });
-		const { stderr } = await asyncExecShell(
-			`DOCKER_HOST=${host} docker run ${envs.join(' ')} ${labels.join(
-				' '
-			)} --name ${imageId} --network ${docker.network} --restart always -d ${applicationId}:${tag}`
-		);
-		if (stderr) console.log(stderr);
-		saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
+		try {
+			saveBuildLog({ line: 'Deployment started.', buildId, applicationId });
+			const { stderr } = await asyncExecShell(
+				`DOCKER_HOST=${host} docker run --env-file=${workdir}/.env ${labels.join(
+					' '
+				)} --name ${imageId} --network ${
+					docker.network
+				} --restart always -d ${applicationId}:${tag}`
+			);
+			if (stderr) console.log(stderr);
+			saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
+		} catch (error) {
+			throw new Error(error);
+		}
 
 		if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
 			saveBuildLog({ line: 'Proxy configuration started!', buildId, applicationId });
