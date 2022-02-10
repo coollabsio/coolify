@@ -1,6 +1,6 @@
 # Coolify
 
-An open-source, hassle-free, self-hostable Heroku & Netlify alternative.
+An open-source & self-hostable Heroku / Netlify alternative.
 
 ## Support
 
