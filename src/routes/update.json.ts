@@ -10,14 +10,10 @@ export const get: RequestHandler = async () => {
 	try {
 		const currentVersion = version;
 		const versions = await got
-			.get(`https://get.coollabs.io/version.json?appId=${process.env['COOLIFY_APP_ID']}`)
+			.get(`https://get.coollabs.io/versions.json?appId=${process.env['COOLIFY_APP_ID']}`)
 			.json();
-		const latestVersion = versions['coolify-v2'].main.version;
+		const latestVersion = versions['coolify'].main.version;
 		const isUpdateAvailable = compare(latestVersion, currentVersion);
-		// if (isUpdateAvailable === 1) {
-		//     await asyncExecShell(`env | grep COOLIFY > .env`)
-		//     asyncExecShell(`docker compose pull`);
-		// }
 		return {
 			body: {
 				isUpdateAvailable: isUpdateAvailable === 1,
