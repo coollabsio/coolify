@@ -2,12 +2,6 @@
 
 An open-source, hassle-free, self-hostable Heroku & Netlify alternative.
 
-## Status
-
-This version is not usable yet. But it will be:
-
-![](https://media.tenor.com/images/4554562afdb531e5fe62e301afd22ea2/tenor.gif)
-
 ## Support
 
 - Twitter: [@andrasbacsai](https://twitter.com/andrasbacsai)
