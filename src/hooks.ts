@@ -7,7 +7,6 @@ import { version } from '$lib/common';
 import cookie from 'cookie';
 import { dev } from '$app/env';
 
-// EDGE case: Same COOLIFY_SECRET_KEY, but different database. Permission not found.
 export const handle = handleSession(
 	{
 		secret: process.env['COOLIFY_SECRET_KEY'],

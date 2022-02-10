@@ -29,12 +29,15 @@
 		databaseDbUserPassword = database.rootUserPassword;
 	} else if (database.type === 'redis') {
 		databaseDefault = '';
+		databaseDbUser = '';
 	}
 	let databaseUrl = generateUrl();
 
 	function generateUrl() {
 		return browser
-			? `${database.type}://${databaseDbUser}:${databaseDbUserPassword}@${
+			? `${database.type}://${
+					databaseDbUser ? databaseDbUser + ':' : ''
+			  }${databaseDbUserPassword}@${
 					isPublic
 						? settings.fqdn
 							? getDomain(settings.fqdn)

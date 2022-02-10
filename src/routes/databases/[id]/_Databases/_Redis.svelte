@@ -7,7 +7,7 @@
 	<div class="title">Redis</div>
 </div>
 <div class="px-10">
-	<div class="grid grid-cols-3 items-center">
+	<!-- <div class="grid grid-cols-3 items-center">
 		<label for="dbUser">User</label>
 		<div class="col-span-2 ">
 			<CopyPasswordField
@@ -19,7 +19,7 @@
 				bind:value={database.dbUser}
 			/>
 		</div>
-	</div>
+	</div> -->
 	<div class="grid grid-cols-3 items-center">
 		<label for="dbUserPassword">Password</label>
 		<div class="col-span-2 ">
@@ -34,7 +34,7 @@
 			/>
 		</div>
 	</div>
-	<div class="grid grid-cols-3 items-center">
+	<!-- <div class="grid grid-cols-3 items-center">
 		<label for="rootUser">Root User</label>
 		<div class="col-span-2 ">
 			<CopyPasswordField
@@ -60,5 +60,5 @@
 				value={database.rootUserPassword}
 			/>
 		</div>
-	</div>
+	</div> -->
 </div>

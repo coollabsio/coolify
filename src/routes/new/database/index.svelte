@@ -46,7 +46,13 @@
 <div class="pt-10">
 	<form on:submit|preventDefault={handleSubmit}>
 		<div class="flex flex-col items-center space-y-4">
-			<input name="name" placeholder="Database name" required bind:this={autofocus} value={name} />
+			<input
+				name="name"
+				placeholder="Database name"
+				required
+				bind:this={autofocus}
+				bind:value={name}
+			/>
 			<button type="submit" class="bg-purple-600 hover:bg-purple-500">Save</button>
 		</div>
 	</form>

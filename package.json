@@ -1,6 +1,6 @@
 {
 	"name": "coolify",
-	"description": "An open-source, hassle-free, self-hostable Heroku & Netlify alternative.",
+	"description": "An open-source & self-hostable Heroku / Netlify alternative.",
 	"version": "2.0.0",
 	"license": "AGPL-3.0",
 	"scripts": {
@@ -16,7 +16,8 @@
 		"db:generate": "prisma generate",
 		"db:push": "prisma db push && prisma generate",
 		"db:seed": "prisma db seed",
-		"release:coolify": "cross-var docker build -t coollabsio/coolify:$npm_package_version -t coollabsio/coolify:latest . && docker push coollabsio/coolify:$npm_package_version && docker image push coollabsio/coolify:$npm_package_version && docker push coollabsio/coolify:latest",
+		"prerelease": "cross-var docker build -t coollabsio/coolify:$npm_package_version -t coollabsio/coolify:latest .",
+		"release:coolify": "cross-var yarn prerelease && docker push coollabsio/coolify:$npm_package_version && docker image push coollabsio/coolify:$npm_package_version && docker push coollabsio/coolify:latest",
 		"release:haproxy": "docker build -f haproxy.Dockerfile -t coollabsio/coolify-haproxy-alpine:1.0.0 -t coollabsio/coolify-haproxy-alpine:latest . && docker image push --all-tags coollabsio/coolify-haproxy-alpine",
 		"release:haproxy:tcp": "docker build -f haproxy-tcp.Dockerfile -t coollabsio/coolify-haproxy-tcp-alpine:1.0.0 -t coollabsio/coolify-haproxy-tcp-alpine:latest . && docker image push --all-tags coollabsio/coolify-haproxy-tcp-alpine",
 		"release:haproxy:http": "docker build -f haproxy-http.Dockerfile -t coollabsio/coolify-haproxy-http-alpine:1.0.0 -t coollabsio/coolify-haproxy-http-alpine:latest . && docker image push --all-tags coollabsio/coolify-haproxy-http-alpine",
