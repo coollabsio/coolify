@@ -2,8 +2,8 @@
 	"compilerOptions": {
 		"moduleResolution": "node",
 		"module": "es2020",
-		"lib": ["es2020"],
-		"target": "es2019",
+		"lib": ["es2020", "DOM"],
+		"target": "es2020",
 		/**
 			svelte-preprocess cannot figure out whether you have a value or a type, so tell TypeScript
 			to enforce using \`import type\` instead of \`import\` for Types.
@@ -17,18 +17,14 @@
 			*/
 		"sourceMap": true,
 		"esModuleInterop": true,
-		"allowSyntheticDefaultImports": true,
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true,
 		"baseUrl": ".",
 		"allowJs": true,
 		"checkJs": true,
 		"paths": {
-			"$lib/*": ["src/lib/*"],
-			"$store": ["src/store/index.ts"],
-			"$api/*": ["src/routes/api/*"],
-			"$models/*": ["src/models/*"],
-			"$components/*": ["src/components/*"]
+			"$lib": ["src/lib"],
+			"$lib/*": ["src/lib/*"]
 		}
 	},
 	"include": ["src/**/*.d.ts", "src/**/*.js", "src/**/*.ts", "src/**/*.svelte"]

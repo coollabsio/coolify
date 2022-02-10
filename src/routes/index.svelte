@@ -1,116 +1,108 @@
-<script>
-	import { browser } from '$app/env';
-	import { goto } from '$app/navigation';
-	import { session } from '$app/stores';
-	import { toast } from '@zerodevx/svelte-toast';
-	import PasswordField from '$components/PasswordField.svelte';
-	import { request } from '$lib/request';
-	import { settings } from '$store';
-	import Loading from '$components/Loading.svelte';
-	let loading = false;
-	let email = null;
-	let password = null;
-	async function login() {
-		const left = screen.width / 2 - 1020 / 2;
-		const top = screen.height / 2 - 618 / 2;
-		const newWindow = open(
-			`https://github.com/login/oauth/authorize?client_id=${
-				import.meta.env.VITE_GITHUB_APP_CLIENTID
-			}`,
-			'Authenticate',
-			'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
-				top +
-				', left=' +
-				left +
-				', toolbar=0, menubar=0, status=0'
-		);
-		const timer = setInterval(() => {
-			if (newWindow?.closed) {
-				clearInterval(timer);
-								// WHY need to navigate to / to get cookies?!
-				browser && window.location.replace('/')
-			}
-		}, 100);
-	}
-	async function loginWithEmail() {
-		try {
-			loading = true;
-			const { message } = await request('/api/v1/login/email', $session, {
-				body: {
-					email,
-					password
+<script context="module" lang="ts">
+	import type { Load } from '@sveltejs/kit';
+	export const load: Load = async ({ fetch, session }) => {
+		const url = `/index.json`;
+		const res = await fetch(url);
+
+		if (res.ok) {
+			return {
+				props: {
+					...(await res.json())
 				}
-			});
-			toast.push(message);
-			setTimeout(() => {
-				// WHY need to navigate to / to get cookies?!
-				browser && window.location.replace('/')
-			}, 1000);
-		} catch (error) {
-			loading = false;
-			browser && toast.push(error.error || error || 'Ooops something went wrong.');
+			};
 		}
-	}
+
+		return {
+			status: res.status,
+			error: new Error(`Could not load ${url}`)
+		};
+	};
 </script>
 
-<div class="flex justify-center items-center h-screen w-full bg-warmGray-900">
-	<div class="max-w-7xl mx-auto px-4 sm:py-24 sm:px-6 lg:px-8">
-		<div class="text-center">
-			<p
-				class="mt-1 pb-8 font-extrabold text-white text-5xl sm:tracking-tight lg:text-6xl text-center"
-			>
-				<span class="border-gradient">Coolify</span>
-			</p>
-			<h2 class="text-2xl md:text-3xl font-extrabold text-white py-10">
-				An open-source, hassle-free, self-hostable<br />
-				<span class="text-indigo-400">Heroku</span>
-				& <span class="text-green-400">Netlify</span> alternative
-			</h2>
-			{#if loading}
-				<Loading fullscreen={false} />
-			{:else}
-				<div class="text-center py-10 max-w-7xl">
-					{#if !$session.isLoggedIn}
-						{#if $settings.clientId}
-							<button
-								class="text-white bg-warmGray-800 hover:bg-warmGray-700 rounded p-2 px-10 font-bold"
-								on:click={login}>Login with GitHub</button
-							>
-						{:else}
-							<div>
-								<div class="grid grid-flow-row gap-2 items-center pb-6">
-									<div class="grid grid-flow-row">
-										<label for="Email" class="">Email address</label>
-										<input
-											class="border-2"
-											id="Email"
-											bind:value={email}
-											placeholder="hi@coollabs.io"
-										/>
-									</div>
-									<div class="grid grid-flow-row">
-										<label for="Password" class="">Password</label>
-										<PasswordField bind:value={password} isEditable />
-									</div>
-								</div>
-								<div class="space-x-4 pt-10">
-									<button
-										class="text-white bg-warmGray-800 hover:bg-warmGray-700 rounded p-2 px-10 font-bold"
-										on:click={loginWithEmail}>Login with Email</button
-									>
-								</div>
-							</div>
-						{/if}
-					{:else}
-						<button
-							class="text-white bg-warmGray-800 hover:bg-warmGray-700 rounded p-2 px-10 font-bold"
-							on:click={() =>
-								$settings.clientId ? goto('/dashboard/applications') : goto('/dashboard/services')}
-							>Get Started</button
-						>
-					{/if}
-				</div>
-			{/if}
+<script lang="ts">
+	export let applicationsCount: number;
+	export let sourcesCount: number;
+	export let destinationsCount: number;
+	export let teamsCount: number;
+	export let databasesCount: number;
+	export let servicesCount: number;
+</script>
+
+<div class="flex space-x-1 p-6 font-bold">
+	<div class="mr-4 text-2xl tracking-tight">Dashboard</div>
+</div>
+
+<div class="mt-10 pb-12 tracking-tight sm:pb-16">
+	<div class="relative">
+		<div class="absolute inset-0 h-1/2" />
+		<div class="relative mx-auto px-4 sm:px-6 lg:px-8">
+			<div class="mx-auto max-w-4xl">
+				<dl class="gap-5 gap-y-16 sm:grid sm:grid-cols-3">
+					<a
+						href="/applications"
+						sveltekit:prefetch
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-green-500 no-underline transition duration-150 hover:bg-green-500 hover:text-white"
+					>
+						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
+							Applications
+						</dt>
+						<dd class="order-1 text-5xl font-extrabold ">
+							{applicationsCount}
+						</dd>
+					</a>
+					<a
+						href="/destinations"
+						sveltekit:prefetch
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-sky-500 no-underline transition duration-150 hover:bg-sky-500 hover:text-white"
+					>
+						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
+							Destinations
+						</dt>
+						<dd class="order-1 text-5xl font-extrabold ">
+							{destinationsCount}
+						</dd>
+					</a>
+					<a
+						href="/sources"
+						sveltekit:prefetch
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-orange-500 no-underline transition duration-150 hover:bg-orange-500 hover:text-white"
+					>
+						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
+							Git Sources
+						</dt>
+						<dd class="order-1 text-5xl font-extrabold ">
+							{sourcesCount}
+						</dd>
+					</a>
+					<a
+						href="/databases"
+						sveltekit:prefetch
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-purple-500 no-underline transition duration-150 hover:bg-purple-500 hover:text-white"
+					>
+						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">Databases</dt>
+						<dd class="order-1 text-5xl font-extrabold ">{databasesCount}</dd>
+					</a>
+					<a
+						href="/services"
+						sveltekit:prefetch
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-pink-500 no-underline transition duration-150 hover:bg-pink-500 hover:text-white"
+					>
+						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">Services</dt>
+						<dd class="order-1 text-5xl font-extrabold ">{servicesCount}</dd>
+					</a>
+
+					<a
+						href="/teams"
+						sveltekit:prefetch
+						class="flex cursor-pointer flex-col rounded p-6 text-center text-cyan-500 no-underline transition duration-150 hover:bg-cyan-500 hover:text-white"
+					>
+						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">Teams</dt>
+						<dd class="order-1 text-5xl font-extrabold ">
+							{teamsCount}
+						</dd>
+					</a>
+				</dl>
+			</div>
 		</div>
 	</div>
 </div>

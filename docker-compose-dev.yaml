@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  redis:
+    image: 'bitnami/redis:6.2'
+    container_name: coolify-redis
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    networks:
+      - coolify-infra
+    ports:
+      - target: 6379
+        published: 6379
+        protocol: tcp
+        mode: host
+
+networks:
+  coolify-infra:
+    attachable: true
+    name: coolify-infra

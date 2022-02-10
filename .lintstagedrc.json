@@ -1,0 +1,5 @@
+{
+	"**/*.{js,jsx,ts,tsx,cjs,svelte,json,css,scss,md,yaml}": [
+		"prettier --ignore-path .gitignore --write --plugin-search-dir=."
+	]
+}

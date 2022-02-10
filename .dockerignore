@@ -1,7 +1,11 @@
 .DS_Store
 node_modules
-/.svelte
 /build
-/functions
-.pnpm-store
-.pnpm-debug.log
+/.svelte-kit
+/package
+
+.env
+.env.stag
+/db/*.db
+/db/*.db-journal
+/data/haproxy/haproxy.cfg

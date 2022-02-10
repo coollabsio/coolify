@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  coolify:
+    image: coollabsio/coolify:latest
+    restart: always
+    container_name: coolify
+    ports:
+      - target: 3000
+        published: 3000
+        protocol: tcp
+        mode: host
+    volumes:
+      - 'coolify-db:/app/db'
+      - 'coolify-ssl-certs:/app/ssl'
+      - 'coolify-letsencrypt:/etc/letsencrypt'
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    env_file:
+      - '.env'
+    networks:
+      - coolify-infra
+    depends_on: ['redis']
+  redis:
+    image: bitnami/redis:6.2
+    restart: always
+    container_name: coolify-redis
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    networks:
+      - coolify-infra
+
+networks:
+  coolify-infra:
+    attachable: true
+    name: coolify-infra
+
+volumes:
+  coolify-db:
+    name: coolify-db
+  coolify-ssl-certs:
+    name: coolify-ssl-certs
+  coolify-letsencrypt:
+    name: coolify-letsencrypt

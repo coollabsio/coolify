@@ -1,0 +1,15 @@
+global
+  log stdout format raw local0 debug
+
+defaults 
+  mode tcp
+  log global
+
+frontend "${APP}"
+  mode tcp
+  bind *:"${PORT}" name "${APP}"
+  default_backend "${APP}"
+
+backend "${APP}"
+  mode tcp
+  server "${APP}" "${APP}":"${PRIVATE_PORT}" check

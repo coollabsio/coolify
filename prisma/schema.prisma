@@ -1,0 +1,298 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("COOLIFY_DATABASE_URL")
+}
+
+model Setting {
+  id                    String   @id @default(cuid())
+  fqdn                  String?  @unique
+  isRegistrationEnabled Boolean  @default(false)
+  proxyPassword         String
+  proxyUser             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model User {
+  id         String       @id @unique @default(cuid())
+  email      String       @unique
+  type       String
+  password   String?
+  teams      Team[]
+  permission Permission[]
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Permission {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  team       Team     @relation(fields: [teamId], references: [id])
+  teamId     String
+  permission String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Team {
+  id                String              @id @default(cuid())
+  users             User[]
+  name              String?
+  applications      Application[]
+  gitSources        GitSource[]
+  gitHubApps        GithubApp[]
+  gitLabApps        GitlabApp[]
+  destinationDocker DestinationDocker[]
+  permissions       Permission[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  database          Database[]          @relation(fields: [databaseId], references: [id])
+  databaseId        String?
+  service           Service[]           @relation(fields: [serviceId], references: [id])
+  serviceId         String?
+}
+
+model TeamInvitation {
+  id         String   @id @default(cuid())
+  uid        String
+  email      String
+  teamId     String
+  teamName   String
+  permission String
+  createdAt  DateTime @default(now())
+}
+
+model Application {
+  id                  String               @id @default(cuid())
+  name                String
+  fqdn                String?              @unique
+  repository          String?
+  configHash          String?
+  branch              String?
+  buildPack           String?
+  projectId           Int?
+  port                Int?
+  installCommand      String?
+  buildCommand        String?
+  startCommand        String?
+  baseDirectory       String?
+  publishDirectory    String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  settings            ApplicationSettings?
+  teams               Team[]
+  destinationDockerId String?
+  destinationDocker   DestinationDocker?   @relation(fields: [destinationDockerId], references: [id])
+  gitSourceId         String?
+  gitSource           GitSource?           @relation(fields: [gitSourceId], references: [id])
+  secrets             Secret[]
+}
+
+model ApplicationSettings {
+  id            String      @id @default(cuid())
+  application   Application @relation(fields: [applicationId], references: [id])
+  applicationId String      @unique
+  debug         Boolean     @default(false)
+  previews      Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Secret {
+  id            String      @id @default(cuid())
+  name          String      @unique
+  value         String
+  isBuildSecret Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  application   Application @relation(fields: [applicationId], references: [id])
+  applicationId String
+}
+
+model BuildLog {
+  id            String  @id @default(cuid())
+  applicationId String?
+  buildId       String
+  line          String
+  time          Int
+}
+
+model Build {
+  id                  String   @id @default(cuid())
+  type                String
+  applicationId       String?
+  destinationDockerId String?
+  gitSourceId         String?
+  githubAppId         String?
+  gitlabAppId         String?
+  commit              String?
+  status              String?  @default("queued")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model DestinationDocker {
+  id                 String        @id @default(cuid())
+  network            String        @unique
+  name               String
+  engine             String
+  remoteEngine       Boolean       @default(false)
+  isCoolifyProxyUsed Boolean?      @default(false)
+  teams              Team[]
+  application        Application[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  database           Database[]
+  service            Service[]
+}
+
+model GitSource {
+  id           String        @id @default(cuid())
+  name         String
+  teams        Team[]
+  type         String?
+  apiUrl       String?
+  htmlUrl      String?
+  organization String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  githubAppId  String?       @unique
+  githubApp    GithubApp?    @relation(fields: [githubAppId], references: [id])
+  application  Application[]
+  gitlabAppId  String?       @unique
+  gitlabApp    GitlabApp?    @relation(fields: [gitlabAppId], references: [id])
+}
+
+model GithubApp {
+  id             String     @id @default(cuid())
+  name           String?    @unique
+  teams          Team[]
+  appId          Int?
+  installationId Int?
+  clientId       String?
+  clientSecret   String?
+  webhookSecret  String?
+  privateKey     String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  gitSource      GitSource?
+}
+
+model GitlabApp {
+  id            String     @id @default(cuid())
+  oauthId       Int        @unique
+  groupName     String?    @unique
+  teams         Team[]
+  deployKeyId   Int?
+  privateSshKey String?
+  publicSshKey  String?
+  webhookToken  String?
+  appId         String?
+  appSecret     String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  gitSource     GitSource?
+}
+
+model Database {
+  id                  String             @id @default(cuid())
+  name                String
+  publicPort          Int?
+  defaultDatabase     String?
+  type                String?
+  version             String?
+  dbUser              String?
+  dbUserPassword      String?
+  rootUser            String?
+  rootUserPassword    String?
+  settings            DatabaseSettings?
+  destinationDocker   DestinationDocker? @relation(fields: [destinationDockerId], references: [id])
+  destinationDockerId String?
+  teams               Team[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+}
+
+model DatabaseSettings {
+  id         String   @id @default(cuid())
+  database   Database @relation(fields: [databaseId], references: [id])
+  databaseId String   @unique
+  isPublic   Boolean  @default(false)
+  appendOnly Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Service {
+  id                  String              @id @default(cuid())
+  name                String
+  fqdn                String?
+  type                String?
+  version             String?
+  teams               Team[]
+  destinationDockerId String?
+  destinationDocker   DestinationDocker?  @relation(fields: [destinationDockerId], references: [id])
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  plausibleAnalytics  PlausibleAnalytics?
+  minio               Minio?
+  vscodeserver        Vscodeserver?
+  wordpress           Wordpress?
+}
+
+model PlausibleAnalytics {
+  id                   String   @id @default(cuid())
+  email                String?
+  username             String?
+  password             String
+  postgresqlUser       String
+  postgresqlPassword   String
+  postgresqlDatabase   String
+  postgresqlPublicPort Int?
+  secretKeyBase        String?
+  serviceId            String   @unique
+  service              Service  @relation(fields: [serviceId], references: [id])
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Minio {
+  id               String   @id @default(cuid())
+  rootUser         String
+  rootUserPassword String
+  publicPort       Int?
+  serviceId        String   @unique
+  service          Service  @relation(fields: [serviceId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Vscodeserver {
+  id        String   @id @default(cuid())
+  password  String
+  serviceId String   @unique
+  service   Service  @relation(fields: [serviceId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Wordpress {
+  id                    String   @id @default(cuid())
+  extraConfig           String?
+  tablePrefix           String?
+  mysqlUser             String
+  mysqlPassword         String
+  mysqlRootUser         String
+  mysqlRootUserPassword String
+  mysqlDatabase         String?
+  mysqlPublicPort       Int?
+  serviceId             String   @unique
+  service               Service  @relation(fields: [serviceId], references: [id])
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}

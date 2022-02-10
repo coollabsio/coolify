@@ -1,0 +1,38 @@
+global
+  stats socket /var/run/api.sock user haproxy group haproxy mode 660 level admin expose-fd listeners
+  log stdout format raw local0 debug
+
+defaults 
+  mode http
+  log global
+  timeout http-request 60s
+  timeout connect 10s
+  timeout client 60s
+  timeout server 60s
+
+userlist haproxy-dataplaneapi 
+  user admin insecure-password "${HAPROXY_PASSWORD}"
+
+frontend http
+  mode http
+  bind :80
+  bind :443 ssl crt /usr/local/etc/haproxy/ssl/ alpn h2,http/1.1
+  acl is_certbot path_beg /.well-known/acme-challenge/
+  use_backend backend-certbot if is_certbot
+  use_backend %[req.hdr(host),lower]
+
+frontend stats 
+  bind *:8404
+  stats enable
+  stats uri /
+  stats refresh 5s
+  stats admin if TRUE
+  stats auth "${HAPROXY_USERNAME}:${HAPROXY_PASSWORD}"
+
+backend backend-certbot 
+  mode http
+  server certbot host.docker.internal:9080
+
+program api 
+  command /usr/bin/dataplaneapi -f /usr/local/etc/haproxy/dataplaneapi.hcl --userlist haproxy-dataplaneapi
+  no option start-on-reload

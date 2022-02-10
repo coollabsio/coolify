@@ -1,0 +1,288 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+	@apply h-full min-h-full;
+}
+body {
+	@apply min-h-screen overflow-x-hidden bg-coolblack text-sm text-white;
+}
+
+main,
+.main {
+	width: calc(100% - 4rem);
+	margin-left: 4rem;
+}
+
+input {
+	@apply w-96 select-all rounded border border-transparent bg-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:bg-transparent md:text-sm;
+}
+textarea {
+	@apply w-96 select-all rounded border border-transparent bg-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:bg-transparent md:text-sm;
+}
+
+select {
+	@apply rounded bg-coolgray-200 p-2 text-xs font-bold tracking-tight text-white outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:text-stone-600 md:text-sm;
+}
+
+label {
+	@apply inline-block w-64 text-xs tracking-tight md:text-sm;
+}
+
+button {
+	@apply rounded bg-coolgray-200 p-1 px-4 py-2 text-xs font-bold outline-none transition-all duration-100 hover:bg-coolgray-500 disabled:cursor-not-allowed disabled:bg-coolblack disabled:text-stone-600 md:text-sm;
+}
+
+a {
+	@apply underline hover:text-white;
+}
+
+.content {
+	@apply p-2 px-4;
+}
+
+.title {
+	@apply mr-4 text-base tracking-tight md:text-2xl;
+}
+.nav-main {
+	@apply fixed top-0 left-0 min-h-screen w-16 min-w-[4rem] border-r border-stone-800 bg-coolgray-200;
+}
+
+.nav-side {
+	@apply absolute right-0 top-0 z-50 m-5 flex items-center justify-end space-x-2 bg-coolblack/40 text-white;
+}
+
+.add-icon {
+	@apply rounded p-1 transition duration-200;
+}
+
+.icons {
+	@apply rounded p-2 transition duration-200 hover:bg-coolgray-500 disabled:bg-coolblack !important;
+}
+
+.arrow-right-applications {
+	@apply -ml-6 px-2 font-bold text-green-500;
+}
+
+.border-gradient {
+	border-bottom: 2px solid transparent;
+	-o-border-image: linear-gradient(
+		0.25turn,
+		rgba(255, 249, 34),
+		rgba(255, 0, 128),
+		rgba(56, 2, 155, 0)
+	);
+	border-image: linear-gradient(
+		0.25turn,
+		rgba(255, 249, 34),
+		rgba(255, 0, 128),
+		rgba(56, 2, 155, 0)
+	);
+	border-image-slice: 1;
+}
+.border-gradient-full {
+	border: 4px solid transparent;
+	-o-border-image: linear-gradient(
+		0.25turn,
+		rgba(255, 249, 34),
+		rgba(255, 0, 128),
+		rgba(56, 2, 155, 0)
+	);
+	border-image: linear-gradient(
+		0.25turn,
+		rgba(255, 249, 34),
+		rgba(255, 0, 128),
+		rgba(56, 2, 155, 0)
+	);
+	border-image-slice: 1;
+}
+/**
+ * Tooltip Styles
+ */
+
+/* Base styles for the element that has a tooltip */
+[data-tooltip],
+.tooltip {
+	position: relative;
+	cursor: pointer;
+}
+
+/* Base styles for the entire tooltip */
+[data-tooltip]:before,
+[data-tooltip]:after,
+.tooltip:before,
+.tooltip:after {
+	position: absolute;
+	visibility: hidden;
+	opacity: 0;
+	transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out,
+		transform 0.2s cubic-bezier(0.71, 1.7, 0.77, 1.24);
+	transform: translate3d(0, 0, 0);
+	pointer-events: none;
+}
+
+/* Show the entire tooltip on hover and focus */
+[data-tooltip]:hover:before,
+[data-tooltip]:hover:after,
+[data-tooltip]:focus:before,
+[data-tooltip]:focus:after,
+.tooltip:hover:before,
+.tooltip:hover:after,
+.tooltip:focus:before,
+.tooltip:focus:after {
+	visibility: visible;
+	opacity: 1;
+}
+
+/* Base styles for the tooltip's directional arrow */
+.tooltip:before,
+[data-tooltip]:before {
+	z-index: 1001;
+	border: 6px solid transparent;
+	background: transparent;
+	content: '';
+}
+
+/* Base styles for the tooltip's content area */
+.tooltip:after,
+[data-tooltip]:after {
+	z-index: 1000;
+	padding: 8px;
+	color: #fff;
+	content: attr(data-tooltip);
+	@apply min-w-[100px] rounded bg-coollabs text-center font-normal;
+}
+
+/* Directions */
+
+/* Top (default) */
+[data-tooltip]:before,
+[data-tooltip]:after,
+.tooltip:before,
+.tooltip:after,
+.tooltip-top:before,
+.tooltip-top:after {
+	bottom: 100%;
+	left: 50%;
+}
+
+/* Horizontally align top/bottom tooltips */
+[data-tooltip]:after,
+.tooltip:after,
+.tooltip-top:after {
+	margin-left: -80px;
+}
+
+[data-tooltip]:hover:before,
+[data-tooltip]:hover:after,
+[data-tooltip]:focus:before,
+[data-tooltip]:focus:after,
+.tooltip:hover:before,
+.tooltip:hover:after,
+.tooltip:focus:before,
+.tooltip:focus:after,
+.tooltip-top:hover:before,
+.tooltip-top:hover:after,
+.tooltip-top:focus:before,
+.tooltip-top:focus:after {
+	transform: translateY(-12px);
+}
+
+/* Left */
+.tooltip-left:before,
+.tooltip-left:after {
+	right: 100%;
+	bottom: 50%;
+	left: auto;
+}
+
+.tooltip-left:hover:before,
+.tooltip-left:hover:after,
+.tooltip-left:focus:before,
+.tooltip-left:focus:after {
+	transform: translateX(-12px);
+}
+
+/* Bottom */
+.tooltip-bottom:before,
+.tooltip-bottom:after {
+	top: 100%;
+	bottom: auto;
+	left: 50%;
+}
+
+.tooltip-bottom:hover:before,
+.tooltip-bottom:hover:after,
+.tooltip-bottom:focus:before,
+.tooltip-bottom:focus:after {
+	transform: translateY(12px);
+}
+
+/* Right */
+.tooltip-right:before,
+.tooltip-right:after {
+	bottom: 50%;
+	left: 100%;
+}
+
+.tooltip-right:hover:before,
+.tooltip-right:hover:after,
+.tooltip-right:focus:before,
+.tooltip-right:focus:after {
+	transform: translateX(12px);
+}
+
+/* Move directional arrows down a bit for left/right tooltips */
+.tooltip-left:before,
+.tooltip-right:before {
+	top: 12px;
+}
+
+/* Vertically center tooltip content for left/right tooltips */
+.tooltip-left:after,
+.tooltip-right:after {
+	margin-left: 0;
+	margin-bottom: -16px;
+}
+
+.box-selection {
+	@apply min-w-[16rem] max-w-[24rem] justify-center rounded-lg border-transparent bg-coolgray-200 p-6 shadow-lg transition duration-150 hover:scale-105 hover:border-transparent hover:bg-coolgray-400;
+}
+
+._toastBar {
+	@apply hidden !important;
+}
+._toastMsg {
+	@apply text-xs !important;
+}
+._toastBtn {
+	@apply text-xs !important;
+}
+._toastItem {
+	@apply bg-coollabs bg-opacity-80 !important;
+}
+
+.lds-heart {
+	animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+@keyframes lds-heart {
+	0% {
+		transform: scale(1);
+	}
+	5% {
+		transform: scale(1.2);
+	}
+	39% {
+		transform: scale(0.85);
+	}
+	45% {
+		transform: scale(1);
+	}
+	60% {
+		transform: scale(0.95);
+	}
+	100% {
+		transform: scale(0.9);
+	}
+}
