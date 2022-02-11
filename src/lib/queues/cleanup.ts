@@ -14,7 +14,11 @@ export default async function () {
 					`coollabsio/${defaultProxyImageTcp}`,
 					`coollabsio/${defaultProxyImageHttp}`,
 					'certbot/certbot:latest',
-					' alpine:latest'
+					'alpine:latest',
+					'nginx:stable-alpine',
+					'node:lts',
+					'php:apache',
+					'rust:latest'
 				];
 				for (const image of images) {
 					await asyncExecShell(
