@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   coolify:
-    image: coollabsio/coolify:latest
+    image: coollabsio/coolify:${TAG}
     restart: always
     container_name: coolify
     ports:

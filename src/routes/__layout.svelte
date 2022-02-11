@@ -48,7 +48,7 @@
 		checking: false,
 		success: null
 	};
-
+	let latestVersion = 'latest';
 	onMount(async () => {
 		if ($session.uid) {
 			try {
@@ -63,6 +63,7 @@
 				try {
 					const data = await get(`/update.json`);
 					if (data?.isUpdateAvailable) {
+						latestVersion = data.latestVersion;
 						await post(`/update.json`, { type: 'pull' });
 					}
 					isUpdateAvailable = data?.isUpdateAvailable;
@@ -95,54 +96,53 @@
 
 	async function update() {
 		updateStatus.loading = true;
-		if (!dev) {
-			try {
-				await post(`/update.json`, { type: 'update' });
-				toast.push('Update completed. Waiting for the new version to start...');
-				let reachable = false;
-				let tries = 0;
-				do {
-					await asyncSleep(4000);
-					try {
-						await get(`/undead.json`);
-						reachable = true;
-					} catch (error) {
-						reachable = false;
-					}
-					if (reachable) break;
-					tries++;
-				} while (!reachable || tries < 120);
-				toast.push('New version reachable. Reloading...');
-				updateStatus.loading = false;
-				updateStatus.success = true;
-				await asyncSleep(3000);
-				return window.location.reload();
-			} catch ({ error }) {
-				return errorNotification(error);
-			} finally {
-				updateStatus.success = false;
-				updateStatus.loading = false;
-			}
-		} else {
+		// if (!dev) {
+		try {
+			await post(`/update.json`, { type: 'update', latestVersion });
+			toast.push('Update completed. Waiting for the new version to start...');
 			let reachable = false;
 			let tries = 0;
 			do {
-				await asyncSleep(1000);
+				await asyncSleep(4000);
 				try {
 					await get(`/undead.json`);
 					reachable = true;
 				} catch (error) {
-					console.log(error);
 					reachable = false;
 				}
-				console.log(reachable);
 				if (reachable) break;
 				tries++;
 			} while (!reachable || tries < 120);
 			toast.push('New version reachable. Reloading...');
-			await asyncSleep(2000);
-			window.location.reload();
+			updateStatus.loading = false;
+			updateStatus.success = true;
+			await asyncSleep(3000);
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
+		} finally {
+			updateStatus.success = false;
+			updateStatus.loading = false;
 		}
+		// } else {
+		// 	let reachable = false;
+		// 	let tries = 0;
+		// 	do {
+		// 		await asyncSleep(1000);
+		// 		try {
+		// 			await get(`/undead.json`);
+		// 			reachable = true;
+		// 		} catch (error) {
+		// 			console.log(error);
+		// 			reachable = false;
+		// 		}
+		// 		if (reachable) break;
+		// 		tries++;
+		// 	} while (!reachable || tries < 120);
+		// 	toast.push('New version reachable. Reloading...');
+		// 	await asyncSleep(2000);
+		// 	window.location.reload();
+		// }
 	}
 </script>
 
