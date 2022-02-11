@@ -30,13 +30,13 @@ export const post: RequestHandler = async (event) => {
 	if (type === 'pull') {
 		try {
 			if (!dev) {
-				await asyncExecShell(`env | grep COOLIFY > .env`);
-				await asyncExecShell(`docker compose pull`);
+				await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
 				return {
 					status: 200,
 					body: {}
 				};
 			} else {
+				await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
 				await asyncSleep(2000);
 				return {
 					status: 200,
@@ -49,8 +49,9 @@ export const post: RequestHandler = async (event) => {
 	} else if (type === 'update') {
 		try {
 			if (!dev) {
+				await asyncExecShell(`env | grep COOLIFY > .env`);
 				await asyncExecShell(
-					`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify && docker stop -t 0 coolify-redis && docker compose up -d --force-recreate"`
+					`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify coolify-redis && docker rm coolify coolify-redis && docker compose up -d --force-recreate"`
 				);
 				return {
 					status: 200,

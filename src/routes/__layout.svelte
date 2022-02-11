@@ -39,8 +39,7 @@
 	import { errorNotification } from '$lib/form';
 	import { asyncSleep } from '$lib/components/common';
 	import { del, get, post } from '$lib/api';
-	import { dev } from '$app/env';
-	import Loading from '$lib/components/Loading.svelte';
+	import { browser } from '$app/env';
 
 	let isUpdateAvailable = false;
 	let updateStatus = {
@@ -51,6 +50,7 @@
 	let latestVersion = 'latest';
 	onMount(async () => {
 		if ($session.uid) {
+			const overrideVersion = browser && window.localStorage.getItem('latestVersion');
 			try {
 				await get(`/login.json`);
 			} catch ({ error }) {
@@ -62,11 +62,11 @@
 				updateStatus.checking = true;
 				try {
 					const data = await get(`/update.json`);
-					if (data?.isUpdateAvailable) {
-						latestVersion = data.latestVersion;
-						await post(`/update.json`, { type: 'pull' });
+					if (overrideVersion || data?.isUpdateAvailable) {
+						latestVersion = overrideVersion || data.latestVersion;
+						isUpdateAvailable = overrideVersion ? true : data?.isUpdateAvailable;
+						await post(`/update.json`, { type: 'pull', latestVersion });
 					}
-					isUpdateAvailable = data?.isUpdateAvailable;
 				} catch (error) {
 				} finally {
 					updateStatus.checking = false;
