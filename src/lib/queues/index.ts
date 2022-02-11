@@ -107,7 +107,7 @@ cron().catch((error) => {
 	console.log(error);
 });
 
-const buildQueueName = dev ? cuid() : 'build_queue';
+const buildQueueName = 'build_queue';
 const buildQueue = new Queue(buildQueueName, connectionOptions);
 const buildWorker = new Worker(buildQueueName, async (job) => await builder(job), {
 	concurrency: 2,
@@ -120,11 +120,8 @@ buildWorker.on('completed', async (job: Bullmq.Job) => {
 	} catch (err) {
 		console.log(err);
 	} finally {
-		const workdir = `/tmp/build-sources/${job.data.repository}/${job.data.build_id}`;
+		const workdir = `/tmp/build-sources/${job.data.repository}/`;
 		await asyncExecShell(`rm -fr ${workdir}`);
-		await asyncExecShell(
-			`test -f /tmp/build-sources/${job.data.repository}/id.rsa && rm /tmp/build-sources/${job.data.repository}/id.rsa`
-		);
 	}
 	return;
 });
@@ -136,11 +133,8 @@ buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
 	} catch (error) {
 		console.log(error);
 	} finally {
-		const workdir = `/tmp/build-sources/${job.data.repository}/${job.data.build_id}`;
+		const workdir = `/tmp/build-sources/${job.data.repository}`;
 		await asyncExecShell(`rm -fr ${workdir}`);
-		await asyncExecShell(
-			`test -f /tmp/build-sources/${job.data.repository}/id.rsa && rm /tmp/build-sources/${job.data.repository}/id.rsa`
-		);
 	}
 	saveBuildLog({ line: 'Failed build!', buildId: job.data.build_id, applicationId: job.data.id });
 	saveBuildLog({
