@@ -1,7 +1,7 @@
 {
 	"name": "coolify",
 	"description": "An open-source & self-hostable Heroku / Netlify alternative.",
-	"version": "2.0.3",
+	"version": "2.0.4",
 	"license": "AGPL-3.0",
 	"scripts": {
 		"dev": "docker-compose -f docker-compose-dev.yaml up -d && NODE_ENV=development svelte-kit dev --host 0.0.0.0",
@@ -16,6 +16,7 @@
 		"db:generate": "prisma generate",
 		"db:push": "prisma db push && prisma generate",
 		"db:seed": "prisma db seed",
+		"stagrelease": "cross-var docker build -t coollabsio/coolify:$npm_package_version && docker push coollabsio/coolify:$npm_package_version",
 		"prerelease": "cross-var docker build -t coollabsio/coolify:$npm_package_version -t coollabsio/coolify:latest .",
 		"release:coolify": "cross-var yarn prerelease && docker push coollabsio/coolify:$npm_package_version && docker image push coollabsio/coolify:$npm_package_version && docker push coollabsio/coolify:latest",
 		"release:haproxy": "docker build -f haproxy.Dockerfile -t coollabsio/coolify-haproxy-alpine:1.0.0 -t coollabsio/coolify-haproxy-alpine:latest . && docker image push --all-tags coollabsio/coolify-haproxy-alpine",

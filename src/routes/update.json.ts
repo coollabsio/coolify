@@ -12,7 +12,7 @@ export const get: RequestHandler = async () => {
 		const versions = await got
 			.get(`https://get.coollabs.io/versions.json?appId=${process.env['COOLIFY_APP_ID']}`)
 			.json();
-		const latestVersion = versions['coolify'].main.version;
+		const latestVersion = dev ? '10.0.0' : versions['coolify'].main.version;
 		const isUpdateAvailable = compare(latestVersion, currentVersion);
 		return {
 			body: {
@@ -26,7 +26,7 @@ export const get: RequestHandler = async () => {
 };
 
 export const post: RequestHandler = async (event) => {
-	const { type } = await event.request.json();
+	const { type, latestVersion } = await event.request.json();
 	if (type === 'pull') {
 		try {
 			if (!dev) {
@@ -50,13 +50,14 @@ export const post: RequestHandler = async (event) => {
 		try {
 			if (!dev) {
 				await asyncExecShell(
-					`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:latest /bin/sh -c "env | grep COOLIFY > .env && docker stop -t 0 coolify && docker stop -t 0 coolify-redis && docker compose up -d --force-recreate"`
+					`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:latest /bin/sh -c "env | grep COOLIFY > .env && docker stop -t 0 coolify && docker stop -t 0 coolify-redis && export TAG=${latestVersion} && docker compose up -d --force-recreate"`
 				);
 				return {
 					status: 200,
 					body: {}
 				};
 			} else {
+				console.log(latestVersion);
 				await asyncSleep(2000);
 				return {
 					status: 200,
