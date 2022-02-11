@@ -37,11 +37,9 @@ export async function configureDestinationForDatabase({ id, destinationId }) {
 		const host = getEngine(engine);
 		if (type && version) {
 			const baseImage = getDatabaseImage(type);
-			asyncExecShell(`DOCKER_HOST=${host} docker pull ${baseImage}:${version}`);
-			asyncExecShell(`DOCKER_HOST=${host} docker pull coollabsio/${defaultProxyImageTcp}`);
-			asyncExecShell(`DOCKER_HOST=${host} docker pull coollabsio/${defaultProxyImageHttp}`);
-			asyncExecShell(`DOCKER_HOST=${host} docker pull certbot/certbot:latest`);
-			asyncExecShell(`DOCKER_HOST=${host} docker pull alpine:latest`);
+			asyncExecShell(
+				`DOCKER_HOST=${host} docker pull ${baseImage}:${version} && echo "FROM ${baseImage}:${version}" | docker build --label coolify.managed="true" -t "${baseImage}:${version}" -`
+			);
 		}
 	}
 }
