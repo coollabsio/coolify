@@ -14,6 +14,7 @@ export default async function () {
 					`coollabsio/${defaultProxyImageTcp}`,
 					`coollabsio/${defaultProxyImageHttp}`,
 					'certbot/certbot:latest',
+					'node:16.14.0-alpine',
 					'alpine:latest',
 					'nginx:stable-alpine',
 					'node:lts',
