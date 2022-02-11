@@ -1,5 +1,5 @@
 import { encrypt } from '$lib/crypto';
-import { prisma, PrismaErrorHandler } from './common';
+import { prisma } from './common';
 
 export async function listSecrets({ applicationId }) {
 	return await prisma.secret.findMany({

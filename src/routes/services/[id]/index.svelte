@@ -36,6 +36,7 @@
 	import Wordpress from '$lib/components/svg/services/Wordpress.svelte';
 	import Services from './_Services/_Services.svelte';
 	import { getDomain } from '$lib/components/common';
+	import VaultWarden from '$lib/components/svg/services/VaultWarden.svelte';
 
 	export let service;
 	export let isRunning;
@@ -93,6 +94,10 @@
 		{:else if service.type === 'wordpress'}
 			<a href="https://wordpress.org" target="_blank">
 				<Wordpress />
+			</a>
+		{:else if service.type === 'vaultwarden'}
+			<a href="https://github.com/dani-garcia/vaultwarden" target="_blank">
+				<VaultWarden />
 			</a>
 		{/if}
 	</div>

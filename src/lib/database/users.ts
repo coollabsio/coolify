@@ -1,8 +1,8 @@
 import cuid from 'cuid';
 import bcrypt from 'bcrypt';
 
-import { prisma, PrismaErrorHandler } from './common';
-import { asyncExecShell, removeContainer, uniqueName } from '$lib/common';
+import { prisma } from './common';
+import { asyncExecShell, uniqueName } from '$lib/common';
 
 import * as db from '$lib/database';
 import { startCoolifyProxy } from '$lib/haproxy';

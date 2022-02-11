@@ -2,6 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* poppins-regular - latin-ext_latin_devanagari */
+@font-face {
+	font-family: 'Poppins';
+	font-style: normal;
+	font-weight: 400;
+	src: local(''), url('/poppins-v19-latin-ext_latin_devanagari-regular.woff2') format('woff2'),
+		/* Chrome 26+, Opera 23+, Firefox 39+ */
+			url('/poppins-v19-latin-ext_latin_devanagari-regular.woff') format('woff'); /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+/* poppins-500 - latin-ext_latin_devanagari */
+@font-face {
+	font-family: 'Poppins';
+	font-style: normal;
+	font-weight: 500;
+	src: local(''), url('/poppins-v19-latin-ext_latin_devanagari-500.woff2') format('woff2'),
+		/* Chrome 26+, Opera 23+, Firefox 39+ */ url('/poppins-v19-latin-ext_latin_devanagari-500.woff')
+			format('woff'); /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+
 html {
 	@apply h-full min-h-full;
 }

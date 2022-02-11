@@ -1,6 +1,6 @@
 import { decrypt, encrypt } from '$lib/crypto';
 import { removeProxyConfiguration } from '$lib/haproxy';
-import { asyncExecShell, getEngine, removeContainer } from '$lib/common';
+import { asyncExecShell, getEngine } from '$lib/common';
 
 import { getDomain, removeDestinationDocker } from '$lib/common';
 import { prisma } from './common';

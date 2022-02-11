@@ -12,7 +12,8 @@ export const get: RequestHandler = async (event) => {
 	try {
 		const destination = await db.getDestination({ id, teamId });
 		const settings = await db.listSettings();
-		const state = await checkContainer(destination.engine, 'coolify-haproxy');
+		const state =
+			destination?.engine && (await checkContainer(destination.engine, 'coolify-haproxy'));
 		return {
 			status: 200,
 			body: {

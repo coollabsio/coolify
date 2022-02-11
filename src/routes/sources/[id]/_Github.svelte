@@ -73,7 +73,9 @@
 						class:hover:bg-orange-500={!loading}
 						disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
 					>
-					<button on:click={() => installRepositories(source)}>Change GitHub App Settings</button>
+					<button on:click|preventDefault={() => installRepositories(source)}
+						>Change GitHub App Settings</button
+					>
 				{/if}
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">

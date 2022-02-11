@@ -36,6 +36,7 @@
 	import Wordpress from '$lib/components/svg/services/Wordpress.svelte';
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/api';
+	import VaultWarden from '$lib/components/svg/services/VaultWarden.svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -71,6 +72,8 @@
 						<VsCodeServer isAbsolute />
 					{:else if type.name === 'wordpress'}
 						<Wordpress isAbsolute />
+					{:else if type.name === 'vaultwarden'}
+						<VaultWarden isAbsolute />
 					{/if}{type.fancyName}
 				</button>
 			</form>

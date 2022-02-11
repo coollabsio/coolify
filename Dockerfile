@@ -8,6 +8,8 @@ RUN yarn build
 FROM node:16.14.0-alpine
 WORKDIR /app
 
+LABEL coolify.managed true
+
 RUN apk add --no-cache git openssh-client curl jq cmake sqlite
 
 RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@6

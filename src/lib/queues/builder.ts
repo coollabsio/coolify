@@ -7,6 +7,7 @@ import { asyncExecShell, createDirectories, getDomain, getEngine, saveBuildLog }
 import { configureProxyForApplication, reloadHaproxy } from '../haproxy';
 import * as db from '$lib/database';
 import { decrypt } from '$lib/crypto';
+import { sentry } from '$lib/common';
 import {
 	copyBaseConfigurationFiles,
 	makeLabelForStandaloneApplication,
@@ -246,19 +247,22 @@ export default async function (job) {
 		} catch (error) {
 			throw new Error(error);
 		}
-
-		if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-			saveBuildLog({ line: 'Proxy configuration started!', buildId, applicationId });
-			await configureProxyForApplication({ domain, imageId, applicationId, port });
-			if (isHttps) await letsEncrypt({ domain, id: applicationId });
-			await reloadHaproxy(destinationDocker.engine);
-			saveBuildLog({ line: 'Proxy configuration successful!', buildId, applicationId });
-		} else {
-			saveBuildLog({
-				line: 'Coolify Proxy is not configured for this destination. Nothing else to do.',
-				buildId,
-				applicationId
-			});
+		try {
+			if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
+				saveBuildLog({ line: 'Proxy configuration started!', buildId, applicationId });
+				await configureProxyForApplication({ domain, imageId, applicationId, port });
+				if (isHttps) await letsEncrypt({ domain, id: applicationId });
+				await reloadHaproxy(destinationDocker.engine);
+				saveBuildLog({ line: 'Proxy configuration successful!', buildId, applicationId });
+			} else {
+				saveBuildLog({
+					line: 'Coolify Proxy is not configured for this destination. Nothing else to do.',
+					buildId,
+					applicationId
+				});
+			}
+		} catch (error) {
+			sentry.captureException(error);
 		}
 	}
 }
