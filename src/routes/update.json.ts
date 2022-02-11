@@ -30,13 +30,13 @@ export const post: RequestHandler = async (event) => {
 	if (type === 'pull') {
 		try {
 			if (!dev) {
-				await asyncExecShell(`env | grep COOLIFY > .env`);
-				await asyncExecShell(`docker compose pull`);
+				await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
 				return {
 					status: 200,
 					body: {}
 				};
 			} else {
+				await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
 				await asyncSleep(2000);
 				return {
 					status: 200,
