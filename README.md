@@ -23,7 +23,6 @@ You can use the official ones or your self hosted version!
 - Local Docker Engine
 - Remote Docker Engine (WIP)
 - Kubernetes (WIP)
--
 
 ### Applications
 
