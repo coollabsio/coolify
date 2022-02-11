@@ -1,5 +1,5 @@
 import { decrypt, encrypt } from '$lib/crypto';
-import { prisma, PrismaErrorHandler } from './common';
+import { prisma } from './common';
 
 export async function addInstallation({ gitSourceId, installation_id }) {
 	const source = await prisma.gitSource.findUnique({

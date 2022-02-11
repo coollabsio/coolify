@@ -114,15 +114,6 @@ export async function updateDatabase({
 	});
 }
 
-// export async function setDatabaseSettings({ id, isPublic }) {
-//     try {
-//         await prisma.databaseSettings.update({ where: { databaseId: id }, data: { isPublic } })
-//         return { status: 201 }
-//     } catch (e) {
-//         throw PrismaErrorHandler(e)
-//     }
-// }
-
 export async function stopDatabase(database) {
 	let everStarted = false;
 	const {

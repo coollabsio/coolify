@@ -1,5 +1,5 @@
 import { encrypt } from '$lib/crypto';
-import { generateSshKeyPair, prisma, PrismaErrorHandler } from './common';
+import { generateSshKeyPair, prisma } from './common';
 
 export async function updateDeployKey({ id, deployKeyId }) {
 	const application = await prisma.application.findUnique({

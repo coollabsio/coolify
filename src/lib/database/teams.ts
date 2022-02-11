@@ -1,4 +1,4 @@
-import { prisma, PrismaErrorHandler } from './common';
+import { prisma } from './common';
 
 export async function listTeams() {
 	return await prisma.team.findMany();

@@ -1,8 +1,8 @@
 import { asyncExecShell, getEngine } from '$lib/common';
 import { dockerInstance } from '$lib/docker';
-import { defaultProxyImageHttp, defaultProxyImageTcp, startCoolifyProxy } from '$lib/haproxy';
+import { startCoolifyProxy } from '$lib/haproxy';
 import { getDatabaseImage } from '.';
-import { prisma, PrismaErrorHandler } from './common';
+import { prisma } from './common';
 
 export async function listDestinations(teamId) {
 	return await prisma.destinationDocker.findMany({ where: { teams: { some: { id: teamId } } } });

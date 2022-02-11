@@ -1,8 +1,7 @@
 import { decrypt, encrypt } from '$lib/crypto';
-import { dockerInstance } from '$lib/docker';
 import cuid from 'cuid';
 import { generatePassword } from '.';
-import { prisma, PrismaErrorHandler } from './common';
+import { prisma } from './common';
 
 export async function listServices(teamId) {
 	return await prisma.service.findMany({ where: { teams: { some: { id: teamId } } } });

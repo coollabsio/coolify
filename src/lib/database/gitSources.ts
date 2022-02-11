@@ -1,5 +1,5 @@
 import { decrypt, encrypt } from '$lib/crypto';
-import { prisma, PrismaErrorHandler } from './common';
+import { prisma } from './common';
 
 export async function listSources(teamId) {
 	return await prisma.gitSource.findMany({

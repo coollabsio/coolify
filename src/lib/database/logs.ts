@@ -7,7 +7,7 @@ export async function listLogs({ buildId, last = 0 }) {
 			orderBy: { time: 'asc' }
 		});
 		return [...body];
-	} catch (e) {
-		throw PrismaErrorHandler(e);
+	} catch (error) {
+		return PrismaErrorHandler(error);
 	}
 }

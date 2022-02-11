@@ -1,5 +1,5 @@
 import { getDomain } from '$lib/common';
-import { prisma, PrismaErrorHandler } from './common';
+import { prisma } from './common';
 
 export async function isBranchAlreadyUsed({ repository, branch, id }) {
 	const application = await prisma.application.findUnique({
