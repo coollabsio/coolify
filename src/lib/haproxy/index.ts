@@ -481,8 +481,12 @@ export async function startTcpProxy(destinationDocker, id, publicPort, privatePo
 
 	try {
 		if (foundDB && !found) {
+			const { stdout: Config } = await asyncExecShell(
+				`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
+			);
+			const ip = JSON.parse(Config)[0].Gateway;
 			return await asyncExecShell(
-				`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} -d coollabsio/${defaultProxyImageTcp}`
+				`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} -d coollabsio/${defaultProxyImageTcp}`
 			);
 		}
 	} catch (error) {
@@ -499,8 +503,12 @@ export async function startHttpProxy(destinationDocker, id, publicPort, privateP
 
 	try {
 		if (foundDB && !found) {
+			const { stdout: Config } = await asyncExecShell(
+				`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
+			);
+			const ip = JSON.parse(Config)[0].Gateway;
 			return await asyncExecShell(
-				`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} -d coollabsio/${defaultProxyImageHttp}`
+				`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} -d coollabsio/${defaultProxyImageHttp}`
 			);
 		}
 	} catch (error) {
@@ -512,8 +520,12 @@ export async function startCoolifyProxy(engine) {
 	const found = await checkContainer(engine, 'coolify-haproxy');
 	const { proxyPassword, proxyUser } = await db.listSettings();
 	if (!found) {
+		const { stdout: Config } = await asyncExecShell(
+			`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
+		);
+		const ip = JSON.parse(Config)[0].Gateway;
 		await asyncExecShell(
-			`DOCKER_HOST="${host}" docker run -e HAPROXY_USERNAME=${proxyUser} -e HAPROXY_PASSWORD=${proxyPassword} --restart always --add-host 'host.docker.internal:host-gateway' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "5000:5000" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`
+			`DOCKER_HOST="${host}" docker run -e HAPROXY_USERNAME=${proxyUser} -e HAPROXY_PASSWORD=${proxyPassword} --restart always --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "5000:5000" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`
 		);
 	}
 	await configureNetworkCoolifyProxy(engine);
