@@ -62,7 +62,7 @@
 				updateStatus.checking = true;
 				try {
 					const data = await get(`/update.json`);
-					if (data?.isUpdateAvailable) {
+					if (overrideVersion || data?.isUpdateAvailable) {
 						latestVersion = overrideVersion || data.latestVersion;
 						await post(`/update.json`, { type: 'pull', latestVersion });
 					}
