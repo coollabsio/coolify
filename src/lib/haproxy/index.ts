@@ -106,7 +106,11 @@ export async function forceSSLOffApplication({ domain }) {
 export async function forceSSLOnApplication({ domain }) {
 	if (!dev) {
 		const haproxy = await haproxyInstance();
-		await checkHAProxy(haproxy);
+		try {
+			await checkHAProxy(haproxy);
+		} catch (error) {
+			return;
+		}
 		const transactionId = await getNextTransactionId();
 
 		try {
@@ -278,7 +282,11 @@ export async function reloadHaproxy(engine) {
 }
 export async function configureProxyForApplication({ domain, imageId, applicationId, port }) {
 	const haproxy = await haproxyInstance();
-	await checkHAProxy(haproxy);
+	try {
+		await checkHAProxy(haproxy);
+	} catch (error) {
+		return;
+	}
 
 	let serverConfigured = false;
 	let backendAvailable: any = null;
@@ -358,7 +366,11 @@ export async function configureProxyForApplication({ domain, imageId, applicatio
 
 export async function configureCoolifyProxyOff({ domain }) {
 	const haproxy = await haproxyInstance();
-	await checkHAProxy(haproxy);
+	try {
+		await checkHAProxy(haproxy);
+	} catch (error) {
+		return;
+	}
 
 	try {
 		const transactionId = await getNextTransactionId();
@@ -388,7 +400,11 @@ export async function checkHAProxy(haproxy) {
 }
 export async function configureCoolifyProxyOn({ domain }) {
 	const haproxy = await haproxyInstance();
-	await checkHAProxy(haproxy);
+	try {
+		await checkHAProxy(haproxy);
+	} catch (error) {
+		return;
+	}
 	let serverConfigured = false;
 	let backendAvailable: any = null;
 	try {
@@ -627,12 +643,15 @@ export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 
 export async function configureSimpleServiceProxyOff({ domain }) {
 	const haproxy = await haproxyInstance();
-	await checkHAProxy(haproxy);
+	try {
+		await checkHAProxy(haproxy);
+	} catch (error) {
+		return;
+	}
 
 	try {
 		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
 		const transactionId = await getNextTransactionId();
-
 		await haproxy
 			.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
 				searchParams: {
