@@ -602,11 +602,7 @@ export async function configureNetworkCoolifyProxy(engine) {
 
 export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 	const haproxy = await haproxyInstance();
-	try {
-		await checkHAProxy(haproxy);
-	} catch (error) {
-		return;
-	}
+	await checkHAProxy(haproxy);
 	try {
 		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
 		return;

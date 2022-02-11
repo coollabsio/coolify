@@ -116,6 +116,12 @@ export const supportedServiceTypesAndVersions = [
 		fancyName: 'Wordpress',
 		baseImage: 'wordpress',
 		versions: ['latest', 'php8.1', 'php8.0', 'php7.4', 'php7.3']
+	},
+	{
+		name: 'vaultwarden',
+		fancyName: 'Vaultwarden',
+		baseImage: 'vaultwarden/server',
+		versions: ['latest']
 	}
 ];
 

@@ -99,6 +99,13 @@ export async function configureServiceType({ id, type }) {
 				wordpress: { create: { mysqlPassword, mysqlRootUserPassword, mysqlRootUser, mysqlUser } }
 			}
 		});
+	} else if (type === 'vaultwarden') {
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type
+			}
+		});
 	}
 }
 export async function setService({ id, version }) {
@@ -113,6 +120,9 @@ export async function updatePlausibleAnalyticsService({ id, fqdn, email, usernam
 	await prisma.service.update({ where: { id }, data: { name, fqdn } });
 }
 export async function updateNocoDbOrMinioService({ id, fqdn, name }) {
+	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
+}
+export async function updateVaultWardenService({ id, fqdn, name }) {
 	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
 }
 export async function updateVsCodeServer({ id, fqdn, name }) {

@@ -25,6 +25,7 @@
 	import MinIo from '$lib/components/svg/services/MinIO.svelte';
 	import VsCodeServer from '$lib/components/svg/services/VSCodeServer.svelte';
 	import Wordpress from '$lib/components/svg/services/Wordpress.svelte';
+	import VaultWarden from '$lib/components/svg/services/VaultWarden.svelte';
 
 	export let services;
 </script>
@@ -67,6 +68,8 @@
 						<VsCodeServer isAbsolute />
 					{:else if service.type === 'wordpress'}
 						<Wordpress isAbsolute />
+					{:else if service.type === 'vaultwarden'}
+						<VaultWarden isAbsolute />
 					{/if}
 					<div class="font-bold text-xl text-center truncate">
 						{service.name}
