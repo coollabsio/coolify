@@ -2,6 +2,62 @@
 
 An open-source & self-hostable Heroku / Netlify alternative.
 
+## Installation
+
+Installation is automated with the following command:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://get.coollabs.io/coolify/install.sh)"
+```
+
+### Git providers
+
+You can use the official ones or your self hosted version!
+
+- Github
+- GitLab
+- Bitbucket (WIP)
+
+### Destinations
+
+- Local Docker Engine
+- Remote Docker Engine (WIP)
+- Kubernetes (WIP)
+-
+
+### Applications
+
+- Static sites
+- NodeJS
+- VueJS
+- NuxtJS
+- NextJS
+- React/Preact
+- NextJS
+- Gatsby
+- Svelte
+- PHP
+- Rust
+- Dockerfile (you can provide it)
+
+### Databases
+
+- MongoDB
+- MySQL
+- PostgreSQL
+- CouchDB
+- Redis
+
+### One-click services
+
+- [WordPress](https://wordpress.org)
+- [Plausible Analytics](https://plausible.io)
+- [NocoDB](https://nocodb.com)
+- [VSCode Server](https://github.com/cdr/code-server)
+- [MinIO](https://min.io)
+- [VaultWarden](https://github.com/dani-garcia/vaultwarden)
+-
+
 ## Support
 
 - Twitter: [@andrasbacsai](https://twitter.com/andrasbacsai)
@@ -12,6 +68,8 @@ An open-source & self-hostable Heroku / Netlify alternative.
 ## Roadmap
 
 [See the Roadmap here](https://github.com/coollabsio/coolify/projects/1)
+
+(Will be updated soon!)
 
 ## License
 
