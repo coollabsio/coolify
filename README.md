@@ -10,8 +10,12 @@ Installation is automated with the following command:
 /bin/bash -c "$(curl -fsSL https://get.coollabs.io/coolify/install.sh)"
 ```
 
-### Git providers
+## Migration from v1
 
+A fresh installation is necessary. v2 is not compatible with v1.
+
+## Features
+### Git Sources
 You can use the official ones or your self hosted version!
 
 - Github
@@ -23,6 +27,7 @@ You can use the official ones or your self hosted version!
 - Local Docker Engine
 - Remote Docker Engine (WIP)
 - Kubernetes (WIP)
+
 
 ### Applications
 
@@ -55,7 +60,7 @@ You can use the official ones or your self hosted version!
 - [VSCode Server](https://github.com/cdr/code-server)
 - [MinIO](https://min.io)
 - [VaultWarden](https://github.com/dani-garcia/vaultwarden)
--
+
 
 ## Support
 
