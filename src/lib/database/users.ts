@@ -28,12 +28,12 @@ export async function login({ email, password }) {
 				console.log('Network created');
 			})
 			.catch(() => {
-				console.log('Network already exists');
+				console.log('Network already exists.');
 			});
 
 		startCoolifyProxy('/var/run/docker.sock')
 			.then(() => {
-				console.log('Coolify Proxy Started');
+				console.log('Coolify Proxy started.');
 			})
 			.catch((err) => {
 				console.log(err);

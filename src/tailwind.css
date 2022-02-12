@@ -35,7 +35,7 @@ main,
 }
 
 input {
-	@apply w-96 select-all rounded border border-transparent bg-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:bg-transparent md:text-sm;
+	@apply h-12 w-96 select-all rounded border border-transparent bg-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:bg-transparent md:text-sm;
 }
 textarea {
 	@apply w-96 select-all rounded border border-transparent bg-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:bg-transparent md:text-sm;
@@ -50,7 +50,7 @@ label {
 }
 
 button {
-	@apply rounded bg-coolgray-200 p-1 px-4 py-2 text-xs font-bold outline-none transition-all duration-100 hover:bg-coolgray-500 disabled:cursor-not-allowed disabled:bg-coolblack disabled:text-stone-600 md:text-sm;
+	@apply rounded bg-coolgray-200 p-1 px-2 py-1 text-xs font-bold outline-none transition-all duration-100 hover:bg-coolgray-500 disabled:cursor-not-allowed disabled:bg-coolblack disabled:text-stone-600;
 }
 
 a {
