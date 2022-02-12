@@ -105,13 +105,15 @@ model ApplicationSettings {
 
 model Secret {
   id            String      @id @default(cuid())
-  name          String      @unique
+  name          String      
   value         String
   isBuildSecret Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   application   Application @relation(fields: [applicationId], references: [id])
   applicationId String
+
+  @@unique([name, applicationId])
 }
 
 model BuildLog {

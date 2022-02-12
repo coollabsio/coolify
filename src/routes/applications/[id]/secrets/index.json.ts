@@ -33,7 +33,7 @@ export const post: RequestHandler = async (event) => {
 		const found = await db.isSecretExists({ id, name });
 		if (found) {
 			throw {
-				error: `Secret ${name} already exists`
+				error: `Secret ${name} already exists.`
 			};
 		} else {
 			await db.createSecret({ id, name, value, isBuildSecret });
