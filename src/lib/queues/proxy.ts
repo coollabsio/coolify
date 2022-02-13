@@ -7,6 +7,7 @@ import {
 	configureProxyForApplication,
 	forceSSLOnApplication,
 	reloadHaproxy,
+	setWwwRedirection,
 	startCoolifyProxy
 } from '$lib/haproxy';
 import * as db from '$lib/database';
@@ -40,6 +41,7 @@ export default async function () {
 							});
 							const isHttps = fqdn.startsWith('https://');
 							if (isHttps) await forceSSLOnApplication({ domain });
+							await setWwwRedirection(fqdn);
 						}
 					}
 				}
@@ -52,6 +54,7 @@ export default async function () {
 			const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy');
 			if (!found) await startCoolifyProxy('/var/run/docker.sock');
 			await configureCoolifyProxyOn({ domain });
+			await setWwwRedirection(fqdn);
 			const isHttps = fqdn.startsWith('https://');
 			if (isHttps) await forceSSLOnApplication({ domain });
 		}

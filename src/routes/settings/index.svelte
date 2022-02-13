@@ -106,7 +106,7 @@
 			<div class="px-4 sm:px-6">
 				<div class="flex space-x-4 py-4 px-4">
 					<p class="pt-2 text-base font-bold text-stone-100">Domain (FQDN)</p>
-					<div class="justify-center text-center">
+					<div class="justify-center">
 						<input
 							bind:value={fqdn}
 							readonly={!$session.isAdmin || isFqdnSet}
