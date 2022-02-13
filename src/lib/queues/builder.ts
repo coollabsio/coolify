@@ -205,9 +205,7 @@ export default async function (job) {
 		const envs = [];
 		if (secrets.length > 0) {
 			secrets.forEach((secret) => {
-				if (!secret.isBuildSecret) {
-					envs.push(`${secret.name}=${secret.value}`);
-				}
+				envs.push(`${secret.name}=${secret.value}`);
 			});
 		}
 		await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
