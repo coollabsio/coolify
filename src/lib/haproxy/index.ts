@@ -1,5 +1,5 @@
 import { dev } from '$app/env';
-import { asyncExecShell, getEngine } from '$lib/common';
+import { asyncExecShell, getDomain, getEngine } from '$lib/common';
 import got from 'got';
 import * as db from '$lib/database';
 import { letsEncrypt } from '$lib/letsencrypt';
@@ -50,8 +50,8 @@ export async function completeTransaction(transactionId) {
 }
 
 export async function removeProxyConfiguration({ domain }) {
-	const haproxy = await haproxyInstance();
 	const transactionId = await getNextTransactionId();
+	const haproxy = await haproxyInstance();
 	const backendFound = await haproxy
 		.get(`v2/services/haproxy/configuration/backends/${domain}`)
 		.json();
@@ -63,8 +63,32 @@ export async function removeProxyConfiguration({ domain }) {
 				}
 			})
 			.json();
-		await completeTransaction(transactionId);
 	}
+	const rules: any = await haproxy
+		.get(`v2/services/haproxy/configuration/http_request_rules`, {
+			searchParams: {
+				parent_name: 'http',
+				parent_type: 'frontend'
+			}
+		})
+		.json();
+	if (rules.data.length > 0) {
+		const rule = rules.data.find((rule) =>
+			rule.redir_value.includes(`${domain}%[capture.req.uri]`)
+		);
+		if (rule) {
+			await haproxy
+				.delete(`v2/services/haproxy/configuration/http_request_rules/${rule.index}`, {
+					searchParams: {
+						transaction_id: transactionId,
+						parent_name: 'http',
+						parent_type: 'frontend'
+					}
+				})
+				.json();
+		}
+	}
+	await completeTransaction(transactionId);
 }
 export async function forceSSLOffApplication({ domain }) {
 	if (!dev) {
@@ -124,7 +148,9 @@ export async function forceSSLOnApplication({ domain }) {
 				.json();
 			let nextRule = 0;
 			if (rules.data.length > 0) {
-				const rule = rules.data.find((rule) => rule.cond_test.includes(`-i ${domain}`));
+				const rule = rules.data.find((rule) =>
+					rule.cond_test.includes(`{ hdr(host) -i ${domain} } !{ ssl_fc }`)
+				);
 				if (rule) return;
 				nextRule = rules.data[rules.data.length - 1].index + 1;
 			}
@@ -138,7 +164,7 @@ export async function forceSSLOnApplication({ domain }) {
 					json: {
 						index: nextRule,
 						cond: 'if',
-						cond_test: `{ hdr(Host) -i ${domain} } !{ ssl_fc }`,
+						cond_test: `{ hdr(host) -i ${domain} } !{ ssl_fc }`,
 						type: 'redirect',
 						redir_type: 'scheme',
 						redir_value: 'https',
@@ -571,4 +597,60 @@ export async function configureSimpleServiceProxyOff({ domain }) {
 		await completeTransaction(transactionId);
 	} catch (error) {}
 	return;
+}
+
+export async function setWwwRedirection(fqdn) {
+	const haproxy = await haproxyInstance();
+	try {
+		await checkHAProxy(haproxy);
+	} catch (error) {
+		return;
+	}
+	const transactionId = await getNextTransactionId();
+
+	try {
+		const domain = getDomain(fqdn);
+		const isHttps = fqdn.startsWith('https://');
+		const isWWW = fqdn.includes('www.');
+		const rules: any = await haproxy
+			.get(`v2/services/haproxy/configuration/http_request_rules`, {
+				searchParams: {
+					parent_name: 'http',
+					parent_type: 'frontend'
+				}
+			})
+			.json();
+		let nextRule = 0;
+		if (rules.data.length > 0) {
+			const rule = rules.data.find((rule) =>
+				rule.redir_value.includes(`${domain}%[capture.req.uri]`)
+			);
+			if (rule) return;
+			nextRule = rules.data[rules.data.length - 1].index + 1;
+		}
+		const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
+		await haproxy
+			.post(`v2/services/haproxy/configuration/http_request_rules`, {
+				searchParams: {
+					transaction_id: transactionId,
+					parent_name: 'http',
+					parent_type: 'frontend'
+				},
+				json: {
+					index: nextRule,
+					cond: `${isWWW ? 'unless' : 'if'}`,
+					cond_test: `{ hdr_beg(host) -i www }`,
+					type: 'redirect',
+					redir_type: 'location',
+					redir_value: redirectValue,
+					redir_code: 301
+				}
+			})
+			.json();
+	} catch (error) {
+		console.log(error);
+		throw error;
+	} finally {
+		await completeTransaction(transactionId);
+	}
 }

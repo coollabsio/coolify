@@ -266,7 +266,7 @@
 						required
 					/>
 					<Explainer
-						text="If you specify <span class='text-green-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>To modify the domain, you must first stop the application."
+						text="If you specify <span class='text-green-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-green-600 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application."
 					/>
 				</div>
 			</div>

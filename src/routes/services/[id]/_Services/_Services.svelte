@@ -110,25 +110,9 @@
 						required
 					/>
 					<Explainer
-						text="If you specify <span class='text-green-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you."
+						text="If you specify <span class='text-pink-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-pink-600 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application."
 					/>
 				</div>
-				<!-- {:else}
-					<label for="fqdn" class="pt-2">Domain (FQDN)</label>
-					<div class="col-span-2 ">
-						<CopyPasswordField
-							placeholder="eg: https://analytics.coollabs.io"
-							readonly={!$session.isAdmin}
-							name="fqdn"
-							id="fqdn"
-							bind:value={service.fqdn}
-							required
-						/>
-						<Explainer
-							text="If you specify <span class='text-green-600'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you."
-						/>
-					</div>
-				{/if} -->
 			</div>
 			{#if service.type === 'plausibleanalytics'}
 				<PlausibleAnalytics bind:service {readOnly} />

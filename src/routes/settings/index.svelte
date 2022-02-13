@@ -118,7 +118,7 @@
 							required
 						/>
 						<Explainer
-							text="Set the fully qualified domain name for your Coolify instance. <br>If you specify <span class='text-green-600 font-bold'>https</span>, it will be accessible only over https. <br>SSL certificate will be generated for you."
+							text="If you specify <span class='text-green-600 font-bold'>https</span>, Coolify will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-green-600 font-bold'>www</span>, Coolify will be redirected (302) from non-www and vice versa."
 						/>
 					</div>
 				</div>
