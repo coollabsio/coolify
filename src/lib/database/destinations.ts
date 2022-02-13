@@ -109,22 +109,4 @@ export async function setDestinationSettings({ engine, isCoolifyProxyUsed }) {
 		where: { engine },
 		data: { isCoolifyProxyUsed }
 	});
-
-	// if (isCoolifyProxyUsed) {
-	//     await installCoolifyProxy(engine)
-	//     await configureNetworkCoolifyProxy(engine)
-	// } else {
-	//     // TODO: must check if other destination is using the proxy??? or not?
-	//     const domain = await prisma.setting.findUnique({ where: { name: 'domain' }, rejectOnNotFound: false })
-	//     if (!domain) {
-	//         await uninstallCoolifyProxy(engine)
-	//     } else {
-	//         return {
-	//             stastus: 500,
-	//             body: {
-	//                 message: 'You can not disable the Coolify proxy while the domain is set for Coolify itself.'
-	//             }
-	//         }
-	//     }
-	// }
 }

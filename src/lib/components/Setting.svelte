@@ -6,7 +6,6 @@
 	export let description;
 	export let isPadding = true;
 	export let disabled = false;
-	// export let disabledReason = '';
 </script>
 
 <li class="flex items-center py-4">
@@ -14,11 +13,6 @@
 		<p class="text-xs font-bold text-stone-100 md:text-base">{title}</p>
 		<Explainer text={description} />
 	</div>
-	<!-- {#if disabled}
-		<div class="flex" class:px-4={isPadding} class:pr-32={!isPadding}>
-			<p class="text-xs font-bold text-stone-400">{disabledReason}</p>
-		</div>
-	{:else} -->
 	<div
 		type="button"
 		on:click

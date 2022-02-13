@@ -4,7 +4,7 @@ import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
 import { letsEncrypt } from '$lib/letsencrypt';
-import { configureSimpleServiceProxyOn, reloadHaproxy } from '$lib/haproxy';
+import { configureSimpleServiceProxyOn, reloadHaproxy, setWwwRedirection } from '$lib/haproxy';
 import { getDomain } from '$lib/components/common';
 import { PrismaErrorHandler } from '$lib/database';
 
@@ -80,6 +80,7 @@ export const post: RequestHandler = async (event) => {
 			if (isHttps) {
 				await letsEncrypt({ domain, id });
 			}
+			await setWwwRedirection(fqdn);
 			await reloadHaproxy(destinationDocker.engine);
 			return {
 				status: 200

@@ -9,6 +9,8 @@ import {
 	forceSSLOffApplication,
 	forceSSLOnApplication,
 	reloadHaproxy,
+	removeWwwRedirection,
+	setWwwRedirection,
 	startCoolifyProxy
 } from '$lib/haproxy';
 import { letsEncrypt } from '$lib/letsencrypt';
@@ -45,9 +47,10 @@ export const del: RequestHandler = async (event) => {
 	const { fqdn } = await event.request.json();
 
 	try {
-		await db.prisma.setting.update({ where: { fqdn }, data: { fqdn: null } });
 		const domain = getDomain(fqdn);
-		await configureCoolifyProxyOff({ domain });
+		await db.prisma.setting.update({ where: { fqdn }, data: { fqdn: null } });
+		await configureCoolifyProxyOff(fqdn);
+		await removeWwwRedirection(domain);
 		return {
 			status: 201
 		};
@@ -77,9 +80,10 @@ export const post: RequestHandler = async (event) => {
 			await db.prisma.setting.update({ where: { id }, data: { isRegistrationEnabled } });
 		}
 		if (oldFqdn && oldFqdn !== fqdn) {
-			const oldDomain = getDomain(oldFqdn);
 			if (oldFqdn) {
-				await configureCoolifyProxyOff({ domain: oldDomain });
+				const oldDomain = getDomain(oldFqdn);
+				await configureCoolifyProxyOff(oldFqdn);
+				await removeWwwRedirection(oldDomain);
 			}
 		}
 		if (fqdn) {
@@ -88,7 +92,8 @@ export const post: RequestHandler = async (event) => {
 			const domain = getDomain(fqdn);
 			const isHttps = fqdn.startsWith('https://');
 			if (domain) {
-				await configureCoolifyProxyOn({ domain });
+				await configureCoolifyProxyOn(fqdn);
+				await setWwwRedirection(fqdn);
 				if (isHttps && !dev) {
 					await letsEncrypt({ domain, isCoolify: true });
 					await forceSSLOnApplication({ domain });

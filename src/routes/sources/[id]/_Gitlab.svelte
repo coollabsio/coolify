@@ -71,8 +71,6 @@
 				window.open(`${source.htmlUrl}/groups/${payload.groupName}/-/settings/applications`);
 				break;
 			case 'instance':
-				// TODO: This is not correct
-				// window.location.assign(`${source.htmlUrl}/-/profile/applications`);
 				break;
 			default:
 				break;

@@ -7,6 +7,7 @@ import { letsEncrypt } from '$lib/letsencrypt';
 import {
 	configureSimpleServiceProxyOn,
 	reloadHaproxy,
+	setWwwRedirection,
 	startHttpProxy,
 	startTcpProxy
 } from '$lib/haproxy';
@@ -86,13 +87,13 @@ export const post: RequestHandler = async (event) => {
 		try {
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
 			await configureSimpleServiceProxyOn({ id, domain, port: consolePort });
-
 			await db.updateMinioService({ id, publicPort });
 			await startHttpProxy(destinationDocker, id, publicPort, apiPort);
 
 			if (isHttps) {
 				await letsEncrypt({ domain, id });
 			}
+			await setWwwRedirection(fqdn);
 			await reloadHaproxy(destinationDocker.engine);
 			return {
 				status: 200

@@ -144,28 +144,6 @@ buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
 	});
 });
 
-// const letsEncryptQueueName = dev ? cuid() : 'letsencrypt_queue'
-// const letsEncryptQueue = new Queue(letsEncryptQueueName, connectionOptions)
-
-// const letsEncryptWorker = new Worker(letsEncryptQueueName, async (job) => await letsencrypt(job), {
-//   concurrency: 1,
-//   ...connectionOptions
-// })
-// letsEncryptWorker.on('completed', async () => {
-//   // TODO: Save letsencrypt logs as build logs!
-//   console.log('[DEBUG] Lets Encrypt job completed')
-// })
-
-// letsEncryptWorker.on('failed', async (job: Job, failedReason: string) => {
-//   try {
-//     await prisma.applicationSettings.updateMany({ where: { applicationId: job.data.id }, data: { forceSSL: false } })
-//   } catch (error) {
-//     console.log(error)
-//   }
-//   console.log('[DEBUG] Lets Encrypt job failed')
-//   console.log(failedReason)
-// })
-
 const buildLogQueueName = dev ? cuid() : 'log_queue';
 const buildLogQueue = new Queue(buildLogQueueName, connectionOptions);
 const buildLogWorker = new Worker(buildLogQueueName, async (job) => await logger(job), {

@@ -25,9 +25,7 @@ export const get: RequestHandler = async (event) => {
 					state = 'running';
 				}
 			} catch (error) {
-				// if (!error.stderr.includes('No such object')) {
-				//     console.log(error)
-				// }
+				//
 			}
 		}
 		const configuration = generateDatabaseConfiguration(database);

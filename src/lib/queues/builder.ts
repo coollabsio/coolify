@@ -4,7 +4,7 @@ import * as buildpacks from '../buildPacks';
 import * as importers from '../importers';
 import { dockerInstance } from '../docker';
 import { asyncExecShell, createDirectories, getDomain, getEngine, saveBuildLog } from '../common';
-import { configureProxyForApplication, reloadHaproxy } from '../haproxy';
+import { configureProxyForApplication, reloadHaproxy, setWwwRedirection } from '../haproxy';
 import * as db from '$lib/database';
 import { decrypt } from '$lib/crypto';
 import { sentry } from '$lib/common';
@@ -64,10 +64,6 @@ export default async function (job) {
 	if (destinationDockerId) {
 		destinationType = 'docker';
 	}
-	// Not implemented yet
-	// if (destinationKubernetesId) {
-	//   destinationType = 'kubernetes'
-	// }
 
 	if (destinationType === 'docker') {
 		const docker = dockerInstance({ destinationDocker });
@@ -209,9 +205,7 @@ export default async function (job) {
 		const envs = [];
 		if (secrets.length > 0) {
 			secrets.forEach((secret) => {
-				if (!secret.isBuildSecret) {
-					envs.push(`${secret.name}=${secret.value}`);
-				}
+				envs.push(`${secret.name}=${secret.value}`);
 			});
 		}
 		await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
@@ -252,6 +246,7 @@ export default async function (job) {
 				saveBuildLog({ line: 'Proxy configuration started!', buildId, applicationId });
 				await configureProxyForApplication({ domain, imageId, applicationId, port });
 				if (isHttps) await letsEncrypt({ domain, id: applicationId });
+				await setWwwRedirection(fqdn);
 				await reloadHaproxy(destinationDocker.engine);
 				saveBuildLog({ line: 'Proxy configuration successful!', buildId, applicationId });
 			} else {

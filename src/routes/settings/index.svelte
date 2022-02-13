@@ -106,7 +106,7 @@
 			<div class="px-4 sm:px-6">
 				<div class="flex space-x-4 py-4 px-4">
 					<p class="pt-2 text-base font-bold text-stone-100">Domain (FQDN)</p>
-					<div class="justify-center text-center">
+					<div class="justify-center">
 						<input
 							bind:value={fqdn}
 							readonly={!$session.isAdmin || isFqdnSet}
@@ -118,7 +118,7 @@
 							required
 						/>
 						<Explainer
-							text="Set the fully qualified domain name for your Coolify instance. <br>If you specify <span class='text-green-600 font-bold'>https</span>, it will be accessible only over https. <br>SSL certificate will be generated for you."
+							text="If you specify <span class='text-green-600 font-bold'>https</span>, Coolify will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-green-600 font-bold'>www</span>, Coolify will be redirected (302) from non-www and vice versa."
 						/>
 					</div>
 				</div>
