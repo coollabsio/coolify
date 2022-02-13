@@ -142,14 +142,6 @@
 			return errorNotification('Branch already configured');
 		}
 	}
-	// async function saveDeployKey(deployKeyId: number) {
-	// 	try {
-	// 		await post(updateDeployKeyIdUrl, { deployKeyId });
-	// 	} catch (error) {
-	// 		errorNotification(error);
-	// 		throw new Error(error);
-	// 	}
-	// }
 	async function checkSSHKey(sshkeyUrl) {
 		try {
 			return await post(sshkeyUrl, {});

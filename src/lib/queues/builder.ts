@@ -64,10 +64,6 @@ export default async function (job) {
 	if (destinationDockerId) {
 		destinationType = 'docker';
 	}
-	// Not implemented yet
-	// if (destinationKubernetesId) {
-	//   destinationType = 'kubernetes'
-	// }
 
 	if (destinationType === 'docker') {
 		const docker = dockerInstance({ destinationDocker });

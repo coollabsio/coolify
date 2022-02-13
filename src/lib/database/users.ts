@@ -97,17 +97,6 @@ export async function login({ email, password }) {
 			});
 		}
 	}
-
-	// const token = jsonwebtoken.sign({}, secretKey, {
-	//     expiresIn: 15778800,
-	//     algorithm: 'HS256',
-	//     audience: 'coolify',
-	//     issuer: 'coolify',
-	//     jwtid: uid,
-	//     subject: `User:${uid}`,
-	//     notBefore: -1000
-	// });
-
 	return {
 		status: 200,
 		headers: {

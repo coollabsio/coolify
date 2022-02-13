@@ -20,9 +20,6 @@
 
 	function showActions(value) {
 		actionsShow = value;
-		// if (value === false) {
-		// 	showPassword = false;
-		// }
 	}
 	function copyToClipboard() {
 		if (isHttps && navigator.clipboard) {

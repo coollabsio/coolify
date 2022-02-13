@@ -124,25 +124,6 @@
 			updateStatus.success = false;
 			updateStatus.loading = false;
 		}
-		// } else {
-		// 	let reachable = false;
-		// 	let tries = 0;
-		// 	do {
-		// 		await asyncSleep(1000);
-		// 		try {
-		// 			await get(`/undead.json`);
-		// 			reachable = true;
-		// 		} catch (error) {
-		// 			console.log(error);
-		// 			reachable = false;
-		// 		}
-		// 		if (reachable) break;
-		// 		tries++;
-		// 	} while (!reachable || tries < 120);
-		// 	toast.push('New version reachable. Reloading...');
-		// 	await asyncSleep(2000);
-		// 	window.location.reload();
-		// }
 	}
 </script>
 
