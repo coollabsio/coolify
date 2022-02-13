@@ -18,6 +18,7 @@
 			if (isNewSecret) {
 				name = '';
 				value = '';
+				isBuildSecret = false;
 			}
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -30,6 +31,7 @@
 			if (isNewSecret) {
 				name = '';
 				value = '';
+				isBuildSecret = false;
 			}
 		} catch ({ error }) {
 			return errorNotification(error);
