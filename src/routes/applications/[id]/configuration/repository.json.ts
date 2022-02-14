@@ -14,13 +14,11 @@ export const get: RequestHandler = async (event) => {
 
 	try {
 		const found = await db.isBranchAlreadyUsed({ repository, branch, id });
-		if (found) {
-			throw {
-				error: `Branch ${branch} is already used by another application`
-			};
-		}
 		return {
-			status: 200
+			status: 200,
+			body: {
+				used: found ? true : false
+			}
 		};
 	} catch (error) {
 		return ErrorHandler(error);

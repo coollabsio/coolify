@@ -132,14 +132,18 @@
 	}
 
 	async function isBranchAlreadyUsed() {
-		const url = `/applications/${id}/configuration/repository.json?repository=${selected.project.path_with_namespace}&branch=${selected.branch.name}`;
-
 		try {
-			await get(url);
+			const data = await get(
+				`/applications/${id}/configuration/repository.json?repository=${selected.project.path_with_namespace}&branch=${selected.branch.name}`
+			);
+			if (data.used) {
+				errorNotification('This branch is already used by another application.');
+				showSave = false;
+				return true;
+			}
 			showSave = true;
-		} catch (error) {
-			showSave = false;
-			return errorNotification('Branch already configured');
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
 	}
 	async function checkSSHKey(sshkeyUrl) {
@@ -195,7 +199,6 @@
 			const deployKeyFound = deployKeys.filter((dk) => dk.title === `${appId}-coolify-deploy-key`);
 			if (deployKeyFound.length > 0) {
 				for (const deployKey of deployKeyFound) {
-					console.log(`${deployKeyUrl}/${deployKey.id}`);
 					await del(
 						`${deployKeyUrl}/${deployKey.id}`,
 						{},
