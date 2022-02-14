@@ -71,7 +71,7 @@ You can use the official ones or your self hosted version!
 
 ## Roadmap
 
-[See the Roadmap here](https://github.com/orgs/coollabsio/projects/3/views/1)
+[See the Roadmap here](https://github.com/orgs/coollabsio/projects/3/views/8)
 
 ## License
 
