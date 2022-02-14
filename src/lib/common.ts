@@ -13,11 +13,11 @@ import Cookie from 'cookie';
 import os from 'os';
 
 try {
-	if (dev) {
+	if (!dev) {
 		Sentry.init({
 			dsn: process.env['COOLIFY_SENTRY_DSN'],
 			tracesSampleRate: 0,
-			environment: 'dev',
+			environment: 'production',
 			debug: true,
 			release: currentVersion,
 			initialScope: {
