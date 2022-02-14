@@ -107,11 +107,7 @@ export async function forceSSLOffApplication({ domain }) {
 export async function forceSSLOnApplication({ domain }) {
 	if (!dev) {
 		const haproxy = await haproxyInstance();
-		try {
-			await checkHAProxy(haproxy);
-		} catch (error) {
-			return;
-		}
+		await checkHAProxy(haproxy);
 		const transactionId = await getNextTransactionId();
 
 		try {
@@ -162,11 +158,7 @@ export async function forceSSLOnApplication({ domain }) {
 
 export async function deleteProxy({ id }) {
 	const haproxy = await haproxyInstance();
-	try {
-		await checkHAProxy(haproxy);
-	} catch (error) {
-		return;
-	}
+	await checkHAProxy(haproxy);
 	const transactionId = await getNextTransactionId();
 	try {
 		await haproxy.get(`v2/services/haproxy/configuration/backends/${id}`).json();
@@ -198,11 +190,7 @@ export async function reloadHaproxy(engine) {
 }
 export async function configureProxyForApplication({ domain, imageId, applicationId, port }) {
 	const haproxy = await haproxyInstance();
-	try {
-		await checkHAProxy(haproxy);
-	} catch (error) {
-		return;
-	}
+	await checkHAProxy(haproxy);
 
 	let serverConfigured = false;
 	let backendAvailable: any = null;
@@ -283,11 +271,7 @@ export async function configureProxyForApplication({ domain, imageId, applicatio
 export async function configureCoolifyProxyOff(fqdn) {
 	const domain = getDomain(fqdn);
 	const haproxy = await haproxyInstance();
-	try {
-		await checkHAProxy(haproxy);
-	} catch (error) {
-		return;
-	}
+	await checkHAProxy(haproxy);
 
 	try {
 		const transactionId = await getNextTransactionId();
@@ -308,22 +292,21 @@ export async function configureCoolifyProxyOff(fqdn) {
 		throw error?.response?.body || error;
 	}
 }
-export async function checkHAProxy(haproxy) {
+export async function checkHAProxy(haproxy?: any) {
 	if (!haproxy) haproxy = await haproxyInstance();
 	try {
 		await haproxy.get('v2/info');
 	} catch (error) {
-		throw 'HAProxy is not running, but it should be!';
+		throw {
+			message:
+				'Coolify Proxy is not running, but it should be!<br><br>Start it in the "Destinations" menu.'
+		};
 	}
 }
 export async function configureCoolifyProxyOn(fqdn) {
 	const domain = getDomain(fqdn);
 	const haproxy = await haproxyInstance();
-	try {
-		await checkHAProxy(haproxy);
-	} catch (error) {
-		return;
-	}
+	await checkHAProxy(haproxy);
 	let serverConfigured = false;
 	let backendAvailable: any = null;
 	try {
@@ -572,12 +555,7 @@ export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 
 export async function configureSimpleServiceProxyOff({ domain }) {
 	const haproxy = await haproxyInstance();
-	try {
-		await checkHAProxy(haproxy);
-	} catch (error) {
-		return;
-	}
-
+	await checkHAProxy(haproxy);
 	try {
 		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
 		const transactionId = await getNextTransactionId();
@@ -596,12 +574,7 @@ export async function configureSimpleServiceProxyOff({ domain }) {
 
 export async function removeWwwRedirection(domain) {
 	const haproxy = await haproxyInstance();
-	try {
-		await checkHAProxy(haproxy);
-	} catch (error) {
-		return;
-	}
-
+	await checkHAProxy();
 	const rules: any = await haproxy
 		.get(`v2/services/haproxy/configuration/http_request_rules`, {
 			searchParams: {
@@ -631,11 +604,7 @@ export async function removeWwwRedirection(domain) {
 }
 export async function setWwwRedirection(fqdn) {
 	const haproxy = await haproxyInstance();
-	try {
-		await checkHAProxy(haproxy);
-	} catch (error) {
-		return;
-	}
+	await checkHAProxy(haproxy);
 	const transactionId = await getNextTransactionId();
 
 	try {

@@ -41,7 +41,7 @@ export function ErrorHandler(e) {
 		e = new Error(e.toString());
 	}
 	let truncatedError = e;
-	if (e.message.includes('docker run')) {
+	if (e.message?.includes('docker run')) {
 		let truncatedArray = [];
 		truncatedArray = truncatedError.message.split('-').filter((line) => {
 			if (!line.startsWith('e ')) {
@@ -50,7 +50,7 @@ export function ErrorHandler(e) {
 		});
 		truncatedError.message = truncatedArray.join('-');
 	}
-	if (e.message.includes('git clone')) {
+	if (e.message?.includes('git clone')) {
 		truncatedError.message = 'git clone failed';
 	}
 	sentry.captureException(truncatedError);
@@ -61,11 +61,11 @@ export function ErrorHandler(e) {
 			error: truncatedError.error || truncatedError.message
 		}
 	};
-	if (truncatedError.name === 'NotFoundError') {
+	if (truncatedError?.name === 'NotFoundError') {
 		payload.status = 404;
 	}
 	if (truncatedError instanceof P.PrismaClientKnownRequestError) {
-		if (truncatedError.code === 'P2002') {
+		if (truncatedError?.code === 'P2002') {
 			payload.body.message = 'Already exists. Choose another name.';
 		}
 	}

@@ -110,23 +110,23 @@
 			loading = false;
 		}
 	}
-	onMount(async () => {
-		if (
-			service.type &&
-			service.destinationDockerId &&
-			service.version &&
-			service.fqdn &&
-			!isRunning
-		) {
-			try {
-				await post(`/services/${service.id}/${service.type}/stop.json`, {});
-			} catch ({ error }) {
-				return errorNotification(error);
-			} finally {
-				loading = false;
-			}
-		}
-	});
+	// onMount(async () => {
+	// 	if (
+	// 		service.type &&
+	// 		service.destinationDockerId &&
+	// 		service.version &&
+	// 		service.fqdn &&
+	// 		!isRunning
+	// 	) {
+	// 		try {
+	// 			await post(`/services/${service.id}/${service.type}/stop.json`, {});
+	// 		} catch ({ error }) {
+	// 			return errorNotification(error);
+	// 		} finally {
+	// 			loading = false;
+	// 		}
+	// 	}
+	// });
 </script>
 
 <nav class="nav-side">
