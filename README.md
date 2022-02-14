@@ -71,9 +71,7 @@ You can use the official ones or your self hosted version!
 
 ## Roadmap
 
-[See the Roadmap here](https://github.com/coollabsio/coolify/projects/1)
-
-(Will be updated soon!)
+[See the Roadmap here](https://github.com/orgs/coollabsio/projects/3/views/1)
 
 ## License
 
