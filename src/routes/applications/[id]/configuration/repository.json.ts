@@ -1,6 +1,6 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { PrismaErrorHandler } from '$lib/database';
+import { ErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (event) => {
@@ -14,16 +14,14 @@ export const get: RequestHandler = async (event) => {
 
 	try {
 		const found = await db.isBranchAlreadyUsed({ repository, branch, id });
-		if (found) {
-			throw {
-				error: `Branch ${branch} is already used by another application`
-			};
-		}
 		return {
-			status: 200
+			status: 200,
+			body: {
+				used: found ? true : false
+			}
 		};
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };
 
@@ -42,6 +40,6 @@ export const post: RequestHandler = async (event) => {
 		await db.configureGitRepository({ id, repository, branch, projectId, webhookToken });
 		return { status: 201 };
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

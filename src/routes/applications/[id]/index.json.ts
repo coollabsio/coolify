@@ -1,7 +1,7 @@
 import { getTeam, getUserDetails } from '$lib/common';
 import { getGithubToken } from '$lib/components/common';
 import * as db from '$lib/database';
-import { PrismaErrorHandler } from '$lib/database';
+import { ErrorHandler } from '$lib/database';
 import { checkContainer } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 import jsonwebtoken from 'jsonwebtoken';
@@ -44,7 +44,7 @@ export const get: RequestHandler = async (event) => {
 		};
 	} catch (error) {
 		console.log(error);
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };
 
@@ -82,6 +82,6 @@ export const post: RequestHandler = async (event) => {
 		});
 		return { status: 201 };
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

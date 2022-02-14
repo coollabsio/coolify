@@ -1,6 +1,6 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { PrismaErrorHandler } from '$lib/database';
+import { ErrorHandler } from '$lib/database';
 import { dayjs } from '$lib/dayjs';
 import { dockerInstance } from '$lib/docker';
 import type { RequestHandler } from '@sveltejs/kit';
@@ -48,6 +48,6 @@ export const get: RequestHandler = async (event) => {
 			}
 		};
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

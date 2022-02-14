@@ -1,5 +1,5 @@
 import * as db from '$lib/database';
-import { PrismaErrorHandler } from '$lib/database';
+import { ErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const options = async () => {
@@ -24,6 +24,6 @@ export const get: RequestHandler = async (request) => {
 			headers: { Location: `/webhooks/success` }
 		};
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

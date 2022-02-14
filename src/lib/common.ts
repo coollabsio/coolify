@@ -8,16 +8,26 @@ import * as db from '$lib/database';
 import { buildLogQueue } from './queues';
 
 import { version as currentVersion } from '../../package.json';
-import { dockerInstance } from './docker';
 import dayjs from 'dayjs';
 import Cookie from 'cookie';
+import os from 'os';
 
 try {
 	if (!dev) {
 		Sentry.init({
 			dsn: process.env['COOLIFY_SENTRY_DSN'],
 			tracesSampleRate: 0,
-			environment: 'production'
+			environment: 'production',
+			debug: true,
+			release: currentVersion,
+			initialScope: {
+				tags: {
+					appId: process.env['COOLIFY_APP_ID'],
+					'os.arch': os.arch(),
+					'os.platform': os.platform(),
+					'os.release': os.release()
+				}
+			}
 		});
 	}
 } catch (err) {

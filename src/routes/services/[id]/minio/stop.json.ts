@@ -1,7 +1,7 @@
 import { getEngine, getUserDetails, removeDestinationDocker } from '$lib/common';
 import { getDomain } from '$lib/components/common';
 import * as db from '$lib/database';
-import { PrismaErrorHandler } from '$lib/database';
+import { ErrorHandler } from '$lib/database';
 import { dockerInstance } from '$lib/docker';
 import { checkContainer, configureSimpleServiceProxyOff, stopTcpHttpProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
@@ -41,6 +41,6 @@ export const post: RequestHandler = async (event) => {
 			status: 200
 		};
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

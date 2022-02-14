@@ -6,7 +6,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { letsEncrypt } from '$lib/letsencrypt';
 import { configureSimpleServiceProxyOn, reloadHaproxy, setWwwRedirection } from '$lib/haproxy';
 import { getDomain } from '$lib/components/common';
-import { PrismaErrorHandler } from '$lib/database';
+import { ErrorHandler } from '$lib/database';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -191,6 +191,6 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 			status: 200
 		};
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

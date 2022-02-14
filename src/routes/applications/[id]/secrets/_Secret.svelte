@@ -9,7 +9,8 @@
 	import { createEventDispatcher } from 'svelte';
 
 	const dispatch = createEventDispatcher();
-
+	let nameEl;
+	let valueEl;
 	const { id } = $page.params;
 	async function removeSecret() {
 		try {
@@ -25,6 +26,15 @@
 		}
 	}
 	async function saveSecret() {
+		const nameValid = nameEl.checkValidity();
+		const valueValid = valueEl.checkValidity();
+		if (!nameValid) {
+			return nameEl.reportValidity();
+		}
+		if (!valueValid) {
+			return valueEl.reportValidity();
+		}
+
 		try {
 			await post(`/applications/${id}/secrets.json`, { name, value, isBuildSecret });
 			dispatch('refresh');
@@ -47,7 +57,9 @@
 <td class="whitespace-nowrap px-6 py-2 text-sm font-medium text-white">
 	<input
 		id="secretName"
+		bind:this={nameEl}
 		bind:value={name}
+		required
 		placeholder="EXAMPLE_VARIABLE"
 		class="-mx-2 w-64 border-2 border-transparent"
 		readonly={!isNewSecret}
@@ -59,6 +71,8 @@
 	<input
 		id="secretValue"
 		bind:value
+		bind:this={valueEl}
+		required
 		placeholder="J$#@UIO%HO#$U%H"
 		class="-mx-2 w-64 border-2 border-transparent"
 		class:bg-transparent={!isNewSecret}

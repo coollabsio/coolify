@@ -1,5 +1,5 @@
 import { asyncExecShell, saveBuildLog } from '$lib/common';
-import { PrismaErrorHandler } from '$lib/database';
+import { ErrorHandler } from '$lib/database';
 
 export default async function ({
 	applicationId,

@@ -1,4 +1,4 @@
-import { prisma, PrismaErrorHandler } from './common';
+import { prisma, ErrorHandler } from './common';
 
 export async function listLogs({ buildId, last = 0 }) {
 	try {
@@ -8,6 +8,6 @@ export async function listLogs({ buildId, last = 0 }) {
 		});
 		return [...body];
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 }

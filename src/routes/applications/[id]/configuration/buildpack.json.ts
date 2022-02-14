@@ -1,7 +1,7 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
-import { PrismaErrorHandler } from '$lib/database';
+import { ErrorHandler } from '$lib/database';
 
 export const get: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -21,7 +21,7 @@ export const get: RequestHandler = async (event) => {
 			}
 		};
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };
 
@@ -36,6 +36,6 @@ export const post: RequestHandler = async (event) => {
 		await db.configureBuildPack({ id, buildPack });
 		return { status: 201 };
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

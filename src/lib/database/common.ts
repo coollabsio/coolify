@@ -36,23 +36,36 @@ if (dev) {
 }
 export const prisma = new PrismaClient(prismaOptions);
 
-export function PrismaErrorHandler(e) {
+export function ErrorHandler(e) {
 	if (e! instanceof Error) {
 		e = new Error(e.toString());
 	}
-	sentry.captureException(e);
+	let truncatedError = e;
+	if (e.message.includes('docker run')) {
+		let truncatedArray = [];
+		truncatedArray = truncatedError.message.split('-').filter((line) => {
+			if (!line.startsWith('e ')) {
+				return line;
+			}
+		});
+		truncatedError.message = truncatedArray.join('-');
+	}
+	if (e.message.includes('git clone')) {
+		truncatedError.message = 'git clone failed';
+	}
+	sentry.captureException(truncatedError);
 	const payload = {
-		status: e.status || 500,
+		status: truncatedError.status || 500,
 		body: {
 			message: 'Ooops, something is not okay, are you okay?',
-			error: e.error || e.message
+			error: truncatedError.error || truncatedError.message
 		}
 	};
-	if (e.name === 'NotFoundError') {
+	if (truncatedError.name === 'NotFoundError') {
 		payload.status = 404;
 	}
-	if (e instanceof P.PrismaClientKnownRequestError) {
-		if (e.code === 'P2002') {
+	if (truncatedError instanceof P.PrismaClientKnownRequestError) {
+		if (truncatedError.code === 'P2002') {
 			payload.body.message = 'Already exists. Choose another name.';
 		}
 	}

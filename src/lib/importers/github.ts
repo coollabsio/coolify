@@ -2,7 +2,7 @@ import { asyncExecShell, saveBuildLog } from '$lib/common';
 import got from 'got';
 import jsonwebtoken from 'jsonwebtoken';
 import * as db from '$lib/database';
-import { PrismaErrorHandler } from '$lib/database';
+import { ErrorHandler } from '$lib/database';
 
 export default async function ({
 	applicationId,
@@ -45,6 +45,6 @@ export default async function ({
 		const { stdout: commit } = await asyncExecShell(`cd ${workdir}/ && git rev-parse HEAD`);
 		return commit.replace('\n', '');
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 }

@@ -74,13 +74,18 @@
 	}
 	async function isBranchAlreadyUsed() {
 		try {
-			return await get(
+			const data = await get(
 				`/applications/${id}/configuration/repository.json?repository=${selected.repository}&branch=${selected.branch}`
 			);
-		} catch ({ error }) {
-			return errorNotification(error);
-		} finally {
+			if (data.used) {
+				errorNotification('This branch is already used by another application.');
+				showSave = false;
+				return true;
+			}
 			showSave = true;
+		} catch ({ error }) {
+			showSave = false;
+			return errorNotification(error);
 		}
 	}
 
