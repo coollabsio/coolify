@@ -1,6 +1,6 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { PrismaErrorHandler } from '$lib/database';
+import { ErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const del: RequestHandler = async (events) => {
@@ -13,6 +13,6 @@ export const del: RequestHandler = async (events) => {
 		await db.removeService({ id });
 		return { status: 200 };
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

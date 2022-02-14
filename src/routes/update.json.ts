@@ -1,7 +1,7 @@
 import { dev } from '$app/env';
 import { asyncExecShell, version } from '$lib/common';
 import { asyncSleep } from '$lib/components/common';
-import { PrismaErrorHandler } from '$lib/database';
+import { ErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import compare from 'compare-versions';
 import got from 'got';
@@ -21,7 +21,7 @@ export const get: RequestHandler = async () => {
 			}
 		};
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };
 
@@ -44,7 +44,7 @@ export const post: RequestHandler = async (event) => {
 				};
 			}
 		} catch (error) {
-			return PrismaErrorHandler(error);
+			return ErrorHandler(error);
 		}
 	} else if (type === 'update') {
 		try {
@@ -66,7 +66,7 @@ export const post: RequestHandler = async (event) => {
 				};
 			}
 		} catch (error) {
-			return PrismaErrorHandler(error);
+			return ErrorHandler(error);
 		}
 	}
 	return {

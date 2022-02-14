@@ -1,6 +1,6 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { PrismaErrorHandler, supportedDatabaseTypesAndVersions } from '$lib/database';
+import { ErrorHandler, supportedDatabaseTypesAndVersions } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (event) => {
@@ -27,6 +27,6 @@ export const post: RequestHandler = async (event) => {
 			status: 201
 		};
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

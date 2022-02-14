@@ -1,6 +1,6 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { generateDatabaseConfiguration, PrismaErrorHandler } from '$lib/database';
+import { generateDatabaseConfiguration, ErrorHandler } from '$lib/database';
 import { startTcpProxy, stopTcpHttpProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
@@ -29,6 +29,6 @@ export const post: RequestHandler = async (event) => {
 			status: 201
 		};
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

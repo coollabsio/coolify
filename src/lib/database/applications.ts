@@ -113,6 +113,13 @@ export async function getApplicationWebhook({ projectId, branch }) {
 		throw { status: 404, body: { message: e.message } };
 	}
 }
+export async function getApplicationById({ id }) {
+	const body = await prisma.application.findFirst({
+		where: { id }
+	});
+
+	return { ...body };
+}
 export async function getApplication({ id, teamId }) {
 	let body = await prisma.application.findFirst({
 		where: { id, teams: { some: { id: teamId } } },

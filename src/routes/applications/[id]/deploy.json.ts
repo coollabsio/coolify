@@ -4,7 +4,7 @@ import cuid from 'cuid';
 import crypto from 'crypto';
 import { buildQueue } from '$lib/queues';
 import { getUserDetails } from '$lib/common';
-import { PrismaErrorHandler } from '$lib/database';
+import { ErrorHandler } from '$lib/database';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -37,6 +37,6 @@ export const post: RequestHandler = async (event) => {
 			}
 		};
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

@@ -6,7 +6,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { letsEncrypt } from '$lib/letsencrypt';
 import { configureSimpleServiceProxyOn, reloadHaproxy, setWwwRedirection } from '$lib/haproxy';
 import { getDomain } from '$lib/components/common';
-import { getServiceImage, PrismaErrorHandler } from '$lib/database';
+import { getServiceImage, ErrorHandler } from '$lib/database';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -76,9 +76,9 @@ export const post: RequestHandler = async (event) => {
 				status: 200
 			};
 		} catch (error) {
-			return PrismaErrorHandler(error);
+			return ErrorHandler(error);
 		}
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

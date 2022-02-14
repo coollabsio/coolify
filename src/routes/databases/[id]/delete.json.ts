@@ -1,6 +1,6 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { PrismaErrorHandler, stopDatabase } from '$lib/database';
+import { ErrorHandler, stopDatabase } from '$lib/database';
 import { deleteProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
@@ -17,6 +17,6 @@ export const del: RequestHandler = async (event) => {
 		await db.removeDatabase({ id });
 		return { status: 200 };
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

@@ -1,6 +1,6 @@
 import { asyncExecShell, getEngine, getTeam, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { PrismaErrorHandler } from '$lib/database';
+import { ErrorHandler } from '$lib/database';
 import { checkContainer } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
@@ -23,7 +23,7 @@ export const get: RequestHandler = async (event) => {
 			}
 		};
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };
 export const post: RequestHandler = async (event) => {
@@ -37,7 +37,7 @@ export const post: RequestHandler = async (event) => {
 		await db.updateDestination({ id, name, engine, network });
 		return { status: 200 };
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };
 
@@ -51,6 +51,6 @@ export const del: RequestHandler = async (event) => {
 		await db.removeDestination({ id });
 		return { status: 200 };
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

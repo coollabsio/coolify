@@ -1,6 +1,6 @@
 import { getTeam, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { PrismaErrorHandler } from '$lib/database';
+import { ErrorHandler } from '$lib/database';
 import { dockerInstance } from '$lib/docker';
 import type { RequestHandler } from '@sveltejs/kit';
 import jsonwebtoken from 'jsonwebtoken';
@@ -39,6 +39,6 @@ export const get: RequestHandler = async (event) => {
 			}
 		};
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

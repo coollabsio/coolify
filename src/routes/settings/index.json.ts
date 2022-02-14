@@ -1,7 +1,7 @@
 import { dev } from '$app/env';
 import { getDomain, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { listSettings, PrismaErrorHandler } from '$lib/database';
+import { listSettings, ErrorHandler } from '$lib/database';
 import {
 	checkContainer,
 	configureCoolifyProxyOff,
@@ -29,7 +29,7 @@ export const get: RequestHandler = async (event) => {
 			}
 		};
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };
 
@@ -55,7 +55,7 @@ export const del: RequestHandler = async (event) => {
 			status: 201
 		};
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };
 export const post: RequestHandler = async (event) => {
@@ -112,6 +112,6 @@ export const post: RequestHandler = async (event) => {
 			status: 201
 		};
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

@@ -1,6 +1,6 @@
 import { asyncExecShell, createDirectories, getEngine, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { generateDatabaseConfiguration, PrismaErrorHandler } from '$lib/database';
+import { generateDatabaseConfiguration, ErrorHandler } from '$lib/database';
 import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
@@ -77,6 +77,6 @@ export const post: RequestHandler = async (event) => {
 			};
 		}
 	} catch (error) {
-		return PrismaErrorHandler(error);
+		return ErrorHandler(error);
 	}
 };

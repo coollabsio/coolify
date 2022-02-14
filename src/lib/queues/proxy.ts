@@ -1,5 +1,5 @@
 import { getDomain } from '$lib/common';
-import { prisma } from '$lib/database';
+import { getApplicationById, prisma } from '$lib/database';
 import { dockerInstance } from '$lib/docker';
 import {
 	checkContainer,
@@ -30,18 +30,21 @@ export default async function () {
 					if (configuration.Labels['coolify.type'] === 'standalone-application') {
 						const { fqdn, applicationId, port, pullmergeRequestId } = parsedConfiguration;
 						if (fqdn) {
-							const domain = getDomain(fqdn);
-							await configureProxyForApplication({
-								domain,
-								imageId: pullmergeRequestId
-									? `${applicationId}-${pullmergeRequestId}`
-									: applicationId,
-								applicationId,
-								port
-							});
-							const isHttps = fqdn.startsWith('https://');
-							if (isHttps) await forceSSLOnApplication({ domain });
-							await setWwwRedirection(fqdn);
+							const found = await getApplicationById({ id: applicationId });
+							if (found) {
+								const domain = getDomain(fqdn);
+								await configureProxyForApplication({
+									domain,
+									imageId: pullmergeRequestId
+										? `${applicationId}-${pullmergeRequestId}`
+										: applicationId,
+									applicationId,
+									port
+								});
+								const isHttps = fqdn.startsWith('https://');
+								if (isHttps) await forceSSLOnApplication({ domain });
+								await setWwwRedirection(fqdn);
+							}
 						}
 					}
 				}
