@@ -48,8 +48,10 @@ export function ErrorHandler(e) {
 				return line;
 			}
 		});
-
 		truncatedError.message = truncatedArray.join('-');
+	}
+	if (e.message.includes('git clone')) {
+		truncatedError.message = 'git clone failed';
 	}
 	sentry.captureException(truncatedError);
 	const payload = {
