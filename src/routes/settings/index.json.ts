@@ -87,8 +87,7 @@ export const post: RequestHandler = async (event) => {
 			}
 		}
 		if (fqdn) {
-			const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy');
-			if (!found) await startCoolifyProxy('/var/run/docker.sock');
+			await startCoolifyProxy('/var/run/docker.sock');
 			const domain = getDomain(fqdn);
 			const isHttps = fqdn.startsWith('https://');
 			if (domain) {

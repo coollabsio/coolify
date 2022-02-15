@@ -12,6 +12,7 @@ import {
 } from '$lib/haproxy';
 import { getDomain } from '$lib/components/common';
 import { ErrorHandler } from '$lib/database';
+import { makeLabelForServices } from '$lib/buildPacks/common';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -82,7 +83,6 @@ export const post: RequestHandler = async (event) => {
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
 		const engine = destinationDocker.engine;
-		// const labels = await makeLabelForPlausibleAnalytics({ id,  })
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 
@@ -138,7 +138,8 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 					environment: config.plausibleAnalytics.environmentVariables,
 					volumes: [config.postgresql.volume],
 					restart: 'always',
-					depends_on: [`${id}-postgresql`, `${id}-clickhouse`]
+					depends_on: [`${id}-postgresql`, `${id}-clickhouse`],
+					labels: makeLabelForServices('plausibleAnalytics')
 				},
 				[`${id}-postgresql`]: {
 					container_name: `${id}-postgresql`,

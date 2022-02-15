@@ -38,7 +38,7 @@ export async function configureDestinationForDatabase({ id, destinationId }) {
 		if (type && version) {
 			const baseImage = getDatabaseImage(type);
 			asyncExecShell(
-				`DOCKER_HOST=${host} docker pull ${baseImage}:${version} && echo "FROM ${baseImage}:${version}" | docker build --label coolify.managed="true" -t "${baseImage}:${version}" -`
+				`DOCKER_HOST=${host} docker pull ${baseImage}:${version} && echo "FROM ${baseImage}:${version}" | docker build --label coolify.image="true" -t "${baseImage}:${version}" -`
 			);
 		}
 	}

@@ -14,6 +14,7 @@
 	let cannotDisable = settings.fqdn && destination.engine === '/var/run/docker.sock';
 	// let scannedApps = [];
 	let loading = false;
+	let restarting = false;
 	async function handleSubmit() {
 		loading = true;
 		try {
@@ -39,6 +40,17 @@
 					engine: destination.engine
 				});
 				await stopProxy();
+			} catch ({ error }) {
+				return errorNotification(error);
+			}
+		} else if (state === true && destination.isCoolifyProxyUsed === false) {
+			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
+			try {
+				await post(`/destinations/${id}/settings.json`, {
+					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
+					engine: destination.engine
+				});
+				await startProxy();
 			} catch ({ error }) {
 				return errorNotification(error);
 			}
@@ -89,6 +101,25 @@
 			return errorNotification(error);
 		}
 	}
+	async function forceRestartProxy() {
+		const sure = confirm(
+			'Are you sure you want to restart the proxy? Everyting will be reconfigured in ~10 sec.'
+		);
+		if (sure) {
+			try {
+				restarting = true;
+				toast.push('Coolify Proxy restarting...');
+				await post(`/destinations/${id}/restart.json`, {
+					engine: destination.engine,
+					fqdn: settings.fqdn
+				});
+			} catch ({ error }) {
+				setTimeout(() => {
+					window.location.reload();
+				}, 5000);
+			}
+		}
+	}
 </script>
 
 <div class="flex justify-center px-6 pb-8">
@@ -103,6 +134,12 @@
 				disabled={loading}
 				>{loading ? 'Saving...' : 'Save'}
 			</button>
+			<button
+				class={restarting ? '' : 'bg-red-600 hover:bg-red-500'}
+				disabled={restarting}
+				on:click|preventDefault={forceRestartProxy}
+				>{restarting ? 'Restarting... please wait...' : 'Force restart proxy'}</button
+			>
 			<!-- <button type="button" class="bg-coollabs hover:bg-coollabs-100" on:click={scanApps}
 				>Scan for applications</button
 			> -->

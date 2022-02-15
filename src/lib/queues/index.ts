@@ -87,7 +87,7 @@ const cron = async () => {
 
 	await queue.proxy.add('proxy', {}, { repeat: { every: 10000 } });
 	// await queue.ssl.add('ssl', {}, { repeat: { every: 10000 } });
-	await queue.cleanup.add('cleanup', {}, { repeat: { every: 3600000 } });
+	if (!dev) await queue.cleanup.add('cleanup', {}, { repeat: { every: 600000 } });
 	await queue.sslRenew.add('sslRenew', {}, { repeat: { every: 1800000 } });
 
 	const events = {
@@ -144,7 +144,7 @@ buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
 	});
 });
 
-const buildLogQueueName = dev ? cuid() : 'log_queue';
+const buildLogQueueName = 'log_queue';
 const buildLogQueue = new Queue(buildLogQueueName, connectionOptions);
 const buildLogWorker = new Worker(buildLogQueueName, async (job) => await logger(job), {
 	concurrency: 1,
