@@ -36,8 +36,6 @@ export const post: RequestHandler = async (event) => {
 					body: {}
 				};
 			} else {
-				await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
-				await asyncSleep(2000);
 				return {
 					status: 200,
 					body: {}
