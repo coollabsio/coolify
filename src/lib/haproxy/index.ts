@@ -545,12 +545,6 @@ export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 				port: port
 			}
 		});
-		console.log({
-			address: id,
-			check: 'enabled',
-			name: id,
-			port: port
-		});
 		await completeTransaction(transactionId);
 	} catch (error) {
 		console.log(error);
