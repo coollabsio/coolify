@@ -5,6 +5,7 @@ import cuid from 'cuid';
 import crypto from 'crypto';
 import { buildQueue } from '$lib/queues';
 import { checkContainer, removeProxyConfiguration } from '$lib/haproxy';
+import { dev } from '$app/env';
 
 export const options: RequestHandler = async () => {
 	return {
@@ -22,8 +23,8 @@ export const post: RequestHandler = async (event) => {
 		const buildId = cuid();
 		const allowedGithubEvents = ['push', 'pull_request'];
 		const allowedActions = ['opened', 'reopened', 'synchronize', 'closed'];
-		const githubEvent = event.request.headers.get('x-github-event').toLowerCase();
-		const githubSignature = event.request.headers.get('x-hub-signature-256').toLowerCase();
+		const githubEvent = event.request.headers.get('x-github-event')?.toLowerCase();
+		const githubSignature = event.request.headers.get('x-hub-signature-256')?.toLowerCase();
 		if (!allowedGithubEvents.includes(githubEvent)) {
 			return {
 				status: 500,
@@ -34,7 +35,6 @@ export const post: RequestHandler = async (event) => {
 		}
 		let repository, projectId, branch;
 		const body = await event.request.json();
-
 		if (githubEvent === 'push') {
 			repository = body.repository;
 			projectId = repository.id;
@@ -54,14 +54,17 @@ export const post: RequestHandler = async (event) => {
 				'utf8'
 			);
 			const checksum = Buffer.from(githubSignature, 'utf8');
-			if (checksum.length !== digest.length || !crypto.timingSafeEqual(digest, checksum)) {
-				return {
-					status: 500,
-					body: {
-						message: 'SHA256 checksum failed. Are you doing something fishy?'
-					}
-				};
+			if (!dev) {
+				if (checksum.length !== digest.length || !crypto.timingSafeEqual(digest, checksum)) {
+					return {
+						status: 500,
+						body: {
+							message: 'SHA256 checksum failed. Are you doing something fishy?'
+						}
+					};
+				}
 			}
+
 			if (githubEvent === 'push') {
 				if (!applicationFound.configHash) {
 					const configHash = crypto
@@ -120,7 +123,11 @@ export const post: RequestHandler = async (event) => {
 							};
 						}
 					}
-					if (pullmergeRequestAction === 'opened' || pullmergeRequestAction === 'reopened') {
+					if (
+						pullmergeRequestAction === 'opened' ||
+						pullmergeRequestAction === 'reopened' ||
+						pullmergeRequestAction === 'synchronize'
+					) {
 						await buildQueue.add(buildId, {
 							build_id: buildId,
 							type: 'webhook_pr',
