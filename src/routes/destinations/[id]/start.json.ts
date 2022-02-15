@@ -15,8 +15,7 @@ export const post: RequestHandler = async (event) => {
 			status: 200
 		};
 	} catch (error) {
-		return ErrorHandler(error);
-	} finally {
 		await stopCoolifyProxy(engine);
+		return ErrorHandler(error);
 	}
 };

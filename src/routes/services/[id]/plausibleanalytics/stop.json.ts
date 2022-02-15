@@ -37,7 +37,11 @@ export const post: RequestHandler = async (event) => {
 				console.error(error);
 			}
 
-			await configureSimpleServiceProxyOff({ domain });
+			try {
+				await configureSimpleServiceProxyOff({ domain });
+			} catch (error) {
+				console.log(error);
+			}
 		}
 
 		return {

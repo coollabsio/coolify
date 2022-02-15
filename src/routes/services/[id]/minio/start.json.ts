@@ -5,6 +5,7 @@ import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
 import { letsEncrypt } from '$lib/letsencrypt';
 import {
+	checkHAProxy,
 	configureSimpleServiceProxyOn,
 	reloadHaproxy,
 	setWwwRedirection,
@@ -22,6 +23,7 @@ export const post: RequestHandler = async (event) => {
 	const { id } = event.params;
 
 	try {
+		await checkHAProxy();
 		const service = await db.getService({ id, teamId });
 		const {
 			type,

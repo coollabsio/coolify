@@ -33,8 +33,12 @@ export const post: RequestHandler = async (event) => {
 			} catch (error) {
 				console.error(error);
 			}
-			await stopTcpHttpProxy(destinationDocker, publicPort);
-			await configureSimpleServiceProxyOff({ domain });
+			try {
+				await stopTcpHttpProxy(destinationDocker, publicPort);
+				await configureSimpleServiceProxyOff({ domain });
+			} catch (error) {
+				console.log(error);
+			}
 		}
 
 		return {
