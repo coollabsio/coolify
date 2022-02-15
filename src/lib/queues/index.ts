@@ -144,7 +144,7 @@ buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
 	});
 });
 
-const buildLogQueueName = dev ? cuid() : 'log_queue';
+const buildLogQueueName = 'log_queue';
 const buildLogQueue = new Queue(buildLogQueueName, connectionOptions);
 const buildLogWorker = new Worker(buildLogQueueName, async (job) => await logger(job), {
 	concurrency: 1,

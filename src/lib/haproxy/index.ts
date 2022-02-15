@@ -212,7 +212,7 @@ export async function configureProxyForApplication({ domain, imageId, applicatio
 			if (backendAvailable.data.forwardfor.enabled === 'enabled') {
 				if (backendAvailable.data.name === domain) {
 					if (server.data.check === 'enabled') {
-						if (server.data.address === applicationId) {
+						if (server.data.address === imageId) {
 							if (server.data.port === port) {
 								serverConfigured = true;
 							}

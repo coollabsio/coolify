@@ -54,9 +54,8 @@ export default async function () {
 		const { fqdn } = await db.listSettings();
 		if (fqdn) {
 			const domain = getDomain(fqdn);
-			const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy');
-			if (!found) await startCoolifyProxy('/var/run/docker.sock');
-			await configureCoolifyProxyOn({ domain });
+			await startCoolifyProxy('/var/run/docker.sock');
+			await configureCoolifyProxyOn(fqdn);
 			await setWwwRedirection(fqdn);
 			const isHttps = fqdn.startsWith('https://');
 			if (isHttps) await forceSSLOnApplication({ domain });

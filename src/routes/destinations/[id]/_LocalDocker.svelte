@@ -42,6 +42,17 @@
 			} catch ({ error }) {
 				return errorNotification(error);
 			}
+		} else if (state === true && destination.isCoolifyProxyUsed === false) {
+			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
+			try {
+				await post(`/destinations/${id}/settings.json`, {
+					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
+					engine: destination.engine
+				});
+				await startProxy();
+			} catch ({ error }) {
+				return errorNotification(error);
+			}
 		}
 	});
 	async function changeProxySetting() {
@@ -85,6 +96,24 @@
 		try {
 			await post(`/destinations/${id}/start.json`, { engine: destination.engine });
 			return toast.push('Coolify Proxy started!');
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
+	async function forceRestartProxy() {
+		try {
+			toast.push('Coolify Proxy restarting...');
+			await post(`/destinations/${id}/stop.json`, { engine: destination.engine });
+			await post(`/destinations/${id}/settings.json`, {
+				isCoolifyProxyUsed: false,
+				engine: destination.engine
+			});
+			await post(`/destinations/${id}/start.json`, { engine: destination.engine });
+			await post(`/destinations/${id}/settings.json`, {
+				isCoolifyProxyUsed: true,
+				engine: destination.engine
+			});
+			window.location.reload();
 		} catch ({ error }) {
 			return errorNotification(error);
 		}
@@ -158,6 +187,7 @@
 							: ''
 					}`}
 				/>
+				<button on:click|preventDefault={forceRestartProxy}>Force Restart Proxy</button>
 			</ul>
 		</div>
 	</form>
