@@ -59,10 +59,14 @@ export async function removeApplication({ id, teamId }) {
 				const id = containerObj.ID;
 				const preview = containerObj.Image.split('-')[1];
 				await removeDestinationDocker({ id, engine: destinationDocker.engine });
-				if (preview) {
-					await removeProxyConfiguration({ domain: `${preview}.${domain}` });
-				} else {
-					await removeProxyConfiguration({ domain });
+				try {
+					if (preview) {
+						await removeProxyConfiguration({ domain: `${preview}.${domain}` });
+					} else {
+						await removeProxyConfiguration({ domain });
+					}
+				} catch (error) {
+					console.log(error);
 				}
 			}
 		}
