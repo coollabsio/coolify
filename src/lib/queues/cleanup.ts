@@ -23,7 +23,7 @@ export default async function () {
 				];
 				for (const image of images) {
 					await asyncExecShell(
-						`DOCKER_HOST=${host} docker pull ${image} && echo "FROM ${image}" | docker build --label coolify.managed="true" -t "${image}" -`
+						`DOCKER_HOST=${host} docker pull ${image} && echo "FROM ${image}" | docker build --label coolify.image="true" -t "${image}" -`
 					);
 				}
 			} catch (error) {}
@@ -35,7 +35,7 @@ export default async function () {
 			// Cleanup images that are not managed by coolify
 			try {
 				await asyncExecShell(
-					`DOCKER_HOST=${host} docker image prune --filter 'label!=coolify.managed=true' -a -f`
+					`DOCKER_HOST=${host} docker image prune --filter 'label!=coolify.image=true' -a -f`
 				);
 			} catch (error) {
 				console.log(error);

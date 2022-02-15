@@ -27,7 +27,10 @@ export default async function () {
 					const parsedConfiguration = JSON.parse(
 						Buffer.from(configuration.Labels['coolify.configuration'], 'base64').toString()
 					);
-					if (configuration.Labels['coolify.type'] === 'standalone-application') {
+					if (
+						parsedConfiguration &&
+						configuration.Labels['coolify.type'] === 'standalone-application'
+					) {
 						const { fqdn, applicationId, port, pullmergeRequestId } = parsedConfiguration;
 						if (fqdn) {
 							const found = await getApplicationById({ id: applicationId });
