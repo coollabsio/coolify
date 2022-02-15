@@ -1,5 +1,6 @@
 <script lang="ts">
 	export let buildId;
+	export let followingBuild;
 
 	import { createEventDispatcher, onDestroy, onMount } from 'svelte';
 	const dispatch = createEventDispatcher();
@@ -18,13 +19,15 @@
 
 	const { id } = $page.params;
 
+	const cleanAnsiCodes = (str: string) => str.replace(/\x1B\[(\d+)m/g, '');
+
 	async function streamLogs(sequence = 0) {
 		try {
 			let { logs: responseLogs, status } = await get(
 				`/applications/${id}/logs/build/build.json?buildId=${buildId}&sequence=${sequence}`
 			);
 			currentStatus = status;
-			logs = logs.concat(responseLogs);
+			logs = logs.concat(responseLogs.map((log) => ({ ...log, line: cleanAnsiCodes(log.line) })));
 			loading = false;
 			streamInterval = setInterval(async () => {
 				if (status !== 'running') {
@@ -38,8 +41,13 @@
 					);
 					status = data.status;
 					currentStatus = status;
-					logs = logs.concat(data.logs);
+
+					logs = logs.concat(data.logs.map((log) => ({ ...log, line: cleanAnsiCodes(log.line) })));
 					dispatch('updateBuildStatus', { status });
+					if (followingBuild) {
+						const logEl = document.getElementById('logs');
+						logEl.scrollTop = logEl.scrollHeight;
+					}
 				} catch ({ error }) {
 					return errorNotification(error);
 				}
@@ -60,12 +68,13 @@
 {#if loading}
 	<Loading />
 {:else}
-	<div class="relative">
+	<div class="relative ">
 		{#if currentStatus === 'running'}
 			<LoadingLogs />
 		{/if}
 		<div
-			class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words"
+			class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh]"
+			id="logs"
 		>
 			{#each logs as log}
 				<div>{log.line + '\n'}</div>

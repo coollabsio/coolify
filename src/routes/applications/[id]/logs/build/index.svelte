@@ -33,6 +33,7 @@
 	export let buildCount;
 
 	let buildId;
+	let followingBuild;
 	$: buildId;
 
 	let skip = 0;
@@ -85,6 +86,15 @@
 		buildId = build;
 		goto(`/applications/${id}/logs/build?buildId=${buildId}`);
 	}
+
+	function followBuild() {
+		followingBuild = !followingBuild;
+		if (followingBuild) {
+			const logEl = document.getElementById('logs');
+			logEl.scrollTop = logEl.scrollHeight;
+			window.scrollTo(0, document.body.scrollHeight);
+		}
+	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -92,48 +102,75 @@
 		Build logs of <a href={application.fqdn} target="_blank">{getDomain(application.fqdn)}</a>
 	</div>
 </div>
-<div class="flex flex-row justify-start space-x-2 px-10 pt-6 ">
-	<div class="min-w-[16rem] space-y-2">
-		{#each builds as build (build.id)}
-			<div
-				data-tooltip={new Intl.DateTimeFormat('default', dateOptions).format(
-					new Date(build.createdAt)
-				) + `\n${build.status}`}
-				on:click={() => loadBuild(build.id)}
-				class="tooltip-top flex cursor-pointer items-center justify-center rounded-r border-l-2 border-transparent py-4 no-underline transition-all duration-100 hover:bg-coolgray-400 hover:shadow-xl"
-				class:bg-coolgray-400={buildId === build.id}
-				class:border-red-500={build.status === 'failed'}
-				class:border-green-500={build.status === 'success'}
-				class:border-yellow-500={build.status === 'inprogress'}
-			>
-				<div class="flex-col px-2">
-					<div class="text-sm font-bold">
-						{application.branch}
+<div class="block flex-row justify-start space-x-2 px-5 pt-6 sm:px-10 md:flex">
+	<div class="mb-4 min-w-[16rem] space-y-2 md:mb-0 ">
+		<div class="top-4 md:sticky">
+			{#each builds as build (build.id)}
+				<div
+					data-tooltip={new Intl.DateTimeFormat('default', dateOptions).format(
+						new Date(build.createdAt)
+					) + `\n${build.status}`}
+					on:click={() => loadBuild(build.id)}
+					class="tooltip-top flex cursor-pointer items-center justify-center rounded-r border-l-2 border-transparent py-4 no-underline transition-all duration-100 hover:bg-coolgray-400 hover:shadow-xl "
+					class:bg-coolgray-400={buildId === build.id}
+					class:border-red-500={build.status === 'failed'}
+					class:border-green-500={build.status === 'success'}
+					class:border-yellow-500={build.status === 'inprogress'}
+				>
+					<div class="flex-col px-2">
+						<div class="text-sm font-bold">
+							{application.branch}
+						</div>
+						<div class="text-xs">
+							{build.type}
+						</div>
 					</div>
-					<div class="text-xs">
-						{build.type}
-					</div>
-				</div>
-				<div class="flex-1" />
+					<div class="flex-1" />
 
-				<div class="w-48 text-center text-xs">
-					{#if build.status === 'running'}
-						<div class="font-bold">Running</div>
-					{:else}
-						<div>{build.since}</div>
-						<div>Finished in <span class="font-bold">{build.took}s</span></div>
-					{/if}
+					<div class="w-48 text-center text-xs">
+						{#if build.status === 'running'}
+							<div class="font-bold">Running</div>
+						{:else}
+							<div>{build.since}</div>
+							<div>Finished in <span class="font-bold">{build.took}s</span></div>
+						{/if}
+					</div>
 				</div>
-			</div>
-		{/each}
+			{/each}
+		</div>
+		<button
+			on:click={followBuild}
+			data-tooltip="Follow logs"
+			class={followingBuild && 'text-green-500'}
+		>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				class="h-6 w-6"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+			>
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M15 13l-3 3m0 0l-3-3m3 3V8m0 13a9 9 0 110-18 9 9 0 010 18z"
+				/>
+			</svg>
+		</button>
 		{#if buildCount > 0 && !noMoreBuilds}
 			<button class="w-full" on:click={loadMoreBuilds}>Load More</button>
 		{/if}
 	</div>
-	<div class="w-96 flex-1">
+	<div class="flex-1 md:w-96">
 		{#if buildId}
 			{#key buildId}
-				<svelte:component this={BuildLog} {buildId} on:updateBuildStatus={updateBuildStatus} />
+				<svelte:component
+					this={BuildLog}
+					{buildId}
+					{followingBuild}
+					on:updateBuildStatus={updateBuildStatus}
+				/>
 			{/key}
 		{/if}
 	</div>
