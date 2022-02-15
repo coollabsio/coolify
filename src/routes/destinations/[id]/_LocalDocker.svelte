@@ -14,6 +14,7 @@
 	let cannotDisable = settings.fqdn && destination.engine === '/var/run/docker.sock';
 	// let scannedApps = [];
 	let loading = false;
+	let restarting = false;
 	async function handleSubmit() {
 		loading = true;
 		try {
@@ -102,20 +103,16 @@
 	}
 	async function forceRestartProxy() {
 		try {
+			restarting = true;
 			toast.push('Coolify Proxy restarting...');
-			await post(`/destinations/${id}/stop.json`, { engine: destination.engine });
-			await post(`/destinations/${id}/settings.json`, {
-				isCoolifyProxyUsed: false,
-				engine: destination.engine
+			await post(`/destinations/${id}/restart.json`, {
+				engine: destination.engine,
+				fqdn: settings.fqdn
 			});
-			await post(`/destinations/${id}/start.json`, { engine: destination.engine });
-			await post(`/destinations/${id}/settings.json`, {
-				isCoolifyProxyUsed: true,
-				engine: destination.engine
-			});
-			window.location.reload();
 		} catch ({ error }) {
-			return errorNotification(error);
+			setTimeout(() => {
+				window.location.reload();
+			}, 5000);
 		}
 	}
 </script>
@@ -132,6 +129,12 @@
 				disabled={loading}
 				>{loading ? 'Saving...' : 'Save'}
 			</button>
+			<button
+				class={restarting ? '' : 'bg-red-600 hover:bg-red-500'}
+				disabled={restarting}
+				on:click|preventDefault={forceRestartProxy}
+				>{restarting ? 'Restarting... please wait...' : 'Force restart proxy'}</button
+			>
 			<!-- <button type="button" class="bg-coollabs hover:bg-coollabs-100" on:click={scanApps}
 				>Scan for applications</button
 			> -->
@@ -187,7 +190,6 @@
 							: ''
 					}`}
 				/>
-				<button on:click|preventDefault={forceRestartProxy}>Force Restart Proxy</button>
 			</ul>
 		</div>
 	</form>

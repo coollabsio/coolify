@@ -605,7 +605,7 @@ export async function removeWwwRedirection(domain) {
 export async function setWwwRedirection(fqdn) {
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
-	const transactionId = await getNextTransactionId();
+	let transactionId;
 
 	try {
 		const domain = getDomain(fqdn);
@@ -629,6 +629,7 @@ export async function setWwwRedirection(fqdn) {
 			nextRule = rules.data[rules.data.length - 1].index + 1;
 		}
 		const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
+		transactionId = await getNextTransactionId();
 		await haproxy
 			.post(`v2/services/haproxy/configuration/http_request_rules`, {
 				searchParams: {
@@ -651,6 +652,6 @@ export async function setWwwRedirection(fqdn) {
 		console.log(error);
 		throw error;
 	} finally {
-		await completeTransaction(transactionId);
+		if (transactionId) await completeTransaction(transactionId);
 	}
 }
