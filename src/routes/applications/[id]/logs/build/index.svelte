@@ -128,9 +128,7 @@
 			{/each}
 		</div>
 		<div class="flex space-x-2">
-			<button disabled={buildCount > 0 && !noMoreBuilds} class="w-full" on:click={loadMoreBuilds}
-				>Load More</button
-			>
+			<button disabled={noMoreBuilds} class="w-full" on:click={loadMoreBuilds}>Load More</button>
 		</div>
 	</div>
 	<div class="flex-1 md:w-96">
