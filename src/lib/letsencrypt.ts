@@ -14,7 +14,7 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 		} else {
 			if (isCoolify) {
 				await asyncExecShell(
-					`docker run --rm --name certbot-${randomCuid} -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080 -d ${nakedDomain} -d ${wwwDomain} --agree-tos --non-interactive --register-unsafely-without-email`
+					`docker run --rm --name certbot-${randomCuid} -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080 -d ${nakedDomain} -d ${wwwDomain} --expand --agree-tos --non-interactive --register-unsafely-without-email`
 				);
 
 				const { stderr } = await asyncExecShell(
@@ -37,7 +37,7 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 			if (data.destinationDockerId && data.destinationDocker) {
 				const host = getEngine(data.destinationDocker.engine);
 				await asyncExecShell(
-					`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080 -d ${nakedDomain} -d ${wwwDomain} --agree-tos --non-interactive --register-unsafely-without-email`
+					`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080 -d ${nakedDomain} -d ${wwwDomain} --expand --agree-tos --non-interactive --register-unsafely-without-email`
 				);
 				const { stderr } = await asyncExecShell(
 					`DOCKER_HOST=${host} docker run --rm --name bash-${randomCuid} -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" alpine:latest cat /etc/letsencrypt/live/${nakedDomain}/fullchain.pem /etc/letsencrypt/live/${nakedDomain}/privkey.pem > /app/ssl/${nakedDomain}.pem`
