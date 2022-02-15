@@ -63,7 +63,5 @@ export default async function () {
 	} catch (error) {
 		console.log(error);
 		throw error;
-	} finally {
-		// await reloadHaproxy('/var/run/docker.sock');
 	}
 }
