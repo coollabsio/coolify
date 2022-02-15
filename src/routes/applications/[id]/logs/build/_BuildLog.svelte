@@ -57,15 +57,12 @@
 
 					logs = logs.concat(data.logs.map((log) => ({ ...log, line: cleanAnsiCodes(log.line) })));
 					dispatch('updateBuildStatus', { status });
-					if (followingBuild) {
-						const logEl = document.getElementById('logs');
-						logEl.scrollTop = logEl.scrollHeight;
-					}
 				} catch ({ error }) {
 					return errorNotification(error);
 				}
 			}, 1000);
 		} catch ({ error }) {
+			console.log(error);
 			return errorNotification(error);
 		}
 	}
