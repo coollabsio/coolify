@@ -71,7 +71,7 @@ export async function forceSSLOffApplication({ domain }) {
 	if (!dev) {
 		const haproxy = await haproxyInstance();
 		await checkHAProxy(haproxy);
-		const transactionId = await getNextTransactionId();
+		let transactionId;
 		try {
 			const rules: any = await haproxy
 				.get(`v2/services/haproxy/configuration/http_request_rules`, {
@@ -84,6 +84,8 @@ export async function forceSSLOffApplication({ domain }) {
 			if (rules.data.length > 0) {
 				const rule = rules.data.find((rule) => rule.cond_test.includes(`-i ${domain}`));
 				if (rule) {
+					transactionId = await getNextTransactionId();
+
 					await haproxy
 						.delete(`v2/services/haproxy/configuration/http_request_rules/${rule.index}`, {
 							searchParams: {
@@ -98,7 +100,7 @@ export async function forceSSLOffApplication({ domain }) {
 		} catch (error) {
 			console.log(error);
 		} finally {
-			await completeTransaction(transactionId);
+			if (transactionId) await completeTransaction(transactionId);
 		}
 	} else {
 		console.log(`[DEBUG] Removing ssl for ${domain}`);
@@ -108,8 +110,7 @@ export async function forceSSLOnApplication({ domain }) {
 	if (!dev) {
 		const haproxy = await haproxyInstance();
 		await checkHAProxy(haproxy);
-		const transactionId = await getNextTransactionId();
-
+		let transactionId;
 		try {
 			const rules: any = await haproxy
 				.get(`v2/services/haproxy/configuration/http_request_rules`, {
@@ -127,6 +128,8 @@ export async function forceSSLOnApplication({ domain }) {
 				if (rule) return;
 				nextRule = rules.data[rules.data.length - 1].index + 1;
 			}
+			transactionId = await getNextTransactionId();
+
 			await haproxy
 				.post(`v2/services/haproxy/configuration/http_request_rules`, {
 					searchParams: {
@@ -149,7 +152,7 @@ export async function forceSSLOnApplication({ domain }) {
 			console.log(error);
 			throw error;
 		} finally {
-			await completeTransaction(transactionId);
+			if (transactionId) await completeTransaction(transactionId);
 		}
 	} else {
 		console.log(`[DEBUG] Adding ssl for ${domain}`);
@@ -159,9 +162,10 @@ export async function forceSSLOnApplication({ domain }) {
 export async function deleteProxy({ id }) {
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
-	const transactionId = await getNextTransactionId();
+	let transactionId;
 	try {
 		await haproxy.get(`v2/services/haproxy/configuration/backends/${id}`).json();
+		transactionId = await getNextTransactionId();
 		await haproxy
 			.delete(`v2/services/haproxy/configuration/backends/${id}`, {
 				searchParams: {
@@ -180,7 +184,7 @@ export async function deleteProxy({ id }) {
 	} catch (error) {
 		console.log(error.response.body);
 	} finally {
-		await completeTransaction(transactionId);
+		if (transactionId) await completeTransaction(transactionId);
 	}
 }
 
@@ -274,8 +278,8 @@ export async function configureCoolifyProxyOff(fqdn) {
 	await checkHAProxy(haproxy);
 
 	try {
-		const transactionId = await getNextTransactionId();
 		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
+		const transactionId = await getNextTransactionId();
 		await haproxy
 			.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
 				searchParams: {
