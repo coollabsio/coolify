@@ -96,10 +96,9 @@
 
 	async function update() {
 		updateStatus.loading = true;
-		// if (!dev) {
 		try {
 			await post(`/update.json`, { type: 'update', latestVersion });
-			toast.push('Update completed. Waiting for the new version to start...');
+			toast.push('Update completed.<br>Waiting for the new version to start...');
 			let reachable = false;
 			let tries = 0;
 			do {
@@ -119,10 +118,9 @@
 			await asyncSleep(3000);
 			return window.location.reload();
 		} catch ({ error }) {
-			return errorNotification(error);
-		} finally {
 			updateStatus.success = false;
 			updateStatus.loading = false;
+			return errorNotification(error);
 		}
 	}
 </script>
