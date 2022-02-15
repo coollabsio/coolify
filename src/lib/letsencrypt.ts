@@ -1,5 +1,5 @@
 import { dev } from '$app/env';
-import { forceSSLOffApplication, forceSSLOnApplication, getNextTransactionId } from '$lib/haproxy';
+import { forceSSLOnApplication } from '$lib/haproxy';
 import { asyncExecShell, getEngine } from './common';
 import * as db from '$lib/database';
 import cuid from 'cuid';
@@ -13,15 +13,15 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 			return await forceSSLOnApplication({ domain });
 		} else {
 			if (isCoolify) {
-				const { stderr: certError } = await asyncExecShell(
+				await asyncExecShell(
 					`docker run --rm --name certbot-${randomCuid} -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080 -d ${nakedDomain} -d ${wwwDomain} --expand --agree-tos --non-interactive --register-unsafely-without-email`
 				);
-				if (certError) throw new Error(certError);
 
 				const { stderr: copyError } = await asyncExecShell(
 					`docker run --rm -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" alpine:latest sh -c "test -d /etc/letsencrypt/live/${nakedDomain}/ && cat /etc/letsencrypt/live/${nakedDomain}/fullchain.pem /etc/letsencrypt/live/${nakedDomain}/privkey.pem > /app/ssl/${nakedDomain}.pem || cat /etc/letsencrypt/live/${wwwDomain}/fullchain.pem /etc/letsencrypt/live/${wwwDomain}/privkey.pem > /app/ssl/${wwwDomain}.pem"`
 				);
-				if (copyError) throw new Error(copyError);
+
+				if (copyError) throw copyError;
 				return;
 			}
 			let data: any = await db.prisma.application.findUnique({
@@ -37,18 +37,18 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 			// Set SSL with Let's encrypt
 			if (data.destinationDockerId && data.destinationDocker) {
 				const host = getEngine(data.destinationDocker.engine);
-				const { stderr: certError } = await asyncExecShell(
+				await asyncExecShell(
 					`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080 -d ${nakedDomain} -d ${wwwDomain} --expand --agree-tos --non-interactive --register-unsafely-without-email`
 				);
-				if (certError) throw new Error(certError);
 				const { stderr: copyError } = await asyncExecShell(
 					`DOCKER_HOST=${host} docker run --rm -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" alpine:latest sh -c "test -d /etc/letsencrypt/live/${nakedDomain}/ && cat /etc/letsencrypt/live/${nakedDomain}/fullchain.pem /etc/letsencrypt/live/${nakedDomain}/privkey.pem > /app/ssl/${nakedDomain}.pem || cat /etc/letsencrypt/live/${wwwDomain}/fullchain.pem /etc/letsencrypt/live/${wwwDomain}/privkey.pem > /app/ssl/${wwwDomain}.pem"`
 				);
-				if (copyError) throw new Error(copyError);
+				if (copyError) throw copyError;
 				await forceSSLOnApplication({ domain });
 			}
 		}
 	} catch (error) {
+		console.log(error);
 		throw error;
 	}
 }
