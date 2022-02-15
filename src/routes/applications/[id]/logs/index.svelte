@@ -42,8 +42,8 @@
 		}, 1000);
 	});
 	onDestroy(() => {
-		window.clearInterval(loadLogsInterval);
-		window.clearInterval(followingInterval);
+		clearInterval(loadLogsInterval);
+		clearInterval(followingInterval);
 	});
 	async function loadLogs() {
 		try {

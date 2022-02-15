@@ -70,8 +70,8 @@
 		}
 	}
 	onDestroy(() => {
-		window.clearInterval(streamInterval);
-		window.clearInterval(followingInterval);
+		clearInterval(streamInterval);
+		clearInterval(followingInterval);
 	});
 	onMount(async () => {
 		window.scrollTo(0, 0);
