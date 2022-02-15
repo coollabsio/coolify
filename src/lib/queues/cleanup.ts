@@ -40,6 +40,12 @@ export default async function () {
 			} catch (error) {
 				console.log(error);
 			}
+			// Cleanup dangling images
+			try {
+				await asyncExecShell(`DOCKER_HOST=${host} docker image prune -f`);
+			} catch (error) {
+				console.log(error);
+			}
 		}
 	}
 }
