@@ -114,27 +114,55 @@ export const supportedServiceTypesAndVersions = [
 		name: 'plausibleanalytics',
 		fancyName: 'Plausible Analytics',
 		baseImage: 'plausible/analytics',
-		versions: ['latest']
+		versions: ['latest'],
+		ports: {
+			main: 8000
+		}
 	},
-	{ name: 'nocodb', fancyName: 'NocoDB', baseImage: 'nocodb/nocodb', versions: ['latest'] },
-	{ name: 'minio', fancyName: 'MinIO', baseImage: 'minio/minio', versions: ['latest'] },
+	{
+		name: 'nocodb',
+		fancyName: 'NocoDB',
+		baseImage: 'nocodb/nocodb',
+		versions: ['latest'],
+		ports: {
+			main: 8080
+		}
+	},
+	{
+		name: 'minio',
+		fancyName: 'MinIO',
+		baseImage: 'minio/minio',
+		versions: ['latest'],
+		ports: {
+			main: 9001
+		}
+	},
 	{
 		name: 'vscodeserver',
 		fancyName: 'VSCode Server',
 		baseImage: 'codercom/code-server',
-		versions: ['latest']
+		versions: ['latest'],
+		ports: {
+			main: 8080
+		}
 	},
 	{
 		name: 'wordpress',
 		fancyName: 'Wordpress',
 		baseImage: 'wordpress',
-		versions: ['latest', 'php8.1', 'php8.0', 'php7.4', 'php7.3']
+		versions: ['latest', 'php8.1', 'php8.0', 'php7.4', 'php7.3'],
+		ports: {
+			main: 80
+		}
 	},
 	{
 		name: 'vaultwarden',
 		fancyName: 'Vaultwarden',
 		baseImage: 'vaultwarden/server',
-		versions: ['latest']
+		versions: ['latest'],
+		ports: {
+			main: 80
+		}
 	}
 ];
 

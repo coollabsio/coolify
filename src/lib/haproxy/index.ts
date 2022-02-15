@@ -509,46 +509,60 @@ export async function configureNetworkCoolifyProxy(engine) {
 export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
+	let serverConfigured = false;
+	let backendAvailable: any = null;
+
 	try {
-		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
-		const transactionId = await getNextTransactionId();
-		await haproxy
-			.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
+		backendAvailable = await haproxy
+			.get(`v2/services/haproxy/configuration/backends/${domain}`)
+			.json();
+		const server: any = await haproxy
+			.get(`v2/services/haproxy/configuration/servers/${id}`, {
 				searchParams: {
-					transaction_id: transactionId
+					backend: domain
 				}
 			})
 			.json();
-		await completeTransaction(transactionId);
+		if (backendAvailable && server) {
+			// Very sophisticated way to check if the server is already configured in proxy
+			if (backendAvailable.data.forwardfor.enabled === 'enabled') {
+				if (backendAvailable.data.name === domain) {
+					if (server.data.check === 'enabled') {
+						if (server.data.address === id) {
+							if (server.data.port === port) {
+								serverConfigured = true;
+							}
+						}
+					}
+				}
+			}
+		}
 	} catch (error) {}
-	try {
-		const transactionId = await getNextTransactionId();
-		await haproxy.post('v2/services/haproxy/configuration/backends', {
-			searchParams: {
-				transaction_id: transactionId
-			},
-			json: {
-				'init-addr': 'last,libc,none',
-				forwardfor: { enabled: 'enabled' },
-				name: domain
-			}
-		});
-		await haproxy.post('v2/services/haproxy/configuration/servers', {
-			searchParams: {
-				transaction_id: transactionId,
-				backend: domain
-			},
-			json: {
-				address: id,
-				check: 'enabled',
-				name: id,
-				port: port
-			}
-		});
-		await completeTransaction(transactionId);
-	} catch (error) {
-		console.log(error);
-	}
+	if (serverConfigured) return;
+	const transactionId = await getNextTransactionId();
+	await haproxy.post('v2/services/haproxy/configuration/backends', {
+		searchParams: {
+			transaction_id: transactionId
+		},
+		json: {
+			'init-addr': 'last,libc,none',
+			forwardfor: { enabled: 'enabled' },
+			name: domain
+		}
+	});
+	await haproxy.post('v2/services/haproxy/configuration/servers', {
+		searchParams: {
+			transaction_id: transactionId,
+			backend: domain
+		},
+		json: {
+			address: id,
+			check: 'enabled',
+			name: id,
+			port: port
+		}
+	});
+	await completeTransaction(transactionId);
 }
 
 export async function configureSimpleServiceProxyOff({ domain }) {

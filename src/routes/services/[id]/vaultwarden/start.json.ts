@@ -12,6 +12,7 @@ import {
 } from '$lib/haproxy';
 import { getDomain } from '$lib/components/common';
 import { getServiceImage, ErrorHandler } from '$lib/database';
+import { makeLabelForServices } from '$lib/buildPacks/common';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -46,7 +47,8 @@ export const post: RequestHandler = async (event) => {
 					image: config.image,
 					networks: [network],
 					volumes: [config.volume],
-					restart: 'always'
+					restart: 'always',
+					labels: makeLabelForServices('vaultWarden')
 				}
 			},
 			networks: {

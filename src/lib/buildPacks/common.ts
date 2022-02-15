@@ -74,26 +74,12 @@ export async function makeLabelForStandaloneDatabase({ id, image, volume }) {
 	];
 }
 
-export async function makeLabelForPlausibleAnalytics({ id, images, volume }) {
-	const service = await db.prisma.service.findFirst({
-		where: { id },
-		include: { plausibleAnalytics: true }
-	});
-	delete service.destinationDockerId;
-	delete service.createdAt;
-	delete service.updatedAt;
+export function makeLabelForServices(type) {
 	return [
 		'coolify.managed=true',
 		`coolify.version=${version}`,
-		`coolify.type=service-plausibleanalytics`,
-		`coolify.configuration=${base64Encode(
-			JSON.stringify({
-				version,
-				images,
-				volume,
-				...service
-			})
-		)}`
+		`coolify.type=service`,
+		`coolify.service.type=${type}`
 	];
 }
 

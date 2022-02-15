@@ -15,6 +15,7 @@ import {
 import getPort from 'get-port';
 import { getDomain } from '$lib/components/common';
 import { ErrorHandler } from '$lib/database';
+import { makeLabelForServices } from '$lib/buildPacks/common';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -63,7 +64,8 @@ export const post: RequestHandler = async (event) => {
 					environment: config.environmentVariables,
 					networks: [network],
 					volumes: [config.volume],
-					restart: 'always'
+					restart: 'always',
+					labels: makeLabelForServices('minio')
 				}
 			},
 			networks: {

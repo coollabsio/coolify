@@ -102,17 +102,22 @@
 		}
 	}
 	async function forceRestartProxy() {
-		try {
-			restarting = true;
-			toast.push('Coolify Proxy restarting...');
-			await post(`/destinations/${id}/restart.json`, {
-				engine: destination.engine,
-				fqdn: settings.fqdn
-			});
-		} catch ({ error }) {
-			setTimeout(() => {
-				window.location.reload();
-			}, 5000);
+		const sure = confirm(
+			'Are you sure you want to restart the proxy? Everyting will be reconfigured in ~10 sec.'
+		);
+		if (sure) {
+			try {
+				restarting = true;
+				toast.push('Coolify Proxy restarting...');
+				await post(`/destinations/${id}/restart.json`, {
+					engine: destination.engine,
+					fqdn: settings.fqdn
+				});
+			} catch ({ error }) {
+				setTimeout(() => {
+					window.location.reload();
+				}, 5000);
+			}
 		}
 	}
 </script>

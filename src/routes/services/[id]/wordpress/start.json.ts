@@ -12,6 +12,7 @@ import {
 } from '$lib/haproxy';
 import { getDomain } from '$lib/components/common';
 import { ErrorHandler } from '$lib/database';
+import { makeLabelForServices } from '$lib/buildPacks/common';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -78,7 +79,8 @@ export const post: RequestHandler = async (event) => {
 					environment: config.wordpress.environmentVariables,
 					networks: [network],
 					restart: 'always',
-					depends_on: [`${id}-mysql`]
+					depends_on: [`${id}-mysql`],
+					labels: makeLabelForServices('wordpress')
 				},
 				[`${id}-mysql`]: {
 					container_name: `${id}-mysql`,

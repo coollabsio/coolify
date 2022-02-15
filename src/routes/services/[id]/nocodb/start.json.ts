@@ -12,6 +12,7 @@ import {
 } from '$lib/haproxy';
 import { getDomain } from '$lib/components/common';
 import { ErrorHandler } from '$lib/database';
+import { makeLabelForServices } from '$lib/buildPacks/common';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -39,7 +40,8 @@ export const post: RequestHandler = async (event) => {
 					container_name: id,
 					image: `nocodb/nocodb:${version}`,
 					networks: [network],
-					restart: 'always'
+					restart: 'always',
+					labels: makeLabelForServices('nocodb')
 				}
 			},
 			networks: {
