@@ -10,7 +10,8 @@ import { dev } from '$app/env';
 export const handle = handleSession(
 	{
 		secret: process.env['COOLIFY_SECRET_KEY'],
-		expires: 30
+		expires: 30,
+		cookie: { secure: false }
 	},
 	async function ({ event, resolve }) {
 		let response;
