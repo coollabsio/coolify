@@ -1,12 +1,9 @@
-import { dev } from '$app/env';
 import { getDomain, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { listSettings, ErrorHandler } from '$lib/database';
 import {
-	checkContainer,
 	configureCoolifyProxyOff,
 	configureCoolifyProxyOn,
-	forceSSLOffApplication,
 	forceSSLOnApplication,
 	reloadHaproxy,
 	removeWwwRedirection,
