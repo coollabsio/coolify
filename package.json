@@ -75,7 +75,7 @@
 		"js-yaml": "4.1.0",
 		"jsonwebtoken": "8.5.1",
 		"node-forge": "1.2.1",
-		"svelte-kit-cookie-session": "2.0.5",
+		"svelte-kit-cookie-session": "2.0.2",
 		"unique-names-generator": "4.6.0"
 	},
 	"prisma": {
