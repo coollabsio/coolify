@@ -17,7 +17,7 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 		if (isCoolify) {
 			const data = await db.prisma.setting.findFirst();
 			dualCerts = data.dualCerts;
-			host = '/var/run/docker.sock';
+			host = 'unix:///var/run/docker.sock';
 		} else {
 			// Check Application
 			const applicationData = await db.prisma.application.findUnique({
