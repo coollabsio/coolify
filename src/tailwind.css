@@ -170,7 +170,7 @@ a {
 	padding: 8px;
 	color: #fff;
 	content: attr(data-tooltip);
-	@apply min-w-[100px] rounded bg-coollabs text-center font-medium;
+	@apply min-w-[100px] rounded bg-coollabs text-center font-normal;
 }
 
 /* Directions */
