@@ -10,7 +10,7 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 		const nakedDomain = domain.replace('www.', '');
 		const wwwDomain = `www.${nakedDomain}`;
 		const randomCuid = cuid();
-		const randomPort = getPort();
+		const randomPort = await getPort();
 
 		let host;
 		let dualCerts = false;
