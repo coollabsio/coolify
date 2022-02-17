@@ -16,7 +16,7 @@ export const post: RequestHandler = async (event) => {
 		return {
 			status: found ? 500 : 200,
 			body: {
-				error: found && `Domain ${fqdn} is already configured`
+				error: found && `Domain ${fqdn.replace('www.', '')} is already configured`
 			}
 		};
 	} catch (error) {

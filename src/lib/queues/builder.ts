@@ -239,6 +239,8 @@ export default async function (job) {
 			if (stderr) console.log(stderr);
 			saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
 		} catch (error) {
+			saveBuildLog({ line: error, buildId, applicationId });
+			sentry.captureException(error);
 			throw new Error(error);
 		}
 		try {
@@ -257,6 +259,7 @@ export default async function (job) {
 				});
 			}
 		} catch (error) {
+			saveBuildLog({ line: error.stdout || error, buildId, applicationId });
 			sentry.captureException(error);
 		}
 	}

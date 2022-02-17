@@ -46,30 +46,29 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 				}
 			}
 		}
-		if (!dev) {
-			if (dualCerts) {
-				await asyncExecShell(
-					`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p ${randomPort}:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${nakedDomain} -d ${wwwDomain} --expand --agree-tos --non-interactive --register-unsafely-without-email`
-				);
-				await asyncExecShell(
-					`DOCKER_HOST=${host} docker run --rm -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" alpine:latest sh -c "test -d /etc/letsencrypt/live/${nakedDomain}/ && cat /etc/letsencrypt/live/${nakedDomain}/fullchain.pem /etc/letsencrypt/live/${nakedDomain}/privkey.pem > /app/ssl/${nakedDomain}.pem || cat /etc/letsencrypt/live/${wwwDomain}/fullchain.pem /etc/letsencrypt/live/${wwwDomain}/privkey.pem > /app/ssl/${wwwDomain}.pem"`
-				);
-			} else {
-				await asyncExecShell(
-					`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p ${randomPort}:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${domain}  --expand --agree-tos --non-interactive --register-unsafely-without-email`
-				);
-				await asyncExecShell(
-					`DOCKER_HOST=${host} docker run --rm -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" alpine:latest sh -c "cat /etc/letsencrypt/live/${domain}/fullchain.pem /etc/letsencrypt/live/${domain}/privkey.pem > /app/ssl/${domain}.pem"`
-				);
-			}
+		if (dualCerts) {
+			await asyncExecShell(
+				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p ${randomPort}:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${nakedDomain} -d ${wwwDomain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
+					dev && '--test-cert'
+				}`
+			);
+			await asyncExecShell(
+				`DOCKER_HOST=${host} docker run --rm -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" alpine:latest sh -c "test -d /etc/letsencrypt/live/${nakedDomain}/ && cat /etc/letsencrypt/live/${nakedDomain}/fullchain.pem /etc/letsencrypt/live/${nakedDomain}/privkey.pem > /app/ssl/${nakedDomain}.pem || cat /etc/letsencrypt/live/${wwwDomain}/fullchain.pem /etc/letsencrypt/live/${wwwDomain}/privkey.pem > /app/ssl/${wwwDomain}.pem"`
+			);
 		} else {
-			console.log({ dualCerts, host, wwwDomain, nakedDomain, domain });
+			await asyncExecShell(
+				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p ${randomPort}:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${domain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
+					dev && '--test-cert'
+				}`
+			);
+			await asyncExecShell(
+				`DOCKER_HOST=${host} docker run --rm -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" alpine:latest sh -c "cat /etc/letsencrypt/live/${domain}/fullchain.pem /etc/letsencrypt/live/${domain}/privkey.pem > /app/ssl/${domain}.pem"`
+			);
 		}
 		if (!isCoolify) {
 			await forceSSLOnApplication({ domain });
 		}
 	} catch (error) {
-		console.log(error);
 		throw error;
 	}
 }
