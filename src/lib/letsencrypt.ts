@@ -49,7 +49,7 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 		if (dualCerts) {
 			await asyncExecShell(
 				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p ${randomPort}:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${nakedDomain} -d ${wwwDomain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
-					dev && '--test-cert'
+					dev ? '--test-cert' : ''
 				}`
 			);
 			await asyncExecShell(
@@ -58,7 +58,7 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 		} else {
 			await asyncExecShell(
 				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p ${randomPort}:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${domain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
-					dev && '--test-cert'
+					dev ? '--test-cert' : ''
 				}`
 			);
 			await asyncExecShell(
