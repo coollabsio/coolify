@@ -107,10 +107,17 @@ export async function configureServiceType({ id, type }) {
 		});
 	}
 }
-export async function setService({ id, version }) {
+export async function setServiceVersion({ id, version }) {
 	return await prisma.service.update({
 		where: { id },
 		data: { version }
+	});
+}
+
+export async function setServiceSettings({ id, dualCerts }) {
+	return await prisma.service.update({
+		where: { id },
+		data: { dualCerts }
 	});
 }
 

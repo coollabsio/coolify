@@ -10,85 +10,73 @@
 	<div class="title">Wordpress</div>
 </div>
 
-<div class="grid grid-cols-3 items-center">
+<div class="grid grid-cols-2 items-center px-10">
 	<label for="extraConfig">Extra Config</label>
-	<div class="col-span-2 ">
-		<textarea
-			disabled={isRunning}
-			readonly={isRunning}
-			class:resize-none={isRunning}
-			rows={isRunning ? 1 : 5}
-			name="extraConfig"
-			id="extraConfig"
-			placeholder={!isRunning
-				? `eg:
+	<textarea
+		disabled={isRunning}
+		readonly={isRunning}
+		class:resize-none={isRunning}
+		rows={isRunning ? 1 : 5}
+		name="extraConfig"
+		id="extraConfig"
+		placeholder={!isRunning
+			? `eg:
 
 define('WP_ALLOW_MULTISITE', true);
 define('MULTISITE', true);
 define('SUBDOMAIN_INSTALL', false);`
-				: null}>{service.wordpress.extraConfig}</textarea
-		>
-	</div>
+			: null}>{service.wordpress.extraConfig || 'N/A'}</textarea
+	>
 </div>
 <div class="flex space-x-1 py-5 font-bold">
 	<div class="title">MySQL</div>
 </div>
-<div class="grid grid-cols-3 items-center">
+<div class="grid grid-cols-2 items-center px-10">
 	<label for="mysqlDatabase">Database</label>
-	<div class="col-span-2 ">
-		<input
-			name="mysqlDatabase"
-			id="mysqlDatabase"
-			required
-			readonly={readOnly}
-			disabled={readOnly}
-			bind:value={service.wordpress.mysqlDatabase}
-			placeholder="eg: wordpress_db"
-		/>
-	</div>
+	<input
+		name="mysqlDatabase"
+		id="mysqlDatabase"
+		required
+		readonly={readOnly}
+		disabled={readOnly}
+		bind:value={service.wordpress.mysqlDatabase}
+		placeholder="eg: wordpress_db"
+	/>
 </div>
-<div class="grid grid-cols-3 items-center">
+<div class="grid grid-cols-2 items-center px-10">
 	<label for="mysqlRootUser">Root User</label>
-	<div class="col-span-2 ">
-		<input
-			name="mysqlRootUser"
-			id="mysqlRootUser"
-			placeholder="MySQL Root User"
-			value={service.wordpress.mysqlRootUser}
-			disabled
-			readonly
-		/>
-	</div>
+	<input
+		name="mysqlRootUser"
+		id="mysqlRootUser"
+		placeholder="MySQL Root User"
+		value={service.wordpress.mysqlRootUser}
+		disabled
+		readonly
+	/>
 </div>
-<div class="grid grid-cols-3 items-center">
+<div class="grid grid-cols-2 items-center px-10">
 	<label for="mysqlRootUserPassword">Root's Password</label>
-	<div class="col-span-2 ">
-		<CopyPasswordField
-			id="mysqlRootUserPassword"
-			isPasswordField
-			readonly
-			disabled
-			name="mysqlRootUserPassword"
-			value={service.wordpress.mysqlRootUserPassword}
-		/>
-	</div>
+	<CopyPasswordField
+		id="mysqlRootUserPassword"
+		isPasswordField
+		readonly
+		disabled
+		name="mysqlRootUserPassword"
+		value={service.wordpress.mysqlRootUserPassword}
+	/>
 </div>
-<div class="grid grid-cols-3 items-center">
+<div class="grid grid-cols-2 items-center px-10">
 	<label for="mysqlUser">User</label>
-	<div class="col-span-2 ">
-		<input name="mysqlUser" id="mysqlUser" value={service.wordpress.mysqlUser} disabled readonly />
-	</div>
+	<input name="mysqlUser" id="mysqlUser" value={service.wordpress.mysqlUser} disabled readonly />
 </div>
-<div class="grid grid-cols-3 items-center">
+<div class="grid grid-cols-2 items-center px-10">
 	<label for="mysqlPassword">Password</label>
-	<div class="col-span-2 ">
-		<CopyPasswordField
-			id="mysqlPassword"
-			isPasswordField
-			readonly
-			disabled
-			name="mysqlPassword"
-			value={service.wordpress.mysqlPassword}
-		/>
-	</div>
+	<CopyPasswordField
+		id="mysqlPassword"
+		isPasswordField
+		readonly
+		disabled
+		name="mysqlPassword"
+		value={service.wordpress.mysqlPassword}
+	/>
 </div>

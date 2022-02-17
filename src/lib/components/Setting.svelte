@@ -4,15 +4,17 @@
 	export let setting;
 	export let title;
 	export let description;
-	export let isPadding = true;
+	export let isCenter = true;
 	export let disabled = false;
 </script>
 
-<li class="flex items-center py-4">
-	<div class="flex w-96 flex-col" class:px-4={isPadding} class:pr-32={!isPadding}>
-		<p class="text-xs font-bold text-stone-100 md:text-base">{title}</p>
+<div class="flex items-center py-4 pr-8">
+	<div class="flex w-96 flex-col">
+		<div class="text-xs font-bold text-stone-100 md:text-base">{title}</div>
 		<Explainer text={description} />
 	</div>
+</div>
+<div class:text-center={isCenter}>
 	<div
 		type="button"
 		on:click
@@ -58,5 +60,4 @@
 			</span>
 		</span>
 	</div>
-	<!-- {/if} -->
-</li>
+</div>

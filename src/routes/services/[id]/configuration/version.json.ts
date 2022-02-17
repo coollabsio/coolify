@@ -30,7 +30,7 @@ export const post: RequestHandler = async (event) => {
 	const { version } = await event.request.json();
 
 	try {
-		await db.setService({ id, version });
+		await db.setServiceVersion({ id, version });
 		return {
 			status: 201
 		};

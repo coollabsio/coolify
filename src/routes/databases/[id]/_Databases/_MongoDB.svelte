@@ -7,31 +7,27 @@
 	<div class="title">MongoDB</div>
 </div>
 <div class="px-10">
-	<div class="grid grid-cols-3 items-center">
+	<div class="grid grid-cols-2 items-center">
 		<label for="rootUser">Root User</label>
-		<div class="col-span-2 ">
-			<CopyPasswordField
-				placeholder="Generated automatically after start"
-				id="rootUser"
-				readonly
-				disabled
-				name="rootUser"
-				value={database.rootUser}
-			/>
-		</div>
+		<CopyPasswordField
+			placeholder="Generated automatically after start"
+			id="rootUser"
+			readonly
+			disabled
+			name="rootUser"
+			value={database.rootUser}
+		/>
 	</div>
-	<div class="grid grid-cols-3 items-center">
+	<div class="grid grid-cols-2 items-center">
 		<label for="rootUserPassword">Root's Password</label>
-		<div class="col-span-2 ">
-			<CopyPasswordField
-				placeholder="Generated automatically after start"
-				isPasswordField={true}
-				readonly
-				disabled
-				id="rootUserPassword"
-				name="rootUserPassword"
-				value={database.rootUserPassword}
-			/>
-		</div>
+		<CopyPasswordField
+			placeholder="Generated automatically after start"
+			isPasswordField={true}
+			readonly
+			disabled
+			id="rootUserPassword"
+			name="rootUserPassword"
+			value={database.rootUserPassword}
+		/>
 	</div>
 </div>

@@ -99,7 +99,7 @@
 	<span class="arrow-right-applications px-1 text-cyan-500">></span>
 	<span class="pr-2">{team.name}</span>
 </div>
-<div class="mx-auto max-w-2xl">
+<div class="mx-auto max-w-4xl">
 	<form on:submit|preventDefault={handleSubmit}>
 		<div class="flex space-x-1 p-6 font-bold">
 			<div class="title">Settings</div>
@@ -113,10 +113,10 @@
 			<input id="name" name="name" placeholder="name" bind:value={team.name} />
 		</div>
 		{#if team.id === '0'}
-			<div class="px-20 pt-4 text-center">
+			<div class="px-8 pt-4 text-left">
 				<Explainer
-					maxWidthClass="w-full"
-					text="This is the <span class='text-red-500 font-bold'>root</span> team. <br><br>That means members of this group can manage instance wide settings and have all the priviliges in Coolify. (imagine like root user on Linux)"
+					customClass="w-full"
+					text="This is the <span class='text-red-500 font-bold'>root</span> team. That means members of this group can manage instance wide settings and have all the priviliges in Coolify (imagine like root user on Linux)."
 				/>
 			</div>
 		{/if}
@@ -178,11 +178,19 @@
 	</div>
 </div>
 {#if $session.isAdmin}
-	<div class="mx-auto max-w-2xl pt-8">
+	<div class="mx-auto max-w-4xl pt-8">
 		<form on:submit|preventDefault={sendInvitation}>
-			<div class="flex space-x-1 p-6 font-bold">
-				<div class="title">Invite new member</div>
-				<div class="text-center">
+			<div class="flex space-x-1 p-6">
+				<div>
+					<div class="title font-bold">Invite new member</div>
+					<div class="text-left">
+						<Explainer
+							customClass="w-56"
+							text="You can only invite registered users at the moment - will be extended soon."
+						/>
+					</div>
+				</div>
+				<div class="pt-1 text-center">
 					<button class="bg-cyan-600 hover:bg-cyan-500" type="submit">Send invitation</button>
 				</div>
 			</div>

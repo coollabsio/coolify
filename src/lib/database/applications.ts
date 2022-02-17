@@ -209,10 +209,10 @@ export async function configureApplication({
 	});
 }
 
-export async function setApplicationSettings({ id, debug, previews }) {
+export async function setApplicationSettings({ id, debug, previews, dualCerts }) {
 	return await prisma.application.update({
 		where: { id },
-		data: { settings: { update: { debug, previews } } },
+		data: { settings: { update: { debug, previews, dualCerts } } },
 		include: { destinationDocker: true }
 	});
 }

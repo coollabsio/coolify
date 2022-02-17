@@ -43,9 +43,10 @@ specifiers:
   prisma: 3.9.2
   svelte: 3.46.4
   svelte-check: 2.4.3
-  svelte-kit-cookie-session: 2.0.5
+  svelte-kit-cookie-session: 2.0.2
   svelte-preprocess: 4.10.3
   tailwindcss: 3.0.22
+  tailwindcss-scrollbar: ^0.1.0
   ts-node: 10.5.0
   tslib: 2.3.1
   typescript: 4.5.5
@@ -70,7 +71,8 @@ dependencies:
   js-yaml: 4.1.0
   jsonwebtoken: 8.5.1
   node-forge: 1.2.1
-  svelte-kit-cookie-session: 2.0.5
+  svelte-kit-cookie-session: 2.0.2
+  tailwindcss-scrollbar: 0.1.0_tailwindcss@3.0.22
   unique-names-generator: 4.6.0
 
 devDependencies:
@@ -5203,10 +5205,10 @@ packages:
       svelte: 3.46.4
     dev: true
 
-  /svelte-kit-cookie-session/2.0.5:
+  /svelte-kit-cookie-session/2.0.2:
     resolution:
       {
-        integrity: sha512-IX1IXtn42UTz/isem1LqH0SAZdCx6Z6Iu2V4Q83V2EScFbXZWfeFY08Azl8ZrPKdIDhSNHBLAAumRjA6TBxCvQ==
+        integrity: sha512-+JfunYbraIOkecOJlC1iYqH9g6YOY8MXyUdE3hTZquR1JrODmOZZ+pVPmZuVIFpM5sStJf/jF1NT5306TWE9Gw==
       }
     dev: false
 
@@ -5287,6 +5289,17 @@ packages:
       string-width: 4.2.3
       strip-ansi: 6.0.1
     dev: true
+
+  /tailwindcss-scrollbar/0.1.0_tailwindcss@3.0.22:
+    resolution:
+      {
+        integrity: sha512-egipxw4ooQDh94x02XQpPck0P0sfwazwoUGfA9SedPATIuYDR+6qe8d31Gl7YsSMRiOKDkkqfI0kBvEw9lT/Hg==
+      }
+    peerDependencies:
+      tailwindcss: '>= 2.x.x'
+    dependencies:
+      tailwindcss: 3.0.22_c940fbabf228b85b1c73d314b43e31f1
+    dev: false
 
   /tailwindcss/3.0.22_c940fbabf228b85b1c73d314b43e31f1:
     resolution:

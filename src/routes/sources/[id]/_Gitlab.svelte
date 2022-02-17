@@ -120,7 +120,7 @@
 			</div>
 
 			<Explainer
-				maxWidthClass="w-full"
+				customClass="w-full"
 				text="<span class='font-bold text-base'>Scopes required:</span> 	
 	<br>- api (Access the authenticated user's API)
 	<br>- read_repository (Allows read-only access to the repository)

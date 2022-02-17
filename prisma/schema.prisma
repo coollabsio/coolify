@@ -11,6 +11,7 @@ model Setting {
   id                    String   @id @default(cuid())
   fqdn                  String?  @unique
   isRegistrationEnabled Boolean  @default(false)
+  dualCerts             Boolean  @default(false)
   proxyPassword         String
   proxyUser             String
   createdAt             DateTime @default(now())
@@ -97,6 +98,7 @@ model ApplicationSettings {
   id            String      @id @default(cuid())
   application   Application @relation(fields: [applicationId], references: [id])
   applicationId String      @unique
+  dualCerts     Boolean     @default(false)
   debug         Boolean     @default(false)
   previews      Boolean     @default(false)
   createdAt     DateTime    @default(now())
@@ -105,7 +107,7 @@ model ApplicationSettings {
 
 model Secret {
   id            String      @id @default(cuid())
-  name          String      
+  name          String
   value         String
   isBuildSecret Boolean     @default(false)
   createdAt     DateTime    @default(now())
@@ -234,6 +236,7 @@ model Service {
   id                  String              @id @default(cuid())
   name                String
   fqdn                String?
+  dualCerts           Boolean             @default(false)
   type                String?
   version             String?
   teams               Team[]

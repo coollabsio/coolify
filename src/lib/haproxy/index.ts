@@ -2,7 +2,6 @@ import { dev } from '$app/env';
 import { asyncExecShell, getDomain, getEngine } from '$lib/common';
 import got from 'got';
 import * as db from '$lib/database';
-import { letsEncrypt } from '$lib/letsencrypt';
 
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555';
 

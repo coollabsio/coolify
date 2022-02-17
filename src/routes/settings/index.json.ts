@@ -15,6 +15,7 @@ import {
 } from '$lib/haproxy';
 import { letsEncrypt } from '$lib/letsencrypt';
 import type { RequestHandler } from '@sveltejs/kit';
+import dns from 'dns/promises';
 
 export const get: RequestHandler = async (event) => {
 	const { status, body } = await getUserDetails(event);
@@ -45,14 +46,18 @@ export const del: RequestHandler = async (event) => {
 	if (status === 401) return { status, body };
 
 	const { fqdn } = await event.request.json();
-
+	const ip = await dns.resolve(event.url.hostname);
 	try {
 		const domain = getDomain(fqdn);
 		await db.prisma.setting.update({ where: { fqdn }, data: { fqdn: null } });
 		await configureCoolifyProxyOff(fqdn);
 		await removeWwwRedirection(domain);
 		return {
-			status: 201
+			status: 200,
+			body: {
+				message: 'Domain removed',
+				redirect: `http://${ip[0]}:3000/settings`
+			}
 		};
 	} catch (error) {
 		return ErrorHandler(error);
@@ -69,15 +74,19 @@ export const post: RequestHandler = async (event) => {
 		};
 	if (status === 401) return { status, body };
 
-	const { fqdn, isRegistrationEnabled } = await event.request.json();
+	const { fqdn, isRegistrationEnabled, dualCerts } = await event.request.json();
 	try {
 		const {
 			id,
 			fqdn: oldFqdn,
-			isRegistrationEnabled: oldIsRegistrationEnabled
+			isRegistrationEnabled: oldIsRegistrationEnabled,
+			dualCerts: oldDualCerts
 		} = await db.listSettings();
 		if (oldIsRegistrationEnabled !== isRegistrationEnabled) {
 			await db.prisma.setting.update({ where: { id }, data: { isRegistrationEnabled } });
+		}
+		if (oldDualCerts !== dualCerts) {
+			await db.prisma.setting.update({ where: { id }, data: { dualCerts } });
 		}
 		if (oldFqdn && oldFqdn !== fqdn) {
 			if (oldFqdn) {
@@ -93,7 +102,7 @@ export const post: RequestHandler = async (event) => {
 			if (domain) {
 				await configureCoolifyProxyOn(fqdn);
 				await setWwwRedirection(fqdn);
-				if (isHttps && !dev) {
+				if (isHttps) {
 					await letsEncrypt({ domain, isCoolify: true });
 					await forceSSLOnApplication({ domain });
 					await reloadHaproxy('/var/run/docker.sock');

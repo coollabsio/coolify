@@ -7,16 +7,14 @@
 <div class="flex space-x-1 py-5 font-bold">
 	<div class="title">VSCode Server</div>
 </div>
-<div class="grid grid-cols-3 items-center">
+<div class="grid grid-cols-2 items-center px-10">
 	<label for="password">Password</label>
-	<div class="col-span-2 ">
-		<CopyPasswordField
-			id="password"
-			isPasswordField
-			readonly
-			disabled
-			name="password"
-			value={service.vscodeserver.password}
-		/>
-	</div>
+	<CopyPasswordField
+		id="password"
+		isPasswordField
+		readonly
+		disabled
+		name="password"
+		value={service.vscodeserver.password}
+	/>
 </div>

@@ -7,6 +7,7 @@
 	import { post } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
+	import Setting from '$lib/components/Setting.svelte';
 	import { errorNotification } from '$lib/form';
 	import { toast } from '@zerodevx/svelte-toast';
 	import MinIo from './_MinIO.svelte';
@@ -18,6 +19,7 @@
 
 	let loading = false;
 	let loadingVerification = false;
+	let dualCerts = service.dualCerts;
 
 	async function handleSubmit() {
 		loading = true;
@@ -40,6 +42,17 @@
 			return errorNotification(error);
 		} finally {
 			loadingVerification = false;
+		}
+	}
+	async function changeSettings(name) {
+		try {
+			if (name === 'dualCerts') {
+				dualCerts = !dualCerts;
+			}
+			await post(`/services/${id}/settings.json`, { dualCerts });
+			return toast.push('Settings saved.');
+		} catch ({ error }) {
+			return errorNotification(error);
 		}
 	}
 </script>
@@ -67,10 +80,10 @@
 			{/if}
 		</div>
 
-		<div class="grid grid-flow-row gap-2 px-10">
-			<div class="mt-2 grid grid-cols-3 items-center">
+		<div class="grid grid-flow-row gap-2">
+			<div class="mt-2 grid grid-cols-2 items-center px-10">
 				<label for="name">Name</label>
-				<div class="col-span-2 ">
+				<div>
 					<input
 						readonly={!$session.isAdmin}
 						name="name"
@@ -81,9 +94,9 @@
 				</div>
 			</div>
 
-			<div class="grid grid-cols-3 items-center">
+			<div class="grid grid-cols-2 items-center px-10">
 				<label for="destination">Destination</label>
-				<div class="col-span-2">
+				<div>
 					{#if service.destinationDockerId}
 						<div class="no-underline">
 							<input
@@ -96,9 +109,9 @@
 					{/if}
 				</div>
 			</div>
-			<div class="grid grid-cols-3">
+			<div class="grid grid-cols-2 px-10">
 				<label for="fqdn" class="pt-2">Domain (FQDN)</label>
-				<div class="col-span-2 ">
+				<div>
 					<CopyPasswordField
 						placeholder="eg: https://analytics.coollabs.io"
 						readonly={!$session.isAdmin && !isRunning}
@@ -113,6 +126,14 @@
 						text="If you specify <span class='text-pink-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-pink-600 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application."
 					/>
 				</div>
+			</div>
+			<div class="grid grid-cols-2 items-center px-10">
+				<Setting
+					bind:setting={dualCerts}
+					title="Generate SSL for www and non-www?"
+					description="It will generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-pink-600'>both DNS entries</span> set in advance.<br><br>Service needs to be restarted."
+					on:click={() => changeSettings('dualCerts')}
+				/>
 			</div>
 			{#if service.type === 'plausibleanalytics'}
 				<PlausibleAnalytics bind:service {readOnly} />

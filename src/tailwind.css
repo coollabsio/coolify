@@ -22,10 +22,10 @@
 }
 
 html {
-	@apply h-full min-h-full;
+	@apply h-full min-h-full overflow-y-scroll;
 }
 body {
-	@apply min-h-screen overflow-x-hidden bg-coolblack text-sm text-white;
+	@apply min-h-screen overflow-x-hidden bg-coolblack text-sm text-white scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200;
 }
 
 main,
@@ -170,7 +170,7 @@ a {
 	padding: 8px;
 	color: #fff;
 	content: attr(data-tooltip);
-	@apply min-w-[100px] rounded bg-coollabs text-center font-normal;
+	@apply min-w-[100px] rounded bg-coollabs text-center font-medium;
 }
 
 /* Directions */

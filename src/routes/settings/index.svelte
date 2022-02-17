@@ -30,10 +30,13 @@
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { browser } from '$app/env';
 	import { getDomain } from '$lib/components/common';
+	import { toast } from '@zerodevx/svelte-toast';
 
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
+	let dualCerts = settings.dualCerts;
+
 	let fqdn = settings.fqdn;
-	let isFqdnSet = settings.fqdn;
+	let isFqdnSet = !!settings.fqdn;
 	let loading = {
 		save: false,
 		remove: false
@@ -43,8 +46,8 @@
 		if (fqdn) {
 			loading.remove = true;
 			try {
-				await del(`/settings.json`, { fqdn });
-				return window.location.reload();
+				const { redirect } = await del(`/settings.json`, { fqdn });
+				return redirect ? window.location.replace(redirect) : window.location.reload();
 			} catch ({ error }) {
 				return errorNotification(error);
 			} finally {
@@ -57,7 +60,11 @@
 			if (name === 'isRegistrationEnabled') {
 				isRegistrationEnabled = !isRegistrationEnabled;
 			}
-			return await post(`/settings.json`, { isRegistrationEnabled });
+			if (name === 'dualCerts') {
+				dualCerts = !dualCerts;
+			}
+			await post(`/settings.json`, { isRegistrationEnabled, dualCerts });
+			return toast.push('Settings saved.');
 		} catch ({ error }) {
 			return errorNotification(error);
 		}
@@ -82,15 +89,15 @@
 	<div class="mr-4 text-2xl tracking-tight">Settings</div>
 </div>
 {#if $session.teamId === '0'}
-	<div class="mx-auto max-w-2xl">
+	<div class="mx-auto max-w-4xl px-6">
 		<form on:submit|preventDefault={handleSubmit}>
-			<div class="flex space-x-1 p-6 font-bold">
+			<div class="flex space-x-1 py-6 font-bold">
 				<div class="title">Global Settings</div>
 				<button
 					type="submit"
 					disabled={loading.save}
-					class:bg-green-600={!loading.save}
-					class:hover:bg-green-500={!loading.save}
+					class:bg-yellow-500={!loading.save}
+					class:hover:bg-yellow-400={!loading.save}
 					class="mx-2 ">{loading.save ? 'Saving...' : 'Save'}</button
 				>
 				{#if isFqdnSet}
@@ -103,10 +110,10 @@
 					>
 				{/if}
 			</div>
-			<div class="px-4 sm:px-6">
-				<div class="flex space-x-4 py-4 px-4">
-					<p class="pt-2 text-base font-bold text-stone-100">Domain (FQDN)</p>
-					<div class="justify-center">
+			<div class="grid grid-flow-row gap-2 px-10">
+				<div class="grid grid-cols-2 items-start">
+					<div class="pt-2 text-base font-bold text-stone-100">Domain (FQDN)</div>
+					<div class="justify-start text-left">
 						<input
 							bind:value={fqdn}
 							readonly={!$session.isAdmin || isFqdnSet}
@@ -118,57 +125,60 @@
 							required
 						/>
 						<Explainer
-							text="If you specify <span class='text-green-600 font-bold'>https</span>, Coolify will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-green-600 font-bold'>www</span>, Coolify will be redirected (302) from non-www and vice versa."
+							text="If you specify <span class='text-yellow-500 font-bold'>https</span>, Coolify will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-yellow-500 font-bold'>www</span>, Coolify will be redirected (302) from non-www and vice versa."
 						/>
 					</div>
 				</div>
-				<ul class="mt-2 divide-y divide-stone-800">
+				<div class="grid grid-cols-2 items-center">
+					<Setting
+						disabled={isFqdnSet}
+						bind:setting={dualCerts}
+						title="Generate SSL for www and non-www?"
+						description="It will generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-yellow-400'>both DNS entries</span> set in advance.<br><br>Useful if you expect to have visitors on both."
+						on:click={() => !isFqdnSet && changeSettings('dualCerts')}
+					/>
+				</div>
+				<div class="grid grid-cols-2 items-center">
 					<Setting
 						bind:setting={isRegistrationEnabled}
 						title="Registration allowed?"
 						description="Allow further registrations to the application. <br>It's turned off after the first registration. "
 						on:click={() => changeSettings('isRegistrationEnabled')}
 					/>
-				</ul>
+				</div>
 			</div>
 		</form>
-		<div class="mx-auto max-w-4xl px-6">
-			<div class="flex space-x-1 pt-5 font-bold">
-				<div class="title">HAProxy Settings</div>
-			</div>
-			<Explainer
-				text={`Credentials for <a class="text-white font-bold" href=${
-					fqdn
-						? 'http://' + getDomain(fqdn) + ':8404'
-						: browser && 'http://' + window.location.hostname + ':8404'
-				} target="_blank">stats</a> page.`}
-			/>
-
-			<div class="grid grid-cols-3 items-center px-4 pt-5">
+		<div class="flex space-x-1 pt-6 font-bold">
+			<div class="title">Coolify Proxy Settings</div>
+		</div>
+		<Explainer
+			text={`Credentials for <a class="text-white font-bold" href=${
+				fqdn
+					? 'http://' + getDomain(fqdn) + ':8404'
+					: browser && 'http://' + window.location.hostname + ':8404'
+			} target="_blank">stats</a> page.`}
+		/>
+		<div class="px-10 py-5">
+			<div class="grid grid-cols-2 items-center">
 				<label for="proxyUser">User</label>
-
-				<div class="col-span-2 ">
-					<CopyPasswordField
-						readonly
-						disabled
-						id="proxyUser"
-						name="proxyUser"
-						value={settings.proxyUser}
-					/>
-				</div>
+				<CopyPasswordField
+					readonly
+					disabled
+					id="proxyUser"
+					name="proxyUser"
+					value={settings.proxyUser}
+				/>
 			</div>
-			<div class="grid grid-cols-3 items-center px-4">
+			<div class="grid grid-cols-2 items-center">
 				<label for="proxyPassword">Password</label>
-				<div class="col-span-2 ">
-					<CopyPasswordField
-						readonly
-						disabled
-						id="proxyPassword"
-						name="proxyPassword"
-						isPasswordField
-						value={settings.proxyPassword}
-					/>
-				</div>
+				<CopyPasswordField
+					readonly
+					disabled
+					id="proxyPassword"
+					name="proxyPassword"
+					isPasswordField
+					value={settings.proxyPassword}
+				/>
 			</div>
 		</div>
 	</div>
