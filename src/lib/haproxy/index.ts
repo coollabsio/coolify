@@ -64,7 +64,7 @@ export async function removeProxyConfiguration({ domain }) {
 			.json();
 		await completeTransaction(transactionId);
 	}
-	await forceSSLOffApplication(domain);
+	await forceSSLOffApplication({ domain });
 	await removeWwwRedirection(domain);
 }
 export async function forceSSLOffApplication({ domain }) {
@@ -577,7 +577,7 @@ export async function configureSimpleServiceProxyOff({ domain }) {
 			.json();
 		await completeTransaction(transactionId);
 	} catch (error) {}
-	await forceSSLOffApplication(domain);
+	await forceSSLOffApplication({ domain });
 	await removeWwwRedirection(domain);
 	return;
 }
