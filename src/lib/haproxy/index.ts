@@ -577,6 +577,7 @@ export async function configureSimpleServiceProxyOff({ domain }) {
 			.json();
 		await completeTransaction(transactionId);
 	} catch (error) {}
+	await forceSSLOffApplication(domain);
 	await removeWwwRedirection(domain);
 	return;
 }
