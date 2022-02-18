@@ -48,7 +48,8 @@ export async function completeTransaction(transactionId) {
 	return await haproxy.put(`v2/services/haproxy/transactions/${transactionId}`);
 }
 
-export async function removeProxyConfiguration({ domain }) {
+export async function removeProxyConfiguration(fqdn) {
+	const domain = getDomain(fqdn);
 	const haproxy = await haproxyInstance();
 	const backendFound = await haproxy
 		.get(`v2/services/haproxy/configuration/backends/${domain}`)
@@ -64,10 +65,10 @@ export async function removeProxyConfiguration({ domain }) {
 			.json();
 		await completeTransaction(transactionId);
 	}
-	await forceSSLOffApplication({ domain });
-	await removeWwwRedirection(domain);
+	await forceSSLOffApplication(domain);
+	await removeWwwRedirection(fqdn);
 }
-export async function forceSSLOffApplication({ domain }) {
+export async function forceSSLOffApplication(domain) {
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
 	let transactionId;
@@ -104,7 +105,7 @@ export async function forceSSLOffApplication({ domain }) {
 		if (transactionId) await completeTransaction(transactionId);
 	}
 }
-export async function forceSSLOnApplication({ domain }) {
+export async function forceSSLOnApplication(domain) {
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
 	let transactionId;
@@ -283,7 +284,7 @@ export async function configureCoolifyProxyOff(fqdn) {
 			})
 			.json();
 		await completeTransaction(transactionId);
-		if (isHttps) await forceSSLOffApplication({ domain });
+		if (isHttps) await forceSSLOffApplication(domain);
 		await removeWwwRedirection(fqdn);
 	} catch (error) {
 		throw error?.response?.body || error;
@@ -558,7 +559,8 @@ export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 	await completeTransaction(transactionId);
 }
 
-export async function configureSimpleServiceProxyOff({ domain }) {
+export async function configureSimpleServiceProxyOff(fqdn) {
+	const domain = getDomain(fqdn);
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
 	try {
@@ -573,12 +575,16 @@ export async function configureSimpleServiceProxyOff({ domain }) {
 			.json();
 		await completeTransaction(transactionId);
 	} catch (error) {}
-	await forceSSLOffApplication({ domain });
-	await removeWwwRedirection(domain);
+	await forceSSLOffApplication(domain);
+	await removeWwwRedirection(fqdn);
 	return;
 }
 
-export async function removeWwwRedirection(domain) {
+export async function removeWwwRedirection(fqdn) {
+	const domain = getDomain(fqdn);
+	const isHttps = fqdn.startsWith('https://');
+	const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
+
 	const haproxy = await haproxyInstance();
 	await checkHAProxy();
 	const rules: any = await haproxy
@@ -590,9 +596,7 @@ export async function removeWwwRedirection(domain) {
 		})
 		.json();
 	if (rules.data.length > 0) {
-		const rule = rules.data.find((rule) =>
-			rule.redir_value.includes(`${domain}%[capture.req.uri]`)
-		);
+		const rule = rules.data.find((rule) => rule.redir_value.includes(redirectValue));
 		if (rule) {
 			const transactionId = await getNextTransactionId();
 			await haproxy
@@ -617,6 +621,7 @@ export async function setWwwRedirection(fqdn) {
 		const domain = getDomain(fqdn);
 		const isHttps = fqdn.startsWith('https://');
 		const isWWW = fqdn.includes('www.');
+		const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
 		const contTest = `{ req.hdr(host) -i ${isWWW ? domain.replace('www.', '') : `www.${domain}`} }`;
 		const rules: any = await haproxy
 			.get(`v2/services/haproxy/configuration/http_request_rules`, {
@@ -628,13 +633,11 @@ export async function setWwwRedirection(fqdn) {
 			.json();
 		let nextRule = 0;
 		if (rules.data.length > 0) {
-			const rule = rules.data.find((rule) =>
-				rule.redir_value.includes(`${domain}%[capture.req.uri]`)
-			);
+			const rule = rules.data.find((rule) => rule.redir_value.includes(redirectValue));
 			if (rule) return;
 			nextRule = rules.data[rules.data.length - 1].index + 1;
 		}
-		const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
+
 		transactionId = await getNextTransactionId();
 		await haproxy
 			.post(`v2/services/haproxy/configuration/http_request_rules`, {

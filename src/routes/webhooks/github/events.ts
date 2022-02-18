@@ -144,10 +144,17 @@ export const post: RequestHandler = async (event) => {
 					} else if (pullmergeRequestAction === 'closed') {
 						if (applicationFound.destinationDockerId) {
 							const domain = getDomain(applicationFound.fqdn);
+							const isHttps = applicationFound.fqdn.startsWith('https://');
+							const isWWW = applicationFound.fqdn.includes('www.');
+							const fqdn = `${isHttps ? 'https://' : 'http://'}${
+								isWWW ? 'www.' : ''
+							}${pullmergeRequestId}.${domain}`;
+
 							const id = `${applicationFound.id}-${pullmergeRequestId}`;
 							const engine = applicationFound.destinationDocker.engine;
+
 							await removeDestinationDocker({ id, engine });
-							await removeProxyConfiguration({ domain: `${pullmergeRequestId}.${domain}` });
+							await removeProxyConfiguration(fqdn);
 						}
 						return {
 							status: 200,

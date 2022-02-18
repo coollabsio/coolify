@@ -131,6 +131,7 @@
 				</div>
 				<div class="grid grid-cols-2 items-center">
 					<Setting
+						dataTooltip="Must remove the domain before you can change this setting."
 						disabled={isFqdnSet}
 						bind:setting={dualCerts}
 						title="Generate SSL for www and non-www?"

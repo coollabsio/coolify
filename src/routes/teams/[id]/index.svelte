@@ -22,21 +22,20 @@
 <script lang="ts">
 	export let permissions;
 	export let team;
-	export let invitations;
+	export let invitations: any[];
 	import { page, session } from '$app/stores';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
 	import { post } from '$lib/api';
 	const { id } = $page.params;
-
 	let invitation = {
 		teamName: team.name,
 		email: null,
 		permission: 'read'
 	};
-	let myPermission = permissions.find((u) => u.user.id === $session.uid).permission;
-	function isAdmin(permission = myPermission) {
-		if (myPermission === 'admin' || myPermission === 'owner') {
+	// let myPermission = permissions.find((u) => u.user.id === $session.userId).permission;
+	function isAdmin(permission: string) {
+		if (permission === 'admin' || permission === 'owner') {
 			return true;
 		}
 
@@ -56,7 +55,7 @@
 			return errorNotification(error);
 		}
 	}
-	async function revokeInvitation(id) {
+	async function revokeInvitation(id: string) {
 		try {
 			await post(`/teams/${id}/invitation/revoke.json`, { id });
 			return window.location.reload();
@@ -64,7 +63,7 @@
 			return errorNotification(error);
 		}
 	}
-	async function removeFromTeam(uid) {
+	async function removeFromTeam(uid: string) {
 		try {
 			await post(`/teams/${id}/remove/user.json`, { teamId: team.id, uid });
 			return window.location.reload();
@@ -72,7 +71,7 @@
 			return errorNotification(error);
 		}
 	}
-	async function changePermission(userId, permissionId, currentPermission) {
+	async function changePermission(userId: string, permissionId: string, currentPermission: string) {
 		let newPermission = 'read';
 		if (currentPermission === 'read') {
 			newPermission = 'admin';
@@ -136,10 +135,11 @@
 				<tr class="text-xs">
 					<td class="py-4"
 						>{permission.user.email}
-						<span class="font-bold">{permission.user.id === $session.uid ? '(You)' : ''}</span></td
+						<span class="font-bold">{permission.user.id === $session.userId ? '(You)' : ''}</span
+						></td
 					>
 					<td class="py-4">{permission.permission}</td>
-					{#if $session.isAdmin && permission.user.id !== $session.uid && permission.permission !== 'owner'}
+					{#if $session.isAdmin && permission.user.id !== $session.userId && permission.permission !== 'owner'}
 						<td class="flex flex-col items-center justify-center space-y-2 py-4 text-center">
 							<button
 								class="w-52 bg-red-600 hover:bg-red-500"

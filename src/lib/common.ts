@@ -67,7 +67,7 @@ export const isTeamIdTokenAvailable = (request) => {
 };
 
 export const getTeam = (event) => {
-	const cookies: Cookies = Cookie.parse(event.request.headers.get('cookie'));
+	const cookies = Cookie.parse(event.request.headers.get('cookie'));
 	if (cookies.teamId) {
 		return cookies.teamId;
 	} else if (event.locals.session.data.teamId) {
@@ -78,7 +78,7 @@ export const getTeam = (event) => {
 
 export const getUserDetails = async (event, isAdminRequired = true) => {
 	const teamId = getTeam(event);
-	const userId = event.locals.session.data.uid || null;
+	const userId = event.locals.session.data.userId || null;
 	const { permission = 'read' } = await db.prisma.permission.findFirst({
 		where: { teamId, userId },
 		select: { permission: true },

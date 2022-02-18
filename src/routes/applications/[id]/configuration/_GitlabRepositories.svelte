@@ -8,7 +8,6 @@
 	import cuid from 'cuid';
 	import { goto } from '$app/navigation';
 	import { del, get, post, put } from '$lib/api';
-
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
 

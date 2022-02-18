@@ -276,11 +276,13 @@
 			</div>
 			<div class="grid grid-cols-2 items-center pb-8">
 				<Setting
+					dataTooltip="Must be stopped to modify."
+					disabled={isRunning}
 					isCenter={false}
 					bind:setting={dualCerts}
 					title="Generate SSL for www and non-www?"
-					description="It will generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-green-500'>both DNS entries</span> set in advance.<br><br>Useful if you expect to have visitors on both.<br>Application must be redeployed."
-					on:click={() => changeSettings('dualCerts')}
+					description="It will generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-green-500'>both DNS entries</span> set in advance.<br><br>Useful if you expect to have visitors on both."
+					on:click={() => !isRunning && changeSettings('dualCerts')}
 				/>
 			</div>
 			{#if !staticDeployments.includes(application.buildPack)}

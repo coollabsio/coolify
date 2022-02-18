@@ -101,7 +101,7 @@ export const post: RequestHandler = async (event) => {
 				await setWwwRedirection(fqdn);
 				if (isHttps) {
 					await letsEncrypt({ domain, isCoolify: true });
-					await forceSSLOnApplication({ domain });
+					await forceSSLOnApplication(domain);
 					await reloadHaproxy('/var/run/docker.sock');
 				}
 			}

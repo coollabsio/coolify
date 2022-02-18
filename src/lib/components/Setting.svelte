@@ -6,6 +6,7 @@
 	export let description;
 	export let isCenter = true;
 	export let disabled = false;
+	export let dataTooltip = null;
 </script>
 
 <div class="flex items-center py-4 pr-8">
@@ -14,7 +15,7 @@
 		<Explainer text={description} />
 	</div>
 </div>
-<div class:text-center={isCenter}>
+<div class:tooltip={dataTooltip} class:text-center={isCenter} data-tooltip={dataTooltip}>
 	<div
 		type="button"
 		on:click

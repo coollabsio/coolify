@@ -12,13 +12,16 @@ export async function login({ email, password }) {
 	const users = await prisma.user.count();
 	const userFound = await prisma.user.findUnique({
 		where: { email },
-		include: { teams: true },
+		include: { teams: true, permission: true },
 		rejectOnNotFound: false
 	});
+	console.log(userFound);
 	// Registration disabled if database is not seeded properly
 	const { isRegistrationEnabled, id } = await db.listSettings();
 
 	let uid = cuid();
+	let permission = 'read';
+	let isAdmin = false;
 	// Disable registration if we are registering the first user.
 	if (users === 0) {
 		await prisma.setting.update({ where: { id }, data: { isRegistrationEnabled: false } });
@@ -50,6 +53,8 @@ export async function login({ email, password }) {
 				};
 			}
 			uid = userFound.id;
+			// permission = userFound.permission;
+			isAdmin = true;
 		}
 	} else {
 		// If registration disabled, return 403
@@ -61,6 +66,8 @@ export async function login({ email, password }) {
 
 		const hashedPassword = await bcrypt.hash(password, saltRounds);
 		if (users === 0) {
+			permission = 'owner';
+			isAdmin = true;
 			await prisma.user.create({
 				data: {
 					id: uid,
@@ -103,8 +110,10 @@ export async function login({ email, password }) {
 			'Set-Cookie': `teamId=${uid}; HttpOnly; Path=/; Max-Age=15778800;`
 		},
 		body: {
-			uid,
-			teamId: uid
+			userId: uid,
+			teamId: uid,
+			permission,
+			isAdmin
 		}
 	};
 }

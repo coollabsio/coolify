@@ -129,10 +129,12 @@
 			</div>
 			<div class="grid grid-cols-2 items-center px-10">
 				<Setting
+					disabled={isRunning}
+					dataTooltip="Must be stopped to modify."
 					bind:setting={dualCerts}
 					title="Generate SSL for www and non-www?"
 					description="It will generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-pink-600'>both DNS entries</span> set in advance.<br><br>Service needs to be restarted."
-					on:click={() => changeSettings('dualCerts')}
+					on:click={() => !isRunning && changeSettings('dualCerts')}
 				/>
 			</div>
 			{#if service.type === 'plausibleanalytics'}

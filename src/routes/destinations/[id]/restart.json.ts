@@ -24,7 +24,7 @@ export const post: RequestHandler = async (event) => {
 		await configureCoolifyProxyOn(fqdn);
 		await setWwwRedirection(fqdn);
 		const isHttps = fqdn.startsWith('https://');
-		if (isHttps) await forceSSLOnApplication({ domain });
+		if (isHttps) await forceSSLOnApplication(domain);
 		return {
 			status: 200
 		};
