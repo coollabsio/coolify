@@ -2,6 +2,7 @@ import { dev } from '$app/env';
 import { sentry } from '$lib/common';
 import * as Prisma from '@prisma/client';
 import { default as ProdPrisma } from '@prisma/client';
+import type { PrismaClientOptions } from '@prisma/client/runtime';
 import generator from 'generate-password';
 import forge from 'node-forge';
 
@@ -19,28 +20,20 @@ if (!dev) {
 	PrismaClient = ProdPrisma.PrismaClient;
 	P = ProdPrisma.Prisma;
 }
-let prismaOptions = {
+
+export const prisma = new PrismaClient({
+	errorFormat: 'pretty',
 	rejectOnNotFound: false
-};
-if (dev) {
-	prismaOptions = {
-		errorFormat: 'pretty',
-		rejectOnNotFound: false,
-		log: [
-			{
-				emit: 'event',
-				level: 'query'
-			}
-		]
-	};
-}
-export const prisma = new PrismaClient(prismaOptions);
+});
 
 export function ErrorHandler(e) {
 	if (e! instanceof Error) {
 		e = new Error(e.toString());
 	}
 	let truncatedError = e;
+	if (e.stdout) {
+		truncatedError = e.stdout;
+	}
 	if (e.message?.includes('docker run')) {
 		let truncatedArray = [];
 		truncatedArray = truncatedError.message.split('-').filter((line) => {

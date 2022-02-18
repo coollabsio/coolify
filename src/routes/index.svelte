@@ -1,7 +1,7 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ fetch, session }) => {
-		const url = `/index.json`;
+		const url = `/dashboard.json`;
 		const res = await fetch(url);
 
 		if (res.ok) {

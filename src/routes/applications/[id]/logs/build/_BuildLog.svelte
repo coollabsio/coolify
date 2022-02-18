@@ -86,6 +86,7 @@
 		<div class="flex justify-end sticky top-0 p-2">
 			<button
 				on:click={followBuild}
+				class="bg-transparent"
 				data-tooltip="Follow logs"
 				class:text-green-500={followingBuild}
 			>
@@ -108,7 +109,7 @@
 			</button>
 		</div>
 		<div
-			class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12"
+			class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
 			bind:this={logsEl}
 		>
 			{#each logs as log}

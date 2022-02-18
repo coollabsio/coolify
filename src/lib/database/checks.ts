@@ -21,16 +21,35 @@ export async function isSecretExists({ id, name }) {
 
 export async function isDomainConfigured({ id, fqdn }) {
 	const domain = getDomain(fqdn);
+	const nakedDomain = domain.replace('www.', '');
 	const foundApp = await prisma.application.findFirst({
-		where: { fqdn: { endsWith: `//${domain}` }, id: { not: id } },
+		where: {
+			OR: [
+				{ fqdn: { endsWith: `//${nakedDomain}` } },
+				{ fqdn: { endsWith: `//www.${nakedDomain}` } }
+			],
+			id: { not: id }
+		},
 		select: { fqdn: true }
 	});
 	const foundService = await prisma.service.findFirst({
-		where: { fqdn: { endsWith: `//${domain}` }, id: { not: id } },
+		where: {
+			OR: [
+				{ fqdn: { endsWith: `//${nakedDomain}` } },
+				{ fqdn: { endsWith: `//www.${nakedDomain}` } }
+			],
+			id: { not: id }
+		},
 		select: { fqdn: true }
 	});
 	const coolifyFqdn = await prisma.setting.findFirst({
-		where: { fqdn: { endsWith: `//${domain}` }, id: { not: id } },
+		where: {
+			OR: [
+				{ fqdn: { endsWith: `//${nakedDomain}` } },
+				{ fqdn: { endsWith: `//www.${nakedDomain}` } }
+			],
+			id: { not: id }
+		},
 		select: { fqdn: true }
 	});
 	if (foundApp || foundService || coolifyFqdn) return true;

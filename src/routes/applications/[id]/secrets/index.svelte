@@ -46,22 +46,21 @@
 			<tr>
 				<th
 					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-warmGray-400"
-					>Name</th
+					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white">Name</th
 				>
 				<th
 					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-warmGray-400"
+					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white"
 					>Value</th
 				>
 				<th
 					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-warmGray-400"
+					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white"
 					>Need during buildtime?</th
 				>
 				<th
 					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-warmGray-400"
+					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white"
 				/>
 			</tr>
 		</thead>

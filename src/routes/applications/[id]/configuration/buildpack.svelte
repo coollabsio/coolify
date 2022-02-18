@@ -1,7 +1,7 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ fetch, params, url, stuff }) => {
-		const { application, ghToken } = stuff;
+		const { application } = stuff;
 		if (application?.buildPack && !url.searchParams.get('from')) {
 			return {
 				status: 302,
@@ -14,8 +14,7 @@
 			return {
 				props: {
 					...(await res.json()),
-					application,
-					ghToken
+					application
 				}
 			};
 		}
@@ -43,7 +42,6 @@
 	export let projectId;
 	export let repository;
 	export let branch;
-	export let ghToken;
 	export let type;
 	export let application;
 
@@ -96,7 +94,7 @@
 				}
 			} else if (type === 'github') {
 				const files = await get(`${apiUrl}/repos/${repository}/contents?ref=${branch}`, {
-					Authorization: `Bearer ${ghToken}`,
+					Authorization: `Bearer ${$session.ghToken || ghToken}`,
 					Accept: 'application/vnd.github.v2.json'
 				});
 				const packageJson = files.find(
@@ -113,7 +111,7 @@
 					foundConfig.buildPack = 'docker';
 				} else if (packageJson) {
 					const data = await get(`${packageJson.git_url}`, {
-						Authorization: `Bearer ${ghToken}`,
+						Authorization: `Bearer ${$session.ghToken}`,
 						Accept: 'application/vnd.github.v2.raw'
 					});
 					const json = JSON.parse(data) || {};

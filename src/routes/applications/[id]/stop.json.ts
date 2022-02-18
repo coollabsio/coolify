@@ -16,12 +16,11 @@ export const post: RequestHandler = async (event) => {
 			id,
 			teamId
 		});
-		const domain = getDomain(fqdn);
 		if (destinationDockerId) {
 			const docker = dockerInstance({ destinationDocker });
 			await docker.engine.getContainer(id).stop();
 		}
-		await removeProxyConfiguration({ domain });
+		await removeProxyConfiguration(fqdn);
 		return {
 			status: 200
 		};

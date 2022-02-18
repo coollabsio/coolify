@@ -9,7 +9,7 @@
 	let emailEl;
 	let email, password;
 
-	if (browser && $session.uid) {
+	if (browser && $session.userId) {
 		goto('/');
 	}
 	onMount(() => {
@@ -34,7 +34,7 @@
 </script>
 
 <div class="flex h-screen flex-col items-center justify-center">
-	{#if $session.uid}
+	{#if $session.userId}
 		<div class="flex justify-center px-4 text-xl font-bold">Already logged in...</div>
 	{:else}
 		<div class="flex justify-center px-4">
@@ -67,6 +67,7 @@
 						class:text-stone-600={loading}
 						class:bg-coollabs={!loading}>{loading ? 'Authenticating...' : 'Login'}</button
 					>
+					<button on:click|preventDefault={() => goto('/reset')}>Reset password</button>
 				</div>
 			</form>
 		</div>

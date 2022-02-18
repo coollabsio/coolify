@@ -7,32 +7,17 @@
 	<div class="title">Redis</div>
 </div>
 <div class="px-10">
-	<!-- <div class="grid grid-cols-3 items-center">
-		<label for="dbUser">User</label>
-		<div class="col-span-2 ">
-			<CopyPasswordField
-				readonly
-				disabled
-				placeholder="Generated automatically after start"
-				id="dbUser"
-				name="dbUser"
-				bind:value={database.dbUser}
-			/>
-		</div>
-	</div> -->
-	<div class="grid grid-cols-3 items-center">
+	<div class="grid grid-cols-2 items-center">
 		<label for="dbUserPassword">Password</label>
-		<div class="col-span-2 ">
-			<CopyPasswordField
-				disabled
-				readonly
-				placeholder="Generated automatically after start"
-				isPasswordField
-				id="dbUserPassword"
-				name="dbUserPassword"
-				value={database.dbUserPassword}
-			/>
-		</div>
+		<CopyPasswordField
+			disabled
+			readonly
+			placeholder="Generated automatically after start"
+			isPasswordField
+			id="dbUserPassword"
+			name="dbUserPassword"
+			value={database.dbUserPassword}
+		/>
 	</div>
 	<!-- <div class="grid grid-cols-3 items-center">
 		<label for="rootUser">Root User</label>

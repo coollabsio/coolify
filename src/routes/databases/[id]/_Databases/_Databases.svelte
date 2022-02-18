@@ -36,7 +36,7 @@
 
 	function generateUrl() {
 		return browser
-			? `${database.type}://${
+			? `${database.type}://${database.type === 'redis' && ':'}${
 					databaseDbUser ? databaseDbUser + ':' : ''
 			  }${databaseDbUserPassword}@${
 					isPublic
@@ -88,70 +88,60 @@
 		</div>
 
 		<div class="grid grid-flow-row gap-2 px-10">
-			<div class="grid grid-cols-3 items-center">
+			<div class="grid grid-cols-2 items-center">
 				<label for="name">Name</label>
-				<div class="col-span-2 ">
-					<input
-						readonly={!$session.isAdmin}
-						name="name"
-						id="name"
-						bind:value={database.name}
-						required
-					/>
-				</div>
+				<input
+					readonly={!$session.isAdmin}
+					name="name"
+					id="name"
+					bind:value={database.name}
+					required
+				/>
 			</div>
-			<div class="grid grid-cols-3 items-center">
+			<div class="grid grid-cols-2 items-center">
 				<label for="destination">Destination</label>
-				<div class="col-span-2">
-					{#if database.destinationDockerId}
-						<div class="no-underline">
-							<input
-								value={database.destinationDocker.name}
-								id="destination"
-								disabled
-								readonly
-								class="bg-transparent "
-							/>
-						</div>
-					{/if}
-				</div>
+				{#if database.destinationDockerId}
+					<div class="no-underline">
+						<input
+							value={database.destinationDocker.name}
+							id="destination"
+							disabled
+							readonly
+							class="bg-transparent "
+						/>
+					</div>
+				{/if}
 			</div>
 
-			<div class="grid grid-cols-3 items-center">
+			<div class="grid grid-cols-2 items-center">
 				<label for="version">Version</label>
-				<div class="col-span-2 ">
-					<input value={database.version} readonly disabled class="bg-transparent " />
-				</div>
+				<input value={database.version} readonly disabled class="bg-transparent " />
 			</div>
 		</div>
 
 		<div class="grid grid-flow-row gap-2 px-10">
-			<div class="grid grid-cols-3 items-center">
+			<div class="grid grid-cols-2 items-center">
 				<label for="host">Host</label>
-				<div class="col-span-2 ">
-					<CopyPasswordField
-						placeholder="Generated automatically after start"
-						isPasswordField={false}
-						readonly
-						disabled
-						id="host"
-						name="host"
-						value={database.id}
-					/>
-				</div>
+				<CopyPasswordField
+					placeholder="Generated automatically after start"
+					isPasswordField={false}
+					readonly
+					disabled
+					id="host"
+					name="host"
+					value={database.id}
+				/>
 			</div>
-			<div class="grid grid-cols-3 items-center">
+			<div class="grid grid-cols-2 items-center">
 				<label for="publicPort">Port</label>
-				<div class="col-span-2">
-					<CopyPasswordField
-						placeholder="Generated automatically after start"
-						id="publicPort"
-						readonly
-						disabled
-						name="publicPort"
-						value={isPublic ? database.publicPort : privatePort}
-					/>
-				</div>
+				<CopyPasswordField
+					placeholder="Generated automatically after start"
+					id="publicPort"
+					readonly
+					disabled
+					name="publicPort"
+					value={isPublic ? database.publicPort : privatePort}
+				/>
 			</div>
 		</div>
 		<div class="grid grid-flow-row gap-2">
@@ -166,44 +156,42 @@
 			{:else if database.type === 'couchdb'}
 				<CouchDb bind:database />
 			{/if}
-			<div class="grid grid-cols-3 items-center px-10 pb-8">
+			<div class="grid grid-cols-2 items-center px-10 pb-8">
 				<label for="url">Connection String</label>
-				<div class="col-span-2 ">
-					<CopyPasswordField
-						textarea={true}
-						placeholder="Generated automatically after start"
-						isPasswordField={false}
-						id="url"
-						name="url"
-						readonly
-						disabled
-						value={databaseUrl}
-					/>
-				</div>
+				<CopyPasswordField
+					textarea={true}
+					placeholder="Generated automatically after start"
+					isPasswordField={false}
+					id="url"
+					name="url"
+					readonly
+					disabled
+					value={databaseUrl}
+				/>
 			</div>
 		</div>
 	</form>
 	<div class="flex space-x-1 pb-5 font-bold">
 		<div class="title">Features</div>
 	</div>
-	<div class="px-4 pb-10 sm:px-6">
-		<ul class="mt-2 divide-y divide-stone-800">
+	<div class="px-10 pb-10">
+		<div class="grid grid-cols-2 items-center">
 			<Setting
 				bind:setting={isPublic}
 				on:click={() => changeSettings('isPublic')}
 				title="Set it public"
 				description="Your database will be reachable over the internet. <br>Take security seriously in this case!"
 			/>
-		</ul>
+		</div>
 		{#if database.type === 'redis'}
-			<ul class="mt-2 divide-y divide-stone-800">
+			<div class="grid grid-cols-2 items-center">
 				<Setting
 					bind:setting={appendOnly}
 					on:click={() => changeSettings('appendOnly')}
 					title="Change append only mode"
 					description="Useful if you would like to restore redis data from a backup.<br><span class='font-bold text-white'>Database restart is required.</span>"
 				/>
-			</ul>
+			</div>
 		{/if}
 	</div>
 </div>

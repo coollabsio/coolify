@@ -22,21 +22,20 @@
 <script lang="ts">
 	export let permissions;
 	export let team;
-	export let invitations;
+	export let invitations: any[];
 	import { page, session } from '$app/stores';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
 	import { post } from '$lib/api';
 	const { id } = $page.params;
-
 	let invitation = {
 		teamName: team.name,
 		email: null,
 		permission: 'read'
 	};
-	let myPermission = permissions.find((u) => u.user.id === $session.uid).permission;
-	function isAdmin(permission = myPermission) {
-		if (myPermission === 'admin' || myPermission === 'owner') {
+	// let myPermission = permissions.find((u) => u.user.id === $session.userId).permission;
+	function isAdmin(permission: string) {
+		if (permission === 'admin' || permission === 'owner') {
 			return true;
 		}
 
@@ -56,7 +55,7 @@
 			return errorNotification(error);
 		}
 	}
-	async function revokeInvitation(id) {
+	async function revokeInvitation(id: string) {
 		try {
 			await post(`/teams/${id}/invitation/revoke.json`, { id });
 			return window.location.reload();
@@ -64,7 +63,7 @@
 			return errorNotification(error);
 		}
 	}
-	async function removeFromTeam(uid) {
+	async function removeFromTeam(uid: string) {
 		try {
 			await post(`/teams/${id}/remove/user.json`, { teamId: team.id, uid });
 			return window.location.reload();
@@ -72,7 +71,7 @@
 			return errorNotification(error);
 		}
 	}
-	async function changePermission(userId, permissionId, currentPermission) {
+	async function changePermission(userId: string, permissionId: string, currentPermission: string) {
 		let newPermission = 'read';
 		if (currentPermission === 'read') {
 			newPermission = 'admin';
@@ -99,7 +98,7 @@
 	<span class="arrow-right-applications px-1 text-cyan-500">></span>
 	<span class="pr-2">{team.name}</span>
 </div>
-<div class="mx-auto max-w-2xl">
+<div class="mx-auto max-w-4xl">
 	<form on:submit|preventDefault={handleSubmit}>
 		<div class="flex space-x-1 p-6 font-bold">
 			<div class="title">Settings</div>
@@ -113,10 +112,10 @@
 			<input id="name" name="name" placeholder="name" bind:value={team.name} />
 		</div>
 		{#if team.id === '0'}
-			<div class="px-20 pt-4 text-center">
+			<div class="px-8 pt-4 text-left">
 				<Explainer
-					maxWidthClass="w-full"
-					text="This is the <span class='text-red-500 font-bold'>root</span> team. <br><br>That means members of this group can manage instance wide settings and have all the priviliges in Coolify. (imagine like root user on Linux)"
+					customClass="w-full"
+					text="This is the <span class='text-red-500 font-bold'>root</span> team. That means members of this group can manage instance wide settings and have all the priviliges in Coolify (imagine like root user on Linux)."
 				/>
 			</div>
 		{/if}
@@ -136,10 +135,11 @@
 				<tr class="text-xs">
 					<td class="py-4"
 						>{permission.user.email}
-						<span class="font-bold">{permission.user.id === $session.uid ? '(You)' : ''}</span></td
+						<span class="font-bold">{permission.user.id === $session.userId ? '(You)' : ''}</span
+						></td
 					>
 					<td class="py-4">{permission.permission}</td>
-					{#if $session.isAdmin && permission.user.id !== $session.uid && permission.permission !== 'owner'}
+					{#if $session.isAdmin && permission.user.id !== $session.userId && permission.permission !== 'owner'}
 						<td class="flex flex-col items-center justify-center space-y-2 py-4 text-center">
 							<button
 								class="w-52 bg-red-600 hover:bg-red-500"
@@ -178,11 +178,19 @@
 	</div>
 </div>
 {#if $session.isAdmin}
-	<div class="mx-auto max-w-2xl pt-8">
+	<div class="mx-auto max-w-4xl pt-8">
 		<form on:submit|preventDefault={sendInvitation}>
-			<div class="flex space-x-1 p-6 font-bold">
-				<div class="title">Invite new member</div>
-				<div class="text-center">
+			<div class="flex space-x-1 p-6">
+				<div>
+					<div class="title font-bold">Invite new member</div>
+					<div class="text-left">
+						<Explainer
+							customClass="w-56"
+							text="You can only invite registered users at the moment - will be extended soon."
+						/>
+					</div>
+				</div>
+				<div class="pt-1 text-center">
 					<button class="bg-cyan-600 hover:bg-cyan-500" type="submit">Send invitation</button>
 				</div>
 			</div>

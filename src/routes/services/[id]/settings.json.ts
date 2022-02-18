@@ -8,10 +8,10 @@ export const post: RequestHandler = async (event) => {
 	if (status === 401) return { status, body };
 
 	const { id } = event.params;
-	const { debug, previews, dualCerts } = await event.request.json();
+	const { dualCerts } = await event.request.json();
 
 	try {
-		await db.setApplicationSettings({ id, debug, previews, dualCerts });
+		await db.setServiceSettings({ id, dualCerts });
 		return { status: 201 };
 	} catch (error) {
 		return ErrorHandler(error);

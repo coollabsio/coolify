@@ -3,10 +3,10 @@ lockfileVersion: 5.3
 specifiers:
   '@iarna/toml': 2.2.5
   '@prisma/client': 3.9.2
-  '@sentry/node': 6.17.8
-  '@sveltejs/adapter-node': 1.0.0-next.67
-  '@sveltejs/adapter-static': 1.0.0-next.27
-  '@sveltejs/kit': 1.0.0-next.259
+  '@sentry/node': 6.17.9
+  '@sveltejs/adapter-node': 1.0.0-next.68
+  '@sveltejs/adapter-static': 1.0.0-next.28
+  '@sveltejs/kit': 1.0.0-next.278
   '@types/bcrypt': 5.0.0
   '@types/js-cookie': 3.0.1
   '@types/node': 17.0.18
@@ -16,7 +16,7 @@ specifiers:
   '@zerodevx/svelte-toast': 0.6.3
   autoprefixer: 10.4.2
   bcrypt: 5.0.1
-  bullmq: 1.72.0
+  bullmq: 1.73.0
   compare-versions: 4.1.3
   cookie: 0.4.2
   cross-var: 1.1.0
@@ -28,7 +28,7 @@ specifiers:
   eslint-config-prettier: 8.3.0
   eslint-plugin-svelte3: 3.2.1
   generate-password: 1.7.0
-  get-port: 6.0.0
+  get-port: 6.1.0
   got: 12.0.1
   husky: 7.0.4
   js-cookie: 3.0.1
@@ -43,20 +43,21 @@ specifiers:
   prisma: 3.9.2
   svelte: 3.46.4
   svelte-check: 2.4.3
-  svelte-kit-cookie-session: 2.0.5
+  svelte-kit-cookie-session: 2.1.2
   svelte-preprocess: 4.10.3
-  tailwindcss: 3.0.22
+  tailwindcss: 3.0.23
+  tailwindcss-scrollbar: ^0.1.0
   ts-node: 10.5.0
   tslib: 2.3.1
   typescript: 4.5.5
-  unique-names-generator: 4.6.0
+  unique-names-generator: 4.7.1
 
 dependencies:
   '@iarna/toml': 2.2.5
   '@prisma/client': 3.9.2_prisma@3.9.2
-  '@sentry/node': 6.17.8
+  '@sentry/node': 6.17.9
   bcrypt: 5.0.1
-  bullmq: 1.72.0
+  bullmq: 1.73.0
   compare-versions: 4.1.3
   cookie: 0.4.2
   cuid: 2.1.8
@@ -64,19 +65,20 @@ dependencies:
   dockerode: 3.3.1
   dotenv-extended: 2.9.0
   generate-password: 1.7.0
-  get-port: 6.0.0
+  get-port: 6.1.0
   got: 12.0.1
   js-cookie: 3.0.1
   js-yaml: 4.1.0
   jsonwebtoken: 8.5.1
   node-forge: 1.2.1
-  svelte-kit-cookie-session: 2.0.5
-  unique-names-generator: 4.6.0
+  svelte-kit-cookie-session: 2.1.2
+  tailwindcss-scrollbar: 0.1.0_tailwindcss@3.0.23
+  unique-names-generator: 4.7.1
 
 devDependencies:
-  '@sveltejs/adapter-node': 1.0.0-next.67
-  '@sveltejs/adapter-static': 1.0.0-next.27
-  '@sveltejs/kit': 1.0.0-next.259_svelte@3.46.4
+  '@sveltejs/adapter-node': 1.0.0-next.68
+  '@sveltejs/adapter-static': 1.0.0-next.28
+  '@sveltejs/kit': 1.0.0-next.278_svelte@3.46.4
   '@types/bcrypt': 5.0.0
   '@types/js-cookie': 3.0.1
   '@types/node': 17.0.18
@@ -99,7 +101,7 @@ devDependencies:
   svelte: 3.46.4
   svelte-check: 2.4.3_postcss@8.4.6+svelte@3.46.4
   svelte-preprocess: 4.10.3_88b359da5cac6d8f6ee1bbb7080a3fa9
-  tailwindcss: 3.0.22_c940fbabf228b85b1c73d314b43e31f1
+  tailwindcss: 3.0.23_c940fbabf228b85b1c73d314b43e31f1
   ts-node: 10.5.0_f3bd4037939c2ed2942ba074291f8ef2
   tslib: 2.3.1
   typescript: 4.5.5
@@ -293,56 +295,56 @@ packages:
       picomatch: 2.3.0
     dev: true
 
-  /@sentry/core/6.17.8:
+  /@sentry/core/6.17.9:
     resolution:
       {
-        integrity: sha512-4WTjgQom75Rvgn6XYy6e7vMIbWlj8utau1wWvr7kjqFKuuuuycRvPgVzAdVr4B3WDHHCInAZpUchsOLs2qwIEA==
+        integrity: sha512-14KalmTholGUtgdh9TklO+jUpyQ/D3OGkhlH1rnGQGoJgFy2eYm+s+MnUEMxFdGIUCz5kOteuNqYZxaDmFagpQ==
       }
     engines: { node: '>=6' }
     dependencies:
-      '@sentry/hub': 6.17.8
-      '@sentry/minimal': 6.17.8
-      '@sentry/types': 6.17.8
-      '@sentry/utils': 6.17.8
+      '@sentry/hub': 6.17.9
+      '@sentry/minimal': 6.17.9
+      '@sentry/types': 6.17.9
+      '@sentry/utils': 6.17.9
       tslib: 1.14.1
     dev: false
 
-  /@sentry/hub/6.17.8:
+  /@sentry/hub/6.17.9:
     resolution:
       {
-        integrity: sha512-GW0XYpkoQu/kSJaTLfsF4extHDOBPNRnT0qKr/YO20Z5wGxYp8LsdnAuU3njcFHcAV2F/QDTj2BPq1U385/4+A==
+        integrity: sha512-34EdrweWDbBV9EzEFIXcO+JeoyQmKzQVJxpTKZoJA6PUwf2NrndaUdjlkDEtBEzjuLUTxhLxtOzEsYs1O6RVcg==
       }
     engines: { node: '>=6' }
     dependencies:
-      '@sentry/types': 6.17.8
-      '@sentry/utils': 6.17.8
+      '@sentry/types': 6.17.9
+      '@sentry/utils': 6.17.9
       tslib: 1.14.1
     dev: false
 
-  /@sentry/minimal/6.17.8:
+  /@sentry/minimal/6.17.9:
     resolution:
       {
-        integrity: sha512-VJXFZBO/O8SViK0fdzodxpNr+pbpgczNgLpz/MNuSooV6EBesgCMVjXtxDUp1Ie1odc0GUprN/ZMLYBmYdIrKQ==
+        integrity: sha512-T3PMCHcKk6lkZq6zKgANrYJJxXBXKOe+ousV1Fas1rVBMv7dtKfsa4itqQHszcW9shusPDiaQKIJ4zRLE5LKmg==
       }
     engines: { node: '>=6' }
     dependencies:
-      '@sentry/hub': 6.17.8
-      '@sentry/types': 6.17.8
+      '@sentry/hub': 6.17.9
+      '@sentry/types': 6.17.9
       tslib: 1.14.1
     dev: false
 
-  /@sentry/node/6.17.8:
+  /@sentry/node/6.17.9:
     resolution:
       {
-        integrity: sha512-b3zg1XjKtxp7o821ENORO1CCzMM4QzKP01rzztMwyMcj28dmUq36QXoQAnwdKn7jEYkJdLnMeniIBR6U6NUJrQ==
+        integrity: sha512-jbn+q7qPGOh6D7nYoYGaAlmuvMDpQmyMwBtUVYybuZp2AALe43O3Z4LtoJ+1+F31XowpsIPZx1mwNs4ZrILskA==
       }
     engines: { node: '>=6' }
     dependencies:
-      '@sentry/core': 6.17.8
-      '@sentry/hub': 6.17.8
-      '@sentry/tracing': 6.17.8
-      '@sentry/types': 6.17.8
-      '@sentry/utils': 6.17.8
+      '@sentry/core': 6.17.9
+      '@sentry/hub': 6.17.9
+      '@sentry/tracing': 6.17.9
+      '@sentry/types': 6.17.9
+      '@sentry/utils': 6.17.9
       cookie: 0.4.2
       https-proxy-agent: 5.0.0
       lru_map: 0.3.3
@@ -351,36 +353,36 @@ packages:
       - supports-color
     dev: false
 
-  /@sentry/tracing/6.17.8:
+  /@sentry/tracing/6.17.9:
     resolution:
       {
-        integrity: sha512-WJ3W8O6iPI3w7MrzTnYcw3s5PGBNFqT4b9oBCl5Ndjexs8DsGlQOxjrsipo36z6TpnRHpAE4FEbOETb2R8JRJQ==
+        integrity: sha512-5Rb/OS4ryNJLvz2nv6wyjwhifjy6veqaF9ffLrwFYij/WDy7m62ASBblxgeiI3fbPLX0aBRFWIJAq1vko26+AQ==
       }
     engines: { node: '>=6' }
     dependencies:
-      '@sentry/hub': 6.17.8
-      '@sentry/minimal': 6.17.8
-      '@sentry/types': 6.17.8
-      '@sentry/utils': 6.17.8
+      '@sentry/hub': 6.17.9
+      '@sentry/minimal': 6.17.9
+      '@sentry/types': 6.17.9
+      '@sentry/utils': 6.17.9
       tslib: 1.14.1
     dev: false
 
-  /@sentry/types/6.17.8:
+  /@sentry/types/6.17.9:
     resolution:
       {
-        integrity: sha512-0i0f+dpvV62Pm5QMVBHNfEsTGIXoXRGQbeN2LGL4XbhzrzUmIrBPzrnZHv9c/JYtSJnI6A0B9OG7Bdlh3aku+Q==
+        integrity: sha512-xuulX6qUCL14ayEOh/h6FUIvZtsi1Bx34dSOaWDrjXUOJHJAM7214uiqW1GZxPJ13YuaUIubjTSfDmSQ9CBzTw==
       }
     engines: { node: '>=6' }
     dev: false
 
-  /@sentry/utils/6.17.8:
+  /@sentry/utils/6.17.9:
     resolution:
       {
-        integrity: sha512-cAOM53A5FHv95hpDuXKJU8rI4B1XdZ6qe3Yo+/nDS9QDpOgzvyjcItgXPvKW1wUjdHCcnwu7VBfBxB7teYOW9g==
+        integrity: sha512-4eo9Z3JlJCGlGrQRbtZWL+L9NnlUXgTbfK3Lk7oO8D1ev8R5b5+iE6tZHTvU5rQRcq6zu+POT+tK5u9oxc/rnQ==
       }
     engines: { node: '>=6' }
     dependencies:
-      '@sentry/types': 6.17.8
+      '@sentry/types': 6.17.9
       tslib: 1.14.1
     dev: false
 
@@ -392,28 +394,28 @@ packages:
     engines: { node: '>=10' }
     dev: false
 
-  /@sveltejs/adapter-node/1.0.0-next.67:
+  /@sveltejs/adapter-node/1.0.0-next.68:
     resolution:
       {
-        integrity: sha512-+LuLn91xARZsRANiQNIIDpMMncUTnP2pJc8tyL+FdpVvs5UtlvkYJpeCBPFqjjseRpIIbi8Slu89GCdrRXBDUg==
+        integrity: sha512-MiEjtl15Aupm6bjirVlq0kkc9AL8qDXz/blsh4jYMsaiidmcEHeDgfZQFM5YiXy95DbxV30MAkhwCQiYK/J8Kw==
       }
     dependencies:
       tiny-glob: 0.2.9
     dev: true
 
-  /@sveltejs/adapter-static/1.0.0-next.27:
+  /@sveltejs/adapter-static/1.0.0-next.28:
     resolution:
       {
-        integrity: sha512-dcN1p1D7ZY/a9SClfN14mgm9pyWbLxdwM9gzPMZG6xXOoqMtwI03aZOFgGGumHPdv+XcGRZM96vUSRoDm6vBJQ==
+        integrity: sha512-c4xLyeSwnbGQxe4f1SLpHTbxZDm3TEr43scR3tOlVgQN+mnAL9aDdl3nTtdzWmrUDmDEmY4GriAwLyFLZuINLw==
       }
     dependencies:
       tiny-glob: 0.2.9
     dev: true
 
-  /@sveltejs/kit/1.0.0-next.259_svelte@3.46.4:
+  /@sveltejs/kit/1.0.0-next.278_svelte@3.46.4:
     resolution:
       {
-        integrity: sha512-+Tss6cQXmpi4Jno/ZP0zJ3INBLMED+WeW4UI81tmexheC76Y2p+cbInneKO/REx/8QFo1iroYrWAUkZPsOg8Ew==
+        integrity: sha512-WT93Wnu05X9WG9BMMk/dj0gy6R7iXm9aXRDVgmIl9z8jT2ukejgmkhi5IwBYrK0OMIUALRVfukn+iy+srPc91Q==
       }
     engines: { node: '>=14.13' }
     hasBin: true
@@ -1746,10 +1748,10 @@ packages:
       ieee754: 1.2.1
     dev: false
 
-  /bullmq/1.72.0:
+  /bullmq/1.73.0:
     resolution:
       {
-        integrity: sha512-Q0pk6GphHyYsacpjZZFhjp/+TY+2g2FDsJS3qwIyskQL4j7vZaa1iYX3gKDEBn4C5eZMP1EOl9GWkm2bhdB0Wg==
+        integrity: sha512-+BF7yeGagYD/iMkM3FA8Wvb3j3MyKE/OdXv404+nQjUsKXfL7PbqX5NSA9lBtFzOdyFx9ZWyKRnBwuGQsLfM0w==
       }
     dependencies:
       cron-parser: 2.18.0
@@ -3114,10 +3116,10 @@ packages:
     engines: { node: '>=8' }
     dev: false
 
-  /get-port/6.0.0:
+  /get-port/6.1.0:
     resolution:
       {
-        integrity: sha512-qSVkVF6Eq1GdL/cBNiFuP4nUHMF7OEMTqEjC6alR2N90u8BFOoO0PFhNTX2QtAUoGrz8NnrSWj85TZ8YXZ6LOA==
+        integrity: sha512-JKnPFW/G2ZRirH/25sLK1aLBQktJfQLixzMMuMBP8A2G/ivSaIwdTnlJeO7PWeyhyIGVorezNf6+CXZU9i0cIQ==
       }
     engines: { node: ^12.20.0 || ^14.13.1 || >=16.0.0 }
     dev: false
@@ -5203,10 +5205,10 @@ packages:
       svelte: 3.46.4
     dev: true
 
-  /svelte-kit-cookie-session/2.0.5:
+  /svelte-kit-cookie-session/2.1.2:
     resolution:
       {
-        integrity: sha512-IX1IXtn42UTz/isem1LqH0SAZdCx6Z6Iu2V4Q83V2EScFbXZWfeFY08Azl8ZrPKdIDhSNHBLAAumRjA6TBxCvQ==
+        integrity: sha512-PfxIWDhiyYWu7iKlL0GHpmwDrdFh+rX/WmBzOuvctF25UqngIo9MCiegWBSBLE1RBwNs5UqaIeI8+vligmY07g==
       }
     dev: false
 
@@ -5288,10 +5290,21 @@ packages:
       strip-ansi: 6.0.1
     dev: true
 
-  /tailwindcss/3.0.22_c940fbabf228b85b1c73d314b43e31f1:
+  /tailwindcss-scrollbar/0.1.0_tailwindcss@3.0.23:
     resolution:
       {
-        integrity: sha512-F8lt74RlNZirnkaSk310+vGQta7c0/hgx7/bqxruM4wS9lp8oqV93lzavajC3VT0Lp4UUtUVIt8ifKcmGzkr0A==
+        integrity: sha512-egipxw4ooQDh94x02XQpPck0P0sfwazwoUGfA9SedPATIuYDR+6qe8d31Gl7YsSMRiOKDkkqfI0kBvEw9lT/Hg==
+      }
+    peerDependencies:
+      tailwindcss: '>= 2.x.x'
+    dependencies:
+      tailwindcss: 3.0.23_c940fbabf228b85b1c73d314b43e31f1
+    dev: false
+
+  /tailwindcss/3.0.23_c940fbabf228b85b1c73d314b43e31f1:
+    resolution:
+      {
+        integrity: sha512-+OZOV9ubyQ6oI2BXEhzw4HrqvgcARY38xv3zKcjnWtMIZstEsXdI9xftd1iB7+RbOnj2HOEzkA0OyB5BaSxPQA==
       }
     engines: { node: '>=12.13.0' }
     hasBin: true
@@ -5515,10 +5528,10 @@ packages:
       function.name: 1.0.13
     dev: false
 
-  /unique-names-generator/4.6.0:
+  /unique-names-generator/4.7.1:
     resolution:
       {
-        integrity: sha512-m0fke1emBeT96UYn2psPQYwljooDWRTKt9oUZ5vlt88ZFMBGxqwPyLHXwCfkbgdm8jzioCp7oIpo6KdM+fnUlQ==
+        integrity: sha512-lMx9dX+KRmG8sq6gulYYpKWZc9RlGsgBR6aoO8Qsm3qvkSJ+3rAymr+TnV8EDMrIrwuFJ4kruzMWM/OpYzPoow==
       }
     engines: { node: '>=8' }
     dev: false

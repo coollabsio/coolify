@@ -48,7 +48,7 @@ export default async function () {
 										port
 									});
 									const isHttps = fqdn.startsWith('https://');
-									if (isHttps) await forceSSLOnApplication({ domain });
+									if (isHttps) await forceSSLOnApplication(domain);
 									await setWwwRedirection(fqdn);
 								}
 							}
@@ -98,7 +98,7 @@ export default async function () {
 			await configureCoolifyProxyOn(fqdn);
 			await setWwwRedirection(fqdn);
 			const isHttps = fqdn.startsWith('https://');
-			if (isHttps) await forceSSLOnApplication({ domain });
+			if (isHttps) await forceSSLOnApplication(domain);
 		}
 	} catch (error) {
 		console.log(error);

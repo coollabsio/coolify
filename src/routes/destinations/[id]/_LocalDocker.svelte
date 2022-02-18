@@ -181,21 +181,18 @@
 				/>
 			</div>
 		</div>
-		<div class="flex justify-start">
-			<ul class="mt-2 divide-y divide-stone-800">
-				<Setting
-					disabled={cannotDisable}
-					bind:setting={destination.isCoolifyProxyUsed}
-					on:click={changeProxySetting}
-					isPadding={false}
-					title="Use Coolify Proxy?"
-					description={`This will install a proxy on the destination to allow you to access your applications and services without any manual configuration. Databases will have their own proxy. <br><br>${
-						cannotDisable
-							? '<span class="font-bold text-white">You cannot disable this proxy as FQDN is configured for Coolify.</span>'
-							: ''
-					}`}
-				/>
-			</ul>
+		<div class="grid grid-cols-2 items-center">
+			<Setting
+				disabled={cannotDisable}
+				bind:setting={destination.isCoolifyProxyUsed}
+				on:click={changeProxySetting}
+				title="Use Coolify Proxy?"
+				description={`This will install a proxy on the destination to allow you to access your applications and services without any manual configuration. Databases will have their own proxy. <br><br>${
+					cannotDisable
+						? '<span class="font-bold text-white">You cannot disable this proxy as FQDN is configured for Coolify.</span>'
+						: ''
+				}`}
+			/>
 		</div>
 	</form>
 </div>

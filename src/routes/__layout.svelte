@@ -2,14 +2,14 @@
 	import type { Load } from '@sveltejs/kit';
 	import { publicPaths } from '$lib/settings';
 
-	export const load: Load = async ({ fetch, url, params, session }) => {
-		if (!session.uid && !publicPaths.includes(url.pathname)) {
+	export const load: Load = async ({ fetch, url, session }) => {
+		if (!session.userId && !publicPaths.includes(url.pathname)) {
 			return {
 				status: 302,
 				redirect: '/login'
 			};
 		}
-		if (!session.uid) {
+		if (!session.userId) {
 			return {};
 		}
 		const endpoint = `/teams.json`;
@@ -49,7 +49,7 @@
 	};
 	let latestVersion = 'latest';
 	onMount(async () => {
-		if ($session.uid) {
+		if ($session.userId) {
 			const overrideVersion = browser && window.localStorage.getItem('latestVersion');
 			try {
 				await get(`/login.json`);
@@ -84,7 +84,7 @@
 	}
 	async function switchTeam() {
 		try {
-			await post(`/index.json?from=${$page.url.pathname}`, {
+			await post(`/dashboard.json?from=${$page.url.pathname}`, {
 				cookie: 'teamId',
 				value: selectedTeamId
 			});
@@ -129,7 +129,7 @@
 	<title>Coolify</title>
 </svelte:head>
 <SvelteToast options={{ intro: { y: -64 }, duration: 3000, pausable: true }} />
-{#if $session.uid}
+{#if $session.userId}
 	<nav class="nav-main">
 		<div class="flex h-screen w-full flex-col items-center transition-all duration-100">
 			<div class="my-4 h-10 w-10"><img src="/favicon.png" alt="coolLabs logo" /></div>

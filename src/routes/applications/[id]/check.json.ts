@@ -16,7 +16,7 @@ export const post: RequestHandler = async (event) => {
 		const found = await db.isDomainConfigured({ id, fqdn });
 		if (found) {
 			throw {
-				message: `Domain ${getDomain(fqdn)} is already configured.`
+				message: `Domain ${getDomain(fqdn).replace('www.', '')} is already configured.`
 			};
 		}
 		return {
