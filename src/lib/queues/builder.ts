@@ -261,6 +261,7 @@ export default async function (job) {
 		} catch (error) {
 			saveBuildLog({ line: error.stdout || error, buildId, applicationId });
 			sentry.captureException(error);
+			throw new Error(error);
 		}
 	}
 }

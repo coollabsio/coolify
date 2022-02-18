@@ -127,7 +127,6 @@ buildWorker.on('completed', async (job: Bullmq.Job) => {
 });
 
 buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
-	console.log(failedReason);
 	try {
 		await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'failed' } });
 	} catch (error) {
@@ -136,7 +135,11 @@ buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
 		const workdir = `/tmp/build-sources/${job.data.repository}`;
 		await asyncExecShell(`rm -fr ${workdir}`);
 	}
-	saveBuildLog({ line: 'Failed build!', buildId: job.data.build_id, applicationId: job.data.id });
+	saveBuildLog({
+		line: 'Failed to deploy!',
+		buildId: job.data.build_id,
+		applicationId: job.data.id
+	});
 	saveBuildLog({
 		line: `Reason: ${failedReason.toString()}`,
 		buildId: job.data.build_id,

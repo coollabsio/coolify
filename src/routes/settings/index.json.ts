@@ -12,7 +12,7 @@ import {
 } from '$lib/haproxy';
 import { letsEncrypt } from '$lib/letsencrypt';
 import type { RequestHandler } from '@sveltejs/kit';
-import dns from 'dns/promises';
+import { promises as dns } from 'dns';
 
 export const get: RequestHandler = async (event) => {
 	const { status, body } = await getUserDetails(event);

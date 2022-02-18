@@ -82,7 +82,7 @@
 	}
 	async function loadBuild(build) {
 		buildId = build;
-		goto(`/applications/${id}/logs/build?buildId=${buildId}`);
+		await goto(`/applications/${id}/logs/build?buildId=${buildId}`);
 	}
 </script>
 
@@ -94,13 +94,15 @@
 <div class="block flex-row justify-start space-x-2 px-5 pt-6 sm:px-10 md:flex">
 	<div class="mb-4 min-w-[16rem] space-y-2 md:mb-0 ">
 		<div class="top-4 md:sticky">
-			{#each builds as build (build.id)}
+			{#each builds as build, index (build.id)}
 				<div
 					data-tooltip={new Intl.DateTimeFormat('default', dateOptions).format(
 						new Date(build.createdAt)
 					) + `\n${build.status}`}
 					on:click={() => loadBuild(build.id)}
-					class="tooltip-top flex cursor-pointer items-center justify-center rounded-r border-l-2 border-transparent py-4 no-underline transition-all duration-100 hover:bg-coolgray-400 hover:shadow-xl "
+					class:rounded-tr={index === 0}
+					class:rounded-br={index === builds.length - 1}
+					class="tooltip-top flex cursor-pointer items-center justify-center border-l-2 border-transparent py-4 no-underline transition-all duration-100 hover:bg-coolgray-400 hover:shadow-xl "
 					class:bg-coolgray-400={buildId === build.id}
 					class:border-red-500={build.status === 'failed'}
 					class:border-green-500={build.status === 'success'}

@@ -105,55 +105,51 @@ export async function forceSSLOffApplication({ domain }) {
 	}
 }
 export async function forceSSLOnApplication({ domain }) {
-	if (!dev) {
-		const haproxy = await haproxyInstance();
-		await checkHAProxy(haproxy);
-		let transactionId;
-		try {
-			const rules: any = await haproxy
-				.get(`v2/services/haproxy/configuration/http_request_rules`, {
-					searchParams: {
-						parent_name: 'http',
-						parent_type: 'frontend'
-					}
-				})
-				.json();
-			let nextRule = 0;
-			if (rules.data.length > 0) {
-				const rule = rules.data.find((rule) =>
-					rule.cond_test.includes(`{ hdr(host) -i ${domain} } !{ ssl_fc }`)
-				);
-				if (rule) return;
-				nextRule = rules.data[rules.data.length - 1].index + 1;
-			}
-			transactionId = await getNextTransactionId();
-
-			await haproxy
-				.post(`v2/services/haproxy/configuration/http_request_rules`, {
-					searchParams: {
-						transaction_id: transactionId,
-						parent_name: 'http',
-						parent_type: 'frontend'
-					},
-					json: {
-						index: nextRule,
-						cond: 'if',
-						cond_test: `{ hdr(host) -i ${domain} } !{ ssl_fc }`,
-						type: 'redirect',
-						redir_type: 'scheme',
-						redir_value: 'https',
-						redir_code: 301
-					}
-				})
-				.json();
-		} catch (error) {
-			console.log(error);
-			throw error;
-		} finally {
-			if (transactionId) await completeTransaction(transactionId);
+	const haproxy = await haproxyInstance();
+	await checkHAProxy(haproxy);
+	let transactionId;
+	try {
+		const rules: any = await haproxy
+			.get(`v2/services/haproxy/configuration/http_request_rules`, {
+				searchParams: {
+					parent_name: 'http',
+					parent_type: 'frontend'
+				}
+			})
+			.json();
+		let nextRule = 0;
+		if (rules.data.length > 0) {
+			const rule = rules.data.find((rule) =>
+				rule.cond_test.includes(`{ hdr(host) -i ${domain} } !{ ssl_fc }`)
+			);
+			if (rule) return;
+			nextRule = rules.data[rules.data.length - 1].index + 1;
 		}
-	} else {
-		console.log(`[DEBUG] Adding ssl for ${domain}`);
+		transactionId = await getNextTransactionId();
+
+		await haproxy
+			.post(`v2/services/haproxy/configuration/http_request_rules`, {
+				searchParams: {
+					transaction_id: transactionId,
+					parent_name: 'http',
+					parent_type: 'frontend'
+				},
+				json: {
+					index: nextRule,
+					cond: 'if',
+					cond_test: `{ hdr(host) -i ${domain} } !{ ssl_fc }`,
+					type: 'redirect',
+					redir_type: 'scheme',
+					redir_value: 'https',
+					redir_code: dev ? 302 : 301
+				}
+			})
+			.json();
+	} catch (error) {
+		console.log(error);
+		throw error;
+	} finally {
+		if (transactionId) await completeTransaction(transactionId);
 	}
 }
 
