@@ -17,7 +17,7 @@
 		const endpoint = `/applications/${params.id}.json`;
 		const res = await fetch(endpoint);
 		if (res.ok) {
-			const { application, githubToken, ghToken, isRunning, appId } = await res.json();
+			const { application, isRunning, appId } = await res.json();
 			if (!application || Object.entries(application).length === 0) {
 				return {
 					status: 302,
@@ -42,8 +42,6 @@
 				},
 				stuff: {
 					isRunning,
-					ghToken,
-					githubToken,
 					application,
 					appId
 				}

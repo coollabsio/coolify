@@ -42,7 +42,7 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 	import type Prisma from '@prisma/client';
-	import { getDomain, notNodeDeployments, staticDeployments } from '$lib/components/common';
+	import { notNodeDeployments, staticDeployments } from '$lib/components/common';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { post } from '$lib/api';
 	const { id } = $page.params;

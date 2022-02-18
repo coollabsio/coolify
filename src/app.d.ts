@@ -18,6 +18,7 @@ interface SessionData {
 	isAdmin?: boolean;
 	expires?: string | null;
 	gitlabToken?: string | null;
+	ghToken?: string | null;
 }
 
 type DateTimeFormatOptions = {
