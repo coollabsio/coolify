@@ -77,11 +77,12 @@
 	{#if logs.length === 0}
 		<div class="text-xl font-bold tracking-tighter">Waiting for the logs...</div>
 	{:else}
-		<div class="relative w-full">
+		<div class="relative">
 			<LoadingLogs />
 			<div class="flex justify-end sticky top-0 p-2">
 				<button
 					on:click={followBuild}
+					class="bg-transparent"
 					data-tooltip="Follow logs"
 					class:text-green-500={followingBuild}
 				>
@@ -104,12 +105,14 @@
 				</button>
 			</div>
 			<div
-				class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 p-6 whitespace-pre-wrap break-words w-full mb-10 -mt-12 overflow-y-visible scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
+				class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
 				bind:this={logsEl}
 			>
-				{#each logs as log}
-					{log + '\n'}
-				{/each}
+				<div class="px-2">
+					{#each logs as log}
+						{log + '\n'}
+					{/each}
+				</div>
 			</div>
 		</div>
 	{/if}

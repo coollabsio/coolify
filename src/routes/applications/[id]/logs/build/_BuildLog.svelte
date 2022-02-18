@@ -86,6 +86,7 @@
 		<div class="flex justify-end sticky top-0 p-2">
 			<button
 				on:click={followBuild}
+				class="bg-transparent"
 				data-tooltip="Follow logs"
 				class:text-green-500={followingBuild}
 			>
