@@ -16,22 +16,24 @@ export const handle = handleSession(
 	async function ({ event, resolve }) {
 		let response;
 		try {
-			let gitlabToken = event.locals.cookies.gitlabToken;
-			let ghToken = event.locals.cookies.ghToken;
-			if (event.locals.cookies['kit.session']) {
-				const { permission, teamId, userId } = await getUserDetails(event, false);
-				const newSession = {
-					userId,
-					teamId,
-					permission,
-					isAdmin: permission === 'admin' || permission === 'owner',
-					expires: event.locals.session.data.expires,
-					gitlabToken,
-					ghToken
-				};
+			if (event.locals.cookies) {
+				let gitlabToken = event.locals.cookies.gitlabToken || null;
+				let ghToken = event.locals.cookies.ghToken;
+				if (event.locals.cookies['kit.session']) {
+					const { permission, teamId, userId } = await getUserDetails(event, false);
+					const newSession = {
+						userId,
+						teamId,
+						permission,
+						isAdmin: permission === 'admin' || permission === 'owner',
+						expires: event.locals.session.data.expires,
+						gitlabToken,
+						ghToken
+					};
 
-				if (JSON.stringify(event.locals.session.data) !== JSON.stringify(newSession)) {
-					event.locals.session.data = { ...newSession };
+					if (JSON.stringify(event.locals.session.data) !== JSON.stringify(newSession)) {
+						event.locals.session.data = { ...newSession };
+					}
 				}
 			}
 

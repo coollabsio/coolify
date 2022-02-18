@@ -6,16 +6,17 @@ import { asyncExecShell, uniqueName } from '$lib/common';
 
 import * as db from '$lib/database';
 import { startCoolifyProxy } from '$lib/haproxy';
-
-export async function login({ email, password }) {
+export async function hashPassword(password: string) {
 	const saltRounds = 15;
+	return bcrypt.hash(password, saltRounds);
+}
+export async function login({ email, password }) {
 	const users = await prisma.user.count();
 	const userFound = await prisma.user.findUnique({
 		where: { email },
 		include: { teams: true, permission: true },
 		rejectOnNotFound: false
 	});
-	console.log(userFound);
 	// Registration disabled if database is not seeded properly
 	const { isRegistrationEnabled, id } = await db.listSettings();
 
@@ -64,7 +65,7 @@ export async function login({ email, password }) {
 			};
 		}
 
-		const hashedPassword = await bcrypt.hash(password, saltRounds);
+		const hashedPassword = await hashPassword(password);
 		if (users === 0) {
 			permission = 'owner';
 			isAdmin = true;

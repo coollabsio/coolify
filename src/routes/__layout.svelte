@@ -2,7 +2,7 @@
 	import type { Load } from '@sveltejs/kit';
 	import { publicPaths } from '$lib/settings';
 
-	export const load: Load = async ({ fetch, url, params, session }) => {
+	export const load: Load = async ({ fetch, url, session }) => {
 		if (!session.userId && !publicPaths.includes(url.pathname)) {
 			return {
 				status: 302,

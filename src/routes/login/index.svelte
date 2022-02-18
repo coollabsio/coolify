@@ -67,6 +67,7 @@
 						class:text-stone-600={loading}
 						class:bg-coollabs={!loading}>{loading ? 'Authenticating...' : 'Login'}</button
 					>
+					<button on:click|preventDefault={() => goto('/reset')}>Reset password</button>
 				</div>
 			</form>
 		</div>

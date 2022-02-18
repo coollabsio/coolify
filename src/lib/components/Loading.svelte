@@ -11,7 +11,7 @@
 		<span class="loader" />
 	</div>
 {:else}
-	<div class=" main h-64 py-24 left-0 top-0 flex flex-wrap content-center mx-auto">
+	<div class="main h-64 py-24 left-0 top-0 flex flex-wrap content-center mx-auto">
 		<span class="loader" />
 	</div>
 {/if}

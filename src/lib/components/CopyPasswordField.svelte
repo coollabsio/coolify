@@ -29,7 +29,7 @@
 	}
 </script>
 
-<span
+<div
 	class="relative"
 	on:mouseenter={() => showActions(true)}
 	on:mouseleave={() => showActions(false)}
@@ -78,7 +78,7 @@
 	{/if}
 
 	{#if actionsShow}
-		<div class="absolute top-0 right-0 mx-2 cursor-pointer text-warmGray-600 hover:text-white">
+		<div class="absolute top-0 right-0 m-3  cursor-pointer text-warmGray-600 hover:text-white">
 			<div class="flex space-x-2">
 				{#if isPasswordField}
 					<div on:click={() => (showPassword = !showPassword)}>
@@ -142,4 +142,4 @@
 			</div>
 		</div>
 	{/if}
-</span>
+</div>
