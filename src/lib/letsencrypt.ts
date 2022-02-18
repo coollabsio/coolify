@@ -1,5 +1,5 @@
 import { dev } from '$app/env';
-import { forceSSLOnApplication } from '$lib/haproxy';
+import { forceSSLOffApplication, forceSSLOnApplication } from '$lib/haproxy';
 import { asyncExecShell, getEngine } from './common';
 import * as db from '$lib/database';
 import cuid from 'cuid';
@@ -10,7 +10,7 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 		const nakedDomain = domain.replace('www.', '');
 		const wwwDomain = `www.${nakedDomain}`;
 		const randomCuid = cuid();
-		const randomPort = await getPort();
+		const randomPort = 9080;
 
 		let host;
 		let dualCerts = false;
@@ -46,6 +46,7 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 				}
 			}
 		}
+		await forceSSLOffApplication({ domain });
 		if (dualCerts) {
 			const error = await asyncExecShell(
 				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p ${randomPort}:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${nakedDomain} -d ${wwwDomain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
@@ -69,10 +70,11 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 			);
 			if (sslCopyError.stderr) throw sslCopyError;
 		}
+	} catch (error) {
+		throw error;
+	} finally {
 		if (!isCoolify) {
 			await forceSSLOnApplication({ domain });
 		}
-	} catch (error) {
-		throw error;
 	}
 }
