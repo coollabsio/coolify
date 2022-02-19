@@ -232,7 +232,7 @@
 							value={application.buildPack}
 							id="buildPack"
 							disabled
-							class="cursor-pointe hover:bg-coolgray-500"
+							class="cursor-pointer hover:bg-coolgray-500"
 						/></a
 					>
 				</div>
