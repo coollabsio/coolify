@@ -21,8 +21,8 @@ export const get: RequestHandler = async (event) => {
 	const code = event.url.searchParams.get('code');
 	const state = event.url.searchParams.get('state');
 	try {
+		const { fqdn } = await db.listSettings();
 		const application = await db.getApplication({ id: state, teamId });
-		const { fqdn } = application;
 		const { appId, appSecret } = application.gitSource.gitlabApp;
 		const { htmlUrl } = application.gitSource;
 

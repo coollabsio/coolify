@@ -5,6 +5,7 @@
 	import { page, session } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { post } from '$lib/api';
+	import { browser } from '$app/env';
 	const { id } = $page.params;
 
 	let loading = false;
@@ -121,12 +122,16 @@
 
 			<Explainer
 				customClass="w-full"
-				text="<span class='font-bold text-base'>Scopes required:</span> 	
-	<br>- api (Access the authenticated user's API)
-	<br>- read_repository (Allows read-only access to the repository)
-	<br>- email (Allows read-only access to the user's primary email address using OpenID Connect)
+				text="<span class='font-bold text-base text-white'>Scopes required:</span> 	
+	<br>- <span class='text-orange-500 font-bold'>api</span> (Access the authenticated user's API)
+	<br>- <span class='text-orange-500 font-bold'>read_repository</span> (Allows read-only access to the repository)
+	<br>- <span class='text-orange-500 font-bold'>email</span> (Allows read-only access to the user's primary email address using OpenID Connect)
 	<br>
-	<br>For extra security, you can add Expire access tokens!"
+	<br>For extra security, you can set Expire access tokens!
+	<br><br>Webhook URL: <span class='text-orange-500 font-bold'>{browser
+					? window.location.origin
+					: ''}/webhooks/gitlab</span>
+	<br>But if you will set a custom domain name for Coolify, use that instead."
 			/>
 		</form>
 		<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4 pt-10">
