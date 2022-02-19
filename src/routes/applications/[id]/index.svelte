@@ -197,7 +197,7 @@
 							value={application.gitSource.name}
 							id="gitSource"
 							disabled
-							class="cursor-pointer bg-coolgray-200 hover:bg-coolgray-500"
+							class="cursor-pointer hover:bg-coolgray-500"
 						/></a
 					>
 				</div>
@@ -214,7 +214,7 @@
 							value="{application.repository}/{application.branch}"
 							id="repository"
 							disabled
-							class="cursor-pointer bg-coolgray-200 hover:bg-coolgray-500"
+							class="cursor-pointer hover:bg-coolgray-500"
 						/></a
 					>
 				</div>
@@ -232,7 +232,7 @@
 							value={application.buildPack}
 							id="buildPack"
 							disabled
-							class="cursor-pointer bg-coolgray-200 hover:bg-coolgray-500"
+							class="cursor-pointer hover:bg-coolgray-500"
 						/></a
 					>
 				</div>

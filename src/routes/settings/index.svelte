@@ -159,7 +159,7 @@
 					: browser && 'http://' + window.location.hostname + ':8404'
 			} target="_blank">stats</a> page.`}
 		/>
-		<div class="px-10 py-5">
+		<div class="space-y-2 px-10 py-5">
 			<div class="grid grid-cols-2 items-center">
 				<label for="proxyUser">User</label>
 				<CopyPasswordField

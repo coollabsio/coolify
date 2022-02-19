@@ -94,7 +94,7 @@
 				}
 			} else if (type === 'github') {
 				const files = await get(`${apiUrl}/repos/${repository}/contents?ref=${branch}`, {
-					Authorization: `Bearer ${$session.ghToken || ghToken}`,
+					Authorization: `Bearer ${$session.ghToken}`,
 					Accept: 'application/vnd.github.v2.json'
 				});
 				const packageJson = files.find(

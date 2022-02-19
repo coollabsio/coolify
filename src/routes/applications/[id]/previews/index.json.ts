@@ -11,6 +11,9 @@ export const get: RequestHandler = async (event) => {
 
 	const { id } = event.params;
 	try {
+		const secrets = await db.listSecrets(id);
+		const applicationSecrets = secrets.filter((secret) => !secret.isPRMRSecret);
+		const PRMRSecrets = secrets.filter((secret) => secret.isPRMRSecret);
 		const destinationDocker = await db.getDestinationByApplicationId({ id, teamId });
 		const docker = dockerInstance({ destinationDocker });
 		const listContainers = await docker.engine.listContainers({
@@ -35,7 +38,13 @@ export const get: RequestHandler = async (event) => {
 			});
 		return {
 			body: {
-				containers: jsonContainers
+				containers: jsonContainers,
+				applicationSecrets: applicationSecrets.sort((a, b) => {
+					return ('' + a.name).localeCompare(b.name);
+				}),
+				PRMRSecrets: PRMRSecrets.sort((a, b) => {
+					return ('' + a.name).localeCompare(b.name);
+				})
 			}
 		};
 	} catch (error) {

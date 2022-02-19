@@ -3,14 +3,19 @@
 	export let value = '';
 	export let isBuildSecret = false;
 	export let isNewSecret = false;
+	export let isPRMRSecret = false;
+	export let PRMRSecret = {};
+
+	if (isPRMRSecret) value = PRMRSecret.value;
+
 	import { page } from '$app/stores';
 	import { del, post } from '$lib/api';
+	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { errorNotification } from '$lib/form';
+	import { toast } from '@zerodevx/svelte-toast';
 	import { createEventDispatcher } from 'svelte';
 
 	const dispatch = createEventDispatcher();
-	let nameEl;
-	let valueEl;
 	const { id } = $page.params;
 	async function removeSecret() {
 		try {
@@ -25,24 +30,24 @@
 			return errorNotification(error);
 		}
 	}
-	async function saveSecret() {
-		const nameValid = nameEl.checkValidity();
-		const valueValid = valueEl.checkValidity();
-		if (!nameValid) {
-			return nameEl.reportValidity();
-		}
-		if (!valueValid) {
-			return valueEl.reportValidity();
-		}
-
+	async function saveSecret(isNew = false) {
+		if (!name) return errorNotification('Name is required.');
+		if (!value) return errorNotification('Value is required.');
 		try {
-			await post(`/applications/${id}/secrets.json`, { name, value, isBuildSecret });
+			await post(`/applications/${id}/secrets.json`, {
+				name,
+				value,
+				isBuildSecret,
+				isPRMRSecret,
+				isNew
+			});
 			dispatch('refresh');
 			if (isNewSecret) {
 				name = '';
 				value = '';
 				isBuildSecret = false;
 			}
+			toast.push('Secret saved.');
 		} catch ({ error }) {
 			return errorNotification(error);
 		}
@@ -56,8 +61,7 @@
 
 <td class="whitespace-nowrap px-6 py-2 text-sm font-medium text-white">
 	<input
-		id="secretName"
-		bind:this={nameEl}
+		id={isNewSecret ? 'secretName' : 'secretNameNew'}
 		bind:value={name}
 		required
 		placeholder="EXAMPLE_VARIABLE"
@@ -68,16 +72,13 @@
 	/>
 </td>
 <td class="whitespace-nowrap px-6 py-2 text-sm font-medium text-white">
-	<input
-		id="secretValue"
+	<CopyPasswordField
+		id={isNewSecret ? 'secretValue' : 'secretValueNew'}
+		name={isNewSecret ? 'secretValue' : 'secretValueNew'}
+		isPasswordField={true}
 		bind:value
-		bind:this={valueEl}
 		required
 		placeholder="J$#@UIO%HO#$U%H"
-		class="-mx-2 w-64 border-2 border-transparent"
-		class:bg-transparent={!isNewSecret}
-		class:cursor-not-allowed={!isNewSecret}
-		readonly={!isNewSecret}
 	/>
 </td>
 <td class="whitespace-nowrap px-6 py-2 text-center text-sm font-medium text-white">
@@ -132,11 +133,20 @@
 <td class="whitespace-nowrap px-6 py-2 text-sm font-medium text-white">
 	{#if isNewSecret}
 		<div class="flex items-center justify-center">
-			<button class="w-24 bg-green-600 hover:bg-green-500" on:click={saveSecret}>Add</button>
+			<button class="bg-green-600 hover:bg-green-500" on:click={() => saveSecret(true)}>Add</button>
 		</div>
 	{:else}
-		<div class="flex justify-center items-end">
-			<button class="w-24 bg-red-600 hover:bg-red-500" on:click={removeSecret}>Remove</button>
+		<div class="flex-col space-y-2">
+			<div class="flex items-center justify-center">
+				<button class="w-24 bg-green-600 hover:bg-green-500" on:click={() => saveSecret(false)}
+					>Set</button
+				>
+			</div>
+			{#if !isPRMRSecret}
+				<div class="flex justify-center items-end">
+					<button class="w-24 bg-red-600 hover:bg-red-500" on:click={removeSecret}>Remove</button>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </td>

@@ -9,7 +9,8 @@ export default async function ({
 	docker,
 	buildId,
 	baseDirectory,
-	secrets
+	secrets,
+	pullmergeRequestId
 }) {
 	try {
 		let file = `${workdir}/Dockerfile`;
@@ -24,7 +25,15 @@ export default async function ({
 		if (secrets.length > 0) {
 			secrets.forEach((secret) => {
 				if (secret.isBuildSecret) {
-					Dockerfile.push(`ARG ${secret.name} ${secret.value}`);
+					if (pullmergeRequestId) {
+						if (secret.isPRMRSecret) {
+							Dockerfile.push(`ARG ${secret.name} ${secret.value}`);
+						}
+					} else {
+						if (!secret.isPRMRSecret) {
+							Dockerfile.push(`ARG ${secret.name} ${secret.value}`);
+						}
+					}
 				}
 			});
 		}

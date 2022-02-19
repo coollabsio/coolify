@@ -109,13 +109,14 @@ model Secret {
   id            String      @id @default(cuid())
   name          String
   value         String
+  isPRMRSecret  Boolean     @default(false)
   isBuildSecret Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   application   Application @relation(fields: [applicationId], references: [id])
   applicationId String
 
-  @@unique([name, applicationId])
+  @@unique([name, applicationId, isPRMRSecret])
 }
 
 model BuildLog {
