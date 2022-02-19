@@ -36,7 +36,7 @@
 
 	function generateUrl() {
 		return browser
-			? `${database.type}://${database.type === 'redis' ? ':' : ''}${
+			? `${database.type}://${
 					databaseDbUser ? databaseDbUser + ':' : ''
 			  }${databaseDbUserPassword}@${
 					isPublic
