@@ -5,6 +5,7 @@
 	import { page, session } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { post } from '$lib/api';
+	import { browser } from '$app/env';
 	const { id } = $page.params;
 
 	let loading = false;
@@ -127,8 +128,9 @@
 	<br>- <span class='text-orange-500 font-bold'>email</span> (Allows read-only access to the user's primary email address using OpenID Connect)
 	<br>
 	<br>For extra security, you can set Expire access tokens!
-	<br><br>Webhook URL: <span class='text-orange-500 font-bold'>{window.location
-					.origin}/webhooks/gitlab</span>
+	<br><br>Webhook URL: <span class='text-orange-500 font-bold'>{browser
+					? window.location.origin
+					: ''}/webhooks/gitlab</span>
 	<br>But if you will set a custom domain name for Coolify, use that instead."
 			/>
 		</form>
