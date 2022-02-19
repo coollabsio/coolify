@@ -3,6 +3,11 @@
 	export let value = '';
 	export let isBuildSecret = false;
 	export let isNewSecret = false;
+	export let isPRMRSecret = false;
+	export let PRMRSecret = {};
+
+	if (isPRMRSecret) value = PRMRSecret.value;
+
 	import { page } from '$app/stores';
 	import { del, post } from '$lib/api';
 	import { errorNotification } from '$lib/form';
@@ -36,7 +41,7 @@
 		}
 
 		try {
-			await post(`/applications/${id}/secrets.json`, { name, value, isBuildSecret });
+			await post(`/applications/${id}/secrets.json`, { name, value, isBuildSecret, isPRMRSecret });
 			dispatch('refresh');
 			if (isNewSecret) {
 				name = '';
@@ -75,9 +80,9 @@
 		required
 		placeholder="J$#@UIO%HO#$U%H"
 		class="-mx-2 w-64 border-2 border-transparent"
-		class:bg-transparent={!isNewSecret}
-		class:cursor-not-allowed={!isNewSecret}
-		readonly={!isNewSecret}
+		class:bg-transparent={!isNewSecret && !isPRMRSecret}
+		class:cursor-not-allowed={!isNewSecret && !isPRMRSecret}
+		readonly={!isNewSecret && !isPRMRSecret}
 	/>
 </td>
 <td class="whitespace-nowrap px-6 py-2 text-center text-sm font-medium text-white">
@@ -133,6 +138,10 @@
 	{#if isNewSecret}
 		<div class="flex items-center justify-center">
 			<button class="w-24 bg-green-600 hover:bg-green-500" on:click={saveSecret}>Add</button>
+		</div>
+	{:else if isPRMRSecret}
+		<div class="flex items-center justify-center">
+			<button class="w-24 bg-green-600 hover:bg-green-500" on:click={saveSecret}>Set</button>
 		</div>
 	{:else}
 		<div class="flex justify-center items-end">
