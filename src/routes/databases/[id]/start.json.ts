@@ -66,7 +66,7 @@ export const post: RequestHandler = async (event) => {
 			console.log(error);
 		}
 		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+			await asyncExecShell(`DOCKER_HOST=${host} docker-compose -f ${composeFileDestination} up -d`);
 			if (isPublic) await startTcpProxy(destinationDocker, id, publicPort, privatePort);
 			return {
 				status: 200

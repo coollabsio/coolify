@@ -89,7 +89,7 @@ export const post: RequestHandler = async (event) => {
 			console.log(error);
 		}
 		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+			await asyncExecShell(`DOCKER_HOST=${host} docker-compose -f ${composeFileDestination} up -d`);
 			await configureSimpleServiceProxyOn({ id, domain, port: consolePort });
 			await db.updateMinioService({ id, publicPort });
 			await startHttpProxy(destinationDocker, id, publicPort, apiPort);

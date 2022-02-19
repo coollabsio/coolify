@@ -184,7 +184,7 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 			console.log(error);
 		}
 		await asyncExecShell(
-			`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up --build -d`
+			`DOCKER_HOST=${host} docker-compose -f ${composeFileDestination} up --build -d`
 		);
 		await configureSimpleServiceProxyOn({ id, domain, port: 8000 });
 

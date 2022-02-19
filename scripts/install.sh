@@ -85,7 +85,7 @@ EOF
 # Restarting docker daemon
 sh -c "systemctl daemon-reload && systemctl restart docker"
 
-# Downloading docker compose cli plugin
+# Downloading docker-compose cli plugin
 mkdir -p ~/.docker/cli-plugins/
 curl -SL https://github.com/docker/compose/releases/download/v2.2.2/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
 chmod +x ~/.docker/cli-plugins/docker-compose
@@ -105,7 +105,7 @@ COOLIFY_SENTRY_DSN=$SENTRY_DSN
 COOLIFY_HOSTED_ON=docker" > coolify/.env
 fi
 
-cd coolify && docker run -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db-sqlite coollabsio/coolify:latest /bin/sh -c "env | grep COOLIFY > .env && docker compose up -d --force-recreate"
+cd coolify && docker run -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db-sqlite coollabsio/coolify:latest /bin/sh -c "env | grep COOLIFY > .env && docker-compose up -d --force-recreate"
 
 echo -e "Congratulations! Your coolify is ready to use.\n"
 echo "Please visit http://<Your Public IP Address>:3000/ to get started."

@@ -82,7 +82,7 @@ export const post: RequestHandler = async (event) => {
 		}
 
 		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+			await asyncExecShell(`DOCKER_HOST=${host} docker-compose -f ${composeFileDestination} up -d`);
 			await configureSimpleServiceProxyOn({ id, domain, port: 8080 });
 
 			if (isHttps) {
