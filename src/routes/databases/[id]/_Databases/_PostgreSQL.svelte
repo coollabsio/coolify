@@ -6,7 +6,7 @@
 <div class="flex space-x-1 py-5 font-bold">
 	<div class="title">PostgreSQL</div>
 </div>
-<div class="px-10">
+<div class="space-y-2 px-10">
 	<div class="grid grid-cols-2 items-center">
 		<label for="defaultDatabase">Default Database</label>
 		<CopyPasswordField

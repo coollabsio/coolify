@@ -1,11 +1,17 @@
-import { encrypt } from '$lib/crypto';
+import { encrypt, decrypt } from '$lib/crypto';
 import { prisma } from './common';
 
 export async function listSecrets(applicationId: string) {
-	return await prisma.secret.findMany({
+	let secrets = await prisma.secret.findMany({
 		where: { applicationId },
 		orderBy: { createdAt: 'desc' }
 	});
+	secrets = secrets.map((secret) => {
+		secret.value = decrypt(secret.value);
+		return secret;
+	});
+
+	return secrets;
 }
 
 export async function createSecret({ id, name, value, isBuildSecret, isPRMRSecret }) {
@@ -18,6 +24,8 @@ export async function createSecret({ id, name, value, isBuildSecret, isPRMRSecre
 export async function updateSecret({ id, name, value, isBuildSecret, isPRMRSecret }) {
 	value = encrypt(value);
 	const found = await prisma.secret.findFirst({ where: { applicationId: id, name, isPRMRSecret } });
+	console.log(found);
+
 	if (found) {
 		return await prisma.secret.updateMany({
 			where: { applicationId: id, name, isPRMRSecret },

@@ -18,7 +18,6 @@ export const buildPacks = [
 
 	{
 		name: 'static',
-		...defaultBuildAndDeploy,
 		publishDirectory: 'dist',
 		port: 80,
 		fancyName: 'Static',

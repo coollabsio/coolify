@@ -28,10 +28,9 @@ export const post: RequestHandler = async (event) => {
 	if (status === 401) return { status, body };
 
 	const { id } = event.params;
-	const { name, value, isBuildSecret, isPRMRSecret } = await event.request.json();
-
+	const { name, value, isBuildSecret, isPRMRSecret, isNew } = await event.request.json();
 	try {
-		if (!isPRMRSecret) {
+		if (isNew) {
 			const found = await db.isSecretExists({ id, name, isPRMRSecret });
 			if (found) {
 				throw {

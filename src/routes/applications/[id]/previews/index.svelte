@@ -28,6 +28,7 @@
 	import Secret from '../secrets/_Secret.svelte';
 	import { get } from '$lib/api';
 	import { page } from '$app/stores';
+	import Explainer from '$lib/components/Explainer.svelte';
 
 	const { id } = $page.params;
 	async function refreshSecrets() {
@@ -41,10 +42,7 @@
 		Previews for <a href={application.fqdn} target="_blank">{getDomain(application.fqdn)}</a>
 	</div>
 </div>
-<div>
-	Preview secrets. They will overwrite application secrets for PR/MR deployments. Useful for
-	creating staging environments for these deployments.
-</div>
+
 <div class="mx-auto max-w-6xl rounded-xl px-6 pt-4">
 	<table class="mx-auto">
 		<thead class=" rounded-xl border-b border-coolgray-500">
@@ -72,23 +70,28 @@
 		<tbody class="">
 			{#each applicationSecrets as secret}
 				{#key secret.id}
-					<tr class="hover:bg-coolgray-200">
+					<tr class="h-20 transition duration-100 hover:bg-coolgray-400">
 						<Secret
 							PRMRSecret={PRMRSecrets.find((s) => s.name === secret.name)}
 							isPRMRSecret
 							name={secret.name}
-							value={secret.value ? secret.value : 'ENCRYPTED'}
+							value={secret.value}
 							isBuildSecret={secret.isBuildSecret}
 							on:refresh={refreshSecrets}
 						/>
 					</tr>
 				{/key}
 			{/each}
-			<!-- <tr>
-				<Secret isPRMRSecret isNewSecret on:refresh={refreshSecrets} />
-			</tr> -->
 		</tbody>
 	</table>
+</div>
+<div class="flex justify-center py-4 text-center">
+	<Explainer
+		customClass="w-full"
+		text={applicationSecrets.length === 0
+			? "<span class='font-bold text-white text-xl'>Please add secrets to the application first.</span> <br><br>These values overwrite application secrets in PR/MR deployments. Useful for creating <span class='text-green-500 font-bold'>staging</span> environments."
+			: "These values overwrite application secrets in PR/MR deployments. Useful for creating <span class='text-green-500 font-bold'>staging</span> environments."}
+	/>
 </div>
 <div class="mx-auto max-w-4xl py-10">
 	<div class="flex flex-wrap justify-center space-x-2">

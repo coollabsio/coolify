@@ -39,8 +39,12 @@ export const get: RequestHandler = async (event) => {
 		return {
 			body: {
 				containers: jsonContainers,
-				applicationSecrets,
-				PRMRSecrets
+				applicationSecrets: applicationSecrets.sort((a, b) => {
+					return ('' + a.name).localeCompare(b.name);
+				}),
+				PRMRSecrets: PRMRSecrets.sort((a, b) => {
+					return ('' + a.name).localeCompare(b.name);
+				})
 			}
 		};
 	} catch (error) {

@@ -13,15 +13,24 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 		installCommand,
 		buildCommand,
 		debug,
-		secrets
+		secrets,
+		pullmergeRequestId
 	} = data;
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild}`);
 	Dockerfile.push('WORKDIR /usr/src/app');
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {
-			if (!secret.isBuildSecret) {
-				Dockerfile.push(`ARG ${secret.name} ${secret.value}`);
+			if (secret.isBuildSecret) {
+				if (pullmergeRequestId) {
+					if (secret.isPRMRSecret) {
+						Dockerfile.push(`ARG ${secret.name} ${secret.value}`);
+					}
+				} else {
+					if (!secret.isPRMRSecret) {
+						Dockerfile.push(`ARG ${secret.name} ${secret.value}`);
+					}
+				}
 			}
 		});
 	}
