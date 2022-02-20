@@ -3,23 +3,24 @@ import { forceSSLOffApplication, forceSSLOnApplication } from '$lib/haproxy';
 import { asyncExecShell, getEngine } from './common';
 import * as db from '$lib/database';
 import cuid from 'cuid';
-import getPort from 'get-port';
+import getPort, { portNumbers } from 'get-port';
 
 export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 	try {
+		const data = await db.prisma.setting.findFirst();
+		const { minPort, maxPort } = data;
+
 		const nakedDomain = domain.replace('www.', '');
 		const wwwDomain = `www.${nakedDomain}`;
 		const randomCuid = cuid();
-		const randomPort = 9080;
+		const randomPort = await getPort({ port: portNumbers(minPort, maxPort) });
 
 		let host;
 		let dualCerts = false;
 		if (isCoolify) {
-			const data = await db.prisma.setting.findFirst();
 			dualCerts = data.dualCerts;
 			host = 'unix:///var/run/docker.sock';
 		} else {
-			// Check Application
 			const applicationData = await db.prisma.application.findUnique({
 				where: { id },
 				include: { destinationDocker: true, settings: true }

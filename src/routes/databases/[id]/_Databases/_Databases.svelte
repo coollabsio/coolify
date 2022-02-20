@@ -56,9 +56,11 @@
 			appendOnly = !appendOnly;
 		}
 		try {
-			await post(`/databases/${id}/settings.json`, { isPublic, appendOnly });
+			const { publicPort } = await post(`/databases/${id}/settings.json`, { isPublic, appendOnly });
+			if (isPublic) {
+				database.publicPort = publicPort;
+			}
 			databaseUrl = generateUrl();
-			return;
 		} catch ({ error }) {
 			return errorNotification(error);
 		}
@@ -135,7 +137,7 @@
 			<div class="grid grid-cols-2 items-center">
 				<label for="publicPort">Port</label>
 				<CopyPasswordField
-					placeholder="Generated automatically after start"
+					placeholder="Generated automatically after set to public"
 					id="publicPort"
 					readonly
 					disabled

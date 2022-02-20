@@ -12,6 +12,8 @@ model Setting {
   fqdn                  String?  @unique
   isRegistrationEnabled Boolean  @default(false)
   dualCerts             Boolean  @default(false)
+  minPort               Int      @default(9000)
+  maxPort               Int      @default(9100)
   proxyPassword         String
   proxyUser             String
   createdAt             DateTime @default(now())
