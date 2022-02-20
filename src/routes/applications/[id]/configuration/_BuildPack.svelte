@@ -3,6 +3,7 @@
 
 	import { page } from '$app/stores';
 	import { post } from '$lib/api';
+	import { findBuildPack } from '$lib/components/templates';
 	import { errorNotification } from '$lib/form';
 
 	const { id } = $page.params;
@@ -11,10 +12,13 @@
 	export let buildPack;
 	export let foundConfig;
 	export let scanning;
+	export let packageManager;
 
 	async function handleSubmit(name) {
 		try {
-			const tempBuildPack = JSON.parse(JSON.stringify(buildPack));
+			const tempBuildPack = JSON.parse(
+				JSON.stringify(findBuildPack(buildPack.name, packageManager))
+			);
 			delete tempBuildPack.name;
 			delete tempBuildPack.fancyName;
 			delete tempBuildPack.color;

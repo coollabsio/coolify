@@ -30,7 +30,7 @@
 	import type Prisma from '@prisma/client';
 
 	import { page } from '$app/stores';
-	import { enhance, errorNotification } from '$lib/form';
+	import { errorNotification } from '$lib/form';
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/api';
 
