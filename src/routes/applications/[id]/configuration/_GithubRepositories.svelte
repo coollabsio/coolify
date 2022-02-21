@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-
 	export let application;
 
-	import { page, session } from '$app/stores';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
+	import { gitTokens } from '$lib/store';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -29,13 +29,9 @@
 	};
 	let showSave = false;
 	async function loadRepositoriesByPage(page = 0) {
-		try {
-			return await get(`${apiUrl}/installation/repositories?per_page=100&page=${page}`, {
-				Authorization: `token ${$session.ghToken}`
-			});
-		} catch ({ error }) {
-			return errorNotification(error);
-		}
+		return await get(`${apiUrl}/installation/repositories?per_page=100&page=${page}`, {
+			Authorization: `token ${$gitTokens.githubToken}`
+		});
 	}
 	async function loadRepositories() {
 		let page = 1;
@@ -58,7 +54,7 @@
 		selected.projectId = repositories.find((repo) => repo.full_name === selected.repository).id;
 		try {
 			branches = await get(`${apiUrl}/repos/${selected.repository}/branches`, {
-				Authorization: `token ${$session.ghToken}`
+				Authorization: `token ${$gitTokens.githubToken}`
 			});
 			return;
 		} catch ({ error }) {
@@ -85,7 +81,47 @@
 	}
 
 	onMount(async () => {
-		await loadRepositories();
+		try {
+			if (!$gitTokens.githubToken) {
+				const { token } = await get(`/applications/${id}/configuration/githubToken.json`);
+				$gitTokens.githubToken = token;
+			}
+			await loadRepositories();
+		} catch (error) {
+			if (
+				error.error === 'invalid_token' ||
+				error.error_description ===
+					'Token is expired. You can either do re-authorization or token refresh.' ||
+				error.message === '401 Unauthorized'
+			) {
+				if (application.gitSource.gitlabAppId) {
+					let htmlUrl = application.gitSource.htmlUrl;
+					const left = screen.width / 2 - 1020 / 2;
+					const top = screen.height / 2 - 618 / 2;
+					const newWindow = open(
+						`${htmlUrl}/oauth/authorize?client_id=${application.gitSource.gitlabApp.appId}&redirect_uri=${window.location.origin}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${$page.params.id}`,
+						'GitLab',
+						'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
+							top +
+							', left=' +
+							left +
+							', toolbar=0, menubar=0, status=0'
+					);
+					const timer = setInterval(() => {
+						if (newWindow?.closed) {
+							clearInterval(timer);
+							window.location.reload();
+						}
+					}, 100);
+				}
+			}
+			if (error.message === 'Bad credentials') {
+				const { token } = await get(`/applications/${id}/configuration/githubToken.json`);
+				$gitTokens.githubToken = token;
+				return await loadRepositories();
+			}
+			return errorNotification(error);
+		}
 	});
 	async function handleSubmit() {
 		try {

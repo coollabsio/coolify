@@ -17,8 +17,6 @@ export const handle = handleSession(
 		let response;
 		try {
 			if (event.locals.cookies) {
-				let gitlabToken = event.locals.cookies.gitlabToken || null;
-				let ghToken = event.locals.cookies.ghToken || null;
 				if (event.locals.cookies['kit.session']) {
 					const { permission, teamId, userId } = await getUserDetails(event, false);
 					const newSession = {
@@ -26,9 +24,7 @@ export const handle = handleSession(
 						teamId,
 						permission,
 						isAdmin: permission === 'admin' || permission === 'owner',
-						expires: event.locals.session.data.expires,
-						gitlabToken,
-						ghToken
+						expires: event.locals.session.data.expires
 					};
 
 					if (JSON.stringify(event.locals.session.data) !== JSON.stringify(newSession)) {

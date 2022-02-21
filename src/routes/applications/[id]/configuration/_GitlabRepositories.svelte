@@ -8,6 +8,8 @@
 	import cuid from 'cuid';
 	import { goto } from '$app/navigation';
 	import { del, get, post, put } from '$lib/api';
+	import { gitTokens } from '$lib/store';
+
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
 
@@ -35,13 +37,13 @@
 		branch: undefined
 	};
 	onMount(async () => {
-		if (!$session.gitlabToken) {
+		if (!$gitTokens.gitlabToken) {
 			getGitlabToken();
 		} else {
 			loading.base = true;
 			try {
 				const user = await get(`${apiUrl}/v4/user`, {
-					Authorization: `Bearer ${$session.gitlabToken}`
+					Authorization: `Bearer ${$gitTokens.gitlabToken}`
 				});
 				username = user.username;
 			} catch (error) {
@@ -49,7 +51,7 @@
 			}
 			try {
 				groups = await get(`${apiUrl}/v4/groups?per_page=5000`, {
-					Authorization: `Bearer ${$session.gitlabToken}`
+					Authorization: `Bearer ${$gitTokens.gitlabToken}`
 				});
 			} catch (error) {
 				errorNotification(error);
@@ -87,7 +89,7 @@
 				projects = await get(
 					`${apiUrl}/v4/users/${selected.group.name}/projects?min_access_level=40&page=1&per_page=25&archived=false`,
 					{
-						Authorization: `Bearer ${$session.gitlabToken}`
+						Authorization: `Bearer ${$gitTokens.gitlabToken}`
 					}
 				);
 			} catch (error) {
@@ -101,7 +103,7 @@
 				projects = await get(
 					`${apiUrl}/v4/groups/${selected.group.id}/projects?page=1&per_page=25&archived=false`,
 					{
-						Authorization: `Bearer ${$session.gitlabToken}`
+						Authorization: `Bearer ${$gitTokens.gitlabToken}`
 					}
 				);
 			} catch (error) {
@@ -119,7 +121,7 @@
 			branches = await get(
 				`${apiUrl}/v4/projects/${selected.project.id}/repository/branches?per_page=100&page=1`,
 				{
-					Authorization: `Bearer ${$session.gitlabToken}`
+					Authorization: `Bearer ${$gitTokens.gitlabToken}`
 				}
 			);
 		} catch (error) {
@@ -169,7 +171,7 @@
 					merge_requests_events: true
 				},
 				{
-					Authorization: `Bearer ${$session.gitlabToken}`
+					Authorization: `Bearer ${$gitTokens.gitlabToken}`
 				}
 			);
 		} catch (error) {
@@ -193,7 +195,7 @@
 				publicSshKey = publicKey;
 			}
 			const deployKeys = await get(deployKeyUrl, {
-				Authorization: `Bearer ${$session.gitlabToken}`
+				Authorization: `Bearer ${$gitTokens.gitlabToken}`
 			});
 			const deployKeyFound = deployKeys.filter((dk) => dk.title === `${appId}-coolify-deploy-key`);
 			if (deployKeyFound.length > 0) {
@@ -202,7 +204,7 @@
 						`${deployKeyUrl}/${deployKey.id}`,
 						{},
 						{
-							Authorization: `Bearer ${$session.gitlabToken}`
+							Authorization: `Bearer ${$gitTokens.gitlabToken}`
 						}
 					);
 				}
@@ -215,7 +217,7 @@
 					can_push: false
 				},
 				{
-					Authorization: `Bearer ${$session.gitlabToken}`
+					Authorization: `Bearer ${$gitTokens.gitlabToken}`
 				}
 			);
 			await post(updateDeployKeyIdUrl, { deployKeyId: id });
