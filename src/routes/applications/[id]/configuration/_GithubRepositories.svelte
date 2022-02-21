@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { browser } from '$app/env';
+
 	import { goto } from '$app/navigation';
 
 	export let githubToken;
@@ -33,13 +35,9 @@
 	let token = null;
 
 	async function loadRepositoriesByPage(page = 0) {
-		try {
-			return await get(`${apiUrl}/installation/repositories?per_page=100&page=${page}`, {
-				Authorization: `token ${token}`
-			});
-		} catch ({ error }) {
-			return errorNotification(error);
-		}
+		return await get(`${apiUrl}/installation/repositories?per_page=100&page=${page}`, {
+			Authorization: `token ${$session.ghToken}`
+		});
 	}
 	async function loadRepositories() {
 		token = await getGithubToken({ apiUrl, githubToken, application });
@@ -90,7 +88,41 @@
 	}
 
 	onMount(async () => {
-		await loadRepositories();
+		try {
+			await loadRepositories();
+		} catch (error) {
+			if (
+				error.error === 'invalid_token' ||
+				error.error_description ===
+					'Token is expired. You can either do re-authorization or token refresh.' ||
+				error.message === '401 Unauthorized'
+			) {
+				if (application.gitSource.gitlabAppId) {
+					let htmlUrl = application.gitSource.htmlUrl;
+					const left = screen.width / 2 - 1020 / 2;
+					const top = screen.height / 2 - 618 / 2;
+					const newWindow = open(
+						`${htmlUrl}/oauth/authorize?client_id=${application.gitSource.gitlabApp.appId}&redirect_uri=${window.location.origin}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${$page.params.id}`,
+						'GitLab',
+						'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
+							top +
+							', left=' +
+							left +
+							', toolbar=0, menubar=0, status=0'
+					);
+					const timer = setInterval(() => {
+						if (newWindow?.closed) {
+							clearInterval(timer);
+							window.location.reload();
+						}
+					}, 100);
+				}
+			}
+			if (error.message === 'Bad credentials') {
+				browser && window.location.reload();
+			}
+			return errorNotification(error);
+		}
 	});
 	async function handleSubmit() {
 		try {

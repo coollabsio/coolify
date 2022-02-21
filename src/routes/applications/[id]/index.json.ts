@@ -1,10 +1,11 @@
-import { getTeam, getUserDetails } from '$lib/common';
+import { getUserDetails } from '$lib/common';
 import { getGithubToken } from '$lib/components/common';
 import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
 import { checkContainer } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 import jsonwebtoken from 'jsonwebtoken';
+import { get as getRequest } from '$lib/api';
 
 export const get: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -20,15 +21,33 @@ export const get: RequestHandler = async (event) => {
 		const application = await db.getApplication({ id, teamId });
 		const { gitSource } = application;
 		if (gitSource?.type === 'github' && gitSource?.githubApp) {
-			const payload = {
-				iat: Math.round(new Date().getTime() / 1000),
-				exp: Math.round(new Date().getTime() / 1000 + 60),
-				iss: gitSource.githubApp.appId
-			};
-			githubToken = jsonwebtoken.sign(payload, gitSource.githubApp.privateKey, {
-				algorithm: 'RS256'
-			});
-			ghToken = await getGithubToken({ apiUrl: gitSource.apiUrl, application, githubToken });
+			if (!event.locals.session.data.ghToken) {
+				const payload = {
+					iat: Math.round(new Date().getTime() / 1000),
+					exp: Math.round(new Date().getTime() / 1000 + 600),
+					iss: gitSource.githubApp.appId
+				};
+				githubToken = jsonwebtoken.sign(payload, gitSource.githubApp.privateKey, {
+					algorithm: 'RS256'
+				});
+				ghToken = await getGithubToken({ apiUrl: gitSource.apiUrl, application, githubToken });
+			} else {
+				try {
+					await getRequest(`${gitSource.apiUrl}/installation/repositories`, {
+						Authorization: `token ${event.locals.session.data.ghToken}`
+					});
+				} catch (error) {
+					const payload = {
+						iat: Math.round(new Date().getTime() / 1000),
+						exp: Math.round(new Date().getTime() / 1000 + 600),
+						iss: gitSource.githubApp.appId
+					};
+					githubToken = jsonwebtoken.sign(payload, gitSource.githubApp.privateKey, {
+						algorithm: 'RS256'
+					});
+					ghToken = await getGithubToken({ apiUrl: gitSource.apiUrl, application, githubToken });
+				}
+			}
 		}
 		if (application.destinationDockerId) {
 			isRunning = await checkContainer(application.destinationDocker.engine, id);
