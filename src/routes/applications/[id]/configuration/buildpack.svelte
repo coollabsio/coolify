@@ -34,6 +34,7 @@
 	import { page, session } from '$app/stores';
 	import { get } from '$lib/api';
 	import { errorNotification } from '$lib/form';
+	import { gitTokens } from '$lib/store';
 
 	let scanning = true;
 	let foundConfig = null;
@@ -59,7 +60,7 @@
 		try {
 			if (type === 'gitlab') {
 				const files = await get(`${apiUrl}/v4/projects/${projectId}/repository/tree`, {
-					Authorization: `Bearer ${$session.gitlabToken}`
+					Authorization: `Bearer ${$gitTokens.gitlabToken}`
 				});
 				const packageJson = files.find(
 					(file) => file.name === 'package.json' && file.type === 'blob'
@@ -78,7 +79,7 @@
 					const data = await get(
 						`${apiUrl}/v4/projects/${projectId}/repository/files/${path}/raw?ref=${branch}`,
 						{
-							Authorization: `Bearer ${$session.gitlabToken}`
+							Authorization: `Bearer ${$gitTokens.gitlabToken}`
 						}
 					);
 					const json = JSON.parse(data) || {};
@@ -94,7 +95,7 @@
 				}
 			} else if (type === 'github') {
 				const files = await get(`${apiUrl}/repos/${repository}/contents?ref=${branch}`, {
-					Authorization: `Bearer ${$session.ghToken}`,
+					Authorization: `Bearer ${$gitTokens.githubToken}`,
 					Accept: 'application/vnd.github.v2.json'
 				});
 				const packageJson = files.find(
@@ -111,7 +112,7 @@
 					foundConfig.buildPack = 'docker';
 				} else if (packageJson) {
 					const data = await get(`${packageJson.git_url}`, {
-						Authorization: `Bearer ${$session.ghToken}`,
+						Authorization: `Bearer ${$gitTokens.githubToken}`,
 						Accept: 'application/vnd.github.v2.raw'
 					});
 					const json = JSON.parse(data) || {};

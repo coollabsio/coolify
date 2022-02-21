@@ -1,14 +1,12 @@
 <script lang="ts">
-	import { browser } from '$app/env';
-
-	import { goto } from '$app/navigation';
-
 	export let application;
 
-	import { page, session } from '$app/stores';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
+	import { gitTokens } from '$lib/store';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -32,7 +30,7 @@
 	let showSave = false;
 	async function loadRepositoriesByPage(page = 0) {
 		return await get(`${apiUrl}/installation/repositories?per_page=100&page=${page}`, {
-			Authorization: `token ${$session.ghToken}`
+			Authorization: `token ${$gitTokens.githubToken}`
 		});
 	}
 	async function loadRepositories() {
@@ -56,7 +54,7 @@
 		selected.projectId = repositories.find((repo) => repo.full_name === selected.repository).id;
 		try {
 			branches = await get(`${apiUrl}/repos/${selected.repository}/branches`, {
-				Authorization: `token ${$session.ghToken}`
+				Authorization: `token ${$gitTokens.githubToken}`
 			});
 			return;
 		} catch ({ error }) {
@@ -84,6 +82,10 @@
 
 	onMount(async () => {
 		try {
+			if (!$gitTokens.githubToken) {
+				const { token } = await get(`/applications/${id}/configuration/githubToken.json`);
+				$gitTokens.githubToken = token;
+			}
 			await loadRepositories();
 		} catch (error) {
 			if (
@@ -114,7 +116,9 @@
 				}
 			}
 			if (error.message === 'Bad credentials') {
-				browser && window.location.reload();
+				const { token } = await get(`/applications/${id}/configuration/githubToken.json`);
+				$gitTokens.githubToken = token;
+				return await loadRepositories();
 			}
 			return errorNotification(error);
 		}

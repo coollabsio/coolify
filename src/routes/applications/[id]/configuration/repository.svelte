@@ -20,6 +20,7 @@
 <script lang="ts">
 	export let application;
 	export let appId;
+
 	import GithubRepositories from './_GithubRepositories.svelte';
 	import GitlabRepositories from './_GitlabRepositories.svelte';
 </script>

@@ -17,12 +17,19 @@
 		const endpoint = `/applications/${params.id}.json`;
 		const res = await fetch(endpoint);
 		if (res.ok) {
-			const { application, isRunning, appId } = await res.json();
+			let { application, isRunning, appId, githubToken, gitlabToken } = await res.json();
 			if (!application || Object.entries(application).length === 0) {
 				return {
 					status: 302,
 					redirect: '/applications'
 				};
+			}
+			if (application.gitSource?.githubAppId && !githubToken) {
+				const response = await fetch(`/applications/${params.id}/configuration/githubToken.json`);
+				if (response.ok) {
+					const { token } = await response.json();
+					githubToken = token;
+				}
 			}
 			const configurationPhase = checkConfiguration(application);
 			if (
@@ -38,7 +45,9 @@
 			return {
 				props: {
 					application,
-					isRunning
+					isRunning,
+					githubToken,
+					gitlabToken
 				},
 				stuff: {
 					isRunning,
@@ -58,12 +67,18 @@
 <script lang="ts">
 	export let application;
 	export let isRunning;
+	export let githubToken;
+	export let gitlabToken;
 	import { page, session } from '$app/stores';
 	import { errorNotification } from '$lib/form';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import Loading from '$lib/components/Loading.svelte';
 	import { del, post } from '$lib/api';
 	import { goto } from '$app/navigation';
+	import { gitTokens } from '$lib/store';
+
+	if (githubToken) $gitTokens.githubToken = githubToken;
+	if (gitlabToken) $gitTokens.gitlabToken = gitlabToken;
 
 	let loading = false;
 	const { id } = $page.params;

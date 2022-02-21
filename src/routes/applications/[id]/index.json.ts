@@ -1,5 +1,4 @@
 import { getUserDetails } from '$lib/common';
-import { getGithubToken } from '$lib/components/common';
 import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
 import { checkContainer } from '$lib/haproxy';
@@ -11,61 +10,28 @@ export const get: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 
-	const appId = process.env['COOLIFY_APP_ID'];
-	let githubToken = null;
-	let ghToken = null;
-	let isRunning = false;
 	const { id } = event.params;
 
+	const appId = process.env['COOLIFY_APP_ID'];
+	let isRunning = false;
+	let githubToken = event.locals.cookies?.githubToken || null;
+	let gitlabToken = event.locals.cookies?.gitlabToken || null;
 	try {
 		const application = await db.getApplication({ id, teamId });
-		const { gitSource } = application;
-		if (gitSource?.type === 'github' && gitSource?.githubApp) {
-			if (!event.locals.session.data.ghToken) {
-				const payload = {
-					iat: Math.round(new Date().getTime() / 1000),
-					exp: Math.round(new Date().getTime() / 1000 + 600),
-					iss: gitSource.githubApp.appId
-				};
-				githubToken = jsonwebtoken.sign(payload, gitSource.githubApp.privateKey, {
-					algorithm: 'RS256'
-				});
-				ghToken = await getGithubToken({ apiUrl: gitSource.apiUrl, application, githubToken });
-			} else {
-				try {
-					await getRequest(`${gitSource.apiUrl}/installation/repositories`, {
-						Authorization: `token ${event.locals.session.data.ghToken}`
-					});
-				} catch (error) {
-					const payload = {
-						iat: Math.round(new Date().getTime() / 1000),
-						exp: Math.round(new Date().getTime() / 1000 + 600),
-						iss: gitSource.githubApp.appId
-					};
-					githubToken = jsonwebtoken.sign(payload, gitSource.githubApp.privateKey, {
-						algorithm: 'RS256'
-					});
-					ghToken = await getGithubToken({ apiUrl: gitSource.apiUrl, application, githubToken });
-				}
-			}
-		}
 		if (application.destinationDockerId) {
 			isRunning = await checkContainer(application.destinationDocker.engine, id);
 		}
-		const payload = {
+		return {
+			status: 200,
 			body: {
 				isRunning,
 				application,
-				appId
+				appId,
+				githubToken,
+				gitlabToken
 			},
 			headers: {}
 		};
-		if (ghToken) {
-			payload.headers = {
-				'set-cookie': [`ghToken=${ghToken}; HttpOnly; Path=/; Max-Age=15778800;`]
-			};
-		}
-		return payload;
 	} catch (error) {
 		console.log(error);
 		return ErrorHandler(error);
