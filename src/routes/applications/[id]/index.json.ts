@@ -15,8 +15,8 @@ export const get: RequestHandler = async (event) => {
 	let githubToken = null;
 	let ghToken = null;
 	let isRunning = false;
-
 	const { id } = event.params;
+
 	try {
 		const application = await db.getApplication({ id, teamId });
 		const { gitSource } = application;
@@ -52,15 +52,20 @@ export const get: RequestHandler = async (event) => {
 		if (application.destinationDockerId) {
 			isRunning = await checkContainer(application.destinationDocker.engine, id);
 		}
-		return {
+		const payload = {
 			body: {
 				isRunning,
-				ghToken,
-				githubToken,
 				application,
 				appId
-			}
+			},
+			headers: {}
 		};
+		if (ghToken) {
+			payload.headers = {
+				'set-cookie': [`ghToken=${ghToken}; HttpOnly; Path=/; Max-Age=15778800;`]
+			};
+		}
+		return payload;
 	} catch (error) {
 		console.log(error);
 		return ErrorHandler(error);

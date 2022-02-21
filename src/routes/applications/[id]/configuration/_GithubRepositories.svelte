@@ -3,13 +3,11 @@
 
 	import { goto } from '$app/navigation';
 
-	export let githubToken;
 	export let application;
 
-	import { page } from '$app/stores';
+	import { page, session } from '$app/stores';
 	import { get, post } from '$lib/api';
-	import { getGithubToken } from '$lib/components/common';
-	import { enhance, errorNotification } from '$lib/form';
+	import { errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
 
 	const { id } = $page.params;
@@ -32,15 +30,12 @@
 		branch: undefined
 	};
 	let showSave = false;
-	let token = null;
-
 	async function loadRepositoriesByPage(page = 0) {
 		return await get(`${apiUrl}/installation/repositories?per_page=100&page=${page}`, {
 			Authorization: `token ${$session.ghToken}`
 		});
 	}
 	async function loadRepositories() {
-		token = await getGithubToken({ apiUrl, githubToken, application });
 		let page = 1;
 		let reposCount = 0;
 		const loadedRepos = await loadRepositoriesByPage();
@@ -61,7 +56,7 @@
 		selected.projectId = repositories.find((repo) => repo.full_name === selected.repository).id;
 		try {
 			branches = await get(`${apiUrl}/repos/${selected.repository}/branches`, {
-				Authorization: `token ${token}`
+				Authorization: `token ${$session.ghToken}`
 			});
 			return;
 		} catch ({ error }) {

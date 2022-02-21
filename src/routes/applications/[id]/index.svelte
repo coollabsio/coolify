@@ -42,7 +42,7 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 	import type Prisma from '@prisma/client';
-	import { getDomain, notNodeDeployments, staticDeployments } from '$lib/components/common';
+	import { notNodeDeployments, staticDeployments } from '$lib/components/common';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { post } from '$lib/api';
 	const { id } = $page.params;
@@ -52,6 +52,7 @@
 	let loading = false;
 	let debug = application.settings.debug;
 	let previews = application.settings.previews;
+	let dualCerts = application.settings.dualCerts;
 
 	onMount(() => {
 		domainEl.focus();
@@ -64,8 +65,11 @@
 		if (name === 'previews') {
 			previews = !previews;
 		}
+		if (name === 'dualCerts') {
+			dualCerts = !dualCerts;
+		}
 		try {
-			await post(`/applications/${id}/settings.json`, { previews, debug });
+			await post(`/applications/${id}/settings.json`, { previews, debug, dualCerts });
 			return toast.push('Settings saved.');
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -193,7 +197,7 @@
 							value={application.gitSource.name}
 							id="gitSource"
 							disabled
-							class="cursor-pointer bg-coolgray-200 hover:bg-coolgray-500"
+							class="cursor-pointer hover:bg-coolgray-500"
 						/></a
 					>
 				</div>
@@ -210,7 +214,7 @@
 							value="{application.repository}/{application.branch}"
 							id="repository"
 							disabled
-							class="cursor-pointer bg-coolgray-200 hover:bg-coolgray-500"
+							class="cursor-pointer hover:bg-coolgray-500"
 						/></a
 					>
 				</div>
@@ -228,7 +232,7 @@
 							value={application.buildPack}
 							id="buildPack"
 							disabled
-							class="cursor-pointer bg-coolgray-200 hover:bg-coolgray-500"
+							class="cursor-pointer hover:bg-coolgray-500"
 						/></a
 					>
 				</div>
@@ -252,7 +256,7 @@
 		</div>
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="grid grid-cols-3">
-				<label for="fqdn" class="pt-2">Domain (FQDN)</label>
+				<label for="fqdn" class="relative pt-2">Domain (FQDN)</label>
 				<div class="col-span-2">
 					<input
 						readonly={!$session.isAdmin || isRunning}
@@ -266,11 +270,21 @@
 						required
 					/>
 					<Explainer
-						text="If you specify <span class='text-green-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-green-600 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application."
+						text="If you specify <span class='text-green-500 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-green-500 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application."
 					/>
 				</div>
 			</div>
-
+			<div class="grid grid-cols-2 items-center pb-8">
+				<Setting
+					dataTooltip="Must be stopped to modify."
+					disabled={isRunning}
+					isCenter={false}
+					bind:setting={dualCerts}
+					title="Generate SSL for www and non-www?"
+					description="It will generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-green-500'>both DNS entries</span> set in advance.<br><br>Useful if you expect to have visitors on both."
+					on:click={() => !isRunning && changeSettings('dualCerts')}
+				/>
+			</div>
 			{#if !staticDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-3 items-center">
 					<label for="port">Port</label>
@@ -285,6 +299,7 @@
 					</div>
 				</div>
 			{/if}
+
 			{#if !notNodeDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-3 items-center">
 					<label for="installCommand">Install Command</label>
@@ -361,8 +376,7 @@
 	<div class="flex space-x-1 pb-5 font-bold">
 		<div class="title">Features</div>
 	</div>
-	<div class="px-4 pb-10 sm:px-6">
-		<!-- <ul class="mt-2 divide-y divide-stone-800">
+	<!-- <ul class="mt-2 divide-y divide-stone-800">
 			<Setting
 				bind:setting={forceSSL}
 				on:click={() => changeSettings('forceSSL')}
@@ -370,21 +384,24 @@
 				description="Creates a https redirect for all requests from http and also generates a https certificate for the domain through Let's Encrypt."
 			/>
 		</ul> -->
-		<ul class="mt-2 divide-y divide-stone-800">
+	<div class="px-10 pb-10">
+		<div class="grid grid-cols-2 items-center">
 			<Setting
+				isCenter={false}
 				bind:setting={previews}
 				on:click={() => changeSettings('previews')}
 				title="Enable MR/PR Previews"
 				description="Creates previews from pull and merge requests."
 			/>
-		</ul>
-		<ul class="mt-2 divide-y divide-stone-800">
+		</div>
+		<div class="grid grid-cols-2 items-center">
 			<Setting
+				isCenter={false}
 				bind:setting={debug}
 				on:click={() => changeSettings('debug')}
 				title="Debug Logs"
 				description="Enable debug logs during build phase. <br>(<span class='text-red-500'>sensitive information</span> could be visible in logs)"
 			/>
-		</ul>
+		</div>
 	</div>
 </div>

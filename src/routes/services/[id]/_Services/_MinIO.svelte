@@ -7,42 +7,36 @@
 <div class="flex space-x-1 py-5 font-bold">
 	<div class="title">MinIO Server</div>
 </div>
-<div class="grid grid-cols-3 items-center">
+<div class="grid grid-cols-2 items-center px-10">
 	<label for="rootUser">Root User</label>
-	<div class="col-span-2 ">
-		<input
-			name="rootUser"
-			id="rootUser"
-			placeholder="User to login"
-			value={service.minio.rootUser}
-			disabled
-			readonly
-		/>
-	</div>
+	<input
+		name="rootUser"
+		id="rootUser"
+		placeholder="User to login"
+		value={service.minio.rootUser}
+		disabled
+		readonly
+	/>
 </div>
-<div class="grid grid-cols-3 items-center">
+<div class="grid grid-cols-2 items-center px-10">
 	<label for="rootUserPassword">Root's Password</label>
-	<div class="col-span-2 ">
-		<CopyPasswordField
-			id="rootUserPassword"
-			isPasswordField
-			readonly
-			disabled
-			name="rootUserPassword"
-			value={service.minio.rootUserPassword}
-		/>
-	</div>
+	<CopyPasswordField
+		id="rootUserPassword"
+		isPasswordField
+		readonly
+		disabled
+		name="rootUserPassword"
+		value={service.minio.rootUserPassword}
+	/>
 </div>
-<div class="grid grid-cols-3 items-center">
+<div class="grid grid-cols-2 items-center px-10">
 	<label for="publicPort">API Port</label>
-	<div class="col-span-2 ">
-		<input
-			name="publicPort"
-			id="publicPort"
-			value={service.minio.publicPort}
-			disabled
-			readonly
-			placeholder="Generated automatically after start"
-		/>
-	</div>
+	<input
+		name="publicPort"
+		id="publicPort"
+		value={service.minio.publicPort}
+		disabled
+		readonly
+		placeholder="Generated automatically after start"
+	/>
 </div>

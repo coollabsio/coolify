@@ -35,7 +35,7 @@ export const post: RequestHandler = async (event) => {
 			}
 			try {
 				await stopTcpHttpProxy(destinationDocker, publicPort);
-				await configureSimpleServiceProxyOff({ domain });
+				await configureSimpleServiceProxyOff(fqdn);
 			} catch (error) {
 				console.log(error);
 			}

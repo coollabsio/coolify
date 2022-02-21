@@ -64,7 +64,6 @@ export default async function (job) {
 	if (destinationDockerId) {
 		destinationType = 'docker';
 	}
-
 	if (destinationType === 'docker') {
 		const docker = dockerInstance({ destinationDocker });
 		const host = getEngine(destinationDocker.engine);
@@ -205,7 +204,15 @@ export default async function (job) {
 		const envs = [];
 		if (secrets.length > 0) {
 			secrets.forEach((secret) => {
-				envs.push(`${secret.name}=${secret.value}`);
+				if (pullmergeRequestId) {
+					if (secret.isPRMRSecret) {
+						envs.push(`${secret.name}=${secret.value}`);
+					}
+				} else {
+					if (!secret.isPRMRSecret) {
+						envs.push(`${secret.name}=${secret.value}`);
+					}
+				}
 			});
 		}
 		await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
@@ -239,6 +246,8 @@ export default async function (job) {
 			if (stderr) console.log(stderr);
 			saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
 		} catch (error) {
+			saveBuildLog({ line: error, buildId, applicationId });
+			sentry.captureException(error);
 			throw new Error(error);
 		}
 		try {
@@ -257,7 +266,9 @@ export default async function (job) {
 				});
 			}
 		} catch (error) {
+			saveBuildLog({ line: error.stdout || error, buildId, applicationId });
 			sentry.captureException(error);
+			throw new Error(error);
 		}
 	}
 }

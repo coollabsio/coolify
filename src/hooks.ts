@@ -2,7 +2,7 @@ import dotEnvExtended from 'dotenv-extended';
 dotEnvExtended.load();
 import type { GetSession } from '@sveltejs/kit';
 import { handleSession } from 'svelte-kit-cookie-session';
-import { getUserDetails, isTeamIdTokenAvailable, sentry } from '$lib/common';
+import { getUserDetails, sentry } from '$lib/common';
 import { version } from '$lib/common';
 import cookie from 'cookie';
 import { dev } from '$app/env';
@@ -10,27 +10,38 @@ import { dev } from '$app/env';
 export const handle = handleSession(
 	{
 		secret: process.env['COOLIFY_SECRET_KEY'],
-		expires: 30
+		expires: 30,
+		cookie: { secure: false }
 	},
 	async function ({ event, resolve }) {
 		let response;
 		try {
-			const cookies: Cookies = cookie.parse(event.request.headers.get('cookie') || '');
-			if (cookies['kit.session']) {
-				const { permission, teamId } = await getUserDetails(event, false);
-				event.locals.user = {
-					teamId,
-					permission,
-					isAdmin: permission === 'admin' || permission === 'owner'
-				};
+			if (event.locals.cookies) {
+				let gitlabToken = event.locals.cookies.gitlabToken || null;
+				let ghToken = event.locals.cookies.ghToken || null;
+				if (event.locals.cookies['kit.session']) {
+					const { permission, teamId, userId } = await getUserDetails(event, false);
+					const newSession = {
+						userId,
+						teamId,
+						permission,
+						isAdmin: permission === 'admin' || permission === 'owner',
+						expires: event.locals.session.data.expires,
+						gitlabToken,
+						ghToken
+					};
+
+					if (JSON.stringify(event.locals.session.data) !== JSON.stringify(newSession)) {
+						event.locals.session.data = { ...newSession };
+					}
+				}
 			}
-			if (cookies.gitlabToken) {
-				event.locals.gitlabToken = cookies.gitlabToken;
-			}
+
 			response = await resolve(event, {
 				ssr: !event.url.pathname.startsWith('/webhooks/success')
 			});
 		} catch (error) {
+			console.log(error);
 			response = await resolve(event, {
 				ssr: !event.url.pathname.startsWith('/webhooks/success')
 			});
@@ -61,17 +72,13 @@ export const handle = handleSession(
 	}
 );
 
-export const getSession: GetSession = function (request) {
+export const getSession: GetSession = function ({ locals }) {
 	return {
 		version,
-		gitlabToken: request.locals?.gitlabToken || null,
-		uid: request.locals.session.data?.uid || null,
-		teamId: request.locals.user?.teamId || null,
-		permission: request.locals.user?.permission,
-		isAdmin: request.locals.user?.isAdmin || false
+		...locals.session.data
 	};
 };
 
 export async function handleError({ error, event }) {
-	if (!dev) sentry.captureException(error, { event });
+	if (!dev) sentry.captureException(error, event);
 }

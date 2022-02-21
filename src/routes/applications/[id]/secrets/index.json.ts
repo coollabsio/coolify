@@ -7,8 +7,9 @@ export const get: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 
+	const { id } = event.params;
 	try {
-		const secrets = await db.listSecrets({ applicationId: event.params.id });
+		const secrets = await (await db.listSecrets(id)).filter((secret) => !secret.isPRMRSecret);
 		return {
 			status: 200,
 			body: {
@@ -27,16 +28,22 @@ export const post: RequestHandler = async (event) => {
 	if (status === 401) return { status, body };
 
 	const { id } = event.params;
-	const { name, value, isBuildSecret } = await event.request.json();
-
+	const { name, value, isBuildSecret, isPRMRSecret, isNew } = await event.request.json();
 	try {
-		const found = await db.isSecretExists({ id, name });
-		if (found) {
-			throw {
-				error: `Secret ${name} already exists.`
-			};
+		if (isNew) {
+			const found = await db.isSecretExists({ id, name, isPRMRSecret });
+			if (found) {
+				throw {
+					error: `Secret ${name} already exists.`
+				};
+			} else {
+				await db.createSecret({ id, name, value, isBuildSecret, isPRMRSecret });
+				return {
+					status: 201
+				};
+			}
 		} else {
-			await db.createSecret({ id, name, value, isBuildSecret });
+			await db.updateSecret({ id, name, value, isBuildSecret, isPRMRSecret });
 			return {
 				status: 201
 			};

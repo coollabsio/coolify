@@ -20,7 +20,7 @@
 </script>
 
 <script lang="ts">
-	export let applications: Array<Applications>;
+	export let applications: Array<Application>;
 	import { session } from '$app/stores';
 	import Application from './_Application.svelte';
 </script>

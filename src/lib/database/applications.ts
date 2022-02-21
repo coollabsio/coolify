@@ -1,5 +1,5 @@
 import { decrypt, encrypt } from '$lib/crypto';
-import { removeProxyConfiguration, removeWwwRedirection } from '$lib/haproxy';
+import { removeProxyConfiguration } from '$lib/haproxy';
 import { asyncExecShell, getEngine } from '$lib/common';
 
 import { getDomain, removeDestinationDocker } from '$lib/common';
@@ -209,10 +209,10 @@ export async function configureApplication({
 	});
 }
 
-export async function setApplicationSettings({ id, debug, previews }) {
+export async function setApplicationSettings({ id, debug, previews, dualCerts }) {
 	return await prisma.application.update({
 		where: { id },
-		data: { settings: { update: { debug, previews } } },
+		data: { settings: { update: { debug, previews, dualCerts } } },
 		include: { destinationDocker: true }
 	});
 }

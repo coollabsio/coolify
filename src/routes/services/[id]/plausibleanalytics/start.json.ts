@@ -60,7 +60,7 @@ export const post: RequestHandler = async (event) => {
 				}
 			},
 			postgresql: {
-				volume: `${plausibleDbId}-postgresql-data:/var/lib/postgresql/data`,
+				volume: `${plausibleDbId}-postgresql-data:/bitnami/postgresql/`,
 				image: 'bitnami/postgresql:13.2.0',
 				environmentVariables: {
 					POSTGRESQL_PASSWORD: postgresqlPassword,
@@ -136,7 +136,6 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 						'sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh db init-admin && /entrypoint.sh run"',
 					networks: [network],
 					environment: config.plausibleAnalytics.environmentVariables,
-					volumes: [config.postgresql.volume],
 					restart: 'always',
 					depends_on: [`${id}-postgresql`, `${id}-clickhouse`],
 					labels: makeLabelForServices('plausibleAnalytics')

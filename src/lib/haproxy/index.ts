@@ -2,7 +2,6 @@ import { dev } from '$app/env';
 import { asyncExecShell, getDomain, getEngine } from '$lib/common';
 import got from 'got';
 import * as db from '$lib/database';
-import { letsEncrypt } from '$lib/letsencrypt';
 
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555';
 
@@ -49,7 +48,8 @@ export async function completeTransaction(transactionId) {
 	return await haproxy.put(`v2/services/haproxy/transactions/${transactionId}`);
 }
 
-export async function removeProxyConfiguration({ domain }) {
+export async function removeProxyConfiguration(fqdn) {
+	const domain = getDomain(fqdn);
 	const haproxy = await haproxyInstance();
 	const backendFound = await haproxy
 		.get(`v2/services/haproxy/configuration/backends/${domain}`)
@@ -65,97 +65,92 @@ export async function removeProxyConfiguration({ domain }) {
 			.json();
 		await completeTransaction(transactionId);
 	}
-	await removeWwwRedirection(domain);
+	await forceSSLOffApplication(domain);
+	await removeWwwRedirection(fqdn);
 }
-export async function forceSSLOffApplication({ domain }) {
-	if (!dev) {
-		const haproxy = await haproxyInstance();
-		await checkHAProxy(haproxy);
-		let transactionId;
-		try {
-			const rules: any = await haproxy
-				.get(`v2/services/haproxy/configuration/http_request_rules`, {
-					searchParams: {
-						parent_name: 'http',
-						parent_type: 'frontend'
-					}
-				})
-				.json();
-			if (rules.data.length > 0) {
-				const rule = rules.data.find((rule) => rule.cond_test.includes(`-i ${domain}`));
-				if (rule) {
-					transactionId = await getNextTransactionId();
-
-					await haproxy
-						.delete(`v2/services/haproxy/configuration/http_request_rules/${rule.index}`, {
-							searchParams: {
-								transaction_id: transactionId,
-								parent_name: 'http',
-								parent_type: 'frontend'
-							}
-						})
-						.json();
+export async function forceSSLOffApplication(domain) {
+	const haproxy = await haproxyInstance();
+	await checkHAProxy(haproxy);
+	let transactionId;
+	try {
+		const rules: any = await haproxy
+			.get(`v2/services/haproxy/configuration/http_request_rules`, {
+				searchParams: {
+					parent_name: 'http',
+					parent_type: 'frontend'
 				}
+			})
+			.json();
+		if (rules.data.length > 0) {
+			const rule = rules.data.find((rule) =>
+				rule.cond_test.includes(`{ hdr(host) -i ${domain} } !{ ssl_fc }`)
+			);
+			if (rule) {
+				transactionId = await getNextTransactionId();
+
+				await haproxy
+					.delete(`v2/services/haproxy/configuration/http_request_rules/${rule.index}`, {
+						searchParams: {
+							transaction_id: transactionId,
+							parent_name: 'http',
+							parent_type: 'frontend'
+						}
+					})
+					.json();
 			}
-		} catch (error) {
-			console.log(error);
-		} finally {
-			if (transactionId) await completeTransaction(transactionId);
 		}
-	} else {
-		console.log(`[DEBUG] Removing ssl for ${domain}`);
+	} catch (error) {
+		console.log(error);
+	} finally {
+		if (transactionId) await completeTransaction(transactionId);
 	}
 }
-export async function forceSSLOnApplication({ domain }) {
-	if (!dev) {
-		const haproxy = await haproxyInstance();
-		await checkHAProxy(haproxy);
-		let transactionId;
-		try {
-			const rules: any = await haproxy
-				.get(`v2/services/haproxy/configuration/http_request_rules`, {
-					searchParams: {
-						parent_name: 'http',
-						parent_type: 'frontend'
-					}
-				})
-				.json();
-			let nextRule = 0;
-			if (rules.data.length > 0) {
-				const rule = rules.data.find((rule) =>
-					rule.cond_test.includes(`{ hdr(host) -i ${domain} } !{ ssl_fc }`)
-				);
-				if (rule) return;
-				nextRule = rules.data[rules.data.length - 1].index + 1;
-			}
-			transactionId = await getNextTransactionId();
-
-			await haproxy
-				.post(`v2/services/haproxy/configuration/http_request_rules`, {
-					searchParams: {
-						transaction_id: transactionId,
-						parent_name: 'http',
-						parent_type: 'frontend'
-					},
-					json: {
-						index: nextRule,
-						cond: 'if',
-						cond_test: `{ hdr(host) -i ${domain} } !{ ssl_fc }`,
-						type: 'redirect',
-						redir_type: 'scheme',
-						redir_value: 'https',
-						redir_code: 301
-					}
-				})
-				.json();
-		} catch (error) {
-			console.log(error);
-			throw error;
-		} finally {
-			if (transactionId) await completeTransaction(transactionId);
+export async function forceSSLOnApplication(domain) {
+	const haproxy = await haproxyInstance();
+	await checkHAProxy(haproxy);
+	let transactionId;
+	try {
+		const rules: any = await haproxy
+			.get(`v2/services/haproxy/configuration/http_request_rules`, {
+				searchParams: {
+					parent_name: 'http',
+					parent_type: 'frontend'
+				}
+			})
+			.json();
+		let nextRule = 0;
+		if (rules.data.length > 0) {
+			const rule = rules.data.find((rule) =>
+				rule.cond_test.includes(`{ hdr(host) -i ${domain} } !{ ssl_fc }`)
+			);
+			if (rule) return;
+			nextRule = rules.data[rules.data.length - 1].index + 1;
 		}
-	} else {
-		console.log(`[DEBUG] Adding ssl for ${domain}`);
+		transactionId = await getNextTransactionId();
+
+		await haproxy
+			.post(`v2/services/haproxy/configuration/http_request_rules`, {
+				searchParams: {
+					transaction_id: transactionId,
+					parent_name: 'http',
+					parent_type: 'frontend'
+				},
+				json: {
+					index: nextRule,
+					cond: 'if',
+					cond_test: `{ hdr(host) -i ${domain} } !{ ssl_fc }`,
+					type: 'redirect',
+					redir_type: 'scheme',
+					redir_value: 'https',
+					redir_code: dev ? 302 : 301
+				}
+			})
+			.json();
+	} catch (error) {
+		console.log(error);
+		throw error;
+	} finally {
+		if (transactionId) await completeTransaction(transactionId);
 	}
 }
 
@@ -274,6 +269,7 @@ export async function configureProxyForApplication({ domain, imageId, applicatio
 
 export async function configureCoolifyProxyOff(fqdn) {
 	const domain = getDomain(fqdn);
+	const isHttps = fqdn.startsWith('https://');
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
 
@@ -288,10 +284,8 @@ export async function configureCoolifyProxyOff(fqdn) {
 			})
 			.json();
 		await completeTransaction(transactionId);
-		if (!dev) {
-			await forceSSLOffApplication({ domain });
-		}
-		await setWwwRedirection(fqdn);
+		if (isHttps) await forceSSLOffApplication(domain);
+		await removeWwwRedirection(fqdn);
 	} catch (error) {
 		throw error?.response?.body || error;
 	}
@@ -565,7 +559,8 @@ export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 	await completeTransaction(transactionId);
 }
 
-export async function configureSimpleServiceProxyOff({ domain }) {
+export async function configureSimpleServiceProxyOff(fqdn) {
+	const domain = getDomain(fqdn);
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
 	try {
@@ -580,11 +575,16 @@ export async function configureSimpleServiceProxyOff({ domain }) {
 			.json();
 		await completeTransaction(transactionId);
 	} catch (error) {}
-	await removeWwwRedirection(domain);
+	await forceSSLOffApplication(domain);
+	await removeWwwRedirection(fqdn);
 	return;
 }
 
-export async function removeWwwRedirection(domain) {
+export async function removeWwwRedirection(fqdn) {
+	const domain = getDomain(fqdn);
+	const isHttps = fqdn.startsWith('https://');
+	const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
+
 	const haproxy = await haproxyInstance();
 	await checkHAProxy();
 	const rules: any = await haproxy
@@ -596,9 +596,7 @@ export async function removeWwwRedirection(domain) {
 		})
 		.json();
 	if (rules.data.length > 0) {
-		const rule = rules.data.find((rule) =>
-			rule.redir_value.includes(`${domain}%[capture.req.uri]`)
-		);
+		const rule = rules.data.find((rule) => rule.redir_value.includes(redirectValue));
 		if (rule) {
 			const transactionId = await getNextTransactionId();
 			await haproxy
@@ -623,6 +621,7 @@ export async function setWwwRedirection(fqdn) {
 		const domain = getDomain(fqdn);
 		const isHttps = fqdn.startsWith('https://');
 		const isWWW = fqdn.includes('www.');
+		const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
 		const contTest = `{ req.hdr(host) -i ${isWWW ? domain.replace('www.', '') : `www.${domain}`} }`;
 		const rules: any = await haproxy
 			.get(`v2/services/haproxy/configuration/http_request_rules`, {
@@ -634,13 +633,11 @@ export async function setWwwRedirection(fqdn) {
 			.json();
 		let nextRule = 0;
 		if (rules.data.length > 0) {
-			const rule = rules.data.find((rule) =>
-				rule.redir_value.includes(`${domain}%[capture.req.uri]`)
-			);
+			const rule = rules.data.find((rule) => rule.redir_value.includes(redirectValue));
 			if (rule) return;
 			nextRule = rules.data[rules.data.length - 1].index + 1;
 		}
-		const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
+
 		transactionId = await getNextTransactionId();
 		await haproxy
 			.post(`v2/services/haproxy/configuration/http_request_rules`, {

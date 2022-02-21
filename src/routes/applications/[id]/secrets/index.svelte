@@ -46,32 +46,31 @@
 			<tr>
 				<th
 					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-warmGray-400"
-					>Name</th
+					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white">Name</th
 				>
 				<th
 					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-warmGray-400"
+					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white"
 					>Value</th
 				>
 				<th
 					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-warmGray-400"
+					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white"
 					>Need during buildtime?</th
 				>
 				<th
 					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-warmGray-400"
+					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white"
 				/>
 			</tr>
 		</thead>
 		<tbody class="">
 			{#each secrets as secret}
 				{#key secret.id}
-					<tr class="hover:bg-coolgray-200">
+					<tr class="h-20 transition duration-100 hover:bg-coolgray-400">
 						<Secret
 							name={secret.name}
-							value={secret.value ? secret.value : 'ENCRYPTED'}
+							value={secret.value}
 							isBuildSecret={secret.isBuildSecret}
 							on:refresh={refreshSecrets}
 						/>
