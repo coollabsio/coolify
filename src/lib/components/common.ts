@@ -9,22 +9,6 @@ export const dateOptions: DateTimeFormatOptions = {
 	hour12: false
 };
 
-export async function getGithubToken({ apiUrl, application, githubToken }): Promise<void> {
-	const response = await fetch(
-		`${apiUrl}/app/installations/${application.gitSource.githubApp.installationId}/access_tokens`,
-		{
-			method: 'POST',
-			headers: {
-				Authorization: `Bearer ${githubToken}`
-			}
-		}
-	);
-	if (!response.ok) {
-		throw new Error('Git Source not configured.');
-	}
-	const data = await response.json();
-	return data.token;
-}
 export const staticDeployments = ['react', 'vuejs', 'static', 'svelte', 'gatsby', 'php'];
 export const notNodeDeployments = ['php', 'docker', 'rust'];
 
