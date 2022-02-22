@@ -40,7 +40,7 @@
 	<span class="pr-2">{source.name}</span>
 </div>
 
-<div class="flex justify-center space-x-2 px-6 py-3">
+<div class="flex justify-center px-6 pb-8">
 	{#if source.type === 'github'}
 		<Github bind:source />
 	{:else if source.type === 'gitlab'}

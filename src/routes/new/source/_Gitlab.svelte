@@ -27,56 +27,47 @@
 			<div class="text-xl font-bold text-white">Configuration</div>
 			<button type="submit" class="bg-orange-600 hover:bg-orange-500">Save</button>
 		</div>
-		<div class="grid grid-cols-3 items-center">
-			<label for="type">Type</label>
-
-			<div class="col-span-2">
-				<select name="type" id="type" class="w-96" bind:value={gitSource.type}>
-					<option value="github">GitHub</option>
-					<option value="gitlab">GitLab</option>
-					<option value="bitbucket">BitBucket</option>
-				</select>
-			</div>
+		<div class="grid grid-cols-2 items-center px-10">
+			<label for="type" class="text-base font-bold text-stone-100">Type</label>
+			<select name="type" id="type" class="w-96" bind:value={gitSource.type}>
+				<option value="github">GitHub</option>
+				<option value="gitlab">GitLab</option>
+				<option value="bitbucket">BitBucket</option>
+			</select>
 		</div>
-		<div class="grid grid-cols-3 items-center">
-			<label for="name">Name</label>
-			<div class="col-span-2">
-				<input
-					name="name"
-					id="name"
-					placeholder="GitHub.com"
-					required
-					bind:this={nameEl}
-					bind:value={gitSource.name}
-				/>
-			</div>
+		<div class="grid grid-cols-2 items-center px-10">
+			<label for="name" class="text-base font-bold text-stone-100">Name</label>
+			<input
+				name="name"
+				id="name"
+				placeholder="GitHub.com"
+				required
+				bind:this={nameEl}
+				bind:value={gitSource.name}
+			/>
 		</div>
 
-		<div class="grid grid-cols-3 items-center">
-			<label for="htmlUrl">HTML URL</label>
-			<div class="col-span-2">
-				<input
-					type="url"
-					name="htmlUrl"
-					id="htmlUrl"
-					placeholder="eg: https://github.com"
-					required
-					bind:value={gitSource.htmlUrl}
-				/>
-			</div>
+		<div class="grid grid-cols-2 items-center px-10">
+			<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
+			<input
+				type="url"
+				name="htmlUrl"
+				id="htmlUrl"
+				placeholder="eg: https://github.com"
+				required
+				bind:value={gitSource.htmlUrl}
+			/>
 		</div>
-		<div class="grid grid-cols-3 items-center">
-			<label for="apiUrl">API URL</label>
-			<div class="col-span-2">
-				<input
-					name="apiUrl"
-					type="url"
-					id="apiUrl"
-					placeholder="eg: https://api.github.com"
-					required
-					bind:value={gitSource.apiUrl}
-				/>
-			</div>
+		<div class="grid grid-cols-2 items-center px-10">
+			<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
+			<input
+				name="apiUrl"
+				type="url"
+				id="apiUrl"
+				placeholder="eg: https://api.github.com"
+				required
+				bind:value={gitSource.apiUrl}
+			/>
 		</div>
 	</form>
 </div>

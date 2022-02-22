@@ -59,19 +59,19 @@
 	}
 </script>
 
-<td class="whitespace-nowrap px-6 py-2 text-sm font-medium text-white">
+<td>
 	<input
 		id={isNewSecret ? 'secretName' : 'secretNameNew'}
 		bind:value={name}
 		required
 		placeholder="EXAMPLE_VARIABLE"
-		class="-mx-2 w-64 border-2 border-transparent"
+		class=" border border-dashed border-coolgray-300"
 		readonly={!isNewSecret}
 		class:bg-transparent={!isNewSecret}
 		class:cursor-not-allowed={!isNewSecret}
 	/>
 </td>
-<td class="whitespace-nowrap px-6 py-2 text-sm font-medium text-white">
+<td>
 	<CopyPasswordField
 		id={isNewSecret ? 'secretValue' : 'secretValueNew'}
 		name={isNewSecret ? 'secretValue' : 'secretValueNew'}
@@ -81,7 +81,7 @@
 		placeholder="J$#@UIO%HO#$U%H"
 	/>
 </td>
-<td class="whitespace-nowrap px-6 py-2 text-center text-sm font-medium text-white">
+<td class="text-center">
 	<div
 		type="button"
 		on:click={setSecretValue}
@@ -130,21 +130,19 @@
 		</span>
 	</div>
 </td>
-<td class="whitespace-nowrap px-6 py-2 text-sm font-medium text-white">
+<td>
 	{#if isNewSecret}
 		<div class="flex items-center justify-center">
 			<button class="bg-green-600 hover:bg-green-500" on:click={() => saveSecret(true)}>Add</button>
 		</div>
 	{:else}
-		<div class="flex-col space-y-2">
+		<div class="flex flex-row justify-center space-x-2">
 			<div class="flex items-center justify-center">
-				<button class="w-24 bg-green-600 hover:bg-green-500" on:click={() => saveSecret(false)}
-					>Set</button
-				>
+				<button class="" on:click={() => saveSecret(false)}>Set</button>
 			</div>
 			{#if !isPRMRSecret}
 				<div class="flex justify-center items-end">
-					<button class="w-24 bg-red-600 hover:bg-red-500" on:click={removeSecret}>Remove</button>
+					<button class="bg-red-600 hover:bg-red-500" on:click={removeSecret}>Remove</button>
 				</div>
 			{/if}
 		</div>

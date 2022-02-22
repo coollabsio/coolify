@@ -91,7 +91,7 @@
 
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="grid grid-cols-2 items-center">
-				<label for="name">Name</label>
+				<label for="name" class="text-base font-bold text-stone-100">Name</label>
 				<input
 					readonly={!$session.isAdmin}
 					name="name"
@@ -101,7 +101,7 @@
 				/>
 			</div>
 			<div class="grid grid-cols-2 items-center">
-				<label for="destination">Destination</label>
+				<label for="destination" class="text-base font-bold text-stone-100">Destination</label>
 				{#if database.destinationDockerId}
 					<div class="no-underline">
 						<input
@@ -116,14 +116,14 @@
 			</div>
 
 			<div class="grid grid-cols-2 items-center">
-				<label for="version">Version</label>
+				<label for="version" class="text-base font-bold text-stone-100">Version</label>
 				<input value={database.version} readonly disabled class="bg-transparent " />
 			</div>
 		</div>
 
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="grid grid-cols-2 items-center">
-				<label for="host">Host</label>
+				<label for="host" class="text-base font-bold text-stone-100">Host</label>
 				<CopyPasswordField
 					placeholder="Generated automatically after start"
 					isPasswordField={false}
@@ -135,7 +135,7 @@
 				/>
 			</div>
 			<div class="grid grid-cols-2 items-center">
-				<label for="publicPort">Port</label>
+				<label for="publicPort" class="text-base font-bold text-stone-100">Port</label>
 				<CopyPasswordField
 					placeholder="Generated automatically after set to public"
 					id="publicPort"
@@ -159,7 +159,7 @@
 				<CouchDb bind:database />
 			{/if}
 			<div class="grid grid-cols-2 items-center px-10 pb-8">
-				<label for="url">Connection String</label>
+				<label for="url" class="text-base font-bold text-stone-100">Connection String</label>
 				<CopyPasswordField
 					textarea={true}
 					placeholder="Generated automatically after start"

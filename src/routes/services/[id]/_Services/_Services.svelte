@@ -70,11 +70,7 @@
 				>
 			{/if}
 			{#if service.type === 'plausibleanalytics' && isRunning}
-				<button
-					on:click|preventDefault={setEmailsToVerified}
-					class:bg-pink-600={!loadingVerification}
-					class:hover:bg-pink-500={!loadingVerification}
-					disabled={loadingVerification}
+				<button on:click|preventDefault={setEmailsToVerified} disabled={loadingVerification}
 					>{loadingVerification ? 'Verifying' : 'Verify emails without SMTP'}</button
 				>
 			{/if}
@@ -82,7 +78,7 @@
 
 		<div class="grid grid-flow-row gap-2">
 			<div class="mt-2 grid grid-cols-2 items-center px-10">
-				<label for="name">Name</label>
+				<label for="name" class="text-base font-bold text-stone-100">Name</label>
 				<div>
 					<input
 						readonly={!$session.isAdmin}
@@ -95,7 +91,7 @@
 			</div>
 
 			<div class="grid grid-cols-2 items-center px-10">
-				<label for="destination">Destination</label>
+				<label for="destination" class="text-base font-bold text-stone-100">Destination</label>
 				<div>
 					{#if service.destinationDockerId}
 						<div class="no-underline">
@@ -110,22 +106,23 @@
 				</div>
 			</div>
 			<div class="grid grid-cols-2 px-10">
-				<label for="fqdn" class="pt-2">Domain (FQDN)</label>
-				<div>
-					<CopyPasswordField
-						placeholder="eg: https://analytics.coollabs.io"
-						readonly={!$session.isAdmin && !isRunning}
-						disabled={!$session.isAdmin || isRunning}
-						name="fqdn"
-						id="fqdn"
-						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-						bind:value={service.fqdn}
-						required
-					/>
+				<div class="flex-col ">
+					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">Domain (FQDN)</label>
 					<Explainer
 						text="If you specify <span class='text-pink-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-pink-600 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application."
 					/>
 				</div>
+
+				<CopyPasswordField
+					placeholder="eg: https://analytics.coollabs.io"
+					readonly={!$session.isAdmin && !isRunning}
+					disabled={!$session.isAdmin || isRunning}
+					name="fqdn"
+					id="fqdn"
+					pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+					bind:value={service.fqdn}
+					required
+				/>
 			</div>
 			<div class="grid grid-cols-2 items-center px-10">
 				<Setting

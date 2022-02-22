@@ -62,32 +62,28 @@
 {#if !source.githubAppId}
 	<button on:click={newGithubApp}>Create new GitHub App</button>
 {:else if source.githubApp?.installationId}
-	<div class="mx-auto max-w-4xl px-6">
-		<form on:submit|preventDefault={handleSubmit} class="py-4">
-			<div class="flex space-x-1 pb-5 font-bold">
-				<div class="title">General</div>
-				{#if $session.isAdmin}
-					<button
-						type="submit"
-						class:bg-orange-600={!loading}
-						class:hover:bg-orange-500={!loading}
-						disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
-					>
-					<button on:click|preventDefault={() => installRepositories(source)}
-						>Change GitHub App Settings</button
-					>
-				{/if}
+	<form on:submit|preventDefault={handleSubmit} class="py-4">
+		<div class="flex space-x-1 pb-5 font-bold">
+			<div class="title">General</div>
+			{#if $session.isAdmin}
+				<button
+					type="submit"
+					class:bg-orange-600={!loading}
+					class:hover:bg-orange-500={!loading}
+					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
+				>
+				<button on:click|preventDefault={() => installRepositories(source)}
+					>Change GitHub App Settings</button
+				>
+			{/if}
+		</div>
+		<div class="grid grid-flow-row gap-2 px-10">
+			<div class="grid grid-cols-2 items-center mt-2">
+				<label for="name" class="text-base font-bold text-stone-100">Name</label>
+				<input name="name" id="name" required bind:value={source.name} />
 			</div>
-			<div class="grid grid-flow-row gap-2 px-10">
-				<div class="mt-2 grid grid-cols-3 items-center">
-					<label for="name">Name</label>
-					<div class="col-span-2 ">
-						<input name="name" id="name" required bind:value={source.name} />
-					</div>
-				</div>
-			</div>
-		</form>
-	</div>
+		</div>
+	</form>
 {:else}
 	<button on:click={() => installRepositories(source)}>Install Repositories</button>
 {/if}

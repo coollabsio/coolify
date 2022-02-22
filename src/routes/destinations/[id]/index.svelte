@@ -42,5 +42,6 @@
 	<span class="arrow-right-applications px-1">></span>
 	<span class="pr-2">{destination.name}</span>
 </div>
-
-<LocalDocker bind:destination {settings} {state} />
+<div class="mx-auto max-w-4xl px-6">
+	<LocalDocker bind:destination {settings} {state} />
+</div>

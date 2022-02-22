@@ -29,7 +29,7 @@
 	{#if !isPasswordField || showPassword}
 		{#if textarea}
 			<textarea
-				rows="3"
+				rows="5"
 				class={disabledClass}
 				{placeholder}
 				type="text"
