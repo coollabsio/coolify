@@ -533,7 +533,7 @@
 		</div>
 	</nav>
 	<select
-		class="fixed right-0 bottom-0 z-50 m-2 p-2 px-4"
+		class="fixed right-0 bottom-0 z-50 m-2 w-64 bg-opacity-30 p-2 px-4"
 		bind:value={selectedTeamId}
 		on:change={switchTeam}
 	>

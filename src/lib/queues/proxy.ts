@@ -101,7 +101,6 @@ export default async function () {
 			if (isHttps) await forceSSLOnApplication(domain);
 		}
 	} catch (error) {
-		console.log(error);
 		throw error;
 	}
 }

@@ -57,7 +57,7 @@
 	}
 </script>
 
-<div class="mx-auto max-w-4xl px-6">
+<div class="mx-auto max-w-4xl px-6 pb-12">
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
 		<div class="flex space-x-1 pb-5 font-bold">
 			<div class="title">General</div>
