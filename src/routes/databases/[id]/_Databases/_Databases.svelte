@@ -121,7 +121,7 @@
 			</div>
 		</div>
 
-		<div class="grid grid-flow-row gap-2 px-10">
+		<div class="grid grid-flow-row gap-2 px-10 pt-2">
 			<div class="grid grid-cols-2 items-center">
 				<label for="host" class="text-base font-bold text-stone-100">Host</label>
 				<CopyPasswordField
