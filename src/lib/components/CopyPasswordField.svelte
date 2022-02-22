@@ -15,7 +15,6 @@
 	export let placeholder = '';
 
 	let disabledClass = 'bg-coolback disabled:bg-coolblack';
-	let actionsShow = false;
 	let isHttps = browser && window.location.protocol === 'https:';
 
 	function showActions(value) {
