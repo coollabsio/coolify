@@ -9,10 +9,9 @@ import {
 	configureSimpleServiceProxyOn,
 	reloadHaproxy,
 	setWwwRedirection,
-	startHttpProxy,
-	startTcpProxy
+	startHttpProxy
 } from '$lib/haproxy';
-import getPort from 'get-port';
+import getPort, { portNumbers } from 'get-port';
 import { getDomain } from '$lib/components/common';
 import { ErrorHandler } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
@@ -35,14 +34,20 @@ export const post: RequestHandler = async (event) => {
 			minio: { rootUser, rootUserPassword }
 		} = service;
 
+		const data = await db.prisma.setting.findFirst();
+		const { minPort, maxPort } = data;
+
 		const domain = getDomain(fqdn);
 		const isHttps = fqdn.startsWith('https://');
 
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
-		const publicPort = await getPort();
+
+		const publicPort = await getPort({ port: portNumbers(minPort, maxPort) });
+
 		const consolePort = 9001;
 		const apiPort = 9000;
+
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 
 		const config = {

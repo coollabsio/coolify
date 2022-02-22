@@ -98,7 +98,7 @@
 		updateStatus.loading = true;
 		try {
 			await post(`/update.json`, { type: 'update', latestVersion });
-			toast.push('Update completed.<br>Waiting for the new version to start...');
+			toast.push('Update completed.<br><br>Waiting for the new version to start...');
 			let reachable = false;
 			let tries = 0;
 			do {
@@ -444,7 +444,8 @@
 						</button>
 					{/if}
 				{/if}
-
+			</div>
+			<div class="flex flex-col space-y-4 py-2">
 				<a
 					sveltekit:prefetch
 					href="/teams"
@@ -519,20 +520,20 @@
 						<path d="M7 12h14l-3 -3m0 6l3 -3" />
 					</svg>
 				</div>
-			</div>
-			<div
-				class="w-full text-center font-bold text-stone-400 hover:bg-coolgray-200 hover:text-white"
-			>
-				<a
-					class="text-[10px] no-underline"
-					href={`https://github.com/coollabsio/coolify/releases/tag/v${$session.version}`}
-					target="_blank">v{$session.version}</a
+				<div
+					class="w-full text-center font-bold text-stone-400 hover:bg-coolgray-200 hover:text-white"
 				>
+					<a
+						class="text-[10px] no-underline"
+						href={`https://github.com/coollabsio/coolify/releases/tag/v${$session.version}`}
+						target="_blank">v{$session.version}</a
+					>
+				</div>
 			</div>
 		</div>
 	</nav>
 	<select
-		class="fixed right-0 bottom-0 z-50 m-2 p-2 px-4"
+		class="fixed right-0 bottom-0 z-50 m-2 w-64 bg-opacity-30 p-2 px-4"
 		bind:value={selectedTeamId}
 		on:change={switchTeam}
 	>

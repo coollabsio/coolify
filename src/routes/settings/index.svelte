@@ -35,6 +35,9 @@
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
 	let dualCerts = settings.dualCerts;
 
+	let minPort = settings.minPort;
+	let maxPort = settings.maxPort;
+
 	let fqdn = settings.fqdn;
 	let isFqdnSet = !!settings.fqdn;
 	let loading = {
@@ -75,7 +78,11 @@
 			if (fqdn) {
 				await post(`/settings/check.json`, { fqdn });
 				await post(`/settings.json`, { fqdn });
-				return window.location.reload();
+			}
+			if (minPort !== settings.minPort || maxPort !== settings.maxPort) {
+				await post(`/settings.json`, { minPort, maxPort });
+				settings.minPort = minPort;
+				settings.maxPort = maxPort;
 			}
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -90,9 +97,9 @@
 </div>
 {#if $session.teamId === '0'}
 	<div class="mx-auto max-w-4xl px-6">
-		<form on:submit|preventDefault={handleSubmit}>
-			<div class="flex space-x-1 py-6 font-bold">
-				<div class="title">Global Settings</div>
+		<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
+			<div class="flex space-x-1 py-6">
+				<div class="title font-bold">Global Settings</div>
 				<button
 					type="submit"
 					disabled={loading.save}
@@ -112,7 +119,12 @@
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
 				<div class="grid grid-cols-2 items-start">
-					<div class="pt-2 text-base font-bold text-stone-100">Domain (FQDN)</div>
+					<div class="flex-col">
+						<div class="pt-2 text-base font-bold text-stone-100">Domain (FQDN)</div>
+						<Explainer
+							text="If you specify <span class='text-yellow-500 font-bold'>https</span>, Coolify will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-yellow-500 font-bold'>www</span>, Coolify will be redirected (302) from non-www and vice versa."
+						/>
+					</div>
 					<div class="justify-start text-left">
 						<input
 							bind:value={fqdn}
@@ -122,10 +134,31 @@
 							id="fqdn"
 							pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 							placeholder="eg: https://coolify.io"
-							required
 						/>
+					</div>
+				</div>
+				<div class="grid grid-cols-2 items-start py-6">
+					<div class="flex-col">
+						<div class="pt-2 text-base font-bold text-stone-100">Public Port Range</div>
 						<Explainer
-							text="If you specify <span class='text-yellow-500 font-bold'>https</span>, Coolify will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-yellow-500 font-bold'>www</span>, Coolify will be redirected (302) from non-www and vice versa."
+							text="Ports used to expose databases/services/internal services.<br> Add them to your firewall (if applicable).<br><br>You can specify a range of ports, eg: <span class='text-yellow-500 font-bold'>9000-9100</span>"
+						/>
+					</div>
+					<div class="mx-auto flex-row items-center justify-center space-y-2">
+						<input
+							class="h-8 w-20 px-2"
+							type="number"
+							bind:value={minPort}
+							min="1024"
+							max={maxPort}
+						/>
+						-
+						<input
+							class="h-8 w-20 px-2"
+							type="number"
+							bind:value={maxPort}
+							min={minPort}
+							max="65543"
 						/>
 					</div>
 				</div>
@@ -135,7 +168,7 @@
 						disabled={isFqdnSet}
 						bind:setting={dualCerts}
 						title="Generate SSL for www and non-www?"
-						description="It will generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-yellow-400'>both DNS entries</span> set in advance.<br><br>Useful if you expect to have visitors on both."
+						description="It will generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-yellow-500'>both DNS entries</span> set in advance.<br><br>Useful if you expect to have visitors on both."
 						on:click={() => !isFqdnSet && changeSettings('dualCerts')}
 					/>
 				</div>

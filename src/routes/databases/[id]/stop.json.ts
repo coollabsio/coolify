@@ -15,6 +15,7 @@ export const post: RequestHandler = async (event) => {
 		const everStarted = await stopDatabase(database);
 		if (everStarted) await stopTcpHttpProxy(database.destinationDocker, database.publicPort);
 		await db.setDatabase({ id, isPublic: false });
+		await db.prisma.database.update({ where: { id }, data: { publicPort: null } });
 
 		return {
 			status: 200

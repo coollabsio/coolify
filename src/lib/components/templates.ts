@@ -1,16 +1,146 @@
-const defaultBuildAndDeploy = {
-	installCommand: 'yarn install',
-	buildCommand: 'yarn build',
-	startCommand: 'yarn start'
-};
-export const buildPacks = [
-	{
+function defaultBuildAndDeploy(packageManager) {
+	return {
+		installCommand:
+			packageManager === 'npm' ? `${packageManager} run install` : `${packageManager} install`,
+		buildCommand:
+			packageManager === 'npm' ? `${packageManager} run build` : `${packageManager} build`,
+		startCommand:
+			packageManager === 'npm' ? `${packageManager} run start` : `${packageManager} start`
+	};
+}
+export function findBuildPack(pack, packageManager = 'npm') {
+	const metaData = buildPacks.find((b) => b.name === pack);
+	if (pack === 'node') {
+		return {
+			...metaData,
+			installCommand: null,
+			buildCommand: null,
+			startCommand: null,
+			publishDirectory: null,
+			port: null
+		};
+	}
+	if (pack === 'static') {
+		return {
+			...metaData,
+			installCommand: null,
+			buildCommand: null,
+			startCommand: null,
+			publishDirectory: null,
+			port: 80
+		};
+	}
+	if (pack === 'docker') {
+		return {
+			...metaData,
+			installCommand: null,
+			buildCommand: null,
+			startCommand: null,
+			publishDirectory: null,
+			port: null
+		};
+	}
+	if (pack === 'svelte') {
+		return {
+			...metaData,
+			...defaultBuildAndDeploy(packageManager),
+			publishDirectory: 'public',
+			port: 80
+		};
+	}
+	if (pack === 'nestjs') {
+		return {
+			...metaData,
+			...defaultBuildAndDeploy(packageManager),
+			startCommand:
+				packageManager === 'npm' ? 'npm run start:prod' : `${packageManager} run start:prod`,
+			publishDirectory: null,
+			port: 3000
+		};
+	}
+	if (pack === 'react') {
+		return {
+			...metaData,
+			...defaultBuildAndDeploy(packageManager),
+			publishDirectory: 'build',
+			port: 80
+		};
+	}
+	if (pack === 'nextjs') {
+		return {
+			...metaData,
+			...defaultBuildAndDeploy(packageManager),
+			publishDirectory: null,
+			port: 3000
+		};
+	}
+	if (pack === 'gatsby') {
+		return {
+			...metaData,
+			...defaultBuildAndDeploy(packageManager),
+			publishDirectory: 'public',
+			port: 80
+		};
+	}
+	if (pack === 'vuejs') {
+		return {
+			...metaData,
+			...defaultBuildAndDeploy(packageManager),
+			publishDirectory: 'dist',
+			port: 80
+		};
+	}
+	if (pack === 'nuxtjs') {
+		return {
+			...metaData,
+			...defaultBuildAndDeploy(packageManager),
+			publishDirectory: null,
+			port: 3000
+		};
+	}
+	if (pack === 'preact') {
+		return {
+			...metaData,
+			...defaultBuildAndDeploy(packageManager),
+			publishDirectory: 'build',
+			port: 80
+		};
+	}
+	if (pack === 'php') {
+		return {
+			...metaData,
+			installCommand: null,
+			buildCommand: null,
+			startCommand: null,
+			publishDirectory: null,
+			port: 80
+		};
+	}
+	if (pack === 'rust') {
+		return {
+			...metaData,
+			installCommand: null,
+			buildCommand: null,
+			startCommand: null,
+			publishDirectory: null,
+			port: 3000
+		};
+	}
+	return {
 		name: 'node',
+		fancyName: 'Node.js',
+		hoverColor: 'hover:bg-green-700',
+		color: 'bg-green-700',
 		installCommand: null,
 		buildCommand: null,
 		startCommand: null,
 		publishDirectory: null,
-		port: null,
+		port: null
+	};
+}
+export const buildPacks = [
+	{
+		name: 'node',
 		fancyName: 'Node.js',
 		hoverColor: 'hover:bg-green-700',
 		color: 'bg-green-700'
@@ -18,103 +148,72 @@ export const buildPacks = [
 
 	{
 		name: 'static',
-		publishDirectory: 'dist',
-		port: 80,
 		fancyName: 'Static',
 		hoverColor: 'hover:bg-orange-700',
 		color: 'bg-orange-700'
 	},
 	{
 		name: 'docker',
-		installCommand: null,
-		buildCommand: null,
-		startCommand: null,
-		publishDirectory: null,
-		port: null,
 		fancyName: 'Docker',
 		hoverColor: 'hover:bg-sky-700',
 		color: 'bg-sky-700'
 	},
 	{
 		name: 'svelte',
-		...defaultBuildAndDeploy,
-		publishDirectory: 'public',
-		port: 80,
 		fancyName: 'Svelte',
 		hoverColor: 'hover:bg-orange-700',
 		color: 'bg-orange-700'
 	},
 	{
 		name: 'nestjs',
-		...defaultBuildAndDeploy,
-		startCommand: 'yarn start:prod',
-		port: 3000,
 		fancyName: 'NestJS',
 		hoverColor: 'hover:bg-red-700',
 		color: 'bg-red-700'
 	},
 	{
 		name: 'react',
-		...defaultBuildAndDeploy,
-		publishDirectory: 'build',
-		port: 80,
 		fancyName: 'React',
 		hoverColor: 'hover:bg-blue-700',
 		color: 'bg-blue-700'
 	},
 	{
 		name: 'nextjs',
-		...defaultBuildAndDeploy,
-		port: 3000,
 		fancyName: 'NextJS',
 		hoverColor: 'hover:bg-blue-700',
 		color: 'bg-blue-700'
 	},
 	{
 		name: 'gatsby',
-		...defaultBuildAndDeploy,
-		publishDirectory: 'public',
-		port: 80,
 		fancyName: 'Gatsby',
 		hoverColor: 'hover:bg-blue-700',
 		color: 'bg-blue-700'
 	},
 	{
 		name: 'vuejs',
-		...defaultBuildAndDeploy,
-		publishDirectory: 'dist',
-		port: 80,
 		fancyName: 'VueJS',
 		hoverColor: 'hover:bg-green-700',
 		color: 'bg-green-700'
 	},
 	{
 		name: 'nuxtjs',
-		...defaultBuildAndDeploy,
-		port: 3000,
 		fancyName: 'NuxtJS',
 		hoverColor: 'hover:bg-green-700',
 		color: 'bg-green-700'
 	},
 	{
 		name: 'preact',
-		...defaultBuildAndDeploy,
-		publishDirectory: 'build',
-		port: 80,
 		fancyName: 'Preact',
 		hoverColor: 'hover:bg-blue-700',
 		color: 'bg-blue-700'
 	},
 	{
 		name: 'php',
-		port: 80,
 		fancyName: 'PHP',
 		hoverColor: 'hover:bg-indigo-700',
 		color: 'bg-indigo-700'
 	},
 	{
 		name: 'rust',
-		port: 3000,
 		fancyName: 'Rust',
 		hoverColor: 'hover:bg-pink-700',
 		color: 'bg-pink-700'

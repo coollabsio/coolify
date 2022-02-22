@@ -1,9 +1,9 @@
 import { decrypt, encrypt } from '$lib/crypto';
-import { dockerInstance } from '$lib/docker';
+import * as db from '$lib/database';
 import cuid from 'cuid';
 import { generatePassword } from '.';
 import { prisma, ErrorHandler } from './common';
-import getPort from 'get-port';
+import getPort, { portNumbers } from 'get-port';
 import { asyncExecShell, getEngine, removeContainer } from '$lib/common';
 
 export async function listDatabases(teamId) {
@@ -16,24 +16,9 @@ export async function newDatabase({ name, teamId }) {
 	const rootUserPassword = encrypt(generatePassword());
 	const defaultDatabase = cuid();
 
-	let publicPort = await getPort();
-	let i = 0;
-
-	do {
-		const usedPorts = await prisma.database.findMany({ where: { publicPort } });
-		if (usedPorts.length === 0) break;
-		publicPort = await getPort();
-		i++;
-	} while (i < 10);
-	if (i === 9) {
-		throw {
-			error: 'No free port found!? Is it possible?'
-		};
-	}
 	return await prisma.database.create({
 		data: {
 			name,
-			publicPort,
 			defaultDatabase,
 			dbUser,
 			dbUserPassword,

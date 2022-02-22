@@ -61,12 +61,12 @@
 		<div class="w-full text-center font-bold">Loading...</div>
 	{:else if app.foundByDomain}
 		<div class="w-full bg-coolgray-200 text-xs">
-			<span class="text-red-500">Domain</span> already configured for
+			<span class="text-red-500">Domain</span> already used for
 			<span class="text-red-500">{app.foundName}</span>
 		</div>
 	{:else if app.foundByRepository}
 		<div class="w-full bg-coolgray-200 text-xs">
-			<span class="text-red-500">Repository</span> already configured for
+			<span class="text-red-500">Repository</span> already used for
 			<span class="text-red-500">{app.foundName}</span>
 		</div>
 	{:else}

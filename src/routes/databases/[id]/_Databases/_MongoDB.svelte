@@ -8,7 +8,7 @@
 </div>
 <div class="space-y-2 px-10">
 	<div class="grid grid-cols-2 items-center">
-		<label for="rootUser">Root User</label>
+		<label for="rootUser" class="text-base font-bold text-stone-100">Root User</label>
 		<CopyPasswordField
 			placeholder="Generated automatically after start"
 			id="rootUser"
@@ -19,7 +19,7 @@
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center">
-		<label for="rootUserPassword">Root's Password</label>
+		<label for="rootUserPassword" class="text-base font-bold text-stone-100">Root's Password</label>
 		<CopyPasswordField
 			placeholder="Generated automatically after start"
 			isPasswordField={true}

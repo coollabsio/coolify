@@ -122,80 +122,72 @@
 	}
 </script>
 
-<div class="flex justify-center px-6 pb-8">
-	<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
-		<div class="flex h-8 items-center space-x-2">
-			<div class="text-xl font-bold text-white">Configuration</div>
-			<button
-				type="submit"
-				class="bg-sky-600 hover:bg-sky-500"
-				class:bg-sky-600={!loading}
-				class:hover:bg-sky-500={!loading}
-				disabled={loading}
-				>{loading ? 'Saving...' : 'Save'}
-			</button>
-			<button
-				class={restarting ? '' : 'bg-red-600 hover:bg-red-500'}
-				disabled={restarting}
-				on:click|preventDefault={forceRestartProxy}
-				>{restarting ? 'Restarting... please wait...' : 'Force restart proxy'}</button
-			>
-			<!-- <button type="button" class="bg-coollabs hover:bg-coollabs-100" on:click={scanApps}
+<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
+	<div class="flex space-x-1 pb-5">
+		<div class="title font-bold">Configuration</div>
+		<button
+			type="submit"
+			class="bg-sky-600 hover:bg-sky-500"
+			class:bg-sky-600={!loading}
+			class:hover:bg-sky-500={!loading}
+			disabled={loading}
+			>{loading ? 'Saving...' : 'Save'}
+		</button>
+		<button
+			class={restarting ? '' : 'bg-red-600 hover:bg-red-500'}
+			disabled={restarting}
+			on:click|preventDefault={forceRestartProxy}
+			>{restarting ? 'Restarting... please wait...' : 'Force restart proxy'}</button
+		>
+		<!-- <button type="button" class="bg-coollabs hover:bg-coollabs-100" on:click={scanApps}
 				>Scan for applications</button
 			> -->
-		</div>
-		<div class="grid grid-cols-3 items-center">
-			<label for="name">Name</label>
-			<div class="col-span-2">
-				<input name="name" placeholder="name" bind:value={destination.name} />
-			</div>
-		</div>
+	</div>
+	<div class="grid grid-cols-2 items-center px-10 ">
+		<label for="name" class="text-base font-bold text-stone-100">Name</label>
+		<input name="name" placeholder="name" bind:value={destination.name} />
+	</div>
 
-		<div class="grid grid-cols-3 items-center">
-			<label for="engine">Engine</label>
-			<div class="col-span-2">
-				<CopyPasswordField
-					id="engine"
-					readonly
-					disabled
-					name="engine"
-					placeholder="eg: /var/run/docker.sock"
-					value={destination.engine}
-				/>
-			</div>
-		</div>
-		<!-- <div class="flex items-center">
+	<div class="grid grid-cols-2 items-center px-10">
+		<label for="engine" class="text-base font-bold text-stone-100">Engine</label>
+		<CopyPasswordField
+			id="engine"
+			readonly
+			disabled
+			name="engine"
+			placeholder="eg: /var/run/docker.sock"
+			value={destination.engine}
+		/>
+	</div>
+	<!-- <div class="flex items-center">
 			<label for="remoteEngine">Remote Engine?</label>
 			<input name="remoteEngine" type="checkbox" bind:checked={payload.remoteEngine} />
 		</div> -->
-		<div class="grid grid-cols-3 items-center">
-			<label for="network">Network</label>
-			<div class="col-span-2">
-				<CopyPasswordField
-					id="network"
-					readonly
-					disabled
-					name="network"
-					placeholder="default: coolify"
-					value={destination.network}
-				/>
-			</div>
-		</div>
-		<div class="grid grid-cols-2 items-center">
-			<Setting
-				disabled={cannotDisable}
-				bind:setting={destination.isCoolifyProxyUsed}
-				on:click={changeProxySetting}
-				title="Use Coolify Proxy?"
-				description={`This will install a proxy on the destination to allow you to access your applications and services without any manual configuration. Databases will have their own proxy. <br><br>${
-					cannotDisable
-						? '<span class="font-bold text-white">You cannot disable this proxy as FQDN is configured for Coolify.</span>'
-						: ''
-				}`}
-			/>
-		</div>
-	</form>
-</div>
+	<div class="grid grid-cols-2 items-center px-10">
+		<label for="network" class="text-base font-bold text-stone-100">Network</label>
+		<CopyPasswordField
+			id="network"
+			readonly
+			disabled
+			name="network"
+			placeholder="default: coolify"
+			value={destination.network}
+		/>
+	</div>
+	<div class="grid grid-cols-2 items-center">
+		<Setting
+			disabled={cannotDisable}
+			bind:setting={destination.isCoolifyProxyUsed}
+			on:click={changeProxySetting}
+			title="Use Coolify Proxy?"
+			description={`This will install a proxy on the destination to allow you to access your applications and services without any manual configuration. Databases will have their own proxy. <br><br>${
+				cannotDisable
+					? '<span class="font-bold text-white">You cannot disable this proxy as FQDN is configured for Coolify.</span>'
+					: ''
+			}`}
+		/>
+	</div>
+</form>
 <!-- <div class="flex justify-center">
 	{#if payload.isCoolifyProxyUsed}
 		{#if state}

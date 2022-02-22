@@ -15,16 +15,12 @@
 	export let placeholder = '';
 
 	let disabledClass = 'bg-coolback disabled:bg-coolblack';
-	let actionsShow = false;
 	let isHttps = browser && window.location.protocol === 'https:';
 
-	function showActions(value) {
-		actionsShow = value;
-	}
 	function copyToClipboard() {
 		if (isHttps && navigator.clipboard) {
 			navigator.clipboard.writeText(value);
-			toast.push('Copied to clipboard');
+			toast.push('Copied to clipboard.');
 		}
 	}
 </script>
@@ -33,7 +29,7 @@
 	{#if !isPasswordField || showPassword}
 		{#if textarea}
 			<textarea
-				rows="3"
+				rows="5"
 				class={disabledClass}
 				{placeholder}
 				type="text"

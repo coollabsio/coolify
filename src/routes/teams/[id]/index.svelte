@@ -47,7 +47,7 @@
 			await post(`/teams/${id}/invitation/invite.json`, {
 				teamId: team.id,
 				teamName: invitation.teamName,
-				email: invitation.email,
+				email: invitation.email.toLowerCase(),
 				permission: invitation.permission
 			});
 			return window.location.reload();
@@ -98,39 +98,40 @@
 	<span class="arrow-right-applications px-1 text-cyan-500">></span>
 	<span class="pr-2">{team.name}</span>
 </div>
-<div class="mx-auto max-w-4xl">
-	<form on:submit|preventDefault={handleSubmit}>
-		<div class="flex space-x-1 p-6 font-bold">
-			<div class="title">Settings</div>
-			<div class="text-center">
-				<button class="bg-cyan-600 hover:bg-cyan-500" type="submit">Save</button>
+<div class="mx-auto max-w-4xl px-6">
+	<form on:submit|preventDefault={handleSubmit} class=" py-4">
+		<div class="flex space-x-1 pb-5">
+			<div class="title font-bold">Settings</div>
+			<button class="bg-cyan-600 hover:bg-cyan-500" type="submit">Save</button>
+		</div>
+		<div class="grid grid-flow-row gap-2 px-10">
+			<div class="mt-2 grid grid-cols-2">
+				<div class="flex-col">
+					<label for="name" class="text-base font-bold text-stone-100">Name</label>
+					{#if team.id === '0'}
+						<Explainer
+							customClass="w-full"
+							text="This is the <span class='text-red-500 font-bold'>root</span> team. That means members of this group can manage instance wide settings and have all the priviliges in Coolify (imagine like root user on Linux)."
+						/>
+					{/if}
+				</div>
+				<input id="name" name="name" placeholder="name" bind:value={team.name} />
 			</div>
 		</div>
-
-		<div class="mx-2 flex items-center space-x-2 px-4 sm:px-6">
-			<label for="name">Name</label>
-			<input id="name" name="name" placeholder="name" bind:value={team.name} />
-		</div>
-		{#if team.id === '0'}
-			<div class="px-8 pt-4 text-left">
-				<Explainer
-					customClass="w-full"
-					text="This is the <span class='text-red-500 font-bold'>root</span> team. That means members of this group can manage instance wide settings and have all the priviliges in Coolify (imagine like root user on Linux)."
-				/>
-			</div>
-		{/if}
 	</form>
 
-	<div class="flex space-x-1 py-5 px-6 pt-10 font-bold">
+	<div class="flex space-x-1 py-5 pt-10 font-bold">
 		<div class="title">Members</div>
 	</div>
 	<div class="px-4 sm:px-6">
-		<table class="mx-2 w-full table-auto text-left">
-			<tr class="h-8 border-b border-coolgray-400">
-				<th scope="col">Email</th>
-				<th scope="col">Permission</th>
-				<th scope="col" class="text-center">Actions</th>
-			</tr>
+		<table class="w-full border-separate text-left">
+			<thead>
+				<tr class="h-8 border-b border-coolgray-400">
+					<th scope="col">Email</th>
+					<th scope="col">Permission</th>
+					<th scope="col" class="text-center">Actions</th>
+				</tr>
+			</thead>
 			{#each permissions as permission}
 				<tr class="text-xs">
 					<td class="py-4"
@@ -176,25 +177,18 @@
 			{/each}
 		</table>
 	</div>
-</div>
-{#if $session.isAdmin}
-	<div class="mx-auto max-w-4xl pt-8">
-		<form on:submit|preventDefault={sendInvitation}>
-			<div class="flex space-x-1 p-6">
-				<div>
+	{#if $session.isAdmin}
+		<form on:submit|preventDefault={sendInvitation} class="py-5 pt-10">
+			<div class="flex space-x-1">
+				<div class="flex space-x-1">
 					<div class="title font-bold">Invite new member</div>
-					<div class="text-left">
-						<Explainer
-							customClass="w-56"
-							text="You can only invite registered users at the moment - will be extended soon."
-						/>
-					</div>
-				</div>
-				<div class="pt-1 text-center">
 					<button class="bg-cyan-600 hover:bg-cyan-500" type="submit">Send invitation</button>
 				</div>
 			</div>
-			<div class="flex-col space-y-2 px-4 sm:px-6">
+			<Explainer
+				text="You can only invite registered users at the moment - will be extended soon."
+			/>
+			<div class="flex-col space-y-2 px-4 pt-5 sm:px-6">
 				<div class="flex space-x-0">
 					<input
 						bind:value={invitation.email}
@@ -205,18 +199,20 @@
 					<div class="flex-1" />
 					<button
 						on:click={() => (invitation.permission = 'read')}
-						class="rounded-none rounded-l"
+						class="rounded-none rounded-l border border-dashed border-transparent"
 						type="button"
+						class:border-coolgray-300={invitation.permission !== 'read'}
 						class:bg-pink-500={invitation.permission === 'read'}>Read</button
 					>
 					<button
 						on:click={() => (invitation.permission = 'admin')}
-						class="rounded-none rounded-r"
+						class="rounded-none rounded-r border border-dashed border-transparent"
 						type="button"
+						class:border-coolgray-300={invitation.permission !== 'admin'}
 						class:bg-red-500={invitation.permission === 'admin'}>Admin</button
 					>
 				</div>
 			</div>
 		</form>
-	</div>
-{/if}
+	{/if}
+</div>

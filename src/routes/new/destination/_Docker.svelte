@@ -5,7 +5,7 @@
 
 	import { post } from '$lib/api';
 	import Setting from '$lib/components/Setting.svelte';
-	import { enhance, errorNotification } from '$lib/form';
+	import { errorNotification } from '$lib/form';
 
 	let loading = false;
 
@@ -24,8 +24,8 @@
 
 <div class="flex justify-center px-6 pb-8">
 	<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
-		<div class="flex h-8 items-center space-x-2">
-			<div class="text-xl font-bold text-white">Configuration</div>
+		<div class="flex items-center space-x-2 pb-5">
+			<div class="title font-bold">Configuration</div>
 			<button
 				type="submit"
 				class:bg-sky-600={!loading}
@@ -38,24 +38,20 @@
 					: 'Save'}</button
 			>
 		</div>
-		<div class="grid grid-cols-3 items-center">
-			<label for="name">Name</label>
-			<div class="col-span-2">
-				<input required name="name" placeholder="name" bind:value={payload.name} />
-			</div>
+		<div class="mt-2 grid grid-cols-2 items-center px-10">
+			<label for="name" class="text-base font-bold text-stone-100">Name</label>
+			<input required name="name" placeholder="name" bind:value={payload.name} />
 		</div>
 
-		<div class="grid grid-cols-3 items-center">
-			<label for="engine">Engine</label>
-			<div class="col-span-2">
-				<input
-					required
-					name="engine"
-					placeholder="eg: /var/run/docker.sock"
-					bind:value={payload.engine}
-				/>
-				<!-- <Explainer text="You can use remote Docker Engine with over SSH." /> -->
-			</div>
+		<div class="grid grid-cols-2 items-center px-10">
+			<label for="engine" class="text-base font-bold text-stone-100">Engine</label>
+			<input
+				required
+				name="engine"
+				placeholder="eg: /var/run/docker.sock"
+				bind:value={payload.engine}
+			/>
+			<!-- <Explainer text="You can use remote Docker Engine with over SSH." /> -->
 		</div>
 		<!-- <div class="flex items-center">
 			<label for="remoteEngine">Remote Docker Engine?</label>
@@ -75,27 +71,17 @@
 				</div>
 			</div>
 		{/if} -->
-		<div class="grid grid-cols-3 items-center">
-			<label for="network">Network</label>
-			<div class="col-span-2">
-				<input
-					required
-					name="network"
-					placeholder="default: coolify"
-					bind:value={payload.network}
-				/>
-			</div>
+		<div class="grid grid-cols-2 items-center px-10">
+			<label for="network" class="text-base font-bold text-stone-100">Network</label>
+			<input required name="network" placeholder="default: coolify" bind:value={payload.network} />
 		</div>
-		<div class="flex justify-start">
-			<ul class="mt-2 divide-y divide-stone-800">
-				<Setting
-					bind:setting={payload.isCoolifyProxyUsed}
-					on:click={() => (payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed)}
-					isPadding={false}
-					title="Use Coolify Proxy?"
-					description="This will install a proxy on the destination to allow you to access your applications and services without any manual configuration (recommended for Docker). Databases will have their own proxy."
-				/>
-			</ul>
+		<div class="grid grid-cols-2 items-center">
+			<Setting
+				bind:setting={payload.isCoolifyProxyUsed}
+				on:click={() => (payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed)}
+				title="Use Coolify Proxy?"
+				description="This will install a proxy on the destination to allow you to access your applications and services without any manual configuration (recommended for Docker).<br><br>Databases will have their own proxy."
+			/>
 		</div>
 	</form>
 </div>

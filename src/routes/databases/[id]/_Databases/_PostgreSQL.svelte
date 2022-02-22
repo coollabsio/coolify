@@ -8,7 +8,7 @@
 </div>
 <div class="space-y-2 px-10">
 	<div class="grid grid-cols-2 items-center">
-		<label for="defaultDatabase">Default Database</label>
+		<label for="defaultDatabase" class="text-base font-bold text-stone-100">Default Database</label>
 		<CopyPasswordField
 			required
 			readonly={database.defaultDatabase}
@@ -20,7 +20,7 @@
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center">
-		<label for="dbUser">User</label>
+		<label for="dbUser" class="text-base font-bold text-stone-100">User</label>
 		<CopyPasswordField
 			readonly
 			disabled
@@ -31,7 +31,7 @@
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center">
-		<label for="dbUserPassword">Password</label>
+		<label for="dbUserPassword" class="text-base font-bold text-stone-100">Password</label>
 		<CopyPasswordField
 			readonly
 			disabled

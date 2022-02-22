@@ -8,7 +8,7 @@
 </div>
 <div class="space-y-2 px-10">
 	<div class="grid grid-cols-2 items-center">
-		<label for="dbUserPassword">Password</label>
+		<label for="dbUserPassword" class="text-base font-bold text-stone-100">Password</label>
 		<CopyPasswordField
 			disabled
 			readonly

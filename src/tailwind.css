@@ -35,14 +35,14 @@ main,
 }
 
 input {
-	@apply h-12 w-96 rounded border border-transparent bg-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:border disabled:border-dashed disabled:border-coolgray-300 disabled:bg-transparent md:text-sm;
+	@apply h-12 w-96 rounded border border-transparent bg-transparent bg-coolgray-200 p-2 pr-20 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:border disabled:border-dashed disabled:border-coolgray-300 disabled:bg-transparent md:text-sm;
 }
 textarea {
-	@apply w-96 rounded border border-transparent bg-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:border disabled:border-dashed disabled:border-coolgray-300 disabled:bg-transparent md:text-sm;
+	@apply min-w-[24rem] rounded border border-transparent bg-transparent bg-coolgray-200 p-2 pr-20 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:border disabled:border-dashed disabled:border-coolgray-300 disabled:bg-transparent md:text-sm;
 }
 
 select {
-	@apply rounded bg-coolgray-200 p-2 text-xs font-bold tracking-tight text-white outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:text-stone-600 md:text-sm;
+	@apply h-12 w-96 rounded bg-coolgray-200 p-2 text-xs font-bold tracking-tight text-white outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:text-stone-600 md:text-sm;
 }
 
 label {
