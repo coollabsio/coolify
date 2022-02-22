@@ -47,7 +47,7 @@
 			await post(`/teams/${id}/invitation/invite.json`, {
 				teamId: team.id,
 				teamName: invitation.teamName,
-				email: invitation.email,
+				email: invitation.email.toLowerCase(),
 				permission: invitation.permission
 			});
 			return window.location.reload();

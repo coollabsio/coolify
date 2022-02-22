@@ -18,7 +18,7 @@
 	async function handleSubmit() {
 		loading = true;
 		try {
-			const { teamId } = await post(`/login.json`, { email, password });
+			const { teamId } = await post(`/login.json`, { email: email.toLowerCase(), password });
 			if (teamId === '0') {
 				window.location.replace('/settings');
 			} else {
