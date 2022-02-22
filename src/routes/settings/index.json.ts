@@ -78,7 +78,7 @@ export const post: RequestHandler = async (event) => {
 		};
 	if (status === 401) return { status, body };
 
-	const { fqdn, isRegistrationEnabled, dualCerts } = await event.request.json();
+	const { fqdn, isRegistrationEnabled, dualCerts, minPort, maxPort } = await event.request.json();
 	try {
 		const {
 			id,
@@ -118,6 +118,9 @@ export const post: RequestHandler = async (event) => {
 				where: { engine: '/var/run/docker.sock' },
 				data: { isCoolifyProxyUsed: true }
 			});
+		}
+		if (minPort && maxPort) {
+			await db.prisma.setting.update({ where: { id }, data: { minPort, maxPort } });
 		}
 
 		return {

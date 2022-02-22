@@ -20,7 +20,7 @@
 	function copyToClipboard() {
 		if (isHttps && navigator.clipboard) {
 			navigator.clipboard.writeText(value);
-			toast.push('Copied to clipboard');
+			toast.push('Copied to clipboard.');
 		}
 	}
 </script>

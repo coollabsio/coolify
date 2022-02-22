@@ -98,7 +98,7 @@
 		updateStatus.loading = true;
 		try {
 			await post(`/update.json`, { type: 'update', latestVersion });
-			toast.push('Update completed.<br>Waiting for the new version to start...');
+			toast.push('Update completed.<br><br>Waiting for the new version to start...');
 			let reachable = false;
 			let tries = 0;
 			do {
