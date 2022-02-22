@@ -17,9 +17,6 @@
 	let disabledClass = 'bg-coolback disabled:bg-coolblack';
 	let isHttps = browser && window.location.protocol === 'https:';
 
-	function showActions(value) {
-		actionsShow = value;
-	}
 	function copyToClipboard() {
 		if (isHttps && navigator.clipboard) {
 			navigator.clipboard.writeText(value);
