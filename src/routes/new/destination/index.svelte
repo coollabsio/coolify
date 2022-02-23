@@ -1,6 +1,6 @@
 <script>
 	import Docker from './_Docker.svelte';
-
+	import cuid from 'cuid';
 	let payload = {};
 	let selected = 'docker';
 
@@ -15,7 +15,7 @@
 					user: 'root',
 					port: 22,
 					privateKey: null,
-					network: 'coolify',
+					network: cuid(),
 					isCoolifyProxyUsed: true
 				};
 				break;

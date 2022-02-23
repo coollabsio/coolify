@@ -61,8 +61,8 @@
 		class:hover:text-red-500={$session.isAdmin}
 		class="icons tooltip-bottom bg-transparent text-sm"
 		data-tooltip={$session.isAdmin
-			? 'Delete Git Source'
-			: 'You do not have permission to delete a Git Source'}><DeleteIcon /></button
+			? 'Delete Destination'
+			: 'You do not have permission to delete this destination'}><DeleteIcon /></button
 	>
 </nav>
 <slot />
