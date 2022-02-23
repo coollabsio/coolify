@@ -45,7 +45,7 @@
 	export let readOnly;
 
 	if (browser && window.location.hostname === 'demo.coolify.io') {
-		service.fqdn = `${cuid()}.demo.coolify.io`;
+		service.fqdn = `http://${cuid()}.demo.coolify.io`;
 	}
 </script>
 

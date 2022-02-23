@@ -58,7 +58,7 @@
 	let dualCerts = application.settings.dualCerts;
 
 	if (browser && window.location.hostname === 'demo.coolify.io') {
-		application.fqdn = `${cuid()}.demo.coolify.io`;
+		application.fqdn = `http://${cuid()}.demo.coolify.io`;
 	}
 
 	onMount(() => {
