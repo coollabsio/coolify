@@ -10,6 +10,7 @@ import nuxtjs from './nuxtjs';
 import vuejs from './vuejs';
 import php from './php';
 import rust from './rust';
+import astro from './static';
 
 export {
 	node,
@@ -23,5 +24,6 @@ export {
 	nuxtjs,
 	vuejs,
 	php,
-	rust
+	rust,
+	astro
 };

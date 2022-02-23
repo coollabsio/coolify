@@ -35,6 +35,7 @@
 	import { get } from '$lib/api';
 	import { errorNotification } from '$lib/form';
 	import { gitTokens } from '$lib/store';
+	import { browser } from '$app/env';
 
 	let scanning = true;
 	let foundConfig = null;
