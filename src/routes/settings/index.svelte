@@ -75,7 +75,7 @@
 	async function handleSubmit() {
 		try {
 			loading.save = true;
-			if (fqdn) {
+			if (fqdn !== settings.fqdn) {
 				await post(`/settings/check.json`, { fqdn });
 				await post(`/settings.json`, { fqdn });
 			}
