@@ -79,7 +79,7 @@ export async function login({ email, password }) {
 						create: {
 							id: uid,
 							name: uniqueName(),
-							destinationDocker: { connect: { network: cuid() } }
+							destinationDocker: { connect: { network: 'coolify' } }
 						}
 					},
 					permission: { create: { teamId: uid, permission: 'owner' } }
