@@ -2,6 +2,12 @@
 
 An open-source & self-hostable Heroku / Netlify alternative.
 
+## Demo instance
+
+https://demo.coolify.io/
+
+(If it is unresponsible, that means someone overloaded the server. 🙃)
+
 ## Installation
 
 Installation is automated with the following command:
