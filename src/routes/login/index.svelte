@@ -58,7 +58,7 @@
 					required
 				/>
 
-				<div class="flex space-x-2 h-8 items-center justify-center pt-14">
+				<div class="flex space-x-2 h-8 items-center justify-center pt-8">
 					<button
 						type="submit"
 						disabled={loading}
@@ -71,5 +71,15 @@
 				</div>
 			</form>
 		</div>
+		{#if browser && window.location.host === 'demo.coolify.io'}
+			<div class="pt-5 font-bold">
+				Registration is <span class="text-pink-500">open</span>, just fill in an email (does not
+				need to be live email address for the demo instance) and a password.
+			</div>
+			<div class="pt-5 font-bold">
+				All users gets an <span class="text-pink-500">own namespace</span>, so you won't be able to
+				access other users data.
+			</div>
+		{/if}
 	{/if}
 </div>

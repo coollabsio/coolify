@@ -45,7 +45,6 @@ export const del: RequestHandler = async (event) => {
 
 	const { fqdn } = await event.request.json();
 	let ip;
-	console.log(fqdn);
 	try {
 		ip = await dns.resolve(fqdn);
 	} catch (error) {
