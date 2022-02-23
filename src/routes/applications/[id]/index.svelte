@@ -50,6 +50,7 @@
 	let domainEl: HTMLInputElement;
 
 	let loading = false;
+	let forceSave = false;
 	let debug = application.settings.debug;
 	let previews = application.settings.previews;
 	let dualCerts = application.settings.dualCerts;
@@ -78,10 +79,13 @@
 	async function handleSubmit() {
 		loading = true;
 		try {
-			await post(`/applications/${id}/check.json`, { fqdn: application.fqdn });
+			await post(`/applications/${id}/check.json`, { fqdn: application.fqdn, forceSave });
 			await post(`/applications/${id}.json`, { ...application });
 			return window.location.reload();
 		} catch ({ error }) {
+			if (error.startsWith('DNS not set')) {
+				forceSave = true;
+			}
 			return errorNotification(error);
 		} finally {
 			loading = false;
@@ -167,8 +171,11 @@
 				<button
 					type="submit"
 					class:bg-green-600={!loading}
+					class:bg-orange-600={forceSave}
 					class:hover:bg-green-500={!loading}
-					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
+					class:hover:bg-orange-400={forceSave}
+					disabled={loading}
+					>{loading ? 'Saving...' : forceSave ? 'Are you sure to continue?' : 'Save'}</button
 				>
 			{/if}
 		</div>
@@ -249,7 +256,7 @@
 				<div class="flex-col">
 					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">Domain (FQDN)</label>
 					<Explainer
-						text="If you specify <span class='text-green-500 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-green-500 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application."
+						text="If you specify <span class='text-green-500 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-green-500 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application.<br><br><span class='text-white font-bold'>You must set your DNS to point to the server IP in advance.</span>"
 					/>
 				</div>
 				<input
