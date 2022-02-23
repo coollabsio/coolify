@@ -11,6 +11,7 @@ import vuejs from './vuejs';
 import php from './php';
 import rust from './rust';
 import astro from './static';
+import eleventy from './static';
 
 export {
 	node,
@@ -25,5 +26,6 @@ export {
 	vuejs,
 	php,
 	rust,
-	astro
+	astro,
+	eleventy
 };

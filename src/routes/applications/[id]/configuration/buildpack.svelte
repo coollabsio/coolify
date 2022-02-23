@@ -37,6 +37,8 @@
 	import { gitTokens } from '$lib/store';
 	import { browser } from '$app/env';
 
+	const { id } = $page.params;
+
 	let scanning = true;
 	let foundConfig = null;
 	let packageManager = 'npm';
@@ -176,6 +178,8 @@
 				}
 			}
 			if (error.message === 'Bad credentials') {
+				const { token } = await get(`/applications/${id}/configuration/githubToken.json`);
+				$gitTokens.githubToken = token;
 				browser && window.location.reload();
 			}
 			return errorNotification(error);

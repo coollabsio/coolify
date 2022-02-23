@@ -136,6 +136,16 @@ export function findBuildPack(pack, packageManager = 'npm') {
 			port: 80
 		};
 	}
+	if (pack === 'eleventy') {
+		return {
+			...metaData,
+			installCommand: `yarn install`,
+			buildCommand: `yarn build`,
+			startCommand: null,
+			publishDirectory: `_site`,
+			port: 80
+		};
+	}
 	return {
 		name: 'node',
 		fancyName: 'Node.js',
@@ -192,17 +202,24 @@ export const buildPacks = [
 		color: 'bg-green-700'
 	},
 	{
+		name: 'gatsby',
+		fancyName: 'Gatsby',
+		hoverColor: 'hover:bg-blue-700',
+		color: 'bg-blue-700'
+	},
+	{
 		name: 'astro',
 		fancyName: 'Astro',
 		hoverColor: 'hover:bg-pink-700',
 		color: 'bg-pink-700'
 	},
 	{
-		name: 'gatsby',
-		fancyName: 'Gatsby',
-		hoverColor: 'hover:bg-blue-700',
-		color: 'bg-blue-700'
+		name: 'eleventy',
+		fancyName: 'Eleventy',
+		hoverColor: 'hover:bg-red-700',
+		color: 'bg-red-700'
 	},
+
 	{
 		name: 'react',
 		fancyName: 'React',
@@ -216,16 +233,16 @@ export const buildPacks = [
 		color: 'bg-blue-700'
 	},
 	{
-		name: 'nestjs',
-		fancyName: 'NestJS',
-		hoverColor: 'hover:bg-red-700',
-		color: 'bg-red-700'
-	},
-	{
 		name: 'nextjs',
 		fancyName: 'NextJS',
 		hoverColor: 'hover:bg-blue-700',
 		color: 'bg-blue-700'
+	},
+	{
+		name: 'nestjs',
+		fancyName: 'NestJS',
+		hoverColor: 'hover:bg-red-700',
+		color: 'bg-red-700'
 	},
 	{
 		name: 'rust',
@@ -237,6 +254,9 @@ export const buildPacks = [
 export const scanningTemplates = {
 	astro: {
 		buildPack: 'astro'
+	},
+	'@11ty/eleventy': {
+		buildPack: 'eleventy'
 	},
 	svelte: {
 		buildPack: 'svelte'
