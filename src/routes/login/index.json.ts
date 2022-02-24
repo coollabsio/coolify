@@ -4,10 +4,10 @@ import { ErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler = async (event) => {
-	const { email, password } = await event.request.json();
+	const { email, password, isLogin } = await event.request.json();
 
 	try {
-		const { body } = await db.login({ email, password });
+		const { body } = await db.login({ email, password, isLogin });
 		event.locals.session.data = body;
 		return {
 			status: 200

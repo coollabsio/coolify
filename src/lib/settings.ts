@@ -1,5 +1,6 @@
 export const publicPaths = [
 	'/login',
+	'/register',
 	'/reset',
 	'/reset/password',
 	'/webhooks/success',

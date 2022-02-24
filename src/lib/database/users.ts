@@ -10,13 +10,18 @@ export async function hashPassword(password: string) {
 	const saltRounds = 15;
 	return bcrypt.hash(password, saltRounds);
 }
-export async function login({ email, password }) {
+export async function login({ email, password, isLogin }) {
 	const users = await prisma.user.count();
 	const userFound = await prisma.user.findUnique({
 		where: { email },
 		include: { teams: true, permission: true },
 		rejectOnNotFound: false
 	});
+	if (!userFound && isLogin) {
+		throw {
+			error: 'Wrong password or email address.'
+		};
+	}
 	// Registration disabled if database is not seeded properly
 	const { isRegistrationEnabled, id } = await db.listSettings();
 
