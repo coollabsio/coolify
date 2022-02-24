@@ -31,6 +31,8 @@
 			<textarea
 				rows="5"
 				class={disabledClass}
+				class:pr-10={true}
+				class:pr-20={value && isHttps}
 				{placeholder}
 				type="text"
 				{id}
@@ -44,6 +46,8 @@
 			<input
 				class={disabledClass}
 				type="text"
+				class:pr-10={true}
+				class:pr-20={value && isHttps}
 				{id}
 				{name}
 				{required}
@@ -57,6 +61,8 @@
 	{:else}
 		<input
 			class={disabledClass}
+			class:pr-10={true}
+			class:pr-20={value && isHttps}
 			type="password"
 			{id}
 			{name}

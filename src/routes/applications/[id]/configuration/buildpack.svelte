@@ -35,6 +35,9 @@
 	import { get } from '$lib/api';
 	import { errorNotification } from '$lib/form';
 	import { gitTokens } from '$lib/store';
+	import { browser } from '$app/env';
+
+	const { id } = $page.params;
 
 	let scanning = true;
 	let foundConfig = null;
@@ -83,7 +86,7 @@
 				if (pnpmLock) packageManager = 'pnpm';
 
 				if (dockerfile) {
-					foundConfig.buildPack = 'docker';
+					foundConfig = findBuildPack('docker', packageManager);
 				} else if (packageJson) {
 					const path = packageJson.path;
 					const data = await get(
@@ -127,7 +130,7 @@
 				if (pnpmLock) packageManager = 'pnpm';
 
 				if (dockerfile) {
-					foundConfig.buildPack = 'docker';
+					foundConfig = findBuildPack('docker', packageManager);
 				} else if (packageJson) {
 					const data = await get(`${packageJson.git_url}`, {
 						Authorization: `Bearer ${$gitTokens.githubToken}`,
@@ -175,6 +178,8 @@
 				}
 			}
 			if (error.message === 'Bad credentials') {
+				const { token } = await get(`/applications/${id}/configuration/githubToken.json`);
+				$gitTokens.githubToken = token;
 				browser && window.location.reload();
 			}
 			return errorNotification(error);

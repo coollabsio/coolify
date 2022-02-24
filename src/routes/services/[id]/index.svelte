@@ -37,10 +37,16 @@
 	import Services from './_Services/_Services.svelte';
 	import { getDomain } from '$lib/components/common';
 	import VaultWarden from '$lib/components/svg/services/VaultWarden.svelte';
+	import cuid from 'cuid';
+	import { browser } from '$app/env';
 
 	export let service;
 	export let isRunning;
 	export let readOnly;
+
+	if (browser && window.location.hostname === 'demo.coolify.io' && !service.fqdn) {
+		service.fqdn = `http://${cuid()}.demo.coolify.io`;
+	}
 </script>
 
 <div

@@ -45,6 +45,8 @@
 	import { notNodeDeployments, staticDeployments } from '$lib/components/common';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { post } from '$lib/api';
+	import cuid from 'cuid';
+	import { browser } from '$app/env';
 	const { id } = $page.params;
 
 	let domainEl: HTMLInputElement;
@@ -54,6 +56,10 @@
 	let debug = application.settings.debug;
 	let previews = application.settings.previews;
 	let dualCerts = application.settings.dualCerts;
+
+	if (browser && window.location.hostname === 'demo.coolify.io' && !application.fqdn) {
+		application.fqdn = `http://${cuid()}.demo.coolify.io`;
+	}
 
 	onMount(() => {
 		domainEl.focus();
@@ -255,6 +261,11 @@
 			<div class="grid grid-cols-2">
 				<div class="flex-col">
 					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">Domain (FQDN)</label>
+					{#if browser && window.location.hostname === 'demo.coolify.io'}
+						<Explainer
+							text="<span class='text-white font-bold'>You can use the predefined random domain name or enter your own domain name.</span>"
+						/>
+					{/if}
 					<Explainer
 						text="If you specify <span class='text-green-500 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-green-500 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application.<br><br><span class='text-white font-bold'>You must set your DNS to point to the server IP in advance.</span>"
 					/>
