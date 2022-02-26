@@ -187,6 +187,59 @@ export async function reloadHaproxy(engine) {
 	const host = getEngine(engine);
 	return await asyncExecShell(`DOCKER_HOST=${host} docker exec coolify-haproxy kill -HUP 1`);
 }
+export async function checkProxyConfigurations() {
+	const haproxy = await haproxyInstance();
+	await checkHAProxy(haproxy);
+	try {
+		const stats: any = await haproxy.get(`v2/services/haproxy/stats/native`).json();
+		for (const stat of stats[0].stats) {
+			if (stat.stats.status === 'DOWN' && stat.type === 'server') {
+				const {
+					name,
+					backend_name: backendName,
+					stats: { lastchg }
+				} = stat;
+				const application = await db.getApplicationById(name);
+				if (!application) {
+					const transactionId = await getNextTransactionId();
+					await haproxy
+						.delete(`v2/services/haproxy/configuration/backends/${backendName}`, {
+							searchParams: {
+								transaction_id: transactionId
+							}
+						})
+						.json();
+					return await completeTransaction(transactionId);
+				}
+				const found = await checkContainer(application.destinationDocker.engine, name);
+				if (!found) {
+					const transactionId = await getNextTransactionId();
+					await haproxy
+						.delete(`v2/services/haproxy/configuration/backends/${backendName}`, {
+							searchParams: {
+								transaction_id: transactionId
+							}
+						})
+						.json();
+					return await completeTransaction(transactionId);
+				}
+				if (lastchg > 120) {
+					const transactionId = await getNextTransactionId();
+					await haproxy
+						.delete(`v2/services/haproxy/configuration/backends/${backendName}`, {
+							searchParams: {
+								transaction_id: transactionId
+							}
+						})
+						.json();
+					await completeTransaction(transactionId);
+				}
+			}
+		}
+	} catch (error) {
+		console.log(error);
+	}
+}
 export async function configureProxyForApplication({ domain, imageId, applicationId, port }) {
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);

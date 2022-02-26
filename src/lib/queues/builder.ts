@@ -4,7 +4,12 @@ import * as buildpacks from '../buildPacks';
 import * as importers from '../importers';
 import { dockerInstance } from '../docker';
 import { asyncExecShell, createDirectories, getDomain, getEngine, saveBuildLog } from '../common';
-import { configureProxyForApplication, reloadHaproxy, setWwwRedirection } from '../haproxy';
+import {
+	checkProxyConfigurations,
+	configureProxyForApplication,
+	reloadHaproxy,
+	setWwwRedirection
+} from '../haproxy';
 import * as db from '$lib/database';
 import { decrypt } from '$lib/crypto';
 import { sentry } from '$lib/common';
@@ -253,6 +258,7 @@ export default async function (job) {
 		try {
 			if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
 				saveBuildLog({ line: 'Proxy configuration started!', buildId, applicationId });
+				await checkProxyConfigurations();
 				await configureProxyForApplication({ domain, imageId, applicationId, port });
 				if (isHttps) await letsEncrypt({ domain, id: applicationId });
 				await setWwwRedirection(fqdn);
