@@ -1,4 +1,5 @@
-import { asyncExecShell, getEngine, getTeam, getUserDetails } from '$lib/common';
+import { getUserDetails } from '$lib/common';
+import { generateRemoteEngine } from '$lib/components/common';
 import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
 import { checkContainer } from '$lib/haproxy';
@@ -12,15 +13,21 @@ export const get: RequestHandler = async (event) => {
 	try {
 		const destination = await db.getDestination({ id, teamId });
 		const settings = await db.listSettings();
-		const state =
-			destination?.engine && (await checkContainer(destination.engine, 'coolify-haproxy'));
+		let payload = {
+			destination,
+			settings,
+			state: false
+		};
+		if (destination.remoteEngine) {
+			const engine = await generateRemoteEngine(destination);
+			payload.state = await checkContainer(engine, 'coolify-haproxy');
+		} else {
+			payload.state =
+				destination?.engine && (await checkContainer(destination.engine, 'coolify-haproxy'));
+		}
 		return {
 			status: 200,
-			body: {
-				destination,
-				settings,
-				state
-			}
+			body: { ...payload }
 		};
 	} catch (error) {
 		return ErrorHandler(error);

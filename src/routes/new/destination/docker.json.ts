@@ -8,10 +8,36 @@ export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 
-	const { name, engine, network, isCoolifyProxyUsed } = await event.request.json();
+	const {
+		name,
+		engine,
+		network,
+		isCoolifyProxyUsed,
+		remoteEngine,
+		ipAddress,
+		user,
+		port,
+		sshPrivateKey
+	} = await event.request.json();
 
 	try {
-		const id = await db.newDestination({ name, teamId, engine, network, isCoolifyProxyUsed });
+		let id = null;
+		if (remoteEngine) {
+			id = await db.newRemoteDestination({
+				name,
+				teamId,
+				engine,
+				network,
+				isCoolifyProxyUsed,
+				remoteEngine,
+				ipAddress,
+				user,
+				port,
+				sshPrivateKey
+			});
+		} else {
+			id = await db.newLocalDestination({ name, teamId, engine, network, isCoolifyProxyUsed });
+		}
 		return { status: 200, body: { id } };
 	} catch (error) {
 		return ErrorHandler(error);

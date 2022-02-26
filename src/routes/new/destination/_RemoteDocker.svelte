@@ -4,6 +4,7 @@
 	export let payload;
 
 	import { post } from '$lib/api';
+	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 	import { errorNotification } from '$lib/form';
 
@@ -11,7 +12,6 @@
 
 	async function handleSubmit() {
 		try {
-			await post('/new/destination/check.json', { network: payload.network });
 			const { id } = await post('/new/destination/docker.json', {
 				...payload
 			});
@@ -44,33 +44,36 @@
 		</div>
 
 		<div class="grid grid-cols-2 items-center px-10">
-			<label for="engine" class="text-base font-bold text-stone-100">Engine</label>
+			<label for="ipAddress" class="text-base font-bold text-stone-100">IP Address</label>
 			<input
 				required
-				name="engine"
-				placeholder="eg: /var/run/docker.sock"
-				bind:value={payload.engine}
+				name="ipAddress"
+				placeholder="eg: 192.168..."
+				bind:value={payload.ipAddress}
 			/>
-			<!-- <Explainer text="You can use remote Docker Engine with over SSH." /> -->
 		</div>
-		<!-- <div class="flex items-center">
-			<label for="remoteEngine">Remote Docker Engine?</label>
-			<input name="remoteEngine" type="checkbox" bind:checked={payload.remoteEngine} />
+
+		<div class="grid grid-cols-2 items-center px-10">
+			<label for="user" class="text-base font-bold text-stone-100">User</label>
+			<input required name="user" placeholder="eg: root" bind:value={payload.user} />
 		</div>
-		{#if payload.remoteEngine}
-			<div class="grid grid-cols-3 items-center">
-				<label for="user">User</label>
-				<div class="col-span-2">
-					<input required name="user" placeholder="eg: root" bind:value={payload.user} />
-				</div>
-			</div>
-			<div class="grid grid-cols-3 items-center">
-				<label for="port">Port</label>
-				<div class="col-span-2">
-					<input required name="port" placeholder="eg: 22" bind:value={payload.port} />
-				</div>
-			</div>
-		{/if} -->
+
+		<div class="grid grid-cols-2 items-center px-10">
+			<label for="port" class="text-base font-bold text-stone-100">Port</label>
+			<input required name="port" placeholder="eg: 22" bind:value={payload.port} />
+		</div>
+		<div class="grid grid-cols-2 items-center px-10">
+			<label for="sshPrivateKey" class="text-base font-bold text-stone-100">SSH Private Key</label>
+			<textarea
+				rows="10"
+				class="resize-none"
+				required
+				name="sshPrivateKey"
+				placeholder="eg: -----BEGIN...."
+				bind:value={payload.sshPrivateKey}
+			/>
+		</div>
+
 		<div class="grid grid-cols-2 items-center px-10">
 			<label for="network" class="text-base font-bold text-stone-100">Network</label>
 			<input required name="network" placeholder="default: coolify" bind:value={payload.network} />

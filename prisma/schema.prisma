@@ -147,8 +147,12 @@ model DestinationDocker {
   id                 String        @id @default(cuid())
   network            String        @unique
   name               String
-  engine             String
+  engine             String?
   remoteEngine       Boolean       @default(false)
+  ipAddress          String?
+  sshPrivateKey      String?
+  user               String?       @default("root")
+  port               Int?          @default(22)
   isCoolifyProxyUsed Boolean?      @default(false)
   teams              Team[]
   application        Application[]

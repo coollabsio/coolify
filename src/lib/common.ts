@@ -103,7 +103,7 @@ export const getUserDetails = async (event, isAdminRequired = true) => {
 };
 
 export function getEngine(engine) {
-	return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : `tcp://${engine}:2375`;
+	return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : engine;
 }
 
 export async function removeContainer(id, engine) {
