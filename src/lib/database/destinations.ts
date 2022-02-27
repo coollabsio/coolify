@@ -1,4 +1,5 @@
 import { asyncExecShell, getEngine } from '$lib/common';
+import { decrypt, encrypt } from '$lib/crypto';
 import { dockerInstance } from '$lib/docker';
 import { startCoolifyProxy } from '$lib/haproxy';
 import { getDatabaseImage } from '.';
@@ -47,7 +48,36 @@ export async function updateDestination({ id, name, engine, network }) {
 	return await prisma.destinationDocker.update({ where: { id }, data: { name, engine, network } });
 }
 
-export async function newDestination({ name, teamId, engine, network, isCoolifyProxyUsed }) {
+export async function newRemoteDestination({
+	name,
+	teamId,
+	engine,
+	network,
+	isCoolifyProxyUsed,
+	remoteEngine,
+	ipAddress,
+	user,
+	port,
+	sshPrivateKey
+}) {
+	const encryptedPrivateKey = encrypt(sshPrivateKey);
+	const destination = await prisma.destinationDocker.create({
+		data: {
+			name,
+			teams: { connect: { id: teamId } },
+			engine,
+			network,
+			isCoolifyProxyUsed,
+			remoteEngine,
+			ipAddress,
+			user,
+			port,
+			sshPrivateKey: encryptedPrivateKey
+		}
+	});
+	return destination.id;
+}
+export async function newLocalDestination({ name, teamId, engine, network, isCoolifyProxyUsed }) {
 	const host = getEngine(engine);
 	const docker = dockerInstance({ destinationDocker: { engine, network } });
 	const found = await docker.engine.listNetworks({ filters: { name: [`^${network}$`] } });
@@ -94,9 +124,13 @@ export async function removeDestination({ id }) {
 }
 
 export async function getDestination({ id, teamId }) {
-	return await prisma.destinationDocker.findFirst({
+	let destination = await prisma.destinationDocker.findFirst({
 		where: { id, teams: { some: { id: teamId } } }
 	});
+	if (destination.remoteEngine) {
+		destination.sshPrivateKey = decrypt(destination.sshPrivateKey);
+	}
+	return destination;
 }
 export async function getDestinationByApplicationId({ id, teamId }) {
 	return await prisma.destinationDocker.findFirst({

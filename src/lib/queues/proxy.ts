@@ -3,6 +3,7 @@ import { getApplicationById, prisma, supportedServiceTypesAndVersions } from '$l
 import { dockerInstance } from '$lib/docker';
 import {
 	checkContainer,
+	checkProxyConfigurations,
 	configureCoolifyProxyOn,
 	configureProxyForApplication,
 	configureSimpleServiceProxyOn,
@@ -13,13 +14,22 @@ import {
 	startHttpProxy
 } from '$lib/haproxy';
 import * as db from '$lib/database';
+// import { generateRemoteEngine } from '$lib/components/common';
 
 export default async function () {
+	try {
+		await checkProxyConfigurations();
+	} catch (error) {
+		console.log(error);
+	}
 	try {
 		// Check destination containers and configure proxy if needed
 		const destinationDockers = await prisma.destinationDocker.findMany({});
 		for (const destination of destinationDockers) {
 			if (destination.isCoolifyProxyUsed) {
+				// if (destination.remoteEngine) {
+				// 	const engine = generateRemoteEngine(destination);
+				// }
 				const docker = dockerInstance({ destinationDocker: destination });
 				const containers = await docker.engine.listContainers();
 				const configurations = containers.filter(

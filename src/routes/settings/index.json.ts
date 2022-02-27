@@ -3,6 +3,7 @@ import { getDomain, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { listSettings, ErrorHandler } from '$lib/database';
 import {
+	checkProxyConfigurations,
 	configureCoolifyProxyOff,
 	configureCoolifyProxyOn,
 	forceSSLOnApplication,
@@ -79,6 +80,7 @@ export const post: RequestHandler = async (event) => {
 
 	const { fqdn, isRegistrationEnabled, dualCerts, minPort, maxPort } = await event.request.json();
 	try {
+		await checkProxyConfigurations();
 		const {
 			id,
 			fqdn: oldFqdn,

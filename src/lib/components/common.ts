@@ -15,3 +15,6 @@ export const notNodeDeployments = ['php', 'docker', 'rust'];
 export function getDomain(domain) {
 	return domain?.replace('https://', '').replace('http://', '');
 }
+export function generateRemoteEngine(destination) {
+	return `ssh://${destination.user}@${destination.ipAddress}:${destination.port}`;
+}

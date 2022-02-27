@@ -26,10 +26,12 @@ export const get: RequestHandler = async () => {
 };
 
 export const post: RequestHandler = async (event) => {
-	const { type, latestVersion } = await event.request.json();
+	const { type, latestVersion, overrideVersion = false } = await event.request.json();
 	if (type === 'pull') {
 		try {
 			if (!dev) {
+				if (!overrideVersion)
+					await asyncExecShell(`docker image inspect coollabsio/coolify:${latestVersion}`);
 				await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
 				return {
 					status: 200,

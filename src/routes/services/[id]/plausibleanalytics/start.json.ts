@@ -6,6 +6,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { letsEncrypt } from '$lib/letsencrypt';
 import {
 	checkHAProxy,
+	checkProxyConfigurations,
 	configureSimpleServiceProxyOn,
 	reloadHaproxy,
 	setWwwRedirection
@@ -186,6 +187,7 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 		await asyncExecShell(
 			`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up --build -d`
 		);
+		await checkProxyConfigurations();
 		await configureSimpleServiceProxyOn({ id, domain, port: 8000 });
 
 		if (isHttps) {

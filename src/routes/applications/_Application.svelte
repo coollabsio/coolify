@@ -13,6 +13,8 @@
 	import Nextjs from '$lib/components/svg/applications/Nextjs.svelte';
 	import Gatsby from '$lib/components/svg/applications/Gatsby.svelte';
 	import Docker from '$lib/components/svg/applications/Docker.svelte';
+	import Astro from '$lib/components/svg/applications/Astro.svelte';
+	import Eleventy from '$lib/components/svg/applications/Eleventy.svelte';
 
 	const buildPack = application?.buildPack?.toLowerCase();
 </script>
@@ -45,6 +47,10 @@
 			<Gatsby />
 		{:else if buildPack === 'docker'}
 			<Docker />
+		{:else if buildPack === 'astro'}
+			<Astro />
+		{:else if buildPack === 'eleventy'}
+			<Eleventy />
 		{/if}
 
 		<div class="truncate text-center text-xl font-bold">{application.name}</div>

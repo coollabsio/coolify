@@ -119,7 +119,8 @@ export async function getApplicationWebhook({ projectId, branch }) {
 }
 export async function getApplicationById({ id }) {
 	const body = await prisma.application.findFirst({
-		where: { id }
+		where: { id },
+		include: { destinationDocker: true }
 	});
 
 	return { ...body };

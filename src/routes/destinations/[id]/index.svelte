@@ -35,6 +35,7 @@
 
 	import type Prisma from '@prisma/client';
 	import LocalDocker from './_LocalDocker.svelte';
+	import RemoteDocker from './_RemoteDocker.svelte';
 </script>
 
 <div class="flex space-x-1 p-6 text-2xl font-bold">
@@ -42,6 +43,11 @@
 	<span class="arrow-right-applications px-1">></span>
 	<span class="pr-2">{destination.name}</span>
 </div>
+
 <div class="mx-auto max-w-4xl px-6">
-	<LocalDocker bind:destination {settings} {state} />
+	{#if destination.remoteEngine}
+		<RemoteDocker bind:destination {settings} {state} />
+	{:else}
+		<LocalDocker bind:destination {settings} {state} />
+	{/if}
 </div>

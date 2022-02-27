@@ -10,6 +10,7 @@
 	import { post } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { onMount } from 'svelte';
+	import { generateRemoteEngine } from '$lib/components/common';
 	const { id } = $page.params;
 	let cannotDisable = settings.fqdn && destination.engine === '/var/run/docker.sock';
 	// let scannedApps = [];
@@ -87,7 +88,8 @@
 	}
 	async function stopProxy() {
 		try {
-			await post(`/destinations/${id}/stop.json`, { engine: destination.engine });
+			const engine = generateRemoteEngine(destination);
+			await post(`/destinations/${id}/stop.json`, { engine });
 			return toast.push('Coolify Proxy stopped!');
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -95,7 +97,8 @@
 	}
 	async function startProxy() {
 		try {
-			await post(`/destinations/${id}/start.json`, { engine: destination.engine });
+			const engine = generateRemoteEngine(destination);
+			await post(`/destinations/${id}/start.json`, { engine });
 			return toast.push('Coolify Proxy started!');
 		} catch ({ error }) {
 			return errorNotification(error);

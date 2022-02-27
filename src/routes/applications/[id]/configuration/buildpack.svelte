@@ -105,6 +105,8 @@
 					foundConfig = findBuildPack('static', packageManager);
 				} else if (indexPHP) {
 					foundConfig = findBuildPack('php');
+				} else {
+					foundConfig = findBuildPack('node', packageManager);
 				}
 			} else if (type === 'github') {
 				const files = await get(`${apiUrl}/repos/${repository}/contents?ref=${branch}`, {
@@ -146,6 +148,8 @@
 					foundConfig = findBuildPack('static', packageManager);
 				} else if (indexPHP) {
 					foundConfig = findBuildPack('php');
+				} else {
+					foundConfig = findBuildPack('node', packageManager);
 				}
 			}
 		} catch (error) {
@@ -183,9 +187,10 @@
 				browser && window.location.reload();
 			}
 			return errorNotification(error);
+		} finally {
+			if (!foundConfig) foundConfig = findBuildPack('node', packageManager);
+			scanning = false;
 		}
-		if (!foundConfig) foundConfig = findBuildPack('node', packageManager);
-		scanning = false;
 	}
 	onMount(async () => {
 		await scanRepository();

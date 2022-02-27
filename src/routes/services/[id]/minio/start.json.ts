@@ -6,6 +6,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { letsEncrypt } from '$lib/letsencrypt';
 import {
 	checkHAProxy,
+	checkProxyConfigurations,
 	configureSimpleServiceProxyOn,
 	reloadHaproxy,
 	setWwwRedirection,
@@ -95,6 +96,7 @@ export const post: RequestHandler = async (event) => {
 		}
 		try {
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+			await checkProxyConfigurations();
 			await configureSimpleServiceProxyOn({ id, domain, port: consolePort });
 			await db.updateMinioService({ id, publicPort });
 			await startHttpProxy(destinationDocker, id, publicPort, apiPort);

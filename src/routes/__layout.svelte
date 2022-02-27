@@ -30,7 +30,6 @@
 <script>
 	export let teams;
 	export let selectedTeamId;
-	import { fade } from 'svelte/transition';
 
 	import '../tailwind.css';
 	import { SvelteToast, toast } from '@zerodevx/svelte-toast';
@@ -44,7 +43,6 @@
 	let isUpdateAvailable = false;
 	let updateStatus = {
 		loading: false,
-		checking: false,
 		success: null
 	};
 	let latestVersion = 'latest';
@@ -59,18 +57,14 @@
 				return errorNotification(error);
 			}
 			if ($session.teamId === '0') {
-				updateStatus.checking = true;
 				try {
 					const data = await get(`/update.json`);
 					if (overrideVersion || data?.isUpdateAvailable) {
 						latestVersion = overrideVersion || data.latestVersion;
 						isUpdateAvailable = overrideVersion ? true : data?.isUpdateAvailable;
-						await post(`/update.json`, { type: 'pull', latestVersion });
+						await post(`/update.json`, { type: 'pull', latestVersion, overrideVersion });
 					}
-				} catch (error) {
-				} finally {
-					updateStatus.checking = false;
-				}
+				} catch (error) {}
 			}
 		}
 	});
@@ -311,32 +305,7 @@
 
 			<div class="flex flex-col space-y-4 py-2">
 				{#if $session.teamId === '0'}
-					{#if updateStatus.checking}
-						<button
-							disabled
-							in:fade={{ duration: 150 }}
-							class="icons tooltip-right bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white duration-75 hover:scale-105"
-							data-tooltip="Checking for updates..."
-							><svg
-								xmlns="http://www.w3.org/2000/svg"
-								class="h-9 w-8 animate-spin"
-								viewBox="0 0 24 24"
-								stroke-width="1.5"
-								stroke="currentColor"
-								fill="none"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-							>
-								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-								<path d="M9 4.55a8 8 0 0 1 6 14.9m0 -4.45v5h5" />
-								<line x1="5.63" y1="7.16" x2="5.63" y2="7.17" />
-								<line x1="4.06" y1="11" x2="4.06" y2="11.01" />
-								<line x1="4.63" y1="15.1" x2="4.63" y2="15.11" />
-								<line x1="7.16" y1="18.37" x2="7.16" y2="18.38" />
-								<line x1="11" y1="19.94" x2="11" y2="19.95" />
-							</svg></button
-						>
-					{:else if isUpdateAvailable}
+					{#if isUpdateAvailable}
 						<button
 							disabled={updateStatus.success === false}
 							data-tooltip="Update available"
@@ -346,7 +315,7 @@
 							{#if updateStatus.loading}
 								<svg
 									xmlns="http://www.w3.org/2000/svg"
-									class="w-8 h-9 lds-heart"
+									class="lds-heart h-9 w-8"
 									viewBox="0 0 24 24"
 									stroke-width="1.5"
 									stroke="currentColor"
