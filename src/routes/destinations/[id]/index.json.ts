@@ -1,4 +1,4 @@
-import { getUserDetails } from '$lib/common';
+import { asyncExecShell, getUserDetails } from '$lib/common';
 import { generateRemoteEngine } from '$lib/components/common';
 import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
@@ -19,8 +19,13 @@ export const get: RequestHandler = async (event) => {
 			state: false
 		};
 		if (destination.remoteEngine) {
-			const engine = await generateRemoteEngine(destination);
-			payload.state = await checkContainer(engine, 'coolify-haproxy');
+			// const { stdout } = await asyncExecShell(
+			// 	`ssh -p ${destination.port} ${destination.user}@${destination.ipAddress} "docker ps -a"`
+			// );
+			// console.log(stdout)
+			// const engine = await generateRemoteEngine(destination);
+			// // await saveSshKey(destination);
+			// payload.state = await checkContainer(engine, 'coolify-haproxy');
 		} else {
 			payload.state =
 				destination?.engine && (await checkContainer(destination.engine, 'coolify-haproxy'));

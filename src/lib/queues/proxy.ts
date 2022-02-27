@@ -13,6 +13,7 @@ import {
 	startHttpProxy
 } from '$lib/haproxy';
 import * as db from '$lib/database';
+// import { generateRemoteEngine } from '$lib/components/common';
 
 export default async function () {
 	try {
@@ -20,6 +21,9 @@ export default async function () {
 		const destinationDockers = await prisma.destinationDocker.findMany({});
 		for (const destination of destinationDockers) {
 			if (destination.isCoolifyProxyUsed) {
+				// if (destination.remoteEngine) {
+				// 	const engine = generateRemoteEngine(destination);
+				// }
 				const docker = dockerInstance({ destinationDocker: destination });
 				const containers = await docker.engine.listContainers();
 				const configurations = containers.filter(

@@ -106,6 +106,11 @@ export function getEngine(engine) {
 	return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : engine;
 }
 
+// export async function saveSshKey(destination) {
+// 	return await asyncExecShell(
+// 		`echo '${destination.sshPrivateKey}' > /tmp/id_rsa_${destination.id} && chmod 600 /tmp/id_rsa_${destination.id}`
+// 	);
+// }
 export async function removeContainer(id, engine) {
 	const host = getEngine(engine);
 	try {

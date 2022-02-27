@@ -42,7 +42,7 @@
 	<div class="text-xl font-bold text-white">Predefined destinations</div>
 	<div class="flex justify-center space-x-2">
 		<button class="w-32" on:click={() => setPredefined('localDocker')}>Local Docker</button>
-		<button class="w-32" on:click={() => setPredefined('remoteDocker')}>Remote Docker</button>
+		<!-- <button class="w-32" on:click={() => setPredefined('remoteDocker')}>Remote Docker</button> -->
 		<button class="w-32" on:click={() => setPredefined('kubernetes')}>Kubernetes</button>
 	</div>
 </div>
