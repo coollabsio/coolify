@@ -62,7 +62,7 @@
 					if (overrideVersion || data?.isUpdateAvailable) {
 						latestVersion = overrideVersion || data.latestVersion;
 						isUpdateAvailable = overrideVersion ? true : data?.isUpdateAvailable;
-						await post(`/update.json`, { type: 'pull', latestVersion, overrideVersion });
+						await post(`/update.json`, { type: 'pull', latestVersion });
 					}
 				} catch (error) {}
 			}
