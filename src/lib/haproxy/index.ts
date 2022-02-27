@@ -199,6 +199,13 @@ export async function checkProxyConfigurations() {
 					backend_name: backendName,
 					stats: { lastchg }
 				} = stat;
+				const { fqdn } = await db.listSettings();
+				if (fqdn) {
+					const domain = getDomain(fqdn);
+					if (backendName === domain) {
+						return;
+					}
+				}
 				const application = await db.getApplicationById(name);
 				if (!application) {
 					const transactionId = await getNextTransactionId();
