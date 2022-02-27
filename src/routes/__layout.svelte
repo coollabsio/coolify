@@ -69,7 +69,7 @@
 					}
 				} catch (error) {
 				} finally {
-					updateStatus;
+					updateStatus.checking = false;
 				}
 			}
 		}
