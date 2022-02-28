@@ -182,7 +182,7 @@
 						title="Build and start application"
 						type="submit"
 						disabled={!$session.isAdmin}
-						class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-green-600 hover:text-white"
+						class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
 						data-tooltip={$session.isAdmin
 							? 'Build and start application'
 							: 'You do not have permission to Build and start application.'}
