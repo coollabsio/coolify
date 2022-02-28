@@ -71,12 +71,14 @@
 						class:text-stone-600={loading}
 						class:bg-coollabs={!loading}>{loading ? 'Authenticating...' : 'Login'}</button
 					>
+
 					<button
 						on:click|preventDefault={() => goto('/register')}
-						class="hover:opacity-90 text-white">Register</button
+						class="bg-transparent hover:bg-coolgray-300	text-white ">Register</button
 					>
-					<button class="bg-transparent" on:click|preventDefault={() => goto('/reset')}
-						>Reset password</button
+					<button
+						class="bg-transparent hover:bg-coolgray-300"
+						on:click|preventDefault={() => goto('/reset')}>Reset password</button
 					>
 				</div>
 			</form>

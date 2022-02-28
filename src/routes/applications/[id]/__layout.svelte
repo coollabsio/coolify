@@ -128,7 +128,7 @@
 					title="Stop application"
 					type="submit"
 					disabled={!$session.isAdmin}
-					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-green-600 hover:text-white"
+					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
 					data-tooltip={$session.isAdmin
 						? 'Stop application'
 						: 'You do not have permission to stop the application.'}
@@ -153,7 +153,7 @@
 						title="Rebuild application"
 						type="submit"
 						disabled={!$session.isAdmin}
-						class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-green-600 hover:text-white"
+						class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:text-green-500"
 						data-tooltip={$session.isAdmin
 							? 'Rebuild application'
 							: 'You do not have permission to rebuild application.'}
