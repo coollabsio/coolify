@@ -6,6 +6,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	const Dockerfile: Array<string> = [];
 
 	Dockerfile.push(`FROM ${image}`);
+	Dockerfile.push(`LABEL coolify.image=true`);
 	Dockerfile.push('RUN a2enmod rewrite');
 	Dockerfile.push('WORKDIR /var/www/html');
 	Dockerfile.push(`COPY ./${baseDirectory || ''} /var/www/html`);

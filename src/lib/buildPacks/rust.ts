@@ -8,6 +8,7 @@ const createDockerfile = async (data, image, name): Promise<void> => {
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push('WORKDIR /usr/src/app');
+	Dockerfile.push(`LABEL coolify.image=true`);
 	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /usr/src/app/target target`);
 	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /usr/local/cargo /usr/local/cargo`);
 	Dockerfile.push(`COPY . .`);
