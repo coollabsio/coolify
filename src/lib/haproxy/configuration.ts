@@ -60,10 +60,11 @@ backend backend-certbot
   server certbot host.docker.internal:9080
 
 {{#applications}}
-
+{{#isRunning}}
 backend {{domain}}
   option forwardfor
   server {{id}} {{id}}:{{port}}
+{{/isRunning}}
 {{/applications}}
 {{#services}}
 
@@ -108,6 +109,7 @@ export async function configureHAProxy() {
 				id,
 				port,
 				domain,
+				isRunning,
 				isHttps,
 				redirectValue,
 				redirectTo: isWWW ? domain : 'www.' + domain
@@ -139,7 +141,7 @@ export async function configureHAProxy() {
 	//     }
 	// }
 	const output = mustache.render(template, data);
-	const newHash = crypto.createHash('md5').update(JSON.stringify(template)).digest('hex');
+	const newHash = crypto.createHash('md5').update(output).digest('hex');
 	const { proxyHash, id } = await db.listSettings();
 	if (proxyHash !== newHash) {
 		await db.prisma.setting.update({ where: { id }, data: { proxyHash: newHash } });
