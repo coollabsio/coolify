@@ -239,10 +239,16 @@ export default async function (job) {
 			baseDirectory,
 			publishDirectory
 		});
+		let envFound = false;
+		try {
+			envFound = !!(await fs.stat(`${workdir}/.env`));
+		} catch (error) {
+			//
+		}
 		try {
 			saveBuildLog({ line: 'Deployment started.', buildId, applicationId });
 			const { stderr } = await asyncExecShell(
-				`DOCKER_HOST=${host} docker run --env-file=${workdir}/.env ${labels.join(
+				`DOCKER_HOST=${host} docker run ${envFound && `--env-file=${workdir}/.env`} ${labels.join(
 					' '
 				)} --name ${imageId} --network ${
 					docker.network
