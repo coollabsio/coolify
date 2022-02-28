@@ -120,7 +120,7 @@
 					title="Stop database"
 					type="submit"
 					disabled={!$session.isAdmin}
-					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-purple-600 hover:text-white"
+					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
 					data-tooltip={$session.isAdmin
 						? 'Stop database'
 						: 'You do not have permission to stop the database.'}
@@ -146,7 +146,7 @@
 					title="Start database"
 					type="submit"
 					disabled={!$session.isAdmin}
-					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-purple-600 hover:text-white"
+					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
 					data-tooltip={$session.isAdmin
 						? 'Start database'
 						: 'You do not have permission to start the database.'}

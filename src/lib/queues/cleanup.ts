@@ -36,7 +36,7 @@ export default async function () {
 			console.log(error);
 		}
 		if (!dev) {
-			//Cleanup images that are not managed by coolify
+			// Cleanup images that are not managed by coolify
 			try {
 				await asyncExecShell(
 					`DOCKER_HOST=${host} docker image prune --filter 'label!=coolify.image=true' -a -f`
@@ -44,12 +44,12 @@ export default async function () {
 			} catch (error) {
 				console.log(error);
 			}
-		}
-		// Cleanup dangling images
-		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker image prune -f`);
-		} catch (error) {
-			console.log(error);
+			// Cleanup old images >3 days
+			try {
+				await asyncExecShell(`DOCKER_HOST=${host} docker image prune --filter "until=72h" -a -f`);
+			} catch (error) {
+				console.log(error);
+			}
 		}
 	}
 }

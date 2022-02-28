@@ -140,7 +140,7 @@
 					title="Stop Service"
 					type="submit"
 					disabled={!$session.isAdmin}
-					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-pink-600 hover:text-white"
+					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
 					data-tooltip={$session.isAdmin
 						? 'Stop Service'
 						: 'You do not have permission to stop the service.'}
@@ -166,7 +166,7 @@
 					title="Start Service"
 					type="submit"
 					disabled={!$session.isAdmin}
-					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:bg-pink-600 hover:text-white"
+					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
 					data-tooltip={$session.isAdmin
 						? 'Start Service'
 						: 'You do not have permission to start the service.'}

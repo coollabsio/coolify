@@ -19,6 +19,7 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild}`);
 	Dockerfile.push('WORKDIR /usr/src/app');
+	Dockerfile.push(`LABEL coolify.image=true`);
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {
 			if (secret.isBuildSecret) {

@@ -6,6 +6,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	const Dockerfile: Array<string> = [];
 
 	Dockerfile.push(`FROM ${image}`);
+	Dockerfile.push(`LABEL coolify.image=true`);
 	Dockerfile.push('WORKDIR /usr/share/nginx/html');
 	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /usr/src/app/${publishDirectory} ./`);
 	Dockerfile.push(`EXPOSE 80`);
