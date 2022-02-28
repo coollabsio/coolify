@@ -199,6 +199,7 @@ export async function checkProxyConfigurations() {
 					backend_name: backendName,
 					stats: { lastchg }
 				} = stat;
+
 				const { fqdn } = await db.listSettings();
 				if (fqdn) {
 					const domain = getDomain(fqdn);
@@ -206,8 +207,15 @@ export async function checkProxyConfigurations() {
 						return;
 					}
 				}
-				const application = await db.getApplicationById(name);
-				if (!application) {
+				const application = await db.prisma.application.findUnique({
+					where: { id: name },
+					include: { destinationDocker: true }
+				});
+				const service = await db.prisma.service.findUnique({
+					where: { id: name },
+					include: { destinationDocker: true }
+				});
+				if (!application && !service) {
 					const transactionId = await getNextTransactionId();
 					await haproxy
 						.delete(`v2/services/haproxy/configuration/backends/${backendName}`, {
@@ -218,18 +226,36 @@ export async function checkProxyConfigurations() {
 						.json();
 					return await completeTransaction(transactionId);
 				}
-				const found = await checkContainer(application.destinationDocker.engine, name);
-				if (!found) {
-					const transactionId = await getNextTransactionId();
-					await haproxy
-						.delete(`v2/services/haproxy/configuration/backends/${backendName}`, {
-							searchParams: {
-								transaction_id: transactionId
-							}
-						})
-						.json();
-					return await completeTransaction(transactionId);
+				if (application?.destinationDocker?.engine && lastchg > 120) {
+					const found = await checkContainer(application.destinationDocker.engine, name);
+					if (!found) {
+						const transactionId = await getNextTransactionId();
+						await haproxy
+							.delete(`v2/services/haproxy/configuration/backends/${backendName}`, {
+								searchParams: {
+									transaction_id: transactionId
+								}
+							})
+							.json();
+						return await completeTransaction(transactionId);
+					}
 				}
+
+				if (service?.destinationDocker?.engine && lastchg > 120) {
+					const found = await checkContainer(service.destinationDocker.engine, name);
+					if (!found) {
+						const transactionId = await getNextTransactionId();
+						await haproxy
+							.delete(`v2/services/haproxy/configuration/backends/${backendName}`, {
+								searchParams: {
+									transaction_id: transactionId
+								}
+							})
+							.json();
+						return await completeTransaction(transactionId);
+					}
+				}
+
 				if (lastchg > 120) {
 					const transactionId = await getNextTransactionId();
 					await haproxy
