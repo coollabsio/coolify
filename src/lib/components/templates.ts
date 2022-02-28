@@ -1,7 +1,7 @@
 function defaultBuildAndDeploy(packageManager) {
 	return {
 		installCommand:
-			packageManager === 'npm' ? `${packageManager} run install` : `${packageManager} install`,
+			packageManager === 'npm' ? `${packageManager} install` : `${packageManager} install`,
 		buildCommand:
 			packageManager === 'npm' ? `${packageManager} run build` : `${packageManager} build`,
 		startCommand:
