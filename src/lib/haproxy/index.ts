@@ -620,6 +620,9 @@ export async function configureSimpleServiceProxyOn({ id, domain, port }) {
 }
 
 export async function configureSimpleServiceProxyOff(fqdn) {
+	if (!fqdn) {
+		return;
+	}
 	const domain = getDomain(fqdn);
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
