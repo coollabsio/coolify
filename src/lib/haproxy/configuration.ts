@@ -65,6 +65,12 @@ backend {{domain}}
   option forwardfor
   server {{id}} {{id}}:{{port}}
 {{/applications}}
+{{#services}}
+
+backend {{domain}}
+  option forwardfor
+  server {{id}} {{id}}:{{port}}
+{{/services}}
 `;
 export async function haproxyInstance() {
 	const { proxyPassword } = await db.listSettings();
@@ -108,10 +114,33 @@ export async function configureHAProxy() {
 			});
 		}
 	}
+	// const services = await db.prisma.service.findMany({
+	//     include: {
+	//         destinationDocker: true,
+	//         minio: true,
+	//         plausibleAnalytics: true,
+	//         vscodeserver: true,
+	//         wordpress: true
+	//     }
+	// });
+
+	// for (const service of services) {
+	//     const {
+	//         fqdn,
+	//         id,
+	//         type,
+	//         destinationDocker: { engine }
+	//     } = service;
+	//     const found = db.supportedServiceTypesAndVersions.find((a) => a.name === type);
+	//     if (found) {
+	//         const port = found.ports.main;
+	//         const publicPort = service[type]?.publicPort;
+	//         const isRunning = await checkContainer(engine, id);
+	//     }
+	// }
 	const output = mustache.render(template, data);
 	const newHash = crypto.createHash('md5').update(JSON.stringify(template)).digest('hex');
 	const { proxyHash, id } = await db.listSettings();
-	console.log(proxyHash, newHash);
 	if (proxyHash !== newHash) {
 		await db.prisma.setting.update({ where: { id }, data: { proxyHash: newHash } });
 		console.log('HAProxy configuration changed, updating...');
