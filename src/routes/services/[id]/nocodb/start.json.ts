@@ -56,14 +56,14 @@ export const post: RequestHandler = async (event) => {
 
 		try {
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
-			await checkProxyConfigurations();
-			await configureSimpleServiceProxyOn({ id, domain, port: 8080 });
+			// await checkProxyConfigurations();
+			// await configureSimpleServiceProxyOn({ id, domain, port: 8080 });
 
-			if (isHttps) {
-				await letsEncrypt({ domain, id });
-			}
-			await setWwwRedirection(fqdn);
-			await reloadHaproxy(destinationDocker.engine);
+			// if (isHttps) {
+			// 	await letsEncrypt({ domain, id });
+			// }
+			// await setWwwRedirection(fqdn);
+			// await reloadHaproxy(destinationDocker.engine);
 			return {
 				status: 200
 			};

@@ -24,7 +24,7 @@ export const post: RequestHandler = async (event) => {
 	const { id } = event.params;
 
 	try {
-		await checkHAProxy();
+		// await checkHAProxy();
 		const service = await db.getService({ id, teamId });
 		const {
 			type,
@@ -96,16 +96,16 @@ export const post: RequestHandler = async (event) => {
 		}
 		try {
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
-			await checkProxyConfigurations();
-			await configureSimpleServiceProxyOn({ id, domain, port: consolePort });
+			// await checkProxyConfigurations();
+			// await configureSimpleServiceProxyOn({ id, domain, port: consolePort });
 			await db.updateMinioService({ id, publicPort });
 			await startHttpProxy(destinationDocker, id, publicPort, apiPort);
 
-			if (isHttps) {
-				await letsEncrypt({ domain, id });
-			}
-			await setWwwRedirection(fqdn);
-			await reloadHaproxy(destinationDocker.engine);
+			// if (isHttps) {
+			// 	await letsEncrypt({ domain, id });
+			// }
+			// await setWwwRedirection(fqdn);
+			// await reloadHaproxy(destinationDocker.engine);
 			return {
 				status: 200
 			};

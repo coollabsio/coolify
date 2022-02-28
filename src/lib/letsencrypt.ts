@@ -5,7 +5,7 @@ import * as db from '$lib/database';
 import cuid from 'cuid';
 import getPort, { portNumbers } from 'get-port';
 
-export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
+export async function letsEncrypt(domain, id = null, isCoolify = false) {
 	try {
 		const data = await db.prisma.setting.findFirst();
 		const { minPort, maxPort } = data;
@@ -47,7 +47,6 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 				}
 			}
 		}
-		await forceSSLOffApplication(domain);
 		if (dualCerts) {
 			await asyncExecShell(
 				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p 9080:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${nakedDomain} -d ${wwwDomain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
@@ -70,10 +69,6 @@ export async function letsEncrypt({ domain, isCoolify = false, id = null }) {
 	} catch (error) {
 		if (error.code !== 0) {
 			throw error;
-		}
-	} finally {
-		if (!isCoolify) {
-			await forceSSLOnApplication(domain);
 		}
 	}
 }

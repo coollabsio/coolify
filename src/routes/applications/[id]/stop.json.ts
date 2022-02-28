@@ -20,7 +20,7 @@ export const post: RequestHandler = async (event) => {
 			const docker = dockerInstance({ destinationDocker });
 			await docker.engine.getContainer(id).stop();
 		}
-		await removeProxyConfiguration(fqdn);
+		// await removeProxyConfiguration(fqdn);
 		return {
 			status: 200
 		};

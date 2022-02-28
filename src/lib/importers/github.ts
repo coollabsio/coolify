@@ -14,7 +14,7 @@ export default async function ({
 	buildId
 }): Promise<any> {
 	try {
-		saveBuildLog({ line: 'GitHub importer started', buildId, applicationId });
+		saveBuildLog({ line: 'GitHub importer started.', buildId, applicationId });
 		const { privateKey, appId, installationId } = await db.getUniqueGithubApp({ githubAppId });
 		const githubPrivateKey = privateKey.replace(/\\n/g, '\n').replace(/"/g, '');
 
