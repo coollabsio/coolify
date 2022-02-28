@@ -74,6 +74,7 @@
 		"js-cookie": "3.0.1",
 		"js-yaml": "4.1.0",
 		"jsonwebtoken": "8.5.1",
+		"mustache": "^4.2.0",
 		"node-forge": "1.2.1",
 		"svelte-kit-cookie-session": "2.1.2",
 		"tailwindcss-scrollbar": "^0.1.0",

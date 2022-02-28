@@ -35,6 +35,7 @@ specifiers:
   js-yaml: 4.1.0
   jsonwebtoken: 8.5.1
   lint-staged: 12.3.4
+  mustache: ^4.2.0
   node-forge: 1.2.1
   postcss: 8.4.6
   prettier: 2.5.1
@@ -70,6 +71,7 @@ dependencies:
   js-cookie: 3.0.1
   js-yaml: 4.1.0
   jsonwebtoken: 8.5.1
+  mustache: 4.2.0
   node-forge: 1.2.1
   svelte-kit-cookie-session: 2.1.2
   tailwindcss-scrollbar: 0.1.0_tailwindcss@3.0.23
@@ -4089,6 +4091,14 @@ packages:
       }
     optionalDependencies:
       msgpackr-extract: 1.0.15
+    dev: false
+
+  /mustache/4.2.0:
+    resolution:
+      {
+        integrity: sha512-71ippSywq5Yb7/tVYyGbkBggbU8H3u5Rz56fH60jGFgr8uHwxs+aSKeqmluIVzM0m0kB7xQjKS6qPfd0b2ZoqQ==
+      }
+    hasBin: true
     dev: false
 
   /nan/2.15.0:
