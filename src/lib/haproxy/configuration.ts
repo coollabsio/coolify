@@ -96,7 +96,6 @@ backend {{domain}}
 {{/services}}
 
 {{#coolify}}
-# updatedAt={{updatedAt}}
 backend {{domain}}
   option forwardfor
   option httpchk GET /undead.json
