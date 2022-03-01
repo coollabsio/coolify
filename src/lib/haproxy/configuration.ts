@@ -113,143 +113,153 @@ export async function haproxyInstance() {
 }
 
 export async function configureHAProxy() {
-	const haproxy = await haproxyInstance();
-	await checkHAProxy(haproxy);
-	const data = {
-		applications: [],
-		services: [],
-		coolify: []
-	};
-	const applications = await db.prisma.application.findMany({
-		include: { destinationDocker: true, settings: true }
-	});
-	for (const application of applications) {
-		const {
-			fqdn,
-			id,
-			port,
-			destinationDocker: { engine, network },
-			settings: { previews },
-			updatedAt
-		} = application;
-		const isRunning = await checkContainer(engine, id);
-		const domain = getDomain(fqdn);
-		const isHttps = fqdn.startsWith('https://');
-		const isWWW = fqdn.includes('www.');
-		const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
-		if (isRunning) {
-			data.applications.push({
+	try {
+		const haproxy = await haproxyInstance();
+		await checkHAProxy(haproxy);
+		const data = {
+			applications: [],
+			services: [],
+			coolify: []
+		};
+		const applications = await db.prisma.application.findMany({
+			include: { destinationDocker: true, settings: true }
+		});
+		for (const application of applications) {
+			const {
+				fqdn,
 				id,
-				port: port || 3000,
+				port,
+				destinationDocker,
+				destinationDockerId,
+				settings: { previews },
+				updatedAt
+			} = application;
+			if (destinationDockerId) {
+				const { engine, network } = destinationDocker;
+				const isRunning = await checkContainer(engine, id);
+				if (fqdn) {
+					const domain = getDomain(fqdn);
+					const isHttps = fqdn.startsWith('https://');
+					const isWWW = fqdn.includes('www.');
+					const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
+					if (isRunning) {
+						data.applications.push({
+							id,
+							port: port || 3000,
+							domain,
+							isRunning,
+							isHttps,
+							redirectValue,
+							redirectTo: isWWW ? domain : 'www.' + domain,
+							updatedAt: updatedAt.getTime()
+						});
+					}
+					if (previews) {
+						const host = getEngine(engine);
+						const { stdout } = await asyncExecShell(
+							`DOCKER_HOST=${host} docker container ls --filter="status=running" --filter="network=${network}" --filter="name=${id}-" --format="{{json .Names}}"`
+						);
+						const containers = stdout
+							.trim()
+							.split('\n')
+							.filter((a) => a)
+							.map((c) => c.replace(/"/g, ''));
+						if (containers.length > 0) {
+							for (const container of containers) {
+								let previewDomain = `${container.split('-')[1]}.${domain}`;
+								data.applications.push({
+									id: container,
+									port: port || 3000,
+									domain: previewDomain,
+									isRunning,
+									isHttps,
+									redirectValue,
+									redirectTo: isWWW ? previewDomain : 'www.' + previewDomain,
+									updatedAt: updatedAt.getTime()
+								});
+							}
+						}
+					}
+				}
+			}
+		}
+		const services = await db.prisma.service.findMany({
+			include: {
+				destinationDocker: true,
+				minio: true,
+				plausibleAnalytics: true,
+				vscodeserver: true,
+				wordpress: true
+			}
+		});
+
+		for (const service of services) {
+			const { fqdn, id, type, destinationDocker, destinationDockerId, updatedAt } = service;
+			if (destinationDockerId) {
+				const { engine } = destinationDocker;
+				const found = db.supportedServiceTypesAndVersions.find((a) => a.name === type);
+				if (found) {
+					const port = found.ports.main;
+					const publicPort = service[type]?.publicPort;
+					const isRunning = await checkContainer(engine, id);
+					if (fqdn) {
+						const domain = getDomain(fqdn);
+						const isHttps = fqdn.startsWith('https://');
+						const isWWW = fqdn.includes('www.');
+						const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
+						if (isRunning) {
+							data.services.push({
+								id,
+								port,
+								publicPort,
+								domain,
+								isRunning,
+								isHttps,
+								redirectValue,
+								redirectTo: isWWW ? domain : 'www.' + domain,
+								updatedAt: updatedAt.getTime()
+							});
+						}
+					}
+				}
+			}
+		}
+		const { fqdn, updatedAt } = await db.prisma.setting.findFirst();
+		if (fqdn) {
+			const domain = getDomain(fqdn);
+			const isHttps = fqdn.startsWith('https://');
+			const isWWW = fqdn.includes('www.');
+			const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
+			data.coolify.push({
+				id: dev ? 'host.docker.internal' : 'coolify',
+				port: 3000,
 				domain,
-				isRunning,
 				isHttps,
 				redirectValue,
 				redirectTo: isWWW ? domain : 'www.' + domain,
 				updatedAt: updatedAt.getTime()
 			});
 		}
-		if (previews) {
-			const host = getEngine(engine);
-			const { stdout } = await asyncExecShell(
-				`DOCKER_HOST=${host} docker container ls --filter="status=running" --filter="network=${network}" --filter="name=${id}-" --format="{{json .Names}}"`
-			);
-			const containers = stdout
-				.trim()
-				.split('\n')
-				.filter((a) => a)
-				.map((c) => c.replace(/"/g, ''));
-			if (containers.length > 0) {
-				for (const container of containers) {
-					let previewDomain = `${container.split('-')[1]}.${domain}`;
-					data.applications.push({
-						id: container,
-						port: port || 3000,
-						domain: previewDomain,
-						isRunning,
-						isHttps,
-						redirectValue,
-						redirectTo: isWWW ? previewDomain : 'www.' + previewDomain,
-						updatedAt: updatedAt.getTime()
-					});
+		const output = mustache.render(template, data);
+		const newHash = crypto.createHash('md5').update(output).digest('hex');
+		const { proxyHash, id } = await db.listSettings();
+		console.log({ proxyHash, newHash, output });
+		if (proxyHash !== newHash) {
+			await db.prisma.setting.update({ where: { id }, data: { proxyHash: newHash } });
+			console.log('HAProxy configuration changed, updating...');
+			await haproxy.post(`v2/services/haproxy/configuration/raw`, {
+				searchParams: {
+					skip_version: true
+				},
+				body: output,
+				headers: {
+					'Content-Type': 'text/plain'
 				}
-			}
+			});
+		} else {
+			console.log('HAProxy configuration is up to date');
 		}
-	}
-	const services = await db.prisma.service.findMany({
-		include: {
-			destinationDocker: true,
-			minio: true,
-			plausibleAnalytics: true,
-			vscodeserver: true,
-			wordpress: true
-		}
-	});
-
-	for (const service of services) {
-		const {
-			fqdn,
-			id,
-			type,
-			destinationDocker: { engine },
-			updatedAt
-		} = service;
-		const found = db.supportedServiceTypesAndVersions.find((a) => a.name === type);
-		if (found) {
-			const port = found.ports.main;
-			const publicPort = service[type]?.publicPort;
-			const isRunning = await checkContainer(engine, id);
-			const domain = getDomain(fqdn);
-			const isHttps = fqdn.startsWith('https://');
-			const isWWW = fqdn.includes('www.');
-			const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
-			if (isRunning) {
-				data.services.push({
-					id,
-					port,
-					publicPort,
-					domain,
-					isRunning,
-					isHttps,
-					redirectValue,
-					redirectTo: isWWW ? domain : 'www.' + domain,
-					updatedAt: updatedAt.getTime()
-				});
-			}
-		}
-	}
-	const { fqdn, updatedAt } = await db.prisma.setting.findFirst();
-	if (fqdn) {
-		const domain = getDomain(fqdn);
-		const isHttps = fqdn.startsWith('https://');
-		const isWWW = fqdn.includes('www.');
-		const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
-		data.coolify.push({
-			id: dev ? 'host.docker.internal' : 'coolify',
-			port: 3000,
-			domain,
-			isHttps,
-			redirectValue,
-			redirectTo: isWWW ? domain : 'www.' + domain,
-			updatedAt
-		});
-	}
-	const output = mustache.render(template, data);
-	const newHash = crypto.createHash('md5').update(output).digest('hex');
-	const { proxyHash, id } = await db.listSettings();
-	if (proxyHash !== newHash) {
-		await db.prisma.setting.update({ where: { id }, data: { proxyHash: newHash } });
-		console.log('HAProxy configuration changed, updating...');
-		await haproxy.post(`v2/services/haproxy/configuration/raw`, {
-			searchParams: {
-				skip_version: true
-			},
-			body: output,
-			headers: {
-				'Content-Type': 'text/plain'
-			}
-		});
-	} else {
-		// console.log('HAProxy configuration is up to date');
+	} catch (error) {
+		throw error;
 	}
 }

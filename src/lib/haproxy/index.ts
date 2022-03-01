@@ -70,7 +70,7 @@ export async function deleteProxy({ id }) {
 			})
 			.json();
 	} catch (error) {
-		console.log(error.response.body);
+		console.log(error.response?.body || error);
 	} finally {
 		if (transactionId) await completeTransaction(transactionId);
 	}
