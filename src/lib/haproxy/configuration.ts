@@ -71,7 +71,6 @@ frontend stats
   bind *:8404
   stats enable
   stats uri /
-  stats refresh 5s
   stats admin if TRUE
   stats auth "\${HAPROXY_USERNAME}:\${HAPROXY_PASSWORD}"
 
@@ -141,7 +140,7 @@ export async function configureHAProxy() {
 		if (isRunning) {
 			data.applications.push({
 				id,
-				port,
+				port: port || 3000,
 				domain,
 				isRunning,
 				isHttps,
@@ -165,7 +164,7 @@ export async function configureHAProxy() {
 					let previewDomain = `${container.split('-')[1]}.${domain}`;
 					data.applications.push({
 						id: container,
-						port,
+						port: port || 3000,
 						domain: previewDomain,
 						isRunning,
 						isHttps,
