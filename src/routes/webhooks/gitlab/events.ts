@@ -48,6 +48,10 @@ export const post: RequestHandler = async (event) => {
 						data: { configHash }
 					});
 				}
+				await db.prisma.application.update({
+					where: { id: applicationFound.id },
+					data: { updatedAt: new Date() }
+				});
 				await buildQueue.add(buildId, {
 					build_id: buildId,
 					type: 'webhook_commit',
@@ -125,6 +129,10 @@ export const post: RequestHandler = async (event) => {
 						action === 'open' ||
 						action === 'update'
 					) {
+						await db.prisma.application.update({
+							where: { id: applicationFound.id },
+							data: { updatedAt: new Date() }
+						});
 						await buildQueue.add(buildId, {
 							build_id: buildId,
 							type: 'webhook_mr',
@@ -140,16 +148,8 @@ export const post: RequestHandler = async (event) => {
 						};
 					} else if (action === 'close') {
 						if (applicationFound.destinationDockerId) {
-							const domain = getDomain(applicationFound.fqdn);
-							const isHttps = applicationFound.fqdn.startsWith('https://');
-							const isWWW = applicationFound.fqdn.includes('www.');
-							const fqdn = `${isHttps ? 'https://' : 'http://'}${
-								isWWW ? 'www.' : ''
-							}${pullmergeRequestId}.${domain}`;
-
 							const id = `${applicationFound.id}-${pullmergeRequestId}`;
 							const engine = applicationFound.destinationDocker.engine;
-
 							await removeDestinationDocker({ id, engine });
 						}
 

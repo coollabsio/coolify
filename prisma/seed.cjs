@@ -27,6 +27,15 @@ async function main() {
 				proxyUser: cuid()
 			}
 		});
+	} else {
+		await prisma.setting.update({
+			where: {
+				id: settingsFound.id
+			},
+			data: {
+				proxyHash: null
+			}
+		});
 	}
 	const localDocker = await prisma.destinationDocker.findFirst({
 		where: { engine: '/var/run/docker.sock' }

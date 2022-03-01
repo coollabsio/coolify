@@ -29,6 +29,7 @@ export const post: RequestHandler = async (event) => {
 				.digest('hex');
 			await db.prisma.application.update({ where: { id }, data: { configHash } });
 		}
+		await db.prisma.application.update({ where: { id }, data: { updatedAt: new Date() } });
 		await buildQueue.add(buildId, { build_id: buildId, type: 'manual', ...applicationFound });
 		return {
 			status: 200,

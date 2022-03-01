@@ -79,7 +79,7 @@ backend backend-certbot
 
 {{#applications}}
 {{#isRunning}}
-
+# updatedAt={{updatedAt}}
 backend {{domain}}
   option forwardfor
   server {{id}} {{id}}:{{port}} check
@@ -88,7 +88,7 @@ backend {{domain}}
 
 {{#services}}
 {{#isRunning}}
-
+# updatedAt={{updatedAt}}
 backend {{domain}}
   option forwardfor
   server {{id}} {{id}}:{{port}} check
@@ -96,6 +96,7 @@ backend {{domain}}
 {{/services}}
 
 {{#coolify}}
+# updatedAt={{updatedAt}}
 backend {{domain}}
   option forwardfor
   option httpchk GET /undead.json
@@ -128,7 +129,8 @@ export async function configureHAProxy() {
 			id,
 			port,
 			destinationDocker: { engine, network },
-			settings: { previews }
+			settings: { previews },
+			updatedAt
 		} = application;
 		const isRunning = await checkContainer(engine, id);
 		const domain = getDomain(fqdn);
@@ -143,7 +145,8 @@ export async function configureHAProxy() {
 				isRunning,
 				isHttps,
 				redirectValue,
-				redirectTo: isWWW ? domain : 'www.' + domain
+				redirectTo: isWWW ? domain : 'www.' + domain,
+				updatedAt: updatedAt.getTime()
 			});
 		}
 		if (previews) {
@@ -166,7 +169,8 @@ export async function configureHAProxy() {
 						isRunning,
 						isHttps,
 						redirectValue,
-						redirectTo: isWWW ? previewDomain : 'www.' + previewDomain
+						redirectTo: isWWW ? previewDomain : 'www.' + previewDomain,
+						updatedAt: updatedAt.getTime()
 					});
 				}
 			}
@@ -187,7 +191,8 @@ export async function configureHAProxy() {
 			fqdn,
 			id,
 			type,
-			destinationDocker: { engine }
+			destinationDocker: { engine },
+			updatedAt
 		} = service;
 		const found = db.supportedServiceTypesAndVersions.find((a) => a.name === type);
 		if (found) {
@@ -207,12 +212,13 @@ export async function configureHAProxy() {
 					isRunning,
 					isHttps,
 					redirectValue,
-					redirectTo: isWWW ? domain : 'www.' + domain
+					redirectTo: isWWW ? domain : 'www.' + domain,
+					updatedAt: updatedAt.getTime()
 				});
 			}
 		}
 	}
-	const { fqdn } = await db.prisma.setting.findFirst();
+	const { fqdn, updatedAt } = await db.prisma.setting.findFirst();
 	if (fqdn) {
 		const domain = getDomain(fqdn);
 		const isHttps = fqdn.startsWith('https://');
@@ -224,7 +230,8 @@ export async function configureHAProxy() {
 			domain,
 			isHttps,
 			redirectValue,
-			redirectTo: isWWW ? domain : 'www.' + domain
+			redirectTo: isWWW ? domain : 'www.' + domain,
+			updatedAt
 		});
 	}
 	const output = mustache.render(template, data);

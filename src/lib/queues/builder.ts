@@ -255,6 +255,6 @@ export default async function (job) {
 			sentry.captureException(error);
 			throw new Error(error);
 		}
-		saveBuildLog({ line: 'Proxy will be configured shortly.', buildId, applicationId });
+		saveBuildLog({ line: 'Proxy will be updated shortly.', buildId, applicationId });
 	}
 }
