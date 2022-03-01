@@ -1,7 +1,7 @@
-import { dev } from '$app/env';
-import { forceSSLOffApplication, forceSSLOnApplication } from '$lib/haproxy';
-import { asyncExecShell, getEngine } from './common';
+import { asyncExecShell, getDomain, getEngine } from '$lib/common';
+import { checkContainer } from '$lib/haproxy';
 import * as db from '$lib/database';
+import { dev } from '$app/env';
 import cuid from 'cuid';
 import getPort, { portNumbers } from 'get-port';
 
@@ -13,7 +13,7 @@ export async function letsEncrypt(domain, id = null, isCoolify = false) {
 		const nakedDomain = domain.replace('www.', '');
 		const wwwDomain = `www.${nakedDomain}`;
 		const randomCuid = cuid();
-		const randomPort = 9000;
+		const randomPort = await getPort({ port: portNumbers(minPort, maxPort) });
 
 		let host;
 		let dualCerts = false;
@@ -69,6 +69,86 @@ export async function letsEncrypt(domain, id = null, isCoolify = false) {
 	} catch (error) {
 		if (error.code !== 0) {
 			throw error;
+		}
+	}
+}
+
+export async function generateSSLCerts() {
+	const ssls = [];
+	const applications = await db.prisma.application.findMany({
+		include: { destinationDocker: true, settings: true }
+	});
+	for (const application of applications) {
+		const {
+			fqdn,
+			id,
+			destinationDocker: { engine, network },
+			settings: { previews }
+		} = application;
+		const isRunning = await checkContainer(engine, id);
+		const domain = getDomain(fqdn);
+		const isHttps = fqdn.startsWith('https://');
+		if (isRunning) {
+			if (isHttps) ssls.push({ domain, id, isCoolify: false });
+		}
+		if (previews) {
+			const host = getEngine(engine);
+			const { stdout } = await asyncExecShell(
+				`DOCKER_HOST=${host} docker container ls --filter="status=running" --filter="network=${network}" --filter="name=${id}-" --format="{{json .Names}}"`
+			);
+			const containers = stdout
+				.trim()
+				.split('\n')
+				.filter((a) => a)
+				.map((c) => c.replace(/"/g, ''));
+			if (containers.length > 0) {
+				for (const container of containers) {
+					let previewDomain = `${container.split('-')[1]}.${domain}`;
+					if (isHttps) ssls.push({ domain: previewDomain, id, isCoolify: false });
+				}
+			}
+		}
+	}
+	const services = await db.prisma.service.findMany({
+		include: {
+			destinationDocker: true,
+			minio: true,
+			plausibleAnalytics: true,
+			vscodeserver: true,
+			wordpress: true
+		}
+	});
+
+	for (const service of services) {
+		const {
+			fqdn,
+			id,
+			type,
+			destinationDocker: { engine }
+		} = service;
+		const found = db.supportedServiceTypesAndVersions.find((a) => a.name === type);
+		if (found) {
+			const domain = getDomain(fqdn);
+			const isHttps = fqdn.startsWith('https://');
+			const isRunning = await checkContainer(engine, id);
+			if (isRunning) {
+				if (isHttps) ssls.push({ domain, id, isCoolify: false });
+			}
+		}
+	}
+	const { fqdn } = await db.prisma.setting.findFirst();
+	if (fqdn) {
+		const domain = getDomain(fqdn);
+		const isHttps = fqdn.startsWith('https://');
+		if (isHttps) ssls.push({ domain, id: 'coolify', isCoolify: true });
+	}
+	if (ssls.length > 0) {
+		for (const ssl of ssls) {
+			if (!dev) {
+				await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
+			} else {
+				console.log('Generate ssl for', ssl.domain);
+			}
 		}
 	}
 }

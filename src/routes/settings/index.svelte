@@ -78,6 +78,7 @@
 			if (fqdn !== settings.fqdn) {
 				await post(`/settings/check.json`, { fqdn });
 				await post(`/settings.json`, { fqdn });
+				return window.location.reload();
 			}
 			if (minPort !== settings.minPort || maxPort !== settings.maxPort) {
 				await post(`/settings.json`, { minPort, maxPort });
@@ -98,7 +99,7 @@
 {#if $session.teamId === '0'}
 	<div class="mx-auto max-w-4xl px-6">
 		<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
-			<div class="flex space-x-1 py-6">
+			<div class="flex space-x-1 pb-6">
 				<div class="title font-bold">Global Settings</div>
 				<button
 					type="submit"

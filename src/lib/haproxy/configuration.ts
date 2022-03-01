@@ -6,7 +6,6 @@ import crypto from 'crypto';
 import * as db from '$lib/database';
 import { checkContainer, checkHAProxy } from '.';
 import { asyncExecShell, getDomain, getEngine } from '$lib/common';
-import { letsEncrypt } from '$lib/letsencrypt';
 
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555';
 
@@ -115,7 +114,6 @@ export async function haproxyInstance() {
 export async function configureHAProxy() {
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
-	const ssls = [];
 	const data = {
 		applications: [],
 		services: [],
@@ -147,7 +145,6 @@ export async function configureHAProxy() {
 				redirectValue,
 				redirectTo: isWWW ? domain : 'www.' + domain
 			});
-			if (isHttps) ssls.push({ domain, id, isCoolify: false });
 		}
 		if (previews) {
 			const host = getEngine(engine);
@@ -171,7 +168,6 @@ export async function configureHAProxy() {
 						redirectValue,
 						redirectTo: isWWW ? previewDomain : 'www.' + previewDomain
 					});
-					if (isHttps) ssls.push({ domain: previewDomain, id, isCoolify: false });
 				}
 			}
 		}
@@ -202,17 +198,18 @@ export async function configureHAProxy() {
 			const isHttps = fqdn.startsWith('https://');
 			const isWWW = fqdn.includes('www.');
 			const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
-			data.services.push({
-				id,
-				port,
-				publicPort,
-				domain,
-				isRunning,
-				isHttps,
-				redirectValue,
-				redirectTo: isWWW ? domain : 'www.' + domain
-			});
-			if (isHttps) ssls.push({ domain, id, isCoolify: false });
+			if (isRunning) {
+				data.services.push({
+					id,
+					port,
+					publicPort,
+					domain,
+					isRunning,
+					isHttps,
+					redirectValue,
+					redirectTo: isWWW ? domain : 'www.' + domain
+				});
+			}
 		}
 	}
 	const { fqdn } = await db.prisma.setting.findFirst();
@@ -229,7 +226,6 @@ export async function configureHAProxy() {
 			redirectValue,
 			redirectTo: isWWW ? domain : 'www.' + domain
 		});
-		if (!dev && isHttps) ssls.push({ domain, id: 'coolify', isCoolify: true });
 	}
 	const output = mustache.render(template, data);
 	const newHash = crypto.createHash('md5').update(output).digest('hex');
@@ -248,14 +244,5 @@ export async function configureHAProxy() {
 		});
 	} else {
 		// console.log('HAProxy configuration is up to date');
-	}
-	if (ssls.length > 0) {
-		for (const ssl of ssls) {
-			if (!dev) {
-				await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
-			} else {
-				// console.log('Generate ssl for', ssl.domain);
-			}
-		}
 	}
 }
