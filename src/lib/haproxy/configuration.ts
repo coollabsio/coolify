@@ -242,7 +242,6 @@ export async function configureHAProxy() {
 		const output = mustache.render(template, data);
 		const newHash = crypto.createHash('md5').update(output).digest('hex');
 		const { proxyHash, id } = await db.listSettings();
-		console.log({ proxyHash, newHash, output });
 		if (proxyHash !== newHash) {
 			await db.prisma.setting.update({ where: { id }, data: { proxyHash: newHash } });
 			console.log('HAProxy configuration changed, updating...');
