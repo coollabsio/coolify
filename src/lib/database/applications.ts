@@ -1,5 +1,4 @@
 import { decrypt, encrypt } from '$lib/crypto';
-import { removeProxyConfiguration } from '$lib/haproxy';
 import { asyncExecShell, getEngine } from '$lib/common';
 
 import { getDomain, removeDestinationDocker } from '$lib/common';

@@ -1,5 +1,5 @@
 import { getTeam, getUserDetails, getDomain, removeDestinationDocker } from '$lib/common';
-import { checkContainer, removeProxyConfiguration } from '$lib/haproxy';
+import { checkContainer } from '$lib/haproxy';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
@@ -151,7 +151,6 @@ export const post: RequestHandler = async (event) => {
 							const engine = applicationFound.destinationDocker.engine;
 
 							await removeDestinationDocker({ id, engine });
-							await removeProxyConfiguration(fqdn);
 						}
 
 						return {

@@ -4,7 +4,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
 import crypto from 'crypto';
 import { buildQueue } from '$lib/queues';
-import { checkContainer, removeProxyConfiguration } from '$lib/haproxy';
+import { checkContainer } from '$lib/haproxy';
 import { dev } from '$app/env';
 
 export const options: RequestHandler = async () => {
@@ -154,7 +154,6 @@ export const post: RequestHandler = async (event) => {
 							const engine = applicationFound.destinationDocker.engine;
 
 							await removeDestinationDocker({ id, engine });
-							await removeProxyConfiguration(fqdn);
 						}
 						return {
 							status: 200,
