@@ -256,26 +256,5 @@ export default async function (job) {
 			throw new Error(error);
 		}
 		saveBuildLog({ line: 'Proxy will be configured shortly.', buildId, applicationId });
-		// try {
-		// 	if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-		// 		saveBuildLog({ line: 'Proxy configuration started!', buildId, applicationId });
-		// 		await checkProxyConfigurations();
-		// 		await configureProxyForApplication(domain, imageId, port);
-		// 		if (isHttps) await letsEncrypt({ domain, id: applicationId });
-		// 		await setWwwRedirection(fqdn);
-		// 		await reloadHaproxy(destinationDocker.engine);
-		// 		saveBuildLog({ line: 'Proxy configuration successful!', buildId, applicationId });
-		// 	} else {
-		// 		saveBuildLog({
-		// 			line: 'Coolify Proxy is not configured for this destination. Nothing else to do.',
-		// 			buildId,
-		// 			applicationId
-		// 		});
-		// 	}
-		// } catch (error) {
-		// 	saveBuildLog({ line: error.stdout || error, buildId, applicationId });
-		// 	sentry.captureException(error);
-		// 	throw new Error(error);
-		// }
 	}
 }

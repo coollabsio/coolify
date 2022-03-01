@@ -3,15 +3,7 @@ import * as db from '$lib/database';
 import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
-import { letsEncrypt } from '$lib/letsencrypt';
-import {
-	checkHAProxy,
-	checkProxyConfigurations,
-	configureSimpleServiceProxyOn,
-	reloadHaproxy,
-	setWwwRedirection,
-	startHttpProxy
-} from '$lib/haproxy';
+import { startHttpProxy } from '$lib/haproxy';
 import getPort, { portNumbers } from 'get-port';
 import { getDomain } from '$lib/components/common';
 import { ErrorHandler } from '$lib/database';
@@ -24,7 +16,6 @@ export const post: RequestHandler = async (event) => {
 	const { id } = event.params;
 
 	try {
-		// await checkHAProxy();
 		const service = await db.getService({ id, teamId });
 		const {
 			type,
@@ -37,9 +28,6 @@ export const post: RequestHandler = async (event) => {
 
 		const data = await db.prisma.setting.findFirst();
 		const { minPort, maxPort } = data;
-
-		const domain = getDomain(fqdn);
-		const isHttps = fqdn.startsWith('https://');
 
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
@@ -96,16 +84,8 @@ export const post: RequestHandler = async (event) => {
 		}
 		try {
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
-			// await checkProxyConfigurations();
-			// await configureSimpleServiceProxyOn({ id, domain, port: consolePort });
 			await db.updateMinioService({ id, publicPort });
 			await startHttpProxy(destinationDocker, id, publicPort, apiPort);
-
-			// if (isHttps) {
-			// 	await letsEncrypt({ domain, id });
-			// }
-			// await setWwwRedirection(fqdn);
-			// await reloadHaproxy(destinationDocker.engine);
 			return {
 				status: 200
 			};

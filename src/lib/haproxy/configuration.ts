@@ -5,12 +5,12 @@ import crypto from 'crypto';
 
 import * as db from '$lib/database';
 import { checkContainer, checkHAProxy } from '.';
-import { getDomain } from '$lib/common';
+import { asyncExecShell, getDomain, getEngine } from '$lib/common';
+import { letsEncrypt } from '$lib/letsencrypt';
 
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555';
 
-let template = `#coolhash={{hash}}
-program api 
+let template = `program api 
   command /usr/bin/dataplaneapi -f /usr/local/etc/haproxy/dataplaneapi.hcl --userlist haproxy-dataplaneapi
   no option start-on-reload
 	
@@ -44,6 +44,26 @@ frontend http
 		dev ? 302 : 301
 	} if { req.hdr(host) -i {{redirectTo}} }
   {{/applications}}
+  {{#services}}
+  {{#isHttps}}
+  http-request redirect scheme https code ${
+		dev ? 302 : 301
+	} if { hdr(host) -i {{domain}} } !{ ssl_fc }
+  {{/isHttps}}
+  http-request redirect location {{{redirectValue}}} code ${
+		dev ? 302 : 301
+	} if { req.hdr(host) -i {{redirectTo}} }
+  {{/services}}
+  {{#coolify}}
+  {{#isHttps}}
+  http-request redirect scheme https code ${
+		dev ? 302 : 301
+	} if { hdr(host) -i {{domain}} } !{ ssl_fc }
+  {{/isHttps}}
+  http-request redirect location {{{redirectValue}}} code ${
+		dev ? 302 : 301
+	} if { req.hdr(host) -i {{redirectTo}} }
+  {{/coolify}}
   use_backend backend-certbot if is_certbot
   use_backend %[req.hdr(host),lower]
 
@@ -61,17 +81,28 @@ backend backend-certbot
 
 {{#applications}}
 {{#isRunning}}
-backend {{domain}}
-  option forwardfor
-  server {{id}} {{id}}:{{port}}
-{{/isRunning}}
-{{/applications}}
-{{#services}}
 
 backend {{domain}}
   option forwardfor
-  server {{id}} {{id}}:{{port}}
+  server {{id}} {{id}}:{{port}} check
+{{/isRunning}}
+{{/applications}}
+
+{{#services}}
+{{#isRunning}}
+
+backend {{domain}}
+  option forwardfor
+  server {{id}} {{id}}:{{port}} check
+{{/isRunning}}
 {{/services}}
+
+{{#coolify}}
+backend {{domain}}
+  option forwardfor
+  option httpchk GET /undead.json
+  server {{id}} {{id}}:{{port}} check fall 10
+{{/coolify}}
 `;
 export async function haproxyInstance() {
 	const { proxyPassword } = await db.listSettings();
@@ -85,26 +116,29 @@ export async function haproxyInstance() {
 export async function configureHAProxy() {
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
+	const ssls = [];
 	const data = {
 		applications: [],
-		services: []
+		services: [],
+		coolify: []
 	};
 	const applications = await db.prisma.application.findMany({
-		include: { destinationDocker: true }
+		include: { destinationDocker: true, settings: true }
 	});
 	for (const application of applications) {
 		const {
 			fqdn,
 			id,
 			port,
-			destinationDocker: { engine }
+			destinationDocker: { engine, network },
+			settings: { previews }
 		} = application;
 		const isRunning = await checkContainer(engine, id);
+		const domain = getDomain(fqdn);
+		const isHttps = fqdn.startsWith('https://');
+		const isWWW = fqdn.includes('www.');
+		const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
 		if (isRunning) {
-			const domain = getDomain(fqdn);
-			const isHttps = fqdn.startsWith('https://');
-			const isWWW = fqdn.includes('www.');
-			const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
 			data.applications.push({
 				id,
 				port,
@@ -114,32 +148,90 @@ export async function configureHAProxy() {
 				redirectValue,
 				redirectTo: isWWW ? domain : 'www.' + domain
 			});
+			if (isHttps) ssls.push({ domain, id, isCoolify: false });
+		}
+		if (previews) {
+			const host = getEngine(engine);
+			const { stdout } = await asyncExecShell(
+				`DOCKER_HOST=${host} docker container ls --filter="status=running" --filter="network=${network}" --filter="name=${id}-" --format="{{json .Names}}"`
+			);
+			const containers = stdout
+				.trim()
+				.split('\n')
+				.filter((a) => a)
+				.map((c) => c.replace(/"/g, ''));
+			if (containers.length > 0) {
+				for (const container of containers) {
+					let previewDomain = `${container.split('-')[1]}.${domain}`;
+					data.applications.push({
+						id: container,
+						port,
+						domain: previewDomain,
+						isRunning,
+						isHttps,
+						redirectValue,
+						redirectTo: isWWW ? previewDomain : 'www.' + previewDomain
+					});
+					if (isHttps) ssls.push({ domain: previewDomain, id, isCoolify: false });
+				}
+			}
 		}
 	}
-	// const services = await db.prisma.service.findMany({
-	//     include: {
-	//         destinationDocker: true,
-	//         minio: true,
-	//         plausibleAnalytics: true,
-	//         vscodeserver: true,
-	//         wordpress: true
-	//     }
-	// });
+	const services = await db.prisma.service.findMany({
+		include: {
+			destinationDocker: true,
+			minio: true,
+			plausibleAnalytics: true,
+			vscodeserver: true,
+			wordpress: true
+		}
+	});
 
-	// for (const service of services) {
-	//     const {
-	//         fqdn,
-	//         id,
-	//         type,
-	//         destinationDocker: { engine }
-	//     } = service;
-	//     const found = db.supportedServiceTypesAndVersions.find((a) => a.name === type);
-	//     if (found) {
-	//         const port = found.ports.main;
-	//         const publicPort = service[type]?.publicPort;
-	//         const isRunning = await checkContainer(engine, id);
-	//     }
-	// }
+	for (const service of services) {
+		const {
+			fqdn,
+			id,
+			type,
+			destinationDocker: { engine }
+		} = service;
+		const found = db.supportedServiceTypesAndVersions.find((a) => a.name === type);
+		if (found) {
+			const port = found.ports.main;
+			const publicPort = service[type]?.publicPort;
+			const isRunning = await checkContainer(engine, id);
+			const domain = getDomain(fqdn);
+			const isHttps = fqdn.startsWith('https://');
+			const isWWW = fqdn.includes('www.');
+			const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
+			data.services.push({
+				id,
+				port,
+				publicPort,
+				domain,
+				isRunning,
+				isHttps,
+				redirectValue,
+				redirectTo: isWWW ? domain : 'www.' + domain
+			});
+			if (isHttps) ssls.push({ domain, id, isCoolify: false });
+		}
+	}
+	const { fqdn } = await db.prisma.setting.findFirst();
+	if (fqdn) {
+		const domain = getDomain(fqdn);
+		const isHttps = fqdn.startsWith('https://');
+		const isWWW = fqdn.includes('www.');
+		const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
+		data.coolify.push({
+			id: dev ? 'host.docker.internal' : 'coolify',
+			port: 3000,
+			domain,
+			isHttps,
+			redirectValue,
+			redirectTo: isWWW ? domain : 'www.' + domain
+		});
+		if (!dev && isHttps) ssls.push({ domain, id: 'coolify', isCoolify: true });
+	}
 	const output = mustache.render(template, data);
 	const newHash = crypto.createHash('md5').update(output).digest('hex');
 	const { proxyHash, id } = await db.listSettings();
@@ -156,6 +248,15 @@ export async function configureHAProxy() {
 			}
 		});
 	} else {
-		console.log('HAProxy configuration is up to date');
+		// console.log('HAProxy configuration is up to date');
+	}
+	if (ssls.length > 0) {
+		for (const ssl of ssls) {
+			if (!dev) {
+				await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
+			} else {
+				// console.log('Generate ssl for', ssl.domain);
+			}
+		}
 	}
 }

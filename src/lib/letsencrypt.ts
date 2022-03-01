@@ -13,7 +13,7 @@ export async function letsEncrypt(domain, id = null, isCoolify = false) {
 		const nakedDomain = domain.replace('www.', '');
 		const wwwDomain = `www.${nakedDomain}`;
 		const randomCuid = cuid();
-		const randomPort = await getPort({ port: portNumbers(minPort, maxPort) });
+		const randomPort = 9000;
 
 		let host;
 		let dualCerts = false;

@@ -1,18 +1,6 @@
-import { dev } from '$app/env';
-import { getDomain, getUserDetails } from '$lib/common';
+import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { listSettings, ErrorHandler } from '$lib/database';
-import {
-	checkProxyConfigurations,
-	configureCoolifyProxyOff,
-	configureCoolifyProxyOn,
-	forceSSLOnApplication,
-	reloadHaproxy,
-	removeWwwRedirection,
-	setWwwRedirection,
-	startCoolifyProxy
-} from '$lib/haproxy';
-import { letsEncrypt } from '$lib/letsencrypt';
 import type { RequestHandler } from '@sveltejs/kit';
 import { promises as dns } from 'dns';
 
@@ -52,10 +40,7 @@ export const del: RequestHandler = async (event) => {
 		// Do not care.
 	}
 	try {
-		const domain = getDomain(fqdn);
 		await db.prisma.setting.update({ where: { fqdn }, data: { fqdn: null } });
-		await configureCoolifyProxyOff(fqdn);
-		await removeWwwRedirection(domain);
 		return {
 			status: 200,
 			body: {
@@ -80,50 +65,19 @@ export const post: RequestHandler = async (event) => {
 
 	const { fqdn, isRegistrationEnabled, dualCerts, minPort, maxPort } = await event.request.json();
 	try {
-		await checkProxyConfigurations();
-		const {
-			id,
-			fqdn: oldFqdn,
-			isRegistrationEnabled: oldIsRegistrationEnabled,
-			dualCerts: oldDualCerts
-		} = await db.listSettings();
-		if (oldIsRegistrationEnabled !== isRegistrationEnabled) {
+		const { id } = await db.listSettings();
+		if (isRegistrationEnabled) {
 			await db.prisma.setting.update({ where: { id }, data: { isRegistrationEnabled } });
 		}
-		if (oldDualCerts !== dualCerts) {
-			await db.prisma.setting.update({ where: { id }, data: { dualCerts } });
-		}
-		if (oldFqdn && oldFqdn !== fqdn) {
-			if (oldFqdn) {
-				const oldDomain = getDomain(oldFqdn);
-				await configureCoolifyProxyOff(oldFqdn);
-				await removeWwwRedirection(oldDomain);
-			}
-		}
 		if (fqdn) {
-			await startCoolifyProxy('/var/run/docker.sock');
-			const domain = getDomain(fqdn);
-			const isHttps = fqdn.startsWith('https://');
-			if (domain) {
-				await configureCoolifyProxyOn(fqdn);
-				await setWwwRedirection(fqdn);
-				if (isHttps) {
-					await letsEncrypt({ domain, isCoolify: true });
-					await forceSSLOnApplication(domain);
-					await reloadHaproxy('/var/run/docker.sock');
-				}
-			}
-
 			await db.prisma.setting.update({ where: { id }, data: { fqdn } });
-			await db.prisma.destinationDocker.updateMany({
-				where: { engine: '/var/run/docker.sock' },
-				data: { isCoolifyProxyUsed: true }
-			});
+		}
+		if (dualCerts) {
+			await db.prisma.setting.update({ where: { id }, data: { dualCerts } });
 		}
 		if (minPort && maxPort) {
 			await db.prisma.setting.update({ where: { id }, data: { minPort, maxPort } });
 		}
-
 		return {
 			status: 201
 		};

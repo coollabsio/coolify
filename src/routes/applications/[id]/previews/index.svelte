@@ -44,33 +44,19 @@
 </div>
 
 <div class="mx-auto max-w-6xl rounded-xl px-6 pt-4">
-	<table class="mx-auto">
-		<thead class=" rounded-xl border-b border-coolgray-500">
-			<tr>
-				<th
-					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white">Name</th
-				>
-				<th
-					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white"
-					>Value</th
-				>
-				<th
-					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white"
-					>Need during buildtime?</th
-				>
-				<th
-					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white"
-				/>
+	<table class="mx-auto border-separate text-left">
+		<thead>
+			<tr class="h-12">
+				<th scope="col">Name</th>
+				<th scope="col">Value</th>
+				<th scope="col" class="w-64 text-center">Need during buildtime?</th>
+				<th scope="col" class="w-96 text-center">Action</th>
 			</tr>
 		</thead>
-		<tbody class="">
+		<tbody>
 			{#each applicationSecrets as secret}
 				{#key secret.id}
-					<tr class="h-20 transition duration-100 hover:bg-coolgray-400">
+					<tr>
 						<Secret
 							PRMRSecret={PRMRSecrets.find((s) => s.name === secret.name)}
 							isPRMRSecret
