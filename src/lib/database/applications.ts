@@ -135,13 +135,13 @@ export async function getApplication({ id, teamId }) {
 		}
 	});
 
-	if (body.gitSource?.githubApp?.clientSecret) {
+	if (body?.gitSource?.githubApp?.clientSecret) {
 		body.gitSource.githubApp.clientSecret = decrypt(body.gitSource.githubApp.clientSecret);
 	}
-	if (body.gitSource?.githubApp?.webhookSecret) {
+	if (body?.gitSource?.githubApp?.webhookSecret) {
 		body.gitSource.githubApp.webhookSecret = decrypt(body.gitSource.githubApp.webhookSecret);
 	}
-	if (body.gitSource?.githubApp?.privateKey) {
+	if (body?.gitSource?.githubApp?.privateKey) {
 		body.gitSource.githubApp.privateKey = decrypt(body.gitSource.githubApp.privateKey);
 	}
 	if (body?.gitSource?.gitlabApp?.appSecret) {
