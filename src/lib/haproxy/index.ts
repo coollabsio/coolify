@@ -381,7 +381,7 @@ export async function startHttpProxy(destinationDocker, id, publicPort, privateP
 export async function startCoolifyProxy(engine) {
 	const host = getEngine(engine);
 	const found = await checkContainer(engine, 'coolify-haproxy');
-	const { proxyPassword, proxyUser } = await db.listSettings();
+	const { proxyPassword, proxyUser, id } = await db.listSettings();
 	if (!found) {
 		const { stdout: Config } = await asyncExecShell(
 			`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
@@ -390,6 +390,7 @@ export async function startCoolifyProxy(engine) {
 		await asyncExecShell(
 			`DOCKER_HOST="${host}" docker run -e HAPROXY_USERNAME=${proxyUser} -e HAPROXY_PASSWORD=${proxyPassword} --restart always --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "5000:5000" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`
 		);
+		await db.prisma.setting.update({ where: { id }, data: { proxyHash: null } });
 	}
 	await configureNetworkCoolifyProxy(engine);
 }
@@ -422,6 +423,8 @@ export async function stopCoolifyProxy(engine) {
 	const host = getEngine(engine);
 	const found = await checkContainer(engine, 'coolify-haproxy');
 	await db.setDestinationSettings({ engine, isCoolifyProxyUsed: false });
+	const { id } = await db.prisma.setting.findFirst({});
+	await db.prisma.setting.update({ where: { id }, data: { proxyHash: null } });
 	try {
 		if (found) {
 			await asyncExecShell(
