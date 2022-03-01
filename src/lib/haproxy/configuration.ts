@@ -224,7 +224,7 @@ export async function configureHAProxy() {
 				}
 			}
 		}
-		const { fqdn, updatedAt } = await db.prisma.setting.findFirst();
+		const { fqdn } = await db.prisma.setting.findFirst();
 		if (fqdn) {
 			const domain = getDomain(fqdn);
 			const isHttps = fqdn.startsWith('https://');
@@ -236,8 +236,7 @@ export async function configureHAProxy() {
 				domain,
 				isHttps,
 				redirectValue,
-				redirectTo: isWWW ? domain : 'www.' + domain,
-				updatedAt: updatedAt.getTime()
+				redirectTo: isWWW ? domain : 'www.' + domain
 			});
 		}
 		const output = mustache.render(template, data);
