@@ -8,9 +8,10 @@ export default async function () {
 		const host = getEngine(destinationDocker.engine);
 		// Cleanup old coolify images
 		try {
-			const { stdout: images } = await asyncExecShell(
+			let { stdout: images } = await asyncExecShell(
 				`DOCKER_HOST=${host} docker images coollabsio/coolify --filter before="coollabsio/coolify:latest" -q | xargs `
 			);
+			images = images.trim();
 			if (images) {
 				await asyncExecShell(`DOCKER_HOST=${host} docker rmi ${images}`);
 			}
