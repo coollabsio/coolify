@@ -189,8 +189,11 @@
 		<Explainer
 			text={`Credentials for <a class="text-white font-bold" href=${
 				fqdn
-					? 'http://' + getDomain(fqdn) + ':8404'
-					: browser && 'http://' + window.location.hostname + ':8404'
+					? `http://${settings.proxyUser}:${settings.proxyPassword}@` + getDomain(fqdn) + ':8404'
+					: browser &&
+					  `http://${settings.proxyUser}:${settings.proxyPassword}@` +
+							window.location.hostname +
+							':8404'
 			} target="_blank">stats</a> page.`}
 		/>
 		<div class="space-y-2 px-10 py-5">

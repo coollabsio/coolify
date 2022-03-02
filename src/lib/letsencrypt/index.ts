@@ -48,6 +48,17 @@ export async function letsEncrypt(domain, id = null, isCoolify = false) {
 			}
 		}
 		if (dualCerts) {
+			let found = false;
+			try {
+				await asyncExecShell(
+					`DOCKER_HOST=${host} docker run --rm -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" alpine:latest sh -c "ls -1 /app/ssl/${wwwDomain}.pem"`
+				);
+				found = true;
+			} catch (error) {
+				//
+			}
+			if (found) return;
+
 			await asyncExecShell(
 				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p 9080:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${nakedDomain} -d ${wwwDomain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
 					dev ? '--test-cert' : ''
@@ -58,6 +69,16 @@ export async function letsEncrypt(domain, id = null, isCoolify = false) {
 			);
 			await reloadHaproxy(host);
 		} else {
+			let found = false;
+			try {
+				await asyncExecShell(
+					`DOCKER_HOST=${host} docker run --rm -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" alpine:latest sh -c "ls -1 /app/ssl/${domain}.pem"`
+				);
+				found = true;
+			} catch (error) {
+				//
+			}
+			if (found) return;
 			await asyncExecShell(
 				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p 9080:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${domain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
 					dev ? '--test-cert' : ''

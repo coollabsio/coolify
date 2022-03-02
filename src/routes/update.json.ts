@@ -10,7 +10,9 @@ export const get: RequestHandler = async (request) => {
 	try {
 		const currentVersion = version;
 		const versions = await got
-			.get(`https://get.coollabs.io/versions.json?appId=${process.env['COOLIFY_APP_ID']}`)
+			.get(
+				`https://get.coollabs.io/versions.json?appId=${process.env['COOLIFY_APP_ID']}&version=${currentVersion}`
+			)
 			.json();
 		const latestVersion =
 			request.url.hostname === 'staging.coolify.io'
