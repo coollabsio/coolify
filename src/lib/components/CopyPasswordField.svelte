@@ -75,7 +75,7 @@
 		/>
 	{/if}
 
-	<div class="absolute top-0 right-0 m-3  cursor-pointer text-warmGray-600 hover:text-white">
+	<div class="absolute top-0 right-0 m-3  cursor-pointer text-stone-600 hover:text-white">
 		<div class="flex space-x-2">
 			{#if isPasswordField}
 				<div on:click={() => (showPassword = !showPassword)}>
