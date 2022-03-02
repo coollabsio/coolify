@@ -178,7 +178,7 @@ export async function checkContainer(engine, container) {
 
 		const parsedStdout = JSON.parse(stdout);
 		const status = parsedStdout.Status;
-		const isRunning = parsedStdout.Running;
+		const isRunning = parsedStdout.Running && parsedStdout.Restart;
 
 		if (status === 'exited' || status === 'created') {
 			await asyncExecShell(`DOCKER_HOST="${host}" docker rm ${container}`);
