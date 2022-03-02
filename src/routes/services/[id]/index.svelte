@@ -35,10 +35,10 @@
 	import VsCodeServer from '$lib/components/svg/services/VSCodeServer.svelte';
 	import Wordpress from '$lib/components/svg/services/Wordpress.svelte';
 	import Services from './_Services/_Services.svelte';
-	import { getDomain } from '$lib/components/common';
 	import VaultWarden from '$lib/components/svg/services/VaultWarden.svelte';
 	import cuid from 'cuid';
 	import { browser } from '$app/env';
+	import LanguageTool from '$lib/components/svg/services/LanguageTool.svelte';
 
 	export let service;
 	export let isRunning;
@@ -104,6 +104,10 @@
 		{:else if service.type === 'vaultwarden'}
 			<a href="https://github.com/dani-garcia/vaultwarden" target="_blank">
 				<VaultWarden />
+			</a>
+		{:else if service.type === 'languagetool'}
+			<a href="https://languagetool.org/dev" target="_blank">
+				<LanguageTool />
 			</a>
 		{/if}
 	</div>

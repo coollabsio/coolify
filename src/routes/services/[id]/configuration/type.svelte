@@ -37,6 +37,7 @@
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/api';
 	import VaultWarden from '$lib/components/svg/services/VaultWarden.svelte';
+	import LanguageTool from '$lib/components/svg/services/LanguageTool.svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -74,6 +75,8 @@
 						<Wordpress isAbsolute />
 					{:else if type.name === 'vaultwarden'}
 						<VaultWarden isAbsolute />
+					{:else if type.name === 'languagetool'}
+						<LanguageTool isAbsolute />
 					{/if}{type.fancyName}
 				</button>
 			</form>

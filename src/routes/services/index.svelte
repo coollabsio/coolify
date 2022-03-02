@@ -26,6 +26,7 @@
 	import VsCodeServer from '$lib/components/svg/services/VSCodeServer.svelte';
 	import Wordpress from '$lib/components/svg/services/Wordpress.svelte';
 	import VaultWarden from '$lib/components/svg/services/VaultWarden.svelte';
+	import LanguageTool from '$lib/components/svg/services/LanguageTool.svelte';
 
 	export let services;
 </script>
@@ -70,6 +71,8 @@
 						<Wordpress isAbsolute />
 					{:else if service.type === 'vaultwarden'}
 						<VaultWarden isAbsolute />
+					{:else if service.type === 'languagetool'}
+						<LanguageTool isAbsolute />
 					{/if}
 					<div class="font-bold text-xl text-center truncate">
 						{service.name}
