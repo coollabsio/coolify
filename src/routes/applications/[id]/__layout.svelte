@@ -86,7 +86,7 @@
 	async function handleDeploySubmit() {
 		try {
 			const { buildId } = await post(`/applications/${id}/deploy.json`, { ...application });
-			return window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
+			return await goto(`/applications/${id}/logs/build?buildId=${buildId}`);
 		} catch ({ error }) {
 			return errorNotification(error);
 		}
@@ -108,7 +108,7 @@
 		try {
 			loading = true;
 			await post(`/applications/${id}/stop.json`, {});
-			return window.location.reload();
+			isRunning = false;
 		} catch ({ error }) {
 			return errorNotification(error);
 		} finally {
