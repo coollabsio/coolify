@@ -9,7 +9,7 @@ export default async function () {
 		// Cleanup old coolify images
 		try {
 			let { stdout: images } = await asyncExecShell(
-				`DOCKER_HOST=${host} docker images coollabsio/coolify --filter before="coollabsio/coolify:latest" -q | xargs `
+				`DOCKER_HOST=${host} docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs `
 			);
 			images = images.trim();
 			if (images) {
