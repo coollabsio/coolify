@@ -156,6 +156,15 @@ export const supportedServiceTypesAndVersions = [
 		ports: {
 			main: 80
 		}
+	},
+	{
+		name: 'languagetool',
+		fancyName: 'LanguageTool',
+		baseImage: 'silviof/docker-languagetool',
+		versions: ['latest'],
+		ports: {
+			main: 8010
+		}
 	}
 ];
 
