@@ -4,7 +4,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
 import crypto from 'crypto';
 import { buildQueue } from '$lib/queues';
-import { checkContainer, removeProxyConfiguration } from '$lib/haproxy';
+import { checkContainer } from '$lib/haproxy';
 import { dev } from '$app/env';
 
 export const options: RequestHandler = async () => {
@@ -84,6 +84,10 @@ export const post: RequestHandler = async (event) => {
 						data: { configHash }
 					});
 				}
+				await db.prisma.application.update({
+					where: { id: applicationFound.id },
+					data: { updatedAt: new Date() }
+				});
 				await buildQueue.add(buildId, {
 					build_id: buildId,
 					type: 'webhook_commit',
@@ -128,6 +132,10 @@ export const post: RequestHandler = async (event) => {
 						pullmergeRequestAction === 'reopened' ||
 						pullmergeRequestAction === 'synchronize'
 					) {
+						await db.prisma.application.update({
+							where: { id: applicationFound.id },
+							data: { updatedAt: new Date() }
+						});
 						await buildQueue.add(buildId, {
 							build_id: buildId,
 							type: 'webhook_pr',
@@ -143,18 +151,9 @@ export const post: RequestHandler = async (event) => {
 						};
 					} else if (pullmergeRequestAction === 'closed') {
 						if (applicationFound.destinationDockerId) {
-							const domain = getDomain(applicationFound.fqdn);
-							const isHttps = applicationFound.fqdn.startsWith('https://');
-							const isWWW = applicationFound.fqdn.includes('www.');
-							const fqdn = `${isHttps ? 'https://' : 'http://'}${
-								isWWW ? 'www.' : ''
-							}${pullmergeRequestId}.${domain}`;
-
 							const id = `${applicationFound.id}-${pullmergeRequestId}`;
 							const engine = applicationFound.destinationDocker.engine;
-
 							await removeDestinationDocker({ id, engine });
-							await removeProxyConfiguration(fqdn);
 						}
 						return {
 							status: 200,

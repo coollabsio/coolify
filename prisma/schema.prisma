@@ -16,6 +16,7 @@ model Setting {
   maxPort               Int      @default(9100)
   proxyPassword         String
   proxyUser             String
+  proxyHash             String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }

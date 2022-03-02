@@ -117,6 +117,8 @@
 				setTimeout(() => {
 					window.location.reload();
 				}, 5000);
+			} finally {
+				restarting = false;
 			}
 		}
 	}

@@ -1,5 +1,5 @@
 import { dev } from '$app/env';
-import { asyncExecShell, getDomain, getEngine } from '$lib/common';
+import { asyncExecShell, getEngine } from '$lib/common';
 import got from 'got';
 import * as db from '$lib/database';
 
@@ -47,113 +47,6 @@ export async function completeTransaction(transactionId) {
 	const haproxy = await haproxyInstance();
 	return await haproxy.put(`v2/services/haproxy/transactions/${transactionId}`);
 }
-
-export async function removeProxyConfiguration(fqdn) {
-	const domain = getDomain(fqdn);
-	const haproxy = await haproxyInstance();
-	const backendFound = await haproxy
-		.get(`v2/services/haproxy/configuration/backends/${domain}`)
-		.json();
-	if (backendFound) {
-		const transactionId = await getNextTransactionId();
-		await haproxy
-			.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
-				searchParams: {
-					transaction_id: transactionId
-				}
-			})
-			.json();
-		await completeTransaction(transactionId);
-	}
-	await forceSSLOffApplication(domain);
-	await removeWwwRedirection(fqdn);
-}
-export async function forceSSLOffApplication(domain) {
-	const haproxy = await haproxyInstance();
-	await checkHAProxy(haproxy);
-	let transactionId;
-	try {
-		const rules: any = await haproxy
-			.get(`v2/services/haproxy/configuration/http_request_rules`, {
-				searchParams: {
-					parent_name: 'http',
-					parent_type: 'frontend'
-				}
-			})
-			.json();
-		if (rules.data.length > 0) {
-			const rule = rules.data.find((rule) =>
-				rule.cond_test.includes(`{ hdr(host) -i ${domain} } !{ ssl_fc }`)
-			);
-			if (rule) {
-				transactionId = await getNextTransactionId();
-
-				await haproxy
-					.delete(`v2/services/haproxy/configuration/http_request_rules/${rule.index}`, {
-						searchParams: {
-							transaction_id: transactionId,
-							parent_name: 'http',
-							parent_type: 'frontend'
-						}
-					})
-					.json();
-			}
-		}
-	} catch (error) {
-		console.log(error);
-	} finally {
-		if (transactionId) await completeTransaction(transactionId);
-	}
-}
-export async function forceSSLOnApplication(domain) {
-	const haproxy = await haproxyInstance();
-	await checkHAProxy(haproxy);
-	let transactionId;
-	try {
-		const rules: any = await haproxy
-			.get(`v2/services/haproxy/configuration/http_request_rules`, {
-				searchParams: {
-					parent_name: 'http',
-					parent_type: 'frontend'
-				}
-			})
-			.json();
-		let nextRule = 0;
-		if (rules.data.length > 0) {
-			const rule = rules.data.find((rule) =>
-				rule.cond_test.includes(`{ hdr(host) -i ${domain} } !{ ssl_fc }`)
-			);
-			if (rule) return;
-			nextRule = rules.data[rules.data.length - 1].index + 1;
-		}
-		transactionId = await getNextTransactionId();
-
-		await haproxy
-			.post(`v2/services/haproxy/configuration/http_request_rules`, {
-				searchParams: {
-					transaction_id: transactionId,
-					parent_name: 'http',
-					parent_type: 'frontend'
-				},
-				json: {
-					index: nextRule,
-					cond: 'if',
-					cond_test: `{ hdr(host) -i ${domain} } !{ ssl_fc }`,
-					type: 'redirect',
-					redir_type: 'scheme',
-					redir_value: 'https',
-					redir_code: dev ? 302 : 301
-				}
-			})
-			.json();
-	} catch (error) {
-		console.log(error);
-		throw error;
-	} finally {
-		if (transactionId) await completeTransaction(transactionId);
-	}
-}
-
 export async function deleteProxy({ id }) {
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
@@ -177,7 +70,7 @@ export async function deleteProxy({ id }) {
 			})
 			.json();
 	} catch (error) {
-		console.log(error.response.body);
+		console.log(error.response?.body || error);
 	} finally {
 		if (transactionId) await completeTransaction(transactionId);
 	}
@@ -186,169 +79,6 @@ export async function deleteProxy({ id }) {
 export async function reloadHaproxy(engine) {
 	const host = getEngine(engine);
 	return await asyncExecShell(`DOCKER_HOST=${host} docker exec coolify-haproxy kill -HUP 1`);
-}
-export async function checkProxyConfigurations() {
-	const haproxy = await haproxyInstance();
-	await checkHAProxy(haproxy);
-	try {
-		const stats: any = await haproxy.get(`v2/services/haproxy/stats/native`).json();
-		for (const stat of stats[0].stats) {
-			if (stat.stats.status === 'DOWN' && stat.type === 'server') {
-				const {
-					name,
-					backend_name: backendName,
-					stats: { lastchg }
-				} = stat;
-				const { fqdn } = await db.listSettings();
-				if (fqdn) {
-					const domain = getDomain(fqdn);
-					if (backendName === domain) {
-						return;
-					}
-				}
-				const application = await db.getApplicationById(name);
-				if (!application) {
-					const transactionId = await getNextTransactionId();
-					await haproxy
-						.delete(`v2/services/haproxy/configuration/backends/${backendName}`, {
-							searchParams: {
-								transaction_id: transactionId
-							}
-						})
-						.json();
-					return await completeTransaction(transactionId);
-				}
-				const found = await checkContainer(application.destinationDocker.engine, name);
-				if (!found) {
-					const transactionId = await getNextTransactionId();
-					await haproxy
-						.delete(`v2/services/haproxy/configuration/backends/${backendName}`, {
-							searchParams: {
-								transaction_id: transactionId
-							}
-						})
-						.json();
-					return await completeTransaction(transactionId);
-				}
-				if (lastchg > 120) {
-					const transactionId = await getNextTransactionId();
-					await haproxy
-						.delete(`v2/services/haproxy/configuration/backends/${backendName}`, {
-							searchParams: {
-								transaction_id: transactionId
-							}
-						})
-						.json();
-					await completeTransaction(transactionId);
-				}
-			}
-		}
-	} catch (error) {
-		console.log(error);
-	}
-}
-export async function configureProxyForApplication({ domain, imageId, applicationId, port }) {
-	const haproxy = await haproxyInstance();
-	await checkHAProxy(haproxy);
-
-	let serverConfigured = false;
-	let backendAvailable: any = null;
-
-	try {
-		backendAvailable = await haproxy
-			.get(`v2/services/haproxy/configuration/backends/${domain}`)
-			.json();
-		const server: any = await haproxy
-			.get(`v2/services/haproxy/configuration/servers/${imageId}`, {
-				searchParams: {
-					backend: domain
-				}
-			})
-			.json();
-
-		if (backendAvailable && server) {
-			// Very sophisticated way to check if the server is already configured in proxy
-			if (backendAvailable.data.forwardfor.enabled === 'enabled') {
-				if (backendAvailable.data.name === domain) {
-					if (server.data.check === 'enabled') {
-						if (server.data.address === imageId) {
-							if (server.data.port === port) {
-								serverConfigured = true;
-							}
-						}
-					}
-				}
-			}
-		}
-	} catch (error) {
-		//console.log('error getting backend or server', error?.response?.body);
-		//
-	}
-
-	if (serverConfigured) return;
-	const transactionId = await getNextTransactionId();
-	if (backendAvailable) {
-		await haproxy
-			.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
-				searchParams: {
-					transaction_id: transactionId
-				}
-			})
-			.json();
-	}
-	try {
-		await haproxy.post('v2/services/haproxy/configuration/backends', {
-			searchParams: {
-				transaction_id: transactionId
-			},
-			json: {
-				'init-addr': 'last,libc,none',
-				forwardfor: { enabled: 'enabled' },
-				name: domain
-			}
-		});
-
-		await haproxy.post('v2/services/haproxy/configuration/servers', {
-			searchParams: {
-				transaction_id: transactionId,
-				backend: domain
-			},
-			json: {
-				address: imageId,
-				check: 'enabled',
-				name: imageId,
-				port: port
-			}
-		});
-	} catch (error) {
-		throw error?.response?.body || error;
-	} finally {
-		await completeTransaction(transactionId);
-	}
-}
-
-export async function configureCoolifyProxyOff(fqdn) {
-	const domain = getDomain(fqdn);
-	const isHttps = fqdn.startsWith('https://');
-	const haproxy = await haproxyInstance();
-	await checkHAProxy(haproxy);
-
-	try {
-		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
-		const transactionId = await getNextTransactionId();
-		await haproxy
-			.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
-				searchParams: {
-					transaction_id: transactionId
-				}
-			})
-			.json();
-		await completeTransaction(transactionId);
-		if (isHttps) await forceSSLOffApplication(domain);
-		await removeWwwRedirection(fqdn);
-	} catch (error) {
-		throw error?.response?.body || error;
-	}
 }
 export async function checkHAProxy(haproxy?: any) {
 	if (!haproxy) haproxy = await haproxyInstance();
@@ -359,76 +89,6 @@ export async function checkHAProxy(haproxy?: any) {
 			message:
 				'Coolify Proxy is not running, but it should be!<br><br>Start it in the "Destinations" menu.'
 		};
-	}
-}
-export async function configureCoolifyProxyOn(fqdn) {
-	const domain = getDomain(fqdn);
-	const haproxy = await haproxyInstance();
-	await checkHAProxy(haproxy);
-	let serverConfigured = false;
-	let backendAvailable: any = null;
-	try {
-		backendAvailable = await haproxy
-			.get(`v2/services/haproxy/configuration/backends/${domain}`)
-			.json();
-		const server: any = await haproxy
-			.get(`v2/services/haproxy/configuration/servers/coolify`, {
-				searchParams: {
-					backend: domain
-				}
-			})
-			.json();
-		if (backendAvailable && server) {
-			// Very sophisticated way to check if the server is already configured in proxy
-			if (backendAvailable.data.forwardfor.enabled === 'enabled') {
-				if (backendAvailable.data.name === domain) {
-					if (server.data.check === 'enabled') {
-						if (server.data.address === dev ? 'host.docker.internal' : 'coolify') {
-							if (server.data.port === 3000) {
-								serverConfigured = true;
-							}
-						}
-					}
-				}
-			}
-		}
-	} catch (error) {}
-	if (serverConfigured) return;
-	const transactionId = await getNextTransactionId();
-	try {
-		await haproxy.post('v2/services/haproxy/configuration/backends', {
-			searchParams: {
-				transaction_id: transactionId
-			},
-			json: {
-				adv_check: 'httpchk',
-				httpchk_params: {
-					method: 'GET',
-					uri: '/undead.json'
-				},
-				'init-addr': 'last,libc,none',
-				forwardfor: { enabled: 'enabled' },
-				name: domain
-			}
-		});
-		await haproxy.post('v2/services/haproxy/configuration/servers', {
-			searchParams: {
-				transaction_id: transactionId,
-				backend: domain
-			},
-			json: {
-				address: dev ? 'host.docker.internal' : 'coolify',
-				check: 'enabled',
-				fall: 10,
-				name: 'coolify',
-				port: 3000
-			}
-		});
-	} catch (error) {
-		console.log(error);
-		throw error;
-	} finally {
-		await completeTransaction(transactionId);
 	}
 }
 
@@ -494,7 +154,7 @@ export async function startHttpProxy(destinationDocker, id, publicPort, privateP
 export async function startCoolifyProxy(engine) {
 	const host = getEngine(engine);
 	const found = await checkContainer(engine, 'coolify-haproxy');
-	const { proxyPassword, proxyUser } = await db.listSettings();
+	const { proxyPassword, proxyUser, id } = await db.listSettings();
 	if (!found) {
 		const { stdout: Config } = await asyncExecShell(
 			`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
@@ -503,6 +163,7 @@ export async function startCoolifyProxy(engine) {
 		await asyncExecShell(
 			`DOCKER_HOST="${host}" docker run -e HAPROXY_USERNAME=${proxyUser} -e HAPROXY_PASSWORD=${proxyPassword} --restart always --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "5000:5000" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`
 		);
+		await db.prisma.setting.update({ where: { id }, data: { proxyHash: null } });
 	}
 	await configureNetworkCoolifyProxy(engine);
 }
@@ -535,6 +196,8 @@ export async function stopCoolifyProxy(engine) {
 	const host = getEngine(engine);
 	const found = await checkContainer(engine, 'coolify-haproxy');
 	await db.setDestinationSettings({ engine, isCoolifyProxyUsed: false });
+	const { id } = await db.prisma.setting.findFirst({});
+	await db.prisma.setting.update({ where: { id }, data: { proxyHash: null } });
 	try {
 		if (found) {
 			await asyncExecShell(
@@ -558,172 +221,4 @@ export async function configureNetworkCoolifyProxy(engine) {
 			// TODO: handle error
 		}
 	});
-}
-
-export async function configureSimpleServiceProxyOn({ id, domain, port }) {
-	const haproxy = await haproxyInstance();
-	await checkHAProxy(haproxy);
-	let serverConfigured = false;
-	let backendAvailable: any = null;
-
-	try {
-		backendAvailable = await haproxy
-			.get(`v2/services/haproxy/configuration/backends/${domain}`)
-			.json();
-		const server: any = await haproxy
-			.get(`v2/services/haproxy/configuration/servers/${id}`, {
-				searchParams: {
-					backend: domain
-				}
-			})
-			.json();
-		if (backendAvailable && server) {
-			// Very sophisticated way to check if the server is already configured in proxy
-			if (backendAvailable.data.forwardfor.enabled === 'enabled') {
-				if (backendAvailable.data.name === domain) {
-					if (server.data.check === 'enabled') {
-						if (server.data.address === id) {
-							if (server.data.port === port) {
-								serverConfigured = true;
-							}
-						}
-					}
-				}
-			}
-		}
-	} catch (error) {}
-	if (serverConfigured) return;
-	const transactionId = await getNextTransactionId();
-	await haproxy.post('v2/services/haproxy/configuration/backends', {
-		searchParams: {
-			transaction_id: transactionId
-		},
-		json: {
-			'init-addr': 'last,libc,none',
-			forwardfor: { enabled: 'enabled' },
-			name: domain
-		}
-	});
-	await haproxy.post('v2/services/haproxy/configuration/servers', {
-		searchParams: {
-			transaction_id: transactionId,
-			backend: domain
-		},
-		json: {
-			address: id,
-			check: 'enabled',
-			name: id,
-			port: port
-		}
-	});
-	await completeTransaction(transactionId);
-}
-
-export async function configureSimpleServiceProxyOff(fqdn) {
-	if (!fqdn) {
-		return;
-	}
-	const domain = getDomain(fqdn);
-	const haproxy = await haproxyInstance();
-	await checkHAProxy(haproxy);
-	try {
-		await haproxy.get(`v2/services/haproxy/configuration/backends/${domain}`).json();
-		const transactionId = await getNextTransactionId();
-		await haproxy
-			.delete(`v2/services/haproxy/configuration/backends/${domain}`, {
-				searchParams: {
-					transaction_id: transactionId
-				}
-			})
-			.json();
-		await completeTransaction(transactionId);
-	} catch (error) {}
-	await forceSSLOffApplication(domain);
-	await removeWwwRedirection(fqdn);
-	return;
-}
-
-export async function removeWwwRedirection(fqdn) {
-	const domain = getDomain(fqdn);
-	const isHttps = fqdn.startsWith('https://');
-	const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
-
-	const haproxy = await haproxyInstance();
-	await checkHAProxy();
-	const rules: any = await haproxy
-		.get(`v2/services/haproxy/configuration/http_request_rules`, {
-			searchParams: {
-				parent_name: 'http',
-				parent_type: 'frontend'
-			}
-		})
-		.json();
-	if (rules.data.length > 0) {
-		const rule = rules.data.find((rule) => rule.redir_value.includes(redirectValue));
-		if (rule) {
-			const transactionId = await getNextTransactionId();
-			await haproxy
-				.delete(`v2/services/haproxy/configuration/http_request_rules/${rule.index}`, {
-					searchParams: {
-						transaction_id: transactionId,
-						parent_name: 'http',
-						parent_type: 'frontend'
-					}
-				})
-				.json();
-			await completeTransaction(transactionId);
-		}
-	}
-}
-export async function setWwwRedirection(fqdn) {
-	const haproxy = await haproxyInstance();
-	await checkHAProxy(haproxy);
-	let transactionId;
-
-	try {
-		const domain = getDomain(fqdn);
-		const isHttps = fqdn.startsWith('https://');
-		const isWWW = fqdn.includes('www.');
-		const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
-		const contTest = `{ req.hdr(host) -i ${isWWW ? domain.replace('www.', '') : `www.${domain}`} }`;
-		const rules: any = await haproxy
-			.get(`v2/services/haproxy/configuration/http_request_rules`, {
-				searchParams: {
-					parent_name: 'http',
-					parent_type: 'frontend'
-				}
-			})
-			.json();
-		let nextRule = 0;
-		if (rules.data.length > 0) {
-			const rule = rules.data.find((rule) => rule.redir_value.includes(redirectValue));
-			if (rule) return;
-			nextRule = rules.data[rules.data.length - 1].index + 1;
-		}
-
-		transactionId = await getNextTransactionId();
-		await haproxy
-			.post(`v2/services/haproxy/configuration/http_request_rules`, {
-				searchParams: {
-					transaction_id: transactionId,
-					parent_name: 'http',
-					parent_type: 'frontend'
-				},
-				json: {
-					index: nextRule,
-					cond: 'if',
-					cond_test: contTest,
-					type: 'redirect',
-					redir_type: 'location',
-					redir_value: redirectValue,
-					redir_code: dev ? 302 : 301
-				}
-			})
-			.json();
-	} catch (error) {
-		console.log(error);
-		throw error;
-	} finally {
-		if (transactionId) await completeTransaction(transactionId);
-	}
 }

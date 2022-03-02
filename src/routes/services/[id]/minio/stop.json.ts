@@ -1,9 +1,7 @@
-import { getEngine, getUserDetails, removeDestinationDocker } from '$lib/common';
-import { getDomain } from '$lib/components/common';
+import { getUserDetails, removeDestinationDocker } from '$lib/common';
 import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
-import { dockerInstance } from '$lib/docker';
-import { checkContainer, configureSimpleServiceProxyOff, stopTcpHttpProxy } from '$lib/haproxy';
+import { checkContainer, stopTcpHttpProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler = async (event) => {
@@ -21,7 +19,6 @@ export const post: RequestHandler = async (event) => {
 			minio: { publicPort }
 		} = service;
 		await db.updateMinioService({ id, publicPort: null });
-		const domain = getDomain(fqdn);
 		if (destinationDockerId) {
 			const engine = destinationDocker.engine;
 
@@ -35,7 +32,6 @@ export const post: RequestHandler = async (event) => {
 			}
 			try {
 				await stopTcpHttpProxy(destinationDocker, publicPort);
-				await configureSimpleServiceProxyOff(fqdn);
 			} catch (error) {
 				console.log(error);
 			}

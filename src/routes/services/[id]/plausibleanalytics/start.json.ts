@@ -3,15 +3,6 @@ import * as db from '$lib/database';
 import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
-import { letsEncrypt } from '$lib/letsencrypt';
-import {
-	checkHAProxy,
-	checkProxyConfigurations,
-	configureSimpleServiceProxyOn,
-	reloadHaproxy,
-	setWwwRedirection
-} from '$lib/haproxy';
-import { getDomain } from '$lib/components/common';
 import { ErrorHandler } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 
@@ -22,7 +13,6 @@ export const post: RequestHandler = async (event) => {
 	const { id } = event.params;
 
 	try {
-		await checkHAProxy();
 		const service = await db.getService({ id, teamId });
 		const {
 			type,
@@ -41,9 +31,6 @@ export const post: RequestHandler = async (event) => {
 				secretKeyBase
 			}
 		} = service;
-
-		const domain = getDomain(fqdn);
-		const isHttps = fqdn.startsWith('https://');
 
 		const config = {
 			plausibleAnalytics: {
@@ -83,7 +70,6 @@ export const post: RequestHandler = async (event) => {
 		};
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
-		const engine = destinationDocker.engine;
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 
@@ -187,14 +173,7 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 		await asyncExecShell(
 			`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up --build -d`
 		);
-		await checkProxyConfigurations();
-		await configureSimpleServiceProxyOn({ id, domain, port: 8000 });
 
-		if (isHttps) {
-			await letsEncrypt({ domain, id });
-		}
-		await setWwwRedirection(fqdn);
-		await reloadHaproxy(destinationDocker.engine);
 		return {
 			status: 200
 		};

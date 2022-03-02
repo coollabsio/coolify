@@ -38,13 +38,13 @@
 	import { errorNotification } from '$lib/form';
 	import { asyncSleep } from '$lib/components/common';
 	import { del, get, post } from '$lib/api';
-	import { browser } from '$app/env';
-	import { fade } from 'svelte/transition';
+	import { browser, dev } from '$app/env';
 
 	let isUpdateAvailable = false;
+
 	let updateStatus = {
+		found: false,
 		loading: false,
-		checking: false,
 		success: null
 	};
 	let latestVersion = 'latest';
@@ -60,16 +60,19 @@
 			}
 			if ($session.teamId === '0') {
 				try {
-					updateStatus.checking = true;
 					const data = await get(`/update.json`);
 					if (overrideVersion || data?.isUpdateAvailable) {
 						latestVersion = overrideVersion || data.latestVersion;
-						isUpdateAvailable = overrideVersion ? true : data?.isUpdateAvailable;
-						await post(`/update.json`, { type: 'pull', latestVersion });
+						console.log('checking update');
+						const { exists } = await post(`/update.json`, {
+							type: 'check',
+							latestVersion,
+							overrideVersion
+						});
+						isUpdateAvailable = exists;
 					}
 				} catch (error) {
 				} finally {
-					updateStatus.checking = false;
 				}
 			}
 		}
@@ -97,26 +100,32 @@
 	async function update() {
 		updateStatus.loading = true;
 		try {
-			await post(`/update.json`, { type: 'update', latestVersion });
-			toast.push('Update completed.<br><br>Waiting for the new version to start...');
-			let reachable = false;
-			let tries = 0;
-			do {
+			if (dev) {
+				console.log(`updating to ${latestVersion}`);
 				await asyncSleep(4000);
-				try {
-					await get(`/undead.json`);
-					reachable = true;
-				} catch (error) {
-					reachable = false;
-				}
-				if (reachable) break;
-				tries++;
-			} while (!reachable || tries < 120);
-			toast.push('New version reachable. Reloading...');
-			updateStatus.loading = false;
-			updateStatus.success = true;
-			await asyncSleep(3000);
-			return window.location.reload();
+				return window.location.reload();
+			} else {
+				await post(`/update.json`, { type: 'update', latestVersion });
+				toast.push('Update completed.<br><br>Waiting for the new version to start...');
+				let reachable = false;
+				let tries = 0;
+				do {
+					await asyncSleep(4000);
+					try {
+						await get(`/undead.json`);
+						reachable = true;
+					} catch (error) {
+						reachable = false;
+					}
+					if (reachable) break;
+					tries++;
+				} while (!reachable || tries < 120);
+				toast.push('New version reachable. Reloading...');
+				updateStatus.loading = false;
+				updateStatus.success = true;
+				await asyncSleep(3000);
+				return window.location.reload();
+			}
 		} catch ({ error }) {
 			updateStatus.success = false;
 			updateStatus.loading = false;
@@ -311,35 +320,10 @@
 
 			<div class="flex flex-col space-y-4 py-2">
 				{#if $session.teamId === '0'}
-					{#if updateStatus.checking}
-						<button
-							disabled
-							in:fade={{ duration: 150 }}
-							class="icons tooltip-right bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white duration-75 hover:scale-105"
-							data-tooltip="Checking for updates..."
-							><svg
-								xmlns="http://www.w3.org/2000/svg"
-								class="h-9 w-8 animate-spin"
-								viewBox="0 0 24 24"
-								stroke-width="1.5"
-								stroke="currentColor"
-								fill="none"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-							>
-								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-								<path d="M9 4.55a8 8 0 0 1 6 14.9m0 -4.45v5h5" />
-								<line x1="5.63" y1="7.16" x2="5.63" y2="7.17" />
-								<line x1="4.06" y1="11" x2="4.06" y2="11.01" />
-								<line x1="4.63" y1="15.1" x2="4.63" y2="15.11" />
-								<line x1="7.16" y1="18.37" x2="7.16" y2="18.38" />
-								<line x1="11" y1="19.94" x2="11" y2="19.95" />
-							</svg></button
-						>
-					{:else if isUpdateAvailable}
+					{#if isUpdateAvailable}
 						<button
 							disabled={updateStatus.success === false}
-							data-tooltip="Update available"
+							title="Update available"
 							on:click={update}
 							class="icons tooltip-right bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white duration-75 hover:scale-105"
 						>

@@ -12,7 +12,7 @@ export const get: RequestHandler = async () => {
 		const versions = await got
 			.get(`https://get.coollabs.io/versions.json?appId=${process.env['COOLIFY_APP_ID']}`)
 			.json();
-		const latestVersion = dev ? '10.0.0' : versions['coolify'].main.version;
+		const latestVersion = versions['coolify'].main.version;
 		const isUpdateAvailable = compare(latestVersion, currentVersion);
 		return {
 			body: {
@@ -26,27 +26,11 @@ export const get: RequestHandler = async () => {
 };
 
 export const post: RequestHandler = async (event) => {
-	const { type, latestVersion } = await event.request.json();
-	if (type === 'pull') {
+	const { type, latestVersion, overrideVersion } = await event.request.json();
+	if (type === 'update') {
 		try {
 			if (!dev) {
 				await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
-				return {
-					status: 200,
-					body: {}
-				};
-			} else {
-				return {
-					status: 200,
-					body: {}
-				};
-			}
-		} catch (error) {
-			return ErrorHandler(error);
-		}
-	} else if (type === 'update') {
-		try {
-			if (!dev) {
 				await asyncExecShell(`env | grep COOLIFY > .env`);
 				await asyncExecShell(
 					`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify coolify-redis && docker rm coolify coolify-redis && docker compose up -d --force-recreate"`
@@ -65,6 +49,31 @@ export const post: RequestHandler = async (event) => {
 			}
 		} catch (error) {
 			return ErrorHandler(error);
+		}
+	} else if (type === 'check') {
+		try {
+			if (overrideVersion) {
+				return {
+					status: 200,
+					body: {
+						exists: true
+					}
+				};
+			}
+			await asyncExecShell(`docker image inspect coollabsio/coolify:${latestVersion}`);
+			return {
+				status: 200,
+				body: {
+					exists: true
+				}
+			};
+		} catch (error) {
+			return {
+				status: 200,
+				body: {
+					exists: false
+				}
+			};
 		}
 	}
 	return {

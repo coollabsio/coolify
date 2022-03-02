@@ -43,53 +43,41 @@
 	</div>
 </div>
 
-<div class="mx-auto max-w-6xl rounded-xl px-6 pt-4">
-	<table class="mx-auto">
-		<thead class=" rounded-xl border-b border-coolgray-500">
-			<tr>
-				<th
-					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white">Name</th
-				>
-				<th
-					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white"
-					>Value</th
-				>
-				<th
-					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white"
-					>Need during buildtime?</th
-				>
-				<th
-					scope="col"
-					class="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider text-white"
-				/>
-			</tr>
-		</thead>
-		<tbody class="">
-			{#each applicationSecrets as secret}
-				{#key secret.id}
-					<tr class="h-20 transition duration-100 hover:bg-coolgray-400">
-						<Secret
-							PRMRSecret={PRMRSecrets.find((s) => s.name === secret.name)}
-							isPRMRSecret
-							name={secret.name}
-							value={secret.value}
-							isBuildSecret={secret.isBuildSecret}
-							on:refresh={refreshSecrets}
-						/>
-					</tr>
-				{/key}
-			{/each}
-		</tbody>
-	</table>
-</div>
+{#if applicationSecrets.length !== 0}
+	<div class="mx-auto max-w-6xl rounded-xl px-6 pt-4">
+		<table class="mx-auto border-separate text-left">
+			<thead>
+				<tr class="h-12">
+					<th scope="col">Name</th>
+					<th scope="col">Value</th>
+					<th scope="col" class="w-64 text-center">Need during buildtime?</th>
+					<th scope="col" class="w-96 text-center">Action</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each applicationSecrets as secret}
+					{#key secret.id}
+						<tr>
+							<Secret
+								PRMRSecret={PRMRSecrets.find((s) => s.name === secret.name)}
+								isPRMRSecret
+								name={secret.name}
+								value={secret.value}
+								isBuildSecret={secret.isBuildSecret}
+								on:refresh={refreshSecrets}
+							/>
+						</tr>
+					{/key}
+				{/each}
+			</tbody>
+		</table>
+	</div>
+{/if}
 <div class="flex justify-center py-4 text-center">
 	<Explainer
 		customClass="w-full"
 		text={applicationSecrets.length === 0
-			? "<span class='font-bold text-white text-xl'>Please add secrets to the application first.</span> <br><br>These values overwrite application secrets in PR/MR deployments. Useful for creating <span class='text-green-500 font-bold'>staging</span> environments."
+			? "You can add secrets to PR/MR deployments. Please add secrets to the application first. <br>Useful for creating <span class='text-green-500 font-bold'>staging</span> environments."
 			: "These values overwrite application secrets in PR/MR deployments. Useful for creating <span class='text-green-500 font-bold'>staging</span> environments."}
 	/>
 </div>

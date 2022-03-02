@@ -4,12 +4,6 @@ import * as buildpacks from '../buildPacks';
 import * as importers from '../importers';
 import { dockerInstance } from '../docker';
 import { asyncExecShell, createDirectories, getDomain, getEngine, saveBuildLog } from '../common';
-import {
-	checkProxyConfigurations,
-	configureProxyForApplication,
-	reloadHaproxy,
-	setWwwRedirection
-} from '../haproxy';
 import * as db from '$lib/database';
 import { decrypt } from '$lib/crypto';
 import { sentry } from '$lib/common';
@@ -261,26 +255,6 @@ export default async function (job) {
 			sentry.captureException(error);
 			throw new Error(error);
 		}
-		try {
-			if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-				saveBuildLog({ line: 'Proxy configuration started!', buildId, applicationId });
-				await checkProxyConfigurations();
-				await configureProxyForApplication({ domain, imageId, applicationId, port });
-				if (isHttps) await letsEncrypt({ domain, id: applicationId });
-				await setWwwRedirection(fqdn);
-				await reloadHaproxy(destinationDocker.engine);
-				saveBuildLog({ line: 'Proxy configuration successful!', buildId, applicationId });
-			} else {
-				saveBuildLog({
-					line: 'Coolify Proxy is not configured for this destination. Nothing else to do.',
-					buildId,
-					applicationId
-				});
-			}
-		} catch (error) {
-			saveBuildLog({ line: error.stdout || error, buildId, applicationId });
-			sentry.captureException(error);
-			throw new Error(error);
-		}
+		saveBuildLog({ line: 'Proxy will be updated shortly.', buildId, applicationId });
 	}
 }

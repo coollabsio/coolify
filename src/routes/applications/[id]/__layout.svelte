@@ -86,7 +86,7 @@
 	async function handleDeploySubmit() {
 		try {
 			const { buildId } = await post(`/applications/${id}/deploy.json`, { ...application });
-			return await goto(`/applications/${id}/logs/build?buildId=${buildId}`);
+			return window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
 		} catch ({ error }) {
 			return errorNotification(error);
 		}

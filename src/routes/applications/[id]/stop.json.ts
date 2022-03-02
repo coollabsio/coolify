@@ -1,8 +1,7 @@
-import { getDomain, getUserDetails } from '$lib/common';
+import { asyncExecShell, getEngine, getUserDetails, removeDestinationDocker } from '$lib/common';
 import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
-import { dockerInstance } from '$lib/docker';
-import { removeProxyConfiguration } from '$lib/haproxy';
+import { checkContainer } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler = async (event) => {
@@ -17,10 +16,12 @@ export const post: RequestHandler = async (event) => {
 			teamId
 		});
 		if (destinationDockerId) {
-			const docker = dockerInstance({ destinationDocker });
-			await docker.engine.getContainer(id).stop();
+			const { engine } = destinationDocker;
+			const found = await checkContainer(engine, id);
+			if (found) {
+				await removeDestinationDocker({ id, engine });
+			}
 		}
-		await removeProxyConfiguration(fqdn);
 		return {
 			status: 200
 		};

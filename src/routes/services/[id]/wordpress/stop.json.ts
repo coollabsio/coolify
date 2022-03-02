@@ -1,9 +1,7 @@
 import { getUserDetails, removeDestinationDocker } from '$lib/common';
-import { getDomain } from '$lib/components/common';
 import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
-import { dockerInstance } from '$lib/docker';
-import { checkContainer, configureSimpleServiceProxyOff } from '$lib/haproxy';
+import { checkContainer } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler = async (event) => {
@@ -15,7 +13,6 @@ export const post: RequestHandler = async (event) => {
 	try {
 		const service = await db.getService({ id, teamId });
 		const { destinationDockerId, destinationDocker, fqdn } = service;
-		const domain = getDomain(fqdn);
 		if (destinationDockerId) {
 			const engine = destinationDocker.engine;
 			try {
@@ -29,11 +26,6 @@ export const post: RequestHandler = async (event) => {
 				}
 			} catch (error) {
 				console.error(error);
-			}
-			try {
-				await configureSimpleServiceProxyOff(fqdn);
-			} catch (error) {
-				console.log(error);
 			}
 		}
 

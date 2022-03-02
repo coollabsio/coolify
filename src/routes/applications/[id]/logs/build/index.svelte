@@ -51,7 +51,6 @@
 						build.took = data.builds[0].took;
 						build.since = data.builds[0].since;
 					}
-					window.location.reload();
 					return build;
 				});
 				return;
