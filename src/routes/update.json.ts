@@ -6,13 +6,16 @@ import type { RequestHandler } from '@sveltejs/kit';
 import compare from 'compare-versions';
 import got from 'got';
 
-export const get: RequestHandler = async () => {
+export const get: RequestHandler = async (request) => {
 	try {
 		const currentVersion = version;
 		const versions = await got
 			.get(`https://get.coollabs.io/versions.json?appId=${process.env['COOLIFY_APP_ID']}`)
 			.json();
-		const latestVersion = versions['coolify'].main.version;
+		const latestVersion =
+			request.url.hostname === 'staging.coolify.io'
+				? versions['coolify'].next.version
+				: versions['coolify'].main.version;
 		const isUpdateAvailable = compare(latestVersion, currentVersion);
 		return {
 			body: {
@@ -21,12 +24,13 @@ export const get: RequestHandler = async () => {
 			}
 		};
 	} catch (error) {
+		console.log(error);
 		return ErrorHandler(error);
 	}
 };
 
 export const post: RequestHandler = async (event) => {
-	const { type, latestVersion, overrideVersion } = await event.request.json();
+	const { type, latestVersion } = await event.request.json();
 	if (type === 'update') {
 		try {
 			if (!dev) {
@@ -49,31 +53,6 @@ export const post: RequestHandler = async (event) => {
 			}
 		} catch (error) {
 			return ErrorHandler(error);
-		}
-	} else if (type === 'check') {
-		try {
-			if (overrideVersion) {
-				return {
-					status: 200,
-					body: {
-						exists: true
-					}
-				};
-			}
-			await asyncExecShell(`docker image inspect coollabsio/coolify:${latestVersion}`);
-			return {
-				status: 200,
-				body: {
-					exists: true
-				}
-			};
-		} catch (error) {
-			return {
-				status: 200,
-				body: {
-					exists: false
-				}
-			};
 		}
 	}
 	return {

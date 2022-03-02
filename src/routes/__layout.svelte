@@ -63,13 +63,11 @@
 					const data = await get(`/update.json`);
 					if (overrideVersion || data?.isUpdateAvailable) {
 						latestVersion = overrideVersion || data.latestVersion;
-						console.log('checking update');
-						const { exists } = await post(`/update.json`, {
-							type: 'check',
-							latestVersion,
-							overrideVersion
-						});
-						isUpdateAvailable = exists;
+						if (overrideVersion) {
+							isUpdateAvailable = true;
+						} else {
+							isUpdateAvailable = data.isUpdateAvailable;
+						}
 					}
 				} catch (error) {
 				} finally {
