@@ -13,7 +13,7 @@ export default async function () {
 			);
 			images = images.trim();
 			if (images) {
-				await asyncExecShell(`DOCKER_HOST=${host} docker rmi ${images}`);
+				await asyncExecShell(`DOCKER_HOST=${host} docker rmi -f ${images}`);
 			}
 		} catch (error) {
 			console.log(error);
