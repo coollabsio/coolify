@@ -243,7 +243,6 @@ export async function configureHAProxy() {
 		const { proxyHash, id } = await db.listSettings();
 		if (proxyHash !== newHash) {
 			await db.prisma.setting.update({ where: { id }, data: { proxyHash: newHash } });
-			console.log('HAProxy configuration changed, updating...');
 			await haproxy.post(`v2/services/haproxy/configuration/raw`, {
 				searchParams: {
 					skip_version: true
@@ -253,8 +252,6 @@ export async function configureHAProxy() {
 					'Content-Type': 'text/plain'
 				}
 			});
-		} else {
-			console.log('HAProxy configuration is up to date');
 		}
 	} catch (error) {
 		throw error;
