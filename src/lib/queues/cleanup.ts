@@ -6,10 +6,14 @@ export default async function () {
 	const destinationDockers = await prisma.destinationDocker.findMany();
 	for (const destinationDocker of destinationDockers) {
 		const host = getEngine(destinationDocker.engine);
+		// Cleanup old coolify images
 		try {
-			await asyncExecShell(
-				`DOCKER_HOST=${host} docker rmi $(docker images coollabsio/coolify --filter before="coollabsio/coolify:latest" -q)`
+			const { stdout: images } = await asyncExecShell(
+				`DOCKER_HOST=${host} docker images coollabsio/coolify --filter before="coollabsio/coolify:latest" -q`
 			);
+			if (images) {
+				await asyncExecShell(`DOCKER_HOST=${host} docker rmi ${images}`);
+			}
 		} catch (error) {
 			console.log(error);
 		}
