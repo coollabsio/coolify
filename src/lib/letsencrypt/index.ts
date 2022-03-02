@@ -144,14 +144,13 @@ export async function generateSSLCerts() {
 		const isHttps = fqdn.startsWith('https://');
 		if (isHttps) ssls.push({ domain, id: 'coolify', isCoolify: true });
 	}
-	console.log(ssls);
 	if (ssls.length > 0) {
 		for (const ssl of ssls) {
 			if (!dev) {
-				console.log('Generate ssl for', ssl.domain);
+				console.log('Checking SSL for', ssl.domain);
 				await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
 			} else {
-				console.log('Generate ssl for', ssl.domain);
+				console.log('Checking SSL for', ssl.domain);
 			}
 		}
 	}
