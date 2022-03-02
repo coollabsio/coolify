@@ -38,11 +38,18 @@ export const post: RequestHandler = async (event) => {
 				}
 			},
 			volumes: {
-				[`${id}-ngrams`]: {}
+				[`${id}-ngrams`]: {
+					external: true
+				}
 			}
 		};
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
+		try {
+			await asyncExecShell(`DOCKER_HOST=${host} docker volume create ${id}-ngrams`);
+		} catch (error) {
+			console.log(error);
+		}
 
 		try {
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
