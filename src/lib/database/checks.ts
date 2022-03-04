@@ -15,6 +15,9 @@ export async function isDockerNetworkExists({ network }) {
 	return await prisma.destinationDocker.findFirst({ where: { network } });
 }
 
+export async function isServiceSecretExists({ id, name }) {
+	return await prisma.serviceSecret.findFirst({ where: { name, serviceId: id } });
+}
 export async function isSecretExists({ id, name, isPRMRSecret }) {
 	return await prisma.secret.findFirst({ where: { name, applicationId: id, isPRMRSecret } });
 }

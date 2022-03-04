@@ -1,4 +1,3 @@
-import { dev } from '$app/env';
 import { ErrorHandler } from '$lib/database';
 import { configureHAProxy } from '$lib/haproxy/configuration';
 

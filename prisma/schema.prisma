@@ -122,6 +122,18 @@ model Secret {
   @@unique([name, applicationId, isPRMRSecret])
 }
 
+model ServiceSecret {
+  id        String   @id @default(cuid())
+  name      String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  service   Service  @relation(fields: [serviceId], references: [id])
+  serviceId String
+
+  @@unique([name, serviceId])
+}
+
 model BuildLog {
   id            String  @id @default(cuid())
   applicationId String?
@@ -252,6 +264,7 @@ model Service {
   minio               Minio?
   vscodeserver        Vscodeserver?
   wordpress           Wordpress?
+  serviceSecret       ServiceSecret[]
 }
 
 model PlausibleAnalytics {

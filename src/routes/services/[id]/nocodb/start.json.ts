@@ -3,7 +3,7 @@ import * as db from '$lib/database';
 import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
-import { ErrorHandler } from '$lib/database';
+import { ErrorHandler, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 
 export const post: RequestHandler = async (event) => {
@@ -14,19 +14,30 @@ export const post: RequestHandler = async (event) => {
 
 	try {
 		const service = await db.getService({ id, teamId });
-		const { type, version, destinationDockerId, destinationDocker } = service;
+		const { type, version, destinationDockerId, destinationDocker, serviceSecret } = service;
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
+		const image = getServiceImage(type);
 
+		const config = {
+			image: `${image}:${version}`,
+			environmentVariables: {}
+		};
+		if (serviceSecret.length > 0) {
+			serviceSecret.forEach((secret) => {
+				config.environmentVariables[secret.name] = secret.value;
+			});
+		}
 		const composeFile = {
 			version: '3.8',
 			services: {
 				[id]: {
 					container_name: id,
-					image: `nocodb/nocodb:${version}`,
+					image: config.image,
 					networks: [network],
+					environment: config.environmentVariables,
 					restart: 'always',
 					labels: makeLabelForServices('nocodb')
 				}

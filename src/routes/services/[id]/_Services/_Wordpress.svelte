@@ -25,7 +25,7 @@
 define('WP_ALLOW_MULTISITE', true);
 define('MULTISITE', true);
 define('SUBDOMAIN_INSTALL', false);`
-			: null}>{service.wordpress.extraConfig || 'N/A'}</textarea
+			: 'N/A'}>{service.wordpress.extraConfig}</textarea
 	>
 </div>
 <div class="flex space-x-1 py-5 font-bold">
