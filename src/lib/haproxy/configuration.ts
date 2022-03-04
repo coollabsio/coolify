@@ -112,9 +112,15 @@ export async function haproxyInstance() {
 }
 
 export async function configureHAProxy() {
+	const haproxy = await haproxyInstance();
+
 	try {
-		const haproxy = await haproxyInstance();
 		await checkHAProxy(haproxy);
+	} catch (error) {
+		return 'Error: HAProxy is not running';
+	}
+
+	try {
 		const data = {
 			applications: [],
 			services: [],
