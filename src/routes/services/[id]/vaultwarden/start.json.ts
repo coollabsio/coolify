@@ -14,25 +14,31 @@ export const post: RequestHandler = async (event) => {
 
 	try {
 		const service = await db.getService({ id, teamId });
-		const { type, version, destinationDockerId, destinationDocker } = service;
+		const { type, version, destinationDockerId, destinationDocker, serviceSecret } = service;
 
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
-		const baseImage = getServiceImage(type);
+		const image = getServiceImage(type);
 
 		const config = {
-			image: `${baseImage}:${version}`,
-			volume: `${id}-vaultwarden-data:/data/`
+			image: `${image}:${version}`,
+			volume: `${id}-vaultwarden-data:/data/`,
+			environmentVariables: {}
 		};
-
+		if (serviceSecret.length > 0) {
+			serviceSecret.forEach((secret) => {
+				config.environmentVariables[secret.name] = secret.value;
+			});
+		}
 		const composeFile = {
 			version: '3.8',
 			services: {
 				[id]: {
 					container_name: id,
 					image: config.image,
+					environment: config.environmentVariables,
 					networks: [network],
 					volumes: [config.volume],
 					restart: 'always',

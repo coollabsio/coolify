@@ -3,7 +3,7 @@ import * as db from '$lib/database';
 import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
-import { ErrorHandler } from '$lib/database';
+import { ErrorHandler, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 
 export const post: RequestHandler = async (event) => {
@@ -20,6 +20,7 @@ export const post: RequestHandler = async (event) => {
 			fqdn,
 			destinationDockerId,
 			destinationDocker,
+			serviceSecret,
 			plausibleAnalytics: {
 				id: plausibleDbId,
 				username,
@@ -31,10 +32,11 @@ export const post: RequestHandler = async (event) => {
 				secretKeyBase
 			}
 		} = service;
+		const image = getServiceImage(type);
 
 		const config = {
 			plausibleAnalytics: {
-				image: `plausible/analytics:${version}`,
+				image: `${image}:${version}`,
 				environmentVariables: {
 					ADMIN_USER_EMAIL: email,
 					ADMIN_USER_NAME: username,
@@ -68,6 +70,11 @@ export const post: RequestHandler = async (event) => {
 				}
 			}
 		};
+		if (serviceSecret.length > 0) {
+			serviceSecret.forEach((secret) => {
+				config.plausibleAnalytics.environmentVariables[secret.name] = secret.value;
+			});
+		}
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
 

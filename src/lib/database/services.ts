@@ -19,7 +19,8 @@ export async function getService({ id, teamId }) {
 			plausibleAnalytics: true,
 			minio: true,
 			vscodeserver: true,
-			wordpress: true
+			wordpress: true,
+			serviceSecret: true
 		}
 	});
 
@@ -42,6 +43,12 @@ export async function getService({ id, teamId }) {
 	if (body.wordpress?.mysqlRootUserPassword)
 		body.wordpress.mysqlRootUserPassword = decrypt(body.wordpress.mysqlRootUserPassword);
 
+	if (body?.serviceSecret.length > 0) {
+		body.serviceSecret = body.serviceSecret.map((s) => {
+			s.value = decrypt(s.value);
+			return s;
+		});
+	}
 	return { ...body };
 }
 
@@ -159,5 +166,7 @@ export async function removeService({ id }) {
 	await prisma.minio.deleteMany({ where: { serviceId: id } });
 	await prisma.vscodeserver.deleteMany({ where: { serviceId: id } });
 	await prisma.wordpress.deleteMany({ where: { serviceId: id } });
+	await prisma.serviceSecret.deleteMany({ where: { serviceId: id } });
+
 	await prisma.service.delete({ where: { id } });
 }

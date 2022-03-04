@@ -6,7 +6,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { startHttpProxy } from '$lib/haproxy';
 import getPort, { portNumbers } from 'get-port';
 import { getDomain } from '$lib/components/common';
-import { ErrorHandler } from '$lib/database';
+import { ErrorHandler, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 
 export const post: RequestHandler = async (event) => {
@@ -23,7 +23,8 @@ export const post: RequestHandler = async (event) => {
 			fqdn,
 			destinationDockerId,
 			destinationDocker,
-			minio: { rootUser, rootUserPassword }
+			minio: { rootUser, rootUserPassword },
+			serviceSecret
 		} = service;
 
 		const data = await db.prisma.setting.findFirst();
@@ -38,9 +39,10 @@ export const post: RequestHandler = async (event) => {
 		const apiPort = 9000;
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
+		const image = getServiceImage(type);
 
 		const config = {
-			image: `minio/minio:${version}`,
+			image: `${image}:${version}`,
 			volume: `${id}-minio-data:/data`,
 			environmentVariables: {
 				MINIO_ROOT_USER: rootUser,
@@ -48,12 +50,17 @@ export const post: RequestHandler = async (event) => {
 				MINIO_BROWSER_REDIRECT_URL: fqdn
 			}
 		};
+		if (serviceSecret.length > 0) {
+			serviceSecret.forEach((secret) => {
+				config.environmentVariables[secret.name] = secret.value;
+			});
+		}
 		const composeFile = {
 			version: '3.8',
 			services: {
 				[id]: {
 					container_name: id,
-					image: `minio/minio:${version}`,
+					image: config.image,
 					command: `server /data --console-address ":${consolePort}"`,
 					environment: config.environmentVariables,
 					networks: [network],

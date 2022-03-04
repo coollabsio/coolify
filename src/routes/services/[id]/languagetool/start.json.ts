@@ -14,19 +14,32 @@ export const post: RequestHandler = async (event) => {
 
 	try {
 		const service = await db.getService({ id, teamId });
-		const { type, version, destinationDockerId, destinationDocker } = service;
+		const { type, version, destinationDockerId, destinationDocker, serviceSecret } = service;
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 		const image = getServiceImage(type);
+
+		const config = {
+			image: `${image}:${version}`,
+			volume: `${id}-ngrams:/ngrams`,
+			environmentVariables: {}
+		};
+
+		if (serviceSecret.length > 0) {
+			serviceSecret.forEach((secret) => {
+				config.environmentVariables[secret.name] = secret.value;
+			});
+		}
 		const composeFile = {
 			version: '3.8',
 			services: {
 				[id]: {
 					container_name: id,
-					image: `${image}:${version}`,
+					image: config.image,
 					networks: [network],
+					environment: config.environmentVariables,
 					restart: 'always',
 					volumes: [`${id}-ngrams:/ngrams`],
 					labels: makeLabelForServices('languagetool')
