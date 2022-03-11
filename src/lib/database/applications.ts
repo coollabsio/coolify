@@ -71,7 +71,7 @@ export async function removeApplication({ id, teamId }) {
 export async function getApplicationWebhook({ projectId, branch }) {
 	try {
 		let applications = await prisma.application.findMany({
-			where: { projectId, branch },
+			where: { projectId, branch, settings: { autodeploy: true } },
 			include: {
 				destinationDocker: true,
 				settings: true,
@@ -158,23 +158,40 @@ export async function getApplication({ id, teamId }) {
 	return { ...body };
 }
 
-export async function configureGitRepository({ id, repository, branch, projectId, webhookToken }) {
+export async function configureGitRepository({
+	id,
+	repository,
+	branch,
+	projectId,
+	webhookToken,
+	autodeploy
+}) {
 	if (webhookToken) {
 		const encryptedWebhookToken = encrypt(webhookToken);
-		return await prisma.application.update({
+		await prisma.application.update({
 			where: { id },
 			data: {
 				repository,
 				branch,
 				projectId,
-				gitSource: { update: { gitlabApp: { update: { webhookToken: encryptedWebhookToken } } } }
+				gitSource: { update: { gitlabApp: { update: { webhookToken: encryptedWebhookToken } } } },
+				settings: { update: { autodeploy } }
 			}
 		});
 	} else {
-		return await prisma.application.update({
+		await prisma.application.update({
 			where: { id },
-			data: { repository, branch, projectId }
+			data: { repository, branch, projectId, settings: { update: { autodeploy } } }
 		});
+	}
+	if (!autodeploy) {
+		const applications = await prisma.application.findMany({ where: { branch, projectId } });
+		for (const application of applications) {
+			await prisma.applicationSettings.updateMany({
+				where: { applicationId: application.id },
+				data: { autodeploy: false }
+			});
+		}
 	}
 }
 
@@ -210,10 +227,14 @@ export async function configureApplication({
 	});
 }
 
-export async function setApplicationSettings({ id, debug, previews, dualCerts }) {
+export async function checkDoubleBranch(branch, projectId) {
+	const applications = await prisma.application.findMany({ where: { branch, projectId } });
+	return applications.length > 1;
+}
+export async function setApplicationSettings({ id, debug, previews, dualCerts, autodeploy }) {
 	return await prisma.application.update({
 		where: { id },
-		data: { settings: { update: { debug, previews, dualCerts } } },
+		data: { settings: { update: { debug, previews, dualCerts, autodeploy } } },
 		include: { destinationDocker: true }
 	});
 }

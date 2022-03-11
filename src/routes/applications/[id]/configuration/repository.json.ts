@@ -30,14 +30,21 @@ export const post: RequestHandler = async (event) => {
 	if (status === 401) return { status, body };
 
 	const { id } = event.params;
-	let { repository, branch, projectId, webhookToken } = await event.request.json();
+	let { repository, branch, projectId, webhookToken, autodeploy } = await event.request.json();
 
 	repository = repository.toLowerCase();
 	branch = branch.toLowerCase();
 	projectId = Number(projectId);
 
 	try {
-		await db.configureGitRepository({ id, repository, branch, projectId, webhookToken });
+		await db.configureGitRepository({
+			id,
+			repository,
+			branch,
+			projectId,
+			webhookToken,
+			autodeploy
+		});
 		return { status: 201 };
 	} catch (error) {
 		return ErrorHandler(error);

@@ -56,6 +56,7 @@
 	let debug = application.settings.debug;
 	let previews = application.settings.previews;
 	let dualCerts = application.settings.dualCerts;
+	let autodeploy = application.settings.autodeploy;
 
 	if (browser && window.location.hostname === 'demo.coolify.io' && !application.fqdn) {
 		application.fqdn = `http://${cuid()}.demo.coolify.io`;
@@ -75,10 +76,32 @@
 		if (name === 'dualCerts') {
 			dualCerts = !dualCerts;
 		}
+		if (name === 'autodeploy') {
+			autodeploy = !autodeploy;
+		}
 		try {
-			await post(`/applications/${id}/settings.json`, { previews, debug, dualCerts });
+			await post(`/applications/${id}/settings.json`, {
+				previews,
+				debug,
+				dualCerts,
+				autodeploy,
+				branch: application.branch,
+				projectId: application.projectId
+			});
 			return toast.push('Settings saved.');
 		} catch ({ error }) {
+			if (name === 'debug') {
+				debug = !debug;
+			}
+			if (name === 'previews') {
+				previews = !previews;
+			}
+			if (name === 'dualCerts') {
+				dualCerts = !dualCerts;
+			}
+			if (name === 'autodeploy') {
+				autodeploy = !autodeploy;
+			}
 			return errorNotification(error);
 		}
 	}
@@ -383,22 +406,23 @@
 	<div class="flex space-x-1 pb-5 font-bold">
 		<div class="title">Features</div>
 	</div>
-	<!-- <ul class="mt-2 divide-y divide-stone-800">
-			<Setting
-				bind:setting={forceSSL}
-				on:click={() => changeSettings('forceSSL')}
-				title="Force https"
-				description="Creates a https redirect for all requests from http and also generates a https certificate for the domain through Let's Encrypt."
-			/>
-		</ul> -->
 	<div class="px-10 pb-10">
+		<div class="grid grid-cols-2 items-center">
+			<Setting
+				isCenter={false}
+				bind:setting={autodeploy}
+				on:click={() => changeSettings('autodeploy')}
+				title="Enable Automatic Deployment"
+				description="Enable automatic deployment through webhooks."
+			/>
+		</div>
 		<div class="grid grid-cols-2 items-center">
 			<Setting
 				isCenter={false}
 				bind:setting={previews}
 				on:click={() => changeSettings('previews')}
 				title="Enable MR/PR Previews"
-				description="Creates previews from pull and merge requests."
+				description="Enable preview deployments from pull or merge requests."
 			/>
 		</div>
 		<div class="grid grid-cols-2 items-center">

@@ -28,6 +28,8 @@
 		branch: undefined
 	};
 	let showSave = false;
+	let autodeploy = application.settings.autodeploy || true;
+
 	async function loadRepositoriesByPage(page = 0) {
 		return await get(`${apiUrl}/installation/repositories?per_page=100&page=${page}`, {
 			Authorization: `token ${$gitTokens.githubToken}`
@@ -69,7 +71,14 @@
 				`/applications/${id}/configuration/repository.json?repository=${selected.repository}&branch=${selected.branch}`
 			);
 			if (data.used) {
-				errorNotification('This branch is already used by another application.');
+				const sure = confirm(
+					`This branch is already used by another application. Webhooks won't work in this case for both applications. Are you sure you want to use it?`
+				);
+				if (sure) {
+					autodeploy = false;
+					showSave = true;
+					return true;
+				}
 				showSave = false;
 				return true;
 			}
@@ -172,7 +181,7 @@
 					class="w-96"
 					disabled={!selected.repository}
 					bind:value={selected.branch}
-					on:change={() => (showSave = true)}
+					on:change={isBranchAlreadyUsed}
 				>
 					{#if !selected.repository}
 						<option value="" disabled selected>Select a repository first</option>

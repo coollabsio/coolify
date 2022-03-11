@@ -45,8 +45,8 @@ export const post: RequestHandler = async (event) => {
 								})
 							)
 							.digest('hex');
-						await db.prisma.application.updateMany({
-							where: { branch, projectId },
+						await db.prisma.application.update({
+							where: { id: application.id },
 							data: { configHash }
 						});
 					}

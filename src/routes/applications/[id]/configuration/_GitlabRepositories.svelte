@@ -30,6 +30,7 @@
 	let projects = [];
 	let branches = [];
 	let showSave = false;
+	let autodeploy = application.settings.autodeploy || true;
 
 	let selected = {
 		group: undefined,
@@ -138,7 +139,14 @@
 				`/applications/${id}/configuration/repository.json?repository=${selected.project.path_with_namespace}&branch=${selected.branch.name}`
 			);
 			if (data.used) {
-				errorNotification('This branch is already used by another application.');
+				const sure = confirm(
+					`This branch is already used by another application. Webhooks won't work in this case for both applications. Are you sure you want to use it?`
+				);
+				if (sure) {
+					autodeploy = false;
+					showSave = true;
+					return true;
+				}
 				showSave = false;
 				return true;
 			}
@@ -242,6 +250,7 @@
 				repository,
 				branch: selected.branch.name,
 				projectId: selected.project.id,
+				autodeploy,
 				webhookToken
 			});
 			return await goto(from || `/applications/${id}/configuration/buildpack`);
@@ -305,7 +314,7 @@
 				name="branch"
 				class="w-96"
 				bind:value={selected.branch}
-				on:change={() => (showSave = true)}
+				on:change={isBranchAlreadyUsed}
 				disabled={!selected.project}
 			>
 				<option value="" disabled selected>Please select a branch</option>
