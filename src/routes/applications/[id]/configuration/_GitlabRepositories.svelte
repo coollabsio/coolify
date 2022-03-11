@@ -235,8 +235,11 @@
 
 		const url = `/applications/${id}/configuration/repository.json`;
 		try {
+			const repository = `${selected.group.full_path.replace('-personal', '')}/${
+				selected.project.name
+			}`;
 			await post(url, {
-				repository: `${selected.group.full_path}/${selected.project.name}`,
+				repository,
 				branch: selected.branch.name,
 				projectId: selected.project.id,
 				webhookToken
