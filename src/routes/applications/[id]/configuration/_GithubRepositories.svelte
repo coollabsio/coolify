@@ -25,10 +25,10 @@
 	let selected = {
 		projectId: undefined,
 		repository: undefined,
-		branch: undefined
+		branch: undefined,
+		autodeploy: application.settings.autodeploy || true
 	};
 	let showSave = false;
-	let autodeploy = application.settings.autodeploy || true;
 
 	async function loadRepositoriesByPage(page = 0) {
 		return await get(`${apiUrl}/installation/repositories?per_page=100&page=${page}`, {
@@ -75,7 +75,7 @@
 					`This branch is already used by another application. Webhooks won't work in this case for both applications. Are you sure you want to use it?`
 				);
 				if (sure) {
-					autodeploy = false;
+					selected.autodeploy = false;
 					showSave = true;
 					return true;
 				}
