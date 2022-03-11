@@ -108,11 +108,9 @@
 		try {
 			loading = true;
 			await post(`/applications/${id}/stop.json`, {});
-			isRunning = false;
+			return window.location.reload();
 		} catch ({ error }) {
 			return errorNotification(error);
-		} finally {
-			loading = false;
 		}
 	}
 </script>

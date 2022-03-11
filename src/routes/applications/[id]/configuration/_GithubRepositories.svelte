@@ -25,9 +25,11 @@
 	let selected = {
 		projectId: undefined,
 		repository: undefined,
-		branch: undefined
+		branch: undefined,
+		autodeploy: application.settings.autodeploy || true
 	};
 	let showSave = false;
+
 	async function loadRepositoriesByPage(page = 0) {
 		return await get(`${apiUrl}/installation/repositories?per_page=100&page=${page}`, {
 			Authorization: `token ${$gitTokens.githubToken}`
@@ -69,7 +71,14 @@
 				`/applications/${id}/configuration/repository.json?repository=${selected.repository}&branch=${selected.branch}`
 			);
 			if (data.used) {
-				errorNotification('This branch is already used by another application.');
+				const sure = confirm(
+					`This branch is already used by another application. Webhooks won't work in this case for both applications. Are you sure you want to use it?`
+				);
+				if (sure) {
+					selected.autodeploy = false;
+					showSave = true;
+					return true;
+				}
 				showSave = false;
 				return true;
 			}

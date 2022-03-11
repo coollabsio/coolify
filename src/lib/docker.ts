@@ -16,6 +16,7 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 		secrets,
 		pullmergeRequestId
 	} = data;
+	const isPnpm = installCommand.includes('pnpm') || buildCommand.includes('pnpm');
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild}`);
 	Dockerfile.push('WORKDIR /usr/src/app');
@@ -35,7 +36,10 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 			}
 		});
 	}
-	// TODO: If build command defined, install command should be the default yarn install
+	if (isPnpm) {
+		Dockerfile.push('RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm');
+		Dockerfile.push('RUN pnpm add -g pnpm');
+	}
 	if (installCommand) {
 		Dockerfile.push(`COPY ./${baseDirectory || ''}package*.json ./`);
 		try {

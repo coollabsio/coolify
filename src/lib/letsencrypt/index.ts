@@ -99,7 +99,8 @@ export async function letsEncrypt(domain, id = null, isCoolify = false) {
 export async function generateSSLCerts() {
 	const ssls = [];
 	const applications = await db.prisma.application.findMany({
-		include: { destinationDocker: true, settings: true }
+		include: { destinationDocker: true, settings: true },
+		orderBy: { createdAt: 'desc' }
 	});
 	for (const application of applications) {
 		const {
@@ -139,7 +140,8 @@ export async function generateSSLCerts() {
 			plausibleAnalytics: true,
 			vscodeserver: true,
 			wordpress: true
-		}
+		},
+		orderBy: { createdAt: 'desc' }
 	});
 
 	for (const service of services) {

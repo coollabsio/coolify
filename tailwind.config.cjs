@@ -1,5 +1,5 @@
 const defaultTheme = require('tailwindcss/defaultTheme');
-const colors = require('tailwindcss/colors');
+// const colors = require('tailwindcss/colors');
 module.exports = {
 	content: ['./**/*.html', './src/**/*.{js,jsx,ts,tsx,svelte}'],
 	important: true,
@@ -18,7 +18,6 @@ module.exports = {
 				sans: ['Poppins', ...defaultTheme.fontFamily.sans]
 			},
 			colors: {
-				...colors,
 				coollabs: '#6B16ED',
 				'coollabs-100': '#7317FF',
 				coolblack: '#161616',

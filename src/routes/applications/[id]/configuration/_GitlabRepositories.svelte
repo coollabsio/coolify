@@ -30,6 +30,7 @@
 	let projects = [];
 	let branches = [];
 	let showSave = false;
+	let autodeploy = application.settings.autodeploy || true;
 
 	let selected = {
 		group: undefined,
@@ -138,7 +139,14 @@
 				`/applications/${id}/configuration/repository.json?repository=${selected.project.path_with_namespace}&branch=${selected.branch.name}`
 			);
 			if (data.used) {
-				errorNotification('This branch is already used by another application.');
+				const sure = confirm(
+					`This branch is already used by another application. Webhooks won't work in this case for both applications. Are you sure you want to use it?`
+				);
+				if (sure) {
+					autodeploy = false;
+					showSave = true;
+					return true;
+				}
 				showSave = false;
 				return true;
 			}
@@ -235,10 +243,14 @@
 
 		const url = `/applications/${id}/configuration/repository.json`;
 		try {
+			const repository = `${selected.group.full_path.replace('-personal', '')}/${
+				selected.project.name
+			}`;
 			await post(url, {
-				repository: `${selected.group.full_path}/${selected.project.name}`,
+				repository,
 				branch: selected.branch.name,
 				projectId: selected.project.id,
+				autodeploy,
 				webhookToken
 			});
 			return await goto(from || `/applications/${id}/configuration/buildpack`);

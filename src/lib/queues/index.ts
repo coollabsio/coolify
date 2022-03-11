@@ -120,7 +120,7 @@ buildWorker.on('completed', async (job: Bullmq.Job) => {
 	} catch (err) {
 		console.log(err);
 	} finally {
-		const workdir = `/tmp/build-sources/${job.data.repository}/`;
+		const workdir = `/tmp/build-sources/${job.data.repository}/${job.data.build_id}`;
 		await asyncExecShell(`rm -fr ${workdir}`);
 	}
 	return;

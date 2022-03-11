@@ -13,7 +13,7 @@ export function findBuildPack(pack, packageManager = 'npm') {
 	if (pack === 'node') {
 		return {
 			...metaData,
-			installCommand: null,
+			...defaultBuildAndDeploy(packageManager),
 			buildCommand: null,
 			startCommand: null,
 			publishDirectory: null,

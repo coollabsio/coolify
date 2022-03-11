@@ -58,15 +58,6 @@ export async function removeApplication({ id, teamId }) {
 				const id = containerObj.ID;
 				const preview = containerObj.Image.split('-')[1];
 				await removeDestinationDocker({ id, engine: destinationDocker.engine });
-				try {
-					if (preview) {
-						await removeProxyConfiguration({ domain: `${preview}.${domain}` });
-					} else {
-						await removeProxyConfiguration({ domain });
-					}
-				} catch (error) {
-					console.log(error);
-				}
 			}
 		}
 	}
@@ -79,8 +70,8 @@ export async function removeApplication({ id, teamId }) {
 
 export async function getApplicationWebhook({ projectId, branch }) {
 	try {
-		let body = await prisma.application.findFirst({
-			where: { projectId, branch },
+		let application = await prisma.application.findFirst({
+			where: { projectId, branch, settings: { autodeploy: true } },
 			include: {
 				destinationDocker: true,
 				settings: true,
@@ -88,30 +79,38 @@ export async function getApplicationWebhook({ projectId, branch }) {
 				secrets: true
 			}
 		});
-
-		if (body.gitSource?.githubApp?.clientSecret) {
-			body.gitSource.githubApp.clientSecret = decrypt(body.gitSource.githubApp.clientSecret);
+		if (application.gitSource?.githubApp?.clientSecret) {
+			application.gitSource.githubApp.clientSecret = decrypt(
+				application.gitSource.githubApp.clientSecret
+			);
 		}
-		if (body.gitSource?.githubApp?.webhookSecret) {
-			body.gitSource.githubApp.webhookSecret = decrypt(body.gitSource.githubApp.webhookSecret);
+		if (application.gitSource?.githubApp?.webhookSecret) {
+			application.gitSource.githubApp.webhookSecret = decrypt(
+				application.gitSource.githubApp.webhookSecret
+			);
 		}
-		if (body.gitSource?.githubApp?.privateKey) {
-			body.gitSource.githubApp.privateKey = decrypt(body.gitSource.githubApp.privateKey);
+		if (application.gitSource?.githubApp?.privateKey) {
+			application.gitSource.githubApp.privateKey = decrypt(
+				application.gitSource.githubApp.privateKey
+			);
 		}
-		if (body?.gitSource?.gitlabApp?.appSecret) {
-			body.gitSource.gitlabApp.appSecret = decrypt(body.gitSource.gitlabApp.appSecret);
+		if (application?.gitSource?.gitlabApp?.appSecret) {
+			application.gitSource.gitlabApp.appSecret = decrypt(
+				application.gitSource.gitlabApp.appSecret
+			);
 		}
-		if (body?.gitSource?.gitlabApp?.webhookToken) {
-			body.gitSource.gitlabApp.webhookToken = decrypt(body.gitSource.gitlabApp.webhookToken);
+		if (application?.gitSource?.gitlabApp?.webhookToken) {
+			application.gitSource.gitlabApp.webhookToken = decrypt(
+				application.gitSource.gitlabApp.webhookToken
+			);
 		}
-		if (body?.secrets.length > 0) {
-			body.secrets = body.secrets.map((s) => {
+		if (application?.secrets.length > 0) {
+			application.secrets = application.secrets.map((s) => {
 				s.value = decrypt(s.value);
 				return s;
 			});
 		}
-
-		return { ...body };
+		return { ...application };
 	} catch (e) {
 		throw { status: 404, body: { message: e.message } };
 	}
@@ -157,23 +156,40 @@ export async function getApplication({ id, teamId }) {
 	return { ...body };
 }
 
-export async function configureGitRepository({ id, repository, branch, projectId, webhookToken }) {
+export async function configureGitRepository({
+	id,
+	repository,
+	branch,
+	projectId,
+	webhookToken,
+	autodeploy
+}) {
 	if (webhookToken) {
 		const encryptedWebhookToken = encrypt(webhookToken);
-		return await prisma.application.update({
+		await prisma.application.update({
 			where: { id },
 			data: {
 				repository,
 				branch,
 				projectId,
-				gitSource: { update: { gitlabApp: { update: { webhookToken: encryptedWebhookToken } } } }
+				gitSource: { update: { gitlabApp: { update: { webhookToken: encryptedWebhookToken } } } },
+				settings: { update: { autodeploy } }
 			}
 		});
 	} else {
-		return await prisma.application.update({
+		await prisma.application.update({
 			where: { id },
-			data: { repository, branch, projectId }
+			data: { repository, branch, projectId, settings: { update: { autodeploy } } }
 		});
+	}
+	if (!autodeploy) {
+		const applications = await prisma.application.findMany({ where: { branch, projectId } });
+		for (const application of applications) {
+			await prisma.applicationSettings.updateMany({
+				where: { applicationId: application.id },
+				data: { autodeploy: false }
+			});
+		}
 	}
 }
 
@@ -209,10 +225,14 @@ export async function configureApplication({
 	});
 }
 
-export async function setApplicationSettings({ id, debug, previews, dualCerts }) {
+export async function checkDoubleBranch(branch, projectId) {
+	const applications = await prisma.application.findMany({ where: { branch, projectId } });
+	return applications.length > 1;
+}
+export async function setApplicationSettings({ id, debug, previews, dualCerts, autodeploy }) {
 	return await prisma.application.update({
 		where: { id },
-		data: { settings: { update: { debug, previews, dualCerts } } },
+		data: { settings: { update: { debug, previews, dualCerts, autodeploy } } },
 		include: { destinationDocker: true }
 	});
 }

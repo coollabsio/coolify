@@ -13,7 +13,10 @@ const createDockerfile = async (data, image): Promise<void> => {
 		pullmergeRequestId
 	} = data;
 	const Dockerfile: Array<string> = [];
-
+	const isPnpm =
+		installCommand.includes('pnpm') ||
+		buildCommand.includes('pnpm') ||
+		startCommand.includes('pnpm');
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push('WORKDIR /usr/src/app');
 	Dockerfile.push(`LABEL coolify.image=true`);
@@ -31,6 +34,10 @@ const createDockerfile = async (data, image): Promise<void> => {
 				}
 			}
 		});
+	}
+	if (isPnpm) {
+		Dockerfile.push('RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm');
+		Dockerfile.push('RUN pnpm add -g pnpm');
 	}
 	Dockerfile.push(`COPY ./${baseDirectory || ''}package*.json ./`);
 	try {
