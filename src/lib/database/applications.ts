@@ -70,7 +70,7 @@ export async function removeApplication({ id, teamId }) {
 
 export async function getApplicationWebhook({ projectId, branch }) {
 	try {
-		let applications = await prisma.application.findMany({
+		let application = await prisma.application.findFirst({
 			where: { projectId, branch, settings: { autodeploy: true } },
 			include: {
 				destinationDocker: true,
@@ -79,40 +79,38 @@ export async function getApplicationWebhook({ projectId, branch }) {
 				secrets: true
 			}
 		});
-		for (const application of applications) {
-			if (application.gitSource?.githubApp?.clientSecret) {
-				application.gitSource.githubApp.clientSecret = decrypt(
-					application.gitSource.githubApp.clientSecret
-				);
-			}
-			if (application.gitSource?.githubApp?.webhookSecret) {
-				application.gitSource.githubApp.webhookSecret = decrypt(
-					application.gitSource.githubApp.webhookSecret
-				);
-			}
-			if (application.gitSource?.githubApp?.privateKey) {
-				application.gitSource.githubApp.privateKey = decrypt(
-					application.gitSource.githubApp.privateKey
-				);
-			}
-			if (application?.gitSource?.gitlabApp?.appSecret) {
-				application.gitSource.gitlabApp.appSecret = decrypt(
-					application.gitSource.gitlabApp.appSecret
-				);
-			}
-			if (application?.gitSource?.gitlabApp?.webhookToken) {
-				application.gitSource.gitlabApp.webhookToken = decrypt(
-					application.gitSource.gitlabApp.webhookToken
-				);
-			}
-			if (application?.secrets.length > 0) {
-				application.secrets = application.secrets.map((s) => {
-					s.value = decrypt(s.value);
-					return s;
-				});
-			}
+		if (application.gitSource?.githubApp?.clientSecret) {
+			application.gitSource.githubApp.clientSecret = decrypt(
+				application.gitSource.githubApp.clientSecret
+			);
 		}
-		return [...applications];
+		if (application.gitSource?.githubApp?.webhookSecret) {
+			application.gitSource.githubApp.webhookSecret = decrypt(
+				application.gitSource.githubApp.webhookSecret
+			);
+		}
+		if (application.gitSource?.githubApp?.privateKey) {
+			application.gitSource.githubApp.privateKey = decrypt(
+				application.gitSource.githubApp.privateKey
+			);
+		}
+		if (application?.gitSource?.gitlabApp?.appSecret) {
+			application.gitSource.gitlabApp.appSecret = decrypt(
+				application.gitSource.gitlabApp.appSecret
+			);
+		}
+		if (application?.gitSource?.gitlabApp?.webhookToken) {
+			application.gitSource.gitlabApp.webhookToken = decrypt(
+				application.gitSource.gitlabApp.webhookToken
+			);
+		}
+		if (application?.secrets.length > 0) {
+			application.secrets = application.secrets.map((s) => {
+				s.value = decrypt(s.value);
+				return s;
+			});
+		}
+		return { ...application };
 	} catch (e) {
 		throw { status: 404, body: { message: e.message } };
 	}

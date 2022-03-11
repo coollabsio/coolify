@@ -21,46 +21,42 @@ export const options: RequestHandler = async () => {
 export const post: RequestHandler = async (event) => {
 	const allowedActions = ['opened', 'reopen', 'close', 'open', 'update'];
 	const body = await event.request.json();
-
+	const buildId = cuid();
 	try {
 		const { object_kind: objectKind } = body;
 		if (objectKind === 'push') {
 			const { ref } = body;
 			const projectId = Number(body['project_id']);
 			const branch = ref.split('/')[2];
-			const applications = await db.getApplicationWebhook({ projectId, branch });
-			if (applications.length > 0) {
-				for (const application of applications) {
-					const buildId = cuid();
-					if (!application.configHash) {
-						const configHash = crypto
-							.createHash('sha256')
-							.update(
-								JSON.stringify({
-									buildPack: application.buildPack,
-									port: application.port,
-									installCommand: application.installCommand,
-									buildCommand: application.buildCommand,
-									startCommand: application.startCommand
-								})
-							)
-							.digest('hex');
-						await db.prisma.application.update({
-							where: { id: application.id },
-							data: { configHash }
-						});
-					}
-					await db.prisma.application.update({
-						where: { id: application.id },
-						data: { updatedAt: new Date() }
-					});
-					await buildQueue.add(buildId, {
-						build_id: buildId,
-						type: 'webhook_commit',
-						...application
+			const applicationFound = await db.getApplicationWebhook({ projectId, branch });
+			if (applicationFound) {
+				if (!applicationFound.configHash) {
+					const configHash = crypto
+						.createHash('sha256')
+						.update(
+							JSON.stringify({
+								buildPack: applicationFound.buildPack,
+								port: applicationFound.port,
+								installCommand: applicationFound.installCommand,
+								buildCommand: applicationFound.buildCommand,
+								startCommand: applicationFound.startCommand
+							})
+						)
+						.digest('hex');
+					await db.prisma.application.updateMany({
+						where: { branch, projectId },
+						data: { configHash }
 					});
 				}
-
+				await db.prisma.application.update({
+					where: { id: applicationFound.id },
+					data: { updatedAt: new Date() }
+				});
+				await buildQueue.add(buildId, {
+					build_id: buildId,
+					type: 'webhook_commit',
+					...applicationFound
+				});
 				return {
 					status: 200,
 					body: {
@@ -68,12 +64,6 @@ export const post: RequestHandler = async (event) => {
 					}
 				};
 			}
-			return {
-				status: 500,
-				body: {
-					message: 'No applications configured in Coolify.'
-				}
-			};
 		} else if (objectKind === 'merge_request') {
 			const webhookToken = event.request.headers.get('x-gitlab-token');
 			if (!webhookToken) {
@@ -108,73 +98,69 @@ export const post: RequestHandler = async (event) => {
 				};
 			}
 
-			const applications = await db.getApplicationWebhook({ projectId, branch: targetBranch });
-			if (applications.length > 0) {
-				for (const application of applications) {
-					const buildId = cuid();
-					if (application.settings.previews) {
-						if (application.destinationDockerId) {
-							const isRunning = await checkContainer(
-								application.destinationDocker.engine,
-								application.id
-							);
-							if (!isRunning) {
-								return {
-									status: 500,
-									body: {
-										message: 'Application not running.'
-									}
-								};
-							}
-						}
-						if (!dev && application.gitSource.gitlabApp.webhookToken !== webhookToken) {
+			const applicationFound = await db.getApplicationWebhook({ projectId, branch: targetBranch });
+			if (applicationFound) {
+				if (applicationFound.settings.previews) {
+					if (applicationFound.destinationDockerId) {
+						const isRunning = await checkContainer(
+							applicationFound.destinationDocker.engine,
+							applicationFound.id
+						);
+						if (!isRunning) {
 							return {
 								status: 500,
 								body: {
-									message: 'Ooops, something is not okay, are you okay?'
-								}
-							};
-						}
-						if (
-							action === 'opened' ||
-							action === 'reopen' ||
-							action === 'open' ||
-							action === 'update'
-						) {
-							await db.prisma.application.update({
-								where: { id: application.id },
-								data: { updatedAt: new Date() }
-							});
-							await buildQueue.add(buildId, {
-								build_id: buildId,
-								type: 'webhook_mr',
-								...application,
-								sourceBranch,
-								pullmergeRequestId
-							});
-							return {
-								status: 200,
-								body: {
-									message: 'Queued. Thank you!'
-								}
-							};
-						} else if (action === 'close') {
-							if (application.destinationDockerId) {
-								const id = `${application.id}-${pullmergeRequestId}`;
-								const engine = application.destinationDocker.engine;
-								await removeDestinationDocker({ id, engine });
-							}
-
-							return {
-								status: 200,
-								body: {
-									message: 'Removed preview. Thank you!'
+									message: 'Application not running.'
 								}
 							};
 						}
 					}
-				}
+					if (!dev && applicationFound.gitSource.gitlabApp.webhookToken !== webhookToken) {
+						return {
+							status: 500,
+							body: {
+								message: 'Ooops, something is not okay, are you okay?'
+							}
+						};
+					}
+					if (
+						action === 'opened' ||
+						action === 'reopen' ||
+						action === 'open' ||
+						action === 'update'
+					) {
+						await db.prisma.application.update({
+							where: { id: applicationFound.id },
+							data: { updatedAt: new Date() }
+						});
+						await buildQueue.add(buildId, {
+							build_id: buildId,
+							type: 'webhook_mr',
+							...applicationFound,
+							sourceBranch,
+							pullmergeRequestId
+						});
+						return {
+							status: 200,
+							body: {
+								message: 'Queued. Thank you!'
+							}
+						};
+					} else if (action === 'close') {
+						if (applicationFound.destinationDockerId) {
+							const id = `${applicationFound.id}-${pullmergeRequestId}`;
+							const engine = applicationFound.destinationDocker.engine;
+							await removeDestinationDocker({ id, engine });
+						}
 
+						return {
+							status: 200,
+							body: {
+								message: 'Removed preview. Thank you!'
+							}
+						};
+					}
+				}
 				return {
 					status: 500,
 					body: {
