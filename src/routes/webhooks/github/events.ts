@@ -9,7 +9,7 @@ import { dev } from '$app/env';
 
 export const options: RequestHandler = async () => {
 	return {
-		status: 200,
+		status: 204,
 		headers: {
 			'Access-Control-Allow-Origin': '*',
 			'Access-Control-Allow-Headers': 'Content-Type, Authorization',
