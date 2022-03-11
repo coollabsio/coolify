@@ -305,7 +305,7 @@
 				name="branch"
 				class="w-96"
 				bind:value={selected.branch}
-				on:change={isBranchAlreadyUsed}
+				on:change={() => (showSave = true)}
 				disabled={!selected.project}
 			>
 				<option value="" disabled selected>Please select a branch</option>

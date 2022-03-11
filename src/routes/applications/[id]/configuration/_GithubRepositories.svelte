@@ -172,7 +172,7 @@
 					class="w-96"
 					disabled={!selected.repository}
 					bind:value={selected.branch}
-					on:change={isBranchAlreadyUsed}
+					on:change={() => (showSave = true)}
 				>
 					{#if !selected.repository}
 						<option value="" disabled selected>Select a repository first</option>

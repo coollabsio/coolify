@@ -58,15 +58,6 @@ export async function removeApplication({ id, teamId }) {
 				const id = containerObj.ID;
 				const preview = containerObj.Image.split('-')[1];
 				await removeDestinationDocker({ id, engine: destinationDocker.engine });
-				try {
-					if (preview) {
-						await removeProxyConfiguration({ domain: `${preview}.${domain}` });
-					} else {
-						await removeProxyConfiguration({ domain });
-					}
-				} catch (error) {
-					console.log(error);
-				}
 			}
 		}
 	}
@@ -79,7 +70,7 @@ export async function removeApplication({ id, teamId }) {
 
 export async function getApplicationWebhook({ projectId, branch }) {
 	try {
-		let body = await prisma.application.findFirst({
+		let applications = await prisma.application.findMany({
 			where: { projectId, branch },
 			include: {
 				destinationDocker: true,
@@ -88,30 +79,40 @@ export async function getApplicationWebhook({ projectId, branch }) {
 				secrets: true
 			}
 		});
-
-		if (body.gitSource?.githubApp?.clientSecret) {
-			body.gitSource.githubApp.clientSecret = decrypt(body.gitSource.githubApp.clientSecret);
+		for (const application of applications) {
+			if (application.gitSource?.githubApp?.clientSecret) {
+				application.gitSource.githubApp.clientSecret = decrypt(
+					application.gitSource.githubApp.clientSecret
+				);
+			}
+			if (application.gitSource?.githubApp?.webhookSecret) {
+				application.gitSource.githubApp.webhookSecret = decrypt(
+					application.gitSource.githubApp.webhookSecret
+				);
+			}
+			if (application.gitSource?.githubApp?.privateKey) {
+				application.gitSource.githubApp.privateKey = decrypt(
+					application.gitSource.githubApp.privateKey
+				);
+			}
+			if (application?.gitSource?.gitlabApp?.appSecret) {
+				application.gitSource.gitlabApp.appSecret = decrypt(
+					application.gitSource.gitlabApp.appSecret
+				);
+			}
+			if (application?.gitSource?.gitlabApp?.webhookToken) {
+				application.gitSource.gitlabApp.webhookToken = decrypt(
+					application.gitSource.gitlabApp.webhookToken
+				);
+			}
+			if (application?.secrets.length > 0) {
+				application.secrets = application.secrets.map((s) => {
+					s.value = decrypt(s.value);
+					return s;
+				});
+			}
 		}
-		if (body.gitSource?.githubApp?.webhookSecret) {
-			body.gitSource.githubApp.webhookSecret = decrypt(body.gitSource.githubApp.webhookSecret);
-		}
-		if (body.gitSource?.githubApp?.privateKey) {
-			body.gitSource.githubApp.privateKey = decrypt(body.gitSource.githubApp.privateKey);
-		}
-		if (body?.gitSource?.gitlabApp?.appSecret) {
-			body.gitSource.gitlabApp.appSecret = decrypt(body.gitSource.gitlabApp.appSecret);
-		}
-		if (body?.gitSource?.gitlabApp?.webhookToken) {
-			body.gitSource.gitlabApp.webhookToken = decrypt(body.gitSource.gitlabApp.webhookToken);
-		}
-		if (body?.secrets.length > 0) {
-			body.secrets = body.secrets.map((s) => {
-				s.value = decrypt(s.value);
-				return s;
-			});
-		}
-
-		return { ...body };
+		return [...applications];
 	} catch (e) {
 		throw { status: 404, body: { message: e.message } };
 	}

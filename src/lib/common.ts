@@ -11,6 +11,7 @@ import { version as currentVersion } from '../../package.json';
 import dayjs from 'dayjs';
 import Cookie from 'cookie';
 import os from 'os';
+import cuid from 'cuid';
 
 try {
 	if (!dev) {
