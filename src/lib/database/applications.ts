@@ -79,17 +79,17 @@ export async function getApplicationWebhook({ projectId, branch }) {
 				secrets: true
 			}
 		});
-		if (application.gitSource?.githubApp?.clientSecret) {
+		if (application?.gitSource?.githubApp?.clientSecret) {
 			application.gitSource.githubApp.clientSecret = decrypt(
 				application.gitSource.githubApp.clientSecret
 			);
 		}
-		if (application.gitSource?.githubApp?.webhookSecret) {
+		if (application?.gitSource?.githubApp?.webhookSecret) {
 			application.gitSource.githubApp.webhookSecret = decrypt(
 				application.gitSource.githubApp.webhookSecret
 			);
 		}
-		if (application.gitSource?.githubApp?.privateKey) {
+		if (application?.gitSource?.githubApp?.privateKey) {
 			application.gitSource.githubApp.privateKey = decrypt(
 				application.gitSource.githubApp.privateKey
 			);
