@@ -47,7 +47,7 @@ export const post: RequestHandler = async (event) => {
 
 		const applicationFound = await db.getApplicationWebhook({ projectId, branch });
 		if (applicationFound) {
-			const webhookSecret = applicationFound.gitSource.githubApp.webhookSecret;
+			const webhookSecret = applicationFound.gitSource.githubApp.webhookSecret || null;
 			const hmac = crypto.createHmac('sha256', webhookSecret);
 			const digest = Buffer.from(
 				'sha256=' + hmac.update(JSON.stringify(body)).digest('hex'),
