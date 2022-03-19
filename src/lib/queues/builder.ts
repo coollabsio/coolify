@@ -3,7 +3,14 @@ import fs from 'fs/promises';
 import * as buildpacks from '../buildPacks';
 import * as importers from '../importers';
 import { dockerInstance } from '../docker';
-import { asyncExecShell, createDirectories, getDomain, getEngine, saveBuildLog } from '../common';
+import {
+	asyncExecShell,
+	asyncSleep,
+	createDirectories,
+	getDomain,
+	getEngine,
+	saveBuildLog
+} from '../common';
 import * as db from '$lib/database';
 import { decrypt } from '$lib/crypto';
 import { sentry } from '$lib/common';
@@ -12,7 +19,6 @@ import {
 	makeLabelForStandaloneApplication,
 	setDefaultConfiguration
 } from '$lib/buildPacks/common';
-import { letsEncrypt } from '$lib/letsencrypt';
 
 export default async function (job) {
 	/*
@@ -45,7 +51,7 @@ export default async function (job) {
 		settings
 	} = job.data;
 	const { debug } = settings;
-
+	await asyncSleep(1000);
 	let imageId = applicationId;
 	let domain = getDomain(fqdn);
 	const isHttps = fqdn.startsWith('https://');
@@ -67,17 +73,8 @@ export default async function (job) {
 		const docker = dockerInstance({ destinationDocker });
 		const host = getEngine(destinationDocker.engine);
 
-		const build = await db.createBuild({
-			id: buildId,
-			applicationId,
-			destinationDockerId: destinationDocker.id,
-			gitSourceId: gitSource.id,
-			githubAppId: gitSource.githubApp?.id,
-			gitlabAppId: gitSource.gitlabApp?.id,
-			type
-		});
-
-		const { workdir, repodir } = await createDirectories({ repository, buildId: build.id });
+		await db.prisma.build.update({ where: { id: buildId }, data: { status: 'running' } });
+		const { workdir, repodir } = await createDirectories({ repository, buildId });
 
 		const configuration = await setDefaultConfiguration(job.data);
 
@@ -87,6 +84,7 @@ export default async function (job) {
 		startCommand = configuration.startCommand;
 		buildCommand = configuration.buildCommand;
 		publishDirectory = configuration.publishDirectory;
+		baseDirectory = configuration.baseDirectory;
 
 		let commit = await importers[gitSource.type]({
 			applicationId,
@@ -97,7 +95,7 @@ export default async function (job) {
 			gitlabAppId: gitSource.gitlabApp?.id,
 			repository,
 			branch,
-			buildId: build.id,
+			buildId,
 			apiUrl: gitSource.apiUrl,
 			projectId,
 			deployKeyId: gitSource.gitlabApp?.deployKeyId || null,
@@ -109,7 +107,7 @@ export default async function (job) {
 		}
 
 		try {
-			await db.prisma.build.update({ where: { id: build.id }, data: { commit } });
+			db.prisma.build.update({ where: { id: buildId }, data: { commit } });
 		} catch (err) {
 			console.log(err);
 		}
@@ -160,7 +158,7 @@ export default async function (job) {
 			await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId);
 			if (buildpacks[buildPack])
 				await buildpacks[buildPack]({
-					buildId: build.id,
+					buildId,
 					applicationId,
 					domain,
 					name,

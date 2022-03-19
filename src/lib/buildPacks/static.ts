@@ -37,7 +37,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 			`COPY --from=${applicationId}:${tag}-cache /usr/src/app/${publishDirectory} ./`
 		);
 	} else {
-		Dockerfile.push(`COPY ./${baseDirectory || ''} ./`);
+		Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	}
 	Dockerfile.push(`EXPOSE 80`);
 	Dockerfile.push('CMD ["nginx", "-g", "daemon off;"]');

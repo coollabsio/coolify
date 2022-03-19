@@ -16,6 +16,7 @@ export default async function ({
 		let file = `${workdir}/Dockerfile`;
 		if (baseDirectory) {
 			file = `${workdir}/${baseDirectory}/Dockerfile`;
+			workdir = `${workdir}/${baseDirectory}`;
 		}
 
 		const Dockerfile: Array<string> = (await fs.readFile(`${file}`, 'utf8'))

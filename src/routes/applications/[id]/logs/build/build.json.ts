@@ -19,7 +19,7 @@ export const get: RequestHandler = async (event) => {
 		return {
 			body: {
 				logs,
-				status: data?.status || 'running'
+				status: data?.status
 			}
 		};
 	} catch (error) {

@@ -121,6 +121,8 @@
 					<div class="w-48 text-center text-xs">
 						{#if build.status === 'running'}
 							<div class="font-bold">Running</div>
+						{:else if build.status === 'queued'}
+							<div class="font-bold">Queued</div>
 						{:else}
 							<div>{build.since}</div>
 							<div>Finished in <span class="font-bold">{build.took}s</span></div>

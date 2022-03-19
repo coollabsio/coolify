@@ -87,7 +87,7 @@ const cron = async () => {
 
 	await queue.proxy.add('proxy', {}, { repeat: { every: 10000 } });
 	await queue.ssl.add('ssl', {}, { repeat: { every: dev ? 10000 : 60000 } });
-	await queue.cleanup.add('cleanup', {}, { repeat: { every: dev ? 10000 : 300000 } });
+	if (!dev) await queue.cleanup.add('cleanup', {}, { repeat: { every: 300000 } });
 	await queue.sslRenew.add('sslRenew', {}, { repeat: { every: 1800000 } });
 
 	const events = {
@@ -110,18 +110,18 @@ cron().catch((error) => {
 const buildQueueName = 'build_queue';
 const buildQueue = new Queue(buildQueueName, connectionOptions);
 const buildWorker = new Worker(buildQueueName, async (job) => await builder(job), {
-	concurrency: 2,
+	concurrency: 1,
 	...connectionOptions
 });
 
 buildWorker.on('completed', async (job: Bullmq.Job) => {
 	try {
 		await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'success' } });
-	} catch (err) {
-		console.log(err);
+	} catch (error) {
+		console.log(error);
 	} finally {
 		const workdir = `/tmp/build-sources/${job.data.repository}/${job.data.build_id}`;
-		await asyncExecShell(`rm -fr ${workdir}`);
+		if (!dev) await asyncExecShell(`rm -fr ${workdir}`);
 	}
 	return;
 });
@@ -133,7 +133,7 @@ buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
 		console.log(error);
 	} finally {
 		const workdir = `/tmp/build-sources/${job.data.repository}`;
-		await asyncExecShell(`rm -fr ${workdir}`);
+		if (!dev) await asyncExecShell(`rm -fr ${workdir}`);
 	}
 	saveBuildLog({
 		line: 'Failed to deploy!',

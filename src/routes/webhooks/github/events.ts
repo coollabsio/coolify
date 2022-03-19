@@ -47,7 +47,7 @@ export const post: RequestHandler = async (event) => {
 
 		const applicationFound = await db.getApplicationWebhook({ projectId, branch });
 		if (applicationFound) {
-			const webhookSecret = applicationFound.gitSource.githubApp.webhookSecret;
+			const webhookSecret = applicationFound.gitSource.githubApp.webhookSecret || null;
 			const hmac = crypto.createHmac('sha256', webhookSecret);
 			const digest = Buffer.from(
 				'sha256=' + hmac.update(JSON.stringify(body)).digest('hex'),
@@ -87,6 +87,18 @@ export const post: RequestHandler = async (event) => {
 				await db.prisma.application.update({
 					where: { id: applicationFound.id },
 					data: { updatedAt: new Date() }
+				});
+				await db.prisma.build.create({
+					data: {
+						id: buildId,
+						applicationId: applicationFound.id,
+						destinationDockerId: applicationFound.destinationDocker.id,
+						gitSourceId: applicationFound.gitSource.id,
+						githubAppId: applicationFound.gitSource.githubApp?.id,
+						gitlabAppId: applicationFound.gitSource.gitlabApp?.id,
+						status: 'queued',
+						type: 'webhook_commit'
+					}
 				});
 				await buildQueue.add(buildId, {
 					build_id: buildId,
@@ -135,6 +147,18 @@ export const post: RequestHandler = async (event) => {
 						await db.prisma.application.update({
 							where: { id: applicationFound.id },
 							data: { updatedAt: new Date() }
+						});
+						await db.prisma.build.create({
+							data: {
+								id: buildId,
+								applicationId: applicationFound.id,
+								destinationDockerId: applicationFound.destinationDocker.id,
+								gitSourceId: applicationFound.gitSource.id,
+								githubAppId: applicationFound.gitSource.githubApp?.id,
+								gitlabAppId: applicationFound.gitSource.gitlabApp?.id,
+								status: 'queued',
+								type: 'webhook_pr'
+							}
 						});
 						await buildQueue.add(buildId, {
 							build_id: buildId,

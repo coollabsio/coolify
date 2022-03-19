@@ -1,5 +1,6 @@
 import { buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
+import { checkPnpm } from './common';
 
 const createDockerfile = async (data, image): Promise<void> => {
 	const {
@@ -13,10 +14,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 		pullmergeRequestId
 	} = data;
 	const Dockerfile: Array<string> = [];
-	const isPnpm =
-		installCommand.includes('pnpm') ||
-		buildCommand.includes('pnpm') ||
-		startCommand.includes('pnpm');
+	const isPnpm = checkPnpm(installCommand, buildCommand, startCommand);
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push('WORKDIR /usr/src/app');
 	Dockerfile.push(`LABEL coolify.image=true`);
@@ -39,17 +37,9 @@ const createDockerfile = async (data, image): Promise<void> => {
 		Dockerfile.push('RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm');
 		Dockerfile.push('RUN pnpm add -g pnpm');
 	}
-	Dockerfile.push(`COPY ./${baseDirectory || ''}package*.json ./`);
-	try {
-		await fs.stat(`${workdir}/yarn.lock`);
-		Dockerfile.push(`COPY ./${baseDirectory || ''}yarn.lock ./`);
-	} catch (error) {}
-	try {
-		await fs.stat(`${workdir}/pnpm-lock.yaml`);
-		Dockerfile.push(`COPY ./${baseDirectory || ''}pnpm-lock.yaml ./`);
-	} catch (error) {}
+	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	Dockerfile.push(`RUN ${installCommand}`);
-	Dockerfile.push(`COPY ./${baseDirectory || ''} ./`);
+
 	if (buildCommand) {
 		Dockerfile.push(`RUN ${buildCommand}`);
 	}

@@ -64,6 +64,7 @@ export async function removeApplication({ id, teamId }) {
 
 	await prisma.applicationSettings.deleteMany({ where: { application: { id } } });
 	await prisma.buildLog.deleteMany({ where: { applicationId: id } });
+	await prisma.build.deleteMany({ where: { applicationId: id } });
 	await prisma.secret.deleteMany({ where: { applicationId: id } });
 	await prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } });
 }
@@ -79,17 +80,20 @@ export async function getApplicationWebhook({ projectId, branch }) {
 				secrets: true
 			}
 		});
-		if (application.gitSource?.githubApp?.clientSecret) {
+		if (!application) {
+			return null;
+		}
+		if (application?.gitSource?.githubApp?.clientSecret) {
 			application.gitSource.githubApp.clientSecret = decrypt(
 				application.gitSource.githubApp.clientSecret
 			);
 		}
-		if (application.gitSource?.githubApp?.webhookSecret) {
+		if (application?.gitSource?.githubApp?.webhookSecret) {
 			application.gitSource.githubApp.webhookSecret = decrypt(
 				application.gitSource.githubApp.webhookSecret
 			);
 		}
-		if (application.gitSource?.githubApp?.privateKey) {
+		if (application?.gitSource?.githubApp?.privateKey) {
 			application.gitSource.githubApp.privateKey = decrypt(
 				application.gitSource.githubApp.privateKey
 			);

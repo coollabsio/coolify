@@ -30,6 +30,18 @@ export const post: RequestHandler = async (event) => {
 			await db.prisma.application.update({ where: { id }, data: { configHash } });
 		}
 		await db.prisma.application.update({ where: { id }, data: { updatedAt: new Date() } });
+		await db.prisma.build.create({
+			data: {
+				id: buildId,
+				applicationId: id,
+				destinationDockerId: applicationFound.destinationDocker.id,
+				gitSourceId: applicationFound.gitSource.id,
+				githubAppId: applicationFound.gitSource.githubApp?.id,
+				gitlabAppId: applicationFound.gitSource.gitlabApp?.id,
+				status: 'queued',
+				type: 'manual'
+			}
+		});
 		await buildQueue.add(buildId, { build_id: buildId, type: 'manual', ...applicationFound });
 		return {
 			status: 200,

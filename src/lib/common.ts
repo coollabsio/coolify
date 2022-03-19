@@ -69,9 +69,9 @@ export const isTeamIdTokenAvailable = (request) => {
 
 export const getTeam = (event) => {
 	const cookies = Cookie.parse(event.request.headers.get('cookie'));
-	if (cookies.teamId) {
+	if (cookies?.teamId) {
 		return cookies.teamId;
-	} else if (event.locals.session.data.teamId) {
+	} else if (event.locals.session.data?.teamId) {
 		return event.locals.session.data.teamId;
 	}
 	return null;

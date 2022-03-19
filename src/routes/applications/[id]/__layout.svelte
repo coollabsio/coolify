@@ -76,6 +76,7 @@
 	import { del, post } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { gitTokens } from '$lib/store';
+	import { toast } from '@zerodevx/svelte-toast';
 
 	if (githubToken) $gitTokens.githubToken = githubToken;
 	if (gitlabToken) $gitTokens.gitlabToken = gitlabToken;
@@ -86,6 +87,7 @@
 	async function handleDeploySubmit() {
 		try {
 			const { buildId } = await post(`/applications/${id}/deploy.json`, { ...application });
+			toast.push('Deployment queued.');
 			return await goto(`/applications/${id}/logs/build?buildId=${buildId}`);
 		} catch ({ error }) {
 			return errorNotification(error);
