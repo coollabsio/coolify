@@ -117,11 +117,11 @@ const buildWorker = new Worker(buildQueueName, async (job) => await builder(job)
 buildWorker.on('completed', async (job: Bullmq.Job) => {
 	try {
 		await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'success' } });
-	} catch (err) {
-		console.log(err);
+	} catch (error) {
+		console.log(error);
 	} finally {
 		const workdir = `/tmp/build-sources/${job.data.repository}/${job.data.build_id}`;
-		await asyncExecShell(`rm -fr ${workdir}`);
+		if (!dev) await asyncExecShell(`rm -fr ${workdir}`);
 	}
 	return;
 });
@@ -133,7 +133,7 @@ buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
 		console.log(error);
 	} finally {
 		const workdir = `/tmp/build-sources/${job.data.repository}`;
-		await asyncExecShell(`rm -fr ${workdir}`);
+		if (!dev) await asyncExecShell(`rm -fr ${workdir}`);
 	}
 	saveBuildLog({
 		line: 'Failed to deploy!',
