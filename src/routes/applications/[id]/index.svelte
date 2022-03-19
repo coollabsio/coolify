@@ -100,7 +100,6 @@
 		'mosquitto',
 		'msgpack',
 		'mssql',
-		'mysql',
 		'mysqli',
 		'oauth',
 		'oci8',
@@ -229,7 +228,7 @@
 			const tempPhpModules = application.phpModules?.map((module) => module.value).toString() || '';
 			await post(`/applications/${id}/check.json`, { fqdn: application.fqdn, forceSave });
 			await post(`/applications/${id}.json`, { ...application, phpModules: tempPhpModules });
-			// return window.location.reload();
+			return window.location.reload();
 		} catch ({ error }) {
 			if (error.startsWith('DNS not set')) {
 				forceSave = true;
