@@ -52,6 +52,18 @@ export const post: RequestHandler = async (event) => {
 					where: { id: applicationFound.id },
 					data: { updatedAt: new Date() }
 				});
+				await db.prisma.build.create({
+					data: {
+						id: buildId,
+						applicationId: applicationFound.id,
+						destinationDockerId: applicationFound.destinationDocker.id,
+						gitSourceId: applicationFound.gitSource.id,
+						githubAppId: applicationFound.gitSource.githubApp?.id,
+						gitlabAppId: applicationFound.gitSource.gitlabApp?.id,
+						status: 'queued',
+						type: 'webhook_commit'
+					}
+				});
 				await buildQueue.add(buildId, {
 					build_id: buildId,
 					type: 'webhook_commit',
@@ -132,6 +144,18 @@ export const post: RequestHandler = async (event) => {
 						await db.prisma.application.update({
 							where: { id: applicationFound.id },
 							data: { updatedAt: new Date() }
+						});
+						await db.prisma.build.create({
+							data: {
+								id: buildId,
+								applicationId: applicationFound.id,
+								destinationDockerId: applicationFound.destinationDocker.id,
+								gitSourceId: applicationFound.gitSource.id,
+								githubAppId: applicationFound.gitSource.githubApp?.id,
+								gitlabAppId: applicationFound.gitSource.gitlabApp?.id,
+								status: 'queued',
+								type: 'webhook_mr'
+							}
 						});
 						await buildQueue.add(buildId, {
 							build_id: buildId,

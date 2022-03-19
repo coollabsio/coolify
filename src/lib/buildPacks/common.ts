@@ -84,7 +84,15 @@ export function makeLabelForServices(type) {
 }
 
 export const setDefaultConfiguration = async (data) => {
-	let { buildPack, port, installCommand, startCommand, buildCommand, publishDirectory } = data;
+	let {
+		buildPack,
+		port,
+		installCommand,
+		startCommand,
+		buildCommand,
+		publishDirectory,
+		baseDirectory
+	} = data;
 	const template = scanningTemplates[buildPack];
 	if (!port) {
 		port = template?.port || 3000;
@@ -97,6 +105,10 @@ export const setDefaultConfiguration = async (data) => {
 	if (!startCommand) startCommand = template?.startCommand || 'yarn start';
 	if (!buildCommand) buildCommand = template?.buildCommand || null;
 	if (!publishDirectory) publishDirectory = template?.publishDirectory || null;
+	if (baseDirectory) {
+		if (!baseDirectory.startsWith('/')) baseDirectory = `/${baseDirectory}`;
+		if (!baseDirectory.endsWith('/')) baseDirectory = `${baseDirectory}/`;
+	}
 
 	return {
 		buildPack,
@@ -104,7 +116,8 @@ export const setDefaultConfiguration = async (data) => {
 		installCommand,
 		startCommand,
 		buildCommand,
-		publishDirectory
+		publishDirectory,
+		baseDirectory
 	};
 };
 
@@ -174,4 +187,12 @@ export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, ap
 		console.log(error);
 		throw new Error(error);
 	}
+}
+
+export function checkPnpm(installCommand = null, buildCommand = null, startCommand = null) {
+	return (
+		installCommand?.includes('pnpm') ||
+		buildCommand?.includes('pnpm') ||
+		startCommand?.includes('pnpm')
+	);
 }

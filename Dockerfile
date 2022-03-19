@@ -1,4 +1,5 @@
 FROM node:16.14.0-alpine
+RUN apk add --no-cache g++ cmake make python3
 WORKDIR /app
 COPY package*.json .
 RUN yarn install

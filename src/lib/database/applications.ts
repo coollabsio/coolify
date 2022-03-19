@@ -79,6 +79,9 @@ export async function getApplicationWebhook({ projectId, branch }) {
 				secrets: true
 			}
 		});
+		if (!application) {
+			return null;
+		}
 		if (application?.gitSource?.githubApp?.clientSecret) {
 			application.gitSource.githubApp.clientSecret = decrypt(
 				application.gitSource.githubApp.clientSecret

@@ -87,7 +87,7 @@ const cron = async () => {
 
 	await queue.proxy.add('proxy', {}, { repeat: { every: 10000 } });
 	await queue.ssl.add('ssl', {}, { repeat: { every: dev ? 10000 : 60000 } });
-	await queue.cleanup.add('cleanup', {}, { repeat: { every: dev ? 10000 : 300000 } });
+	if (!dev) await queue.cleanup.add('cleanup', {}, { repeat: { every: 300000 } });
 	await queue.sslRenew.add('sslRenew', {}, { repeat: { every: 1800000 } });
 
 	const events = {
@@ -110,7 +110,7 @@ cron().catch((error) => {
 const buildQueueName = 'build_queue';
 const buildQueue = new Queue(buildQueueName, connectionOptions);
 const buildWorker = new Worker(buildQueueName, async (job) => await builder(job), {
-	concurrency: 2,
+	concurrency: 1,
 	...connectionOptions
 });
 

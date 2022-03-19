@@ -9,7 +9,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	Dockerfile.push(`LABEL coolify.image=true`);
 	Dockerfile.push('RUN a2enmod rewrite');
 	Dockerfile.push('WORKDIR /var/www/html');
-	Dockerfile.push(`COPY ./${baseDirectory || ''} /var/www/html`);
+	Dockerfile.push(`COPY .${baseDirectory || ''} /var/www/html`);
 	Dockerfile.push(`EXPOSE 80`);
 	Dockerfile.push('CMD ["apache2-foreground"]');
 	Dockerfile.push('RUN chown -R www-data /var/www/html');

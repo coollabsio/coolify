@@ -1,5 +1,6 @@
 import Dockerode from 'dockerode';
 import { promises as fs } from 'fs';
+import { checkPnpm } from './buildPacks/common';
 import { saveBuildLog } from './common';
 
 export async function buildCacheImageWithNode(data, imageForBuild) {
@@ -16,7 +17,7 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 		secrets,
 		pullmergeRequestId
 	} = data;
-	const isPnpm = installCommand.includes('pnpm') || buildCommand.includes('pnpm');
+	const isPnpm = checkPnpm(installCommand, buildCommand);
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild}`);
 	Dockerfile.push('WORKDIR /usr/src/app');
@@ -40,19 +41,10 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 		Dockerfile.push('RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm');
 		Dockerfile.push('RUN pnpm add -g pnpm');
 	}
+	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	if (installCommand) {
-		Dockerfile.push(`COPY ./${baseDirectory || ''}package*.json ./`);
-		try {
-			await fs.stat(`${workdir}/yarn.lock`);
-			Dockerfile.push(`COPY ./${baseDirectory || ''}yarn.lock ./`);
-		} catch (error) {}
-		try {
-			await fs.stat(`${workdir}/pnpm-lock.yaml`);
-			Dockerfile.push(`COPY ./${baseDirectory || ''}pnpm-lock.yaml ./`);
-		} catch (error) {}
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
-	Dockerfile.push(`COPY ./${baseDirectory || ''} ./`);
 	Dockerfile.push(`RUN ${buildCommand}`);
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
 	await buildImage({ applicationId, tag, workdir, docker, buildId, isCache: true, debug });
