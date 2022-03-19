@@ -64,6 +64,7 @@ export async function removeApplication({ id, teamId }) {
 
 	await prisma.applicationSettings.deleteMany({ where: { application: { id } } });
 	await prisma.buildLog.deleteMany({ where: { applicationId: id } });
+	await prisma.build.deleteMany({ where: { applicationId: id } });
 	await prisma.secret.deleteMany({ where: { applicationId: id } });
 	await prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } });
 }
