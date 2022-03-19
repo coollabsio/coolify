@@ -46,6 +46,7 @@ specifiers:
   svelte-check: 2.4.5
   svelte-kit-cookie-session: 2.1.2
   svelte-preprocess: 4.10.4
+  svelte-select: ^4.4.7
   tailwindcss: 3.0.23
   tailwindcss-scrollbar: ^0.1.0
   ts-node: 10.6.0
@@ -103,6 +104,7 @@ devDependencies:
   svelte: 3.46.4
   svelte-check: 2.4.5_postcss@8.4.7+svelte@3.46.4
   svelte-preprocess: 4.10.4_e836cbb8ceb5bfaa7513362dd6308834
+  svelte-select: 4.4.7
   tailwindcss: 3.0.23_4b9e11f8e85900587b5e2272c5d4c20c
   ts-node: 10.6.0_e79e62fe450383fd2d418267dc75e645
   tslib: 2.3.1
@@ -5275,6 +5277,13 @@ packages:
       strip-indent: 3.0.0
       svelte: 3.46.4
       typescript: 4.6.2
+    dev: true
+
+  /svelte-select/4.4.7:
+    resolution:
+      {
+        integrity: sha512-fIf9Z8rPI6F8naHZ9wjXT0Pv5gLyhdHAFkHFJnCfVVfELE8e82uOoF0xEVQP6Kir+b4Q5yOvNAzZ61WbSU6A0A==
+      }
     dev: true
 
   /svelte/3.46.4:

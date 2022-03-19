@@ -42,7 +42,26 @@ textarea {
 }
 
 select {
-	@apply h-12 w-96 rounded bg-coolgray-200 p-2 text-xs font-bold tracking-tight text-white outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:text-stone-600 md:text-sm;
+	@apply h-12 w-96 rounded bg-coolgray-200  p-2 text-xs font-bold tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:text-stone-600 md:text-sm;
+}
+.svelte-select {
+	--background: rgb(32 32 32);
+	--inputColor: white;
+	--multiItemPadding: 0 0.5rem 0 0.5rem;
+	--border: none;
+	--placeholderColor: rgb(87 83 78);
+	--listBackground: rgb(32 32 32);
+	--itemColor: white;
+	--itemHoverBG: rgb(107 22 237);
+	--multiItemBG: rgb(32 32 32);
+	--multiClearHoverBG: transparent;
+	--multiClearHoverFill: rgb(239 68 68);
+	--multiItemActiveBG: rgb(107 22 237);
+	--multiClearBG: transparent;
+	--clearSelectFocusColor: white;
+	--clearSelectHoverColor: rgb(239 68 68);
+	--multiItemBorderRadius: 0.25rem;
+	--listShadow: none;
 }
 
 label {

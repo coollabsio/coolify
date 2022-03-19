@@ -45,6 +45,7 @@ export default async function (job) {
 		publishDirectory,
 		projectId,
 		secrets,
+		phpModules,
 		type,
 		pullmergeRequestId = null,
 		sourceBranch = null,
@@ -179,7 +180,8 @@ export default async function (job) {
 					buildCommand,
 					startCommand,
 					baseDirectory,
-					secrets
+					secrets,
+					phpModules
 				});
 			else {
 				saveBuildLog({ line: `Build pack ${buildPack} not found`, buildId, applicationId });
