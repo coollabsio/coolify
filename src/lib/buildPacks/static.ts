@@ -33,9 +33,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 		});
 	}
 	if (buildCommand) {
-		Dockerfile.push(
-			`COPY --from=${applicationId}:${tag}-cache /usr/src/app/${publishDirectory} ./`
-		);
+		Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app/${publishDirectory} ./`);
 	} else {
 		Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	}

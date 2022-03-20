@@ -8,7 +8,7 @@ const createDockerfile = async (data, imageforBuild): Promise<void> => {
 	Dockerfile.push(`FROM ${imageforBuild}`);
 	Dockerfile.push('WORKDIR /usr/share/nginx/html');
 	Dockerfile.push(`LABEL coolify.image=true`);
-	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /usr/src/app/${publishDirectory} ./`);
+	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app/${publishDirectory} ./`);
 	Dockerfile.push(`COPY /nginx.conf /etc/nginx/nginx.conf`);
 	Dockerfile.push(`EXPOSE 80`);
 	Dockerfile.push('CMD ["nginx", "-g", "daemon off;"]');

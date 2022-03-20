@@ -134,7 +134,8 @@ export async function getApplication({ id, teamId }) {
 			destinationDocker: true,
 			settings: true,
 			gitSource: { include: { githubApp: true, gitlabApp: true } },
-			secrets: true
+			secrets: true,
+			persistentStorage: true
 		}
 	});
 
@@ -267,4 +268,8 @@ export async function createBuild({
 			type
 		}
 	});
+}
+
+export async function getPersistentStorage(id) {
+	return await prisma.applicationPersistentStorage.findMany({ where: { applicationId: id } });
 }

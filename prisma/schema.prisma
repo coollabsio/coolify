@@ -72,9 +72,9 @@ model TeamInvitation {
 }
 
 model Application {
-  id                  String               @id @default(cuid())
+  id                  String                         @id @default(cuid())
   name                String
-  fqdn                String?              @unique
+  fqdn                String?                        @unique
   repository          String?
   configHash          String?
   branch              String?
@@ -86,16 +86,17 @@ model Application {
   startCommand        String?
   baseDirectory       String?
   publishDirectory    String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  phpModules          String?
+  createdAt           DateTime                       @default(now())
+  updatedAt           DateTime                       @updatedAt
   settings            ApplicationSettings?
   teams               Team[]
   destinationDockerId String?
-  destinationDocker   DestinationDocker?   @relation(fields: [destinationDockerId], references: [id])
+  destinationDocker   DestinationDocker?             @relation(fields: [destinationDockerId], references: [id])
   gitSourceId         String?
-  gitSource           GitSource?           @relation(fields: [gitSourceId], references: [id])
+  gitSource           GitSource?                     @relation(fields: [gitSourceId], references: [id])
   secrets             Secret[]
-  phpModules          String?
+  persistentStorage   ApplicationPersistentStorage[]
 }
 
 model ApplicationSettings {
@@ -108,6 +109,17 @@ model ApplicationSettings {
   autodeploy    Boolean     @default(true)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+}
+
+model ApplicationPersistentStorage {
+  id            String      @id @default(cuid())
+  application   Application @relation(fields: [applicationId], references: [id])
+  applicationId String      @unique
+  path          String      @unique
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([applicationId, path])
 }
 
 model Secret {

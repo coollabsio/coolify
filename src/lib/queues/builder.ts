@@ -49,8 +49,10 @@ export default async function (job) {
 		type,
 		pullmergeRequestId = null,
 		sourceBranch = null,
-		settings
+		settings,
+		persistentStorage
 	} = job.data;
+	console.log(persistentStorage);
 	const { debug } = settings;
 
 	await asyncSleep(1000);
@@ -68,6 +70,10 @@ export default async function (job) {
 	let domain = getDomain(fqdn);
 	const isHttps = fqdn.startsWith('https://');
 
+	let volumes =
+		persistentStorage?.map((storage) => {
+			return `${applicationId}-${storage.id}:${storage.path}`;
+		}) || [];
 	// Previews, we need to get the source branch and set subdomain
 	if (pullmergeRequestId) {
 		branch = sourceBranch;
@@ -252,12 +258,22 @@ export default async function (job) {
 		}
 		try {
 			saveBuildLog({ line: 'Deployment started.', buildId, applicationId });
+			for await (const volume of volumes) {
+				const id = volume.split(':')[0];
+				try {
+					await asyncExecShell(`DOCKER_HOST=${host} docker volume inspect ${id}`);
+				} catch (error) {
+					await asyncExecShell(`DOCKER_HOST=${host} docker volume create ${id}`);
+				}
+			}
+			volumes = volumes.map((volume) => `-v ${volume} `).join();
+			console.log(volumes);
 			const { stderr } = await asyncExecShell(
 				`DOCKER_HOST=${host} docker run ${envFound && `--env-file=${workdir}/.env`} ${labels.join(
 					' '
-				)} --name ${imageId} --network ${
-					docker.network
-				} --restart always -d ${applicationId}:${tag}`
+				)} --name ${imageId} --network ${docker.network} --restart always ${
+					volumes.length > 0 && volumes
+				} -d ${applicationId}:${tag}`
 			);
 			if (stderr) console.log(stderr);
 			saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });

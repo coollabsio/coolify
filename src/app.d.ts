@@ -7,7 +7,9 @@ declare namespace App {
 	}
 	interface Platform {}
 	interface Session extends SessionData {}
-	interface Stuff {}
+	interface Stuff {
+		application: any;
+	}
 }
 
 interface SessionData {
