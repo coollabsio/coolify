@@ -56,7 +56,7 @@ export default async function (job) {
 	await asyncSleep(1000);
 
 	await db.prisma.build.updateMany({
-		where: { status: 'queued', id: { not: buildId } },
+		where: { status: 'queued', id: { not: buildId }, applicationId },
 		data: { status: 'failed' }
 	});
 	let imageId = applicationId;
