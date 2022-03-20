@@ -47,7 +47,8 @@ select {
 .svelte-select {
 	--background: rgb(32 32 32);
 	--inputColor: white;
-	--multiItemPadding: 0 0.5rem 0 0.5rem;
+	--multiItemPadding: 0;
+	--multiSelectPadding: 0 0.5rem 0 0.5rem;
 	--border: none;
 	--placeholderColor: rgb(87 83 78);
 	--listBackground: rgb(32 32 32);
@@ -56,7 +57,7 @@ select {
 	--multiItemBG: rgb(32 32 32);
 	--multiClearHoverBG: transparent;
 	--multiClearHoverFill: rgb(239 68 68);
-	--multiItemActiveBG: rgb(107 22 237);
+	--multiItemActiveBG: transparent;
 	--multiClearBG: transparent;
 	--clearSelectFocusColor: white;
 	--clearSelectHoverColor: rgb(239 68 68);
