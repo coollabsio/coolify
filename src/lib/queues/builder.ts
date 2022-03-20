@@ -52,7 +52,13 @@ export default async function (job) {
 		settings
 	} = job.data;
 	const { debug } = settings;
+
 	await asyncSleep(1000);
+
+	await db.prisma.build.updateMany({
+		where: { status: 'queued', id: { not: buildId } },
+		data: { status: 'failed' }
+	});
 	let imageId = applicationId;
 	let domain = getDomain(fqdn);
 	const isHttps = fqdn.startsWith('https://');
