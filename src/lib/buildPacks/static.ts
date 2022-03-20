@@ -39,6 +39,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	} else {
 		Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	}
+	Dockerfile.push(`COPY /nginx.conf /etc/nginx/nginx.conf`);
 	Dockerfile.push(`EXPOSE 80`);
 	Dockerfile.push('CMD ["nginx", "-g", "daemon off;"]');
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
