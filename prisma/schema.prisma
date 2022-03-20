@@ -95,6 +95,7 @@ model Application {
   gitSourceId         String?
   gitSource           GitSource?           @relation(fields: [gitSourceId], references: [id])
   secrets             Secret[]
+  phpModules          String?
 }
 
 model ApplicationSettings {

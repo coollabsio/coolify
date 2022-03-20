@@ -45,13 +45,25 @@ export default async function (job) {
 		publishDirectory,
 		projectId,
 		secrets,
+		phpModules,
 		type,
 		pullmergeRequestId = null,
 		sourceBranch = null,
 		settings
 	} = job.data;
 	const { debug } = settings;
+
 	await asyncSleep(1000);
+
+	await db.prisma.build.updateMany({
+		where: {
+			status: 'queued',
+			id: { not: buildId },
+			applicationId,
+			createdAt: { lt: new Date(new Date().getTime() - 60 * 60 * 1000) }
+		},
+		data: { status: 'failed' }
+	});
 	let imageId = applicationId;
 	let domain = getDomain(fqdn);
 	const isHttps = fqdn.startsWith('https://');
@@ -179,7 +191,8 @@ export default async function (job) {
 					buildCommand,
 					startCommand,
 					baseDirectory,
-					secrets
+					secrets,
+					phpModules
 				});
 			else {
 				saveBuildLog({ line: `Build pack ${buildPack} not found`, buildId, applicationId });

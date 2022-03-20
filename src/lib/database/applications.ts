@@ -156,6 +156,9 @@ export async function getApplication({ id, teamId }) {
 			return s;
 		});
 	}
+	if (body?.phpModules) {
+		body.phpModules = body.phpModules.split(',');
+	}
 
 	return { ...body };
 }
@@ -211,7 +214,8 @@ export async function configureApplication({
 	buildCommand,
 	startCommand,
 	baseDirectory,
-	publishDirectory
+	publishDirectory,
+	phpModules
 }) {
 	return await prisma.application.update({
 		where: { id },
@@ -224,7 +228,8 @@ export async function configureApplication({
 			startCommand,
 			baseDirectory,
 			publishDirectory,
-			name
+			name,
+			phpModules
 		}
 	});
 }
