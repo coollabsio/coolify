@@ -272,7 +272,7 @@ export default async function (job) {
 				`DOCKER_HOST=${host} docker run ${envFound && `--env-file=${workdir}/.env`} ${labels.join(
 					' '
 				)} --name ${imageId} --network ${docker.network} --restart always ${
-					volumes.length > 0 && volumes
+					volumes.length > 0 ? volumes : ''
 				} -d ${applicationId}:${tag}`
 			);
 			if (stderr) console.log(stderr);

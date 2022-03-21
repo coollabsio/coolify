@@ -13,19 +13,21 @@ const createDockerfile = async (data, image): Promise<void> => {
 		Dockerfile.push(`RUN chmod +x /usr/local/bin/install-php-extensions`);
 		Dockerfile.push(`RUN /usr/local/bin/install-php-extensions ${data.phpModules.join(' ')}`);
 	}
-	Dockerfile.push('RUN a2enmod rewrite');
-	Dockerfile.push('WORKDIR /var/www/html');
-	Dockerfile.push(`COPY .${baseDirectory || ''} /var/www/html`);
-	Dockerfile.push(`COPY /.htaccess /var/www/html/.htaccess`);
+	// Dockerfile.push('RUN a2enmod rewrite');
+	// Dockerfile.push(`ENV APACHE_DOCUMENT_ROOT /app`);
+	// Dockerfile.push(`RUN sed -ri -e 's!/var/www/html!/app!g' /etc/apache2/sites-available/*.conf`);
+	// Dockerfile.push(`RUN sed -ri -e 's!/var/www/!/app!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf`)
+	Dockerfile.push('WORKDIR /app');
+	Dockerfile.push(`COPY .${baseDirectory || ''} /app`);
+	Dockerfile.push(`COPY /.htaccess .`);
+	Dockerfile.push(`COPY /entrypoint.sh /entrypoint.sh`);
 	Dockerfile.push(`EXPOSE 80`);
-	Dockerfile.push('CMD ["apache2-foreground"]');
-	Dockerfile.push('RUN chown -R www-data /var/www/html');
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };
 
 export default async function (data) {
 	try {
-		const image = 'php:apache';
+		const image = 'webdevops/php-nginx';
 		await createDockerfile(data, image);
 		await buildImage(data);
 	} catch (error) {

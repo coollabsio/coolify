@@ -135,6 +135,7 @@ export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, ap
         RewriteRule ^(.+)$ index.php [QSA,L]
         `
 			);
+			await fs.writeFile(`${workdir}/entrypoint.sh`, `chown -R www-data /app`);
 			saveBuildLog({ line: 'Copied default configuration file for PHP.', buildId, applicationId });
 		} else if (staticDeployments.includes(buildPack)) {
 			await fs.writeFile(
