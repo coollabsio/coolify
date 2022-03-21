@@ -11,6 +11,9 @@
 
 	async function saveStorage() {
 		try {
+			storage.path = storage.path.startsWith('/') ? storage.path : `/${storage.path}`;
+			storage.path = storage.path.endsWith('/') ? storage.path.slice(0, -1) : storage.path;
+			storage.path.replace(/\/\//g, '/');
 			await post(`/applications/${id}/storage.json`, {
 				path: storage.path
 			});

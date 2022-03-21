@@ -16,7 +16,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`COPY .${baseDirectory || ''} /app`);
 	Dockerfile.push(`COPY /.htaccess .`);
-	Dockerfile.push(`COPY /entrypoint.sh /entrypoint.sh`);
+	Dockerfile.push(`COPY /entrypoint.sh /opt/docker/provision/entrypoint.d/30-entrypoint.sh`);
 	Dockerfile.push(`EXPOSE 80`);
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };
