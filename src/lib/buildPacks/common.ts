@@ -143,27 +143,35 @@ export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, ap
 				`user  nginx;
             worker_processes  auto;
             
-            error_log  /var/log/nginx/error.log warn;
-            pid        /var/run/nginx.pid;
+            error_log  /docker.stdout;
+            pid        /run/nginx.pid;
             
             events {
                 worker_connections  1024;
             }
             
             http {
-                include       /etc/nginx/mime.types;
-            
-                access_log      off;
-                sendfile        on;
-                #tcp_nopush     on;
-                keepalive_timeout  65;
+				log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+				'$status $body_bytes_sent "$http_referer" '
+				'"$http_user_agent" "$http_x_forwarded_for"';
+
+                access_log  /docker.stdout main;
+
+				sendfile            on;
+				tcp_nopush          on;
+				tcp_nodelay         on;
+				keepalive_timeout   65;
+				types_hash_max_size 2048;
+
+			    include             /etc/nginx/mime.types;
+    			default_type        application/octet-stream;
     
                 server {
                     listen       80;
                     server_name  localhost;
                     
                     location / {
-                        root   /usr/share/nginx/html;
+                        root   /app;
                         index  index.html;
                         try_files $uri $uri/index.html $uri/ /index.html =404;
                     }
@@ -174,7 +182,7 @@ export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, ap
                     #
                     error_page   500 502 503 504  /50x.html;
                     location = /50x.html {
-                        root   /usr/share/nginx/html;
+                        root   /app;
                     }  
             
                 }

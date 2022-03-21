@@ -13,10 +13,6 @@ const createDockerfile = async (data, image): Promise<void> => {
 		Dockerfile.push(`RUN chmod +x /usr/local/bin/install-php-extensions`);
 		Dockerfile.push(`RUN /usr/local/bin/install-php-extensions ${data.phpModules.join(' ')}`);
 	}
-	// Dockerfile.push('RUN a2enmod rewrite');
-	// Dockerfile.push(`ENV APACHE_DOCUMENT_ROOT /app`);
-	// Dockerfile.push(`RUN sed -ri -e 's!/var/www/html!/app!g' /etc/apache2/sites-available/*.conf`);
-	// Dockerfile.push(`RUN sed -ri -e 's!/var/www/!/app!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf`)
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`COPY .${baseDirectory || ''} /app`);
 	Dockerfile.push(`COPY /.htaccess .`);

@@ -52,7 +52,6 @@ export default async function (job) {
 		settings,
 		persistentStorage
 	} = job.data;
-	console.log(persistentStorage);
 	const { debug } = settings;
 
 	await asyncSleep(1000);
@@ -68,11 +67,10 @@ export default async function (job) {
 	});
 	let imageId = applicationId;
 	let domain = getDomain(fqdn);
-	const isHttps = fqdn.startsWith('https://');
 
 	let volumes =
 		persistentStorage?.map((storage) => {
-			return `${applicationId}-${storage.id}:${storage.path}`;
+			return `${applicationId}-${storage.id}:${type !== 'docker' ? '/app/' : ''}${storage.path}`;
 		}) || [];
 	// Previews, we need to get the source branch and set subdomain
 	if (pullmergeRequestId) {
@@ -267,7 +265,6 @@ export default async function (job) {
 				}
 			}
 			volumes = volumes.map((volume) => `-v ${volume} `).join();
-			console.log(volumes);
 			const { stderr } = await asyncExecShell(
 				`DOCKER_HOST=${host} docker run ${envFound && `--env-file=${workdir}/.env`} ${labels.join(
 					' '
