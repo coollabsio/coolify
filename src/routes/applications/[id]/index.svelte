@@ -481,7 +481,7 @@
 					/>
 				</div>
 			{/if}
-			{#if application.buildPack === 'php'}
+			<!-- {#if application.buildPack === 'php'}
 				<div class="grid grid-cols-2 items-center">
 					<label for="startCommand" class="text-base font-bold text-stone-100">PHP Modules</label>
 					<div class="svelte-select">
@@ -493,7 +493,7 @@
 						/>
 					</div>
 				</div>
-			{/if}
+			{/if} -->
 			<div class="grid grid-cols-2 items-center">
 				<div class="flex-col">
 					<label for="baseDirectory" class="pt-2 text-base font-bold text-stone-100"
