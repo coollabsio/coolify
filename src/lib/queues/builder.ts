@@ -113,6 +113,9 @@ export default async function (job) {
 			deployKeyId: gitSource.gitlabApp?.deployKeyId || null,
 			privateSshKey: decrypt(gitSource.gitlabApp?.privateSshKey) || null
 		});
+		if (!commit) {
+			throw new Error('No commit found?');
+		}
 		let tag = commit.slice(0, 7);
 		if (pullmergeRequestId) {
 			tag = `${commit.slice(0, 7)}-${pullmergeRequestId}`;
