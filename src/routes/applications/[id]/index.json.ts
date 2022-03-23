@@ -52,8 +52,7 @@ export const post: RequestHandler = async (event) => {
 		buildCommand,
 		startCommand,
 		baseDirectory,
-		publishDirectory,
-		phpModules
+		publishDirectory
 	} = await event.request.json();
 
 	if (port) port = Number(port);
@@ -69,8 +68,7 @@ export const post: RequestHandler = async (event) => {
 			buildCommand,
 			startCommand,
 			baseDirectory,
-			publishDirectory,
-			phpModules
+			publishDirectory
 		});
 		return { status: 201 };
 	} catch (error) {

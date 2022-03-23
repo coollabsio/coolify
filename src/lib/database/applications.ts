@@ -66,6 +66,7 @@ export async function removeApplication({ id, teamId }) {
 	await prisma.buildLog.deleteMany({ where: { applicationId: id } });
 	await prisma.build.deleteMany({ where: { applicationId: id } });
 	await prisma.secret.deleteMany({ where: { applicationId: id } });
+	await prisma.applicationPersistentStorage.deleteMany({ where: { applicationId: id } });
 	await prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } });
 }
 
@@ -157,9 +158,6 @@ export async function getApplication({ id, teamId }) {
 			return s;
 		});
 	}
-	if (body?.phpModules) {
-		body.phpModules = body.phpModules.split(',');
-	}
 
 	return { ...body };
 }
@@ -215,8 +213,7 @@ export async function configureApplication({
 	buildCommand,
 	startCommand,
 	baseDirectory,
-	publishDirectory,
-	phpModules
+	publishDirectory
 }) {
 	return await prisma.application.update({
 		where: { id },
@@ -229,8 +226,7 @@ export async function configureApplication({
 			startCommand,
 			baseDirectory,
 			publishDirectory,
-			name,
-			phpModules
+			name
 		}
 	});
 }

@@ -9,6 +9,7 @@ declare namespace App {
 	interface Session extends SessionData {}
 	interface Stuff {
 		application: any;
+		isRunning: boolean;
 	}
 }
 

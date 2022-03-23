@@ -26,8 +26,13 @@
 	import { getDomain } from '$lib/components/common';
 	import { page } from '$app/stores';
 	import Storage from './_Storage.svelte';
+	import { get } from '$lib/api';
 
 	const { id } = $page.params;
+	async function refreshStorage() {
+		const data = await get(`/applications/${id}/storage.json`);
+		persistentStorages = [...data.persistentStorages];
+	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -49,12 +54,12 @@
 			{#each persistentStorages as storage}
 				{#key storage.id}
 					<tr>
-						<Storage {storage} />
+						<Storage on:refresh={refreshStorage} {storage} />
 					</tr>
 				{/key}
 			{/each}
 			<tr>
-				<Storage isNew />
+				<Storage on:refresh={refreshStorage} isNew />
 			</tr>
 		</tbody>
 	</table>

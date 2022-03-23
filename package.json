@@ -30,6 +30,7 @@
 		"@sveltejs/kit": "1.0.0-next.288",
 		"@types/bcrypt": "5.0.0",
 		"@types/js-cookie": "3.0.1",
+		"@types/js-yaml": "^4.0.5",
 		"@types/node": "17.0.21",
 		"@types/node-forge": "1.0.0",
 		"@typescript-eslint/eslint-plugin": "4.31.1",

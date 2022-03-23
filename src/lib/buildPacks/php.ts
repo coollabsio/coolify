@@ -6,13 +6,6 @@ const createDockerfile = async (data, image): Promise<void> => {
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push(`LABEL coolify.image=true`);
-	if (data.phpModules?.length > 0) {
-		Dockerfile.push(
-			`ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/`
-		);
-		Dockerfile.push(`RUN chmod +x /usr/local/bin/install-php-extensions`);
-		Dockerfile.push(`RUN /usr/local/bin/install-php-extensions ${data.phpModules.join(' ')}`);
-	}
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`COPY .${baseDirectory || ''} /app`);
 	Dockerfile.push(`COPY /.htaccess .`);

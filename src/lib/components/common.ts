@@ -9,7 +9,16 @@ export const dateOptions: DateTimeFormatOptions = {
 	hour12: false
 };
 
-export const staticDeployments = ['react', 'vuejs', 'static', 'svelte', 'gatsby', 'php'];
+export const staticDeployments = [
+	'react',
+	'vuejs',
+	'static',
+	'svelte',
+	'gatsby',
+	'php',
+	'astro',
+	'eleventy'
+];
 export const notNodeDeployments = ['php', 'docker', 'rust'];
 
 export function getDomain(domain) {

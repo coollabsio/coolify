@@ -29,10 +29,10 @@ export function makeLabelForStandaloneApplication({
 		fqdn = `${protocol}://${pullmergeRequestId}.${domain}`;
 	}
 	return [
-		'--label coolify.managed=true',
-		`--label coolify.version=${version}`,
-		`--label coolify.type=standalone-application`,
-		`--label coolify.configuration=${base64Encode(
+		'coolify.managed=true',
+		`coolify.version=${version}`,
+		`coolify.type=standalone-application`,
+		`coolify.configuration=${base64Encode(
 			JSON.stringify({
 				applicationId,
 				fqdn,
