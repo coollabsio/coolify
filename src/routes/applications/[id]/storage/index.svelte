@@ -27,6 +27,7 @@
 	import { page } from '$app/stores';
 	import Storage from './_Storage.svelte';
 	import { get } from '$lib/api';
+	import Explainer from '$lib/components/Explainer.svelte';
 
 	const { id } = $page.params;
 	async function refreshStorage() {
@@ -44,6 +45,12 @@
 </div>
 
 <div class="mx-auto max-w-6xl rounded-xl px-6 pt-4">
+	<div class="flex justify-center py-4 text-center">
+		<Explainer
+			customClass="w-full"
+			text={'You can specify any folder that you want to be persistent across deployments. <br>This is useful for storing data such as a database (SQLite) or a cache.'}
+		/>
+	</div>
 	<table class="mx-auto border-separate text-left">
 		<thead>
 			<tr class="h-12">

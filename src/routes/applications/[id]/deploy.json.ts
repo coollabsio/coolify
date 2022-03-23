@@ -11,6 +11,7 @@ export const post: RequestHandler = async (event) => {
 	if (status === 401) return { status, body };
 
 	const { id } = event.params;
+	const { pullmergeRequestId = null, branch } = await event.request.json();
 	try {
 		const buildId = cuid();
 		const applicationFound = await db.getApplication({ id, teamId });
@@ -42,7 +43,17 @@ export const post: RequestHandler = async (event) => {
 				type: 'manual'
 			}
 		});
-		await buildQueue.add(buildId, { build_id: buildId, type: 'manual', ...applicationFound });
+		if (pullmergeRequestId) {
+			await buildQueue.add(buildId, {
+				build_id: buildId,
+				type: 'manual',
+				...applicationFound,
+				sourceBranch: branch,
+				pullmergeRequestId
+			});
+		} else {
+			await buildQueue.add(buildId, { build_id: buildId, type: 'manual', ...applicationFound });
+		}
 		return {
 			status: 200,
 			body: {
