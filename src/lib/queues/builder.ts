@@ -68,11 +68,10 @@ export default async function (job) {
 	});
 	let imageId = applicationId;
 	let domain = getDomain(fqdn);
-
 	let volumes =
 		persistentStorage?.map((storage) => {
 			return `${applicationId}${storage.path.replace(/\//gi, '-')}:${
-				type !== 'docker' ? '/app' : ''
+				buildPack !== 'docker' ? '/app' : ''
 			}${storage.path}`;
 		}) || [];
 	// Previews, we need to get the source branch and set subdomain
