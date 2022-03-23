@@ -9,6 +9,7 @@ specifiers:
   '@sveltejs/kit': 1.0.0-next.288
   '@types/bcrypt': 5.0.0
   '@types/js-cookie': 3.0.1
+  '@types/js-yaml': ^4.0.5
   '@types/node': 17.0.21
   '@types/node-forge': 1.0.0
   '@typescript-eslint/eslint-plugin': 4.31.1
@@ -84,6 +85,7 @@ devDependencies:
   '@sveltejs/kit': 1.0.0-next.288_svelte@3.46.4
   '@types/bcrypt': 5.0.0
   '@types/js-cookie': 3.0.1
+  '@types/js-yaml': 4.0.5
   '@types/node': 17.0.21
   '@types/node-forge': 1.0.0
   '@typescript-eslint/eslint-plugin': 4.31.1_386b67ad67ef29c6a0ccaf3e9b60f945
@@ -534,6 +536,13 @@ packages:
     resolution:
       {
         integrity: sha512-7wg/8gfHltklehP+oyJnZrz9XBuX5ZPP4zB6UsI84utdlkRYLnOm2HfpLXazTwZA+fpGn0ir8tGNgVnMEleBGQ==
+      }
+    dev: true
+
+  /@types/js-yaml/4.0.5:
+    resolution:
+      {
+        integrity: sha512-FhpRzf927MNQdRZP0J5DLIdTXhjLYzeUTmLAu69mnVksLH9CJY3IuSeEgbKUki7GQZm0WqDkGzyxju2EZGD2wA==
       }
     dev: true
 

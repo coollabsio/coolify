@@ -20,7 +20,7 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 	const isPnpm = checkPnpm(installCommand, buildCommand);
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild}`);
-	Dockerfile.push('WORKDIR /usr/src/app');
+	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`LABEL coolify.image=true`);
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {
@@ -65,14 +65,14 @@ export async function buildCacheImageWithCargo(data, imageForBuild) {
 	} = data;
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild} as planner-${applicationId}`);
-	Dockerfile.push('WORKDIR /usr/src/app');
+	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push('RUN cargo install cargo-chef');
 	Dockerfile.push('COPY . .');
 	Dockerfile.push('RUN cargo chef prepare --recipe-path recipe.json');
 	Dockerfile.push(`FROM ${imageForBuild}`);
-	Dockerfile.push('WORKDIR /usr/src/app');
+	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push('RUN cargo install cargo-chef');
-	Dockerfile.push(`COPY --from=planner-${applicationId} /usr/src/app/recipe.json recipe.json`);
+	Dockerfile.push(`COPY --from=planner-${applicationId} /app/recipe.json recipe.json`);
 	Dockerfile.push('RUN cargo chef cook --release --recipe-path recipe.json');
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
 	await buildImage({ applicationId, tag, workdir, docker, buildId, isCache: true, debug });

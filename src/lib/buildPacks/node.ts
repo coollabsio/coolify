@@ -17,7 +17,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	const isPnpm = checkPnpm(installCommand, buildCommand, startCommand);
 
 	Dockerfile.push(`FROM ${image}`);
-	Dockerfile.push('WORKDIR /usr/src/app');
+	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`LABEL coolify.image=true`);
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {

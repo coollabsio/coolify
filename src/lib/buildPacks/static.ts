@@ -15,7 +15,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	const Dockerfile: Array<string> = [];
 
 	Dockerfile.push(`FROM ${image}`);
-	Dockerfile.push('WORKDIR /usr/share/nginx/html');
+	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`LABEL coolify.image=true`);
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {
@@ -33,21 +33,18 @@ const createDockerfile = async (data, image): Promise<void> => {
 		});
 	}
 	if (buildCommand) {
-		Dockerfile.push(
-			`COPY --from=${applicationId}:${tag}-cache /usr/src/app/${publishDirectory} ./`
-		);
+		Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app/${publishDirectory} ./`);
 	} else {
 		Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	}
 	Dockerfile.push(`COPY /nginx.conf /etc/nginx/nginx.conf`);
 	Dockerfile.push(`EXPOSE 80`);
-	Dockerfile.push('CMD ["nginx", "-g", "daemon off;"]');
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };
 
 export default async function (data) {
 	try {
-		const image = 'nginx:stable-alpine';
+		const image = 'webdevops/nginx:alpine';
 		const imageForBuild = 'node:lts';
 		if (data.buildCommand) await buildCacheImageWithNode(data, imageForBuild);
 		await createDockerfile(data, image);

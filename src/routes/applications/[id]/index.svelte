@@ -47,125 +47,7 @@
 	import { post } from '$lib/api';
 	import cuid from 'cuid';
 	import { browser } from '$app/env';
-	import Select from 'svelte-select';
 	const { id } = $page.params;
-	let collection = [
-		'amqp',
-		'apcu',
-		'apcu_bc',
-		'ast',
-		'bcmath',
-		'blackfire',
-		'bz2',
-		'calendar',
-		'cmark',
-		'csv',
-		'dba',
-		'decimal',
-		'ds',
-		'enchant',
-		'ev',
-		'event',
-		'excimer',
-		'exif',
-		'ffi',
-		'gd',
-		'gearman',
-		'geoip',
-		'geospatial',
-		'gettext',
-		'gmagick',
-		'gmp',
-		'gnupg',
-		'grpc',
-		'http',
-		'igbinary',
-		'imagick',
-		'imap',
-		'inotify',
-		'interbase',
-		'intl',
-		'ioncube_loader',
-		'jsmin',
-		'json_post',
-		'ldap',
-		'lzf',
-		'mailparse',
-		'maxminddb',
-		'mcrypt',
-		'memcache',
-		'memcached',
-		'mongo',
-		'mongodb',
-		'mosquitto',
-		'msgpack',
-		'mssql',
-		'mysqli',
-		'oauth',
-		'oci8',
-		'odbc',
-		'opcache',
-		'opencensus',
-		'openswoole',
-		'parallel',
-		'pcntl',
-		'pcov',
-		'pdo_dblib',
-		'pdo_firebird',
-		'pdo_mysql',
-		'pdo_oci',
-		'pdo_odbc',
-		'pdo_pgsql',
-		'pdo_sqlsrv',
-		'pgsql',
-		'propro',
-		'protobuf',
-		'pspell',
-		'pthreads',
-		'raphf',
-		'rdkafka',
-		'recode',
-		'redis',
-		'seaslog',
-		'shmop',
-		'smbclient',
-		'snmp',
-		'snuffleupagus',
-		'soap',
-		'sockets',
-		'solr',
-		'sourceguardian',
-		'spx',
-		'sqlsrv',
-		'ssh2',
-		'stomp',
-		'swoole',
-		'sybase_ct',
-		'sysvmsg',
-		'sysvsem',
-		'sysvshm',
-		'tensor',
-		'tidy',
-		'timezonedb',
-		'uopz',
-		'uploadprogress',
-		'uuid',
-		'vips',
-		'wddx',
-		'xdebug',
-		'xhprof',
-		'xlswriter',
-		'xmldiff',
-		'xmlrpc',
-		'xsl',
-		'yac',
-		'yaml',
-		'yar',
-		'zephir_parser',
-		'zip',
-		'zookeeper',
-		'zstd'
-	];
 
 	let domainEl: HTMLInputElement;
 
@@ -225,9 +107,8 @@
 	async function handleSubmit() {
 		loading = true;
 		try {
-			const tempPhpModules = application.phpModules?.map((module) => module.value).toString() || '';
 			await post(`/applications/${id}/check.json`, { fqdn: application.fqdn, forceSave });
-			await post(`/applications/${id}.json`, { ...application, phpModules: tempPhpModules });
+			await post(`/applications/${id}.json`, { ...application });
 			return window.location.reload();
 		} catch ({ error }) {
 			if (error.startsWith('DNS not set')) {
@@ -479,19 +360,6 @@
 						bind:value={application.startCommand}
 						placeholder="default: yarn start"
 					/>
-				</div>
-			{/if}
-			{#if application.buildPack === 'php'}
-				<div class="grid grid-cols-2 items-center">
-					<label for="startCommand" class="text-base font-bold text-stone-100">PHP Modules</label>
-					<div class="svelte-select">
-						<Select
-							isMulti={true}
-							bind:value={application.phpModules}
-							items={collection}
-							placeholder="Select PHP modules to add..."
-						/>
-					</div>
 				</div>
 			{/if}
 			<div class="grid grid-cols-2 items-center">

@@ -26,14 +26,27 @@
 	export let applicationSecrets;
 	import { getDomain } from '$lib/components/common';
 	import Secret from '../secrets/_Secret.svelte';
-	import { get } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import { page } from '$app/stores';
 	import Explainer from '$lib/components/Explainer.svelte';
+	import { errorNotification } from '$lib/form';
+	import { toast } from '@zerodevx/svelte-toast';
 
 	const { id } = $page.params;
 	async function refreshSecrets() {
 		const data = await get(`/applications/${id}/secrets.json`);
 		PRMRSecrets = [...data.secrets];
+	}
+	async function redeploy(container) {
+		try {
+			await post(`/applications/${id}/deploy.json`, {
+				pullmergeRequestId: container.pullmergeRequestId,
+				branch: container.branch
+			});
+			toast.push('Application redeployed queued.');
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
 	}
 </script>
 
@@ -90,6 +103,11 @@
 						<div class="truncate text-center text-xl font-bold">{getDomain(container.fqdn)}</div>
 					</div>
 				</a>
+				<div class="flex items-center justify-center">
+					<button class="bg-coollabs hover:bg-coollabs-100" on:click={() => redeploy(container)}
+						>Redeploy</button
+					>
+				</div>
 			{/each}
 		{:else}
 			<div class="flex-col">

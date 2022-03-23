@@ -272,6 +272,35 @@
 				></a
 			>
 			<a
+				href="/applications/{id}/storage"
+				sveltekit:prefetch
+				class="hover:text-pink-500 rounded"
+				class:text-pink-500={$page.url.pathname === `/applications/${id}/storage`}
+				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/storage`}
+			>
+				<button
+					title="Persistent Storage"
+					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
+					data-tooltip="Persistent Storage"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<ellipse cx="12" cy="6" rx="8" ry="3" />
+						<path d="M4 6v6a8 3 0 0 0 16 0v-6" />
+						<path d="M4 12v6a8 3 0 0 0 16 0v-6" />
+					</svg>
+				</button></a
+			>
+			<a
 				href="/applications/{id}/previews"
 				sveltekit:prefetch
 				class="hover:text-orange-500 rounded"

@@ -19,6 +19,7 @@ import {
 	makeLabelForStandaloneApplication,
 	setDefaultConfiguration
 } from '$lib/buildPacks/common';
+import yaml from 'js-yaml';
 
 export default async function (job) {
 	/*
@@ -49,7 +50,8 @@ export default async function (job) {
 		type,
 		pullmergeRequestId = null,
 		sourceBranch = null,
-		settings
+		settings,
+		persistentStorage
 	} = job.data;
 	const { debug } = settings;
 
@@ -66,8 +68,12 @@ export default async function (job) {
 	});
 	let imageId = applicationId;
 	let domain = getDomain(fqdn);
-	const isHttps = fqdn.startsWith('https://');
-
+	let volumes =
+		persistentStorage?.map((storage) => {
+			return `${applicationId}${storage.path.replace(/\//gi, '-')}:${
+				buildPack !== 'docker' ? '/app' : ''
+			}${storage.path}`;
+		}) || [];
 	// Previews, we need to get the source branch and set subdomain
 	if (pullmergeRequestId) {
 		branch = sourceBranch;
@@ -255,14 +261,53 @@ export default async function (job) {
 		}
 		try {
 			saveBuildLog({ line: 'Deployment started.', buildId, applicationId });
-			const { stderr } = await asyncExecShell(
-				`DOCKER_HOST=${host} docker run ${envFound && `--env-file=${workdir}/.env`} ${labels.join(
-					' '
-				)} --name ${imageId} --network ${
-					docker.network
-				} --restart always -d ${applicationId}:${tag}`
+			// for await (const volume of volumes) {
+			// 	const id = volume.split(':')[0];
+			// 	try {
+			// 		await asyncExecShell(`DOCKER_HOST=${host} docker volume inspect ${id}`);
+			// 	} catch (error) {
+			// 		await asyncExecShell(`DOCKER_HOST=${host} docker volume create ${id}`);
+			// 	}
+			// }
+			const composeVolumes = volumes.map((volume) => {
+				return {
+					[`${volume.split(':')[0]}`]: {
+						name: volume.split(':')[0]
+					}
+				};
+			});
+			const compose = {
+				version: '3.8',
+				services: {
+					[imageId]: {
+						image: `${applicationId}:${tag}`,
+						container_name: imageId,
+						volumes,
+						env_file: envFound ? [`${workdir}/.env`] : [],
+						networks: [docker.network],
+						labels: labels,
+						depends_on: [],
+						restart: 'always'
+					}
+				},
+				networks: {
+					[docker.network]: {
+						external: true
+					}
+				},
+				volumes: Object.assign({}, ...composeVolumes)
+			};
+			await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(compose));
+			await asyncExecShell(
+				`DOCKER_HOST=${host} docker compose --project-directory ${workdir} up -d`
 			);
-			if (stderr) console.log(stderr);
+
+			// const { stderr } = await asyncExecShell(
+			// 	`DOCKER_HOST=${host} docker run ${envFound && `--env-file=${workdir}/.env`} ${labels.join(
+			// 		' '
+			// 	)} --name ${imageId} --network ${docker.network} --restart always ${volumes.length > 0 ? volumes : ''
+			// 	} -d ${applicationId}:${tag}`
+			// );
 			saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
 		} catch (error) {
 			saveBuildLog({ line: error, buildId, applicationId });
