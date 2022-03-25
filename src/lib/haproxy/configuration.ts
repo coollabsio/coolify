@@ -82,7 +82,7 @@ backend backend-certbot
 # updatedAt={{updatedAt}}
 backend {{domain}}
   option forwardfor
-  server {{id}} {{id}}:{{port}} check
+  server {{id}} {{id}}:{{port}}
 {{/isRunning}}
 {{/applications}}
 
@@ -91,7 +91,7 @@ backend {{domain}}
 # updatedAt={{updatedAt}}
 backend {{domain}}
   option forwardfor
-  server {{id}} {{id}}:{{port}} check
+  server {{id}} {{id}}:{{port}}
 {{/isRunning}}
 {{/services}}
 
