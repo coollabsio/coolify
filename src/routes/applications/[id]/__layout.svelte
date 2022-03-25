@@ -88,7 +88,14 @@
 		try {
 			const { buildId } = await post(`/applications/${id}/deploy.json`, { ...application });
 			toast.push('Deployment queued.');
-			return await goto(`/applications/${id}/logs/build?buildId=${buildId}`);
+			console.log($page.url);
+			if ($page.url.pathname.startsWith(`/applications/${id}/logs/build`)) {
+				return window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
+			} else {
+				return await goto(`/applications/${id}/logs/build?buildId=${buildId}`, {
+					replaceState: true
+				});
+			}
 		} catch ({ error }) {
 			return errorNotification(error);
 		}

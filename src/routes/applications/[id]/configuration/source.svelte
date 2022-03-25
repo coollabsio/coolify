@@ -41,7 +41,7 @@
 		gitlabApp: Prisma.GitlabApp;
 		githubApp: Prisma.GithubApp;
 	};
-	sources = sources.filter(
+	const filteredSources = sources.filter(
 		(source) =>
 			(source.type === 'github' && source.githubAppId && source.githubApp.installationId) ||
 			(source.type === 'gitlab' && source.gitlabAppId)
@@ -59,8 +59,8 @@
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">Select a Git Source</div>
 </div>
-<div class="flex justify-center">
-	{#if !sources || sources.length === 0}
+<div class="flex flex-col justify-center">
+	{#if !filteredSources || filteredSources.length === 0}
 		<div class="flex-col">
 			<div class="pb-2">No configurable Git Source found</div>
 			<div class="flex justify-center">
@@ -83,7 +83,7 @@
 		</div>
 	{:else}
 		<div class="flex flex-wrap justify-center">
-			{#each sources as source}
+			{#each filteredSources as source}
 				<div class="p-2">
 					<form on:submit|preventDefault={() => handleSubmit(source.id)}>
 						<button

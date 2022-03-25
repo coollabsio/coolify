@@ -54,7 +54,6 @@
 
 					return build;
 				});
-				return window.location.reload();
 			} catch ({ error }) {
 				return errorNotification(error);
 			}

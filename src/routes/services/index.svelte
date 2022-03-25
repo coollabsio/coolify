@@ -1,24 +1,3 @@
-<script context="module" lang="ts">
-	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch }) => {
-		const url = `/services.json`;
-		const res = await fetch(url);
-
-		if (res.ok) {
-			return {
-				props: {
-					...(await res.json())
-				}
-			};
-		}
-
-		return {
-			status: res.status,
-			error: new Error(`Could not load ${url}`)
-		};
-	};
-</script>
-
 <script lang="ts">
 	import PlausibleAnalytics from '$lib/components/svg/services/PlausibleAnalytics.svelte';
 	import NocoDb from '$lib/components/svg/services/NocoDB.svelte';
@@ -27,13 +6,19 @@
 	import Wordpress from '$lib/components/svg/services/Wordpress.svelte';
 	import VaultWarden from '$lib/components/svg/services/VaultWarden.svelte';
 	import LanguageTool from '$lib/components/svg/services/LanguageTool.svelte';
+	import { post } from '$lib/api';
+	import { goto } from '$app/navigation';
 
 	export let services;
+	async function newService() {
+		const { id } = await post('/services/new', {});
+		return await goto(`/services/${id}`, { replaceState: true });
+	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">Services</div>
-	<a href="/new/service" class="add-icon bg-pink-600 hover:bg-pink-500">
+	<div on:click={newService} class="add-icon cursor-pointer bg-pink-600 hover:bg-pink-500">
 		<svg
 			class="w-6"
 			xmlns="http://www.w3.org/2000/svg"
@@ -47,7 +32,7 @@
 				d="M12 6v6m0 0v6m0-6h6m-6 0H6"
 			/></svg
 		>
-	</a>
+	</div>
 </div>
 
 <div class="flex flex-wrap justify-center">

@@ -24,7 +24,7 @@ export default async function () {
 			console.log(error);
 		}
 		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker image prune -f`);
+			await asyncExecShell(`DOCKER_HOST=${host} docker image prune -f --filter "until=2h"`);
 		} catch (error) {
 			console.log(error);
 		}
