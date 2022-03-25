@@ -55,8 +55,7 @@ export default async function (job) {
 	} = job.data;
 	const { debug } = settings;
 
-	await asyncSleep(1000);
-
+	await asyncSleep(500);
 	await db.prisma.build.updateMany({
 		where: {
 			status: 'queued',

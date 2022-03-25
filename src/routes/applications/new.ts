@@ -1,4 +1,4 @@
-import { getUserDetails } from '$lib/common';
+import { getUserDetails, uniqueName } from '$lib/common';
 import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
@@ -6,22 +6,9 @@ import type { RequestHandler } from '@sveltejs/kit';
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
-
-	let { name, fqdn, port, buildCommand, startCommand, installCommand } = await event.request.json();
-
-	if (fqdn) fqdn = fqdn.toLowerCase();
-	if (port) port = Number(port);
-
+	const name = uniqueName();
 	try {
-		const { id } = await db.importApplication({
-			name,
-			teamId,
-			fqdn,
-			port,
-			buildCommand,
-			startCommand,
-			installCommand
-		});
+		const { id } = await db.newApplication({ name, teamId });
 		return { status: 201, body: { id } };
 	} catch (error) {
 		return ErrorHandler(error);

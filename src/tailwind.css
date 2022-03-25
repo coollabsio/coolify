@@ -85,7 +85,7 @@ a {
 }
 
 .nav-side {
-	@apply relative right-0 top-0 z-50 m-5 flex flex-wrap items-center justify-end space-x-2 bg-coolblack/40 text-white sm:absolute;
+	@apply absolute right-0 top-0 z-50 m-5 flex flex-wrap items-center justify-end space-x-2 bg-coolblack/40 text-white;
 }
 
 .add-icon {

@@ -6,9 +6,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
-
-	const { name } = await event.request.json();
-
+	const name = uniqueName();
 	try {
 		const { id } = await db.newService({ name, teamId });
 		return { status: 201, body: { id } };

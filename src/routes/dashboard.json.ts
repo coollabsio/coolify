@@ -8,12 +8,22 @@ export const get: RequestHandler = async (event) => {
 	if (status === 401) return { status, body };
 
 	try {
-		const applicationsCount = await (await db.listApplications(teamId)).length;
-		const sourcesCount = await (await db.listSources(teamId)).length;
-		const destinationsCount = await (await db.listDestinations(teamId)).length;
-		const teamsCount = await (await db.getMyTeams({ userId })).length;
-		const databasesCount = await (await db.listDatabases(teamId)).length;
-		const servicesCount = await (await db.listServices(teamId)).length;
+		const applicationsCount = await db.prisma.application.count({
+			where: { teams: { some: { id: teamId } } }
+		});
+		const sourcesCount = await db.prisma.gitSource.count({
+			where: { teams: { some: { id: teamId } } }
+		});
+		const destinationsCount = await db.prisma.destinationDocker.count({
+			where: { teams: { some: { id: teamId } } }
+		});
+		const teamsCount = await db.prisma.permission.count({ where: { userId } });
+		const databasesCount = await db.prisma.database.count({
+			where: { teams: { some: { id: teamId } } }
+		});
+		const servicesCount = await db.prisma.service.count({
+			where: { teams: { some: { id: teamId } } }
+		});
 		return {
 			body: {
 				applicationsCount,

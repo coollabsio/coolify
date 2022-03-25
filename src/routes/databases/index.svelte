@@ -1,24 +1,3 @@
-<script context="module" lang="ts">
-	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch }) => {
-		const url = `/databases.json`;
-		const res = await fetch(url);
-
-		if (res.ok) {
-			return {
-				props: {
-					...(await res.json())
-				}
-			};
-		}
-
-		return {
-			status: res.status,
-			error: new Error(`Could not load ${url}`)
-		};
-	};
-</script>
-
 <script lang="ts">
 	export let databases;
 	import Clickhouse from '$lib/components/svg/databases/Clickhouse.svelte';
@@ -27,11 +6,18 @@
 	import MySQL from '$lib/components/svg/databases/MySQL.svelte';
 	import PostgreSQL from '$lib/components/svg/databases/PostgreSQL.svelte';
 	import Redis from '$lib/components/svg/databases/Redis.svelte';
+	import { post } from '$lib/api';
+	import { goto } from '$app/navigation';
+
+	async function newDatabase() {
+		const { id } = await post('/databases/new', {});
+		return await goto(`/databases/${id}`, { replaceState: true });
+	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">Databases</div>
-	<a href="/new/database" class="add-icon bg-purple-600 hover:bg-purple-500">
+	<div on:click={newDatabase} class="add-icon cursor-pointer bg-purple-600 hover:bg-purple-500">
 		<svg
 			class="w-6"
 			xmlns="http://www.w3.org/2000/svg"
@@ -45,7 +31,7 @@
 				d="M12 6v6m0 0v6m0-6h6m-6 0H6"
 			/></svg
 		>
-	</a>
+	</div>
 </div>
 
 <div class="flex flex-wrap justify-center">

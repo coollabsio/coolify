@@ -10,6 +10,7 @@ declare namespace App {
 	interface Stuff {
 		application: any;
 		isRunning: boolean;
+		appId: string;
 	}
 }
 

@@ -151,8 +151,8 @@
 		<a href={`/sources/${application.gitSource.id}`}><button>Configure it now</button></a>
 	</div>
 {:else}
-	<form on:submit|preventDefault={handleSubmit}>
-		<div>
+	<form on:submit|preventDefault={handleSubmit} class="flex flex-col justify-center text-center">
+		<div class="flex-col space-y-3 md:space-y-0 space-x-1">
 			{#if loading.repositories}
 				<select name="repository" disabled class="w-96">
 					<option selected value="">Loading repositories...</option>

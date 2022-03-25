@@ -84,7 +84,7 @@
 			<LoadingLogs />
 		{/if}
 		{#if currentStatus === 'queued'}
-			<div class="text-center">Queued and waiting for execution.</div>
+			<div class="text-center font-bold text-xl">Queued and waiting for execution.</div>
 		{:else}
 			<div class="flex justify-end sticky top-0 p-2">
 				<button
