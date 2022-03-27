@@ -14,15 +14,7 @@ export const post: RequestHandler = async (event) => {
 
 	try {
 		const service = await db.getService({ id, teamId });
-		const {
-			type,
-			version,
-			destinationDockerId,
-			destinationDocker,
-			serviceSecret,
-			vscodeserver: { password }
-		} = service;
-
+		const { type, version, destinationDockerId, destinationDocker, serviceSecret } = service;
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
 
@@ -31,10 +23,8 @@ export const post: RequestHandler = async (event) => {
 
 		const config = {
 			image: `${image}:${version}`,
-			volume: `${id}-vscodeserver-data:/home/coder`,
-			environmentVariables: {
-				PASSWORD: password
-			}
+			volume: `${id}-uptimekuma:/app/data`,
+			environmentVariables: {}
 		};
 		if (serviceSecret.length > 0) {
 			serviceSecret.forEach((secret) => {
@@ -47,11 +37,11 @@ export const post: RequestHandler = async (event) => {
 				[id]: {
 					container_name: id,
 					image: config.image,
-					environment: config.environmentVariables,
 					networks: [network],
 					volumes: [config.volume],
+					environment: config.environmentVariables,
 					restart: 'always',
-					labels: makeLabelForServices('vscodeServer')
+					labels: makeLabelForServices('uptimekuma')
 				}
 			},
 			networks: {
@@ -68,13 +58,19 @@ export const post: RequestHandler = async (event) => {
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-		if (version === 'latest') {
-			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
+		try {
+			if (version === 'latest') {
+				await asyncExecShell(
+					`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`
+				);
+			}
+			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+			return {
+				status: 200
+			};
+		} catch (error) {
+			return ErrorHandler(error);
 		}
-		await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
-		return {
-			status: 200
-		};
 	} catch (error) {
 		return ErrorHandler(error);
 	}

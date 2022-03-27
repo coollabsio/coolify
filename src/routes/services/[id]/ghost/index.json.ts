@@ -8,11 +8,14 @@ export const post: RequestHandler = async (event) => {
 	if (status === 401) return { status, body };
 	const { id } = event.params;
 
-	let { name, fqdn } = await event.request.json();
+	let {
+		name,
+		fqdn,
+		ghost: { mariadbDatabase }
+	} = await event.request.json();
 	if (fqdn) fqdn = fqdn.toLowerCase();
-
 	try {
-		await db.updateService({ id, fqdn, name });
+		await db.updateGhostService({ id, fqdn, name, mariadbDatabase });
 		return { status: 201 };
 	} catch (error) {
 		return ErrorHandler(error);

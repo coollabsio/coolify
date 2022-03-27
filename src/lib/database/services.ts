@@ -1,3 +1,4 @@
+import { asyncExecShell, getEngine } from '$lib/common';
 import { decrypt, encrypt } from '$lib/crypto';
 import cuid from 'cuid';
 import { generatePassword } from '.';
@@ -20,6 +21,7 @@ export async function getService({ id, teamId }) {
 			minio: true,
 			vscodeserver: true,
 			wordpress: true,
+			ghost: true,
 			serviceSecret: true
 		}
 	});
@@ -43,12 +45,18 @@ export async function getService({ id, teamId }) {
 	if (body.wordpress?.mysqlRootUserPassword)
 		body.wordpress.mysqlRootUserPassword = decrypt(body.wordpress.mysqlRootUserPassword);
 
+	if (body.ghost?.mariadbPassword) body.ghost.mariadbPassword = decrypt(body.ghost.mariadbPassword);
+	if (body.ghost?.mariadbRootUserPassword)
+		body.ghost.mariadbRootUserPassword = decrypt(body.ghost.mariadbRootUserPassword);
+	if (body.ghost?.defaultPassword) body.ghost.defaultPassword = decrypt(body.ghost.defaultPassword);
+
 	if (body?.serviceSecret.length > 0) {
 		body.serviceSecret = body.serviceSecret.map((s) => {
 			s.value = decrypt(s.value);
 			return s;
 		});
 	}
+
 	return { ...body };
 }
 
@@ -119,6 +127,44 @@ export async function configureServiceType({ id, type }) {
 				type
 			}
 		});
+	} else if (type === 'n8n') {
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type
+			}
+		});
+	} else if (type === 'uptimekuma') {
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type
+			}
+		});
+	} else if (type === 'ghost') {
+		const defaultEmail = `${cuid()}@coolify.io`;
+		const defaultPassword = encrypt(generatePassword());
+		const mariadbUser = cuid();
+		const mariadbPassword = encrypt(generatePassword());
+		const mariadbRootUser = cuid();
+		const mariadbRootUserPassword = encrypt(generatePassword());
+
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				ghost: {
+					create: {
+						defaultEmail,
+						defaultPassword,
+						mariadbUser,
+						mariadbPassword,
+						mariadbRootUser,
+						mariadbRootUserPassword
+					}
+				}
+			}
+		});
 	}
 }
 export async function setServiceVersion({ id, version }) {
@@ -139,7 +185,7 @@ export async function updatePlausibleAnalyticsService({ id, fqdn, email, usernam
 	await prisma.plausibleAnalytics.update({ where: { serviceId: id }, data: { email, username } });
 	await prisma.service.update({ where: { id }, data: { name, fqdn } });
 }
-export async function updateNocoDbOrMinioService({ id, fqdn, name }) {
+export async function updateService({ id, fqdn, name }) {
 	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
 }
 export async function updateLanguageToolService({ id, fqdn, name }) {
@@ -160,8 +206,15 @@ export async function updateWordpress({ id, fqdn, name, mysqlDatabase, extraConf
 export async function updateMinioService({ id, publicPort }) {
 	return await prisma.minio.update({ where: { serviceId: id }, data: { publicPort } });
 }
+export async function updateGhostService({ id, fqdn, name, mariadbDatabase }) {
+	return await prisma.service.update({
+		where: { id },
+		data: { fqdn, name, ghost: { update: { mariadbDatabase } } }
+	});
+}
 
 export async function removeService({ id }) {
+	await prisma.ghost.deleteMany({ where: { serviceId: id } });
 	await prisma.plausibleAnalytics.deleteMany({ where: { serviceId: id } });
 	await prisma.minio.deleteMany({ where: { serviceId: id } });
 	await prisma.vscodeserver.deleteMany({ where: { serviceId: id } });

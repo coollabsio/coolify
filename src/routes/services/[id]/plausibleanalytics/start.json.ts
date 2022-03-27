@@ -158,29 +158,21 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 			},
 			volumes: {
 				[config.postgresql.volume.split(':')[0]]: {
-					external: true
+					name: config.postgresql.volume.split(':')[0]
 				},
 				[config.clickhouse.volume.split(':')[0]]: {
-					external: true
+					name: config.clickhouse.volume.split(':')[0]
 				}
 			}
 		};
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-		try {
-			await asyncExecShell(
-				`DOCKER_HOST=${host} docker volume create ${config.postgresql.volume.split(':')[0]}`
-			);
-			await asyncExecShell(
-				`DOCKER_HOST=${host} docker volume create ${config.clickhouse.volume.split(':')[0]}`
-			);
-		} catch (error) {
-			console.log(error);
+		if (version === 'latest') {
+			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
 		}
 		await asyncExecShell(
 			`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up --build -d`
 		);
-
 		return {
 			status: 200
 		};

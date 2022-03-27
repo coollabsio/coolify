@@ -41,7 +41,7 @@ export const post: RequestHandler = async (event) => {
 					networks: [network],
 					environment: config.environmentVariables,
 					restart: 'always',
-					volumes: [`${id}-ngrams:/ngrams`],
+					volumes: [config.volume],
 					labels: makeLabelForServices('languagetool')
 				}
 			},
@@ -51,20 +51,20 @@ export const post: RequestHandler = async (event) => {
 				}
 			},
 			volumes: {
-				[`${id}-ngrams`]: {
-					external: true
+				[config.volume.split(':')[0]]: {
+					name: config.volume.split(':')[0]
 				}
 			}
 		};
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker volume create ${id}-ngrams`);
-		} catch (error) {
-			console.log(error);
-		}
 
 		try {
+			if (version === 'latest') {
+				await asyncExecShell(
+					`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`
+				);
+			}
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
 			return {
 				status: 200

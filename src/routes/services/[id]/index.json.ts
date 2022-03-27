@@ -4,7 +4,8 @@ import {
 	generateDatabaseConfiguration,
 	getServiceImage,
 	getVersions,
-	ErrorHandler
+	ErrorHandler,
+	getServiceImages
 } from '$lib/database';
 import { dockerInstance } from '$lib/docker';
 import type { RequestHandler } from '@sveltejs/kit';
@@ -23,7 +24,13 @@ export const get: RequestHandler = async (event) => {
 			const host = getEngine(destinationDocker.engine);
 			const docker = dockerInstance({ destinationDocker });
 			const baseImage = getServiceImage(type);
+			const images = getServiceImages(type);
 			docker.engine.pull(`${baseImage}:${version}`);
+			if (images?.length > 0) {
+				for (const image of images) {
+					docker.engine.pull(`${image}:latest`);
+				}
+			}
 			try {
 				const { stdout } = await asyncExecShell(
 					`DOCKER_HOST=${host} docker inspect --format '{{json .State}}' ${id}`

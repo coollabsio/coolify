@@ -8,6 +8,9 @@
 	import LanguageTool from '$lib/components/svg/services/LanguageTool.svelte';
 	import { post } from '$lib/api';
 	import { goto } from '$app/navigation';
+	import N8n from '$lib/components/svg/services/N8n.svelte';
+	import UptimeKuma from '$lib/components/svg/services/UptimeKuma.svelte';
+	import Ghost from '$lib/components/svg/services/Ghost.svelte';
 
 	export let services;
 	async function newService() {
@@ -58,6 +61,12 @@
 						<VaultWarden isAbsolute />
 					{:else if service.type === 'languagetool'}
 						<LanguageTool isAbsolute />
+					{:else if service.type === 'n8n'}
+						<N8n isAbsolute />
+					{:else if service.type === 'uptimekuma'}
+						<UptimeKuma isAbsolute />
+					{:else if service.type === 'ghost'}
+						<Ghost isAbsolute />
 					{/if}
 					<div class="font-bold text-xl text-center truncate">
 						{service.name}
