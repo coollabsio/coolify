@@ -126,6 +126,13 @@ export async function configureServiceType({ id, type }) {
 				type
 			}
 		});
+	} else if (type === 'uptimekuma') {
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type
+			}
+		});
 	}
 }
 export async function setServiceVersion({ id, version }) {

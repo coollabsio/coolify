@@ -174,6 +174,15 @@ export const supportedServiceTypesAndVersions = [
 		ports: {
 			main: 5678
 		}
+	},
+	{
+		name: 'uptimekuma',
+		fancyName: 'Uptime Kuma',
+		baseImage: 'louislam/uptime-kuma',
+		versions: ['latest'],
+		ports: {
+			main: 3001
+		}
 	}
 ];
 

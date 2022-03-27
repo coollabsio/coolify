@@ -8,9 +8,11 @@ declare namespace App {
 	interface Platform {}
 	interface Session extends SessionData {}
 	interface Stuff {
+		service: any;
 		application: any;
 		isRunning: boolean;
 		appId: string;
+		readOnly: boolean;
 	}
 }
 
