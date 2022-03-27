@@ -10,6 +10,7 @@
 	import Setting from '$lib/components/Setting.svelte';
 	import { errorNotification } from '$lib/form';
 	import { toast } from '@zerodevx/svelte-toast';
+	import Ghost from './_Ghost.svelte';
 	import MinIo from './_MinIO.svelte';
 	import PlausibleAnalytics from './_PlausibleAnalytics.svelte';
 	import VsCodeServer from './_VSCodeServer.svelte';
@@ -142,6 +143,8 @@
 				<VsCodeServer {service} />
 			{:else if service.type === 'wordpress'}
 				<Wordpress bind:service {isRunning} {readOnly} />
+			{:else if service.type === 'ghost'}
+				<Ghost bind:service {readOnly} />
 			{/if}
 		</div>
 	</form>

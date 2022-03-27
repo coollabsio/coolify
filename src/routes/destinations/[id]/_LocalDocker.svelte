@@ -103,7 +103,7 @@
 	}
 	async function forceRestartProxy() {
 		const sure = confirm(
-			'Are you sure you want to restart the proxy? Everyting will be reconfigured in ~10 sec.'
+			'Are you sure you want to restart the proxy? Everything will be reconfigured in ~10 secs.'
 		);
 		if (sure) {
 			try {

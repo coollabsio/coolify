@@ -41,6 +41,7 @@
 	import LanguageTool from '$lib/components/svg/services/LanguageTool.svelte';
 	import N8n from '$lib/components/svg/services/N8n.svelte';
 	import UptimeKuma from '$lib/components/svg/services/UptimeKuma.svelte';
+	import Ghost from '$lib/components/svg/services/Ghost.svelte';
 
 	export let service;
 	export let isRunning;
@@ -118,6 +119,10 @@
 		{:else if service.type === 'uptimekuma'}
 			<a href="https://github.com/louislam/uptime-kuma" target="_blank">
 				<UptimeKuma />
+			</a>
+		{:else if service.type === 'ghost'}
+			<a href="https://ghost.org" target="_blank">
+				<Ghost />
 			</a>
 		{/if}
 	</div>

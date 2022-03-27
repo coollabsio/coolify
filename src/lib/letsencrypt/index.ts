@@ -104,32 +104,34 @@ export async function generateSSLCerts() {
 	});
 	for (const application of applications) {
 		try {
-			const {
-				fqdn,
-				id,
-				destinationDocker: { engine, network },
-				settings: { previews }
-			} = application;
-			const isRunning = await checkContainer(engine, id);
-			const domain = getDomain(fqdn);
-			const isHttps = fqdn.startsWith('https://');
-			if (isRunning) {
-				if (isHttps) ssls.push({ domain, id, isCoolify: false });
-			}
-			if (previews) {
-				const host = getEngine(engine);
-				const { stdout } = await asyncExecShell(
-					`DOCKER_HOST=${host} docker container ls --filter="status=running" --filter="network=${network}" --filter="name=${id}-" --format="{{json .Names}}"`
-				);
-				const containers = stdout
-					.trim()
-					.split('\n')
-					.filter((a) => a)
-					.map((c) => c.replace(/"/g, ''));
-				if (containers.length > 0) {
-					for (const container of containers) {
-						let previewDomain = `${container.split('-')[1]}.${domain}`;
-						if (isHttps) ssls.push({ domain: previewDomain, id, isCoolify: false });
+			if (application.fqdn && application.destinationDockerId) {
+				const {
+					fqdn,
+					id,
+					destinationDocker: { engine, network },
+					settings: { previews }
+				} = application;
+				const isRunning = await checkContainer(engine, id);
+				const domain = getDomain(fqdn);
+				const isHttps = fqdn.startsWith('https://');
+				if (isRunning) {
+					if (isHttps) ssls.push({ domain, id, isCoolify: false });
+				}
+				if (previews) {
+					const host = getEngine(engine);
+					const { stdout } = await asyncExecShell(
+						`DOCKER_HOST=${host} docker container ls --filter="status=running" --filter="network=${network}" --filter="name=${id}-" --format="{{json .Names}}"`
+					);
+					const containers = stdout
+						.trim()
+						.split('\n')
+						.filter((a) => a)
+						.map((c) => c.replace(/"/g, ''));
+					if (containers.length > 0) {
+						for (const container of containers) {
+							let previewDomain = `${container.split('-')[1]}.${domain}`;
+							if (isHttps) ssls.push({ domain: previewDomain, id, isCoolify: false });
+						}
 					}
 				}
 			}
@@ -143,26 +145,29 @@ export async function generateSSLCerts() {
 			minio: true,
 			plausibleAnalytics: true,
 			vscodeserver: true,
-			wordpress: true
+			wordpress: true,
+			ghost: true
 		},
 		orderBy: { createdAt: 'desc' }
 	});
 
 	for (const service of services) {
 		try {
-			const {
-				fqdn,
-				id,
-				type,
-				destinationDocker: { engine }
-			} = service;
-			const found = db.supportedServiceTypesAndVersions.find((a) => a.name === type);
-			if (found) {
-				const domain = getDomain(fqdn);
-				const isHttps = fqdn.startsWith('https://');
-				const isRunning = await checkContainer(engine, id);
-				if (isRunning) {
-					if (isHttps) ssls.push({ domain, id, isCoolify: false });
+			if (service.fqdn && service.destinationDockerId) {
+				const {
+					fqdn,
+					id,
+					type,
+					destinationDocker: { engine }
+				} = service;
+				const found = db.supportedServiceTypesAndVersions.find((a) => a.name === type);
+				if (found) {
+					const domain = getDomain(fqdn);
+					const isHttps = fqdn.startsWith('https://');
+					const isRunning = await checkContainer(engine, id);
+					if (isRunning) {
+						if (isHttps) ssls.push({ domain, id, isCoolify: false });
+					}
 				}
 			}
 		} catch (error) {

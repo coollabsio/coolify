@@ -107,6 +107,7 @@ export const supportedServiceTypesAndVersions = [
 		name: 'plausibleanalytics',
 		fancyName: 'Plausible Analytics',
 		baseImage: 'plausible/analytics',
+		images: ['bitnami/postgresql:13.2.0', 'yandex/clickhouse-server:21.3.2.5'],
 		versions: ['latest'],
 		ports: {
 			main: 8000
@@ -143,6 +144,7 @@ export const supportedServiceTypesAndVersions = [
 		name: 'wordpress',
 		fancyName: 'Wordpress',
 		baseImage: 'wordpress',
+		images: ['bitnami/mysql:5.7'],
 		versions: ['latest', 'php8.1', 'php8.0', 'php7.4', 'php7.3'],
 		ports: {
 			main: 80
@@ -183,6 +185,16 @@ export const supportedServiceTypesAndVersions = [
 		ports: {
 			main: 3001
 		}
+	},
+	{
+		name: 'ghost',
+		fancyName: 'Ghost',
+		baseImage: 'bitnami/ghost',
+		images: ['bitnami/mariadb'],
+		versions: ['latest'],
+		ports: {
+			main: 2368
+		}
 	}
 ];
 
@@ -206,6 +218,13 @@ export function getServiceImage(type) {
 		return found.baseImage;
 	}
 	return '';
+}
+export function getServiceImages(type) {
+	const found = supportedServiceTypesAndVersions.find((t) => t.name === type);
+	if (found) {
+		return found.images;
+	}
+	return [];
 }
 export function generateDatabaseConfiguration(database) {
 	const {

@@ -40,6 +40,7 @@
 	import LanguageTool from '$lib/components/svg/services/LanguageTool.svelte';
 	import N8n from '$lib/components/svg/services/N8n.svelte';
 	import UptimeKuma from '$lib/components/svg/services/UptimeKuma.svelte';
+	import Ghost from '$lib/components/svg/services/Ghost.svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -83,6 +84,8 @@
 						<N8n isAbsolute />
 					{:else if type.name === 'uptimekuma'}
 						<UptimeKuma isAbsolute />
+					{:else if type.name === 'ghost'}
+						<Ghost isAbsolute />
 					{/if}{type.fancyName}
 				</button>
 			</form>

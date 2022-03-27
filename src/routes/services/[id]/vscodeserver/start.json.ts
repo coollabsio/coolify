@@ -61,29 +61,20 @@ export const post: RequestHandler = async (event) => {
 			},
 			volumes: {
 				[config.volume.split(':')[0]]: {
-					external: true
+					name: config.volume.split(':')[0]
 				}
 			}
 		};
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-		try {
-			await asyncExecShell(
-				`DOCKER_HOST=${host} docker volume create ${config.volume.split(':')[0]}`
-			);
-		} catch (error) {
-			console.log(error);
+		if (version === 'latest') {
+			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
 		}
-
-		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
-			return {
-				status: 200
-			};
-		} catch (error) {
-			return ErrorHandler(error);
-		}
+		await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+		return {
+			status: 200
+		};
 	} catch (error) {
 		return ErrorHandler(error);
 	}

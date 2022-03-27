@@ -59,6 +59,11 @@ export const post: RequestHandler = async (event) => {
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
 		try {
+			if (version === 'latest') {
+				await asyncExecShell(
+					`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`
+				);
+			}
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
 			return {
 				status: 200

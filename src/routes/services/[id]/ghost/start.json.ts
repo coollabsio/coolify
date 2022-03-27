@@ -1,4 +1,10 @@
-import { asyncExecShell, createDirectories, getEngine, getUserDetails } from '$lib/common';
+import {
+	asyncExecShell,
+	createDirectories,
+	getDomain,
+	getEngine,
+	getUserDetails
+} from '$lib/common';
 import * as db from '$lib/database';
 import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
@@ -17,52 +23,56 @@ export const post: RequestHandler = async (event) => {
 		const {
 			type,
 			version,
-			fqdn,
 			destinationDockerId,
-			serviceSecret,
 			destinationDocker,
-			wordpress: {
-				mysqlDatabase,
-				mysqlUser,
-				mysqlPassword,
-				extraConfig,
-				mysqlRootUser,
-				mysqlRootUserPassword
+			serviceSecret,
+			fqdn,
+			ghost: {
+				defaultEmail,
+				defaultPassword,
+				mariadbRootUser,
+				mariadbRootUserPassword,
+				mariadbDatabase,
+				mariadbPassword,
+				mariadbUser
 			}
 		} = service;
-
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
-		const image = getServiceImage(type);
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
+		const image = getServiceImage(type);
+		const domain = getDomain(fqdn);
 		const config = {
-			wordpress: {
+			ghost: {
 				image: `${image}:${version}`,
-				volume: `${id}-wordpress-data:/var/www/html`,
+				volume: `${id}-ghost:/bitnami/ghost`,
 				environmentVariables: {
-					WORDPRESS_DB_HOST: `${id}-mysql`,
-					WORDPRESS_DB_USER: mysqlUser,
-					WORDPRESS_DB_PASSWORD: mysqlPassword,
-					WORDPRESS_DB_NAME: mysqlDatabase,
-					WORDPRESS_CONFIG_EXTRA: extraConfig
+					GHOST_HOST: domain,
+					GHOST_EMAIL: defaultEmail,
+					GHOST_PASSWORD: defaultPassword,
+					GHOST_DATABASE_HOST: `${id}-mariadb`,
+					GHOST_DATABASE_USER: mariadbUser,
+					GHOST_DATABASE_PASSWORD: mariadbPassword,
+					GHOST_DATABASE_NAME: mariadbDatabase,
+					GHOST_DATABASE_PORT_NUMBER: 3306
 				}
 			},
-			mysql: {
-				image: `bitnami/mysql:5.7`,
-				volume: `${id}-mysql-data:/bitnami/mysql/data`,
+			mariadb: {
+				image: `bitnami/mariadb:latest`,
+				volume: `${id}-mariadb:/bitnami/mariadb`,
 				environmentVariables: {
-					MYSQL_ROOT_PASSWORD: mysqlRootUserPassword,
-					MYSQL_ROOT_USER: mysqlRootUser,
-					MYSQL_USER: mysqlUser,
-					MYSQL_PASSWORD: mysqlPassword,
-					MYSQL_DATABASE: mysqlDatabase
+					MARIADB_USER: mariadbUser,
+					MARIADB_PASSWORD: mariadbPassword,
+					MARIADB_DATABASE: mariadbDatabase,
+					MARIADB_ROOT_USER: mariadbRootUser,
+					MARIADB_ROOT_PASSWORD: mariadbRootUserPassword
 				}
 			}
 		};
 		if (serviceSecret.length > 0) {
 			serviceSecret.forEach((secret) => {
-				config.wordpress.environmentVariables[secret.name] = secret.value;
+				config.ghost.environmentVariables[secret.name] = secret.value;
 			});
 		}
 		const composeFile = {
@@ -70,20 +80,20 @@ export const post: RequestHandler = async (event) => {
 			services: {
 				[id]: {
 					container_name: id,
-					image: config.wordpress.image,
-					environment: config.wordpress.environmentVariables,
-					volumes: [config.wordpress.volume],
+					image: config.ghost.image,
 					networks: [network],
+					volumes: [config.ghost.volume],
+					environment: config.ghost.environmentVariables,
 					restart: 'always',
-					depends_on: [`${id}-mysql`],
-					labels: makeLabelForServices('wordpress')
+					labels: makeLabelForServices('ghost'),
+					depends_on: [`${id}-mariadb`]
 				},
-				[`${id}-mysql`]: {
-					container_name: `${id}-mysql`,
-					image: config.mysql.image,
-					volumes: [config.mysql.volume],
-					environment: config.mysql.environmentVariables,
+				[`${id}-mariadb`]: {
+					container_name: `${id}-mariadb`,
+					image: config.mariadb.image,
 					networks: [network],
+					volumes: [config.mariadb.volume],
+					environment: config.mariadb.environmentVariables,
 					restart: 'always'
 				}
 			},
@@ -93,16 +103,18 @@ export const post: RequestHandler = async (event) => {
 				}
 			},
 			volumes: {
-				[config.wordpress.volume.split(':')[0]]: {
-					name: config.wordpress.volume.split(':')[0]
+				[config.ghost.volume.split(':')[0]]: {
+					name: config.ghost.volume.split(':')[0]
 				},
-				[config.mysql.volume.split(':')[0]]: {
-					name: config.mysql.volume.split(':')[0]
+				[config.mariadb.volume.split(':')[0]]: {
+					name: config.mariadb.volume.split(':')[0]
 				}
 			}
 		};
+		console.log(JSON.stringify(composeFile.volumes));
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
+
 		try {
 			if (version === 'latest') {
 				await asyncExecShell(
@@ -114,7 +126,6 @@ export const post: RequestHandler = async (event) => {
 				status: 200
 			};
 		} catch (error) {
-			console.log(error);
 			return ErrorHandler(error);
 		}
 	} catch (error) {

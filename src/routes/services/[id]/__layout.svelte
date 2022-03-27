@@ -35,6 +35,7 @@
 			}
 			if (service.plausibleAnalytics?.email && service.plausibleAnalytics.username) readOnly = true;
 			if (service.wordpress?.mysqlDatabase) readOnly = true;
+			if (service.ghost?.mariadbDatabase && service.ghost.mariadbDatabase) readOnly = true;
 
 			return {
 				props: {
