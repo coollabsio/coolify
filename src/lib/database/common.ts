@@ -165,6 +165,15 @@ export const supportedServiceTypesAndVersions = [
 		ports: {
 			main: 8010
 		}
+	},
+	{
+		name: 'n8n',
+		fancyName: 'n8n',
+		baseImage: 'n8nio/n8n',
+		versions: ['latest'],
+		ports: {
+			main: 5678
+		}
 	}
 ];
 

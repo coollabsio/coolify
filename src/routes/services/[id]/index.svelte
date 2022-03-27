@@ -39,6 +39,7 @@
 	import cuid from 'cuid';
 	import { browser } from '$app/env';
 	import LanguageTool from '$lib/components/svg/services/LanguageTool.svelte';
+	import N8n from '$lib/components/svg/services/N8n.svelte';
 
 	export let service;
 	export let isRunning;
@@ -108,6 +109,10 @@
 		{:else if service.type === 'languagetool'}
 			<a href="https://languagetool.org/dev" target="_blank">
 				<LanguageTool />
+			</a>
+		{:else if service.type === 'n8n'}
+			<a href="https://n8n.io" target="_blank">
+				<N8n />
 			</a>
 		{/if}
 	</div>

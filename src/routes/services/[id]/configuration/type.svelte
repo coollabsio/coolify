@@ -38,6 +38,7 @@
 	import { post } from '$lib/api';
 	import VaultWarden from '$lib/components/svg/services/VaultWarden.svelte';
 	import LanguageTool from '$lib/components/svg/services/LanguageTool.svelte';
+	import N8n from '$lib/components/svg/services/N8n.svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -77,6 +78,8 @@
 						<VaultWarden isAbsolute />
 					{:else if type.name === 'languagetool'}
 						<LanguageTool isAbsolute />
+					{:else if type.name === 'n8n'}
+						<N8n isAbsolute />
 					{/if}{type.fancyName}
 				</button>
 			</form>

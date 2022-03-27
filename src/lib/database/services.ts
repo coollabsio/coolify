@@ -119,6 +119,13 @@ export async function configureServiceType({ id, type }) {
 				type
 			}
 		});
+	} else if (type === 'n8n') {
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type
+			}
+		});
 	}
 }
 export async function setServiceVersion({ id, version }) {
@@ -139,7 +146,7 @@ export async function updatePlausibleAnalyticsService({ id, fqdn, email, usernam
 	await prisma.plausibleAnalytics.update({ where: { serviceId: id }, data: { email, username } });
 	await prisma.service.update({ where: { id }, data: { name, fqdn } });
 }
-export async function updateNocoDbOrMinioService({ id, fqdn, name }) {
+export async function updateService({ id, fqdn, name }) {
 	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
 }
 export async function updateLanguageToolService({ id, fqdn, name }) {
