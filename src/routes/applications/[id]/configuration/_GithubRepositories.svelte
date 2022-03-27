@@ -156,8 +156,6 @@
 			return errorNotification(error);
 		}
 	}
-
-	console.log(reposSelectOptions, repositories);
 </script>
 
 {#if repositories.length === 0 && loading.repositories === false}
