@@ -37,6 +37,26 @@ textarea {
 	@apply min-w-[24rem] rounded border border-transparent bg-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:border disabled:border-dashed disabled:border-coolgray-300 disabled:bg-transparent md:text-sm;
 }
 
+#svelte .custom-select-wrapper .selectContainer.disabled input {
+	@apply placeholder:text-stone-600;
+}
+
+#svelte .custom-select-wrapper .selectContainer input {
+	@apply text-white;
+}
+
+#svelte .custom-select-wrapper .selectContainer {
+	@apply h-12 w-96 rounded border-none bg-coolgray-200 p-2 text-xs font-bold tracking-tight  outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 md:text-sm;
+}
+
+#svelte .listContainer {
+	@apply bg-coolgray-200 text-white;
+}
+
+#svelte .item.hover {
+	@apply bg-coolgray-100 text-white;
+}
+
 select {
 	@apply h-12 w-96 rounded bg-coolgray-200  p-2 text-xs font-bold tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:text-stone-600 md:text-sm;
 }
