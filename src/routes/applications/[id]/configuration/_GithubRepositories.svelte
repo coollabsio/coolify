@@ -1,6 +1,6 @@
 <script lang="ts">
 	export let application;
-
+	import Select from 'svelte-select';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { get, post } from '$lib/api';
@@ -35,6 +35,9 @@
 			Authorization: `token ${$gitTokens.githubToken}`
 		});
 	}
+
+	let reposSelectOptions;
+	let branchSelectOptions;
 	async function loadRepositories() {
 		let page = 1;
 		let reposCount = 0;
@@ -49,8 +52,13 @@
 			}
 		}
 		loading.repositories = false;
+		reposSelectOptions = repositories.map((repo) => ({
+			value: repo.full_name,
+			label: repo.name
+		}));
 	}
-	async function loadBranches() {
+	async function loadBranches(event) {
+		selected.repository = event.detail.value;
 		loading.branches = true;
 		selected.branch = undefined;
 		selected.projectId = repositories.find((repo) => repo.full_name === selected.repository).id;
@@ -58,6 +66,10 @@
 			branches = await get(`${apiUrl}/repos/${selected.repository}/branches`, {
 				Authorization: `token ${$gitTokens.githubToken}`
 			});
+			branchSelectOptions = branches.map((branch) => ({
+				value: branch.name,
+				label: branch.name
+			}));
 			return;
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -65,7 +77,8 @@
 			loading.branches = false;
 		}
 	}
-	async function isBranchAlreadyUsed() {
+	async function isBranchAlreadyUsed(event) {
+		selected.branch = event.detail.value;
 		try {
 			const data = await get(
 				`/applications/${id}/configuration/repository.json?repository=${selected.repository}&branch=${selected.branch}`
@@ -143,6 +156,8 @@
 			return errorNotification(error);
 		}
 	}
+
+	console.log(reposSelectOptions, repositories);
 </script>
 
 {#if repositories.length === 0 && loading.repositories === false}
@@ -153,47 +168,33 @@
 {:else}
 	<form on:submit|preventDefault={handleSubmit} class="flex flex-col justify-center text-center">
 		<div class="flex-col space-y-3 md:space-y-0 space-x-1">
-			{#if loading.repositories}
-				<select name="repository" disabled class="w-96">
-					<option selected value="">Loading repositories...</option>
-				</select>
-			{:else}
-				<select
-					name="repository"
-					class="w-96"
-					bind:value={selected.repository}
-					on:change={loadBranches}
-				>
-					<option value="" disabled selected>Please select a repository</option>
-					{#each repositories as repository}
-						<option value={repository.full_name}>{repository.name}</option>
-					{/each}
-				</select>
-			{/if}
-			<input class="hidden" bind:value={selected.projectId} name="projectId" />
-			{#if loading.branches}
-				<select name="branch" disabled class="w-96">
-					<option selected value="">Loading branches...</option>
-				</select>
-			{:else}
-				<select
-					name="branch"
-					class="w-96"
-					disabled={!selected.repository}
-					bind:value={selected.branch}
-					on:change={isBranchAlreadyUsed}
-				>
-					{#if !selected.repository}
-						<option value="" disabled selected>Select a repository first</option>
-					{:else}
-						<option value="" disabled selected>Please select a branch</option>
-					{/if}
-
-					{#each branches as branch}
-						<option value={branch.name}>{branch.name}</option>
-					{/each}
-				</select>
-			{/if}
+			<div class="flex gap-4">
+				<div class="custom-select-wrapper">
+					<Select
+						placeholder={loading.repositories
+							? 'Loading repositories ...'
+							: 'Please select a repository'}
+						id="repository"
+						on:select={loadBranches}
+						items={reposSelectOptions}
+						isDisabled={loading.repositories}
+					/>
+				</div>
+				<input class="hidden" bind:value={selected.projectId} name="projectId" />
+				<div class="custom-select-wrapper">
+					<Select
+						placeholder={loading.branches
+							? 'Loading branches ...'
+							: !selected.repository
+							? 'Please select a repository first'
+							: 'Please select a branch'}
+						id="repository"
+						on:select={isBranchAlreadyUsed}
+						items={branchSelectOptions}
+						isDisabled={loading.branches || !selected.repository}
+					/>
+				</div>
+			</div>
 		</div>
 		<div class="pt-5 flex-col flex justify-center items-center space-y-4">
 			<button
