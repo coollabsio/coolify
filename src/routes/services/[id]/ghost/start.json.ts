@@ -111,7 +111,6 @@ export const post: RequestHandler = async (event) => {
 				}
 			}
 		};
-		console.log(JSON.stringify(composeFile.volumes));
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 

@@ -10,6 +10,7 @@
 	import { goto } from '$app/navigation';
 	import N8n from '$lib/components/svg/services/N8n.svelte';
 	import UptimeKuma from '$lib/components/svg/services/UptimeKuma.svelte';
+	import Ghost from '$lib/components/svg/services/Ghost.svelte';
 
 	export let services;
 	async function newService() {
@@ -64,6 +65,8 @@
 						<N8n isAbsolute />
 					{:else if service.type === 'uptimekuma'}
 						<UptimeKuma isAbsolute />
+					{:else if service.type === 'ghost'}
+						<Ghost isAbsolute />
 					{/if}
 					<div class="font-bold text-xl text-center truncate">
 						{service.name}
