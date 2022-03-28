@@ -16,6 +16,7 @@
 		"db:generate": "prisma generate",
 		"db:push": "prisma db push && prisma generate",
 		"db:seed": "prisma db seed",
+		"db:migrate": "COOLIFY_DATABASE_URL=file:../db/migration.db prisma migrate dev --skip-seed --name",
 		"release:staging": "cross-var docker build -t coollabsio/coolify:$npm_package_version . && docker push coollabsio/coolify:$npm_package_version",
 		"release:pre": "cross-var docker build -t coollabsio/coolify:$npm_package_version -t coollabsio/coolify:latest .",
 		"release:coolify": "cross-var yarn release:pre && docker push coollabsio/coolify:$npm_package_version && docker push coollabsio/coolify:latest",

@@ -3,9 +3,14 @@ node_modules
 /build
 /.svelte-kit
 /package
+/yarn.lock
+/.pnpm-store
+/ssl
 
 .env
+.env.prod
 .env.stag
 /db/*.db
 /db/*.db-journal
 /data/haproxy/haproxy.cfg
+/data/haproxy/haproxy.cfg.lkg

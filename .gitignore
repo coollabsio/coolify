@@ -4,6 +4,8 @@ node_modules
 /.svelte-kit
 /package
 /yarn.lock
+/.pnpm-store
+/ssl
 
 .env
 .env.prod
