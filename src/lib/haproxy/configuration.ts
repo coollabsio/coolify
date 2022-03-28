@@ -194,7 +194,8 @@ export async function configureHAProxy() {
 				minio: true,
 				plausibleAnalytics: true,
 				vscodeserver: true,
-				wordpress: true
+				wordpress: true,
+				ghost: true
 			}
 		});
 

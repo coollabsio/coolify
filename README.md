@@ -2,13 +2,13 @@
 
 An open-source & self-hostable Heroku / Netlify alternative.
 
-## Demo instance
+## Live Demo
 
 https://demo.coolify.io/
 
 (If it is unresponsible, that means someone overloaded the server. 🙃)
 
-## Installation
+## How to install
 
 Installation is automated with the following command:
 
@@ -16,13 +16,13 @@ Installation is automated with the following command:
 /bin/bash -c "$(curl -fsSL https://get.coollabs.io/coolify/install.sh)"
 ```
 
-## Migration from v1
-
-A fresh installation is necessary. v2 is not compatible with v1.
+If you would like no questions during installation
 
 ## Features
+
 ### Git Sources
-You can use the official ones or your self hosted version!
+
+You can use the following Git Sources to be auto-deployed to your Coolifyt instance! (Self hosted versions also supported.)
 
 - Github
 - GitLab
@@ -30,12 +30,15 @@ You can use the official ones or your self hosted version!
 
 ### Destinations
 
+You can deploy your applications to the following destinations:
+
 - Local Docker Engine
 - Remote Docker Engine (WIP)
 - Kubernetes (WIP)
 
-
 ### Applications
+
+These are the predefined build packs, but with the Docker build pack, you can host basically anything that is hostable with a single Dockerfile.
 
 - Static sites
 - NodeJS
@@ -48,9 +51,11 @@ You can use the official ones or your self hosted version!
 - Svelte
 - PHP
 - Rust
-- Dockerfile (you can provide it)
+- Docker
 
 ### Databases
+
+One-click database is ready to be used internally or shared over the internet:
 
 - MongoDB
 - MySQL
@@ -60,13 +65,22 @@ You can use the official ones or your self hosted version!
 
 ### One-click services
 
+You can host cool open-source services as well:
+
 - [WordPress](https://wordpress.org)
+- [Ghost](https://ghost.org)
 - [Plausible Analytics](https://plausible.io)
 - [NocoDB](https://nocodb.com)
 - [VSCode Server](https://github.com/cdr/code-server)
 - [MinIO](https://min.io)
 - [VaultWarden](https://github.com/dani-garcia/vaultwarden)
+- [LanguageTool](https://languagetool.org)
+- [n8n](https://n8n.io)
+- [Uptime Kuma](https://github.com/louislam/uptime-kuma)
 
+## Migration from v1
+
+A fresh installation is necessary. v2 is not compatible with v1.
 
 ## Support
 
@@ -75,9 +89,9 @@ You can use the official ones or your self hosted version!
 - Email: [andras@coollabs.io](mailto:andras@coollabs.io)
 - Discord: [Invitation](https://discord.gg/xhBCC7eGKw)
 
-## Roadmap
+## Contribute
 
-[See the Roadmap here](https://github.com/orgs/coollabsio/projects/3/views/8)
+See [our contribution guide](./CONTRIBUTING.md).
 
 ## License
 
