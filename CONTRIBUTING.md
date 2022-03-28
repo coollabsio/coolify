@@ -14,7 +14,7 @@ First of all, thank you for considering to contribute to my project! It means a 
 - Clone your fork repo to local
 - Create a new branch
 - Push to your fork repo
-- Create a pull request: https://github.com/louislam/uptime-kuma/compare
+- Create a pull request: https://github.com/coollabsio/compare
 - Write a proper description
 - Click "Change to draft"
 
