@@ -78,7 +78,8 @@ export async function getApplicationWebhook({ projectId, branch }) {
 				destinationDocker: true,
 				settings: true,
 				gitSource: { include: { githubApp: true, gitlabApp: true } },
-				secrets: true
+				secrets: true,
+				persistentStorage: true
 			}
 		});
 		if (!application) {
