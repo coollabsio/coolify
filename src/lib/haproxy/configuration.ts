@@ -33,6 +33,7 @@ frontend http
   bind :80
   bind :443 ssl crt /usr/local/etc/haproxy/ssl/ alpn h2,http/1.1
   acl is_certbot path_beg /.well-known/acme-challenge/
+
   {{#applications}}
   {{#isHttps}}
   http-request redirect scheme https code ${
@@ -43,6 +44,7 @@ frontend http
 		dev ? 302 : 301
 	} if { req.hdr(host) -i {{redirectTo}} }
   {{/applications}}
+
   {{#services}}
   {{#isHttps}}
   http-request redirect scheme https code ${
@@ -53,6 +55,7 @@ frontend http
 		dev ? 302 : 301
 	} if { req.hdr(host) -i {{redirectTo}} }
   {{/services}}
+
   {{#coolify}}
   {{#isHttps}}
   http-request redirect scheme https code ${
@@ -63,6 +66,7 @@ frontend http
 		dev ? 302 : 301
 	} if { req.hdr(host) -i {{redirectTo}} }
   {{/coolify}}
+
   use_backend backend-certbot if is_certbot
   use_backend %[req.hdr(host),lower]
 
@@ -82,6 +86,13 @@ backend backend-certbot
 # updatedAt={{updatedAt}}
 backend {{domain}}
   option forwardfor
+  {{#isHttps}}
+  http-request add-header X-Forwarded-Proto https
+  {{/isHttps}}
+  {{^isHttps}}
+  http-request add-header X-Forwarded-Proto http
+  {{/isHttps}}
+  http-request add-header X-Forwarded-Host %[req.hdr(host),lower]
   server {{id}} {{id}}:{{port}}
 {{/isRunning}}
 {{/applications}}
@@ -91,6 +102,13 @@ backend {{domain}}
 # updatedAt={{updatedAt}}
 backend {{domain}}
   option forwardfor
+  {{#isHttps}}
+  http-request add-header X-Forwarded-Proto https
+  {{/isHttps}}
+  {{^isHttps}}
+  http-request add-header X-Forwarded-Proto http
+  {{/isHttps}}
+  http-request add-header X-Forwarded-Host %[req.hdr(host),lower]
   server {{id}} {{id}}:{{port}}
 {{/isRunning}}
 {{/services}}
@@ -99,6 +117,13 @@ backend {{domain}}
 backend {{domain}}
   option forwardfor
   option httpchk GET /undead.json
+  {{#isHttps}}
+  http-request add-header X-Forwarded-Proto https
+  {{/isHttps}}
+  {{^isHttps}}
+  http-request add-header X-Forwarded-Proto http
+  {{/isHttps}}
+  http-request add-header X-Forwarded-Host %[req.hdr(host),lower]
   server {{id}} {{id}}:{{port}} check fall 10
 {{/coolify}}
 `;
