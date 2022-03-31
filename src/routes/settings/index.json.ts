@@ -66,14 +66,9 @@ export const post: RequestHandler = async (event) => {
 	const { fqdn, isRegistrationEnabled, dualCerts, minPort, maxPort } = await event.request.json();
 	try {
 		const { id } = await db.listSettings();
-		if (isRegistrationEnabled) {
-			await db.prisma.setting.update({ where: { id }, data: { isRegistrationEnabled } });
-		}
+		await db.prisma.setting.update({ where: { id }, data: { isRegistrationEnabled, dualCerts } });
 		if (fqdn) {
 			await db.prisma.setting.update({ where: { id }, data: { fqdn } });
-		}
-		if (dualCerts) {
-			await db.prisma.setting.update({ where: { id }, data: { dualCerts } });
 		}
 		if (minPort && maxPort) {
 			await db.prisma.setting.update({ where: { id }, data: { minPort, maxPort } });
