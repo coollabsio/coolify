@@ -13,6 +13,8 @@ declare namespace App {
 		isRunning: boolean;
 		appId: string;
 		readOnly: boolean;
+		source: string;
+		settings: string;
 	}
 }
 

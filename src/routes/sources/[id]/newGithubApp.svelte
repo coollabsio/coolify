@@ -30,8 +30,7 @@
 
 <script>
 	import { dev } from '$app/env';
-	import { getDomain } from '$lib/components/common';
-	import { dashify } from '$lib/github';
+	import { getDomain, dashify } from '$lib/components/common';
 
 	export let source;
 	export let settings;
