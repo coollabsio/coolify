@@ -243,9 +243,7 @@
 
 		const url = `/applications/${id}/configuration/repository.json`;
 		try {
-			const repository = `${selected.group.full_path.replace('-personal', '')}/${
-				selected.project.name
-			}`;
+			const repository = selected.project.path_with_namespace;
 			await post(url, {
 				repository,
 				branch: selected.branch.name,

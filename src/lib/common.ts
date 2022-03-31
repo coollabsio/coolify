@@ -129,9 +129,8 @@ export const removeDestinationDocker = async ({ id, engine }) => {
 };
 
 export const createDirectories = async ({ repository, buildId }) => {
-	const dashedRepository = dashify(repository);
-	const repodir = `/tmp/build-sources/${dashedRepository}/`;
-	const workdir = `/tmp/build-sources/${dashedRepository}/${buildId}`;
+	const repodir = `/tmp/build-sources/${repository}/`;
+	const workdir = `/tmp/build-sources/${repository}/${buildId}`;
 
 	await asyncExecShell(`mkdir -p ${workdir}`);
 
