@@ -53,8 +53,8 @@ export const post: RequestHandler = async (event) => {
 				'sha256=' + hmac.update(JSON.stringify(body)).digest('hex'),
 				'utf8'
 			);
-			const checksum = Buffer.from(githubSignature, 'utf8');
 			if (!dev) {
+				const checksum = Buffer.from(githubSignature, 'utf8');
 				if (checksum.length !== digest.length || !crypto.timingSafeEqual(digest, checksum)) {
 					return {
 						status: 500,

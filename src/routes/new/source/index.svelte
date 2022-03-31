@@ -48,7 +48,7 @@
 </div>
 
 <div class="flex-col space-y-2 pb-10 text-center">
-	<div class="text-xl font-bold text-white">Offical providers</div>
+	<div class="text-xl font-bold text-white">Official providers</div>
 	<div class="flex justify-center space-x-2">
 		<button class="w-32" on:click={() => setPredefined('github')}>GitHub.com</button>
 		<button class="w-32" on:click={() => setPredefined('gitlab')}>GitLab.com</button>

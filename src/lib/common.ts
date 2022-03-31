@@ -2,7 +2,8 @@ import child from 'child_process';
 import util from 'util';
 import { dev } from '$app/env';
 import * as Sentry from '@sentry/node';
-import { uniqueNamesGenerator, Config, adjectives, colors, animals } from 'unique-names-generator';
+import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-generator';
+import type { Config } from 'unique-names-generator';
 
 import * as db from '$lib/database';
 import { buildLogQueue } from './queues';
@@ -107,11 +108,6 @@ export function getEngine(engine) {
 	return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : engine;
 }
 
-// export async function saveSshKey(destination) {
-// 	return await asyncExecShell(
-// 		`echo '${destination.sshPrivateKey}' > /tmp/id_rsa_${destination.id} && chmod 600 /tmp/id_rsa_${destination.id}`
-// 	);
-// }
 export async function removeContainer(id, engine) {
 	const host = getEngine(engine);
 	try {
@@ -133,8 +129,9 @@ export const removeDestinationDocker = async ({ id, engine }) => {
 };
 
 export const createDirectories = async ({ repository, buildId }) => {
-	const repodir = `/tmp/build-sources/${repository}/`;
-	const workdir = `/tmp/build-sources/${repository}/${buildId}`;
+	const dashedRepository = dashify(repository);
+	const repodir = `/tmp/build-sources/${dashedRepository}/`;
+	const workdir = `/tmp/build-sources/${dashedRepository}/${buildId}`;
 
 	await asyncExecShell(`mkdir -p ${workdir}`);
 
@@ -150,4 +147,14 @@ export function generateTimestamp() {
 
 export function getDomain(domain) {
 	return domain?.replace('https://', '').replace('http://', '');
+}
+
+export function dashify(str: string, options?: any): string {
+	if (typeof str !== 'string') return str;
+	return str
+		.trim()
+		.replace(/\W/g, (m) => (/[À-ž]/.test(m) ? m : '-'))
+		.replace(/^-+|-+$/g, '')
+		.replace(/-{2,}/g, (m) => (options && options.condense ? '-' : m))
+		.toLowerCase();
 }
