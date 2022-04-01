@@ -3,14 +3,6 @@ WORKDIR /app
 COPY package*.json .
 RUN yarn install
 
-
-FROM rust:1.58.1-alpine3.14 as prisma
-WORKDIR /prisma
-ENV RUSTFLAGS="-C target-feature=-crt-static"
-RUN apk --no-cache add openssl direnv git musl-dev openssl-dev build-base perl protoc
-RUN git clone --depth=1 --branch=3.11.x https://github.com/prisma/prisma-engines.git /prisma 
-RUN cargo build --release
-
 FROM node:16.14.2-alpine 
 ARG TARGETPLATFORM
 
@@ -22,7 +14,8 @@ ENV PRISMA_QUERY_ENGINE_BINARY=/app/prisma-engines/query-engine \
   PRISMA_FMT_BINARY=/app/prisma-engines/prisma-fmt \
   PRISMA_CLI_QUERY_ENGINE_TYPE=binary \
   PRISMA_CLIENT_ENGINE_TYPE=binary
-COPY --from=prisma /prisma/target/release/query-engine /prisma/target/release/migration-engine /prisma/target/release/introspection-engine /prisma/target/release/prisma-fmt /app/prisma-engines/
+  
+COPY --from=coollabsio/prisma-engine:arm64 /prisma-engines/query-engine /prisma-engines/migration-engine /prisma-engines/introspection-engine /prisma-engines/prisma-fmt /app/prisma-engines/
 
 COPY --from=install /app/node_modules ./node_modules
 COPY . .
