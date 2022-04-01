@@ -46,7 +46,9 @@ export function ErrorHandler(e) {
 	if (e.message?.includes('git clone')) {
 		truncatedError.message = 'git clone failed';
 	}
-	sentry.captureException(truncatedError);
+	if (!e.message?.includes('Coolify Proxy is not running')) {
+		sentry.captureException(truncatedError);
+	}
 	const payload = {
 		status: truncatedError.status || 500,
 		body: {
