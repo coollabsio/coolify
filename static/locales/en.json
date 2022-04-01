@@ -1,0 +1,13 @@
+{
+	"layout": {
+		"update_done": "Update completed.",
+		"wait_new_version_startup": "Waiting for the new version to start...",
+		"new_version": "New version reachable. Reloading...",
+		"switch_to_a_different_team": "Switch to a different team...",
+		"update_available": "Update available"
+	},
+	"error": {
+		"you_can_find_your_way_back": "You can find your way back",
+		"here": "here"
+	}
+}

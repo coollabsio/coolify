@@ -20,6 +20,7 @@ specifiers:
   compare-versions: 4.1.3
   cookie: 0.4.2
   cooltipz-css: ^2.1.0
+  cross-env: ^7.0.3
   cross-var: 1.1.0
   cuid: 2.1.8
   dayjs: 1.11.0
@@ -45,6 +46,7 @@ specifiers:
   prisma: 3.11.1
   svelte: 3.46.4
   svelte-check: 2.4.6
+  svelte-i18n: ^3.3.13
   svelte-kit-cookie-session: 2.1.2
   svelte-preprocess: 4.10.4
   svelte-select: ^4.4.7
@@ -92,6 +94,7 @@ devDependencies:
   '@typescript-eslint/parser': 4.31.1_eslint@7.32.0+typescript@4.6.3
   '@zerodevx/svelte-toast': 0.7.1
   autoprefixer: 10.4.4_postcss@8.4.12
+  cross-env: 7.0.3
   cross-var: 1.1.0
   eslint: 7.32.0
   eslint-config-prettier: 8.5.0_eslint@7.32.0
@@ -105,6 +108,7 @@ devDependencies:
   prisma: 3.11.1
   svelte: 3.46.4
   svelte-check: 2.4.6_postcss@8.4.12+svelte@3.46.4
+  svelte-i18n: 3.3.13_svelte@3.46.4
   svelte-preprocess: 4.10.4_296873641a0ad9f42fe92172d27bcedd
   svelte-select: 4.4.7
   tailwindcss: 3.0.23_b89136460714832cdda11d1e9d57d1ff
@@ -178,6 +182,55 @@ packages:
       strip-json-comments: 3.1.1
     transitivePeerDependencies:
       - supports-color
+    dev: true
+
+  /@formatjs/ecma402-abstract/1.11.4:
+    resolution:
+      {
+        integrity: sha512-EBikYFp2JCdIfGEb5G9dyCkTGDmC57KSHhRQOC3aYxoPWVZvfWCDjZwkGYHN7Lis/fmuWl906bnNTJifDQ3sXw==
+      }
+    dependencies:
+      '@formatjs/intl-localematcher': 0.2.25
+      tslib: 2.3.1
+    dev: true
+
+  /@formatjs/fast-memoize/1.2.1:
+    resolution:
+      {
+        integrity: sha512-Rg0e76nomkz3vF9IPlKeV+Qynok0r7YZjL6syLz4/urSg0IbjPZCB/iYUMNsYA643gh4mgrX3T7KEIFIxJBQeg==
+      }
+    dependencies:
+      tslib: 2.3.1
+    dev: true
+
+  /@formatjs/icu-messageformat-parser/2.0.19:
+    resolution:
+      {
+        integrity: sha512-8HsLm9YLyVVIDMyBJb7wmve2wGd461cUwJ470eUog5YH5ZsF4p5lgvaJ+oGKxz1mrSMNNdDHU9v/NDsS+z+ilg==
+      }
+    dependencies:
+      '@formatjs/ecma402-abstract': 1.11.4
+      '@formatjs/icu-skeleton-parser': 1.3.6
+      tslib: 2.3.1
+    dev: true
+
+  /@formatjs/icu-skeleton-parser/1.3.6:
+    resolution:
+      {
+        integrity: sha512-I96mOxvml/YLrwU2Txnd4klA7V8fRhb6JG/4hm3VMNmeJo1F03IpV2L3wWt7EweqNLES59SZ4d6hVOPCSf80Bg==
+      }
+    dependencies:
+      '@formatjs/ecma402-abstract': 1.11.4
+      tslib: 2.3.1
+    dev: true
+
+  /@formatjs/intl-localematcher/0.2.25:
+    resolution:
+      {
+        integrity: sha512-YmLcX70BxoSopLFdLr1Ds99NdlTI2oWoLbaUW2M406lxOIPzE1KQhRz2fPUkq34xVZQaihCoU29h0KK7An3bhA==
+      }
+    dependencies:
+      tslib: 2.3.1
     dev: true
 
   /@humanwhocodes/config-array/0.5.0:
@@ -2081,6 +2134,17 @@ packages:
       luxon: 1.28.0
     dev: false
 
+  /cross-env/7.0.3:
+    resolution:
+      {
+        integrity: sha512-+/HKd6EgcQCJGh2PSjZuUitQBQynKor4wrFbRg4DtAgS1aWO+gU52xpH7M9ScGgXSYmAVS9bIJ8EzuaGw0oNAw==
+      }
+    engines: { node: '>=10.14', npm: '>=6', yarn: '>=1' }
+    hasBin: true
+    dependencies:
+      cross-spawn: 7.0.3
+    dev: true
+
   /cross-spawn/5.1.0:
     resolution: { integrity: sha1-6L0O/uWPz/b4+UUQoKVUu/ojVEk= }
     dependencies:
@@ -2188,6 +2252,14 @@ packages:
       {
         integrity: sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ==
       }
+    dev: true
+
+  /deepmerge/4.2.2:
+    resolution:
+      {
+        integrity: sha512-FJ3UgI4gIl+PHZm53knsuSFpE+nESMr7M4v9QcgB7S63Kj/6WqMiFQJpBBYz1Pt+66bZpP3Q7Lye0Oo9MPKEdg==
+      }
+    engines: { node: '>=0.10.0' }
     dev: true
 
   /defer-to-connect/2.0.1:
@@ -3389,6 +3461,18 @@ packages:
       {
         integrity: sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==
       }
+
+  /intl-messageformat/9.12.0:
+    resolution:
+      {
+        integrity: sha512-5Q9j21JreB1G27/CqMYsA+pvJ19JjHyhiTSeUuvZK9BCDJGHtOLgpUUcGM+GLHiUuoVMKVeeX1smamiVHQrSKQ==
+      }
+    dependencies:
+      '@formatjs/ecma402-abstract': 1.11.4
+      '@formatjs/fast-memoize': 1.2.1
+      '@formatjs/icu-messageformat-parser': 2.0.19
+      tslib: 2.3.1
+    dev: true
 
   /invariant/2.2.4:
     resolution:
@@ -5157,6 +5241,24 @@ packages:
       svelte: '>=3.19.0'
     dependencies:
       svelte: 3.46.4
+    dev: true
+
+  /svelte-i18n/3.3.13_svelte@3.46.4:
+    resolution:
+      {
+        integrity: sha512-RQM+ys4+Y9ztH//tX22H1UL2cniLNmIR+N4xmYygV6QpQ6EyQvloZiENRew8XrVzfvJ8HaE8NU6/yurLkl7z3g==
+      }
+    engines: { node: '>= 11.15.0' }
+    hasBin: true
+    peerDependencies:
+      svelte: ^3.25.1
+    dependencies:
+      deepmerge: 4.2.2
+      estree-walker: 2.0.2
+      intl-messageformat: 9.12.0
+      sade: 1.7.4
+      svelte: 3.46.4
+      tiny-glob: 0.2.9
     dev: true
 
   /svelte-kit-cookie-session/2.1.2:
