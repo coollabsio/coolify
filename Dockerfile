@@ -1,29 +1,41 @@
-FROM node:17-alpine
-RUN apk add --no-cache g++ cmake make python3
+FROM node:16.14.2-alpine as install
 WORKDIR /app
 COPY package*.json .
 RUN yarn install
-COPY . .
-RUN yarn build
 
-FROM node:17-alpine
-WORKDIR /app
+
+FROM rust:1.58.1-alpine3.14 as prisma
+WORKDIR /prisma
+ENV RUSTFLAGS="-C target-feature=-crt-static"
+RUN apk --no-cache add openssl direnv git musl-dev openssl-dev build-base perl protoc
+RUN git clone --depth=1 --branch=3.11.x https://github.com/prisma/prisma-engines.git /prisma 
+RUN cargo build --release
+
+FROM node:16.14.2-alpine 
 ARG TARGETPLATFORM
-LABEL coolify.managed true
-RUN apk add --no-cache git openssh-client curl jq cmake sqlite
+
+WORKDIR /app
+
+ENV PRISMA_QUERY_ENGINE_BINARY=/app/prisma-engines/query-engine \
+  PRISMA_MIGRATION_ENGINE_BINARY=/app/prisma-engines/migration-engine \
+  PRISMA_INTROSPECTION_ENGINE_BINARY=/app/prisma-engines/introspection-engine \
+  PRISMA_FMT_BINARY=/app/prisma-engines/prisma-fmt \
+  PRISMA_CLI_QUERY_ENGINE_TYPE=binary \
+  PRISMA_CLIENT_ENGINE_TYPE=binary
+COPY --from=prisma /prisma/target/release/query-engine /prisma/target/release/migration-engine /prisma/target/release/introspection-engine /prisma/target/release/prisma-fmt /app/prisma-engines/
+
+COPY --from=install /app/node_modules ./node_modules
+COPY . .
+
+RUN apk add --no-cache git openssh-client curl jq sqlite
 RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@6
 RUN pnpm add -g pnpm
 
 RUN mkdir -p ~/.docker/cli-plugins/
-RUN curl -SL https://cdn.coollabs.io/bin/docker-20.10.9-$TARGETPLATFORM -o /usr/bin/docker
-RUN curl -SL https://cdn.coollabs.io/bin/docker-compose-linux-2.3.4-$TARGETPLATFORM -o ~/.docker/cli-plugins/docker-compose
+RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-20.10.9 -o /usr/bin/docker
+RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-compose-linux-2.3.4 -o ~/.docker/cli-plugins/docker-compose
 RUN chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker
 
-COPY --from=0 /app/docker-compose.yaml .
-COPY --from=0 /app/build .
-COPY --from=0 /app/package.json .
-COPY --from=0 /app/node_modules ./node_modules
-COPY --from=0 /app/prisma ./prisma
-
+RUN pnpm build
 EXPOSE 3000
 CMD ["pnpm", "start"]

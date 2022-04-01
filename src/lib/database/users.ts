@@ -1,5 +1,5 @@
 import cuid from 'cuid';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 import { prisma } from './common';
 import { asyncExecShell, uniqueName } from '$lib/common';
