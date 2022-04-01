@@ -20,6 +20,7 @@ specifiers:
   compare-versions: 4.1.3
   cookie: 0.4.2
   cooltipz-css: ^2.1.0
+  cross-env: ^7.0.3
   cross-var: 1.1.0
   cuid: 2.1.8
   dayjs: 1.11.0
@@ -92,6 +93,7 @@ devDependencies:
   '@typescript-eslint/parser': 4.31.1_eslint@7.32.0+typescript@4.6.3
   '@zerodevx/svelte-toast': 0.7.1
   autoprefixer: 10.4.4_postcss@8.4.12
+  cross-env: 7.0.3
   cross-var: 1.1.0
   eslint: 7.32.0
   eslint-config-prettier: 8.5.0_eslint@7.32.0
@@ -2080,6 +2082,17 @@ packages:
     dependencies:
       luxon: 1.28.0
     dev: false
+
+  /cross-env/7.0.3:
+    resolution:
+      {
+        integrity: sha512-+/HKd6EgcQCJGh2PSjZuUitQBQynKor4wrFbRg4DtAgS1aWO+gU52xpH7M9ScGgXSYmAVS9bIJ8EzuaGw0oNAw==
+      }
+    engines: { node: '>=10.14', npm: '>=6', yarn: '>=1' }
+    hasBin: true
+    dependencies:
+      cross-spawn: 7.0.3
+    dev: true
 
   /cross-spawn/5.1.0:
     resolution: { integrity: sha1-6L0O/uWPz/b4+UUQoKVUu/ojVEk= }
