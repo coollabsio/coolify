@@ -252,6 +252,9 @@ export const buildPacks = [
 	}
 ];
 export const scanningTemplates = {
+	'@sveltejs/kit': {
+		buildPack: 'nodejs'
+	},
 	astro: {
 		buildPack: 'astro'
 	},

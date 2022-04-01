@@ -49,11 +49,7 @@ export async function completeTransaction(transactionId) {
 }
 export async function deleteProxy({ id }) {
 	const haproxy = await haproxyInstance();
-	try {
-		await checkHAProxy(haproxy);
-	} catch (error) {
-		return 'Error: HAProxy is not running';
-	}
+	await checkHAProxy(haproxy);
 
 	let transactionId;
 	try {
