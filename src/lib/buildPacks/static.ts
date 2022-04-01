@@ -22,11 +22,11 @@ const createDockerfile = async (data, image): Promise<void> => {
 			if (secret.isBuildSecret) {
 				if (pullmergeRequestId) {
 					if (secret.isPRMRSecret) {
-						Dockerfile.push(`ARG ${secret.name} ${secret.value}`);
+						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
 					}
 				} else {
 					if (!secret.isPRMRSecret) {
-						Dockerfile.push(`ARG ${secret.name} ${secret.value}`);
+						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
 					}
 				}
 			}
