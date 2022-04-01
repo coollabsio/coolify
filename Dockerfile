@@ -15,7 +15,7 @@ ENV PRISMA_QUERY_ENGINE_BINARY=/app/prisma-engines/query-engine \
   PRISMA_CLI_QUERY_ENGINE_TYPE=binary \
   PRISMA_CLIENT_ENGINE_TYPE=binary
   
-COPY --from=coollabsio/prisma-engine:arm64 /prisma-engines/query-engine /prisma-engines/migration-engine /prisma-engines/introspection-engine /prisma-engines/prisma-fmt /app/prisma-engines/
+COPY --from=coollabsio/prisma-engine:latest /prisma-engines/query-engine /prisma-engines/migration-engine /prisma-engines/introspection-engine /prisma-engines/prisma-fmt /app/prisma-engines/
 
 COPY --from=install /app/node_modules ./node_modules
 COPY . .

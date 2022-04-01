@@ -8,7 +8,7 @@
 		"dev:stop": "docker-compose -f docker-compose-dev.yaml down",
 		"dev:logs": "docker-compose -f docker-compose-dev.yaml logs -f --tail 10",
 		"studio": "npx prisma studio",
-		"start": "npx prisma migrate deploy && npx prisma generate && npx prisma db seed && node index.js",
+		"start": "npx prisma migrate deploy && npx prisma generate && npx prisma db seed && node build/index.js",
 		"build": "svelte-kit build",
 		"preview": "svelte-kit preview",
 		"check": "svelte-check --tsconfig ./tsconfig.json",
