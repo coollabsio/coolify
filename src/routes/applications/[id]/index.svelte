@@ -110,8 +110,8 @@
 			await post(`/applications/${id}/check.json`, { fqdn: application.fqdn, forceSave });
 			await post(`/applications/${id}.json`, { ...application });
 			return window.location.reload();
-		} catch ({ error }) {
-			if (error.startsWith('DNS not set')) {
+		} catch (error) {
+			if (error?.startsWith('DNS not set')) {
 				forceSave = true;
 			}
 			return errorNotification(error);
