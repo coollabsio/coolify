@@ -8,7 +8,7 @@
 	<div class="title">MinIO Server</div>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="rootUser">Root User</label>
+	<label for="rootUser">{$t('forms.root_user')}</label>
 	<input
 		name="rootUser"
 		id="rootUser"
@@ -19,7 +19,7 @@
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="rootUserPassword">Root's Password</label>
+	<label for="rootUserPassword">{$t('forms.roots_password')}</label>
 	<CopyPasswordField
 		id="rootUserPassword"
 		isPasswordField
@@ -37,6 +37,6 @@
 		value={service.minio.publicPort}
 		disabled
 		readonly
-		placeholder="Generated automatically after start"
+		placeholder={$t('forms.generated_automatically_after_start')}
 	/>
 </div>

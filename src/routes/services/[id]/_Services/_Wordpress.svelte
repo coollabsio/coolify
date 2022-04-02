@@ -44,7 +44,7 @@ define('SUBDOMAIN_INSTALL', false);`
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="mysqlRootUser">Root User</label>
+	<label for="mysqlRootUser">{$t('forms.root_user')}</label>
 	<input
 		name="mysqlRootUser"
 		id="mysqlRootUser"
@@ -55,7 +55,7 @@ define('SUBDOMAIN_INSTALL', false);`
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="mysqlRootUserPassword">Root's Password</label>
+	<label for="mysqlRootUserPassword">{$t('forms.roots_password')}</label>
 	<CopyPasswordField
 		id="mysqlRootUserPassword"
 		isPasswordField

@@ -80,7 +80,7 @@
 	<label for="postgresqlPublicPort">Public Port</label>
 	<div class="col-span-2 ">
 		<CopyPasswordField
-			placeholder="Generated automatically after start"
+			placeholder="{ $t('forms.generated_automatically_after_start') }"
 			readonly
 			disabled
 			id="postgresqlPublicPort"

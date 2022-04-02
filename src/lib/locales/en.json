@@ -44,7 +44,15 @@
 		"port": "Port",
 		"default": "default",
 		"base_directory": "Base Directory",
-		"publish_directory": "Publish Directory"
+		"publish_directory": "Publish Directory",
+		"generated_automatically_after_start": "Generated automatically after start",
+		"roots_password": "Root's Password",
+		"root_user": "Root User",
+		"eg": "eg",
+		"user": "User",
+		"loading": "Loading...",
+		"version": "Version",
+		"host": "Host"
 	},
 	"register": {
 		"register": "Register",
@@ -155,5 +163,24 @@
 		"cant_activate_auto_deploy_without_repo": "Cannot activate automatic deployments until only one application is defined for this repository / branch.",
 		"no_applications_found": "No applications found"
 	},
-	"general": "General"
+	"general": "General",
+	"database": {
+		"default_database": "Default Database",
+		"generated_automatically_after_set_to_public": "Generated automatically after set to public",
+		"connection_string": "Connection String",
+		"set_public": "Set it public",
+		"warning_database_public": "Your database will be reachable over the internet. <br>Take security seriously in this case!",
+		"change_append_only_mode": "Change append only mode",
+		"warning_append_only": "Useful if you would like to restore redis data from a backup.<br><span class='font-bold text-white'>Database restart is required.</span>",
+		"select_database_type": "Select a Database type",
+		"select_database_version": "Select a Database version",
+		"confirm_stop": "Are you sure you would like to stop {name}?",
+		"stop_database": "Stop database",
+		"permission_denied_stop_database": "You do not have permission to stop the database.",
+		"start_database": "Start database",
+		"permission_denied_start_database": "You do not have permission to start the database.",
+		"delete_database": "Delete Database",
+		"permission_denied_delete_database": "You do not have permission to delete a Database",
+		"no_databases_found": "No databases found"
+	}
 }

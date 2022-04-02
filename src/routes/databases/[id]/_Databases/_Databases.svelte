@@ -15,6 +15,7 @@
 	import { browser } from '$app/env';
 	import { post } from '$lib/api';
 	import { getDomain } from '$lib/components/common';
+	import { t } from '$lib/translations';
 
 	const { id } = $page.params;
 	let loading = false;
@@ -45,7 +46,7 @@
 							: window.location.hostname
 						: database.id
 			  }:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`
-			: 'Loading...';
+			: $t('forms.loading');
 	}
 
 	async function changeSettings(name) {
@@ -78,20 +79,20 @@
 <div class="mx-auto max-w-4xl px-6">
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
 		<div class="flex space-x-1 pb-5 font-bold">
-			<div class="title">General</div>
+			<div class="title">{$t('general')}</div>
 			{#if $session.isAdmin}
 				<button
 					type="submit"
 					class:bg-purple-600={!loading}
 					class:hover:bg-purple-500={!loading}
-					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
+					disabled={loading}>{loading ? $t('forms.saving') : $t('forms.save')}</button
 				>
 			{/if}
 		</div>
 
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="grid grid-cols-2 items-center">
-				<label for="name" class="text-base font-bold text-stone-100">Name</label>
+				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 				<input
 					readonly={!$session.isAdmin}
 					name="name"
@@ -101,7 +102,9 @@
 				/>
 			</div>
 			<div class="grid grid-cols-2 items-center">
-				<label for="destination" class="text-base font-bold text-stone-100">Destination</label>
+				<label for="destination" class="text-base font-bold text-stone-100"
+					>{$t('application.destination')}</label
+				>
 				{#if database.destinationDockerId}
 					<div class="no-underline">
 						<input
@@ -116,16 +119,17 @@
 			</div>
 
 			<div class="grid grid-cols-2 items-center">
-				<label for="version" class="text-base font-bold text-stone-100">Version</label>
+				<label for="version" class="text-base font-bold text-stone-100">{$t('forms.version')}</label
+				>
 				<input value={database.version} readonly disabled class="bg-transparent " />
 			</div>
 		</div>
 
 		<div class="grid grid-flow-row gap-2 px-10 pt-2">
 			<div class="grid grid-cols-2 items-center">
-				<label for="host" class="text-base font-bold text-stone-100">Host</label>
+				<label for="host" class="text-base font-bold text-stone-100">{$t('forms.host')}</label>
 				<CopyPasswordField
-					placeholder="Generated automatically after start"
+					placeholder={$t('forms.generated_automatically_after_start')}
 					isPasswordField={false}
 					readonly
 					disabled
@@ -135,9 +139,10 @@
 				/>
 			</div>
 			<div class="grid grid-cols-2 items-center">
-				<label for="publicPort" class="text-base font-bold text-stone-100">Port</label>
+				<label for="publicPort" class="text-base font-bold text-stone-100">{$t('forms.port')}</label
+				>
 				<CopyPasswordField
-					placeholder="Generated automatically after set to public"
+					placeholder={$t('database.generated_automatically_after_set_to_public')}
 					id="publicPort"
 					readonly
 					disabled
@@ -159,10 +164,12 @@
 				<CouchDb bind:database />
 			{/if}
 			<div class="grid grid-cols-2 items-center px-10 pb-8">
-				<label for="url" class="text-base font-bold text-stone-100">Connection String</label>
+				<label for="url" class="text-base font-bold text-stone-100"
+					>{$t('database.connection_string')}</label
+				>
 				<CopyPasswordField
 					textarea={true}
-					placeholder="Generated automatically after start"
+					placeholder={$t('forms.generated_automatically_after_start')}
 					isPasswordField={false}
 					id="url"
 					name="url"
@@ -174,15 +181,15 @@
 		</div>
 	</form>
 	<div class="flex space-x-1 pb-5 font-bold">
-		<div class="title">Features</div>
+		<div class="title">{$t('application.features')}</div>
 	</div>
 	<div class="px-10 pb-10">
 		<div class="grid grid-cols-2 items-center">
 			<Setting
 				bind:setting={isPublic}
 				on:click={() => changeSettings('isPublic')}
-				title="Set it public"
-				description="Your database will be reachable over the internet. <br>Take security seriously in this case!"
+				title={$t('database.set_public')}
+				description={$t('database.warning_database_public')}
 			/>
 		</div>
 		{#if database.type === 'redis'}
@@ -190,8 +197,8 @@
 				<Setting
 					bind:setting={appendOnly}
 					on:click={() => changeSettings('appendOnly')}
-					title="Change append only mode"
-					description="Useful if you would like to restore redis data from a backup.<br><span class='font-bold text-white'>Database restart is required.</span>"
+					title={$t('database.change_append_only_mode')}
+					description={$t('database.warning_append_only')}
 				/>
 			</div>
 		{/if}

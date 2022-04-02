@@ -53,7 +53,7 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Select a Database type</div>
+	<div class="mr-4 text-2xl tracking-tight">{$t('database.select_database_type')}</div>
 </div>
 
 <div class="flex flex-wrap justify-center">

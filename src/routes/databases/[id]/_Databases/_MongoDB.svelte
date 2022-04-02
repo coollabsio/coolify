@@ -1,6 +1,7 @@
 <script>
 	export let database;
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
+	import { t } from '$lib/translations';
 </script>
 
 <div class="flex space-x-1 py-5 font-bold">
@@ -8,9 +9,9 @@
 </div>
 <div class="space-y-2 px-10">
 	<div class="grid grid-cols-2 items-center">
-		<label for="rootUser" class="text-base font-bold text-stone-100">Root User</label>
+		<label for="rootUser" class="text-base font-bold text-stone-100">{$t('forms.root_user')}</label>
 		<CopyPasswordField
-			placeholder="Generated automatically after start"
+			placeholder={$t('forms.generated_automatically_after_start')}
 			id="rootUser"
 			readonly
 			disabled
@@ -19,9 +20,11 @@
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center">
-		<label for="rootUserPassword" class="text-base font-bold text-stone-100">Root's Password</label>
+		<label for="rootUserPassword" class="text-base font-bold text-stone-100"
+			>{$t('forms.roots_password')}</label
+		>
 		<CopyPasswordField
-			placeholder="Generated automatically after start"
+			placeholder={$t('forms.generated_automatically_after_start')}
 			isPasswordField={true}
 			readonly
 			disabled
