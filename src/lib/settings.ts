@@ -1,4 +1,4 @@
-export const publicPaths = [
+const publicPaths = [
 	'/login',
 	'/register',
 	'/reset',
@@ -8,3 +8,7 @@ export const publicPaths = [
 	'/webhooks/github/install',
 	'/webhooks/gitlab'
 ];
+
+export function isPublicPath(path: string): boolean {
+	return publicPaths.includes(path);
+}

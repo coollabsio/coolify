@@ -22,10 +22,11 @@
 <script lang="ts">
 	export let sources;
 	import { session } from '$app/stores';
+	import { t } from '$lib/translations';
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Git Sources</div>
+	<div class="mr-4 text-2xl tracking-tight">{$t('index.git_sources')}</div>
 	{#if $session.isAdmin}
 		<a href="/new/source" sveltekit:prefetch class="add-icon bg-orange-600 hover:bg-orange-500">
 			<svg
@@ -47,7 +48,7 @@
 <div class="flex justify-center">
 	{#if !sources || sources.length === 0}
 		<div class="flex-col">
-			<div class="text-center text-xl font-bold">No git sources found</div>
+			<div class="text-center text-xl font-bold">{$t('sources.no_git_sources_found')}</div>
 		</div>
 	{:else}
 		<div class="flex flex-wrap justify-center">
@@ -62,7 +63,7 @@
 						<div class="font-bold text-xl text-center truncate">{source.name}</div>
 						{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && !source.githubAppId && !source.githubApp?.installationId)}
 							<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
-								Configuration missing
+								{$t('application.configuration_missing')}
 							</div>
 						{:else}
 							<div class="truncate text-center">{source.htmlUrl}</div>

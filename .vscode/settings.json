@@ -1,7 +1,5 @@
 {
-	"i18n-ally.localesPaths": ["locales"],
+	"i18n-ally.localesPaths": ["static/locales"],
 	"i18n-ally.keystyle": "nested",
-	"i18n-ally.extract.ignoredByFiles": {
-		"src\\routes\\__layout.svelte": ["Coolify", "coolLabs logo"]
-	}
+	"i18n-ally.extract.ignored": ["Coolify", "coolLabs logo"]
 }

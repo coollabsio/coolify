@@ -1,0 +1,66 @@
+{
+	"layout": {
+		"update_done": "Mise à jour réalisée.",
+		"wait_new_version_startup": "En attente du démarrage de la nouvelle version...",
+		"new_version": "Nouvel version accessible. Rafraichissement de la page...",
+		"switch_to_a_different_team": "Changer d'équipe...",
+		"update_available": "Mise à jour disponible"
+	},
+	"error": {
+		"you_can_find_your_way_back": "Vous ne trouvez pas votre chemin ?",
+		"here": "Ici",
+		"oops_your_lost": "Oups vous êtes perdu ! \nMais n'ayez pas peur !",
+		"generic_message": "Oups, quelque chose ne va pas, ça va ?"
+	},
+	"dashboard": "Tableau de bord",
+	"index": {
+		"applications": "Applications",
+		"databases": "Bases de données",
+		"destinations": "Destinations",
+		"git_sources": "Sources Git",
+		"services": "Services",
+		"teams": "Équipes"
+	},
+	"application": {
+		"no_applications_found": "Aucune application trouvée",
+		"app": {
+			"error_double_app_for_one_branch": "Impossible d'activer les déploiements automatiques tant qu'une seule application n'est pas définie pour ce référentiel/branche."
+		},
+		"configuration_missing": "Configuration manquante"
+	},
+	"forms": {
+		"email": "E-mail",
+		"name": "Nom",
+		"password": "Mot de passe",
+		"password_again": "Retaper le mot de passe"
+	},
+	"general": "Général",
+	"login": {
+		"already_logged_in": "Déjà connecté...",
+		"authenticating": "Authentification...",
+		"login": "Connexion"
+	},
+	"register": {
+		"passwords_do_not_match": "Les mots de passe ne correspondent pas.",
+		"register": "S'inscrire",
+		"register_first_user": "Vous enregistrez le premier utilisateur. \nCe sera l'administrateur de votre instance Coolify."
+	},
+	"reset_password": {
+		"invalid_secret_key": "Clé secrète invalide.",
+		"reset_password": "Réinitialiser le mot de passe"
+	},
+	"save": "Enregistrer",
+	"saving": "Enregistrement...",
+	"sources": {
+		"no_git_sources_found": "Aucune source git trouvée",
+		"source": {
+			"change_app_settings": "Modifier les paramètres de l'application {name}",
+			"create_new_github_app": "Créer une nouvelle application GitHub",
+			"delete_git_source": "Supprimer la source Git",
+			"install_repositories": "Installer les référentiels",
+			"new_github_app": "Nouvelle application Github",
+			"permission_denied_delete_git_source": "Vous n'êtes pas autorisé à supprimer une source Git",
+			"sure_to_delete": "Êtes-vous sûr de vouloir supprimer"
+		}
+	}
+}
