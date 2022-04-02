@@ -255,9 +255,9 @@
 				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/secrets`}
 			>
 				<button
-					title="Environment Variables"
+					title="Secret"
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-					data-tooltip="Environment Variables"
+					data-tooltip="Secret"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
