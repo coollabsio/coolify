@@ -26,6 +26,7 @@
 	import { getDomain } from '$lib/components/common';
 	import { page } from '$app/stores';
 	import { get } from '$lib/api';
+	import { t } from '$lib/translations';
 
 	const { id } = $page.params;
 
@@ -37,17 +38,20 @@
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">
-		Secrets for <a href={application.fqdn} target="_blank">{getDomain(application.fqdn)}</a>
+		{$t('application.secrets.secrets_for')}
+		<a href={application.fqdn} target="_blank">{getDomain(application.fqdn)}</a>
 	</div>
 </div>
 <div class="mx-auto max-w-6xl rounded-xl px-6 pt-4">
 	<table class="mx-auto border-separate text-left">
 		<thead>
 			<tr class="h-12">
-				<th scope="col">Name</th>
-				<th scope="col">Value</th>
-				<th scope="col" class="w-64 text-center">Need during buildtime?</th>
-				<th scope="col" class="w-96 text-center">Action</th>
+				<th scope="col">{$t('forms.name')}</th>
+				<th scope="col">{$t('forms.value')}</th>
+				<th scope="col" class="w-64 text-center"
+					>{$t('application.preview.need_during_buildtime')}</th
+				>
+				<th scope="col" class="w-96 text-center">{$t('forms.action')}</th>
 			</tr>
 		</thead>
 		<tbody>

@@ -12,6 +12,7 @@
 	import { del, post } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { errorNotification } from '$lib/form';
+	import { t } from '$lib/translations';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { createEventDispatcher } from 'svelte';
 
@@ -31,8 +32,8 @@
 		}
 	}
 	async function saveSecret(isNew = false) {
-		if (!name) return errorNotification('Name is required.');
-		if (!value) return errorNotification('Value is required.');
+		if (!name) return errorNotification(`${$t('forms.name')} ${$t('forms.is_required')}`);
+		if (!value) return errorNotification(`${$t('forms.value')} ${$t('forms.is_required')}`);
 		try {
 			await post(`/applications/${id}/secrets.json`, {
 				name,
@@ -47,7 +48,7 @@
 				value = '';
 				isBuildSecret = false;
 			}
-			toast.push('Secret saved.');
+			toast.push($t('application.secrets.secret_saved'));
 		} catch ({ error }) {
 			return errorNotification(error);
 		}
@@ -93,7 +94,7 @@
 		class:cursor-not-allowed={!isNewSecret}
 		class:cursor-pointer={isNewSecret}
 	>
-		<span class="sr-only">Use isBuildSecret</span>
+		<span class="sr-only">{$t('application.secrets.use_isbuildsecret')}</span>
 		<span
 			class="pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
 			class:translate-x-5={isBuildSecret}
@@ -133,16 +134,20 @@
 <td>
 	{#if isNewSecret}
 		<div class="flex items-center justify-center">
-			<button class="bg-green-600 hover:bg-green-500" on:click={() => saveSecret(true)}>Add</button>
+			<button class="bg-green-600 hover:bg-green-500" on:click={() => saveSecret(true)}
+				>{$t('forms.add')}</button
+			>
 		</div>
 	{:else}
 		<div class="flex flex-row justify-center space-x-2">
 			<div class="flex items-center justify-center">
-				<button class="" on:click={() => saveSecret(false)}>Set</button>
+				<button class="" on:click={() => saveSecret(false)}>{$t('forms.set')}</button>
 			</div>
 			{#if !isPRMRSecret}
 				<div class="flex justify-center items-end">
-					<button class="bg-red-600 hover:bg-red-500" on:click={removeSecret}>Remove</button>
+					<button class="bg-red-600 hover:bg-red-500" on:click={removeSecret}
+						>{$t('forms.remove')}</button
+					>
 				</div>
 			{/if}
 		</div>

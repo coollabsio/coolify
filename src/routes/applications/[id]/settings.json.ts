@@ -1,6 +1,7 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
+import { t } from '$lib/translations';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler = async (event) => {
@@ -14,8 +15,7 @@ export const post: RequestHandler = async (event) => {
 		const isDouble = await db.checkDoubleBranch(branch, projectId);
 		if (isDouble && autodeploy) {
 			throw {
-				message:
-					'Cannot activate automatic deployments until only one application is defined for this repository / branch.'
+				message: t.get('application.cant_activate_auto_deploy_without_repo')
 			};
 		}
 		await db.setApplicationSettings({ id, debug, previews, dualCerts, autodeploy });

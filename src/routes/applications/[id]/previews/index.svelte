@@ -31,6 +31,7 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
 	import { toast } from '@zerodevx/svelte-toast';
+	import { t } from '$lib/translations';
 
 	const { id } = $page.params;
 	async function refreshSecrets() {
@@ -61,10 +62,12 @@
 		<table class="mx-auto border-separate text-left">
 			<thead>
 				<tr class="h-12">
-					<th scope="col">Name</th>
-					<th scope="col">Value</th>
-					<th scope="col" class="w-64 text-center">Need during buildtime?</th>
-					<th scope="col" class="w-96 text-center">Action</th>
+					<th scope="col">{$t('forms.name')}</th>
+					<th scope="col">{$t('forms.value')}</th>
+					<th scope="col" class="w-64 text-center"
+						>{$t('application.preview.need_during_buildtime')}</th
+					>
+					<th scope="col" class="w-96 text-center">{$t('forms.action')}</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -90,8 +93,8 @@
 	<Explainer
 		customClass="w-full"
 		text={applicationSecrets.length === 0
-			? "You can add secrets to PR/MR deployments. Please add secrets to the application first. <br>Useful for creating <span class='text-green-500 font-bold'>staging</span> environments."
-			: "These values overwrite application secrets in PR/MR deployments. Useful for creating <span class='text-green-500 font-bold'>staging</span> environments."}
+			? $t('application.preview.setup_secret_app_first')
+			: $t('application.preview.values_overwriting_app_secrets')}
 	/>
 </div>
 <div class="mx-auto max-w-4xl py-10">
@@ -105,13 +108,15 @@
 				</a>
 				<div class="flex items-center justify-center">
 					<button class="bg-coollabs hover:bg-coollabs-100" on:click={() => redeploy(container)}
-						>Redeploy</button
+						>{$t('application.preview.redeploy')}</button
 					>
 				</div>
 			{/each}
 		{:else}
 			<div class="flex-col">
-				<div class="text-center font-bold text-xl">No previews available</div>
+				<div class="text-center font-bold text-xl">
+					{$t('application.preview.no_previews_available')}
+				</div>
 			</div>
 		{/if}
 	</div>

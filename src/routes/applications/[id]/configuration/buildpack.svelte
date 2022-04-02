@@ -213,7 +213,7 @@
 {:else}
 	{#if packageManager === 'yarn' || packageManager === 'pnpm'}
 		<div class="flex justify-center p-6">
-			{@html $t('application.configuration.found_lock_file')}
+			{@html $t('application.configuration.found_lock_file', { packageManager })}
 		</div>
 	{/if}
 	<div class="max-w-7xl mx-auto flex flex-wrap justify-center">

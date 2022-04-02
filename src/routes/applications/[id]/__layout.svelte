@@ -77,6 +77,7 @@
 	import { goto } from '$app/navigation';
 	import { gitTokens } from '$lib/store';
 	import { toast } from '@zerodevx/svelte-toast';
+	import { t } from '$lib/translations';
 
 	if (githubToken) $gitTokens.githubToken = githubToken;
 	if (gitlabToken) $gitTokens.gitlabToken = gitlabToken;
@@ -87,7 +88,7 @@
 	async function handleDeploySubmit() {
 		try {
 			const { buildId } = await post(`/applications/${id}/deploy.json`, { ...application });
-			toast.push('Deployment queued.');
+			toast.push($t('application.deployment_queued'));
 			console.log($page.url);
 			if ($page.url.pathname.startsWith(`/applications/${id}/logs/build`)) {
 				return window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
@@ -102,7 +103,7 @@
 	}
 
 	async function deleteApplication(name) {
-		const sure = confirm(`Are you sure you would like to delete '${name}'?`);
+		const sure = confirm($t('application.confirm_to_delete', { name }));
 		if (sure) {
 			loading = true;
 			try {
@@ -132,13 +133,13 @@
 			{#if isRunning}
 				<button
 					on:click={stopApplication}
-					title="Stop application"
+					title={$t('application.stop_application')}
 					type="submit"
 					disabled={!$session.isAdmin}
 					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
 					data-tooltip={$session.isAdmin
-						? 'Stop application'
-						: 'You do not have permission to stop the application.'}
+						? $t('application.stop_application')
+						: $t('application.permission_denied_stop_application')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -157,13 +158,13 @@
 				</button>
 				<form on:submit|preventDefault={handleDeploySubmit}>
 					<button
-						title="Rebuild application"
+						title={$t('application.rebuild_application')}
 						type="submit"
 						disabled={!$session.isAdmin}
 						class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:text-green-500"
 						data-tooltip={$session.isAdmin
-							? 'Rebuild application'
-							: 'You do not have permission to rebuild application.'}
+							? $t('application.rebuild_application')
+							: $t('application.permission_denied_rebuild_application')}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -186,13 +187,13 @@
 			{:else}
 				<form on:submit|preventDefault={handleDeploySubmit}>
 					<button
-						title="Build and start application"
+						title={$t('application.build_and_start_application')}
 						type="submit"
 						disabled={!$session.isAdmin}
 						class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
 						data-tooltip={$session.isAdmin
-							? 'Build and start application'
-							: 'You do not have permission to Build and start application.'}
+							? $t('application.build_and_start_application')
+							: $t('application.permission_denied_build_and_start_application')}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -220,9 +221,9 @@
 				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}`}
 			>
 				<button
-					title="Configurations"
+					title={$t('application.configurations')}
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-					data-tooltip="Configurations"
+					data-tooltip={$t('application.configurations')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -255,9 +256,9 @@
 				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/secrets`}
 			>
 				<button
-					title="Secrets"
+					title={$t('application.secret')}
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-					data-tooltip="Secrets"
+					data-tooltip={$t('application.secret')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -286,9 +287,9 @@
 				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/storage`}
 			>
 				<button
-					title="Persistent Storage"
+					title={$t('application.persistent_storage')}
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-					data-tooltip="Persistent Storage"
+					data-tooltip={$t('application.persistent_storage')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -315,9 +316,9 @@
 				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/previews`}
 			>
 				<button
-					title="Previews"
+					title={$t('application.previews')}
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-					data-tooltip="Previews"
+					data-tooltip={$t('application.previews')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -347,9 +348,9 @@
 				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs`}
 			>
 				<button
-					title="Application Logs"
+					title={$t('application.logs')}
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500 "
-					data-tooltip="Application Logs"
+					data-tooltip={$t('application.logs')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -378,9 +379,9 @@
 				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs/build`}
 			>
 				<button
-					title="Build Logs"
+					title={$t('application.build_logs')}
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500 "
-					data-tooltip="Build Logs"
+					data-tooltip={$t('application.build_logs')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -409,14 +410,14 @@
 
 		<button
 			on:click={() => deleteApplication(application.name)}
-			title="Delete application"
+			title={$t('application.delete_application')}
 			type="submit"
 			disabled={!$session.isAdmin}
 			class:hover:text-red-500={$session.isAdmin}
 			class="icons bg-transparent  tooltip-bottom text-sm"
 			data-tooltip={$session.isAdmin
-				? 'Delete application'
-				: 'You do not have permission to delete this application'}
+				? $t('application.delete_application')
+				: $t('application.permission_denied_delete_application')}
 		>
 			<DeleteIcon />
 		</button>

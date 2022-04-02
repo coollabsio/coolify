@@ -27,6 +27,7 @@
 	import { getDomain } from '$lib/components/common';
 	import { get } from '$lib/api';
 	import { errorNotification } from '$lib/form';
+	import { t } from '$lib/translations';
 
 	let loadLogsInterval = null;
 	let logs = [];
@@ -75,7 +76,7 @@
 </div>
 <div class="flex flex-row justify-center space-x-2 px-10 pt-6">
 	{#if logs.length === 0}
-		<div class="text-xl font-bold tracking-tighter">Waiting for the logs...</div>
+		<div class="text-xl font-bold tracking-tighter">{$t('application.build.waiting_logs')}</div>
 	{:else}
 		<div class="relative">
 			<LoadingLogs />
