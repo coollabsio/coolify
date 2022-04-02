@@ -63,14 +63,20 @@
 		"type": "Type",
 		"html_url": "HTML URL",
 		"api_url": "API URL",
-		"organization": "Organization"
+		"organization": "Organization",
+		"new_password": "New password",
+		"super_secure_new_password": "Super secure new password",
+		"submit": "Submit"
 	},
 	"register": {
 		"register": "Register",
 		"first_user": "You are registering the first user. It will be the administrator of your Coolify instance."
 	},
 	"reset": {
-		"reset_password": "Reset password"
+		"reset_password": "Reset",
+		"invalid_secret_key": "Invalid secret key.",
+		"secret_key": "Secret Key",
+		"find_path_secret_key": "You can find it in ~/coolify/.env (COOLIFY_SECRET_KEY)"
 	},
 	"application": {
 		"configuration": {

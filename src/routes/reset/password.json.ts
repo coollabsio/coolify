@@ -1,6 +1,7 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import * as db from '$lib/database';
 import { ErrorHandler, hashPassword } from '$lib/database';
+import { t } from '$lib/translations';
 
 export const post: RequestHandler = async (event) => {
 	const { secretKey, user } = await event.request.json();
@@ -8,7 +9,7 @@ export const post: RequestHandler = async (event) => {
 		return {
 			status: 500,
 			body: {
-				error: 'Invalid secret key.'
+				error: t.get('reset.invalid_secret_key')
 			}
 		};
 	}

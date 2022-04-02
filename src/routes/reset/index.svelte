@@ -3,6 +3,7 @@
 	import { get, post } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { errorNotification } from '$lib/form';
+	import { t } from '$lib/translations';
 	import { toast } from '@zerodevx/svelte-toast';
 
 	let secretKey;
@@ -48,14 +49,14 @@
 		<line x1="5" y1="12" x2="11" y2="6" />
 	</svg>
 </div>
-<div class="pb-10 pt-24 text-center text-4xl font-bold">Reset Password</div>
+<div class="pb-10 pt-24 text-center text-4xl font-bold">{$t('reset.reset_password')}</div>
 <div class="flex items-center justify-center">
 	{#if password}
 		<table class="mx-2 text-left">
 			<thead class="mb-2">
 				<tr>
-					<th class="px-2">Email</th>
-					<th>New password</th>
+					<th class="px-2">{$t('forms.email')}</th>
+					<th>{$t('forms.new_password')}</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -67,11 +68,11 @@
 								id="newPassword"
 								name="newPassword"
 								bind:value={user.newPassword}
-								placeholder="Super secure new password"
+								placeholder={$t('forms.super_secure_new_password')}
 							/>
 							<button
 								class="mx-auto my-4 w-32 bg-coollabs hover:bg-coollabs-100"
-								on:click={() => resetPassword(user)}>Reset</button
+								on:click={() => resetPassword(user)}>{$t('reset.reset_password')}</button
 							></td
 						>
 					</tr>
@@ -80,16 +81,16 @@
 		</table>
 	{:else}
 		<form class="flex flex-col" on:submit|preventDefault={handleSubmit}>
-			<div class="text-center text-2xl py-2 font-bold">Secret Key</div>
+			<div class="text-center text-2xl py-2 font-bold">{$t('reset.secret_key')}</div>
 			<CopyPasswordField
 				isPasswordField={true}
 				id="secretKey"
 				name="secretKey"
 				bind:value={secretKey}
-				placeholder="You can find it in ~/coolify/.env (COOLIFY_SECRET_KEY)"
+				placeholder={$t('reset.find_path_secret_key')}
 			/>
 			<button type="submit" class="bg-coollabs hover:bg-coollabs-100 mx-auto w-32 my-4"
-				>Submit</button
+				>{$t('forms.submit')}</button
 			>
 		</form>
 	{/if}
