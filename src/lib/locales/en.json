@@ -17,7 +17,8 @@
 		"git_sources": "Git Sources",
 		"databases": "Databases",
 		"services": "Services",
-		"teams": "Teams"
+		"teams": "Teams",
+		"not_implemented_yet": "Not implemented yet"
 	},
 	"login": {
 		"already_logged_in": "Already logged in...",
@@ -31,7 +32,7 @@
 		"password_again": "Password again",
 		"save": "Save",
 		"saving": "Saving...",
-		"name": "name",
+		"name": "Name",
 		"value": "Value",
 		"action": "Action",
 		"is_required": "is required.",
@@ -56,7 +57,13 @@
 		"already_used_for": "<span class=\"text-red-500\">{type}</span> already used for",
 		"configuration": "Configuration",
 		"engine": "Engine",
-		"network": "Network"
+		"network": "Network",
+		"ip_address": "IP Address",
+		"ssh_private_key": "SSH Private Key",
+		"type": "Type",
+		"html_url": "HTML URL",
+		"api_url": "API URL",
+		"organization": "Organization"
 	},
 	"register": {
 		"register": "Register",
@@ -198,6 +205,26 @@
 		"restarting_please_wait": "Restarting... please wait...",
 		"force_restart_proxy": "Force restart proxy",
 		"use_coolify_proxy": "Use Coolify Proxy?",
-		"no_destination_found": "No destination found"
+		"no_destination_found": "No destination found",
+		"new_error_network_already_exists": "Network {network} already configured for another team!",
+		"new": {
+			"saving_and_configuring_proxy": "Saving and configuring proxy...",
+			"install_proxy": "This will install a proxy on the destination to allow you to access your applications and services without any manual configuration (recommended for Docker).<br><br>Databases will have their own proxy.",
+			"add_new_destination": "Add New Destination",
+			"predefined_destinations": "Predefined destinations"
+		}
+	},
+	"sources": {
+		"local_docker": "Local Docker",
+		"remote_docker": "Remote Docker",
+		"organization_explainer": "Fill it if you would like to use an organization's as your Git Source. Otherwise your user will be used."
+	},
+	"eg_https_api_github_com": "eg: https://api.github.com",
+	"eg_https_github_com": "eg: https://github.com",
+	"source": {
+		"new": {
+			"git_source": "Add New Git Source",
+			"official_providers": "Official providers"
+		}
 	}
 }

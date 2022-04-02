@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { t } from '$lib/translations';
+
 	import Github from './_Github.svelte';
 	import Gitlab from './_Gitlab.svelte';
 	let gitSource = {
@@ -44,11 +46,11 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Add New Git Source</div>
+	<div class="mr-4 text-2xl tracking-tight">{$t('source.new.git_source')}</div>
 </div>
 
 <div class="flex-col space-y-2 pb-10 text-center">
-	<div class="text-xl font-bold text-white">Official providers</div>
+	<div class="text-xl font-bold text-white">{$t('source.new.official_providers')}</div>
 	<div class="flex justify-center space-x-2">
 		<button class="w-32" on:click={() => setPredefined('github')}>GitHub.com</button>
 		<button class="w-32" on:click={() => setPredefined('gitlab')}>GitLab.com</button>
@@ -61,6 +63,6 @@
 	{:else if gitSource.type === 'gitlab'}
 		<Gitlab {gitSource} />
 	{:else if gitSource.type === 'bitbucket'}
-		<div class="text-center font-bold text-4xl py-10">Not implemented yet</div>
+		<div class="text-center font-bold text-4xl py-10">{$t('index.not_implemented_yet')}</div>
 	{/if}
 </div>

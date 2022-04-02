@@ -6,6 +6,7 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 
 	import { errorNotification } from '$lib/form';
+	import { t } from '$lib/translations';
 	import { onMount } from 'svelte';
 
 	let nameEl;
@@ -28,11 +29,11 @@
 	<div class="flex justify-center pb-8">
 		<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
 			<div class="flex h-8 items-center space-x-2">
-				<div class="text-xl font-bold text-white">Configuration</div>
-				<button type="submit" class="bg-orange-600 hover:bg-orange-500">Save</button>
+				<div class="text-xl font-bold text-white">{$t('forms.configuration')}</div>
+				<button type="submit" class="bg-orange-600 hover:bg-orange-500">{$t('forms.save')}</button>
 			</div>
 			<div class="grid grid-cols-2 items-center px-10">
-				<label for="type" class="text-base font-bold text-stone-100">Type</label>
+				<label for="type" class="text-base font-bold text-stone-100">{$t('forms.type')}</label>
 
 				<select name="type" id="type" class="w-96" bind:value={gitSource.type}>
 					<option value="github">GitHub</option>
@@ -41,7 +42,7 @@
 				</select>
 			</div>
 			<div class="grid grid-cols-2 items-center px-10">
-				<label for="name" class="text-base font-bold text-stone-100">Name</label>
+				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 				<input
 					name="name"
 					id="name"
@@ -53,23 +54,25 @@
 			</div>
 
 			<div class="grid grid-cols-2 items-center px-10">
-				<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
+				<label for="htmlUrl" class="text-base font-bold text-stone-100"
+					>{$t('forms.html_url')}</label
+				>
 				<input
 					type="url"
 					name="htmlUrl"
 					id="htmlUrl"
-					placeholder="eg: https://github.com"
+					placeholder="{$t('forms.eg')}: https://github.com"
 					required
 					bind:value={gitSource.htmlUrl}
 				/>
 			</div>
 			<div class="grid grid-cols-2 items-center px-10">
-				<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
+				<label for="apiUrl" class="text-base font-bold text-stone-100">{$t('forms.api_url')}</label>
 				<input
 					name="apiUrl"
 					type="url"
 					id="apiUrl"
-					placeholder="eg: https://api.github.com"
+					placeholder="{$t('forms.eg')}: https://api.github.com"
 					required
 					bind:value={gitSource.apiUrl}
 				/>
@@ -77,16 +80,14 @@
 			<div class="grid grid-cols-2 px-10">
 				<div class="flex flex-col">
 					<label for="organization" class="pt-2 text-base font-bold text-stone-100"
-						>Organization</label
+						>{$t('forms.organization')}</label
 					>
-					<Explainer
-						text="Fill it if you would like to use an organization's as your Git Source. Otherwise your user will be used."
-					/>
+					<Explainer text={$t('sources.organization_explainer')} />
 				</div>
 				<input
 					name="organization"
 					id="organization"
-					placeholder="eg: coollabsio"
+					placeholder="{$t('forms.eg')}: coollabsio"
 					bind:value={gitSource.organization}
 					bind:this={organizationEl}
 				/>
