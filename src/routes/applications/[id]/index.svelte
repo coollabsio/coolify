@@ -352,22 +352,22 @@
 						id="pythonModule"
 						required
 						bind:value={application.pythonModule}
-						placeholder={application.pythonWSGI?.toLowerCase() !== 'gunicorn'
-							? 'myapp.py'
-							: 'myapp'}
+						placeholder={application.pythonWSGI?.toLowerCase() !== 'gunicorn' ? 'main.py' : 'main'}
 					/>
 				</div>
-				<div class="grid grid-cols-2 items-center">
-					<label for="pythonVariable" class="text-base font-bold text-stone-100">Variable</label>
-					<input
-						readonly={!$session.isAdmin}
-						name="pythonVariable"
-						id="pythonVariable"
-						required
-						bind:value={application.pythonVariable}
-						placeholder="default: app"
-					/>
-				</div>
+				{#if application.pythonWSGI?.toLowerCase() === 'gunicorn'}
+					<div class="grid grid-cols-2 items-center">
+						<label for="pythonVariable" class="text-base font-bold text-stone-100">Variable</label>
+						<input
+							readonly={!$session.isAdmin}
+							name="pythonVariable"
+							id="pythonVariable"
+							required
+							bind:value={application.pythonVariable}
+							placeholder="default: app"
+						/>
+					</div>
+				{/if}
 			{/if}
 			{#if !staticDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-2 items-center">
