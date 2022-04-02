@@ -1,5 +1,6 @@
 <script lang="ts">
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
+	import { t } from '$lib/translations';
 
 	export let service;
 	export let isRunning;
@@ -11,7 +12,7 @@
 </div>
 
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="extraConfig">Extra Config</label>
+	<label for="extraConfig">{$t('forms.extra_config')}</label>
 	<textarea
 		disabled={isRunning}
 		readonly={isRunning}
@@ -20,7 +21,7 @@
 		name="extraConfig"
 		id="extraConfig"
 		placeholder={!isRunning
-			? `eg:
+			? `${$t('forms.eg')}:
 
 define('WP_ALLOW_MULTISITE', true);
 define('MULTISITE', true);
@@ -32,7 +33,7 @@ define('SUBDOMAIN_INSTALL', false);`
 	<div class="title">MySQL</div>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="mysqlDatabase">Database</label>
+	<label for="mysqlDatabase">{$t('index.database')}</label>
 	<input
 		name="mysqlDatabase"
 		id="mysqlDatabase"
@@ -40,7 +41,7 @@ define('SUBDOMAIN_INSTALL', false);`
 		readonly={readOnly}
 		disabled={readOnly}
 		bind:value={service.wordpress.mysqlDatabase}
-		placeholder="eg: wordpress_db"
+		placeholder="{$t('forms.eg')}: wordpress_db"
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
@@ -48,7 +49,7 @@ define('SUBDOMAIN_INSTALL', false);`
 	<input
 		name="mysqlRootUser"
 		id="mysqlRootUser"
-		placeholder="MySQL Root User"
+		placeholder="MySQL {$t('forms.root_user')}"
 		value={service.wordpress.mysqlRootUser}
 		disabled
 		readonly
@@ -66,11 +67,11 @@ define('SUBDOMAIN_INSTALL', false);`
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="mysqlUser">User</label>
+	<label for="mysqlUser">{$t('forms.user')}</label>
 	<input name="mysqlUser" id="mysqlUser" value={service.wordpress.mysqlUser} disabled readonly />
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="mysqlPassword">Password</label>
+	<label for="mysqlPassword">{$t('forms.password')}</label>
 	<CopyPasswordField
 		id="mysqlPassword"
 		isPasswordField

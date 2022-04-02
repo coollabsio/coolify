@@ -107,7 +107,7 @@
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="mt-2 grid grid-cols-2">
 				<div class="flex-col">
-					<label for="name" class="text-base font-bold text-stone-100">Name</label>
+					<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 					{#if team.id === '0'}
 						<Explainer
 							customClass="w-full"

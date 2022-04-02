@@ -195,7 +195,7 @@
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
 				<div class="mt-2 grid grid-cols-2 items-center">
-					<label for="name" class="text-base font-bold text-stone-100">Name</label>
+					<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 					<input name="name" id="name" required bind:value={source.name} />
 				</div>
 			</div>

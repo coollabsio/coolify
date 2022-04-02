@@ -1,5 +1,6 @@
 <script lang="ts">
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
+	import { t } from '$lib/translations';
 	export let service;
 	export let readOnly;
 </script>
@@ -8,31 +9,31 @@
 	<div class="title">Plausible Analytics</div>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="email">Email Address</label>
+	<label for="email">{$t('forms.email')}</label>
 	<input
 		name="email"
 		id="email"
 		disabled={readOnly}
 		readonly={readOnly}
-		placeholder="Email address"
+		placeholder={$t('forms.email')}
 		bind:value={service.plausibleAnalytics.email}
 		required
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="username">Username</label>
+	<label for="username">{$t('forms.username')}</label>
 	<CopyPasswordField
 		name="username"
 		id="username"
 		disabled={readOnly}
 		readonly={readOnly}
-		placeholder="User to login"
+		placeholder={$t('forms.username')}
 		bind:value={service.plausibleAnalytics.username}
 		required
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="password">Password</label>
+	<label for="password">{$t('forms.password')}</label>
 	<CopyPasswordField
 		id="password"
 		isPasswordField
@@ -46,7 +47,7 @@
 	<div class="title">PostgreSQL</div>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlUser">Username</label>
+	<label for="postgresqlUser">{$t('forms.username')}</label>
 	<CopyPasswordField
 		name="postgresqlUser"
 		id="postgresqlUser"
@@ -56,7 +57,7 @@
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlPassword">Password</label>
+	<label for="postgresqlPassword">{$t('forms.password')}</label>
 	<CopyPasswordField
 		id="postgresqlPassword"
 		isPasswordField
@@ -67,7 +68,7 @@
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlDatabase">Database</label>
+	<label for="postgresqlDatabase">{$t('index.database')}</label>
 	<CopyPasswordField
 		name="postgresqlDatabase"
 		id="postgresqlDatabase"

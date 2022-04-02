@@ -41,6 +41,7 @@
 	import N8n from '$lib/components/svg/services/N8n.svelte';
 	import UptimeKuma from '$lib/components/svg/services/UptimeKuma.svelte';
 	import Ghost from '$lib/components/svg/services/Ghost.svelte';
+	import { t } from '$lib/translations';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -58,7 +59,7 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Select a Service</div>
+	<div class="mr-4 text-2xl tracking-tight">{$t('forms.select_a_service')}</div>
 </div>
 
 <div class="flex flex-wrap justify-center">

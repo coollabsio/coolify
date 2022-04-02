@@ -26,6 +26,7 @@
 	import { getDomain } from '$lib/components/common';
 	import { page } from '$app/stores';
 	import { get } from '$lib/api';
+	import { t } from '$lib/translations';
 
 	const { id } = $page.params;
 
@@ -37,7 +38,8 @@
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">
-		Secrets {#if service.fqdn}
+		{$t('application.secret')}
+		{#if service.fqdn}
 			<a href={service.fqdn} target="_blank">{getDomain(service.fqdn)}</a>
 		{/if}
 	</div>
@@ -46,9 +48,9 @@
 	<table class="mx-auto border-separate text-left">
 		<thead>
 			<tr class="h-12">
-				<th scope="col">Name</th>
-				<th scope="col">Value</th>
-				<th scope="col" class="w-96 text-center">Action</th>
+				<th scope="col">{$t('forms.name')}</th>
+				<th scope="col">{$t('forms.value')}</th>
+				<th scope="col" class="w-96 text-center">{$t('forms.action')}</th>
 			</tr>
 		</thead>
 		<tbody>

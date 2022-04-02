@@ -62,7 +62,7 @@
 				<input
 					type="password"
 					name="password"
-					placeholder={$t('index.password')}
+					placeholder={$t('forms.password')}
 					bind:value={password}
 					required
 				/>

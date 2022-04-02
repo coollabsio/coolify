@@ -18,7 +18,8 @@
 		"databases": "Databases",
 		"services": "Services",
 		"teams": "Teams",
-		"not_implemented_yet": "Not implemented yet"
+		"not_implemented_yet": "Not implemented yet",
+		"database": "Database"
 	},
 	"login": {
 		"already_logged_in": "Already logged in...",
@@ -27,7 +28,7 @@
 	},
 	"forms": {
 		"password": "Password",
-		"email": "Email",
+		"email": "Email address",
 		"passwords_not_match": "Passwords do not match.",
 		"password_again": "Password again",
 		"save": "Save",
@@ -66,7 +67,18 @@
 		"organization": "Organization",
 		"new_password": "New password",
 		"super_secure_new_password": "Super secure new password",
-		"submit": "Submit"
+		"submit": "Submit",
+		"default_email_address": "Default Email Address",
+		"default_password": "Default Password",
+		"username": "Username",
+		"root_db_user": "Root DB User",
+		"root_db_password": "Root DB Password",
+		"api_port": "API Port",
+		"verifying": "Verifying",
+		"verify_emails_without_smtp": "Verify emails without SMTP",
+		"extra_config": "Extra Config",
+		"select_a_service": "Select a Service",
+		"select_a_service_version": "Select a Service version"
 	},
 	"register": {
 		"register": "Register",
@@ -137,7 +149,7 @@
 			"persistent_storage_explainer": "You can specify any folder that you want to be persistent across deployments. <br>This is useful for storing data such as a database (SQLite) or a cache."
 		},
 		"deployment_queued": "Deployment queued.",
-		"confirm_to_delete": "Are you sure you would like to delete '{0}'?",
+		"confirm_to_delete": "Are you sure you would like to delete '{name}'?",
 		"stop_application": "Stop application",
 		"permission_denied_stop_application": "You do not have permission to stop the application.",
 		"rebuild_application": "Rebuild application",
@@ -232,5 +244,17 @@
 			"git_source": "Add New Git Source",
 			"official_providers": "Official providers"
 		}
+	},
+	"services": {
+		"all_email_verified": "All email verified. You can login now.",
+		"generate_www_non_www_ssl": "It will generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-pink-600'>both DNS entries</span> set in advance.<br><br>Service needs to be restarted."
+	},
+	"service": {
+		"stop_service": "Stop Service",
+		"permission_denied_stop_service": "You do not have permission to stop the service.",
+		"start_service": "Start Service",
+		"permission_denied_start_service": "You do not have permission to start the service.",
+		"delete_service": "Delete Service",
+		"permission_denied_delete_service": "You do not have permission to delete a service."
 	}
 }
