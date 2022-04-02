@@ -283,6 +283,7 @@ model Service {
   wordpress           Wordpress?
   ghost               Ghost?
   serviceSecret       ServiceSecret[]
+  meiliSearch         MeiliSearch?
 }
 
 model PlausibleAnalytics {
@@ -351,4 +352,13 @@ model Ghost {
   service                 Service  @relation(fields: [serviceId], references: [id])
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+}
+
+model MeiliSearch {
+  id        String   @id @default(cuid())
+  masterKey String
+  serviceId String   @unique
+  service   Service  @relation(fields: [serviceId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

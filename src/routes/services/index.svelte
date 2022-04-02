@@ -11,6 +11,7 @@
 	import N8n from '$lib/components/svg/services/N8n.svelte';
 	import UptimeKuma from '$lib/components/svg/services/UptimeKuma.svelte';
 	import Ghost from '$lib/components/svg/services/Ghost.svelte';
+	import MeiliSearch from '$lib/components/svg/services/MeiliSearch.svelte';
 
 	export let services;
 	async function newService() {
@@ -67,6 +68,8 @@
 						<UptimeKuma isAbsolute />
 					{:else if service.type === 'ghost'}
 						<Ghost isAbsolute />
+					{:else if service.type === 'meilisearch'}
+						<MeiliSearch isAbsolute />
 					{/if}
 					<div class="font-bold text-xl text-center truncate">
 						{service.name}

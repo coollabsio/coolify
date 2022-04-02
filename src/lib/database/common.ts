@@ -197,6 +197,16 @@ export const supportedServiceTypesAndVersions = [
 		ports: {
 			main: 2368
 		}
+	},
+	{
+		name: 'meilisearch',
+		fancyName: 'Meilisearch',
+		baseImage: 'getmeili/meilisearch',
+		images: [],
+		versions: ['latest'],
+		ports: {
+			main: 7700
+		}
 	}
 ];
 

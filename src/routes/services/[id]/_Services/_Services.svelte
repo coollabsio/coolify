@@ -11,6 +11,7 @@
 	import { errorNotification } from '$lib/form';
 	import { toast } from '@zerodevx/svelte-toast';
 	import Ghost from './_Ghost.svelte';
+	import MeiliSearch from './_MeiliSearch.svelte';
 	import MinIo from './_MinIO.svelte';
 	import PlausibleAnalytics from './_PlausibleAnalytics.svelte';
 	import VsCodeServer from './_VSCodeServer.svelte';
@@ -145,6 +146,8 @@
 				<Wordpress bind:service {isRunning} {readOnly} />
 			{:else if service.type === 'ghost'}
 				<Ghost bind:service {readOnly} />
+			{:else if service.type === 'meilisearch'}
+				<MeiliSearch bind:service />
 			{/if}
 		</div>
 	</form>
