@@ -15,7 +15,6 @@
 	import Docker from '$lib/components/svg/applications/Docker.svelte';
 	import Astro from '$lib/components/svg/applications/Astro.svelte';
 	import Eleventy from '$lib/components/svg/applications/Eleventy.svelte';
-	import { t } from '$lib/translations';
 
 	const buildPack = application?.buildPack?.toLowerCase();
 </script>
@@ -60,7 +59,7 @@
 		{/if}
 		{#if !application.gitSourceId || !application.destinationDockerId}
 			<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
-				{$t('application.configuration_missing')}
+				Configuration missing
 			</div>
 		{/if}
 	</div>

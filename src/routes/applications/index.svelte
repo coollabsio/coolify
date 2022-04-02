@@ -4,7 +4,6 @@
 	import Application from './_Application.svelte';
 	import { post } from '$lib/api';
 	import { goto } from '$app/navigation';
-	import { t } from '$lib/translations';
 	async function newApplication() {
 		const { id } = await post('/applications/new', {});
 		return await goto(`/applications/${id}`, { replaceState: true });
@@ -12,7 +11,7 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl ">{$t('index.applications')}</div>
+	<div class="mr-4 text-2xl ">Applications</div>
 	{#if $session.isAdmin}
 		<div on:click={newApplication} class="add-icon cursor-pointer bg-green-600 hover:bg-green-500">
 			<svg
@@ -34,7 +33,7 @@
 <div class="flex flex-wrap justify-center">
 	{#if !applications || applications.length === 0}
 		<div class="flex-col">
-			<div class="text-center text-xl font-bold">{$t('application.no_applications_found')}</div>
+			<div class="text-center text-xl font-bold">No applications found</div>
 		</div>
 	{:else}
 		{#each applications as application}

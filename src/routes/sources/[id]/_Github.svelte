@@ -3,7 +3,6 @@
 	import { page, session } from '$app/stores';
 	import { post } from '$lib/api';
 	import { errorNotification } from '$lib/form';
-	import { t } from '$lib/translations';
 	const { id } = $page.params;
 
 	let loading = false;
@@ -44,7 +43,7 @@
 		const top = screen.height / 2 - 618 / 2;
 		const newWindow = open(
 			`/sources/${id}/newGithubApp`,
-			$t('sources.source.new_github_app'),
+			'New Github App',
 			'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
 				top +
 				', left=' +
@@ -61,32 +60,30 @@
 </script>
 
 {#if !source.githubAppId}
-	<button on:click={newGithubApp}>{$t('sources.source.create_new_github_app')}</button>
+	<button on:click={newGithubApp}>Create new GitHub App</button>
 {:else if source.githubApp?.installationId}
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
 		<div class="flex space-x-1 pb-5 font-bold">
-			<div class="title">{$t('general')}</div>
+			<div class="title">General</div>
 			{#if $session.isAdmin}
 				<button
 					type="submit"
 					class:bg-orange-600={!loading}
 					class:hover:bg-orange-500={!loading}
-					disabled={loading}>{loading ? $t('saving') : $t('save')}</button
+					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
 				>
 				<button on:click|preventDefault={() => installRepositories(source)}
-					>{$t('sources.source.change_app_settings', { values: { name: 'Github' } })}</button
+					>Change GitHub App Settings</button
 				>
 			{/if}
 		</div>
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="grid grid-cols-2 items-center mt-2">
-				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
+				<label for="name" class="text-base font-bold text-stone-100">Name</label>
 				<input name="name" id="name" required bind:value={source.name} />
 			</div>
 		</div>
 	</form>
 {:else}
-	<button on:click={() => installRepositories(source)}
-		>{$t('sources.source.install_repositories')}</button
-	>
+	<button on:click={() => installRepositories(source)}>Install Repositories</button>
 {/if}

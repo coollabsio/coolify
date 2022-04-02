@@ -1,15 +1,10 @@
 import { toast } from '@zerodevx/svelte-toast';
-import { t } from '$lib/translations';
-
-let formatMessage;
-t.subscribe((storeFormat) => (formatMessage = storeFormat));
-
-export function errorNotification(message: string): void {
+export function errorNotification(message: string) {
 	console.error(message);
 	if (typeof message !== 'string') {
-		toast.push(formatMessage('error.generic_message'));
+		toast.push('Ooops, something is not okay, are you okay?');
 	} else {
-		toast.push(formatMessage(message));
+		toast.push(message);
 	}
 }
 export function enhance(

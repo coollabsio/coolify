@@ -8,59 +8,6 @@
 	},
 	"error": {
 		"you_can_find_your_way_back": "You can find your way back",
-		"here": "here",
-		"oops_your_lost": "Ooops you are lost! But don't be afraid!",
-		"generic_message": "Ooops, something is not okay, are you okay?"
-	},
-	"index": {
-		"applications": "Applications",
-		"destinations": "Destinations",
-		"git_sources": "Git Sources",
-		"databases": "Databases",
-		"services": "Services",
-		"teams": "Teams"
-	},
-	"dashboard": "Dashboard",
-	"application": {
-		"configuration_missing": "Configuration missing",
-		"no_applications_found": "No applications found",
-		"app": {
-			"error_double_app_for_one_branch": "Cannot activate automatic deployments until only one application is defined for this repository / branch."
-		}
-	},
-	"sources": {
-		"no_git_sources_found": "No git sources found",
-		"source": {
-			"delete_git_source": "Delete Git Source",
-			"permission_denied_delete_git_source": "You do not have permission to delete a Git Source",
-			"sure_to_delete": "Are you sure you would like to delete",
-			"create_new_github_app": "Create new GitHub App",
-			"install_repositories": "Install Repositories",
-			"change_app_settings": "Change {name} App Settings",
-			"new_github_app": "New Github App"
-		}
-	},
-	"general": "General",
-	"saving": "Saving...",
-	"save": "Save",
-	"forms": {
-		"name": "Name",
-		"email": "Email",
-		"password": "Password",
-		"password_again": "Password again"
-	},
-	"login": {
-		"already_logged_in": "Already logged in...",
-		"authenticating": "Authenticating...",
-		"login": "Login"
-	},
-	"register": {
-		"register": "Register",
-		"passwords_do_not_match": "Passwords do not match.",
-		"register_first_user": "You are registering the first user. It will be the administrator of your Coolify instance."
-	},
-	"reset_password": {
-		"reset_password": "Reset password",
-		"invalid_secret_key": "Invalid secret key."
+		"here": "here"
 	}
 }

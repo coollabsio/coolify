@@ -8,7 +8,7 @@ export const post: RequestHandler = async (event) => {
 		return {
 			status: 500,
 			body: {
-				error: 'reset_password.invalid_secret_key'
+				error: 'Invalid secret key.'
 			}
 		};
 	}
