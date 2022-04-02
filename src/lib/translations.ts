@@ -3,19 +3,19 @@ import lang from './lang.json';
 
 /** @type {import('sveltekit-i18n').Config} */
 export const config = {
-	fallbackLocale: 'en-US',
+	fallbackLocale: 'en',
 	translations: {
-		'en-US': { lang },
-		'fr-FR': { lang }
+		en: { lang },
+		fr: { lang }
 	},
 	loaders: [
 		{
-			locale: 'en-US',
+			locale: 'en',
 			key: '',
 			loader: async () => (await import('../../static/locales/en.json')).default
 		},
 		{
-			locale: 'fr-FR',
+			locale: 'fr',
 			key: '',
 			loader: async () => (await import('../../static/locales/fr.json')).default
 		}
