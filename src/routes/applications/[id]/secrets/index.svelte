@@ -26,6 +26,7 @@
 	import { getDomain } from '$lib/components/common';
 	import { page } from '$app/stores';
 	import { get } from '$lib/api';
+	import BatchSecrets from './_BatchSecrets.svelte';
 
 	const { id } = $page.params;
 
@@ -68,4 +69,6 @@
 			</tr>
 		</tbody>
 	</table>
+
+	<BatchSecrets {secrets} {id} {refreshSecrets} />
 </div>
