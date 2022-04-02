@@ -5,6 +5,7 @@ import { checkContainer } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 import jsonwebtoken from 'jsonwebtoken';
 import { get as getRequest } from '$lib/api';
+import { setDefaultConfiguration } from '$lib/buildPacks/common';
 
 export const get: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -52,12 +53,23 @@ export const post: RequestHandler = async (event) => {
 		buildCommand,
 		startCommand,
 		baseDirectory,
-		publishDirectory
+		publishDirectory,
+		pythonWSGI,
+		pythonModule,
+		pythonVariable
 	} = await event.request.json();
-
 	if (port) port = Number(port);
 
 	try {
+		const defaultConfiguration = await setDefaultConfiguration({
+			buildPack,
+			port,
+			installCommand,
+			startCommand,
+			buildCommand,
+			publishDirectory,
+			baseDirectory
+		});
 		await db.configureApplication({
 			id,
 			buildPack,
@@ -68,7 +80,11 @@ export const post: RequestHandler = async (event) => {
 			buildCommand,
 			startCommand,
 			baseDirectory,
-			publishDirectory
+			publishDirectory,
+			pythonWSGI,
+			pythonModule,
+			pythonVariable,
+			...defaultConfiguration
 		});
 		return { status: 201 };
 	} catch (error) {

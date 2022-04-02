@@ -87,6 +87,9 @@ model Application {
   baseDirectory       String?
   publishDirectory    String?
   phpModules          String?
+  pythonWSGI          String?
+  pythonModule        String?
+  pythonVariable      String?
   createdAt           DateTime                       @default(now())
   updatedAt           DateTime                       @updatedAt
   settings            ApplicationSettings?

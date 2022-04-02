@@ -38,6 +38,7 @@
 	import { page, session } from '$app/stores';
 	import { errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
+	import Select from 'svelte-select';
 
 	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
@@ -57,6 +58,23 @@
 	let previews = application.settings.previews;
 	let dualCerts = application.settings.dualCerts;
 	let autodeploy = application.settings.autodeploy;
+
+	let wsgis = [
+		{
+			value: 'None',
+			label: 'None'
+		},
+		{
+			value: 'Gunicorn',
+			label: 'Gunicorn'
+		}
+		// },
+		// {
+		// 	value: 'uWSGI',
+		// 	label: 'uWSGI'
+		// }
+	];
+
 	if (browser && window.location.hostname === 'demo.coolify.io' && !application.fqdn) {
 		application.fqdn = `http://${cuid()}.demo.coolify.io`;
 	}
@@ -118,6 +136,9 @@
 		} finally {
 			loading = false;
 		}
+	}
+	async function selectWSGI(event) {
+		application.pythonWSGI = event.detail.value;
 	}
 </script>
 
@@ -315,6 +336,39 @@
 					on:click={() => !isRunning && changeSettings('dualCerts')}
 				/>
 			</div>
+			{#if application.buildPack === 'python'}
+				<div class="grid grid-cols-2 items-center">
+					<label for="pythonModule" class="text-base font-bold text-stone-100">WSGI</label>
+					<div class="custom-select-wrapper">
+						<Select id="wsgi" items={wsgis} on:select={selectWSGI} value={application.pythonWSGI} />
+					</div>
+				</div>
+
+				<div class="grid grid-cols-2 items-center">
+					<label for="pythonModule" class="text-base font-bold text-stone-100">Module</label>
+					<input
+						readonly={!$session.isAdmin}
+						name="pythonModule"
+						id="pythonModule"
+						required
+						bind:value={application.pythonModule}
+						placeholder={application.pythonWSGI?.toLowerCase() !== 'gunicorn'
+							? 'myapp.py'
+							: 'myapp'}
+					/>
+				</div>
+				<div class="grid grid-cols-2 items-center">
+					<label for="pythonVariable" class="text-base font-bold text-stone-100">Variable</label>
+					<input
+						readonly={!$session.isAdmin}
+						name="pythonVariable"
+						id="pythonVariable"
+						required
+						bind:value={application.pythonVariable}
+						placeholder="default: app"
+					/>
+				</div>
+			{/if}
 			{#if !staticDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-2 items-center">
 					<label for="port" class="text-base font-bold text-stone-100">Port</label>
@@ -323,7 +377,7 @@
 						name="port"
 						id="port"
 						bind:value={application.port}
-						placeholder="default: 3000"
+						placeholder={application.buildPack === 'python' ? '8000' : '3000'}
 					/>
 				</div>
 			{/if}

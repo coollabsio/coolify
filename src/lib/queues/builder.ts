@@ -51,7 +51,10 @@ export default async function (job) {
 		pullmergeRequestId = null,
 		sourceBranch = null,
 		settings,
-		persistentStorage
+		persistentStorage,
+		pythonWSGI,
+		pythonModule,
+		pythonVariable
 	} = job.data;
 	const { debug } = settings;
 
@@ -127,7 +130,7 @@ export default async function (job) {
 		}
 
 		try {
-			db.prisma.build.update({ where: { id: buildId }, data: { commit } });
+			await db.prisma.build.update({ where: { id: buildId }, data: { commit } });
 		} catch (err) {
 			console.log(err);
 		}
@@ -200,7 +203,10 @@ export default async function (job) {
 					startCommand,
 					baseDirectory,
 					secrets,
-					phpModules
+					phpModules,
+					pythonWSGI,
+					pythonModule,
+					pythonVariable
 				});
 			else {
 				saveBuildLog({ line: `Build pack ${buildPack} not found`, buildId, applicationId });

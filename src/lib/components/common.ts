@@ -19,7 +19,7 @@ export const staticDeployments = [
 	'astro',
 	'eleventy'
 ];
-export const notNodeDeployments = ['php', 'docker', 'rust'];
+export const notNodeDeployments = ['php', 'docker', 'rust', 'python'];
 
 export function getDomain(domain) {
 	return domain?.replace('https://', '').replace('http://', '');
