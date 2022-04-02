@@ -11,7 +11,6 @@
 				}
 			};
 		}
-
 		return {
 			status: res.status,
 			error: new Error(`Could not load ${endpoint}`)
@@ -31,6 +30,7 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
 	import { toast } from '@zerodevx/svelte-toast';
+	import BatchSecrets from '../secrets/_BatchSecrets.svelte';
 
 	const { id } = $page.params;
 	async function refreshSecrets() {
@@ -183,3 +183,4 @@
 		{/if}
 	</div>
 </div>
+<BatchSecrets secrets={PRMRSecrets} {id} {refreshSecrets} />
