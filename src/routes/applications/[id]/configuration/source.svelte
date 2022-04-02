@@ -33,6 +33,7 @@
 	import { errorNotification } from '$lib/form';
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/api';
+	import { t } from '$lib/translations';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -57,12 +58,14 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Select a Git Source</div>
+	<div class="mr-4 text-2xl tracking-tight">
+		{$t('application.configuration.select_a_git_source')}
+	</div>
 </div>
 <div class="flex flex-col justify-center">
 	{#if !filteredSources || filteredSources.length === 0}
 		<div class="flex-col">
-			<div class="pb-2">No configurable Git Source found</div>
+			<div class="pb-2">{$t('application.configuration.no_configurable_git')}</div>
 			<div class="flex justify-center">
 				<a href="/new/source" sveltekit:prefetch class="add-icon bg-orange-600 hover:bg-orange-500">
 					<svg
@@ -97,7 +100,7 @@
 							<div class="font-bold text-xl text-center truncate">{source.name}</div>
 							{#if source.gitlabApp && !source.gitlabAppId}
 								<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
-									Configuration missing
+									{$t('application.configuration.configuration_missing')}
 								</div>
 							{/if}
 						</button>

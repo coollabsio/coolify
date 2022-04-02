@@ -36,6 +36,7 @@
 	import { errorNotification } from '$lib/form';
 	import { gitTokens } from '$lib/store';
 	import { browser } from '$app/env';
+	import { t } from '$lib/translations';
 
 	const { id } = $page.params;
 
@@ -198,18 +199,21 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Configure Build Pack</div>
+	<div class="mr-4 text-2xl tracking-tight">
+		{$t('application.configuration.configure_build_pack')}
+	</div>
 </div>
 
 {#if scanning}
 	<div class="flex justify-center space-x-1 p-6 font-bold">
-		<div class="text-xl tracking-tight">Scanning repository to suggest a build pack for you...</div>
+		<div class="text-xl tracking-tight">
+			{$t('application.configuration.scanning_repository_suggest_build_pack')}
+		</div>
 	</div>
 {:else}
 	{#if packageManager === 'yarn' || packageManager === 'pnpm'}
 		<div class="flex justify-center p-6">
-			Found lock file for <span class="font-bold text-orange-500 pl-1">{packageManager}</span>.
-			Using it for predefined commands commands.
+			{@html $t('application.configuration.found_lock_file')}
 		</div>
 	{/if}
 	<div class="max-w-7xl mx-auto flex flex-wrap justify-center">

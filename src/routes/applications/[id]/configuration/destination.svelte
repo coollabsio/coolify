@@ -33,6 +33,7 @@
 	import { errorNotification } from '$lib/form';
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/api';
+	import { t } from '$lib/translations';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -50,12 +51,14 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Configure Destination</div>
+	<div class="mr-4 text-2xl tracking-tight">
+		{$t('application.configuration.configure_destination')}
+	</div>
 </div>
 <div class="flex justify-center">
 	{#if !destinations || destinations.length === 0}
 		<div class="flex-col">
-			<div class="pb-2">No configurable Destination found</div>
+			<div class="pb-2">{$t('application.configuration.no_configurable_destination')}</div>
 			<div class="flex justify-center">
 				<a href="/new/destination" sveltekit:prefetch class="add-icon bg-sky-600 hover:bg-sky-500">
 					<svg

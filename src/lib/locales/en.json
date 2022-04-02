@@ -28,7 +28,9 @@
 		"password": "Password",
 		"email": "Email",
 		"passwords_not_match": "Passwords do not match.",
-		"password_again": "Password again"
+		"password_again": "Password again",
+		"save": "Save",
+		"saving": "Saving..."
 	},
 	"register": {
 		"register": "Register",
@@ -36,5 +38,35 @@
 	},
 	"reset": {
 		"reset_password": "Reset password"
+	},
+	"application": {
+		"configuration": {
+			"buildpack": {
+				"choose_this_one": "Choose this one..."
+			},
+			"branch_already_in_use": "This branch is already used by another application. Webhooks won't work in this case for both applications. Are you sure you want to use it?",
+			"no_repositories_configured": "No repositories configured for your Git Application.",
+			"configure_it_now": "Configure it now",
+			"loading_repositories": "Loading repositories ...",
+			"select_a_repository": "Please select a repository",
+			"loading_branches": "Loading branches ...",
+			"select_a_repository_first": "Please select a repository first",
+			"select_a_branch": "Please select a branch",
+			"loading_groups": "Loading groups...",
+			"select_a_group": "Please select a group",
+			"loading_projects": "Loading projects...",
+			"select_a_project": "Please select a project",
+			"no_projects_found": "No projects found",
+			"no_branches_found": "No branches found",
+			"configure_build_pack": "Configure Build Pack",
+			"scanning_repository_suggest_build_pack": "Scanning repository to suggest a build pack for you...",
+			"found_lock_file": "Found lock file for <span class=\"font-bold text-orange-500 pl-1\">{packageManager}</span>. Using it for predefined commands commands.",
+			"configure_destination": "Configure Destination",
+			"no_configurable_destination": "No configurable Destination found",
+			"select_a_repository_project": "Select a Repository / Project",
+			"select_a_git_source": "Select a Git Source",
+			"no_configurable_git": "No configurable Git Source found",
+			"configuration_missing": "Configuration missing"
+		}
 	}
 }

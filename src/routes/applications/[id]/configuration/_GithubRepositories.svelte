@@ -7,6 +7,7 @@
 	import { errorNotification } from '$lib/form';
 	import { onMount } from 'svelte';
 	import { gitTokens } from '$lib/store';
+	import { t } from '$lib/translations';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -84,9 +85,7 @@
 				`/applications/${id}/configuration/repository.json?repository=${selected.repository}&branch=${selected.branch}`
 			);
 			if (data.used) {
-				const sure = confirm(
-					`This branch is already used by another application. Webhooks won't work in this case for both applications. Are you sure you want to use it?`
-				);
+				const sure = confirm($t('application.configuration.branch_already_in_use'));
 				if (sure) {
 					selected.autodeploy = false;
 					showSave = true;
@@ -160,8 +159,10 @@
 
 {#if repositories.length === 0 && loading.repositories === false}
 	<div class="flex-col text-center">
-		<div class="pb-4">No repositories configured for your Git Application.</div>
-		<a href={`/sources/${application.gitSource.id}`}><button>Configure it now</button></a>
+		<div class="pb-4">{$t('application.configuration.no_repositories_configured')}</div>
+		<a href={`/sources/${application.gitSource.id}`}
+			><button>{$t('application.configuration.configure_it_now')}</button></a
+		>
 	</div>
 {:else}
 	<form on:submit|preventDefault={handleSubmit} class="flex flex-col justify-center text-center">
@@ -170,8 +171,8 @@
 				<div class="custom-select-wrapper">
 					<Select
 						placeholder={loading.repositories
-							? 'Loading repositories ...'
-							: 'Please select a repository'}
+							? $t('application.configuration.loading_repositories')
+							: $t('application.configuration.select_a_repository')}
 						id="repository"
 						on:select={loadBranches}
 						items={reposSelectOptions}
@@ -182,10 +183,10 @@
 				<div class="custom-select-wrapper">
 					<Select
 						placeholder={loading.branches
-							? 'Loading branches ...'
+							? $t('application.configuration.loading_branches')
 							: !selected.repository
-							? 'Please select a repository first'
-							: 'Please select a branch'}
+							? $t('application.configuration.select_a_repository_first')
+							: $t('application.configuration.select_a_branch')}
 						id="repository"
 						on:select={isBranchAlreadyUsed}
 						items={branchSelectOptions}
@@ -200,7 +201,7 @@
 				type="submit"
 				disabled={!showSave}
 				class:bg-orange-600={showSave}
-				class:hover:bg-orange-500={showSave}>Save</button
+				class:hover:bg-orange-500={showSave}>{$t('forms.save')}</button
 			>
 			<!-- <button class="w-40"
 				><a
