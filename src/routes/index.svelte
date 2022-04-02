@@ -20,6 +20,8 @@
 </script>
 
 <script lang="ts">
+	import { t } from '$lib/translations';
+
 	export let applicationsCount: number;
 	export let sourcesCount: number;
 	export let destinationsCount: number;
@@ -29,7 +31,7 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Dashboard</div>
+	<div class="mr-4 text-2xl tracking-tight">{$t('index.dashboard')}</div>
 </div>
 
 <div class="mt-10 pb-12 tracking-tight sm:pb-16">

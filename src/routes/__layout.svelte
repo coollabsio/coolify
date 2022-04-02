@@ -1,6 +1,7 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	import { publicPaths } from '$lib/settings';
+	import { locale, loadTranslations } from '$lib/translations';
 
 	export const load: Load = async ({ fetch, url, session }) => {
 		if (!session.userId && !publicPaths.includes(url.pathname)) {
@@ -15,6 +16,12 @@
 		const endpoint = `/teams.json`;
 		const res = await fetch(endpoint);
 
+		const { pathname } = url;
+		const defaultLocale = session.lang;
+		const initLocale = locale.get() || defaultLocale;
+
+		await loadTranslations(initLocale, pathname);
+
 		if (res.ok) {
 			return {
 				props: {
@@ -23,6 +30,7 @@
 				}
 			};
 		}
+
 		return {};
 	};
 </script>
@@ -38,18 +46,8 @@
 	import { errorNotification } from '$lib/form';
 	import { asyncSleep } from '$lib/components/common';
 	import { del, get, post } from '$lib/api';
-	import { register, init, _, getLocaleFromNavigator } from 'svelte-i18n';
-
-	async function setup() {
-		register('en', () => import('../../static/locales/en.json'));
-
-		return await Promise.allSettled([
-			// TODO: add some more stuff you want to init ...
-			init({ initialLocale: getLocaleFromNavigator(), fallbackLocale: 'en' })
-		]);
-	}
-
-	const setupResult = setup();
+	import { browser } from '$app/env';
+	import { loading, t } from '$lib/translations';
 
 	let isUpdateAvailable = false;
 
@@ -115,7 +113,7 @@
 				return window.location.reload();
 			} else {
 				await post(`/update.json`, { type: 'update', latestVersion });
-				toast.push(`${$_('layout.update_done')}<br><br>${$_('layout.wait_new_version_startup')}`);
+				toast.push(`${$t('layout.update_done')}<br><br>${$t('layout.wait_new_version_startup')}`);
 				let reachable = false;
 				let tries = 0;
 				do {
@@ -129,7 +127,7 @@
 					if (reachable) break;
 					tries++;
 				} while (!reachable || tries < 120);
-				toast.push($_('layout.new_version'));
+				toast.push($t('layout.new_version'));
 				updateStatus.loading = false;
 				updateStatus.success = true;
 				await asyncSleep(3000);
@@ -147,7 +145,7 @@
 	<title>Coolify</title>
 </svelte:head>
 
-{#await setupResult}
+{#await loading}
 	Please wait...
 {:then}
 	<SvelteToast options={{ intro: { y: -64 }, duration: 3000, pausable: true }} />
@@ -336,7 +334,7 @@
 						{#if isUpdateAvailable}
 							<button
 								disabled={updateStatus.success === false}
-								title={$_('layout.update_available')}
+								title={$t('layout.update_available')}
 								on:click={update}
 								class="icons tooltip-right bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white duration-75 hover:scale-105"
 							>
@@ -534,7 +532,7 @@
 			bind:value={selectedTeamId}
 			on:change={switchTeam}
 		>
-			<option value="" disabled selected>{$_('layout.switch_to_a_different_team')}</option>
+			<option value="" disabled selected>{$t('layout.switch_to_a_different_team')}</option>
 			{#each teams as team}
 				<option value={team.teamId}>{team.team.name} - {team.permission}</option>
 			{/each}

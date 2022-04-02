@@ -12,7 +12,8 @@
 </script>
 
 <script>
-	import { _ } from 'svelte-i18n';
+	import { t } from '$lib/translations';
+
 	export let status;
 	export let error;
 </script>
@@ -21,8 +22,8 @@
 	<div class="pb-10 text-7xl font-bold">{status}</div>
 	<div class="text-3xl font-bold">Ooops you are lost! But don't be afraid!</div>
 	<div class="text-xl">
-		{$_('error.you_can_find_your_way_back')}
-		<a href="/" class="font-bold uppercase text-sky-400">{$_('error.here')}</a>
+		{$t('error.you_can_find_your_way_back')}
+		<a href="/" class="font-bold uppercase text-sky-400">{$t('error.here')}</a>
 	</div>
 	<div class="py-10 text-xs font-bold">
 		<pre

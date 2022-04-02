@@ -9,5 +9,8 @@
 	"error": {
 		"you_can_find_your_way_back": "You can find your way back",
 		"here": "here"
+	},
+	"index": {
+		"dashboard": "Dashboard"
 	}
 }

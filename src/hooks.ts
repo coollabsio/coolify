@@ -6,6 +6,7 @@ import { getUserDetails, sentry } from '$lib/common';
 import { version } from '$lib/common';
 import cookie from 'cookie';
 import { dev } from '$app/env';
+import { locales } from '$lib/translations';
 
 export const handle = handleSession(
 	{
@@ -15,6 +16,29 @@ export const handle = handleSession(
 	},
 	async function ({ event, resolve }) {
 		let response;
+
+		const { url, request } = event;
+		const { pathname } = url;
+
+		// Get defined locales
+		const supportedLocales = locales.get();
+		let locale;
+
+		if (event.locals.cookies) {
+			locale = supportedLocales.find(
+				(l) => `${l}`.toLowerCase() === `${event.locals.cookies['lang']}`.toLowerCase()
+			);
+		}
+
+		if (!locale) {
+			locale = `${`${request.headers.get('accept-language')}`.match(
+				/[a-zA-Z]+?(?=-|_|,|;)/
+			)}`.toLowerCase();
+
+			// Set default locale if user preferred locale does not match
+			if (!supportedLocales.includes(locale)) locale = 'en';
+		}
+
 		try {
 			if (event.locals.cookies) {
 				if (event.locals.cookies['kit.session']) {
@@ -24,7 +48,8 @@ export const handle = handleSession(
 						teamId,
 						permission,
 						isAdmin: permission === 'admin' || permission === 'owner',
-						expires: event.locals.session.data.expires
+						expires: event.locals.session.data.expires,
+						lang: locale
 					};
 
 					if (JSON.stringify(event.locals.session.data) !== JSON.stringify(newSession)) {
@@ -34,12 +59,14 @@ export const handle = handleSession(
 			}
 
 			response = await resolve(event, {
-				ssr: !event.url.pathname.startsWith('/webhooks/success')
+				ssr: !event.url.pathname.startsWith('/webhooks/success'),
+				transformPage: ({ html }) => html.replace(/<html.*>/, `<html lang="${locale}">`)
 			});
 		} catch (error) {
 			console.log(error);
 			response = await resolve(event, {
-				ssr: !event.url.pathname.startsWith('/webhooks/success')
+				ssr: !event.url.pathname.startsWith('/webhooks/success'),
+				transformPage: ({ html }) => html.replace(/<html.*>/, `<html lang="${locale}">`)
 			});
 			response.headers.append(
 				'Set-Cookie',
@@ -62,9 +89,18 @@ export const handle = handleSession(
 					expires: new Date('Thu, 01 Jan 1970 00:00:01 GMT')
 				})
 			);
-		} finally {
-			return response;
 		}
+
+		response.headers.append(
+			'Set-Cookie',
+			cookie.serialize('lang', locale, {
+				path: '/',
+				sameSite: 'strict',
+				maxAge: 30 * 24 * 60 * 60
+			})
+		);
+
+		return response;
 	}
 );
 
