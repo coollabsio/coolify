@@ -8,7 +8,7 @@
 	import { createEventDispatcher } from 'svelte';
 	const dispatch = createEventDispatcher();
 
-	let batchSecrets;
+	let batchSecrets = '';
 	function setBatchValue(event) {
 		batchSecrets = event.target?.value;
 	}
@@ -33,14 +33,14 @@
 				limit(() => saveSecret({ name, value, applicationId: id, isNew, dispatch }))
 			)
 		);
-
+		batchSecrets = '';
 		refreshSecrets();
 	}
 </script>
 
 <h2 class="title my-6 font-bold">Paste .env file</h2>
 <form on:submit={getValues} class="mb-12 w-full">
-	<textarea on:change={setBatchValue} class="mb-2 min-h-[200px] w-full" />
+	<textarea value={batchSecrets} on:change={setBatchValue} class="mb-2 min-h-[200px] w-full" />
 	<button
 		class="bg-green-600 hover:bg-green-500 disabled:text-white disabled:opacity-40"
 		type="submit">Batch add secrets</button
