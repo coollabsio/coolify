@@ -1,0 +1,40 @@
+{
+	"index": {
+		"dashboard": "Tableau de bord",
+		"applications": "Applications",
+		"databases": "Bases de données",
+		"destinations": "Destinations",
+		"git_sources": "Sources Git",
+		"services": "Prestations de service",
+		"teams": "Équipes"
+	},
+	"error": {
+		"here": "ici",
+		"you_can_find_your_way_back": "Tu peux retrouver ton chemin"
+	},
+	"forms": {
+		"email": "E-mail",
+		"password": "Mot de passe",
+		"password_again": "Retaper le mot de passe",
+		"passwords_not_match": "Les mots de passe ne correspondent pas."
+	},
+	"layout": {
+		"new_version": "Nouvelle version disponible. \nActualisation...",
+		"switch_to_a_different_team": "Changer d'équipe...",
+		"update_available": "Mise à jour disponible",
+		"update_done": "Mise à jour terminée.",
+		"wait_new_version_startup": "Attente du lancement de la nouvelle version..."
+	},
+	"login": {
+		"already_logged_in": "Déjà connecté...",
+		"authenticating": "Authentification...",
+		"login": "Connexion"
+	},
+	"register": {
+		"first_user": "Vous enregistrez le premier utilisateur. \nCe sera l'administrateur de votre instance Coolify.",
+		"register": "S'inscrire"
+	},
+	"reset": {
+		"reset_password": "Réinitialiser le mot de passe"
+	}
+}

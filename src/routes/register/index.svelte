@@ -6,6 +6,7 @@
 	import { session } from '$app/stores';
 	import { post } from '$lib/api';
 	import { errorNotification } from '$lib/form';
+	import { t } from '$lib/translations';
 	import { onMount } from 'svelte';
 
 	let loading = false;
@@ -20,7 +21,7 @@
 	});
 	async function handleSubmit() {
 		if (password !== passwordCheck) {
-			return errorNotification('Passwords do not match.');
+			return errorNotification($t('forms.passwords_not_match'));
 		}
 		loading = true;
 		try {
@@ -57,7 +58,7 @@
 </div>
 <div class="flex h-screen flex-col items-center justify-center">
 	{#if $session.userId}
-		<div class="flex justify-center px-4 text-xl font-bold">Already logged in...</div>
+		<div class="flex justify-center px-4 text-xl font-bold">{$t('login.already_logged_in')}</div>
 	{:else}
 		<div class="flex justify-center px-4">
 			<form on:submit|preventDefault={handleSubmit} class="flex flex-col py-4 space-y-2">
@@ -66,7 +67,7 @@
 				<input
 					type="email"
 					name="email"
-					placeholder="Email"
+					placeholder={$t('forms.email')}
 					autocomplete="off"
 					required
 					bind:this={emailEl}
@@ -75,28 +76,28 @@
 				<input
 					type="password"
 					name="password"
-					placeholder="Password"
+					placeholder={$t('forms.password')}
 					bind:value={password}
 					required
 				/>
 				<input
 					type="password"
 					name="passwordCheck"
-					placeholder="Password again"
+					placeholder={$t('forms.password_again')}
 					bind:value={passwordCheck}
 					required
 				/>
 
 				<div class="flex space-x-2 h-8 items-center justify-center pt-8">
 					<button type="submit" class="hover:bg-coollabs-100 text-white bg-coollabs"
-						>Register</button
+						>{$t('register.register')}</button
 					>
 				</div>
 			</form>
 		</div>
 		{#if userCount === 0}
 			<div class="pt-5">
-				You are registering the first user. It will be the administrator of your Coolify instance.
+				{$t('register.first_user')}
 			</div>
 		{/if}
 	{/if}

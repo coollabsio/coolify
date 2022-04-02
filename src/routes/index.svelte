@@ -46,7 +46,7 @@
 						class="flex cursor-pointer flex-col rounded p-6 text-center text-green-500 no-underline transition duration-150 hover:bg-green-500 hover:text-white"
 					>
 						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
-							Applications
+							{$t('index.applications')}
 						</dt>
 						<dd class="order-1 text-5xl font-extrabold ">
 							{applicationsCount}
@@ -58,7 +58,7 @@
 						class="flex cursor-pointer flex-col rounded p-6 text-center text-sky-500 no-underline transition duration-150 hover:bg-sky-500 hover:text-white"
 					>
 						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
-							Destinations
+							{$t('index.destinations')}
 						</dt>
 						<dd class="order-1 text-5xl font-extrabold ">
 							{destinationsCount}
@@ -70,7 +70,7 @@
 						class="flex cursor-pointer flex-col rounded p-6 text-center text-orange-500 no-underline transition duration-150 hover:bg-orange-500 hover:text-white"
 					>
 						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
-							Git Sources
+							{$t('index.git_sources')}
 						</dt>
 						<dd class="order-1 text-5xl font-extrabold ">
 							{sourcesCount}
@@ -81,7 +81,9 @@
 						sveltekit:prefetch
 						class="flex cursor-pointer flex-col rounded p-6 text-center text-purple-500 no-underline transition duration-150 hover:bg-purple-500 hover:text-white"
 					>
-						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">Databases</dt>
+						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
+							{$t('index.databases')}
+						</dt>
 						<dd class="order-1 text-5xl font-extrabold ">{databasesCount}</dd>
 					</a>
 					<a
@@ -89,7 +91,9 @@
 						sveltekit:prefetch
 						class="flex cursor-pointer flex-col rounded p-6 text-center text-pink-500 no-underline transition duration-150 hover:bg-pink-500 hover:text-white"
 					>
-						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">Services</dt>
+						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
+							{$t('index.services')}
+						</dt>
 						<dd class="order-1 text-5xl font-extrabold ">{servicesCount}</dd>
 					</a>
 
@@ -98,7 +102,9 @@
 						sveltekit:prefetch
 						class="flex cursor-pointer flex-col rounded p-6 text-center text-cyan-500 no-underline transition duration-150 hover:bg-cyan-500 hover:text-white"
 					>
-						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">Teams</dt>
+						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
+							{$t('index.teams')}
+						</dt>
 						<dd class="order-1 text-5xl font-extrabold ">
 							{teamsCount}
 						</dd>

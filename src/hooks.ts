@@ -18,26 +18,21 @@ export const handle = handleSession(
 		let response;
 
 		const { url, request } = event;
-		const { pathname } = url;
 
 		// Get defined locales
 		const supportedLocales = locales.get();
 		let locale;
 
-		if (event.locals.cookies) {
-			locale = supportedLocales.find(
-				(l) => `${l}`.toLowerCase() === `${event.locals.cookies['lang']}`.toLowerCase()
-			);
-		}
-
-		if (!locale) {
+		if (event.locals.cookies['lang']) {
+			locale = event.locals.cookies['lang'];
+		} else if (!locale) {
 			locale = `${`${request.headers.get('accept-language')}`.match(
 				/[a-zA-Z]+?(?=-|_|,|;)/
 			)}`.toLowerCase();
-
-			// Set default locale if user preferred locale does not match
-			if (!supportedLocales.includes(locale)) locale = 'en';
 		}
+
+		// Set default locale if user preferred locale does not match
+		if (!supportedLocales.includes(locale)) locale = 'en';
 
 		try {
 			if (event.locals.cookies) {
@@ -105,7 +100,18 @@ export const handle = handleSession(
 );
 
 export const getSession: GetSession = function ({ locals }) {
+	// Get defined locales
+	const supportedLocales = locales.get();
+	let locale;
+
+	if (locals.cookies) {
+		locale = supportedLocales.find(
+			(l) => `${l}`.toLowerCase() === `${locals.cookies['lang']}`.toLowerCase()
+		);
+	}
+
 	return {
+		lang: locale,
 		version,
 		...locals.session.data
 	};

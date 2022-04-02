@@ -12,12 +12,6 @@ const config = {
 		vite: {
 			optimizeDeps: {
 				exclude: ['svelte-kit-cookie-session']
-			},
-			server: {
-				fs: {
-					// Allow serving files from one level up to the project root
-					allow: ['../locales']
-				}
 			}
 		}
 	}

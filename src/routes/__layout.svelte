@@ -4,6 +4,11 @@
 	import { locale, loadTranslations } from '$lib/translations';
 
 	export const load: Load = async ({ fetch, url, session }) => {
+		const { pathname } = url;
+		const initLocale = locale.get() || session.lang || 'en';
+
+		await loadTranslations(initLocale, pathname);
+
 		if (!session.userId && !publicPaths.includes(url.pathname)) {
 			return {
 				status: 302,
@@ -15,12 +20,6 @@
 		}
 		const endpoint = `/teams.json`;
 		const res = await fetch(endpoint);
-
-		const { pathname } = url;
-		const defaultLocale = session.lang;
-		const initLocale = locale.get() || defaultLocale;
-
-		await loadTranslations(initLocale, pathname);
 
 		if (res.ok) {
 			return {
