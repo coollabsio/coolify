@@ -18,6 +18,36 @@ export const handle = handleSession(
 	},
 	async function ({ event, resolve }) {
 		let response;
+		let locale;
+
+		const { url, request } = event;
+		const { pathname } = url;
+
+		// If this request is a route request
+		if (routeRegex.test(pathname)) {
+			// Get defined locales
+			const supportedLocales = locales.get();
+
+			// Try to get locale from `pathname`.
+			locale = supportedLocales.find(
+				(l) => `${l}`.toLowerCase() === `${pathname.match(/[^/]+?(?=\/|$)/)}`.toLowerCase()
+			);
+
+			if (!locale) {
+				// Get user preferred locale
+				locale = `${`${request.headers.get('accept-language')}`.match(/[a-zA-Z-]+?(?=_|,|;)/)}`;
+
+				// Set default locale if user preferred locale does not match
+				if (!supportedLocales.includes(locale)) locale = 'en-US';
+
+				// 302 redirect
+				return new Response(undefined, {
+					headers: { location: `/${locale}${pathname}` },
+					status: 302
+				});
+			}
+		}
+
 		try {
 			if (event.locals.cookies) {
 				if (event.locals.cookies['kit.session']) {
@@ -40,7 +70,6 @@ export const handle = handleSession(
 				ssr: !event.url.pathname.startsWith('/webhooks/success')
 			});
 		} catch (error) {
-			console.log(error);
 			response = await resolve(event, {
 				ssr: !event.url.pathname.startsWith('/webhooks/success')
 			});
@@ -67,40 +96,9 @@ export const handle = handleSession(
 			);
 		}
 
-		const { url, request } = event;
-		const { pathname } = url;
-
-		// If this request is a route request
-		if (routeRegex.test(pathname)) {
-			// Get defined locales
-			const supportedLocales = locales.get();
-
-			// Try to get locale from `pathname`.
-			let locale = supportedLocales.find(
-				(l) => `${l}`.toLowerCase() === `${pathname.match(/[^/]+?(?=\/|$)/)}`.toLowerCase()
-			);
-
-			// If route locale is not supported
-			if (!locale) {
-				// Get user preferred locale
-				locale = `${`${request.headers['accept-language']}`.match(
-					/[a-zA-Z]+?(?=-|_|,|;)/
-				)}`.toLowerCase();
-
-				// Set default locale if user preferred locale does not match
-				if (!supportedLocales.includes(locale)) locale = 'en';
-
-				// 301 redirect
-				return new Response(undefined, {
-					headers: { location: `/${locale}${pathname}` },
-					status: 301
-				});
-			}
-
-			// Add html `lang` attribute
+		if (locale && response.headers.get('content-type') === 'text/html') {
 			const body = await response.text();
-
-			return new Response(`${body}`.replace(/<html.*>/, `<html lang="${locale}">`), response);
+			return new Response(body.replace(/<html.*>/, `<html lang="${locale}">`), response);
 		}
 
 		return response;
