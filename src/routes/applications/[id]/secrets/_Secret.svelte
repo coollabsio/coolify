@@ -9,11 +9,11 @@
 	if (isPRMRSecret) value = PRMRSecret.value;
 
 	import { page } from '$app/stores';
-	import { del, post } from '$lib/api';
+	import { del } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { errorNotification } from '$lib/form';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { createEventDispatcher } from 'svelte';
+	import { saveSecret } from './utils';
 
 	const dispatch = createEventDispatcher();
 	const { id } = $page.params;
@@ -30,28 +30,20 @@
 			return errorNotification(error);
 		}
 	}
-	async function saveSecret(isNew = false) {
-		if (!name) return errorNotification('Name is required.');
-		if (!value) return errorNotification('Value is required.');
-		try {
-			await post(`/applications/${id}/secrets.json`, {
-				name,
-				value,
-				isBuildSecret,
-				isPRMRSecret,
-				isNew
-			});
-			dispatch('refresh');
-			if (isNewSecret) {
-				name = '';
-				value = '';
-				isBuildSecret = false;
-			}
-			toast.push('Secret saved.');
-		} catch ({ error }) {
-			return errorNotification(error);
-		}
+
+	async function createSecret(isNew) {
+		saveSecret({
+			isNew,
+			name,
+			value,
+			isBuildSecret,
+			isPRMRSecret,
+			isNewSecret,
+			applicationId: id,
+			dispatch
+		});
 	}
+
 	function setSecretValue() {
 		if (isNewSecret) {
 			isBuildSecret = !isBuildSecret;
@@ -133,12 +125,14 @@
 <td>
 	{#if isNewSecret}
 		<div class="flex items-center justify-center">
-			<button class="bg-green-600 hover:bg-green-500" on:click={() => saveSecret(true)}>Add</button>
+			<button class="bg-green-600 hover:bg-green-500" on:click={() => createSecret(true)}
+				>Add</button
+			>
 		</div>
 	{:else}
 		<div class="flex flex-row justify-center space-x-2">
 			<div class="flex items-center justify-center">
-				<button class="" on:click={() => saveSecret(false)}>Set</button>
+				<button class="" on:click={() => createSecret(false)}>Set</button>
 			</div>
 			{#if !isPRMRSecret}
 				<div class="flex justify-center items-end">

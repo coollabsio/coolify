@@ -144,7 +144,7 @@
 	{#if logs.length === 0}
 		<div class="text-xl font-bold tracking-tighter">Waiting for the logs...</div>
 	{:else}
-		<div class="relative">
+		<div class="relative w-full">
 			<LoadingLogs />
 			<div class="flex justify-end sticky top-0 p-2">
 				<button
@@ -172,7 +172,7 @@
 				</button>
 			</div>
 			<div
-				class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
+				class="font-mono w-full leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
 				bind:this={logsEl}
 			>
 				<div class="px-2">
