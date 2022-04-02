@@ -143,9 +143,13 @@
 </script>
 
 <div class="flex items-center space-x-2 p-5 px-6 font-bold">
-	<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
-		{application.name}
+	<div class="-mb-6 flex-col">
+		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
+			Configuration
+		</div>
+		<span class="text-xs">{application.name} </span>
 	</div>
+
 	{#if application.fqdn}
 		<a
 			href={application.fqdn}
@@ -303,14 +307,14 @@
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="grid grid-cols-2">
 				<div class="flex-col">
-					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">Domain (FQDN)</label>
+					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">URL (FQDN)</label>
 					{#if browser && window.location.hostname === 'demo.coolify.io'}
 						<Explainer
-							text="<span class='text-white font-bold'>You can use the predefined random domain name or enter your own domain name.</span>"
+							text="<span class='text-white font-bold'>You can use the predefined random url name or enter your own domain name.</span>"
 						/>
 					{/if}
 					<Explainer
-						text="If you specify <span class='text-green-500 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-green-500 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application.<br><br><span class='text-white font-bold'>You must set your DNS to point to the server IP in advance.</span>"
+						text="If you specify <span class='text-green-500 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-green-500 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the url, you must first stop the application.<br><br><span class='text-white font-bold'>You must set your DNS to point to the server IP in advance.</span>"
 					/>
 				</div>
 				<input

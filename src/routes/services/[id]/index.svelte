@@ -29,19 +29,10 @@
 </script>
 
 <script lang="ts">
-	import PlausibleAnalytics from '$lib/components/svg/services/PlausibleAnalytics.svelte';
-	import NocoDb from '$lib/components/svg/services/NocoDB.svelte';
-	import MinIo from '$lib/components/svg/services/MinIO.svelte';
-	import VsCodeServer from '$lib/components/svg/services/VSCodeServer.svelte';
-	import Wordpress from '$lib/components/svg/services/Wordpress.svelte';
-	import Services from './_Services/_Services.svelte';
-	import VaultWarden from '$lib/components/svg/services/VaultWarden.svelte';
 	import cuid from 'cuid';
 	import { browser } from '$app/env';
-	import LanguageTool from '$lib/components/svg/services/LanguageTool.svelte';
-	import N8n from '$lib/components/svg/services/N8n.svelte';
-	import UptimeKuma from '$lib/components/svg/services/UptimeKuma.svelte';
-	import Ghost from '$lib/components/svg/services/Ghost.svelte';
+	import ServiceLinks from '$lib/components/ServiceLinks.svelte';
+	import Services from './_Services/_Services.svelte';
 
 	export let service;
 	export let isRunning;
@@ -53,12 +44,15 @@
 </script>
 
 <div
-	class="flex items-center space-x-3 px-6 text-2xl font-bold"
+	class="flex items-center space-x-2 p-5 px-6 font-bold"
 	class:p-5={service.fqdn}
 	class:p-6={!service.fqdn}
 >
-	<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
-		{service.name}
+	<div class="-mb-6 flex-col">
+		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
+			Configuration
+		</div>
+		<span class="text-xs">{service.name}</span>
 	</div>
 	{#if service.fqdn}
 		<a
@@ -83,49 +77,7 @@
 		>
 	{/if}
 
-	<div>
-		{#if service.type === 'plausibleanalytics'}
-			<a href="https://plausible.io" target="_blank">
-				<PlausibleAnalytics />
-			</a>
-		{:else if service.type === 'nocodb'}
-			<a href="https://nocodb.com" target="_blank">
-				<NocoDb />
-			</a>
-		{:else if service.type === 'minio'}
-			<a href="https://min.io" target="_blank">
-				<MinIo />
-			</a>
-		{:else if service.type === 'vscodeserver'}
-			<a href="https://coder.com" target="_blank">
-				<VsCodeServer />
-			</a>
-		{:else if service.type === 'wordpress'}
-			<a href="https://wordpress.org" target="_blank">
-				<Wordpress />
-			</a>
-		{:else if service.type === 'vaultwarden'}
-			<a href="https://github.com/dani-garcia/vaultwarden" target="_blank">
-				<VaultWarden />
-			</a>
-		{:else if service.type === 'languagetool'}
-			<a href="https://languagetool.org/dev" target="_blank">
-				<LanguageTool />
-			</a>
-		{:else if service.type === 'n8n'}
-			<a href="https://n8n.io" target="_blank">
-				<N8n />
-			</a>
-		{:else if service.type === 'uptimekuma'}
-			<a href="https://github.com/louislam/uptime-kuma" target="_blank">
-				<UptimeKuma />
-			</a>
-		{:else if service.type === 'ghost'}
-			<a href="https://ghost.org" target="_blank">
-				<Ghost />
-			</a>
-		{/if}
-	</div>
+	<ServiceLinks {service} />
 </div>
 
 <Services bind:service {isRunning} {readOnly} />

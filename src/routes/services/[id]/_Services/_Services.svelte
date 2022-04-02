@@ -108,9 +108,9 @@
 			</div>
 			<div class="grid grid-cols-2 px-10">
 				<div class="flex-col ">
-					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">Domain (FQDN)</label>
+					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">URL (FQDN)</label>
 					<Explainer
-						text="If you specify <span class='text-pink-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-pink-600 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application."
+						text="If you specify <span class='text-pink-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-pink-600 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the url, you must first stop the application."
 					/>
 				</div>
 
