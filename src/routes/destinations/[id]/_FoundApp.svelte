@@ -2,6 +2,7 @@
 	export let app;
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
+	import { t } from '$lib/translations';
 	const { id } = $page.params;
 	let loading = true;
 	async function checkApp() {
@@ -58,20 +59,20 @@
 <div class="box-selection hover:border-transparent hover:bg-coolgray-200">
 	<div class="truncate pb-2 text-center text-xl font-bold">{app.domain}</div>
 	{#if loading}
-		<div class="w-full text-center font-bold">Loading...</div>
+		<div class="w-full text-center font-bold">{$t('forms.loading')}</div>
 	{:else if app.foundByDomain}
 		<div class="w-full bg-coolgray-200 text-xs">
-			<span class="text-red-500">Domain</span> already used for
+			{@html $t('forms.already_used_for', { type: 'Domains' })}
 			<span class="text-red-500">{app.foundName}</span>
 		</div>
 	{:else if app.foundByRepository}
 		<div class="w-full bg-coolgray-200 text-xs">
-			<span class="text-red-500">Repository</span> already used for
+			{@html $t('forms.already_used_for', { type: 'Repository' })}
 			<span class="text-red-500">{app.foundName}</span>
 		</div>
 	{:else}
 		<button class="bg-green-600 hover:bg-green-500 w-full" on:click={addToCoolify}
-			>Add to Coolify</button
+			>{$t('destination.add_to_coolify')}</button
 		>
 	{/if}
 </div>

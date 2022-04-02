@@ -31,7 +31,7 @@
 		"password_again": "Password again",
 		"save": "Save",
 		"saving": "Saving...",
-		"name": "Name",
+		"name": "name",
 		"value": "Value",
 		"action": "Action",
 		"is_required": "is required.",
@@ -52,7 +52,11 @@
 		"user": "User",
 		"loading": "Loading...",
 		"version": "Version",
-		"host": "Host"
+		"host": "Host",
+		"already_used_for": "<span class=\"text-red-500\">{type}</span> already used for",
+		"configuration": "Configuration",
+		"engine": "Engine",
+		"network": "Network"
 	},
 	"register": {
 		"register": "Register",
@@ -182,5 +186,18 @@
 		"delete_database": "Delete Database",
 		"permission_denied_delete_database": "You do not have permission to delete a Database",
 		"no_databases_found": "No databases found"
+	},
+	"destination": {
+		"delete_destination": "Delete Destination",
+		"permission_denied_delete_destination": "You do not have permission to delete this destination",
+		"add_to_coolify": "Add to Coolify",
+		"coolify_proxy_stopped": "Coolify Proxy stopped!",
+		"coolify_proxy_started": "Coolify Proxy started!",
+		"confirm_restart_proxy": "Are you sure you want to restart the proxy? Everything will be reconfigured in ~10 secs.",
+		"coolify_proxy_restarting": "Coolify Proxy restarting...",
+		"restarting_please_wait": "Restarting... please wait...",
+		"force_restart_proxy": "Force restart proxy",
+		"use_coolify_proxy": "Use Coolify Proxy?",
+		"no_destination_found": "No destination found"
 	}
 }
