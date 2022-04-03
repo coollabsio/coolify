@@ -47,9 +47,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	}
 	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	Dockerfile.push(`EXPOSE ${port}`);
-	console.log({ pythonWSGI });
 	if (pythonWSGI?.toLowerCase() === 'gunicorn') {
-		console.log({ pythonModule, pythonVariable });
 		Dockerfile.push(`CMD gunicorn -w=4 -b=0.0.0.0:8000 ${pythonModule}:${pythonVariable}`);
 	} else if (pythonWSGI?.toLowerCase() === 'uwsgi') {
 		Dockerfile.push(
