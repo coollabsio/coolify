@@ -21,7 +21,7 @@
 
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { dateOptions, getDomain } from '$lib/components/common';
+	import { changeQueryParams, dateOptions, getDomain } from '$lib/components/common';
 
 	import BuildLog from './_BuildLog.svelte';
 	import { get } from '$lib/api';
@@ -79,11 +79,9 @@
 			noMoreBuilds = true;
 		}
 	}
-	async function loadBuild(build) {
+	function loadBuild(build) {
 		buildId = build;
-		const queryParams = new URLSearchParams(window.location.search);
-		queryParams.set('buildId', buildId);
-		return history.pushState(null, null, '?' + queryParams.toString());
+		return changeQueryParams(buildId);
 	}
 </script>
 

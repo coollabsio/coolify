@@ -88,7 +88,6 @@
 		try {
 			const { buildId } = await post(`/applications/${id}/deploy.json`, { ...application });
 			toast.push('Deployment queued.');
-			console.log($page.url);
 			if ($page.url.pathname.startsWith(`/applications/${id}/logs/build`)) {
 				return window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
 			} else {

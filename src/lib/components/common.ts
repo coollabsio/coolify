@@ -37,3 +37,9 @@ export function dashify(str: string, options?: any): string {
 		.replace(/-{2,}/g, (m) => (options && options.condense ? '-' : m))
 		.toLowerCase();
 }
+
+export function changeQueryParams(buildId) {
+	const queryParams = new URLSearchParams(window.location.search);
+	queryParams.set('buildId', buildId);
+	return history.pushState(null, null, '?' + queryParams.toString());
+}
