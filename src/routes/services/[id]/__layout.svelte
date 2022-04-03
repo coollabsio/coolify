@@ -73,7 +73,7 @@
 	let loading = false;
 
 	async function deleteService() {
-		const sure = confirm(t.get('application.confirm_to_delete', { name: service.name }));
+		const sure = confirm($t('application.confirm_to_delete', { name: service.name }));
 		if (sure) {
 			loading = true;
 			try {
@@ -88,7 +88,7 @@
 		}
 	}
 	async function stopService() {
-		const sure = confirm(t.get('application.confirm_stop', { name: service.name }));
+		const sure = confirm($t('database.confirm_stop', { name: service.name }));
 		if (sure) {
 			loading = true;
 			try {
