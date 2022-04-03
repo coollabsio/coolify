@@ -140,7 +140,11 @@ export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, ap
         `
 			);
 			await fs.writeFile(`${workdir}/entrypoint.sh`, `chown -R 1000 /app`);
-			saveBuildLog({ line: 'Copied default configuration file for PHP.', buildId, applicationId });
+			await saveBuildLog({
+				line: 'Copied default configuration file for PHP.',
+				buildId,
+				applicationId
+			});
 		} else if (staticDeployments.includes(buildPack)) {
 			await fs.writeFile(
 				`${workdir}/nginx.conf`,
@@ -194,7 +198,7 @@ export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, ap
             }
             `
 			);
-			saveBuildLog({ line: 'Copied default configuration file.', buildId, applicationId });
+			await saveBuildLog({ line: 'Copied default configuration file.', buildId, applicationId });
 		}
 	} catch (error) {
 		console.log(error);

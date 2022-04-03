@@ -88,12 +88,12 @@ export async function buildImage({
 	debug = false
 }) {
 	if (isCache) {
-		saveBuildLog({ line: `Building cache image started.`, buildId, applicationId });
+		await saveBuildLog({ line: `Building cache image started.`, buildId, applicationId });
 	} else {
-		saveBuildLog({ line: `Building image started.`, buildId, applicationId });
+		await saveBuildLog({ line: `Building image started.`, buildId, applicationId });
 	}
 	if (!debug && isCache) {
-		saveBuildLog({
+		await saveBuildLog({
 			line: `Debug turned off. To see more details, allow it in the configuration.`,
 			buildId,
 			applicationId
@@ -132,7 +132,11 @@ export async function streamEvents({ stream, docker, buildId, applicationId, deb
 			} else if (event.stream) {
 				if (event.stream !== '\n') {
 					if (debug)
-						saveBuildLog({ line: `${event.stream.replace('\n', '')}`, buildId, applicationId });
+						await saveBuildLog({
+							line: `${event.stream.replace('\n', '')}`,
+							buildId,
+							applicationId
+						});
 				}
 			}
 		}

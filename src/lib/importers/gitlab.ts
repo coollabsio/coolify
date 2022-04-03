@@ -11,11 +11,11 @@ export default async function ({
 	buildId,
 	privateSshKey
 }): Promise<any> {
-	saveBuildLog({ line: 'GitLab importer started.', buildId, applicationId });
+	await saveBuildLog({ line: 'GitLab importer started.', buildId, applicationId });
 	await asyncExecShell(`echo '${privateSshKey}' > ${repodir}/id.rsa`);
 	await asyncExecShell(`chmod 600 ${repodir}/id.rsa`);
 
-	saveBuildLog({
+	await saveBuildLog({
 		line: `Cloning ${repository}:${branch} branch.`,
 		buildId,
 		applicationId
