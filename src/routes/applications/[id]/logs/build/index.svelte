@@ -195,9 +195,11 @@
 				</div>
 			{/each}
 		</div>
-		<div class="flex space-x-2">
-			<button disabled={noMoreBuilds} class="w-full" on:click={loadMoreBuilds}>Load More</button>
-		</div>
+		{#if builds.length > 0}
+			<div class="flex space-x-2">
+				<button disabled={noMoreBuilds} class="w-full" on:click={loadMoreBuilds}>Load More</button>
+			</div>
+		{/if}
 	</div>
 	<div class="flex-1 md:w-96">
 		{#if buildId}
