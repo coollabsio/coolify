@@ -81,7 +81,9 @@
 	}
 	async function loadBuild(build) {
 		buildId = build;
-		await goto(`/applications/${id}/logs/build?buildId=${buildId}`);
+		const queryParams = new URLSearchParams(window.location.search);
+		queryParams.set('buildId', buildId);
+		return history.pushState(null, null, '?' + queryParams.toString());
 	}
 </script>
 
@@ -195,10 +197,13 @@
 				</div>
 			{/each}
 		</div>
-		{#if builds.length > 0}
-			<div class="flex space-x-2">
-				<button disabled={noMoreBuilds} class="w-full" on:click={loadMoreBuilds}>Load More</button>
-			</div>
+		{#if !noMoreBuilds}
+			{#if buildCount > 5}
+				<div class="flex space-x-2">
+					<button disabled={noMoreBuilds} class="w-full" on:click={loadMoreBuilds}>Load More</button
+					>
+				</div>
+			{/if}
 		{/if}
 	</div>
 	<div class="flex-1 md:w-96">
