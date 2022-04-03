@@ -175,7 +175,7 @@ export async function configureHAProxy() {
 							isRunning,
 							isHttps,
 							redirectValue,
-							redirectTo: isWWW ? domain : 'www.' + domain,
+							redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain,
 							updatedAt: updatedAt.getTime()
 						});
 					}
@@ -199,7 +199,7 @@ export async function configureHAProxy() {
 									isRunning,
 									isHttps,
 									redirectValue,
-									redirectTo: isWWW ? previewDomain : 'www.' + previewDomain,
+									redirectTo: isWWW ? previewDomain.replace('www.', '') : 'www.' + previewDomain,
 									updatedAt: updatedAt.getTime()
 								});
 							}
@@ -242,7 +242,7 @@ export async function configureHAProxy() {
 								isRunning,
 								isHttps,
 								redirectValue,
-								redirectTo: isWWW ? domain : 'www.' + domain,
+								redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain,
 								updatedAt: updatedAt.getTime()
 							});
 						}
@@ -262,7 +262,7 @@ export async function configureHAProxy() {
 				domain,
 				isHttps,
 				redirectValue,
-				redirectTo: isWWW ? domain : 'www.' + domain
+				redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain
 			});
 		}
 		const output = mustache.render(template, data);
