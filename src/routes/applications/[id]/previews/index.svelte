@@ -30,7 +30,6 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
 	import { toast } from '@zerodevx/svelte-toast';
-	import BatchSecrets from '../secrets/_BatchSecrets.svelte';
 
 	const { id } = $page.params;
 	async function refreshSecrets() {
@@ -122,13 +121,13 @@
 		{/if}
 	</a>
 </div>
-<div class="mx-auto max-w-6xl rounded-xl px-6 pt-4">
+<div class="mx-auto max-w-6xl px-6 pt-4">
 	<div class="flex justify-center py-4 text-center">
 		<Explainer
 			customClass="w-full"
 			text={applicationSecrets.length === 0
 				? "You can add secrets to PR/MR deployments. Please add secrets to the application first. <br>Useful for creating <span class='text-green-500 font-bold'>staging</span> environments."
-				: "These values overwrite application secrets in PR/MR deployments. Useful for creating <span class='text-green-500 font-bold'>staging</span> environments."}
+				: "These values overwrite application secrets in PR/MR deployments. <br>Useful for creating <span class='text-green-500 font-bold'>staging</span> environments."}
 		/>
 	</div>
 	{#if applicationSecrets.length !== 0}
@@ -183,4 +182,3 @@
 		{/if}
 	</div>
 </div>
-<BatchSecrets secrets={PRMRSecrets} {id} {refreshSecrets} />

@@ -106,7 +106,7 @@
 		{/if}
 	</a>
 </div>
-<div class="mx-auto max-w-6xl rounded-xl px-6 pt-4">
+<div class="mx-auto max-w-6xl px-6 pt-4">
 	<table class="mx-auto border-separate text-left">
 		<thead>
 			<tr class="h-12">
