@@ -159,7 +159,7 @@
 						class="icons tooltip-right bg-coolgray-200 hover:text-white"
 						class:text-white={$page.url.pathname === '/'}
 						class:bg-coolgray-500={$page.url.pathname === '/'}
-						data-tooltip="Dashboard"
+						data-tooltip={$t('index.dashboard')}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -188,7 +188,7 @@
 							$page.url.pathname.startsWith('/new/application')}
 						class:bg-coolgray-500={$page.url.pathname.startsWith('/applications') ||
 							$page.url.pathname.startsWith('/new/application')}
-						data-tooltip="Applications"
+						data-tooltip={$t('index.applications')}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -216,7 +216,7 @@
 							$page.url.pathname.startsWith('/new/source')}
 						class:bg-coolgray-500={$page.url.pathname.startsWith('/sources') ||
 							$page.url.pathname.startsWith('/new/source')}
-						data-tooltip="Git Sources"
+						data-tooltip={$t('index.git_sources')}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -246,7 +246,7 @@
 							$page.url.pathname.startsWith('/new/destination')}
 						class:bg-coolgray-500={$page.url.pathname.startsWith('/destinations') ||
 							$page.url.pathname.startsWith('/new/destination')}
-						data-tooltip="Destinations"
+						data-tooltip={$t('index.destinations')}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -281,7 +281,7 @@
 							$page.url.pathname.startsWith('/new/database')}
 						class:bg-coolgray-500={$page.url.pathname.startsWith('/databases') ||
 							$page.url.pathname.startsWith('/new/database')}
-						data-tooltip="Databases"
+						data-tooltip={$t('index.databases')}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -308,7 +308,7 @@
 							$page.url.pathname.startsWith('/new/service')}
 						class:bg-coolgray-500={$page.url.pathname.startsWith('/services') ||
 							$page.url.pathname.startsWith('/new/service')}
-						data-tooltip="Services"
+						data-tooltip={$t('index.services')}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -446,7 +446,7 @@
 						class="icons tooltip-right bg-coolgray-200 hover:text-cyan-500"
 						class:text-cyan-500={$page.url.pathname.startsWith('/teams')}
 						class:bg-coolgray-500={$page.url.pathname.startsWith('/teams')}
-						data-tooltip="Teams"
+						data-tooltip={$t('index.teams')}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -472,7 +472,7 @@
 							class="icons tooltip-right bg-coolgray-200 hover:text-yellow-500"
 							class:text-yellow-500={$page.url.pathname.startsWith('/settings')}
 							class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
-							data-tooltip="Settings"
+							data-tooltip={$t('index.settings')}
 						>
 							<svg
 								xmlns="http://www.w3.org/2000/svg"
@@ -494,7 +494,7 @@
 					{/if}
 					<div
 						class="icons tooltip-right bg-coolgray-200 hover:text-red-500"
-						data-tooltip="Logout"
+						data-tooltip={$t('index.logout')}
 						on:click={logout}
 					>
 						<svg

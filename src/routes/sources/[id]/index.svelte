@@ -32,10 +32,11 @@
 	import type Prisma from '@prisma/client';
 	import Github from './_Github.svelte';
 	import Gitlab from './_Gitlab.svelte';
+	import { t } from '$lib/translations';
 </script>
 
 <div class="flex space-x-1 p-6 px-6 text-2xl font-bold">
-	<div class="tracking-tight">Git Source</div>
+	<div class="tracking-tight">{$t('application.git_source')}</div>
 	<span class="arrow-right-applications px-1 text-orange-500">></span>
 	<span class="pr-2">{source.name}</span>
 </div>

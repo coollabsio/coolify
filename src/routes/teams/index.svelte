@@ -23,6 +23,7 @@
 	import { errorNotification } from '$lib/form';
 	import { session } from '$app/stores';
 	import { post } from '$lib/api';
+	import { t } from '$lib/translations';
 
 	export let teams;
 	export let invitations;
@@ -46,7 +47,7 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Teams</div>
+	<div class="mr-4 text-2xl tracking-tight">{$t('index.teams')}</div>
 	{#if $session.isAdmin}
 		<a href="/new/team" class="add-icon bg-cyan-600 hover:bg-cyan-500">
 			<svg
@@ -69,22 +70,26 @@
 {#if invitations.length > 0}
 	<div class="mx-auto max-w-2xl pb-10">
 		<div class="flex space-x-1 p-6 font-bold">
-			<div class="title">Pending invitations</div>
+			<div class="title">{$t('team.pending_invitations')}</div>
 		</div>
 		<div class="text-center">
 			{#each invitations as invitation}
 				<div class="flex justify-center space-x-2">
 					<div>
-						Invited to <span class="font-bold text-pink-600">{invitation.teamName}</span> with
-						<span class="font-bold text-rose-600">{invitation.permission}</span> permission.
+						{@html $t('team.invited_with_permissions', {
+							teamName: invitation.teamName,
+							permission: invitation.permission
+						})}
 					</div>
 					<button
 						class="hover:bg-green-500"
-						on:click={() => acceptInvitation(invitation.id, invitation.teamId)}>Accept</button
+						on:click={() => acceptInvitation(invitation.id, invitation.teamId)}
+						>{$t('team.accept')}</button
 					>
 					<button
 						class="hover:bg-red-600"
-						on:click={() => revokeInvitation(invitation.id, invitation.teamId)}>Delete</button
+						on:click={() => revokeInvitation(invitation.id, invitation.teamId)}
+						>{$t('team.delete')}</button
 					>
 				</div>
 			{/each}
@@ -101,10 +106,10 @@
 			>
 				<div class="truncate text-center text-xl font-bold">
 					{team.team.name}
-					{team.team?.id === '0' ? '(root)' : ''}
+					{team.team?.id === '0' ? $t('team.root') : ''}
 				</div>
 
-				<div class="mt-1 text-center">{team.team._count.users} member(s)</div>
+				<div class="mt-1 text-center">{team.team._count.users} {$t('team.member')}</div>
 			</div>
 		</a>
 	{/each}

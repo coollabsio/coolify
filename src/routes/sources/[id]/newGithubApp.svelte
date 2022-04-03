@@ -31,6 +31,7 @@
 <script>
 	import { dev } from '$app/env';
 	import { getDomain, dashify } from '$lib/components/common';
+	import { t } from '$lib/translations';
 
 	export let source;
 	export let settings;
@@ -84,5 +85,5 @@
 </script>
 
 <div class="flex h-screen items-center justify-center text-3xl font-bold">
-	Redirecting to Github...
+	{$t('source.github.redirecting')}
 </div>

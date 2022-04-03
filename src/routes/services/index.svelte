@@ -11,6 +11,7 @@
 	import N8n from '$lib/components/svg/services/N8n.svelte';
 	import UptimeKuma from '$lib/components/svg/services/UptimeKuma.svelte';
 	import Ghost from '$lib/components/svg/services/Ghost.svelte';
+	import { t } from '$lib/translations';
 
 	export let services;
 	async function newService() {
@@ -20,7 +21,7 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Services</div>
+	<div class="mr-4 text-2xl tracking-tight">{$t('index.services')}</div>
 	<div on:click={newService} class="add-icon cursor-pointer bg-pink-600 hover:bg-pink-500">
 		<svg
 			class="w-6"
@@ -41,7 +42,7 @@
 <div class="flex flex-wrap justify-center">
 	{#if !services || services.length === 0}
 		<div class="flex-col">
-			<div class="text-center text-xl font-bold">No services found</div>
+			<div class="text-center text-xl font-bold">{$t('service.no_service')}</div>
 		</div>
 	{:else}
 		{#each services as service}
@@ -73,7 +74,7 @@
 					</div>
 					{#if !service.type || !service.fqdn}
 						<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
-							Configuration missing
+							{$t('application.configuration.configuration_missing')}
 						</div>
 					{:else}
 						<div class="text-center truncate">{service.type}</div>

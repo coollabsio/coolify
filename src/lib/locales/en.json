@@ -8,7 +8,8 @@
 	},
 	"error": {
 		"you_can_find_your_way_back": "You can find your way back",
-		"here": "here"
+		"here": "here",
+		"you_are_lost": "Ooops you are lost! But don't be afraid!"
 	},
 	"index": {
 		"dashboard": "Dashboard",
@@ -19,7 +20,12 @@
 		"services": "Services",
 		"teams": "Teams",
 		"not_implemented_yet": "Not implemented yet",
-		"database": "Database"
+		"database": "Database",
+		"settings": "Settings",
+		"global_settings": "Global Settings",
+		"secret": "Secret",
+		"team": "Team",
+		"logout": "Logout"
 	},
 	"login": {
 		"already_logged_in": "Already logged in...",
@@ -78,7 +84,12 @@
 		"verify_emails_without_smtp": "Verify emails without SMTP",
 		"extra_config": "Extra Config",
 		"select_a_service": "Select a Service",
-		"select_a_service_version": "Select a Service version"
+		"select_a_service_version": "Select a Service version",
+		"removing": "Removing...",
+		"remove_domain": "Remove domain",
+		"public_port_range": "Public Port Range",
+		"public_port_range_explainer": "Ports used to expose databases/services/internal services.<br> Add them to your firewall (if applicable).<br><br>You can specify a range of ports, eg: <span class='text-yellow-500 font-bold'>9000-9100</span>",
+		"no_actions_available": "No actions available"
 	},
 	"register": {
 		"register": "Register",
@@ -237,12 +248,31 @@
 		"remote_docker": "Remote Docker",
 		"organization_explainer": "Fill it if you would like to use an organization's as your Git Source. Otherwise your user will be used."
 	},
-	"eg_https_api_github_com": "eg: https://api.github.com",
-	"eg_https_github_com": "eg: https://github.com",
 	"source": {
 		"new": {
 			"git_source": "Add New Git Source",
 			"official_providers": "Official providers"
+		},
+		"no_git_sources_found": "No git sources found",
+		"delete_git_source": "Delete Git Source",
+		"permission_denied": "You do not have permission to delete a Git Source",
+		"create_new_app": "Create new {name} App",
+		"change_app_settings": "Change {name} App Settings",
+		"install_repositories": "Install Repositories",
+		"application_id": "Application ID",
+		"group_name": "Group Name",
+		"oauth_id": "OAuth ID",
+		"oauth_id_explainer": "The OAuth ID is the unique identifier of the GitLab application. <br>You can find it <span class='font-bold text-orange-600' >in the URL</span> of your GitLab OAuth Application.",
+		"register_oauth_gitlab": "Register new OAuth application on GitLab",
+		"gitlab": {
+			"self_hosted": "Instance-wide application (self-hosted)",
+			"user_owned": "User owned application",
+			"group_owned": "Group owned application",
+			"gitlab_application_type": "GitLab Application Type",
+			"already_configured": "GitLab App is already configured."
+		},
+		"github": {
+			"redirecting": "Redirecting to Github..."
 		}
 	},
 	"services": {
@@ -255,6 +285,36 @@
 		"start_service": "Start Service",
 		"permission_denied_start_service": "You do not have permission to start the service.",
 		"delete_service": "Delete Service",
-		"permission_denied_delete_service": "You do not have permission to delete a service."
+		"permission_denied_delete_service": "You do not have permission to delete a service.",
+		"no_service": "No services found"
+	},
+	"setting": {
+		"permission_denied": "You do not have permission to do this. \\nAsk an admin to modify your permissions.",
+		"domain_removed": "Domain removed",
+		"ssl_explainer": "If you specify <span class='text-yellow-500 font-bold'>https</span>, Coolify will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-yellow-500 font-bold'>www</span>, Coolify will be redirected (302) from non-www and vice versa.",
+		"must_remove_domain_before_changing": "Must remove the domain before you can change this setting.",
+		"registration_allowed": "Registration allowed?",
+		"registration_allowed_explainer": "Allow further registrations to the application. <br>It's turned off after the first registration.",
+		"coolify_proxy_settings": "Coolify Proxy Settings"
+	},
+	"team": {
+		"pending_invitations": "Pending invitations",
+		"accept": "Accept",
+		"delete": "Delete",
+		"member": "member(s)",
+		"root": "(root)",
+		"invited_with_permissions": "Invited to <span class=\"font-bold text-pink-600\">{teamName}</span> with <span class=\"font-bold text-rose-600\">{permission}</span> permission.",
+		"members": "Members",
+		"root_team_explainer": "This is the <span class='text-red-500 font-bold'>root</span> team. That means members of this group can manage instance wide settings and have all the priviliges in Coolify (imagine like root user on Linux).",
+		"permission": "Permission",
+		"you": "(You)",
+		"promote_to": "Promote to {grade}",
+		"revoke_invitation": "Revoke invitation",
+		"pending_invitation": "Pending invitation",
+		"invite_new_member": "Invite new member",
+		"send_invitation": "Send invitation",
+		"invite_only_register_explainer": "You can only invite registered users at the moment - will be extended soon.",
+		"admin": "Admin",
+		"read": "Read"
 	}
 }

@@ -3,6 +3,7 @@
 	import { page, session } from '$app/stores';
 	import { post } from '$lib/api';
 	import { errorNotification } from '$lib/form';
+	import { t } from '$lib/translations';
 	const { id } = $page.params;
 
 	let loading = false;
@@ -60,20 +61,20 @@
 </script>
 
 {#if !source.githubAppId}
-	<button on:click={newGithubApp}>Create new GitHub App</button>
+	<button on:click={newGithubApp}>{$t('source.create_new_app', { name: 'GitHub' })}</button>
 {:else if source.githubApp?.installationId}
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
 		<div class="flex space-x-1 pb-5 font-bold">
-			<div class="title">General</div>
+			<div class="title">{$t('general')}</div>
 			{#if $session.isAdmin}
 				<button
 					type="submit"
 					class:bg-orange-600={!loading}
 					class:hover:bg-orange-500={!loading}
-					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
+					disabled={loading}>{loading ? $t('forms.saving') : $t('forms.save')}</button
 				>
 				<button on:click|preventDefault={() => installRepositories(source)}
-					>Change GitHub App Settings</button
+					>{$t('source.change_app_settings', { name: 'GitHub' })}</button
 				>
 			{/if}
 		</div>
@@ -85,5 +86,5 @@
 		</div>
 	</form>
 {:else}
-	<button on:click={() => installRepositories(source)}>Install Repositories</button>
+	<button on:click={() => installRepositories(source)}>{$t('source.install_repositories')}</button>
 {/if}

@@ -4,5 +4,8 @@
 	"i18n-ally.extract.ignoredByFiles": {
 		"src\\routes\\__layout.svelte": ["Coolify", "coolLabs logo"]
 	},
-	"i18n-ally.sourceLanguage": "en"
+	"i18n-ally.sourceLanguage": "en",
+	"i18n-ally.enabledFrameworks": ["svelte"],
+	"i18n-ally.enabledParsers": ["js", "ts", "json"],
+	"i18n-ally.extract.autoDetect": true
 }
