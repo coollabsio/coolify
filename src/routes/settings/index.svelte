@@ -188,14 +188,14 @@
 			<div class="title">{$t('setting.coolify_proxy_settings')}</div>
 		</div>
 		<Explainer
-			text={`Credentials for <a class="text-white font-bold" href=${
-				fqdn
+			text={$t('setting.credential_stat_explainer', {
+				link: fqdn
 					? `http://${settings.proxyUser}:${settings.proxyPassword}@` + getDomain(fqdn) + ':8404'
 					: browser &&
 					  `http://${settings.proxyUser}:${settings.proxyPassword}@` +
 							window.location.hostname +
 							':8404'
-			} target="_blank">stats</a> page.`}
+			})}
 		/>
 		<div class="space-y-2 px-10 py-5">
 			<div class="grid grid-cols-2 items-center">
