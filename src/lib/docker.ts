@@ -126,7 +126,7 @@ export async function streamEvents({ stream, docker, buildId, applicationId, deb
 			if (err) reject(err);
 			resolve(res);
 		}
-		function onProgress(event) {
+		async function onProgress(event) {
 			if (event.error) {
 				reject(event.error);
 			} else if (event.stream) {
