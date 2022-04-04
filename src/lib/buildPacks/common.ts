@@ -124,18 +124,7 @@ export const setDefaultConfiguration = async (data) => {
 
 export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId) {
 	try {
-		// TODO: Write full .dockerignore for all deployments!!
 		if (buildPack === 'php') {
-			await fs.writeFile(
-				`${workdir}/.htaccess`,
-				`
-        RewriteEngine On
-        RewriteBase /
-        RewriteCond %{REQUEST_FILENAME} !-d
-        RewriteCond %{REQUEST_FILENAME} !-f
-        RewriteRule ^(.+)$ index.php [QSA,L]
-        `
-			);
 			await fs.writeFile(`${workdir}/entrypoint.sh`, `chown -R 1000 /app`);
 			await saveBuildLog({
 				line: 'Copied default configuration file for PHP.',
