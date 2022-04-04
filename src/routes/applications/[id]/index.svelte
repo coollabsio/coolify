@@ -296,7 +296,7 @@
 			<div class="grid grid-cols-2">
 				<div class="flex-col">
 					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100"
-						>{$t('application.domain_fqdn')}</label
+						>{$t('application.url_fqdn')}</label
 					>
 					{#if browser && window.location.hostname === 'demo.coolify.io'}
 						<Explainer

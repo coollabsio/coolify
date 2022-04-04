@@ -55,6 +55,7 @@
 		"dns_not_set_partial_error": "DNS non défini",
 		"domain_already_in_use": "Le domaine {{domain}} est déjà utilisé.",
 		"domain_fqdn": "Domaine (FQDN)",
+		"url_fqdn": "URL (FQDN)",
 		"enable_auto_deploy_webhooks": "Activez le déploiement automatique via des webhooks.",
 		"enable_automatic_deployment": "Activer le déploiement automatique",
 		"enable_debug_log_during_build": "Activez les journaux de débogage pendant la phase de build.<br><span class='text-red-500 font-bold'>Les informations sensibles</span> peuvent être visibles et enregistrées dans les journaux.",
