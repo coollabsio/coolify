@@ -22,17 +22,47 @@
 <script lang="ts">
 	export let secrets;
 	export let application;
+	import pLimit from 'p-limit';
 	import Secret from './_Secret.svelte';
-	import { getDomain } from '$lib/components/common';
 	import { page } from '$app/stores';
 	import { get } from '$lib/api';
-	import BatchSecrets from './_BatchSecrets.svelte';
+	import { saveSecret } from './utils';
+	import { toast } from '@zerodevx/svelte-toast';
 
+	const limit = pLimit(1);
 	const { id } = $page.params;
 
+	let batchSecrets = '';
 	async function refreshSecrets() {
 		const data = await get(`/applications/${id}/secrets.json`);
 		secrets = [...data.secrets];
+	}
+	async function getValues(e) {
+		e.preventDefault();
+		const eachValuePair = batchSecrets.split('\n');
+		const batchSecretsPairs = eachValuePair
+			.filter((secret) => !secret.startsWith('#') && secret)
+			.map((secret) => {
+				const [name, value] = secret.split('=');
+				const cleanValue = value?.replaceAll('"', '') || '';
+				return {
+					name,
+					value: cleanValue,
+					isNew: !secrets.find((secret) => name === secret.name)
+				};
+			});
+
+		await Promise.all(
+			batchSecretsPairs.map(({ name, value, isNew }) =>
+				limit(() => saveSecret({ name, value, applicationId: id, isNew }))
+			)
+		);
+		batchSecrets = '';
+		await refreshSecrets();
+		toast.push('Secrets saved');
+	}
+	function asd() {
+		console.log(secrets);
 	}
 </script>
 
@@ -134,6 +164,13 @@
 			</tr>
 		</tbody>
 	</table>
-
-	<BatchSecrets {secrets} {id} {refreshSecrets} />
+	<button on:click={asd}>Save</button>
+	<h2 class="title my-6 font-bold">Paste .env file</h2>
+	<form on:submit|preventDefault={getValues} class="mb-12 w-full">
+		<textarea bind:value={batchSecrets} class="mb-2 min-h-[200px] w-full" />
+		<button
+			class="bg-green-600 hover:bg-green-500 disabled:text-white disabled:opacity-40"
+			type="submit">Batch add secrets</button
+		>
+	</form>
 </div>
