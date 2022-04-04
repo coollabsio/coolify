@@ -89,7 +89,8 @@
 		"remove_domain": "Remove domain",
 		"public_port_range": "Public Port Range",
 		"public_port_range_explainer": "Ports used to expose databases/services/internal services.<br> Add them to your firewall (if applicable).<br><br>You can specify a range of ports, eg: <span class='text-yellow-500 font-bold'>9000-9100</span>",
-		"no_actions_available": "No actions available"
+		"no_actions_available": "No actions available",
+		"admin_api_key": "Admin API key"
 	},
 	"register": {
 		"register": "Register",
@@ -203,7 +204,9 @@
 		"debug_logs": "Debug Logs",
 		"enable_debug_log_during_build": "Enable debug logs during build phase.<br><span class='text-red-500 font-bold'>Sensitive information</span> could be visible and saved in logs.",
 		"cant_activate_auto_deploy_without_repo": "Cannot activate automatic deployments until only one application is defined for this repository / branch.",
-		"no_applications_found": "No applications found"
+		"no_applications_found": "No applications found",
+		"secret__batch_dot_env": "Paste .env file",
+		"batch_secrets": "Batch add secrets"
 	},
 	"general": "General",
 	"database": {

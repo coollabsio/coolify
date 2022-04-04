@@ -12,6 +12,7 @@
 	import { del } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { errorNotification } from '$lib/form';
+	import { t } from '$lib/translations';
 	import { createEventDispatcher } from 'svelte';
 	import { saveSecret } from './utils';
 

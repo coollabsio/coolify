@@ -1,6 +1,7 @@
 import { toast } from '@zerodevx/svelte-toast';
 import { errorNotification } from '$lib/form';
 import { post } from '$lib/api';
+import { t } from '$lib/translations';
 
 type Props = {
 	isNew: boolean;
@@ -23,8 +24,8 @@ export async function saveSecret({
 	applicationId,
 	dispatch
 }: Props): Promise<void> {
-	if (!name) return errorNotification('Name is required.');
-	if (!value) return errorNotification('Value is required.');
+	if (!name) return errorNotification(`${t.get('forms.name')} ${t.get('forms.is_required')}`);
+	if (!value) return errorNotification(`${t.get('forms.value')} ${t.get('forms.is_required')}`);
 	try {
 		await post(`/applications/${applicationId}/secrets.json`, {
 			name,
@@ -39,7 +40,7 @@ export async function saveSecret({
 			value = '';
 			isBuildSecret = false;
 		}
-		toast.push('Secret saved.');
+		toast.push(t.get('application.secrets.secret_saved'));
 	} catch ({ error }) {
 		return errorNotification(error);
 	}
