@@ -6,7 +6,7 @@ An open-source & self-hostable Heroku / Netlify alternative.
 
 https://demo.coolify.io/
 
-(If it is unresponsible, that means someone overloaded the server. 🙃)
+(If it is unresponsive, that means someone overloaded the server. 🙃)
 
 ## How to install
 

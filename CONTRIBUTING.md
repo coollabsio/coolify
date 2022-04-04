@@ -35,7 +35,8 @@ This is a little list of what you can do to help the project:
 - Copy `.env.template` to `.env` and set the `COOLIFY_APP_ID` environment variable to something cool.
 - Install dependencies with `pnpm install`.
 - Need to create a local SQlite database with `pnpm db:push`.
-  - This will apply all migrations and seed the database at `db/dev.db`.
+  - This will apply all migrations at `db/dev.db`.
+- Seed the database with base entities with `pnpm db:seed`
 - You can start coding after starting `pnpm dev`.
 
 #### How to start after you set up your local fork?

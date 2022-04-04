@@ -42,6 +42,7 @@
 	import UptimeKuma from '$lib/components/svg/services/UptimeKuma.svelte';
 	import Ghost from '$lib/components/svg/services/Ghost.svelte';
 	import { t } from '$lib/translations';
+	import MeiliSearch from '$lib/components/svg/services/MeiliSearch.svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -87,6 +88,8 @@
 						<UptimeKuma isAbsolute />
 					{:else if type.name === 'ghost'}
 						<Ghost isAbsolute />
+					{:else if type.name === 'meilisearch'}
+						<MeiliSearch isAbsolute />
 					{/if}{type.fancyName}
 				</button>
 			</form>

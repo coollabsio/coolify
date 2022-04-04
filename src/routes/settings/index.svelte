@@ -123,7 +123,7 @@
 				<div class="grid grid-cols-2 items-start">
 					<div class="flex-col">
 						<div class="pt-2 text-base font-bold text-stone-100">
-							{$t('application.domain_fqdn')}
+							{$t('application.url_fqdn')}
 						</div>
 						<Explainer text={$t('setting.ssl_explainer')} />
 					</div>
