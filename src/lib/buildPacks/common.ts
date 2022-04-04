@@ -102,12 +102,9 @@ export const setDefaultConfiguration = async (data) => {
 		else if (buildPack === 'php') port = 80;
 		else if (buildPack === 'python') port = 8000;
 	}
-	if (template) {
-		if (!installCommand) installCommand = template?.installCommand || 'yarn install';
-		if (!startCommand) startCommand = template?.startCommand || 'yarn start';
-		if (!buildCommand) buildCommand = template?.buildCommand || null;
-	}
-
+	if (!installCommand) installCommand = template?.installCommand || 'yarn install';
+	if (!startCommand) startCommand = template?.startCommand || 'yarn start';
+	if (!buildCommand) buildCommand = template?.buildCommand || null;
 	if (!publishDirectory) publishDirectory = template?.publishDirectory || null;
 	if (baseDirectory) {
 		if (!baseDirectory.startsWith('/')) baseDirectory = `/${baseDirectory}`;
