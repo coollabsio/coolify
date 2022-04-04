@@ -41,7 +41,7 @@
 	class:p-5={service.fqdn}
 	class:p-6={!service.fqdn}
 >
-	<div class="-mb-6 flex-col">
+	<div class="-mb-5 flex-col">
 		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">Secrets</div>
 		<span class="text-xs">{service.name}</span>
 	</div>
