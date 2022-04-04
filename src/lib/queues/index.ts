@@ -135,12 +135,12 @@ buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
 		const workdir = `/tmp/build-sources/${job.data.repository}`;
 		if (!dev) await asyncExecShell(`rm -fr ${workdir}`);
 	}
-	saveBuildLog({
+	await saveBuildLog({
 		line: 'Failed to deploy!',
 		buildId: job.data.build_id,
 		applicationId: job.data.id
 	});
-	saveBuildLog({
+	await saveBuildLog({
 		line: `Reason: ${failedReason.toString()}`,
 		buildId: job.data.build_id,
 		applicationId: job.data.id

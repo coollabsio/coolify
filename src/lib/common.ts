@@ -80,7 +80,7 @@ export const getTeam = (event) => {
 
 export const getUserDetails = async (event, isAdminRequired = true) => {
 	const teamId = getTeam(event);
-	const userId = event.locals.session.data.userId || null;
+	const userId = event?.locals?.session?.data?.userId || null;
 	const { permission = 'read' } = await db.prisma.permission.findFirst({
 		where: { teamId, userId },
 		select: { permission: true },

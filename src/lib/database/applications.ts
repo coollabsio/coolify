@@ -214,11 +214,15 @@ export async function configureApplication({
 	buildCommand,
 	startCommand,
 	baseDirectory,
-	publishDirectory
+	publishDirectory,
+	pythonWSGI,
+	pythonModule,
+	pythonVariable
 }) {
 	return await prisma.application.update({
 		where: { id },
 		data: {
+			name,
 			buildPack,
 			fqdn,
 			port,
@@ -227,7 +231,9 @@ export async function configureApplication({
 			startCommand,
 			baseDirectory,
 			publishDirectory,
-			name
+			pythonWSGI,
+			pythonModule,
+			pythonVariable
 		}
 	});
 }

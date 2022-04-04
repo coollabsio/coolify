@@ -12,6 +12,7 @@
 	import { t } from '$lib/translations';
 	import { toast } from '@zerodevx/svelte-toast';
 	import Ghost from './_Ghost.svelte';
+	import MeiliSearch from './_MeiliSearch.svelte';
 	import MinIo from './_MinIO.svelte';
 	import PlausibleAnalytics from './_PlausibleAnalytics.svelte';
 	import VsCodeServer from './_VSCodeServer.svelte';
@@ -113,9 +114,7 @@
 			</div>
 			<div class="grid grid-cols-2 px-10">
 				<div class="flex-col ">
-					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100"
-						>{$t('application.domain_fqdn')}</label
-					>
+					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">{$t('application.url_fqdn')}</label>
 					<Explainer text={$t('application.https_explainer')} />
 				</div>
 
@@ -150,6 +149,8 @@
 				<Wordpress bind:service {isRunning} {readOnly} />
 			{:else if service.type === 'ghost'}
 				<Ghost bind:service {readOnly} />
+			{:else if service.type === 'meilisearch'}
+				<MeiliSearch bind:service />
 			{/if}
 		</div>
 	</form>
