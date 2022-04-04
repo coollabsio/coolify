@@ -13,6 +13,7 @@
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { errorNotification } from '$lib/form';
 	import { t } from '$lib/translations';
+	import { toast } from '@zerodevx/svelte-toast';
 	import { createEventDispatcher } from 'svelte';
 	import { saveSecret } from './utils';
 
@@ -33,21 +34,39 @@
 	}
 
 	async function createSecret(isNew) {
-		saveSecret({
+		await saveSecret({
 			isNew,
 			name,
 			value,
 			isBuildSecret,
 			isPRMRSecret,
 			isNewSecret,
-			applicationId: id,
-			dispatch
+			applicationId: id
 		});
+		if (isNewSecret) {
+			name = '';
+			value = '';
+			isBuildSecret = false;
+		}
+		dispatch('refresh');
+		toast.push('Secret saved');
 	}
 
-	function setSecretValue() {
-		if (isNewSecret) {
+	async function setSecretValue() {
+		if (!isPRMRSecret) {
 			isBuildSecret = !isBuildSecret;
+			if (!isNewSecret) {
+				await saveSecret({
+					isNew: isNewSecret,
+					name,
+					value,
+					isBuildSecret,
+					isPRMRSecret,
+					isNewSecret,
+					applicationId: id
+				});
+				toast.push('Secret saved');
+			}
 		}
 	}
 </script>
@@ -82,9 +101,9 @@
 		class="relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
 		class:bg-green-600={isBuildSecret}
 		class:bg-stone-700={!isBuildSecret}
-		class:opacity-50={!isNewSecret}
-		class:cursor-not-allowed={!isNewSecret}
-		class:cursor-pointer={isNewSecret}
+		class:opacity-50={isPRMRSecret}
+		class:cursor-not-allowed={isPRMRSecret}
+		class:cursor-pointer={!isPRMRSecret}
 	>
 		<span class="sr-only">{$t('application.secrets.use_isbuildsecret')}</span>
 		<span

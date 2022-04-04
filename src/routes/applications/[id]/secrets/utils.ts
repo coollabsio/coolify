@@ -11,7 +11,6 @@ type Props = {
 	isPRMRSecret?: boolean;
 	isNewSecret?: boolean;
 	applicationId: string;
-	dispatch: (name: string) => void;
 };
 
 export async function saveSecret({
@@ -21,8 +20,7 @@ export async function saveSecret({
 	isBuildSecret,
 	isPRMRSecret,
 	isNewSecret,
-	applicationId,
-	dispatch
+	applicationId
 }: Props): Promise<void> {
 	if (!name) return errorNotification(`${t.get('forms.name')} ${t.get('forms.is_required')}`);
 	if (!value) return errorNotification(`${t.get('forms.value')} ${t.get('forms.is_required')}`);
@@ -34,13 +32,11 @@ export async function saveSecret({
 			isPRMRSecret,
 			isNew: isNew || false
 		});
-		dispatch('refresh');
 		if (isNewSecret) {
 			name = '';
 			value = '';
 			isBuildSecret = false;
 		}
-		toast.push(t.get('application.secrets.secret_saved'));
 	} catch ({ error }) {
 		return errorNotification(error);
 	}

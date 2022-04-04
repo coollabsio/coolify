@@ -31,7 +31,7 @@
 
 		await Promise.all(
 			batchSecretsPairs.map(({ name, value, isNew }) =>
-				limit(() => saveSecret({ name, value, applicationId: id, isNew, dispatch }))
+				limit(() => saveSecret({ name, value, applicationId: id, isNew }))
 			)
 		);
 		batchSecrets = '';
@@ -40,8 +40,8 @@
 </script>
 
 <h2 class="title my-6 font-bold">{$t('application.secret__batch_dot_env')}</h2>
-<form on:submit={getValues} class="mb-12 w-full">
-	<textarea value={batchSecrets} on:change={setBatchValue} class="mb-2 min-h-[200px] w-full" />
+<form on:submit|preventDefault={getValues} class="mb-12 w-full">
+	<textarea bind:value={batchSecrets} class="mb-2 min-h-[200px] w-full" />
 	<button
 		class="bg-green-600 hover:bg-green-500 disabled:text-white disabled:opacity-40"
 		type="submit">{$t('application.batch_secrets')}</button
