@@ -42,6 +42,7 @@
 	import Redis from '$lib/components/svg/databases/Redis.svelte';
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/api';
+	import { t } from '$lib/translations';
 	async function handleSubmit(type) {
 		try {
 			await post(`/databases/${id}/configuration/type.json`, { type });
