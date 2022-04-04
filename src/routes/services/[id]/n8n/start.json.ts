@@ -24,7 +24,9 @@ export const post: RequestHandler = async (event) => {
 		const config = {
 			image: `${image}:${version}`,
 			volume: `${id}-n8n:/root/.n8n`,
-			environmentVariables: {}
+			environmentVariables: {
+				WEBHOOK_URL: `${service.fqdn}`
+			}
 		};
 		if (serviceSecret.length > 0) {
 			serviceSecret.forEach((secret) => {
