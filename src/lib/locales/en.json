@@ -93,6 +93,7 @@
 	},
 	"register": {
 		"register": "Register",
+		"registering": "Registering...",
 		"first_user": "You are registering the first user. It will be the administrator of your Coolify instance."
 	},
 	"reset": {
