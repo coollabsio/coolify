@@ -117,6 +117,7 @@ export default async function (job) {
 			branch,
 			buildId,
 			apiUrl: gitSource.apiUrl,
+			htmlUrl: gitSource.htmlUrl,
 			projectId,
 			deployKeyId: gitSource.gitlabApp?.deployKeyId || null,
 			privateSshKey: decrypt(gitSource.gitlabApp?.privateSshKey) || null
