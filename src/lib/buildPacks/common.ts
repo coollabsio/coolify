@@ -100,10 +100,14 @@ export const setDefaultConfiguration = async (data) => {
 		if (buildPack === 'static') port = 80;
 		else if (buildPack === 'node') port = 3000;
 		else if (buildPack === 'php') port = 80;
+		else if (buildPack === 'python') port = 8000;
 	}
-	if (!installCommand) installCommand = template?.installCommand || 'yarn install';
-	if (!startCommand) startCommand = template?.startCommand || 'yarn start';
-	if (!buildCommand) buildCommand = template?.buildCommand || null;
+	if (template) {
+		if (!installCommand) installCommand = template?.installCommand || 'yarn install';
+		if (!startCommand) startCommand = template?.startCommand || 'yarn start';
+		if (!buildCommand) buildCommand = template?.buildCommand || null;
+	}
+
 	if (!publishDirectory) publishDirectory = template?.publishDirectory || null;
 	if (baseDirectory) {
 		if (!baseDirectory.startsWith('/')) baseDirectory = `/${baseDirectory}`;
@@ -136,7 +140,11 @@ export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, ap
         `
 			);
 			await fs.writeFile(`${workdir}/entrypoint.sh`, `chown -R 1000 /app`);
-			saveBuildLog({ line: 'Copied default configuration file for PHP.', buildId, applicationId });
+			await saveBuildLog({
+				line: 'Copied default configuration file for PHP.',
+				buildId,
+				applicationId
+			});
 		} else if (staticDeployments.includes(buildPack)) {
 			await fs.writeFile(
 				`${workdir}/nginx.conf`,
@@ -190,7 +198,7 @@ export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, ap
             }
             `
 			);
-			saveBuildLog({ line: 'Copied default configuration file.', buildId, applicationId });
+			await saveBuildLog({ line: 'Copied default configuration file.', buildId, applicationId });
 		}
 	} catch (error) {
 		console.log(error);

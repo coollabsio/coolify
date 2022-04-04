@@ -88,7 +88,6 @@
 		try {
 			const { buildId } = await post(`/applications/${id}/deploy.json`, { ...application });
 			toast.push('Deployment queued.');
-			console.log($page.url);
 			if ($page.url.pathname.startsWith(`/applications/${id}/logs/build`)) {
 				return window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
 			} else {
@@ -255,9 +254,9 @@
 				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/secrets`}
 			>
 				<button
-					title="Secrets"
+					title="Secret"
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-					data-tooltip="Secrets"
+					data-tooltip="Secret"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"

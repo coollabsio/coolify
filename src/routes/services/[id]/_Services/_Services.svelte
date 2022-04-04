@@ -11,6 +11,7 @@
 	import { errorNotification } from '$lib/form';
 	import { toast } from '@zerodevx/svelte-toast';
 	import Ghost from './_Ghost.svelte';
+	import MeiliSearch from './_MeiliSearch.svelte';
 	import MinIo from './_MinIO.svelte';
 	import PlausibleAnalytics from './_PlausibleAnalytics.svelte';
 	import VsCodeServer from './_VSCodeServer.svelte';
@@ -108,9 +109,9 @@
 			</div>
 			<div class="grid grid-cols-2 px-10">
 				<div class="flex-col ">
-					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">Domain (FQDN)</label>
+					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">URL (FQDN)</label>
 					<Explainer
-						text="If you specify <span class='text-pink-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-pink-600 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application."
+						text="If you specify <span class='text-pink-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-pink-600 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the url, you must first stop the application."
 					/>
 				</div>
 
@@ -145,6 +146,8 @@
 				<Wordpress bind:service {isRunning} {readOnly} />
 			{:else if service.type === 'ghost'}
 				<Ghost bind:service {readOnly} />
+			{:else if service.type === 'meilisearch'}
+				<MeiliSearch bind:service />
 			{/if}
 		</div>
 	</form>

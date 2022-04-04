@@ -8,7 +8,7 @@ specifiers:
   '@sveltejs/kit': 1.0.0-next.303
   '@types/bcrypt': 5.0.0
   '@types/js-cookie': 3.0.1
-  '@types/js-yaml': ^4.0.5
+  '@types/js-yaml': 4.0.5
   '@types/node': 17.0.23
   '@types/node-forge': 1.0.1
   '@typescript-eslint/eslint-plugin': 4.31.1
@@ -19,7 +19,8 @@ specifiers:
   bullmq: 1.78.1
   compare-versions: 4.1.3
   cookie: 0.4.2
-  cooltipz-css: ^2.1.0
+  cooltipz-css: 2.1.0
+  cross-env: 7.0.3
   cross-var: 1.1.0
   cuid: 2.1.8
   dayjs: 1.11.0
@@ -36,8 +37,9 @@ specifiers:
   js-yaml: 4.1.0
   jsonwebtoken: 8.5.1
   lint-staged: 12.3.7
-  mustache: ^4.2.0
+  mustache: 4.2.0
   node-forge: 1.3.0
+  p-limit: 4.0.0
   postcss: 8.4.12
   prettier: 2.6.1
   prettier-plugin-svelte: 2.6.0
@@ -47,9 +49,9 @@ specifiers:
   svelte-check: 2.4.6
   svelte-kit-cookie-session: 2.1.2
   svelte-preprocess: 4.10.4
-  svelte-select: ^4.4.7
+  svelte-select: 4.4.7
   tailwindcss: 3.0.23
-  tailwindcss-scrollbar: ^0.1.0
+  tailwindcss-scrollbar: 0.1.0
   ts-node: 10.7.0
   tslib: 2.3.1
   typescript: 4.6.3
@@ -76,6 +78,7 @@ dependencies:
   jsonwebtoken: 8.5.1
   mustache: 4.2.0
   node-forge: 1.3.0
+  p-limit: 4.0.0
   svelte-kit-cookie-session: 2.1.2
   tailwindcss-scrollbar: 0.1.0_tailwindcss@3.0.23
   unique-names-generator: 4.7.1
@@ -92,6 +95,7 @@ devDependencies:
   '@typescript-eslint/parser': 4.31.1_eslint@7.32.0+typescript@4.6.3
   '@zerodevx/svelte-toast': 0.7.1
   autoprefixer: 10.4.4_postcss@8.4.12
+  cross-env: 7.0.3
   cross-var: 1.1.0
   eslint: 7.32.0
   eslint-config-prettier: 8.5.0_eslint@7.32.0
@@ -2080,6 +2084,17 @@ packages:
     dependencies:
       luxon: 1.28.0
     dev: false
+
+  /cross-env/7.0.3:
+    resolution:
+      {
+        integrity: sha512-+/HKd6EgcQCJGh2PSjZuUitQBQynKor4wrFbRg4DtAgS1aWO+gU52xpH7M9ScGgXSYmAVS9bIJ8EzuaGw0oNAw==
+      }
+    engines: { node: '>=10.14', npm: '>=6', yarn: '>=1' }
+    hasBin: true
+    dependencies:
+      cross-spawn: 7.0.3
+    dev: true
 
   /cross-spawn/5.1.0:
     resolution: { integrity: sha1-6L0O/uWPz/b4+UUQoKVUu/ojVEk= }
@@ -4235,6 +4250,16 @@ packages:
     engines: { node: '>=12.20' }
     dev: false
 
+  /p-limit/4.0.0:
+    resolution:
+      {
+        integrity: sha512-5b0R4txpzjPWVw/cXXUResoD4hb6U/x9BH08L7nw+GN1sezDzPdxeRvpc9c433fZhBan/wusjbCsqwqm4EIBIQ==
+      }
+    engines: { node: ^12.20.0 || ^14.13.1 || >=16.0.0 }
+    dependencies:
+      yocto-queue: 1.0.0
+    dev: false
+
   /p-map/2.1.0:
     resolution:
       {
@@ -5666,3 +5691,11 @@ packages:
       }
     engines: { node: '>=6' }
     dev: true
+
+  /yocto-queue/1.0.0:
+    resolution:
+      {
+        integrity: sha512-9bnSc/HEW2uRy67wc+T8UwauLuPJVn28jb+GtJY16iiKWyvmYJRXVT4UamsAEGQfPohgr2q4Tq0sQbQlxTfi1g==
+      }
+    engines: { node: '>=12.20' }
+    dev: false

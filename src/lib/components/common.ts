@@ -19,7 +19,7 @@ export const staticDeployments = [
 	'astro',
 	'eleventy'
 ];
-export const notNodeDeployments = ['php', 'docker', 'rust'];
+export const notNodeDeployments = ['php', 'docker', 'rust', 'python'];
 
 export function getDomain(domain) {
 	return domain?.replace('https://', '').replace('http://', '');
@@ -36,4 +36,10 @@ export function dashify(str: string, options?: any): string {
 		.replace(/^-+|-+$/g, '')
 		.replace(/-{2,}/g, (m) => (options && options.condense ? '-' : m))
 		.toLowerCase();
+}
+
+export function changeQueryParams(buildId) {
+	const queryParams = new URLSearchParams(window.location.search);
+	queryParams.set('buildId', buildId);
+	return history.pushState(null, null, '?' + queryParams.toString());
 }

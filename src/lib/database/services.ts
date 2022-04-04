@@ -22,7 +22,8 @@ export async function getService({ id, teamId }) {
 			vscodeserver: true,
 			wordpress: true,
 			ghost: true,
-			serviceSecret: true
+			serviceSecret: true,
+			meiliSearch: true
 		}
 	});
 
@@ -49,6 +50,8 @@ export async function getService({ id, teamId }) {
 	if (body.ghost?.mariadbRootUserPassword)
 		body.ghost.mariadbRootUserPassword = decrypt(body.ghost.mariadbRootUserPassword);
 	if (body.ghost?.defaultPassword) body.ghost.defaultPassword = decrypt(body.ghost.defaultPassword);
+
+	if (body.meiliSearch?.masterKey) body.meiliSearch.masterKey = decrypt(body.meiliSearch.masterKey);
 
 	if (body?.serviceSecret.length > 0) {
 		body.serviceSecret = body.serviceSecret.map((s) => {
@@ -165,6 +168,15 @@ export async function configureServiceType({ id, type }) {
 				}
 			}
 		});
+	} else if (type === 'meilisearch') {
+		const masterKey = encrypt(generatePassword(32));
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				meiliSearch: { create: { masterKey } }
+			}
+		});
 	}
 }
 export async function setServiceVersion({ id, version }) {
@@ -191,6 +203,9 @@ export async function updateService({ id, fqdn, name }) {
 export async function updateLanguageToolService({ id, fqdn, name }) {
 	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
 }
+export async function updateMeiliSearchService({ id, fqdn, name }) {
+	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
+}
 export async function updateVaultWardenService({ id, fqdn, name }) {
 	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
 }
@@ -214,6 +229,7 @@ export async function updateGhostService({ id, fqdn, name, mariadbDatabase }) {
 }
 
 export async function removeService({ id }) {
+	await prisma.meiliSearch.deleteMany({ where: { serviceId: id } });
 	await prisma.ghost.deleteMany({ where: { serviceId: id } });
 	await prisma.plausibleAnalytics.deleteMany({ where: { serviceId: id } });
 	await prisma.minio.deleteMany({ where: { serviceId: id } });

@@ -12,6 +12,7 @@ import php from './php';
 import rust from './rust';
 import astro from './static';
 import eleventy from './static';
+import python from './python';
 
 export {
 	node,
@@ -27,5 +28,6 @@ export {
 	php,
 	rust,
 	astro,
-	eleventy
+	eleventy,
+	python
 };
