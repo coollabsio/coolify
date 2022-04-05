@@ -50,11 +50,6 @@ async function main() {
 			}
 		});
 	}
-	// Update stucked builds
-	await prisma.build.updateMany({
-		where: { status: 'running' },
-		data: { status: 'success' }
-	});
 }
 main()
 	.catch((e) => {
