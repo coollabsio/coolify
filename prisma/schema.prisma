@@ -332,6 +332,12 @@ model Wordpress {
   mysqlRootUserPassword String
   mysqlDatabase         String?
   mysqlPublicPort       Int?
+  ftpEnabled            Boolean  @default(false)
+  ftpUser               String?
+  ftpPassword           String?
+  ftpPublicPort         Int?
+  ftpHostKey            String? 
+  ftpHostKeyPrivate     String?
   serviceId             String   @unique
   service               Service  @relation(fields: [serviceId], references: [id])
   createdAt             DateTime @default(now())

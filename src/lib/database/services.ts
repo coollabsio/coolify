@@ -59,8 +59,12 @@ export async function getService({ id, teamId }) {
 			return s;
 		});
 	}
+	if (body.wordpress?.ftpPassword) {
+		body.wordpress.ftpPassword = decrypt(body.wordpress.ftpPassword);
+	}
+	const settings = await prisma.setting.findFirst();
 
-	return { ...body };
+	return { ...body, settings };
 }
 
 export async function configureServiceType({ id, type }) {
