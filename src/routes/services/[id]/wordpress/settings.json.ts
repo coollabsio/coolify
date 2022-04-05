@@ -40,34 +40,34 @@ export const post: RequestHandler = async (event) => {
 			ftpHostKeyPrivate
 		} = data;
 		if (user) ftpUser = user;
-		try {
-			await fs.stat(hostkeyDir);
-		} catch (error) {
-			await asyncExecShell(`mkdir -p ${hostkeyDir}`);
-		}
-		if (!ftpHostKey) {
-			await asyncExecShell(
-				`ssh-keygen -t ed25519 -f ssh_host_ed25519_key -N "" -q -f /tmp/${id} < /dev/null`
-			);
-			const { stdout: ftpHostKey } = await asyncExecShell(`cat ${hostkeyDir}/${id}.ed25519`);
-			await db.prisma.wordpress.update({
-				where: { serviceId: id },
-				data: { ftpHostKey: encrypt(ftpHostKey.replace('\n', '')) }
-			});
-		} else {
-			await asyncExecShell(`echo ${decrypt(ftpHostKey)} > ${hostkeyDir}/${id}.ed25519`);
-		}
-		if (!ftpHostKeyPrivate) {
-			await asyncExecShell(`ssh-keygen -t rsa -b 4096 -N "" -f /tmp/${id}.rsa < /dev/null`);
-			const { stdout: ftpHostKeyPrivate } = await asyncExecShell(`cat /tmp/${id}.rsa`);
-			await db.prisma.wordpress.update({
-				where: { serviceId: id },
-				data: { ftpHostKeyPrivate: encrypt(ftpHostKeyPrivate.replace('\n', '')) }
-			});
-		} else {
-			await asyncExecShell(`echo ${decrypt(ftpHostKeyPrivate)} > ${hostkeyDir}/${id}.rsa`);
-		}
 		if (destinationDockerId) {
+			try {
+				await fs.stat(hostkeyDir);
+			} catch (error) {
+				await asyncExecShell(`mkdir -p ${hostkeyDir}`);
+			}
+			if (!ftpHostKey) {
+				await asyncExecShell(
+					`ssh-keygen -t ed25519 -f ssh_host_ed25519_key -N "" -q -f ${hostkeyDir}/${id}.ed25519`
+				);
+				const { stdout: ftpHostKey } = await asyncExecShell(`cat ${hostkeyDir}/${id}.ed25519`);
+				await db.prisma.wordpress.update({
+					where: { serviceId: id },
+					data: { ftpHostKey: encrypt(ftpHostKey) }
+				});
+			} else {
+				await asyncExecShell(`echo "${decrypt(ftpHostKey)}" > ${hostkeyDir}/${id}.ed25519`);
+			}
+			if (!ftpHostKeyPrivate) {
+				await asyncExecShell(`ssh-keygen -t rsa -b 4096 -N "" -f ${hostkeyDir}/${id}.rsa`);
+				const { stdout: ftpHostKeyPrivate } = await asyncExecShell(`cat ${hostkeyDir}/${id}.rsa`);
+				await db.prisma.wordpress.update({
+					where: { serviceId: id },
+					data: { ftpHostKeyPrivate: encrypt(ftpHostKeyPrivate) }
+				});
+			} else {
+				await asyncExecShell(`echo "${decrypt(ftpHostKeyPrivate)}" > ${hostkeyDir}/${id}.rsa`);
+			}
 			const { network, engine } = destinationDocker;
 			const host = getEngine(engine);
 			if (ftpEnabled) {

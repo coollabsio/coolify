@@ -26,28 +26,31 @@
 			: 'Loading...';
 	}
 	async function changeSettings(name) {
-		ftpLoading = true;
-		let ftpEnabled = service.wordpress.ftpEnabled;
+		if (ftpLoading) return;
+		if (isRunning) {
+			ftpLoading = true;
+			let ftpEnabled = service.wordpress.ftpEnabled;
 
-		if (name === 'ftpEnabled') {
-			ftpEnabled = !ftpEnabled;
-		}
-		try {
-			const {
-				publicPort,
-				ftpUser: user,
-				ftpPassword: password
-			} = await post(`/services/${id}/wordpress/settings.json`, {
-				ftpEnabled
-			});
-			ftpUrl = generateUrl(publicPort);
-			ftpUser = user;
-			ftpPassword = password;
-			service.wordpress.ftpEnabled = ftpEnabled;
-		} catch ({ error }) {
-			return errorNotification(error);
-		} finally {
-			ftpLoading = false;
+			if (name === 'ftpEnabled') {
+				ftpEnabled = !ftpEnabled;
+			}
+			try {
+				const {
+					publicPort,
+					ftpUser: user,
+					ftpPassword: password
+				} = await post(`/services/${id}/wordpress/settings.json`, {
+					ftpEnabled
+				});
+				ftpUrl = generateUrl(publicPort);
+				ftpUser = user;
+				ftpPassword = password;
+				service.wordpress.ftpEnabled = ftpEnabled;
+			} catch ({ error }) {
+				return errorNotification(error);
+			} finally {
+				ftpLoading = false;
+			}
 		}
 	}
 </script>
@@ -78,6 +81,7 @@ define('SUBDOMAIN_INSTALL', false);`
 	<Setting
 		bind:setting={service.wordpress.ftpEnabled}
 		loading={ftpLoading}
+		disabled={!isRunning}
 		on:click={() => changeSettings('ftpEnabled')}
 		title="Enable sFTP connection to WordPress data"
 		description="Enables an on-demand sFTP connection to the WordPress data directory. This is useful if you want to use sFTP to upload files."
