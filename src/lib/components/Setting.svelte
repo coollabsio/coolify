@@ -28,8 +28,9 @@
 		aria-pressed="false"
 		class="relative mx-20 inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
 		class:opacity-50={disabled || loading}
-		class:bg-green-600={setting}
-		class:bg-stone-700={!setting}
+		class:bg-green-600={!loading && setting}
+		class:bg-stone-700={!loading && !setting}
+		class:bg-yellow-500={loading}
 	>
 		<span class="sr-only">Use setting</span>
 		<span

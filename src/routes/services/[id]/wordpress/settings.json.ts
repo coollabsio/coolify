@@ -68,6 +68,7 @@ export const post: RequestHandler = async (event) => {
 			} else {
 				await asyncExecShell(`echo "${decrypt(ftpHostKeyPrivate)}" > ${hostkeyDir}/${id}.rsa`);
 			}
+			await asyncExecShell(`chmod -R 600 ${hostkeyDir}`);
 			const { network, engine } = destinationDocker;
 			const host = getEngine(engine);
 			if (ftpEnabled) {
