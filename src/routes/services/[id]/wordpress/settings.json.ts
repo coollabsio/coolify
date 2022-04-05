@@ -8,6 +8,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
 import fs from 'fs/promises';
 import getPort, { portNumbers } from 'get-port';
+import yaml from 'js-yaml';
 
 export const post: RequestHandler = async (event) => {
 	const { status, body, teamId } = await getUserDetails(event);
@@ -68,7 +69,6 @@ export const post: RequestHandler = async (event) => {
 			} else {
 				await asyncExecShell(`echo "${decrypt(ftpHostKeyPrivate)}" > ${hostkeyDir}/${id}.rsa`);
 			}
-			await asyncExecShell(`chmod -R 600 ${hostkeyDir}`);
 			const { network, engine } = destinationDocker;
 			const host = getEngine(engine);
 			if (ftpEnabled) {
@@ -88,12 +88,40 @@ export const post: RequestHandler = async (event) => {
 					console.log(error);
 					//
 				}
-
+				const volumes = [
+					`${id}-wordpress-data:/home/${ftpUser}`,
+					`${hostkeyDir}/${id}.ed25519:/etc/ssh/ssh_host_ed25519_key`,
+					`${hostkeyDir}/${id}.rsa:/etc/ssh/ssh_host_rsa_key`
+				];
+				const compose = {
+					version: '3.8',
+					services: {
+						[`${id}-ftp`]: {
+							image: `atmoz/sftp:alpine`,
+							command: `'${ftpUser}:${password.replace('\n', '').replace(/\$/g, '$$$')}:e:1001'`,
+							extra_hosts: ['host.docker.internal:host-gateway'],
+							container_name: `${id}-ftp`,
+							volumes,
+							networks: [network],
+							depends_on: [],
+							restart: 'always'
+						}
+					},
+					networks: {
+						[network]: {
+							external: true
+						}
+					},
+					volumes: {
+						[`${id}-wordpress-data`]: {
+							external: true,
+							name: `${id}-wordpress-data`
+						}
+					}
+				};
+				await fs.writeFile(`${hostkeyDir}/${id}-docker-compose.yml`, yaml.dump(compose));
 				await asyncExecShell(
-					`DOCKER_HOST=${host} docker run --restart always --add-host 'host.docker.internal:host-gateway' --network ${network} --name ${id}-ftp  -v ${id}-wordpress-data:/home/${ftpUser} -v ${hostkeyDir}/${id}.ed25519:/etc/ssh/ssh_host_ed25519_key -v ${hostkeyDir}/${id}.rsa:/etc/ssh/ssh_host_rsa_key -d atmoz/sftp '${ftpUser}:${password.replace(
-						'\n',
-						''
-					)}:e:1001'`
+					`DOCKER_HOST=${host} docker compose -f ${hostkeyDir}/${id}-docker-compose.yml up -d`
 				);
 
 				await startTcpProxy(destinationDocker, `${id}-ftp`, publicPort, 22);
