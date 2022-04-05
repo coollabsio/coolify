@@ -46,11 +46,30 @@ const customConfig: Config = {
 export const version = currentVersion;
 export const asyncExecShell = util.promisify(child.exec);
 export const asyncSleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
+export const asyncUntil = (condition, delay, maxIterations) => {
+	return new Promise<void>(async (resolve, reject) => {
+		let iterations = 0;
+		while (!condition()) {
+			if (maxIterations && iterations >= maxIterations) {
+				reject(new Error('Max iterations reached.'));
+				return;
+			}
+			await asyncSleep(delay);
+			iterations++;
+		}
+		resolve();
+	});
+};
+
 export const sentry = Sentry;
 
 export const uniqueName = () => uniqueNamesGenerator(customConfig);
 
 export const saveBuildLog = async ({ line, buildId, applicationId }) => {
+	if (line.includes('ghs_')) {
+		const regex = /ghs_.*@/g;
+		line = line.replace(regex, '<SENSITIVE_DATA_DELETED>@');
+	}
 	const addTimestamp = `${generateTimestamp()} ${line}`;
 	return await buildLogQueue.add(buildId, { buildId, line: addTimestamp, applicationId });
 };

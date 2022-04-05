@@ -11,7 +11,7 @@ import proxy from './proxy';
 import ssl from './ssl';
 import sslrenewal from './sslrenewal';
 
-import { asyncExecShell, saveBuildLog } from '$lib/common';
+import { asyncExecShell, asyncUntil, saveBuildLog } from '$lib/common';
 
 let { Queue, Worker } = Bullmq;
 let redisHost = 'localhost';
@@ -128,7 +128,22 @@ buildWorker.on('completed', async (job: Bullmq.Job) => {
 
 buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
 	try {
-		await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'failed' } });
+		await asyncUntil(
+			async () => {
+				const found = await prisma.build.findFirst({
+					where: { id: job.data.build_id, status: 'failed' }
+				});
+				if (!found) {
+					return await prisma.build.update({
+						where: { id: job.data.build_id },
+						data: { status: 'failed' }
+					});
+				}
+				return true;
+			},
+			200,
+			5
+		);
 	} catch (error) {
 		console.log(error);
 	} finally {
