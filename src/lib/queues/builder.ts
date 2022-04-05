@@ -61,7 +61,7 @@ export default async function (job) {
 	await asyncSleep(500);
 	await db.prisma.build.updateMany({
 		where: {
-			status: 'queued',
+			status: { in: ['queued', 'running'] },
 			id: { not: buildId },
 			applicationId,
 			createdAt: { lt: new Date(new Date().getTime() - 60 * 60 * 1000) }
