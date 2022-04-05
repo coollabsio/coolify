@@ -20,30 +20,24 @@ import {
 	setDefaultConfiguration
 } from '$lib/buildPacks/common';
 import yaml from 'js-yaml';
+import type { Job } from 'bullmq';
+import type { BuilderJob } from '$lib/types/builderJob';
 
-export default async function (job) {
+export default async function (job: Job<BuilderJob, void, string>): Promise<void> {
 	/*
 	Edge cases:
 	1 - Change build pack and redeploy, what should happen?
   */
-	let {
+	const {
 		id: applicationId,
 		repository,
-		branch,
-		buildPack,
 		name,
 		destinationDocker,
 		destinationDockerId,
 		gitSource,
 		build_id: buildId,
 		configHash,
-		port,
-		installCommand,
-		buildCommand,
-		startCommand,
 		fqdn,
-		baseDirectory,
-		publishDirectory,
 		projectId,
 		secrets,
 		phpModules,
@@ -55,6 +49,16 @@ export default async function (job) {
 		pythonWSGI,
 		pythonModule,
 		pythonVariable
+	} = job.data;
+	let {
+		branch,
+		buildPack,
+		port,
+		installCommand,
+		buildCommand,
+		startCommand,
+		baseDirectory,
+		publishDirectory
 	} = job.data;
 	const { debug } = settings;
 
@@ -70,7 +74,7 @@ export default async function (job) {
 	});
 	let imageId = applicationId;
 	let domain = getDomain(fqdn);
-	let volumes =
+	const volumes =
 		persistentStorage?.map((storage) => {
 			return `${applicationId}${storage.path.replace(/\//gi, '-')}:${
 				buildPack !== 'docker' ? '/app' : ''
@@ -106,7 +110,7 @@ export default async function (job) {
 		publishDirectory = configuration.publishDirectory;
 		baseDirectory = configuration.baseDirectory;
 
-		let commit = await importers[gitSource.type]({
+		const commit = await importers[gitSource.type]({
 			applicationId,
 			debug,
 			workdir,

@@ -1,4 +1,4 @@
-import { getTeam, getUserDetails } from '$lib/common';
+import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
