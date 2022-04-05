@@ -61,6 +61,10 @@ export const saveBuildLog = async ({
 	buildId: string;
 	applicationId: string;
 }): Promise<Job> => {
+	if (line.includes('ghs_')) {
+		const regex = /ghs_.*@/g;
+		line = line.replace(regex, '<SENSITIVE_DATA_DELETED>@');
+	}
 	const addTimestamp = `${generateTimestamp()} ${line}`;
 	return await buildLogQueue.add(buildId, { buildId, line: addTimestamp, applicationId });
 };
