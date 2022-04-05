@@ -2,11 +2,11 @@ import { dev } from '$app/env';
 import { sentry } from '$lib/common';
 import * as Prisma from '@prisma/client';
 import { default as ProdPrisma } from '@prisma/client';
-import type { PrismaClientOptions } from '@prisma/client/runtime';
+import type { Database, DatabaseSettings } from '@prisma/client';
 import generator from 'generate-password';
 import forge from 'node-forge';
 
-export function generatePassword(length = 24) {
+export function generatePassword(length = 24): string {
 	return generator.generate({
 		length,
 		numbers: true,
@@ -26,8 +26,14 @@ export const prisma = new PrismaClient({
 	rejectOnNotFound: false
 });
 
-export function ErrorHandler(e) {
-	if (e! instanceof Error) {
+export function ErrorHandler(e: {
+	stdout?;
+	message?: string;
+	status?: number;
+	name?: string;
+	error?: string;
+}): { status: number; body: { message: string; error: string } } {
+	if (e && e instanceof Error) {
 		e = new Error(e.toString());
 	}
 	let truncatedError = e;
@@ -35,8 +41,7 @@ export function ErrorHandler(e) {
 		truncatedError = e.stdout;
 	}
 	if (e.message?.includes('docker run')) {
-		let truncatedArray = [];
-		truncatedArray = truncatedError.message.split('-').filter((line) => {
+		const truncatedArray: string[] = truncatedError.message.split('-').filter((line) => {
 			if (!line.startsWith('e ')) {
 				return line;
 			}
@@ -64,11 +69,11 @@ export function ErrorHandler(e) {
 			payload.body.message = 'Already exists. Choose another name.';
 		}
 	}
-	// console.error(e)
 	return payload;
 }
+
 export async function generateSshKeyPair(): Promise<{ publicKey: string; privateKey: string }> {
-	return await new Promise(async (resolve, reject) => {
+	return await new Promise((resolve, reject) => {
 		forge.pki.rsa.generateKeyPair({ bits: 4096, workers: -1 }, function (err, keys) {
 			if (keys) {
 				resolve({
@@ -210,35 +215,93 @@ export const supportedServiceTypesAndVersions = [
 	}
 ];
 
-export function getVersions(type) {
+export function getVersions(type: string): string[] {
 	const found = supportedDatabaseTypesAndVersions.find((t) => t.name === type);
 	if (found) {
 		return found.versions;
 	}
 	return [];
 }
-export function getDatabaseImage(type) {
+
+export function getDatabaseImage(type: string): string {
 	const found = supportedDatabaseTypesAndVersions.find((t) => t.name === type);
 	if (found) {
 		return found.baseImage;
 	}
 	return '';
 }
-export function getServiceImage(type) {
+
+export function getServiceImage(type: string): string {
 	const found = supportedServiceTypesAndVersions.find((t) => t.name === type);
 	if (found) {
 		return found.baseImage;
 	}
 	return '';
 }
-export function getServiceImages(type) {
+
+export function getServiceImages(type: string): string[] {
 	const found = supportedServiceTypesAndVersions.find((t) => t.name === type);
 	if (found) {
 		return found.images;
 	}
 	return [];
 }
-export function generateDatabaseConfiguration(database) {
+
+export function generateDatabaseConfiguration(database: Database & { settings: DatabaseSettings }):
+	| {
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				MYSQL_DATABASE: string;
+				MYSQL_PASSWORD: string;
+				MYSQL_ROOT_USER: string;
+				MYSQL_USER: string;
+				MYSQL_ROOT_PASSWORD: string;
+			};
+	  }
+	| {
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				MONGODB_ROOT_USER: string;
+				MONGODB_ROOT_PASSWORD: string;
+			};
+	  }
+	| {
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				POSTGRESQL_USERNAME: string;
+				POSTGRESQL_PASSWORD: string;
+				POSTGRESQL_DATABASE: string;
+			};
+	  }
+	| {
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				REDIS_AOF_ENABLED: string;
+				REDIS_PASSWORD: string;
+			};
+	  }
+	| {
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				COUCHDB_PASSWORD: string;
+				COUCHDB_USER: string;
+			};
+	  } {
 	const {
 		id,
 		dbUser,
@@ -253,7 +316,6 @@ export function generateDatabaseConfiguration(database) {
 	const baseImage = getDatabaseImage(type);
 	if (type === 'mysql') {
 		return {
-			// url: `mysql://${dbUser}:${dbUserPassword}@${id}:${isPublic ? port : 3306}/${defaultDatabase}`,
 			privatePort: 3306,
 			environmentVariables: {
 				MYSQL_USER: dbUser,
@@ -268,7 +330,6 @@ export function generateDatabaseConfiguration(database) {
 		};
 	} else if (type === 'mongodb') {
 		return {
-			// url: `mongodb://${dbUser}:${dbUserPassword}@${id}:${isPublic ? port : 27017}/${defaultDatabase}`,
 			privatePort: 27017,
 			environmentVariables: {
 				MONGODB_ROOT_USER: rootUser,
@@ -280,7 +341,6 @@ export function generateDatabaseConfiguration(database) {
 		};
 	} else if (type === 'postgresql') {
 		return {
-			// url: `psql://${dbUser}:${dbUserPassword}@${id}:${isPublic ? port : 5432}/${defaultDatabase}`,
 			privatePort: 5432,
 			environmentVariables: {
 				POSTGRESQL_PASSWORD: dbUserPassword,
@@ -293,7 +353,6 @@ export function generateDatabaseConfiguration(database) {
 		};
 	} else if (type === 'redis') {
 		return {
-			// url: `redis://${dbUser}:${dbUserPassword}@${id}:${isPublic ? port : 6379}/${defaultDatabase}`,
 			privatePort: 6379,
 			environmentVariables: {
 				REDIS_PASSWORD: dbUserPassword,
@@ -305,7 +364,6 @@ export function generateDatabaseConfiguration(database) {
 		};
 	} else if (type === 'couchdb') {
 		return {
-			// url: `couchdb://${dbUser}:${dbUserPassword}@${id}:${isPublic ? port : 5984}/${defaultDatabase}`,
 			privatePort: 5984,
 			environmentVariables: {
 				COUCHDB_PASSWORD: dbUserPassword,
@@ -316,18 +374,4 @@ export function generateDatabaseConfiguration(database) {
 			ulimits: {}
 		};
 	}
-	// } else if (type === 'clickhouse') {
-	//     return {
-	//         url: `clickhouse://${dbUser}:${dbUserPassword}@${id}:${port}/${defaultDatabase}`,
-	//         privatePort: 9000,
-	//         image: `bitnami/clickhouse-server:${version}`,
-	//         volume: `${id}-${type}-data:/var/lib/clickhouse`,
-	//         ulimits: {
-	// 			nofile: {
-	// 				soft: 262144,
-	// 				hard: 262144
-	// 			}
-	// 		}
-	//     }
-	// }
 }
