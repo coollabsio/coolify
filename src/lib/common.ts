@@ -46,20 +46,6 @@ const customConfig: Config = {
 export const version = currentVersion;
 export const asyncExecShell = util.promisify(child.exec);
 export const asyncSleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
-export const asyncUntil = (condition, delay, maxIterations) => {
-	return new Promise<void>(async (resolve, reject) => {
-		let iterations = 0;
-		while (!condition()) {
-			if (maxIterations && iterations >= maxIterations) {
-				reject(new Error('Max iterations reached.'));
-				return;
-			}
-			await asyncSleep(delay);
-			iterations++;
-		}
-		resolve();
-	});
-};
 
 export const sentry = Sentry;
 
