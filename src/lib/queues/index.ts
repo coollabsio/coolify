@@ -116,54 +116,32 @@ const buildWorker = new Worker(buildQueueName, async (job) => await builder(job)
 
 buildWorker.on('completed', async (job: Bullmq.Job) => {
 	try {
-		await asyncUntil(
-			async () => {
-				const found = await prisma.build.findFirst({
-					where: { id: job.data.build_id, status: 'success' }
-				});
-				if (!found) {
-					return await prisma.build.update({
-						where: { id: job.data.build_id },
-						data: { status: 'success' }
-					});
-				}
-				return true;
-			},
-			100,
-			5
-		);
+		await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'success' } });
 	} catch (error) {
+		setTimeout(async () => {
+			await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'success' } });
+		}, 1234);
 		console.log(error);
 	} finally {
 		const workdir = `/tmp/build-sources/${job.data.repository}/${job.data.build_id}`;
 		if (!dev) await asyncExecShell(`rm -fr ${workdir}`);
+		await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'success' } });
 	}
 	return;
 });
 
 buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
 	try {
-		await asyncUntil(
-			async () => {
-				const found = await prisma.build.findFirst({
-					where: { id: job.data.build_id, status: 'failed' }
-				});
-				if (!found) {
-					return await prisma.build.update({
-						where: { id: job.data.build_id },
-						data: { status: 'failed' }
-					});
-				}
-				return true;
-			},
-			100,
-			5
-		);
+		await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'failed' } });
 	} catch (error) {
+		setTimeout(async () => {
+			await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'failed' } });
+		}, 1234);
 		console.log(error);
 	} finally {
 		const workdir = `/tmp/build-sources/${job.data.repository}`;
 		if (!dev) await asyncExecShell(`rm -fr ${workdir}`);
+		await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'failed' } });
 	}
 	await saveBuildLog({
 		line: 'Failed to deploy!',
