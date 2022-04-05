@@ -17,10 +17,10 @@ export type BuilderJob = {
 	startCommand?: string;
 	baseDirectory: string;
 	publishDirectory: string;
-	phpModules: unknown; // probably an array of some type;
-	pythonWSGI: unknown; // probably a string?;
-	pythonModule: unknown; // probably a string?;
-	pythonVariable: unknown; // probably a string?;
+	phpModules: string;
+	pythonWSGI: string;
+	pythonModule: string;
+	pythonVariable: string;
 	createdAt: string;
 	updatedAt: string;
 	destinationDockerId: string;
