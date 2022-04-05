@@ -116,7 +116,22 @@ const buildWorker = new Worker(buildQueueName, async (job) => await builder(job)
 
 buildWorker.on('completed', async (job: Bullmq.Job) => {
 	try {
-		await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'success' } });
+		await asyncUntil(
+			async () => {
+				const found = await prisma.build.findFirst({
+					where: { id: job.data.build_id, status: 'success' }
+				});
+				if (!found) {
+					return await prisma.build.update({
+						where: { id: job.data.build_id },
+						data: { status: 'success' }
+					});
+				}
+				return true;
+			},
+			100,
+			5
+		);
 	} catch (error) {
 		console.log(error);
 	} finally {
@@ -141,7 +156,7 @@ buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
 				}
 				return true;
 			},
-			200,
+			100,
 			5
 		);
 	} catch (error) {
