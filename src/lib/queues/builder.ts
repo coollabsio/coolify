@@ -217,9 +217,7 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 				await saveBuildLog({ line: `Build pack ${buildPack} not found`, buildId, applicationId });
 				throw new Error(`Build pack ${buildPack} not found.`);
 			}
-			deployNeeded = true;
 		} else {
-			deployNeeded = false;
 			await saveBuildLog({ line: 'Nothing changed.', buildId, applicationId });
 		}
 
