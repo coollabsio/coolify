@@ -132,9 +132,6 @@ export const post: RequestHandler = async (event) => {
 				);
 
 				await startTcpProxy(destinationDocker, `${id}-ftp`, publicPort, 22);
-				await asyncExecShell(
-					`rm -f ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub`
-				);
 			} else {
 				await db.prisma.wordpress.update({
 					where: { serviceId: id },
@@ -152,9 +149,6 @@ export const post: RequestHandler = async (event) => {
 					//
 				}
 				await stopTcpHttpProxy(destinationDocker, oldPublicPort);
-				await asyncExecShell(
-					`rm -f ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub `
-				);
 			}
 		}
 		if (ftpEnabled) {
@@ -175,5 +169,9 @@ export const post: RequestHandler = async (event) => {
 	} catch (error) {
 		console.log(error);
 		return ErrorHandler(error);
+	} finally {
+		await asyncExecShell(
+			`rm -f ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub `
+		);
 	}
 };
