@@ -5,7 +5,7 @@ import { dev } from '$app/env';
 import cuid from 'cuid';
 import getPort, { portNumbers } from 'get-port';
 
-export async function letsEncrypt(domain, id = null, isCoolify = false) {
+export async function letsEncrypt(domain: string, id?: string, isCoolify = false): Promise<void> {
 	try {
 		const data = await db.prisma.setting.findFirst();
 		const { minPort, maxPort } = data;
@@ -96,7 +96,7 @@ export async function letsEncrypt(domain, id = null, isCoolify = false) {
 	}
 }
 
-export async function generateSSLCerts() {
+export async function generateSSLCerts(): Promise<void> {
 	const ssls = [];
 	const applications = await db.prisma.application.findMany({
 		include: { destinationDocker: true, settings: true },
@@ -129,7 +129,7 @@ export async function generateSSLCerts() {
 						.map((c) => c.replace(/"/g, ''));
 					if (containers.length > 0) {
 						for (const container of containers) {
-							let previewDomain = `${container.split('-')[1]}.${domain}`;
+							const previewDomain = `${container.split('-')[1]}.${domain}`;
 							if (isHttps) ssls.push({ domain: previewDomain, id, isCoolify: false });
 						}
 					}
