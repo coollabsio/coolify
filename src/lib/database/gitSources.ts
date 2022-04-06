@@ -5,9 +5,14 @@ import type { GithubApp, GitlabApp, GitSource, Prisma, Application } from '@pris
 export async function listSources(
 	teamId: string | Prisma.StringFilter
 ): Promise<(GitSource & { githubApp?: GithubApp; gitlabApp?: GitlabApp })[]> {
+	if (teamId === '0') {
+		return await prisma.gitSource.findMany({
+			include: { githubApp: true, gitlabApp: true, teams: true }
+		});
+	}
 	return await prisma.gitSource.findMany({
 		where: { teams: { some: { id: teamId } } },
-		include: { githubApp: true, gitlabApp: true }
+		include: { githubApp: true, gitlabApp: true, teams: true }
 	});
 }
 
@@ -54,10 +59,18 @@ export async function getSource({
 	id: string;
 	teamId: string;
 }): Promise<GitSource & { githubApp: GithubApp; gitlabApp: GitlabApp }> {
-	const body = await prisma.gitSource.findFirst({
-		where: { id, teams: { some: { id: teamId } } },
-		include: { githubApp: true, gitlabApp: true }
-	});
+	let body;
+	if (teamId === '0') {
+		body = await prisma.gitSource.findFirst({
+			where: { id },
+			include: { githubApp: true, gitlabApp: true }
+		});
+	} else {
+		body = await prisma.gitSource.findFirst({
+			where: { id, teams: { some: { id: teamId } } },
+			include: { githubApp: true, gitlabApp: true }
+		});
+	}
 	if (body?.githubApp?.clientSecret)
 		body.githubApp.clientSecret = decrypt(body.githubApp.clientSecret);
 	if (body?.githubApp?.webhookSecret)

@@ -62,7 +62,7 @@
 <div class="flex flex-col justify-center">
 	{#if !filteredSources || filteredSources.length === 0}
 		<div class="flex-col">
-			<div class="pb-2">No configurable Git Source found</div>
+			<div class="pb-2 text-center">No configurable Git Source found</div>
 			<div class="flex justify-center">
 				<a href="/new/source" sveltekit:prefetch class="add-icon bg-orange-600 hover:bg-orange-500">
 					<svg

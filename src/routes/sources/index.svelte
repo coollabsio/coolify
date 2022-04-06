@@ -60,6 +60,9 @@
 						class:border-l-4={source.gitlabApp && !source.gitlabAppId}
 					>
 						<div class="font-bold text-xl text-center truncate">{source.name}</div>
+						{#if $session.teamId === '0'}
+							<div class="text-center truncate">Team {source.teams[0].name}</div>
+						{/if}
 						{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && !source.githubAppId && !source.githubApp?.installationId)}
 							<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
 								Configuration missing

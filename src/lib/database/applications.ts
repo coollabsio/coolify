@@ -14,7 +14,13 @@ import type {
 } from '@prisma/client';
 
 export async function listApplications(teamId: string): Promise<Application[]> {
-	return await prisma.application.findMany({ where: { teams: { some: { id: teamId } } } });
+	if (teamId === '0') {
+		return await prisma.application.findMany({ include: { teams: true } });
+	}
+	return await prisma.application.findMany({
+		where: { teams: { some: { id: teamId } } },
+		include: { teams: true }
+	});
 }
 
 export async function newApplication({
@@ -133,13 +139,7 @@ export async function getApplicationWebhook({
 	}
 }
 
-export async function getApplication({
-	id,
-	teamId
-}: {
-	id: string;
-	teamId: string;
-}): Promise<
+export async function getApplication({ id, teamId }: { id: string; teamId: string }): Promise<
 	Application & {
 		destinationDocker: DestinationDocker;
 		settings: ApplicationSettings;
@@ -148,16 +148,30 @@ export async function getApplication({
 		persistentStorage: ApplicationPersistentStorage[];
 	}
 > {
-	const body = await prisma.application.findFirst({
-		where: { id, teams: { some: { id: teamId } } },
-		include: {
-			destinationDocker: true,
-			settings: true,
-			gitSource: { include: { githubApp: true, gitlabApp: true } },
-			secrets: true,
-			persistentStorage: true
-		}
-	});
+	let body;
+	if (teamId === '0') {
+		body = await prisma.application.findFirst({
+			where: { id },
+			include: {
+				destinationDocker: true,
+				settings: true,
+				gitSource: { include: { githubApp: true, gitlabApp: true } },
+				secrets: true,
+				persistentStorage: true
+			}
+		});
+	} else {
+		body = await prisma.application.findFirst({
+			where: { id, teams: { some: { id: teamId } } },
+			include: {
+				destinationDocker: true,
+				settings: true,
+				gitSource: { include: { githubApp: true, gitlabApp: true } },
+				secrets: true,
+				persistentStorage: true
+			}
+		});
+	}
 
 	if (body?.gitSource?.githubApp?.clientSecret) {
 		body.gitSource.githubApp.clientSecret = decrypt(body.gitSource.githubApp.clientSecret);

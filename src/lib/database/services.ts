@@ -5,7 +5,14 @@ import { generatePassword } from '.';
 import { prisma } from './common';
 
 export async function listServices(teamId: string): Promise<Service[]> {
-	return await prisma.service.findMany({ where: { teams: { some: { id: teamId } } } });
+	if (teamId === '0') {
+		return await prisma.service.findMany({ include: { teams: true } });
+	} else {
+		return await prisma.service.findMany({
+			where: { teams: { some: { id: teamId } } },
+			include: { teams: true }
+		});
+	}
 }
 
 export async function newService({
@@ -19,19 +26,28 @@ export async function newService({
 }
 
 export async function getService({ id, teamId }: { id: string; teamId: string }): Promise<Service> {
-	const body = await prisma.service.findFirst({
-		where: { id, teams: { some: { id: teamId } } },
-		include: {
-			destinationDocker: true,
-			plausibleAnalytics: true,
-			minio: true,
-			vscodeserver: true,
-			wordpress: true,
-			ghost: true,
-			serviceSecret: true,
-			meiliSearch: true
-		}
-	});
+	let body;
+	const include = {
+		destinationDocker: true,
+		plausibleAnalytics: true,
+		minio: true,
+		vscodeserver: true,
+		wordpress: true,
+		ghost: true,
+		serviceSecret: true,
+		meiliSearch: true
+	};
+	if (teamId === '0') {
+		body = await prisma.service.findFirst({
+			where: { id },
+			include
+		});
+	} else {
+		body = await prisma.service.findFirst({
+			where: { id, teams: { some: { id: teamId } } },
+			include
+		});
+	}
 
 	if (body.plausibleAnalytics?.postgresqlPassword)
 		body.plausibleAnalytics.postgresqlPassword = decrypt(
@@ -65,8 +81,12 @@ export async function getService({ id, teamId }: { id: string; teamId: string })
 			return s;
 		});
 	}
+	if (body.wordpress?.ftpPassword) {
+		body.wordpress.ftpPassword = decrypt(body.wordpress.ftpPassword);
+	}
+	const settings = await prisma.setting.findFirst();
 
-	return { ...body };
+	return { ...body, settings };
 }
 
 export async function configureServiceType({
@@ -191,6 +211,7 @@ export async function configureServiceType({
 		});
 	}
 }
+
 export async function setServiceVersion({
 	id,
 	version
@@ -233,6 +254,7 @@ export async function updatePlausibleAnalyticsService({
 	await prisma.plausibleAnalytics.update({ where: { serviceId: id }, data: { email, username } });
 	await prisma.service.update({ where: { id }, data: { name, fqdn } });
 }
+
 export async function updateService({
 	id,
 	fqdn,
@@ -244,6 +266,7 @@ export async function updateService({
 }): Promise<Service> {
 	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
 }
+
 export async function updateLanguageToolService({
 	id,
 	fqdn,
@@ -255,6 +278,7 @@ export async function updateLanguageToolService({
 }): Promise<Service> {
 	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
 }
+
 export async function updateMeiliSearchService({
 	id,
 	fqdn,
@@ -266,6 +290,7 @@ export async function updateMeiliSearchService({
 }): Promise<Service> {
 	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
 }
+
 export async function updateVaultWardenService({
 	id,
 	fqdn,
@@ -277,6 +302,7 @@ export async function updateVaultWardenService({
 }): Promise<Service> {
 	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
 }
+
 export async function updateVsCodeServer({
 	id,
 	fqdn,
@@ -288,6 +314,7 @@ export async function updateVsCodeServer({
 }): Promise<Service> {
 	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
 }
+
 export async function updateWordpress({
 	id,
 	fqdn,
@@ -306,6 +333,7 @@ export async function updateWordpress({
 		data: { fqdn, name, wordpress: { update: { mysqlDatabase, extraConfig } } }
 	});
 }
+
 export async function updateMinioService({
 	id,
 	publicPort
@@ -315,6 +343,7 @@ export async function updateMinioService({
 }): Promise<Minio> {
 	return await prisma.minio.update({ where: { serviceId: id }, data: { publicPort } });
 }
+
 export async function updateGhostService({
 	id,
 	fqdn,

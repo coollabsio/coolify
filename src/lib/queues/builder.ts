@@ -23,11 +23,9 @@ import yaml from 'js-yaml';
 import type { Job } from 'bullmq';
 import type { BuilderJob } from '$lib/types/builderJob';
 
+import type { ComposeFile } from '$lib/types/composeFile';
+
 export default async function (job: Job<BuilderJob, void, string>): Promise<void> {
-	/*
-	Edge cases:
-	1 - Change build pack and redeploy, what should happen?
-  */
 	const {
 		id: applicationId,
 		repository,
@@ -276,7 +274,7 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 					}
 				};
 			});
-			const compose = {
+			const composeFile: ComposeFile = {
 				version: '3.8',
 				services: {
 					[imageId]: {
@@ -285,7 +283,7 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 						volumes,
 						env_file: envFound ? [`${workdir}/.env`] : [],
 						networks: [docker.network],
-						labels: labels,
+						labels,
 						depends_on: [],
 						restart: 'always'
 					}
@@ -297,7 +295,7 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 				},
 				volumes: Object.assign({}, ...composeVolumes)
 			};
-			await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(compose));
+			await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
 			await asyncExecShell(
 				`DOCKER_HOST=${host} docker compose --project-directory ${workdir} up -d`
 			);

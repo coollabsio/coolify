@@ -115,12 +115,12 @@ export async function stopTcpHttpProxy(
 		return error;
 	}
 }
-
 export async function startTcpProxy(
 	destinationDocker: DestinationDocker,
 	id: string,
 	publicPort: number,
-	privatePort: number
+	privatePort: number,
+	volume?: string
 ): Promise<{ stdout: string; stderr: string } | Error> {
 	const { network, engine } = destinationDocker;
 	const host = getEngine(engine);
@@ -136,7 +136,9 @@ export async function startTcpProxy(
 			);
 			const ip = JSON.parse(Config)[0].Gateway;
 			return await asyncExecShell(
-				`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} -d coollabsio/${defaultProxyImageTcp}`
+				`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} ${
+					volume ? `-v ${volume}` : ''
+				} -d coollabsio/${defaultProxyImageTcp}`
 			);
 		}
 	} catch (error) {

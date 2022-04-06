@@ -1,5 +1,4 @@
 import { asyncExecShell, getEngine } from '$lib/common';
-import { decrypt } from '$lib/crypto';
 import { dockerInstance } from '$lib/docker';
 import { startCoolifyProxy } from '$lib/haproxy';
 import { getDatabaseImage } from '.';
@@ -18,7 +17,13 @@ type FindDestinationFromTeam = {
 };
 
 export async function listDestinations(teamId: string): Promise<DestinationDocker[]> {
-	return await prisma.destinationDocker.findMany({ where: { teams: { some: { id: teamId } } } });
+	if (teamId === '0') {
+		return await prisma.destinationDocker.findMany({ include: { teams: true } });
+	}
+	return await prisma.destinationDocker.findMany({
+		where: { teams: { some: { id: teamId } } },
+		include: { teams: true }
+	});
 }
 
 export async function configureDestinationForService({
@@ -146,12 +151,17 @@ export async function getDestination({
 	id,
 	teamId
 }: FindDestinationFromTeam): Promise<DestinationDocker & { sshPrivateKey?: string }> {
-	const destination = (await prisma.destinationDocker.findFirst({
-		where: { id, teams: { some: { id: teamId } } }
-	})) as DestinationDocker & { sshPrivateKey?: string };
-	if (destination.remoteEngine) {
-		destination.sshPrivateKey = decrypt(destination.sshPrivateKey);
+	let destination;
+	if (teamId === '0') {
+		destination = await prisma.destinationDocker.findFirst({
+			where: { id }
+		});
+	} else {
+		destination = await prisma.destinationDocker.findFirst({
+			where: { id, teams: { some: { id: teamId } } }
+		});
 	}
+
 	return destination;
 }
 export async function getDestinationByApplicationId({

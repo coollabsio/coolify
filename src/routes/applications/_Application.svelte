@@ -15,6 +15,7 @@
 	import Docker from '$lib/components/svg/applications/Docker.svelte';
 	import Astro from '$lib/components/svg/applications/Astro.svelte';
 	import Eleventy from '$lib/components/svg/applications/Eleventy.svelte';
+	import { session } from '$app/stores';
 
 	const buildPack = application?.buildPack?.toLowerCase();
 </script>
@@ -54,6 +55,9 @@
 		{/if}
 
 		<div class="truncate text-center text-xl font-bold">{application.name}</div>
+		{#if $session.teamId === '0'}
+			<div class="truncate text-center">Team {application.teams[0].name}</div>
+		{/if}
 		{#if application.fqdn}
 			<div class="truncate text-center">{application.fqdn}</div>
 		{/if}

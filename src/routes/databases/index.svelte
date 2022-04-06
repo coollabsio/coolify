@@ -8,6 +8,7 @@
 	import Redis from '$lib/components/svg/databases/Redis.svelte';
 	import { post } from '$lib/api';
 	import { goto } from '$app/navigation';
+	import { session } from '$app/stores';
 
 	async function newDatabase() {
 		const { id } = await post('/databases/new', {});
@@ -59,6 +60,9 @@
 					<div class="font-bold text-xl text-center truncate">
 						{database.name}
 					</div>
+					{#if $session.teamId === '0'}
+						<div class="text-center truncate">Team {database.teams[0].name}</div>
+					{/if}
 					{#if !database.type}
 						<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
 							Configuration missing

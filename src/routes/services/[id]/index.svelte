@@ -6,7 +6,8 @@
 				props: {
 					service: stuff.service,
 					isRunning: stuff.isRunning,
-					readOnly: stuff.readOnly
+					readOnly: stuff.readOnly,
+					settings: stuff.settings
 				}
 			};
 		}
@@ -37,6 +38,7 @@
 	export let service;
 	export let isRunning;
 	export let readOnly;
+	export let settings;
 
 	if (browser && window.location.hostname === 'demo.coolify.io' && !service.fqdn) {
 		service.fqdn = `http://${cuid()}.demo.coolify.io`;
@@ -76,4 +78,4 @@
 	<ServiceLinks {service} />
 </div>
 
-<Services bind:service {isRunning} {readOnly} />
+<Services bind:service {isRunning} {readOnly} {settings} />

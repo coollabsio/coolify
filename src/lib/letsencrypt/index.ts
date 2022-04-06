@@ -4,6 +4,7 @@ import * as db from '$lib/database';
 import { dev } from '$app/env';
 import cuid from 'cuid';
 import getPort, { portNumbers } from 'get-port';
+import { supportedServiceTypesAndVersions } from '$lib/components/common';
 
 export async function letsEncrypt(domain: string, id?: string, isCoolify = false): Promise<void> {
 	try {
@@ -160,7 +161,7 @@ export async function generateSSLCerts(): Promise<void> {
 					type,
 					destinationDocker: { engine }
 				} = service;
-				const found = db.supportedServiceTypesAndVersions.find((a) => a.name === type);
+				const found = supportedServiceTypesAndVersions.find((a) => a.name === type);
 				if (found) {
 					const domain = getDomain(fqdn);
 					const isHttps = fqdn.startsWith('https://');

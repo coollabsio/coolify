@@ -13,7 +13,7 @@ export const post: RequestHandler = async (event) => {
 	if (fqdn) fqdn = fqdn.toLowerCase();
 
 	try {
-		await db.updateMeiliSearchService({ id, fqdn, name });
+		await db.updateService({ id, fqdn, name });
 		return { status: 201 };
 	} catch (error) {
 		return ErrorHandler(error);

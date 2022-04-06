@@ -6,7 +6,14 @@ import { asyncExecShell, getEngine, removeContainer } from '$lib/common';
 import type { Database, DatabaseSettings, DestinationDocker } from '@prisma/client';
 
 export async function listDatabases(teamId: string): Promise<Database[]> {
-	return await prisma.database.findMany({ where: { teams: { some: { id: teamId } } } });
+	if (teamId === '0') {
+		return await prisma.database.findMany({ include: { teams: true } });
+	} else {
+		return await prisma.database.findMany({
+			where: { teams: { some: { id: teamId } } },
+			include: { teams: true }
+		});
+	}
 }
 
 export async function newDatabase({
@@ -43,11 +50,18 @@ export async function getDatabase({
 	id: string;
 	teamId: string;
 }): Promise<Database & { destinationDocker: DestinationDocker; settings: DatabaseSettings }> {
-	const body = await prisma.database.findFirst({
-		where: { id, teams: { some: { id: teamId } } },
-		include: { destinationDocker: true, settings: true }
-	});
-
+	let body;
+	if (teamId === '0') {
+		body = await prisma.database.findFirst({
+			where: { id },
+			include: { destinationDocker: true, settings: true }
+		});
+	} else {
+		body = await prisma.database.findFirst({
+			where: { id, teams: { some: { id: teamId } } },
+			include: { destinationDocker: true, settings: true }
+		});
+	}
 	if (body.dbUserPassword) body.dbUserPassword = decrypt(body.dbUserPassword);
 	if (body.rootUserPassword) body.rootUserPassword = decrypt(body.rootUserPassword);
 
