@@ -7,6 +7,8 @@ import { version } from '$lib/common';
 import cookie from 'cookie';
 import { dev } from '$app/env';
 
+const whiteLabeled = process.env['COOLIFY_WHITE_LABELED'] === 'true';
+
 export const handle = handleSession(
 	{
 		secret: process.env['COOLIFY_SECRET_KEY'],
@@ -71,6 +73,7 @@ export const handle = handleSession(
 export const getSession: GetSession = function ({ locals }) {
 	return {
 		version,
+		whiteLabeled,
 		...locals.session.data
 	};
 };
