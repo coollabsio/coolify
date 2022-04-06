@@ -1,5 +1,3 @@
-import { makeLabelForServices } from '../buildPacks/common';
-
 export type ComposeFile = {
 	version: ComposerFileVersion;
 	services: Record<string, ComposeFileService>;
@@ -11,10 +9,12 @@ export type ComposeFileService = {
 	container_name: string;
 	image?: string;
 	networks: string[];
-	environment: Record<string, unknown>;
+	environment?: Record<string, unknown>;
 	volumes?: string[];
 	ulimits?: unknown;
 	labels?: string[];
+	env_file?: string[];
+	extra_hosts?: string[];
 	restart: ComposeFileRestartOption;
 	depends_on?: string[];
 	command?: string;

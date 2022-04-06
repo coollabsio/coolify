@@ -4,6 +4,7 @@ import { decrypt, encrypt } from '$lib/crypto';
 import * as db from '$lib/database';
 import { generateDatabaseConfiguration, ErrorHandler, generatePassword } from '$lib/database';
 import { checkContainer, startTcpProxy, stopTcpHttpProxy } from '$lib/haproxy';
+import type { ComposeFile } from '$lib/types/composeFile';
 import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
 import fs from 'fs/promises';
@@ -108,7 +109,7 @@ export const post: RequestHandler = async (event) => {
 					}/${id}.sh:/etc/sftp.d/chmod.sh`
 				];
 
-				const compose = {
+				const compose: ComposeFile = {
 					version: '3.8',
 					services: {
 						[`${id}-ftp`]: {
