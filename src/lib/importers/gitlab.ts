@@ -9,7 +9,16 @@ export default async function ({
 	branch,
 	buildId,
 	privateSshKey
-}): Promise<any> {
+}: {
+	applicationId: string;
+	workdir: string;
+	repository: string;
+	htmlUrl: string;
+	branch: string;
+	buildId: string;
+	repodir: string;
+	privateSshKey: string;
+}): Promise<string> {
 	const url = htmlUrl.replace('https://', '').replace('http://', '');
 	await saveBuildLog({ line: 'GitLab importer started.', buildId, applicationId });
 	await asyncExecShell(`echo '${privateSshKey}' > ${repodir}/id.rsa`);
