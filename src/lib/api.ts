@@ -1,3 +1,5 @@
+// TODO: Make this functions generic
+
 async function send({
 	method,
 	path,
