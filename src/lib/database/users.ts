@@ -1,9 +1,7 @@
 import cuid from 'cuid';
 import bcrypt from 'bcrypt';
-
 import { prisma } from './common';
 import { asyncExecShell, uniqueName } from '$lib/common';
-
 import * as db from '$lib/database';
 import { startCoolifyProxy } from '$lib/haproxy';
 import type { User } from '@prisma/client';
