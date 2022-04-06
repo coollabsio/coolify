@@ -97,9 +97,17 @@ export const post: RequestHandler = async (event) => {
 				}
 				const volumes = [
 					`${id}-wordpress-data:/home/${ftpUser}`,
-					`${hostkeyDir}/${id}.ed25519:/etc/ssh/ssh_host_ed25519_key`,
-					`${hostkeyDir}/${id}.rsa:/etc/ssh/ssh_host_rsa_key`
+					`${
+						dev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
+					}/${id}.ed25519:/etc/ssh/ssh_host_ed25519_key`,
+					`${
+						dev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
+					}/${id}.rsa:/etc/ssh/ssh_host_rsa_key`,
+					`${
+						dev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
+					}/${id}.sh:/etc/sftp.d/chmod.sh`
 				];
+
 				const compose = {
 					version: '3.8',
 					services: {
@@ -126,6 +134,11 @@ export const post: RequestHandler = async (event) => {
 						}
 					}
 				};
+				await fs.writeFile(
+					`${hostkeyDir}/${id}.sh`,
+					`#!/bin/bash\nchmod 600 /etc/ssh/ssh_host_ed25519_key /etc/ssh/ssh_host_rsa_key`
+				);
+				await asyncExecShell(`chmod +x ${hostkeyDir}/${id}.sh`);
 				await fs.writeFile(`${hostkeyDir}/${id}-docker-compose.yml`, yaml.dump(compose));
 				await asyncExecShell(
 					`DOCKER_HOST=${host} docker compose -f ${hostkeyDir}/${id}-docker-compose.yml up -d`
@@ -138,14 +151,10 @@ export const post: RequestHandler = async (event) => {
 					data: { ftpPublicPort: null }
 				});
 				try {
-					const isRunning = await checkContainer(engine, `${id}-ftp`);
-					if (isRunning) {
-						await asyncExecShell(
-							`DOCKER_HOST=${host} docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`
-						);
-					}
+					await asyncExecShell(
+						`DOCKER_HOST=${host} docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`
+					);
 				} catch (error) {
-					console.log(error);
 					//
 				}
 				await stopTcpHttpProxy(destinationDocker, oldPublicPort);
@@ -171,7 +180,7 @@ export const post: RequestHandler = async (event) => {
 		return ErrorHandler(error);
 	} finally {
 		await asyncExecShell(
-			`rm -f ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub `
+			`rm -f ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub ${hostkeyDir}/${id}.sh`
 		);
 	}
 };
