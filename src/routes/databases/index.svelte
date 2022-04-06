@@ -59,6 +59,7 @@
 					<div class="font-bold text-xl text-center truncate">
 						{database.name}
 					</div>
+					<div class="text-center truncate">Team {database.teams[0].name}</div>
 					{#if !database.type}
 						<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
 							Configuration missing

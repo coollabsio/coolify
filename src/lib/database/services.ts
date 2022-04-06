@@ -5,7 +5,14 @@ import { generatePassword } from '.';
 import { prisma } from './common';
 
 export async function listServices(teamId) {
-	return await prisma.service.findMany({ where: { teams: { some: { id: teamId } } } });
+	if (teamId === '0') {
+		return await prisma.service.findMany({ include: { teams: true } });
+	} else {
+		return await prisma.service.findMany({
+			where: { teams: { some: { id: teamId } } },
+			include: { teams: true }
+		});
+	}
 }
 
 export async function newService({ name, teamId }) {
@@ -13,19 +20,28 @@ export async function newService({ name, teamId }) {
 }
 
 export async function getService({ id, teamId }) {
-	const body = await prisma.service.findFirst({
-		where: { id, teams: { some: { id: teamId } } },
-		include: {
-			destinationDocker: true,
-			plausibleAnalytics: true,
-			minio: true,
-			vscodeserver: true,
-			wordpress: true,
-			ghost: true,
-			serviceSecret: true,
-			meiliSearch: true
-		}
-	});
+	let body = {};
+	const include = {
+		destinationDocker: true,
+		plausibleAnalytics: true,
+		minio: true,
+		vscodeserver: true,
+		wordpress: true,
+		ghost: true,
+		serviceSecret: true,
+		meiliSearch: true
+	};
+	if (teamId === '0') {
+		body = await prisma.service.findFirst({
+			where: { id },
+			include
+		});
+	} else {
+		body = await prisma.service.findFirst({
+			where: { id, teams: { some: { id: teamId } } },
+			include
+		});
+	}
 
 	if (body.plausibleAnalytics?.postgresqlPassword)
 		body.plausibleAnalytics.postgresqlPassword = decrypt(

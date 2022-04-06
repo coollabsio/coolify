@@ -57,6 +57,7 @@
 				<a href="/destinations/{destination.id}" class="no-underline p-2 w-96">
 					<div class="box-selection hover:bg-sky-600">
 						<div class="font-bold text-xl text-center truncate">{destination.name}</div>
+						<div class="text-center truncate">Team {destination.teams[0].name}</div>
 						<div class="text-center truncate">{destination.network}</div>
 					</div>
 				</a>

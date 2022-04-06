@@ -2,9 +2,14 @@ import { decrypt, encrypt } from '$lib/crypto';
 import { prisma } from './common';
 
 export async function listSources(teamId) {
+	if (teamId === '0') {
+		return await prisma.gitSource.findMany({
+			include: { githubApp: true, gitlabApp: true, teams: true }
+		});
+	}
 	return await prisma.gitSource.findMany({
 		where: { teams: { some: { id: teamId } } },
-		include: { githubApp: true, gitlabApp: true }
+		include: { githubApp: true, gitlabApp: true, teams: true }
 	});
 }
 
@@ -31,10 +36,18 @@ export async function removeSource({ id }) {
 }
 
 export async function getSource({ id, teamId }) {
-	let body = await prisma.gitSource.findFirst({
-		where: { id, teams: { some: { id: teamId } } },
-		include: { githubApp: true, gitlabApp: true }
-	});
+	let body = {};
+	if (teamId === '0') {
+		body = await prisma.gitSource.findFirst({
+			where: { id },
+			include: { githubApp: true, gitlabApp: true }
+		});
+	} else {
+		body = await prisma.gitSource.findFirst({
+			where: { id, teams: { some: { id: teamId } } },
+			include: { githubApp: true, gitlabApp: true }
+		});
+	}
 	if (body?.githubApp?.clientSecret)
 		body.githubApp.clientSecret = decrypt(body.githubApp.clientSecret);
 	if (body?.githubApp?.webhookSecret)

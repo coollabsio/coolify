@@ -7,7 +7,14 @@ import getPort, { portNumbers } from 'get-port';
 import { asyncExecShell, getEngine, removeContainer } from '$lib/common';
 
 export async function listDatabases(teamId) {
-	return await prisma.database.findMany({ where: { teams: { some: { id: teamId } } } });
+	if (teamId === '0') {
+		return await prisma.database.findMany({ include: { teams: true } });
+	} else {
+		return await prisma.database.findMany({
+			where: { teams: { some: { id: teamId } } },
+			include: { teams: true }
+		});
+	}
 }
 export async function newDatabase({ name, teamId }) {
 	const dbUser = cuid();
@@ -31,10 +38,18 @@ export async function newDatabase({ name, teamId }) {
 }
 
 export async function getDatabase({ id, teamId }) {
-	const body = await prisma.database.findFirst({
-		where: { id, teams: { some: { id: teamId } } },
-		include: { destinationDocker: true, settings: true }
-	});
+	let body = {};
+	if (teamId === '0') {
+		body = await prisma.database.findFirst({
+			where: { id },
+			include: { destinationDocker: true, settings: true }
+		});
+	} else {
+		body = await prisma.database.findFirst({
+			where: { id, teams: { some: { id: teamId } } },
+			include: { destinationDocker: true, settings: true }
+		});
+	}
 
 	if (body.dbUserPassword) body.dbUserPassword = decrypt(body.dbUserPassword);
 	if (body.rootUserPassword) body.rootUserPassword = decrypt(body.rootUserPassword);

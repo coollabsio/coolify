@@ -54,6 +54,7 @@
 		{/if}
 
 		<div class="truncate text-center text-xl font-bold">{application.name}</div>
+		<div class="truncate text-center">Team {application.teams[0].name}</div>
 		{#if application.fqdn}
 			<div class="truncate text-center">{application.fqdn}</div>
 		{/if}
