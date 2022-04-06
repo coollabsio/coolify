@@ -49,20 +49,20 @@ export const supportedDatabaseTypesAndVersions = [
 		name: 'mongodb',
 		fancyName: 'MongoDB',
 		baseImage: 'bitnami/mongodb',
-		versions: ['5.0.5', '4.4.11', '4.2.18', '4.0.27']
+		versions: ['5.0', '4.4', '4.2']
 	},
-	{ name: 'mysql', fancyName: 'MySQL', baseImage: 'bitnami/mysql', versions: ['8.0.27', '5.7.36'] },
+	{ name: 'mysql', fancyName: 'MySQL', baseImage: 'bitnami/mysql', versions: ['8.0', '5.7'] },
 	{
 		name: 'postgresql',
 		fancyName: 'PostgreSQL',
 		baseImage: 'bitnami/postgresql',
-		versions: ['14.1.0', '13.5.0', '12.9.0', '11.14.0', '10.19.0', '9.6.24']
+		versions: ['14.2', '13.6', '12.10', '11.15', '10.20']
 	},
 	{
 		name: 'redis',
 		fancyName: 'Redis',
 		baseImage: 'bitnami/redis',
-		versions: ['6.2.6', '6.0.16', '5.0.14']
+		versions: ['6.2', '6.0', '5.0']
 	},
 	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] }
 ];
