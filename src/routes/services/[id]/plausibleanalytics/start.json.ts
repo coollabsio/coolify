@@ -168,14 +168,15 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 		};
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
-			return {
-				status: 200
-			};
-		} catch (error) {
-			return ErrorHandler(error);
+		if (version === 'latest') {
+			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
 		}
+		await asyncExecShell(
+			`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up --build -d`
+		);
+		return {
+			status: 200
+		};
 	} catch (error) {
 		return ErrorHandler(error);
 	}
