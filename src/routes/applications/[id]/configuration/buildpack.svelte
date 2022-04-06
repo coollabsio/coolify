@@ -81,6 +81,9 @@
 				);
 				const indexHtml = files.find((file) => file.name === 'index.html' && file.type === 'blob');
 				const indexPHP = files.find((file) => file.name === 'index.php' && file.type === 'blob');
+				const composerPHP = files.find(
+					(file) => file.name === 'composer.json' && file.type === 'blob'
+				);
 
 				if (yarnLock) packageManager = 'yarn';
 				if (pnpmLock) packageManager = 'pnpm';
@@ -103,7 +106,7 @@
 					foundConfig = findBuildPack('python');
 				} else if (indexHtml) {
 					foundConfig = findBuildPack('static', packageManager);
-				} else if (indexPHP) {
+				} else if (indexPHP || composerPHP) {
 					foundConfig = findBuildPack('php');
 				} else {
 					foundConfig = findBuildPack('node', packageManager);
@@ -127,6 +130,9 @@
 				);
 				const indexHtml = files.find((file) => file.name === 'index.html' && file.type === 'file');
 				const indexPHP = files.find((file) => file.name === 'index.php' && file.type === 'file');
+				const composerPHP = files.find(
+					(file) => file.name === 'composer.json' && file.type === 'file'
+				);
 
 				if (yarnLock) packageManager = 'yarn';
 				if (pnpmLock) packageManager = 'pnpm';
@@ -146,7 +152,7 @@
 					foundConfig = findBuildPack('python');
 				} else if (indexHtml) {
 					foundConfig = findBuildPack('static', packageManager);
-				} else if (indexPHP) {
+				} else if (indexPHP || composerPHP) {
 					foundConfig = findBuildPack('php');
 				} else {
 					foundConfig = findBuildPack('node', packageManager);
