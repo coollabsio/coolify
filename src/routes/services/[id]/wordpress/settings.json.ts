@@ -21,13 +21,10 @@ export const post: RequestHandler = async (event) => {
 	const { ftpEnabled } = await event.request.json();
 	const publicPort = await getPort({ port: portNumbers(minPort, maxPort) });
 	let ftpUser = cuid();
-	const ftpPassword = generatePassword();
+	let ftpPassword = generatePassword();
 
 	const hostkeyDir = dev ? '/tmp/hostkeys' : '/app/ssl/hostkeys';
 	try {
-		const { stdout: password } = await asyncExecShell(
-			`echo ${ftpPassword} | openssl passwd -1 -stdin`
-		);
 		const data = await db.prisma.wordpress.update({
 			where: { serviceId: id },
 			data: { ftpEnabled },
@@ -37,10 +34,16 @@ export const post: RequestHandler = async (event) => {
 			service: { destinationDockerId, destinationDocker },
 			ftpPublicPort: oldPublicPort,
 			ftpUser: user,
+			ftpPassword: savedPassword,
 			ftpHostKey,
 			ftpHostKeyPrivate
 		} = data;
 		if (user) ftpUser = user;
+		if (savedPassword) ftpPassword = decrypt(savedPassword);
+
+		const { stdout: password } = await asyncExecShell(
+			`echo ${ftpPassword} | openssl passwd -1 -stdin`
+		);
 		if (destinationDockerId) {
 			try {
 				await fs.stat(hostkeyDir);
@@ -74,7 +77,11 @@ export const post: RequestHandler = async (event) => {
 			if (ftpEnabled) {
 				await db.prisma.wordpress.update({
 					where: { serviceId: id },
-					data: { ftpPublicPort: publicPort, ftpUser, ftpPassword: encrypt(ftpPassword) }
+					data: {
+						ftpPublicPort: publicPort,
+						ftpUser: user ? undefined : ftpUser,
+						ftpPassword: savedPassword ? undefined : encrypt(ftpPassword)
+					}
 				});
 
 				try {
@@ -125,6 +132,9 @@ export const post: RequestHandler = async (event) => {
 				);
 
 				await startTcpProxy(destinationDocker, `${id}-ftp`, publicPort, 22);
+				await asyncExecShell(
+					`rm -f ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub`
+				);
 			} else {
 				await db.prisma.wordpress.update({
 					where: { serviceId: id },
@@ -141,8 +151,10 @@ export const post: RequestHandler = async (event) => {
 					console.log(error);
 					//
 				}
-
 				await stopTcpHttpProxy(destinationDocker, oldPublicPort);
+				await asyncExecShell(
+					`rm -f ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub `
+				);
 			}
 		}
 		if (ftpEnabled) {
