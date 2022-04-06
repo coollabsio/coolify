@@ -1,7 +1,8 @@
 import { dev } from '$app/env';
 import { asyncExecShell, getEngine } from '$lib/common';
-import got from 'got';
+import got, { type Got, type Response } from 'got';
 import * as db from '$lib/database';
+import type { DestinationDocker } from '@prisma/client';
 
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555';
 
@@ -9,7 +10,7 @@ export const defaultProxyImage = `coolify-haproxy-alpine:latest`;
 export const defaultProxyImageTcp = `coolify-haproxy-tcp-alpine:latest`;
 export const defaultProxyImageHttp = `coolify-haproxy-http-alpine:latest`;
 
-export async function haproxyInstance() {
+export async function haproxyInstance(): Promise<Got> {
 	const { proxyPassword } = await db.listSettings();
 	return got.extend({
 		prefixUrl: url,
@@ -17,6 +18,7 @@ export async function haproxyInstance() {
 		password: proxyPassword
 	});
 }
+
 export async function getRawConfiguration(): Promise<RawHaproxyConfiguration> {
 	return await (await haproxyInstance()).get(`v2/services/haproxy/configuration/raw`).json();
 }
@@ -43,11 +45,12 @@ export async function getNextTransactionId(): Promise<string> {
 	return newTransaction.id;
 }
 
-export async function completeTransaction(transactionId) {
+export async function completeTransaction(transactionId: string): Promise<Response<string>> {
 	const haproxy = await haproxyInstance();
 	return await haproxy.put(`v2/services/haproxy/transactions/${transactionId}`);
 }
-export async function deleteProxy({ id }) {
+
+export async function deleteProxy({ id }: { id: string }): Promise<void> {
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
 
@@ -77,11 +80,12 @@ export async function deleteProxy({ id }) {
 	}
 }
 
-export async function reloadHaproxy(engine) {
+export async function reloadHaproxy(engine: string): Promise<{ stdout: string; stderr: string }> {
 	const host = getEngine(engine);
 	return await asyncExecShell(`DOCKER_HOST=${host} docker exec coolify-haproxy kill -HUP 1`);
 }
-export async function checkHAProxy(haproxy?: any) {
+
+export async function checkHAProxy(haproxy?: Got): Promise<void> {
 	if (!haproxy) haproxy = await haproxyInstance();
 	try {
 		await haproxy.get('v2/info');
@@ -93,7 +97,10 @@ export async function checkHAProxy(haproxy?: any) {
 	}
 }
 
-export async function stopTcpHttpProxy(destinationDocker, publicPort) {
+export async function stopTcpHttpProxy(
+	destinationDocker: DestinationDocker,
+	publicPort: number
+): Promise<{ stdout: string; stderr: string } | Error> {
 	const { engine } = destinationDocker;
 	const host = getEngine(engine);
 	const containerName = `haproxy-for-${publicPort}`;
@@ -108,7 +115,13 @@ export async function stopTcpHttpProxy(destinationDocker, publicPort) {
 		return error;
 	}
 }
-export async function startTcpProxy(destinationDocker, id, publicPort, privatePort) {
+
+export async function startTcpProxy(
+	destinationDocker: DestinationDocker,
+	id: string,
+	publicPort: number,
+	privatePort: number
+): Promise<{ stdout: string; stderr: string } | Error> {
 	const { network, engine } = destinationDocker;
 	const host = getEngine(engine);
 
@@ -130,7 +143,13 @@ export async function startTcpProxy(destinationDocker, id, publicPort, privatePo
 		return error;
 	}
 }
-export async function startHttpProxy(destinationDocker, id, publicPort, privatePort) {
+
+export async function startHttpProxy(
+	destinationDocker: DestinationDocker,
+	id: string,
+	publicPort: number,
+	privatePort: number
+): Promise<{ stdout: string; stderr: string } | Error> {
 	const { network, engine } = destinationDocker;
 	const host = getEngine(engine);
 
@@ -152,7 +171,8 @@ export async function startHttpProxy(destinationDocker, id, publicPort, privateP
 		return error;
 	}
 }
-export async function startCoolifyProxy(engine) {
+
+export async function startCoolifyProxy(engine: string): Promise<void> {
 	const host = getEngine(engine);
 	const found = await checkContainer(engine, 'coolify-haproxy');
 	const { proxyPassword, proxyUser, id } = await db.listSettings();
@@ -168,7 +188,8 @@ export async function startCoolifyProxy(engine) {
 	}
 	await configureNetworkCoolifyProxy(engine);
 }
-export async function checkContainer(engine, container) {
+
+export async function checkContainer(engine: string, container: string): Promise<boolean> {
 	const host = getEngine(engine);
 	let containerFound = false;
 
@@ -178,7 +199,7 @@ export async function checkContainer(engine, container) {
 		);
 		const parsedStdout = JSON.parse(stdout);
 		const status = parsedStdout.Status;
-		const isRunning = status === 'running' ? true : false;
+		const isRunning = status === 'running';
 		if (status === 'exited' || status === 'created') {
 			await asyncExecShell(`DOCKER_HOST="${host}" docker rm ${container}`);
 		}
@@ -191,7 +212,9 @@ export async function checkContainer(engine, container) {
 	return containerFound;
 }
 
-export async function stopCoolifyProxy(engine) {
+export async function stopCoolifyProxy(
+	engine: string
+): Promise<{ stdout: string; stderr: string } | Error> {
 	const host = getEngine(engine);
 	const found = await checkContainer(engine, 'coolify-haproxy');
 	await db.setDestinationSettings({ engine, isCoolifyProxyUsed: false });
@@ -208,16 +231,12 @@ export async function stopCoolifyProxy(engine) {
 	}
 }
 
-export async function configureNetworkCoolifyProxy(engine) {
+export async function configureNetworkCoolifyProxy(engine: string): Promise<void> {
 	const host = getEngine(engine);
 	const destinations = await db.prisma.destinationDocker.findMany({ where: { engine } });
-	destinations.forEach(async (destination) => {
-		try {
-			await asyncExecShell(
-				`DOCKER_HOST="${host}" docker network connect ${destination.network} coolify-haproxy`
-			);
-		} catch (err) {
-			// TODO: handle error
-		}
-	});
+	for (const destination of destinations) {
+		await asyncExecShell(
+			`DOCKER_HOST="${host}" docker network connect ${destination.network} coolify-haproxy`
+		);
+	}
 }
