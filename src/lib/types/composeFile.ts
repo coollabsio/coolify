@@ -18,7 +18,11 @@ export type ComposeFileService = {
 	restart: ComposeFileRestartOption;
 	depends_on?: string[];
 	command?: string;
-	build?: string;
+	build?: {
+		context: string;
+		dockerfile: string;
+		args?: Record<string, unknown>;
+	};
 };
 
 export type ComposerFileVersion =

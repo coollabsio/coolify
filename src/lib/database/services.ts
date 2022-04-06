@@ -220,18 +220,6 @@ export async function updatePlausibleAnalyticsService({ id, fqdn, email, usernam
 export async function updateService({ id, fqdn, name }) {
 	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
 }
-export async function updateLanguageToolService({ id, fqdn, name }) {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
-}
-export async function updateMeiliSearchService({ id, fqdn, name }) {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
-}
-export async function updateVaultWardenService({ id, fqdn, name }) {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
-}
-export async function updateVsCodeServer({ id, fqdn, name }) {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
-}
 export async function updateWordpress({ id, fqdn, name, mysqlDatabase, extraConfig }) {
 	return await prisma.service.update({
 		where: { id },
