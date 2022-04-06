@@ -110,7 +110,7 @@ export const supportedServiceTypesAndVersions = [
 		fancyName: 'Plausible Analytics',
 		baseImage: 'plausible/analytics',
 		images: ['bitnami/postgresql:13.2.0', 'yandex/clickhouse-server:21.3.2.5'],
-		versions: ['latest'],
+		versions: ['latest', 'stable'],
 		ports: {
 			main: 8000
 		}
