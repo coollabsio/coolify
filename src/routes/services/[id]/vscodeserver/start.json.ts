@@ -68,14 +68,14 @@ export const post: RequestHandler = async (event) => {
 		};
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-
-		if (version === 'latest') {
-			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
+		try {
+			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+			return {
+				status: 200
+			};
+		} catch (error) {
+			return ErrorHandler(error);
 		}
-		await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
-		return {
-			status: 200
-		};
 	} catch (error) {
 		return ErrorHandler(error);
 	}
