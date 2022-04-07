@@ -56,7 +56,7 @@ export const supportedDatabaseTypesAndVersions = [
 		name: 'postgresql',
 		fancyName: 'PostgreSQL',
 		baseImage: 'bitnami/postgresql',
-		versions: ['14.2', '13.6', '12.10', '11.15', '10.20']
+		versions: ['14.2.0', '13.6.0', '12.10.0	', '11.15.0', '10.20.0']
 	},
 	{
 		name: 'redis',

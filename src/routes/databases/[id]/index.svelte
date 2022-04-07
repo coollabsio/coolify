@@ -8,7 +8,8 @@
 					database: stuff.database,
 					versions: stuff.versions,
 					privatePort: stuff.privatePort,
-					settings: stuff.settings
+					settings: stuff.settings,
+					isRunning: stuff.isRunning
 				}
 			};
 		}
@@ -35,6 +36,7 @@
 	export let database;
 	export let settings;
 	export let privatePort;
+	export let isRunning;
 </script>
 
 <div class="flex items-center space-x-2 p-6 text-2xl font-bold">
@@ -47,4 +49,4 @@
 	<DatabaseLinks {database} />
 </div>
 
-<Databases bind:database {privatePort} {settings} />
+<Databases bind:database {privatePort} {settings} {isRunning} />

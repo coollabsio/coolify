@@ -15,6 +15,9 @@ declare namespace App {
 		readOnly: boolean;
 		source: string;
 		settings: string;
+		database: Record<string, any>;
+		versions: string;
+		privatePort: string;
 	}
 }
 

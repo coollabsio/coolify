@@ -137,3 +137,37 @@ export async function stopDatabase(database) {
 	}
 	return everStarted;
 }
+
+export async function updatePasswordInDb(database, user, newPassword) {
+	const {
+		id,
+		type,
+		rootUser,
+		rootUserPassword,
+		dbUser,
+		dbUserPassword,
+		defaultDatabase,
+		destinationDockerId,
+		destinationDocker: { engine }
+	} = database;
+	if (destinationDockerId) {
+		const host = getEngine(engine);
+		if (type === 'mysql') {
+			await asyncExecShell(
+				`DOCKER_HOST=${host} docker exec ${id} mysql -u ${rootUser} -p${rootUserPassword} -e \"ALTER USER '${user}'@'%' IDENTIFIED WITH caching_sha2_password BY '${newPassword}';\"`
+			);
+		} else if (type === 'postgresql') {
+			await asyncExecShell(
+				`DOCKER_HOST=${host} docker exec ${id} psql postgresql://${dbUser}:${dbUserPassword}@${id}:5432/${defaultDatabase} -c "ALTER role ${user} WITH PASSWORD '${newPassword}'"`
+			);
+		} else if (type === 'mongodb') {
+			await asyncExecShell(
+				`DOCKER_HOST=${host} docker exec ${id} mongo 'mongodb://${rootUser}:${rootUserPassword}@${id}:27017/admin?readPreference=primary&ssl=false' --eval "db.changeUserPassword('${user}','${newPassword}')"`
+			);
+		} else if (type === 'redis') {
+			await asyncExecShell(
+				`DOCKER_HOST=${host} docker exec ${id} redis-cli -u redis://${dbUserPassword}@${id}:6379 --raw CONFIG SET requirepass ${newPassword}`
+			);
+		}
+	}
+}
