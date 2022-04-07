@@ -52,7 +52,7 @@
 		</div>
 	{:else}
 		<div class="flex flex-col px-8">
-			{#if $session.teamId === '0'}
+			{#if $session.teamId === '0' && ownDatabases.length > 0}
 				<div class="text-xl font-bold pb-5">Your Team's Databases</div>
 			{/if}
 			<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
