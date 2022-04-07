@@ -16,7 +16,7 @@ First of all, thank you for considering to contribute to my project! It means a 
 - Push to your fork repo
 - Create a pull request: https://github.com/coollabsio/compare
 - Write a proper description
-- Click "Change to draft"
+- Open the pull request to review
 
 # How to start after you set up your local fork?
 
