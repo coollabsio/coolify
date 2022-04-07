@@ -72,7 +72,7 @@
 						<div class="box-selection hover:bg-sky-600">
 							<div class="font-bold text-xl text-center truncate">{destination.name}</div>
 							{#if $session.teamId === '0'}
-								<div class="text-center truncate">Team {destination.teams[0].name}</div>
+								<div class="text-center truncate">{destination.teams[0].name}</div>
 							{/if}
 							<div class="text-center truncate">{destination.network}</div>
 						</div>
@@ -81,14 +81,14 @@
 			</div>
 
 			{#if otherDestinations.length > 0 && $session.teamId === '0'}
-				<div class="text-xl font-bold pb-5 pt-10 px-6">Other Team's</div>
+				<div class="text-xl font-bold pb-5 pt-10 px-6">Others</div>
 				<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
 					{#each otherDestinations as destination}
 						<a href="/destinations/{destination.id}" class="no-underline p-2 w-96">
 							<div class="box-selection hover:bg-sky-600">
 								<div class="font-bold text-xl text-center truncate">{destination.name}</div>
 								{#if $session.teamId === '0'}
-									<div class="text-center truncate">Team {destination.teams[0].name}</div>
+									<div class="text-center truncate">{destination.teams[0].name}</div>
 								{/if}
 								<div class="text-center truncate">{destination.network}</div>
 							</div>

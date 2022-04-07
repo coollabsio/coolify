@@ -62,7 +62,7 @@
 	{:else}
 		<div class="flex flex-col">
 			{#if $session.teamId === '0' && ownSources.length > 0 && otherSources.length > 0}
-				<div class="text-xl font-bold pb-5 px-1">Current Team</div>
+				<div class="text-xl font-bold pb-5 px-6">Current Team</div>
 			{/if}
 			<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
 				{#each ownSources as source}
@@ -75,7 +75,7 @@
 						>
 							<div class="font-bold text-xl text-center truncate">{source.name}</div>
 							{#if $session.teamId === '0'}
-								<div class="text-center truncate">Team {source.teams[0].name}</div>
+								<div class="text-center truncate">{source.teams[0].name}</div>
 							{/if}
 							{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && !source.githubAppId && !source.githubApp?.installationId)}
 								<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
@@ -90,7 +90,7 @@
 			</div>
 
 			{#if otherSources.length > 0 && $session.teamId === '0'}
-				<div class="text-xl font-bold pb-5 pt-10 px-6">Other Team's</div>
+				<div class="text-xl font-bold pb-5 pt-10 px-6">Others</div>
 				<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
 					{#each otherSources as source}
 						<a href="/sources/{source.id}" class="no-underline p-2 w-96">
@@ -102,7 +102,7 @@
 							>
 								<div class="font-bold text-xl text-center truncate">{source.name}</div>
 								{#if $session.teamId === '0'}
-									<div class="text-center truncate">Team {source.teams[0].name}</div>
+									<div class="text-center truncate">{source.teams[0].name}</div>
 								{/if}
 								{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && !source.githubAppId && !source.githubApp?.installationId)}
 									<div class="font-bold text-center truncate text-red-500 group-hover:text-white">

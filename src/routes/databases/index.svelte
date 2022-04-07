@@ -76,7 +76,7 @@
 								{database.name}
 							</div>
 							{#if $session.teamId === '0'}
-								<div class="text-center truncate">Team {database.teams[0].name}</div>
+								<div class="text-center truncate">{database.teams[0].name}</div>
 							{/if}
 							{#if !database.type}
 								<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
@@ -90,7 +90,7 @@
 				{/each}
 			</div>
 			{#if otherDatabases.length > 0 && $session.teamId === '0'}
-				<div class="text-xl font-bold pb-5 pt-10 px-6">Other Team's</div>
+				<div class="text-xl font-bold pb-5 pt-10 px-6">Others</div>
 				<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
 					{#each otherDatabases as database}
 						<a href="/databases/{database.id}" class="no-underline p-2 w-96">
@@ -112,7 +112,7 @@
 									{database.name}
 								</div>
 								{#if $session.teamId === '0'}
-									<div class="text-center truncate">Team {database.teams[0].name}</div>
+									<div class="text-center truncate">{database.teams[0].name}</div>
 								{/if}
 								{#if !database.type}
 									<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
