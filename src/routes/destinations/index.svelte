@@ -64,7 +64,7 @@
 	{:else}
 		<div class="flex flex-col">
 			{#if $session.teamId === '0' && ownDestinations.length > 0}
-				<div class="text-xl font-bold pb-5">Your Team's Destinations</div>
+				<div class="text-xl font-bold pb-5 px-1">Your Team's Destinations</div>
 			{/if}
 			<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
 				{#each ownDestinations as destination}
@@ -81,7 +81,7 @@
 			</div>
 
 			{#if otherDestinations.length > 0 && $session.teamId === '0'}
-				<div class="text-xl font-bold pb-5 pt-10">Other Team's Destinations</div>
+				<div class="text-xl font-bold pb-5 px-1 pt-10">Other Team's Destinations</div>
 				<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
 					{#each otherDestinations as destination}
 						<a href="/destinations/{destination.id}" class="no-underline p-2 w-96">
