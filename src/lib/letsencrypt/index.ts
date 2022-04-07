@@ -202,7 +202,7 @@ export async function generateSSLCerts() {
 			if (!dev) {
 				if (
 					certificates.includes(ssl.domain) ||
-					certificates.includes(ssl.domain.replace('www', ''))
+					certificates.includes(ssl.domain.replace('www.', ''))
 				) {
 					console.log(`Certificate for ${ssl.domain} already exists`);
 				} else {
@@ -212,7 +212,7 @@ export async function generateSSLCerts() {
 			} else {
 				if (
 					certificates.includes(ssl.domain) ||
-					certificates.includes(ssl.domain.replace('www', ''))
+					certificates.includes(ssl.domain.replace('www.', ''))
 				) {
 					console.log(`Certificate for ${ssl.domain} already exists`);
 				} else {
