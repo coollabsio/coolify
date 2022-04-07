@@ -434,13 +434,12 @@
 			<div class="flex flex-col space-y-4 py-2">
 				<a
 					sveltekit:prefetch
-					href="/teams"
-					class="icons tooltip-right bg-coolgray-200 hover:text-cyan-500"
-					class:text-cyan-500={$page.url.pathname.startsWith('/teams')}
-					class:bg-coolgray-500={$page.url.pathname.startsWith('/teams')}
-					data-tooltip="Teams"
-				>
-					<svg
+					href="/iam"
+					class="icons tooltip-right bg-coolgray-200 hover:text-fuchsia-500"
+					class:text-fuchsia-500={$page.url.pathname.startsWith('/iam')}
+					class:bg-coolgray-500={$page.url.pathname.startsWith('/iam')}
+					data-tooltip="IAM"
+					><svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="h-8 w-8"
 						viewBox="0 0 24 24"
@@ -457,6 +456,7 @@
 						<path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
 					</svg>
 				</a>
+
 				{#if $session.teamId === '0'}
 					<a
 						sveltekit:prefetch
@@ -484,6 +484,7 @@
 						</svg>
 					</a>
 				{/if}
+
 				<div
 					class="icons tooltip-right bg-coolgray-200 hover:text-red-500"
 					data-tooltip="Logout"
