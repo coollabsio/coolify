@@ -90,7 +90,7 @@
 			</div>
 
 			{#if otherSources.length > 0 && $session.teamId === '0'}
-				<div class="text-xl font-bold pb-5 px-1 pt-10  ">Other Team's</div>
+				<div class="text-xl font-bold pb-5 pt-10 px-6">Other Team's</div>
 				<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
 					{#each otherSources as source}
 						<a href="/sources/{source.id}" class="no-underline p-2 w-96">

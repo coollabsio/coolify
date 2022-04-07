@@ -51,7 +51,7 @@
 			<div class="text-center text-xl font-bold">No databases found</div>
 		</div>
 	{:else}
-		<div class="flex flex-col px-8">
+		<div class="flex flex-col">
 			{#if $session.teamId === '0' && ownDatabases.length > 0 && otherDatabases.length > 0}
 				<div class="text-xl font-bold pb-5 px-6">Current Team</div>
 			{/if}
