@@ -55,7 +55,7 @@
 			{#if $session.teamId === '0'}
 				<div class="text-xl font-bold pb-5 -ml-10">Your Team's Databases</div>
 			{/if}
-			<div class="flex flex-col md:flex-row">
+			<div class="flex flex-col md:flex-row flex-wrap">
 				{#each ownDatabases as database}
 					<a href="/databases/{database.id}" class="no-underline p-2 w-96">
 						<div class="box-selection relative hover:bg-purple-600 group">
@@ -91,7 +91,7 @@
 			</div>
 			{#if otherDatabases.length > 0 && $session.teamId === '0'}
 				<div class="text-xl font-bold pb-5 pt-10  -ml-10">Other Team's Databases</div>
-				<div class="flex">
+				<div class="flex flex-col md:flex-row flex-wrap">
 					{#each otherDatabases as database}
 						<a href="/databases/{database.id}" class="no-underline p-2 w-96">
 							<div class="box-selection relative hover:bg-purple-600 group">

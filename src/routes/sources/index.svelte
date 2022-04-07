@@ -64,7 +64,7 @@
 			{#if $session.teamId === '0'}
 				<div class="text-xl font-bold pb-5 -ml-10">Your Team's Applications</div>
 			{/if}
-			<div class="flex flex-col md:flex-row">
+			<div class="flex flex-col md:flex-row flex-wrap">
 				{#each ownSources as source}
 					<a href="/sources/{source.id}" class="no-underline p-2 w-96">
 						<div
@@ -91,7 +91,7 @@
 
 			{#if otherSources.length > 0 && $session.teamId === '0'}
 				<div class="text-xl font-bold pb-5 pt-10  -ml-10">Other Team's Applications</div>
-				<div class="flex">
+				<div class="flex flex-col md:flex-row flex-wrap">
 					{#each otherSources as source}
 						<a href="/sources/{source.id}" class="no-underline p-2 w-96">
 							<div

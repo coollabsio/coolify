@@ -60,7 +60,7 @@
 			{#if $session.teamId === '0'}
 				<div class="text-xl font-bold pb-5 -ml-10">Your Team's Applications</div>
 			{/if}
-			<div class="flex flex-col md:flex-row">
+			<div class="flex flex-col md:flex-row flex-wrap">
 				{#each ownServices as service}
 					<a href="/services/{service.id}" class="no-underline p-2 w-96">
 						<div class="box-selection relative hover:bg-pink-600 group">
@@ -106,7 +106,7 @@
 			</div>
 			{#if otherServices.length > 0 && $session.teamId === '0'}
 				<div class="text-xl font-bold pb-5 pt-10  -ml-10">Other Team's Applications</div>
-				<div class="flex">
+				<div class="flex flex-col md:flex-row flex-wrap">
 					{#each otherServices as service}
 						<a href="/services/{service.id}" class="no-underline p-2 w-96">
 							<div class="box-selection relative hover:bg-pink-600 group">

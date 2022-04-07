@@ -50,14 +50,14 @@
 			{#if $session.teamId === '0'}
 				<div class="text-xl font-bold pb-5 -ml-10">Your Team's Applications</div>
 			{/if}
-			<div class="flex flex-col md:flex-row">
+			<div class="flex flex-col md:flex-row flex-wrap">
 				{#each ownApplications as application}
 					<Application {application} />
 				{/each}
 			</div>
 			{#if otherApplications.length > 0 && $session.teamId === '0'}
 				<div class="text-xl font-bold pb-5 pt-10 -ml-10">Other Team's Applications</div>
-				<div class="flex">
+				<div class="flex flex-col md:flex-row flex-wrap">
 					{#each otherApplications as application}
 						<Application {application} />
 					{/each}
