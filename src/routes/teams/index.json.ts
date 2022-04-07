@@ -9,7 +9,7 @@ export const get: RequestHandler = async (event) => {
 
 	try {
 		const teams = await db.prisma.permission.findMany({
-			where: { userId: teamId === '0' ? undefined : teamId },
+			where: { userId: teamId === '0' ? undefined : userId },
 			include: { team: { include: { _count: { select: { users: true } } } } }
 		});
 

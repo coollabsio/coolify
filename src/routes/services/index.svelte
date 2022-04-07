@@ -19,6 +19,16 @@
 		const { id } = await post('/services/new', {});
 		return await goto(`/services/${id}`, { replaceState: true });
 	}
+	const ownServices = services.filter((service) => {
+		if (service.teams[0].id === $session.teamId) {
+			return service;
+		}
+	});
+	const otherServices = services.filter((service) => {
+		if (service.teams[0].id !== $session.teamId) {
+			return service;
+		}
+	});
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -46,47 +56,101 @@
 			<div class="text-center text-xl font-bold">No services found</div>
 		</div>
 	{:else}
-		{#each services as service}
-			<a href="/services/{service.id}" class="no-underline p-2 w-96">
-				<div class="box-selection relative hover:bg-pink-600 group">
-					{#if service.type === 'plausibleanalytics'}
-						<PlausibleAnalytics isAbsolute />
-					{:else if service.type === 'nocodb'}
-						<NocoDb isAbsolute />
-					{:else if service.type === 'minio'}
-						<MinIo isAbsolute />
-					{:else if service.type === 'vscodeserver'}
-						<VsCodeServer isAbsolute />
-					{:else if service.type === 'wordpress'}
-						<Wordpress isAbsolute />
-					{:else if service.type === 'vaultwarden'}
-						<VaultWarden isAbsolute />
-					{:else if service.type === 'languagetool'}
-						<LanguageTool isAbsolute />
-					{:else if service.type === 'n8n'}
-						<N8n isAbsolute />
-					{:else if service.type === 'uptimekuma'}
-						<UptimeKuma isAbsolute />
-					{:else if service.type === 'ghost'}
-						<Ghost isAbsolute />
-					{:else if service.type === 'meilisearch'}
-						<MeiliSearch isAbsolute />
-					{/if}
-					<div class="font-bold text-xl text-center truncate">
-						{service.name}
-					</div>
-					{#if $session.teamId === '0'}
-						<div class="text-center truncate">Team {service.teams[0].name}</div>
-					{/if}
-					{#if !service.type || !service.fqdn}
-						<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
-							Configuration missing
+		<div class="flex flex-col">
+			{#if $session.teamId === '0'}
+				<div class="text-xl font-bold pb-5 -ml-10">Your Team's Applications</div>
+			{/if}
+			<div class="flex flex-col md:flex-row">
+				{#each ownServices as service}
+					<a href="/services/{service.id}" class="no-underline p-2 w-96">
+						<div class="box-selection relative hover:bg-pink-600 group">
+							{#if service.type === 'plausibleanalytics'}
+								<PlausibleAnalytics isAbsolute />
+							{:else if service.type === 'nocodb'}
+								<NocoDb isAbsolute />
+							{:else if service.type === 'minio'}
+								<MinIo isAbsolute />
+							{:else if service.type === 'vscodeserver'}
+								<VsCodeServer isAbsolute />
+							{:else if service.type === 'wordpress'}
+								<Wordpress isAbsolute />
+							{:else if service.type === 'vaultwarden'}
+								<VaultWarden isAbsolute />
+							{:else if service.type === 'languagetool'}
+								<LanguageTool isAbsolute />
+							{:else if service.type === 'n8n'}
+								<N8n isAbsolute />
+							{:else if service.type === 'uptimekuma'}
+								<UptimeKuma isAbsolute />
+							{:else if service.type === 'ghost'}
+								<Ghost isAbsolute />
+							{:else if service.type === 'meilisearch'}
+								<MeiliSearch isAbsolute />
+							{/if}
+							<div class="font-bold text-xl text-center truncate">
+								{service.name}
+							</div>
+							{#if $session.teamId === '0'}
+								<div class="text-center truncate">Team {service.teams[0].name}</div>
+							{/if}
+							{#if !service.type || !service.fqdn}
+								<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
+									Configuration missing
+								</div>
+							{:else}
+								<div class="text-center truncate">{service.type}</div>
+							{/if}
 						</div>
-					{:else}
-						<div class="text-center truncate">{service.type}</div>
-					{/if}
+					</a>
+				{/each}
+			</div>
+			{#if otherServices.length > 0 && $session.teamId === '0'}
+				<div class="text-xl font-bold pb-5 pt-10  -ml-10">Other Team's Applications</div>
+				<div class="flex">
+					{#each otherServices as service}
+						<a href="/services/{service.id}" class="no-underline p-2 w-96">
+							<div class="box-selection relative hover:bg-pink-600 group">
+								{#if service.type === 'plausibleanalytics'}
+									<PlausibleAnalytics isAbsolute />
+								{:else if service.type === 'nocodb'}
+									<NocoDb isAbsolute />
+								{:else if service.type === 'minio'}
+									<MinIo isAbsolute />
+								{:else if service.type === 'vscodeserver'}
+									<VsCodeServer isAbsolute />
+								{:else if service.type === 'wordpress'}
+									<Wordpress isAbsolute />
+								{:else if service.type === 'vaultwarden'}
+									<VaultWarden isAbsolute />
+								{:else if service.type === 'languagetool'}
+									<LanguageTool isAbsolute />
+								{:else if service.type === 'n8n'}
+									<N8n isAbsolute />
+								{:else if service.type === 'uptimekuma'}
+									<UptimeKuma isAbsolute />
+								{:else if service.type === 'ghost'}
+									<Ghost isAbsolute />
+								{:else if service.type === 'meilisearch'}
+									<MeiliSearch isAbsolute />
+								{/if}
+								<div class="font-bold text-xl text-center truncate">
+									{service.name}
+								</div>
+								{#if $session.teamId === '0'}
+									<div class="text-center truncate">Team {service.teams[0].name}</div>
+								{/if}
+								{#if !service.type || !service.fqdn}
+									<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
+										Configuration missing
+									</div>
+								{:else}
+									<div class="text-center truncate">{service.type}</div>
+								{/if}
+							</div>
+						</a>
+					{/each}
 				</div>
-			</a>
-		{/each}
+			{/if}
+		</div>
 	{/if}
 </div>

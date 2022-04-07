@@ -14,6 +14,16 @@
 		const { id } = await post('/databases/new', {});
 		return await goto(`/databases/${id}`, { replaceState: true });
 	}
+	const ownDatabases = databases.filter((database) => {
+		if (database.teams[0].id === $session.teamId) {
+			return database;
+		}
+	});
+	const otherDatabases = databases.filter((database) => {
+		if (database.teams[0].id !== $session.teamId) {
+			return database;
+		}
+	});
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -41,37 +51,81 @@
 			<div class="text-center text-xl font-bold">No databases found</div>
 		</div>
 	{:else}
-		{#each databases as database}
-			<a href="/databases/{database.id}" class="no-underline p-2 w-96">
-				<div class="box-selection relative hover:bg-purple-600 group">
-					{#if database.type === 'clickhouse'}
-						<Clickhouse isAbsolute />
-					{:else if database.type === 'couchdb'}
-						<CouchDB isAbsolute />
-					{:else if database.type === 'mongodb'}
-						<MongoDB isAbsolute />
-					{:else if database.type === 'mysql'}
-						<MySQL isAbsolute />
-					{:else if database.type === 'postgresql'}
-						<PostgreSQL isAbsolute />
-					{:else if database.type === 'redis'}
-						<Redis isAbsolute />
-					{/if}
-					<div class="font-bold text-xl text-center truncate">
-						{database.name}
-					</div>
-					{#if $session.teamId === '0'}
-						<div class="text-center truncate">Team {database.teams[0].name}</div>
-					{/if}
-					{#if !database.type}
-						<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
-							Configuration missing
+		<div class="flex flex-col">
+			{#if $session.teamId === '0'}
+				<div class="text-xl font-bold pb-5 -ml-10">Your Team's Databases</div>
+			{/if}
+			<div class="flex flex-col md:flex-row">
+				{#each ownDatabases as database}
+					<a href="/databases/{database.id}" class="no-underline p-2 w-96">
+						<div class="box-selection relative hover:bg-purple-600 group">
+							{#if database.type === 'clickhouse'}
+								<Clickhouse isAbsolute />
+							{:else if database.type === 'couchdb'}
+								<CouchDB isAbsolute />
+							{:else if database.type === 'mongodb'}
+								<MongoDB isAbsolute />
+							{:else if database.type === 'mysql'}
+								<MySQL isAbsolute />
+							{:else if database.type === 'postgresql'}
+								<PostgreSQL isAbsolute />
+							{:else if database.type === 'redis'}
+								<Redis isAbsolute />
+							{/if}
+							<div class="font-bold text-xl text-center truncate">
+								{database.name}
+							</div>
+							{#if $session.teamId === '0'}
+								<div class="text-center truncate">Team {database.teams[0].name}</div>
+							{/if}
+							{#if !database.type}
+								<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
+									Configuration missing
+								</div>
+							{:else}
+								<div class="text-center truncate">{database.type}</div>
+							{/if}
 						</div>
-					{:else}
-						<div class="text-center truncate">{database.type}</div>
-					{/if}
+					</a>
+				{/each}
+			</div>
+			{#if otherDatabases.length > 0 && $session.teamId === '0'}
+				<div class="text-xl font-bold pb-5 pt-10  -ml-10">Other Team's Databases</div>
+				<div class="flex">
+					{#each otherDatabases as database}
+						<a href="/databases/{database.id}" class="no-underline p-2 w-96">
+							<div class="box-selection relative hover:bg-purple-600 group">
+								{#if database.type === 'clickhouse'}
+									<Clickhouse isAbsolute />
+								{:else if database.type === 'couchdb'}
+									<CouchDB isAbsolute />
+								{:else if database.type === 'mongodb'}
+									<MongoDB isAbsolute />
+								{:else if database.type === 'mysql'}
+									<MySQL isAbsolute />
+								{:else if database.type === 'postgresql'}
+									<PostgreSQL isAbsolute />
+								{:else if database.type === 'redis'}
+									<Redis isAbsolute />
+								{/if}
+								<div class="font-bold text-xl text-center truncate">
+									{database.name}
+								</div>
+								{#if $session.teamId === '0'}
+									<div class="text-center truncate">Team {database.teams[0].name}</div>
+								{/if}
+								{#if !database.type}
+									<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
+										Configuration missing
+									</div>
+								{:else}
+									<div class="text-center truncate">{database.type}</div>
+								{/if}
+							</div>
+						</a>
+					{/each}
 				</div>
-			</a>
-		{/each}
+			{/if}
+		</div>
 	{/if}
 </div>

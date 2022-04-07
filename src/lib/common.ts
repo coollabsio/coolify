@@ -100,6 +100,7 @@ export const getUserDetails = async (event, isAdminRequired = true) => {
 			message: 'OK'
 		}
 	};
+
 	if (isAdminRequired && permission !== 'admin' && permission !== 'owner') {
 		payload.status = 401;
 		payload.body.message =

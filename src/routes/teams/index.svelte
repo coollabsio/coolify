@@ -43,6 +43,16 @@
 			return errorNotification(error);
 		}
 	}
+	const ownTeams = teams.filter((team) => {
+		if (team.team.id === $session.teamId) {
+			return team;
+		}
+	});
+	const otherTeams = teams.filter((team) => {
+		if (team.team.id !== $session.teamId) {
+			return team;
+		}
+	});
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -92,20 +102,45 @@
 	</div>
 {/if}
 <div class="flex flex-wrap justify-center">
-	{#each teams as team}
-		<a href="/teams/{team.teamId}" class="w-96 p-2 no-underline">
-			<div
-				class="box-selection relative"
-				class:hover:bg-cyan-600={team.team?.id !== '0'}
-				class:hover:bg-red-500={team.team?.id === '0'}
-			>
-				<div class="truncate text-center text-xl font-bold">
-					{team.team.name}
-					{team.team?.id === '0' ? '(root)' : ''}
-				</div>
+	<div class="flex flex-col">
+		<div class="-ml-10 pb-5 text-xl font-bold">Current Team</div>
+		<div class="flex flex-col md:flex-row">
+			{#each ownTeams as team}
+				<a href="/teams/{team.teamId}" class="w-96 p-2 no-underline">
+					<div
+						class="box-selection relative"
+						class:hover:bg-cyan-600={team.team?.id !== '0'}
+						class:hover:bg-red-500={team.team?.id === '0'}
+					>
+						<div class="truncate text-center text-xl font-bold">
+							{team.team.name}
+							{team.team?.id === '0' ? '(admin team)' : ''}
+						</div>
 
-				<div class="mt-1 text-center">{team.team._count.users} member(s)</div>
-			</div>
-		</a>
-	{/each}
+						<div class="mt-1 text-center">{team.team._count.users} member(s)</div>
+					</div>
+				</a>
+			{/each}
+		</div>
+
+		<div class="-ml-10 pb-5 pt-10 text-xl  font-bold">Other Teams</div>
+		<div class="flex">
+			{#each otherTeams as team}
+				<a href="/teams/{team.teamId}" class="w-96 p-2 no-underline">
+					<div
+						class="box-selection relative"
+						class:hover:bg-cyan-600={team.team?.id !== '0'}
+						class:hover:bg-red-500={team.team?.id === '0'}
+					>
+						<div class="truncate text-center text-xl font-bold">
+							{team.team.name}
+							{team.team?.id === '0' ? '(admin team)' : ''}
+						</div>
+
+						<div class="mt-1 text-center">{team.team._count.users} member(s)</div>
+					</div>
+				</a>
+			{/each}
+		</div>
+	</div>
 </div>

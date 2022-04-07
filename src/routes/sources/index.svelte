@@ -22,6 +22,16 @@
 <script lang="ts">
 	export let sources;
 	import { session } from '$app/stores';
+	const ownSources = sources.filter((source) => {
+		if (source.teams[0].id === $session.teamId) {
+			return source;
+		}
+	});
+	const otherSources = sources.filter((source) => {
+		if (source.teams[0].id !== $session.teamId) {
+			return source;
+		}
+	});
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -50,29 +60,62 @@
 			<div class="text-center text-xl font-bold">No git sources found</div>
 		</div>
 	{:else}
-		<div class="flex flex-wrap justify-center">
-			{#each sources as source}
-				<a href="/sources/{source.id}" class="no-underline p-2 w-96">
-					<div
-						class="box-selection hover:bg-orange-600 group"
-						class:border-red-500={source.gitlabApp && !source.gitlabAppId}
-						class:border-0={source.gitlabApp && !source.gitlabAppId}
-						class:border-l-4={source.gitlabApp && !source.gitlabAppId}
-					>
-						<div class="font-bold text-xl text-center truncate">{source.name}</div>
-						{#if $session.teamId === '0'}
-							<div class="text-center truncate">Team {source.teams[0].name}</div>
-						{/if}
-						{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && !source.githubAppId && !source.githubApp?.installationId)}
-							<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
-								Configuration missing
+		<div class="flex flex-col">
+			{#if $session.teamId === '0'}
+				<div class="text-xl font-bold pb-5 -ml-10">Your Team's Applications</div>
+			{/if}
+			<div class="flex flex-col md:flex-row">
+				{#each ownSources as source}
+					<a href="/sources/{source.id}" class="no-underline p-2 w-96">
+						<div
+							class="box-selection hover:bg-orange-600 group"
+							class:border-red-500={source.gitlabApp && !source.gitlabAppId}
+							class:border-0={source.gitlabApp && !source.gitlabAppId}
+							class:border-l-4={source.gitlabApp && !source.gitlabAppId}
+						>
+							<div class="font-bold text-xl text-center truncate">{source.name}</div>
+							{#if $session.teamId === '0'}
+								<div class="text-center truncate">Team {source.teams[0].name}</div>
+							{/if}
+							{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && !source.githubAppId && !source.githubApp?.installationId)}
+								<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
+									Configuration missing
+								</div>
+							{:else}
+								<div class="truncate text-center">{source.htmlUrl}</div>
+							{/if}
+						</div>
+					</a>
+				{/each}
+			</div>
+
+			{#if otherSources.length > 0 && $session.teamId === '0'}
+				<div class="text-xl font-bold pb-5 pt-10  -ml-10">Other Team's Applications</div>
+				<div class="flex">
+					{#each otherSources as source}
+						<a href="/sources/{source.id}" class="no-underline p-2 w-96">
+							<div
+								class="box-selection hover:bg-orange-600 group"
+								class:border-red-500={source.gitlabApp && !source.gitlabAppId}
+								class:border-0={source.gitlabApp && !source.gitlabAppId}
+								class:border-l-4={source.gitlabApp && !source.gitlabAppId}
+							>
+								<div class="font-bold text-xl text-center truncate">{source.name}</div>
+								{#if $session.teamId === '0'}
+									<div class="text-center truncate">Team {source.teams[0].name}</div>
+								{/if}
+								{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && !source.githubAppId && !source.githubApp?.installationId)}
+									<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
+										Configuration missing
+									</div>
+								{:else}
+									<div class="truncate text-center">{source.htmlUrl}</div>
+								{/if}
 							</div>
-						{:else}
-							<div class="truncate text-center">{source.htmlUrl}</div>
-						{/if}
-					</div>
-				</a>
-			{/each}
+						</a>
+					{/each}
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>

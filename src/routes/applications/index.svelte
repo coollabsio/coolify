@@ -8,6 +8,16 @@
 		const { id } = await post('/applications/new', {});
 		return await goto(`/applications/${id}`, { replaceState: true });
 	}
+	const ownApplications = applications.filter((application) => {
+		if (application.teams[0].id === $session.teamId) {
+			return application;
+		}
+	});
+	const otherApplications = applications.filter((application) => {
+		if (application.teams[0].id !== $session.teamId) {
+			return application;
+		}
+	});
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -36,8 +46,23 @@
 			<div class="text-center text-xl font-bold">No applications found</div>
 		</div>
 	{:else}
-		{#each applications as application}
-			<Application {application} />
-		{/each}
+		<div class="flex flex-col">
+			{#if $session.teamId === '0'}
+				<div class="text-xl font-bold pb-5 -ml-10">Your Team's Applications</div>
+			{/if}
+			<div class="flex flex-col md:flex-row">
+				{#each ownApplications as application}
+					<Application {application} />
+				{/each}
+			</div>
+			{#if otherApplications.length > 0 && $session.teamId === '0'}
+				<div class="text-xl font-bold pb-5 pt-10 -ml-10">Other Team's Applications</div>
+				<div class="flex">
+					{#each otherApplications as application}
+						<Application {application} />
+					{/each}
+				</div>
+			{/if}
+		</div>
 	{/if}
 </div>

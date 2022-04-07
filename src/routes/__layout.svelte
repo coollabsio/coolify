@@ -12,7 +12,7 @@
 		if (!session.userId) {
 			return {};
 		}
-		const endpoint = `/teams.json`;
+		const endpoint = `/dashboard.json`;
 		const res = await fetch(endpoint);
 
 		if (res.ok) {
