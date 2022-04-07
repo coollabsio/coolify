@@ -202,16 +202,16 @@ export async function generateSSLCerts() {
 			if (!dev) {
 				if (certificates.includes(ssl.domain)) {
 					console.log(`Certificate for ${ssl.domain} already exists`);
-					return;
+				} else {
+					console.log('Generating SSL for', ssl.domain);
+					await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
 				}
-				console.log('Generating SSL for', ssl.domain);
-				await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
 			} else {
 				if (certificates.includes(ssl.domain)) {
 					console.log(`Certificate for ${ssl.domain} already exists`);
-					return;
+				} else {
+					console.log('Generating SSL for', ssl.domain);
 				}
-				console.log('Generating SSL for', ssl.domain);
 			}
 		}
 	}
