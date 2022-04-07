@@ -200,14 +200,20 @@ export async function generateSSLCerts() {
 		}
 		for (const ssl of ssls) {
 			if (!dev) {
-				if (certificates.includes(ssl.domain)) {
+				if (
+					certificates.includes(ssl.domain) ||
+					certificates.includes(ssl.domain.replace('www', ''))
+				) {
 					console.log(`Certificate for ${ssl.domain} already exists`);
 				} else {
 					console.log('Generating SSL for', ssl.domain);
 					await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
 				}
 			} else {
-				if (certificates.includes(ssl.domain)) {
+				if (
+					certificates.includes(ssl.domain) ||
+					certificates.includes(ssl.domain.replace('www', ''))
+				) {
 					console.log(`Certificate for ${ssl.domain} already exists`);
 				} else {
 					console.log('Generating SSL for', ssl.domain);
