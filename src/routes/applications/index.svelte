@@ -47,8 +47,8 @@
 		</div>
 	{:else}
 		<div class="flex flex-col">
-			{#if $session.teamId === '0' && ownApplications.length > 0}
-				<div class="text-xl font-bold pb-5 px-1">Your Team's Applications</div>
+			{#if $session.teamId === '0' && ownApplications.length > 0 && otherApplications.length > 0}
+				<div class="text-xl font-bold pb-5 px-1">Current Team</div>
 			{/if}
 			<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
 				{#each ownApplications as application}
@@ -56,7 +56,7 @@
 				{/each}
 			</div>
 			{#if otherApplications.length > 0 && $session.teamId === '0'}
-				<div class="text-xl font-bold pb-5 px-1 pt-10 px-6">Other Team's Applications</div>
+				<div class="text-xl font-bold pb-5 pt-10 px-6">Other Team's</div>
 				<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
 					{#each otherApplications as application}
 						<Application {application} />

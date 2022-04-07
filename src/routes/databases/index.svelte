@@ -52,8 +52,8 @@
 		</div>
 	{:else}
 		<div class="flex flex-col px-8">
-			{#if $session.teamId === '0' && ownDatabases.length > 0}
-				<div class="text-xl font-bold pb-5 px-1">Your Team's Databases</div>
+			{#if $session.teamId === '0' && ownDatabases.length > 0 && otherDatabases.length > 0}
+				<div class="text-xl font-bold pb-5 px-6">Current Team</div>
 			{/if}
 			<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
 				{#each ownDatabases as database}
@@ -90,7 +90,7 @@
 				{/each}
 			</div>
 			{#if otherDatabases.length > 0 && $session.teamId === '0'}
-				<div class="text-xl font-bold pb-5 px-1 pt-10 px-6">Other Team's Databases</div>
+				<div class="text-xl font-bold pb-5 pt-10 px-6">Other Team's</div>
 				<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
 					{#each otherDatabases as database}
 						<a href="/databases/{database.id}" class="no-underline p-2 w-96">
