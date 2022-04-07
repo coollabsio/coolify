@@ -26,7 +26,6 @@ export async function newSource({ name, teamId, type, htmlUrl, apiUrl, organizat
 	});
 }
 export async function removeSource({ id }) {
-	// TODO: Disconnect application with this sourceId! Maybe not needed?
 	const source = await prisma.gitSource.delete({
 		where: { id },
 		include: { githubApp: true, gitlabApp: true }
