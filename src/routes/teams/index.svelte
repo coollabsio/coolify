@@ -103,8 +103,8 @@
 {/if}
 <div class="flex flex-wrap justify-center">
 	<div class="flex flex-col">
-		<div class="-ml-10 pb-5 text-xl font-bold">Current Team</div>
-		<div class="flex flex-col flex-wrap md:flex-row">
+		<div class=" pb-5 text-xl font-bold">Current Team</div>
+		<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 			{#each ownTeams as team}
 				<a href="/teams/{team.teamId}" class="w-96 p-2 no-underline">
 					<div
@@ -123,8 +123,8 @@
 			{/each}
 		</div>
 
-		<div class="-ml-10 pb-5 pt-10 text-xl  font-bold">Other Teams</div>
-		<div class="flex flex-col flex-wrap md:flex-row">
+		<div class=" pb-5 pt-10 text-xl font-bold">Other Teams</div>
+		<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 			{#each otherTeams as team}
 				<a href="/teams/{team.teamId}" class="w-96 p-2 no-underline">
 					<div
