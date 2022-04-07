@@ -13,6 +13,8 @@ const createDockerfile = async (data, image, htaccessFound): Promise<void> => {
 	}
 	Dockerfile.push(`COPY /entrypoint.sh /opt/docker/provision/entrypoint.d/30-entrypoint.sh`);
 	Dockerfile.push(`EXPOSE 80`);
+	Dockerfile.push(`RUN cd /app`)
+	Dockerfile.push(`RUN if test -f composer.json; then composer install; fi`)
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };
 
