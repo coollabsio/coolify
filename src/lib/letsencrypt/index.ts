@@ -3,6 +3,7 @@ import { checkContainer, reloadHaproxy } from '$lib/haproxy';
 import * as db from '$lib/database';
 import { dev } from '$app/env';
 import cuid from 'cuid';
+import fs from 'fs/promises';
 import getPort, { portNumbers } from 'get-port';
 import { supportedServiceTypesAndVersions } from '$lib/components/common';
 
@@ -182,12 +183,35 @@ export async function generateSSLCerts() {
 		if (isHttps) ssls.push({ domain, id: 'coolify', isCoolify: true });
 	}
 	if (ssls.length > 0) {
+		const sslDir = dev ? '/tmp/ssl' : '/app/ssl';
+		if (dev) {
+			try {
+				await asyncExecShell(`mkdir -p ${sslDir}`);
+			} catch (error) {
+				//
+			}
+		}
+		const files = await fs.readdir(sslDir);
+		let certificates = [];
+		if (files.length > 0) {
+			for (const file of files) {
+				file.endsWith('.pem') && certificates.push(file.replace(/\.pem$/, ''));
+			}
+		}
 		for (const ssl of ssls) {
 			if (!dev) {
-				console.log('Checking SSL for', ssl.domain);
+				if (certificates.includes(ssl.domain)) {
+					console.log(`Certificate for ${ssl.domain} already exists`);
+					return;
+				}
+				console.log('Generating SSL for', ssl.domain);
 				await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
 			} else {
-				console.log('Checking SSL for', ssl.domain);
+				if (certificates.includes(ssl.domain)) {
+					console.log(`Certificate for ${ssl.domain} already exists`);
+					return;
+				}
+				console.log('Generating SSL for', ssl.domain);
 			}
 		}
 	}
