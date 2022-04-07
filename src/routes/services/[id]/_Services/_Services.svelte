@@ -93,7 +93,7 @@
 				</div>
 			</div>
 			<div class="grid grid-cols-2 items-center px-10">
-				<label for="buildPack" class="text-base font-bold text-stone-100">Version / Tag</label>
+				<label for="version" class="text-base font-bold text-stone-100">Version / Tag</label>
 				<a
 					href={$session.isAdmin
 						? `/services/${id}/configuration/version?from=/services/${id}`
