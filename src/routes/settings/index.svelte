@@ -11,7 +11,12 @@
 				}
 			};
 		}
-
+		if (res.status === 401) {
+			return {
+				status: 302,
+				redirect: '/databases'
+			};
+		}
 		return {
 			status: res.status,
 			error: new Error(`Could not load ${url}`)

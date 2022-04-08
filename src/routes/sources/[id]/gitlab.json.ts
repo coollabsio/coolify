@@ -9,11 +9,23 @@ export const post: RequestHandler = async (event) => {
 	const { id } = event.params;
 
 	try {
-		let { oauthId, groupName, appId, appSecret } = await event.request.json();
+		let { type, name, htmlUrl, apiUrl, oauthId, appId, appSecret, groupName } =
+			await event.request.json();
 
 		oauthId = Number(oauthId);
 
-		await db.addSource({ id, teamId, oauthId, groupName, appId, appSecret });
+		await db.addGitLabSource({
+			id,
+			teamId,
+			type,
+			name,
+			htmlUrl,
+			apiUrl,
+			oauthId,
+			appId,
+			appSecret,
+			groupName
+		});
 		return { status: 201 };
 	} catch (error) {
 		return ErrorHandler(error);

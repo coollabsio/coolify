@@ -12,8 +12,8 @@
 	import { onMount } from 'svelte';
 	const { id } = $page.params;
 	let cannotDisable = settings.fqdn && destination.engine === '/var/run/docker.sock';
-	// let scannedApps = [];
 	let loading = false;
+	let loadingProxy = false;
 	let restarting = false;
 	async function handleSubmit() {
 		loading = true;
@@ -25,12 +25,6 @@
 			loading = false;
 		}
 	}
-	// async function scanApps() {
-	// 	scannedApps = [];
-	// 	const data = await fetch(`/destinations/${id}/scan.json`);
-	// 	const { containers } = await data.json();
-	// 	scannedApps = containers;
-	// }
 	onMount(async () => {
 		if (state === false && destination.isCoolifyProxyUsed === true) {
 			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
@@ -71,6 +65,7 @@
 			}
 			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
 			try {
+				loadingProxy = true;
 				await post(`/destinations/${id}/settings.json`, {
 					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
 					engine: destination.engine
@@ -82,6 +77,8 @@
 				}
 			} catch ({ error }) {
 				return errorNotification(error);
+			} finally {
+				loadingProxy = false;
 			}
 		}
 	}
@@ -184,41 +181,20 @@
 			value={destination.network}
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center">
-		<Setting
-			disabled={cannotDisable}
-			bind:setting={destination.isCoolifyProxyUsed}
-			on:click={changeProxySetting}
-			title="Use Coolify Proxy?"
-			description={`This will install a proxy on the destination to allow you to access your applications and services without any manual configuration. Databases will have their own proxy. <br><br>${
-				cannotDisable
-					? '<span class="font-bold text-white">You cannot disable this proxy as FQDN is configured for Coolify.</span>'
-					: ''
-			}`}
-		/>
-	</div>
-</form>
-<!-- <div class="flex justify-center">
-	{#if payload.isCoolifyProxyUsed}
-		{#if state}
-			<button on:click={stopProxy}>Stop proxy</button>
-		{:else}
-			<button on:click={startProxy}>Start proxy</button>
-		{/if}
+	{#if $session.teamId === '0'}
+		<div class="grid grid-cols-2 items-center">
+			<Setting
+				loading={loadingProxy}
+				disabled={cannotDisable}
+				bind:setting={destination.isCoolifyProxyUsed}
+				on:click={changeProxySetting}
+				title="Use Coolify Proxy?"
+				description={`This will install a proxy on the destination to allow you to access your applications and services without any manual configuration. Databases will have their own proxy. <br><br>${
+					cannotDisable
+						? '<span class="font-bold text-white">You cannot disable this proxy as FQDN is configured for Coolify.</span>'
+						: ''
+				}`}
+			/>
+		</div>
 	{/if}
-</div> -->
-
-<!-- {#if scannedApps.length > 0}
-	<div class="flex justify-center px-6 pb-10">
-		<div class="flex space-x-2 h-8 items-center">
-			<div class="font-bold text-xl text-white">Found applications</div>
-		</div>
-	</div>
-	<div class="max-w-4xl mx-auto px-6">
-		<div class="flex space-x-2 justify-center">
-			{#each scannedApps as app}
-				<FoundApp {app} />
-			{/each}
-		</div>
-	</div>
-{/if} -->
+</form>
