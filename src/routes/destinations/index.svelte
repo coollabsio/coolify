@@ -57,7 +57,7 @@
 	{/if}
 </div>
 <div class="flex justify-center">
-	{#if !destinations || destinations.length === 0}
+	{#if !destinations || ownDestinations.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">No destination found</div>
 		</div>

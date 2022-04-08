@@ -58,7 +58,7 @@
 	{/if}
 </div>
 <div class="flex flex-wrap justify-center">
-	{#if !applications || applications.length === 0}
+	{#if !applications || ownApplications.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">No applications found</div>
 		</div>
@@ -107,7 +107,7 @@
 								<div class="truncate text-center">Team {application.teams[0].name}</div>
 							{/if}
 							{#if application.fqdn}
-								<div class="truncate text-center">{getDomain(application.fqdn)}</div>
+								<div class="truncate text-center">{getDomain(application.fqdn) || ''}</div>
 							{/if}
 							{#if !application.gitSourceId || !application.destinationDockerId || !application.fqdn}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
@@ -163,7 +163,7 @@
 									<div class="truncate text-center">Team {application.teams[0].name}</div>
 								{/if}
 								{#if application.fqdn}
-									<div class="truncate text-center">{getDomain(application.fqdn)}</div>
+									<div class="truncate text-center">{getDomain(application.fqdn) || ''}</div>
 								{/if}
 								{#if !application.gitSourceId || !application.destinationDockerId || !application.fqdn}
 									<div class="truncate text-center font-bold text-red-500 group-hover:text-white">

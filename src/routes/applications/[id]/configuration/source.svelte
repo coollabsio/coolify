@@ -54,6 +54,10 @@
 			return errorNotification(error);
 		}
 	}
+	async function newSource() {
+		const { id } = await post('/sources/new', {});
+		return await goto(`/sources/${id}`, { replaceState: true });
+	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -64,7 +68,7 @@
 		<div class="flex-col">
 			<div class="pb-2 text-center">No configurable Git Source found</div>
 			<div class="flex justify-center">
-				<a href="/new/source" sveltekit:prefetch class="add-icon bg-orange-600 hover:bg-orange-500">
+				<button on:click={newSource} class="add-icon bg-orange-600 hover:bg-orange-500">
 					<svg
 						class="w-6"
 						xmlns="http://www.w3.org/2000/svg"
@@ -78,7 +82,7 @@
 							d="M12 6v6m0 0v6m0-6h6m-6 0H6"
 						/></svg
 					>
-				</a>
+				</button>
 			</div>
 		</div>
 	{:else}

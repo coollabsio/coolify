@@ -46,7 +46,7 @@
 </div>
 
 <div class="flex flex-wrap justify-center">
-	{#if !databases || databases.length === 0}
+	{#if !databases || ownDatabases.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">No databases found</div>
 		</div>

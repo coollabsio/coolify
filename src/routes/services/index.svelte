@@ -52,7 +52,7 @@
 </div>
 
 <div class="flex flex-wrap justify-center">
-	{#if !services || services.length === 0}
+	{#if !services || ownServices.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">No services found</div>
 		</div>
@@ -92,7 +92,7 @@
 								<div class="text-center truncate">{service.teams[0].name}</div>
 							{/if}
 							{#if service.fqdn}
-								<div class="truncate text-center">{getDomain(service.fqdn)}</div>
+								<div class="truncate text-center">{getDomain(service.fqdn) || ''}</div>
 							{/if}
 							{#if !service.type || !service.fqdn}
 								<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
@@ -139,7 +139,7 @@
 									<div class="text-center truncate">{service.teams[0].name}</div>
 								{/if}
 								{#if service.fqdn}
-									<div class="truncate text-center">{getDomain(service.fqdn)}</div>
+									<div class="truncate text-center">{getDomain(service.fqdn) || ''}</div>
 								{/if}
 								{#if !service.type || !service.fqdn}
 									<div class="font-bold text-center truncate text-red-500 group-hover:text-white">

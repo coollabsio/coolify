@@ -62,7 +62,7 @@
 	{/if}
 </div>
 <div class="flex justify-center">
-	{#if !sources || sources.length === 0}
+	{#if !sources || ownSources.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">No git sources found</div>
 		</div>
@@ -86,7 +86,7 @@
 									Configuration missing
 								</div>
 							{:else}
-								<div class="truncate text-center">{getDomain(source.htmlUrl)}</div>
+								<div class="truncate text-center">{getDomain(source.htmlUrl) || ''}</div>
 							{/if}
 						</div>
 					</a>
