@@ -68,60 +68,7 @@
 				{#each ownApplications as application}
 					<a href="/applications/{application.id}" class="w-96 p-2 no-underline">
 						<div class="box-selection group relative hover:bg-green-600">
-							{#if application.buildPack.toLowerCase() === 'rust'}
-								<Rust />
-							{:else if application.buildPack.toLowerCase() === 'node'}
-								<Nodejs />
-							{:else if application.buildPack.toLowerCase() === 'react'}
-								<React />
-							{:else if application.buildPack.toLowerCase() === 'svelte'}
-								<Svelte />
-							{:else if application.buildPack.toLowerCase() === 'vuejs'}
-								<Vuejs />
-							{:else if application.buildPack.toLowerCase() === 'php'}
-								<PHP />
-							{:else if application.buildPack.toLowerCase() === 'python'}
-								<Python />
-							{:else if application.buildPack.toLowerCase() === 'static'}
-								<Static />
-							{:else if application.buildPack.toLowerCase() === 'nestjs'}
-								<Nestjs />
-							{:else if application.buildPack.toLowerCase() === 'nuxtjs'}
-								<Nuxtjs />
-							{:else if application.buildPack.toLowerCase() === 'nextjs'}
-								<Nextjs />
-							{:else if application.buildPack.toLowerCase() === 'gatsby'}
-								<Gatsby />
-							{:else if application.buildPack.toLowerCase() === 'docker'}
-								<Docker />
-							{:else if application.buildPack.toLowerCase() === 'astro'}
-								<Astro />
-							{:else if application.buildPack.toLowerCase() === 'eleventy'}
-								<Eleventy />
-							{/if}
-
-							<div class="truncate text-center text-xl font-bold">{application.name}</div>
-							{#if $session.teamId === '0' && otherApplications.length > 0}
-								<div class="truncate text-center">Team {application.teams[0].name}</div>
-							{/if}
-							{#if application.fqdn}
-								<div class="truncate text-center">{getDomain(application.fqdn)}</div>
-							{/if}
-							{#if !application.gitSourceId || !application.destinationDockerId || !application.fqdn}
-								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
-									Configuration missing
-								</div>
-							{/if}
-						</div>
-					</a>
-				{/each}
-			</div>
-			{#if otherApplications.length > 0 && $session.teamId === '0'}
-				<div class="text-xl font-bold pb-5 pt-10 px-6">Other Applications</div>
-				<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
-					{#each otherApplications as application}
-						<a href="/applications/{application.id}" class="w-96 p-2 no-underline">
-							<div class="box-selection group relative hover:bg-green-600">
+							{#if application.buildPack}
 								{#if application.buildPack.toLowerCase() === 'rust'}
 									<Rust />
 								{:else if application.buildPack.toLowerCase() === 'node'}
@@ -152,6 +99,63 @@
 									<Astro />
 								{:else if application.buildPack.toLowerCase() === 'eleventy'}
 									<Eleventy />
+								{/if}
+							{/if}
+
+							<div class="truncate text-center text-xl font-bold">{application.name}</div>
+							{#if $session.teamId === '0' && otherApplications.length > 0}
+								<div class="truncate text-center">Team {application.teams[0].name}</div>
+							{/if}
+							{#if application.fqdn}
+								<div class="truncate text-center">{getDomain(application.fqdn)}</div>
+							{/if}
+							{#if !application.gitSourceId || !application.destinationDockerId || !application.fqdn}
+								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
+									Configuration missing
+								</div>
+							{/if}
+						</div>
+					</a>
+				{/each}
+			</div>
+			{#if otherApplications.length > 0 && $session.teamId === '0'}
+				<div class="text-xl font-bold pb-5 pt-10 px-6">Other Applications</div>
+				<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
+					{#each otherApplications as application}
+						<a href="/applications/{application.id}" class="w-96 p-2 no-underline">
+							<div class="box-selection group relative hover:bg-green-600">
+								{#if application.buildPack}
+									{#if application.buildPack.toLowerCase() === 'rust'}
+										<Rust />
+									{:else if application.buildPack.toLowerCase() === 'node'}
+										<Nodejs />
+									{:else if application.buildPack.toLowerCase() === 'react'}
+										<React />
+									{:else if application.buildPack.toLowerCase() === 'svelte'}
+										<Svelte />
+									{:else if application.buildPack.toLowerCase() === 'vuejs'}
+										<Vuejs />
+									{:else if application.buildPack.toLowerCase() === 'php'}
+										<PHP />
+									{:else if application.buildPack.toLowerCase() === 'python'}
+										<Python />
+									{:else if application.buildPack.toLowerCase() === 'static'}
+										<Static />
+									{:else if application.buildPack.toLowerCase() === 'nestjs'}
+										<Nestjs />
+									{:else if application.buildPack.toLowerCase() === 'nuxtjs'}
+										<Nuxtjs />
+									{:else if application.buildPack.toLowerCase() === 'nextjs'}
+										<Nextjs />
+									{:else if application.buildPack.toLowerCase() === 'gatsby'}
+										<Gatsby />
+									{:else if application.buildPack.toLowerCase() === 'docker'}
+										<Docker />
+									{:else if application.buildPack.toLowerCase() === 'astro'}
+										<Astro />
+									{:else if application.buildPack.toLowerCase() === 'eleventy'}
+										<Eleventy />
+									{/if}
 								{/if}
 
 								<div class="truncate text-center text-xl font-bold">{application.name}</div>
