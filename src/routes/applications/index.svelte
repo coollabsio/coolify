@@ -62,9 +62,10 @@
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">No applications found</div>
 		</div>
-	{:else}
+	{/if}
+	{#if ownApplications.length > 0 || otherApplications.length > 0}
 		<div class="flex flex-col">
-			<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
+			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 				{#each ownApplications as application}
 					<a href="/applications/{application.id}" class="w-96 p-2 no-underline">
 						<div class="box-selection group relative hover:bg-green-600">
@@ -119,8 +120,8 @@
 				{/each}
 			</div>
 			{#if otherApplications.length > 0 && $session.teamId === '0'}
-				<div class="text-xl font-bold pb-5 pt-10 px-6">Other Applications</div>
-				<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
+				<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Applications</div>
+				<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 					{#each otherApplications as application}
 						<a href="/applications/{application.id}" class="w-96 p-2 no-underline">
 							<div class="box-selection group relative hover:bg-green-600">

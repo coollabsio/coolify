@@ -66,23 +66,24 @@
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">No git sources found</div>
 		</div>
-	{:else}
+	{/if}
+	{#if ownSources.length > 0 || otherSources.length > 0}
 		<div class="flex flex-col">
-			<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
+			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 				{#each ownSources as source}
-					<a href="/sources/{source.id}" class="no-underline p-2 w-96">
+					<a href="/sources/{source.id}" class="w-96 p-2 no-underline">
 						<div
-							class="box-selection hover:bg-orange-600 group"
+							class="box-selection group hover:bg-orange-600"
 							class:border-red-500={source.gitlabApp && !source.gitlabAppId}
 							class:border-0={source.gitlabApp && !source.gitlabAppId}
 							class:border-l-4={source.gitlabApp && !source.gitlabAppId}
 						>
-							<div class="font-bold text-xl text-center truncate">{source.name}</div>
+							<div class="truncate text-center text-xl font-bold">{source.name}</div>
 							{#if $session.teamId === '0' && otherSources.length > 0}
-								<div class="text-center truncate">{source.teams[0].name}</div>
+								<div class="truncate text-center">{source.teams[0].name}</div>
 							{/if}
 							{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && !source.githubAppId && !source.githubApp?.installationId)}
-								<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
+								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									Configuration missing
 								</div>
 							{:else}
@@ -94,22 +95,22 @@
 			</div>
 
 			{#if otherSources.length > 0 && $session.teamId === '0'}
-				<div class="text-xl font-bold pb-5 pt-10 px-6">Other Sources</div>
-				<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
+				<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Sources</div>
+				<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 					{#each otherSources as source}
-						<a href="/sources/{source.id}" class="no-underline p-2 w-96">
+						<a href="/sources/{source.id}" class="w-96 p-2 no-underline">
 							<div
-								class="box-selection hover:bg-orange-600 group"
+								class="box-selection group hover:bg-orange-600"
 								class:border-red-500={source.gitlabApp && !source.gitlabAppId}
 								class:border-0={source.gitlabApp && !source.gitlabAppId}
 								class:border-l-4={source.gitlabApp && !source.gitlabAppId}
 							>
-								<div class="font-bold text-xl text-center truncate">{source.name}</div>
+								<div class="truncate text-center text-xl font-bold">{source.name}</div>
 								{#if $session.teamId === '0'}
-									<div class="text-center truncate">{source.teams[0].name}</div>
+									<div class="truncate text-center">{source.teams[0].name}</div>
 								{/if}
 								{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && !source.githubAppId && !source.githubApp?.installationId)}
-									<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
+									<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 										Configuration missing
 									</div>
 								{:else}
