@@ -82,6 +82,25 @@ Now you have to set up your wildcards. Add a new `A` record passing the wildcard
 
 Now you must be ready to go!
 
+## Uninstall
+
+First delete everything from docker
+
+```bash
+sudo docker container stop coolify-haproxy coolify coolify-redis
+sudo docker container rm coolify-haproxy coolify coolify-redis
+sudo docker volume rm coolify-db coolify-letsencrypt coolify-ssl-certs
+sudo docker network rm coolify coolify-infra
+```
+
+Then delete some data from storage
+
+```bash
+sudo su
+rm -r ~/coolify
+rm -t /etc/docker/daemon.json
+```
+
 ## Features
 
 ### Git Sources
