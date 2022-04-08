@@ -89,6 +89,7 @@ First delete everything from docker
 ```bash
 sudo docker container stop coolify-haproxy coolify coolify-redis
 sudo docker container rm coolify-haproxy coolify coolify-redis
+sudo docker image rm bitnami/redis certbot/certbot coollabsio/coolify coollabsio/coolify-haproxy-alpine
 sudo docker volume rm coolify-db coolify-letsencrypt coolify-ssl-certs
 sudo docker network rm coolify coolify-infra
 ```
