@@ -4,13 +4,14 @@ import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import { promises as dns } from 'dns';
+import getPort from 'get-port';
 
 export const post: RequestHandler = async (event) => {
 	const { status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 
 	const { id } = event.params;
-	let { fqdn, forceSave } = await event.request.json();
+	let { exposePort, fqdn, forceSave } = await event.request.json();
 	fqdn = fqdn.toLowerCase();
 
 	try {
@@ -39,6 +40,19 @@ export const post: RequestHandler = async (event) => {
 						message: `DNS not set or propogated for ${domain}.<br><br>Please check your DNS settings.`
 					};
 				}
+			}
+		}
+
+		if (exposePort) {
+			exposePort = Number(exposePort);
+
+			if (exposePort < 1024 || exposePort > 65535) {
+				throw { message: `Expose Port needs to be between 1024 and 65535` };
+			}
+
+			const publicPort = await getPort({ port: exposePort });
+			if (exposePort !== publicPort) {
+				throw { message: `Expose Port ${exposePort} is already in use` };
 			}
 		}
 

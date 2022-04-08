@@ -81,6 +81,7 @@ model Application {
   buildPack           String?
   projectId           Int?
   port                Int?
+  exposePort          Int?
   installCommand      String?
   buildCommand        String?
   startCommand        String?

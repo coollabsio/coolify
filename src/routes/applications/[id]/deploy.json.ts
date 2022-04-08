@@ -22,6 +22,7 @@ export const post: RequestHandler = async (event) => {
 					JSON.stringify({
 						buildPack: applicationFound.buildPack,
 						port: applicationFound.port,
+						exposePort: applicationFound.exposePort,
 						installCommand: applicationFound.installCommand,
 						buildCommand: applicationFound.buildCommand,
 						startCommand: applicationFound.startCommand

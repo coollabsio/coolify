@@ -7,6 +7,7 @@ specifiers:
   '@sveltejs/adapter-node': 1.0.0-next.73
   '@sveltejs/kit': 1.0.0-next.303
   '@types/bcrypt': 5.0.0
+  '@types/dockerode': ^3.3.8
   '@types/js-cookie': 3.0.1
   '@types/js-yaml': 4.0.5
   '@types/node': 17.0.23
@@ -87,6 +88,7 @@ devDependencies:
   '@sveltejs/adapter-node': 1.0.0-next.73
   '@sveltejs/kit': 1.0.0-next.303_svelte@3.46.4
   '@types/bcrypt': 5.0.0
+  '@types/dockerode': 3.3.8
   '@types/js-cookie': 3.0.1
   '@types/js-yaml': 4.0.5
   '@types/node': 17.0.23
@@ -505,6 +507,26 @@ packages:
       '@types/responselike': 1.0.0
     dev: false
 
+  /@types/docker-modem/3.0.2:
+    resolution:
+      {
+        integrity: sha512-qC7prjoEYR2QEe6SmCVfB1x3rfcQtUr1n4x89+3e0wSTMQ/KYCyf+/RAA9n2tllkkNc6//JMUZePdFRiGIWfaQ==
+      }
+    dependencies:
+      '@types/node': 17.0.23
+      '@types/ssh2': 0.5.52
+    dev: true
+
+  /@types/dockerode/3.3.8:
+    resolution:
+      {
+        integrity: sha512-/Hip29GzPBWfbSS87lyQDVoB7Ja+kr8oOFWXsySxNFa7jlyj3Yws8LaZRmn1xZl7uJH3Xxsg0oI09GHpT1pIBw==
+      }
+    dependencies:
+      '@types/docker-modem': 3.0.2
+      '@types/node': 17.0.23
+    dev: true
+
   /@types/http-cache-semantics/4.0.1:
     resolution:
       {
@@ -587,6 +609,25 @@ packages:
       }
     dependencies:
       '@types/node': 17.0.23
+    dev: true
+
+  /@types/ssh2-streams/0.1.9:
+    resolution:
+      {
+        integrity: sha512-I2J9jKqfmvXLR5GomDiCoHrEJ58hAOmFrekfFqmCFd+A6gaEStvWnPykoWUwld1PNg4G5ag1LwdA+Lz1doRJqg==
+      }
+    dependencies:
+      '@types/node': 17.0.23
+    dev: true
+
+  /@types/ssh2/0.5.52:
+    resolution:
+      {
+        integrity: sha512-lbLLlXxdCZOSJMCInKH2+9V/77ET2J6NPQHpFI0kda61Dd1KglJs+fPQBchizmzYSOJBgdTajhPqBO1xxLywvg==
+      }
+    dependencies:
+      '@types/node': 17.0.23
+      '@types/ssh2-streams': 0.1.9
     dev: true
 
   /@typescript-eslint/eslint-plugin/4.31.1_8ede7edd7694646e12d33c52460f622c:

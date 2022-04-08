@@ -6,6 +6,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import jsonwebtoken from 'jsonwebtoken';
 import { get as getRequest } from '$lib/api';
 import { setDefaultConfiguration } from '$lib/buildPacks/common';
+import getPort from 'get-port';
 
 export const get: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -49,6 +50,7 @@ export const post: RequestHandler = async (event) => {
 		buildPack,
 		fqdn,
 		port,
+		exposePort,
 		installCommand,
 		buildCommand,
 		startCommand,
@@ -59,6 +61,13 @@ export const post: RequestHandler = async (event) => {
 		pythonVariable
 	} = await event.request.json();
 	if (port) port = Number(port);
+	if (exposePort) {
+		exposePort = Number(exposePort);
+		const publicPort = await getPort({ port: exposePort });
+		if (exposePort !== publicPort) {
+			exposePort = -1;
+		}
+	}
 
 	try {
 		const defaultConfiguration = await setDefaultConfiguration({
@@ -76,6 +85,7 @@ export const post: RequestHandler = async (event) => {
 			name,
 			fqdn,
 			port,
+			exposePort,
 			installCommand,
 			buildCommand,
 			startCommand,

@@ -38,6 +38,7 @@ export default async function (job) {
 		build_id: buildId,
 		configHash,
 		port,
+		exposePort,
 		installCommand,
 		buildCommand,
 		startCommand,
@@ -143,6 +144,7 @@ export default async function (job) {
 					JSON.stringify({
 						buildPack,
 						port,
+						exposePort,
 						installCommand,
 						buildCommand,
 						startCommand,
@@ -284,6 +286,7 @@ export default async function (job) {
 						env_file: envFound ? [`${workdir}/.env`] : [],
 						networks: [docker.network],
 						labels: labels,
+						ports: exposePort ? [`${exposePort}:${port}`] : [],
 						depends_on: [],
 						restart: 'always'
 					}
