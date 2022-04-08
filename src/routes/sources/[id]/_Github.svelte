@@ -76,7 +76,7 @@
 	}
 </script>
 
-<div class="mx-auto max-w-4xl">
+<div class="mx-auto max-w-4xl px-6">
 	{#if !source.githubAppId}
 		<form on:submit|preventDefault={newGithubApp} class="py-4">
 			<div class="flex space-x-1 pb-5 font-bold">
