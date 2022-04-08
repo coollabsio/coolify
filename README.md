@@ -18,6 +18,70 @@ Installation is automated with the following command:
 
 If you would like no questions during installation
 
+
+### Running locally
+
+If you want to install locally, there are some simple steps to be aware.
+
+Download an [Ubuntu](https://ubuntu.com/#download) ISO.
+
+You can use [Ventoy](https://www.ventoy.net/en/index.html) to make a USB boot.
+
+After installed, access your terminal through SSH or direct in the physical machine and make sure your system is up-to-date.
+
+```bash
+sudo apt update && sudo apt upgrade && sudo apt auto-remove
+```
+
+Then run those commands to install Coolify.
+
+```bash
+wget https://get.coollabs.io/coolify/install.sh
+chmod +x install.sh
+sudo ./install.sh
+```
+
+You will be asked if you would like the script to install docker. Press `Y` and wait until it finishes.
+
+At the end of the installation, you'll see a link like `http://your-internet-ip:3000`. It's not possible to access it through this yet, so get your local IP with
+
+```bash
+ip a
+```
+
+and open your browser using `http://your-local-ip:3000`. Now you can set up Coolify your login in Coolify.
+
+At this point you aren't able to config a domain, go to your router and:
+
+1. Set a `static IP` for your machine.
+2. In `Port Fowarding`, redirect port `80` and `443` to the IP you set up in the previous step.
+
+Now you can config the domain in Coolify's settings. After that, you'll be able to access the dashboard by `http://your-domain.xyz`
+
+>Check following sections before setting the domain.
+
+### Setting a Domain
+
+Coolify need a domain to work, so you must provide a valid one to it, and there are some things that you can do.
+
+#### Using nip.io or sslip.io
+
+If you don't own a domain and just want to use it as a test, you can either use [nip.io](nip.io) or [sslip.io](sslip.io).
+You just need to get your internet IP and add `.nip.io` or `.sslip.io` at the end. e.g. `123.123.123.123.nip.io`, and it'll redirect to you IP.
+Both services support wildcards. Just add it like `app.my-ip-address.nip.io`
+
+>This method just works if your internet IP is static. **Check next step**
+
+#### Using a owned domain
+
+In this case, you need to buy a domain from a provider like `Hostinger` or `GoDaddy` and set two nameservers that are pointing to your IP address.
+
+>If you have a static IP, you can either use [nip.io](nip.io) or [sslip.io](sslip.io). If not, there are some DDNS services that can dynamicaly update a domain with your current IP. e.g. (noip)[https://www.noip.com/].
+
+Now you have to set up your wildcards. Add a new `A` record passing the wildcard desired, or `*` to redirect all wildcard requests to your server. Check the respective documentation from your service provider.
+
+Now you must be ready to go!
+
 ## Features
 
 ### Git Sources
