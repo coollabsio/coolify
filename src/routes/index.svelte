@@ -92,7 +92,7 @@
 					</a>
 
 					<a
-						href="/teams"
+						href="/iam"
 						sveltekit:prefetch
 						class="flex cursor-pointer flex-col rounded p-6 text-center text-cyan-500 no-underline transition duration-150 hover:bg-cyan-500 hover:text-white"
 					>

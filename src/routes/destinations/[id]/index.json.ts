@@ -8,7 +8,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 export const get: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
-
+	console.log(teamId);
 	const { id } = event.params;
 	try {
 		const destination = await db.getDestination({ id, teamId });

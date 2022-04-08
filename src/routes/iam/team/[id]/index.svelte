@@ -1,7 +1,7 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ fetch, params }) => {
-		const url = `/teams/${params.id}.json`;
+		const url = `/iam/team/${params.id}.json`;
 		const res = await fetch(url);
 
 		if (res.ok) {
@@ -44,7 +44,7 @@
 
 	async function sendInvitation() {
 		try {
-			await post(`/teams/${id}/invitation/invite.json`, {
+			await post(`/iam/team/${id}/invitation/invite.json`, {
 				teamId: team.id,
 				teamName: invitation.teamName,
 				email: invitation.email.toLowerCase(),
@@ -57,7 +57,7 @@
 	}
 	async function revokeInvitation(id: string) {
 		try {
-			await post(`/teams/${id}/invitation/revoke.json`, { id });
+			await post(`/iam/team/${id}/invitation/revoke.json`, { id });
 			return window.location.reload();
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -65,7 +65,7 @@
 	}
 	async function removeFromTeam(uid: string) {
 		try {
-			await post(`/teams/${id}/remove/user.json`, { teamId: team.id, uid });
+			await post(`/iam/team/${id}/remove/user.json`, { teamId: team.id, uid });
 			return window.location.reload();
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -77,7 +77,7 @@
 			newPermission = 'admin';
 		}
 		try {
-			await post(`/teams/${id}/permission/change.json`, { userId, newPermission, permissionId });
+			await post(`/iam/team/${id}/permission/change.json`, { userId, newPermission, permissionId });
 			return window.location.reload();
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -85,7 +85,7 @@
 	}
 	async function handleSubmit() {
 		try {
-			await post(`/teams/${id}.json`, { ...team });
+			await post(`/iam/team/${id}.json`, { ...team });
 			return window.location.reload();
 		} catch ({ error }) {
 			return errorNotification(error);

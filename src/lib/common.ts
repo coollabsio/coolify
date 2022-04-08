@@ -52,12 +52,14 @@ export const sentry = Sentry;
 export const uniqueName = () => uniqueNamesGenerator(customConfig);
 
 export const saveBuildLog = async ({ line, buildId, applicationId }) => {
-	if (line.includes('ghs_')) {
-		const regex = /ghs_.*@/g;
-		line = line.replace(regex, '<SENSITIVE_DATA_DELETED>@');
+	if (line) {
+		if (line.includes('ghs_')) {
+			const regex = /ghs_.*@/g;
+			line = line.replace(regex, '<SENSITIVE_DATA_DELETED>@');
+		}
+		const addTimestamp = `${generateTimestamp()} ${line}`;
+		return await buildLogQueue.add(buildId, { buildId, line: addTimestamp, applicationId });
 	}
-	const addTimestamp = `${generateTimestamp()} ${line}`;
-	return await buildLogQueue.add(buildId, { buildId, line: addTimestamp, applicationId });
 };
 
 export const isTeamIdTokenAvailable = (request) => {
@@ -100,6 +102,7 @@ export const getUserDetails = async (event, isAdminRequired = true) => {
 			message: 'OK'
 		}
 	};
+
 	if (isAdminRequired && permission !== 'admin' && permission !== 'owner') {
 		payload.status = 401;
 		payload.body.message =

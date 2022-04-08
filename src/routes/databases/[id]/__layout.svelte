@@ -15,7 +15,7 @@
 		const endpoint = `/databases/${params.id}.json`;
 		const res = await fetch(endpoint);
 		if (res.ok) {
-			const { database, state, versions, privatePort, settings } = await res.json();
+			const { database, isRunning, versions, privatePort, settings } = await res.json();
 			if (!database || Object.entries(database).length === 0) {
 				return {
 					status: 302,
@@ -35,13 +35,13 @@
 			return {
 				props: {
 					database,
-					state,
+					isRunning,
 					versions,
 					privatePort
 				},
 				stuff: {
 					database,
-					state,
+					isRunning,
 					versions,
 					privatePort,
 					settings
@@ -65,7 +65,7 @@
 	import { goto } from '$app/navigation';
 
 	export let database;
-	export let state;
+	export let isRunning;
 	let loading = false;
 
 	async function deleteDatabase() {
@@ -91,8 +91,6 @@
 				return window.location.reload();
 			} catch ({ error }) {
 				return errorNotification(error);
-			} finally {
-				loading = false;
 			}
 		}
 	}
@@ -103,8 +101,6 @@
 			return window.location.reload();
 		} catch ({ error }) {
 			return errorNotification(error);
-		} finally {
-			loading = false;
 		}
 	}
 </script>
@@ -114,7 +110,7 @@
 		<Loading fullscreen cover />
 	{:else}
 		{#if database.type && database.destinationDockerId && database.version && database.defaultDatabase}
-			{#if state === 'running'}
+			{#if isRunning}
 				<button
 					on:click={stopDatabase}
 					title="Stop database"
@@ -140,7 +136,7 @@
 						<rect x="14" y="5" width="4" height="14" rx="1" />
 					</svg>
 				</button>
-			{:else if state === 'not started'}
+			{:else}
 				<button
 					on:click={startDatabase}
 					title="Start database"
