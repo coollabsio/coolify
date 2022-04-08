@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { session } from '$app/stores';
 
 	export let payload;
 
@@ -56,13 +57,15 @@
 			<label for="network" class="text-base font-bold text-stone-100">Network</label>
 			<input required name="network" placeholder="default: coolify" bind:value={payload.network} />
 		</div>
-		<div class="grid grid-cols-2 items-center">
-			<Setting
-				bind:setting={payload.isCoolifyProxyUsed}
-				on:click={() => (payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed)}
-				title="Use Coolify Proxy?"
-				description="This will install a proxy on the destination to allow you to access your applications and services without any manual configuration (recommended for Docker).<br><br>Databases will have their own proxy."
-			/>
-		</div>
+		{#if $session.teamId === '0'}
+			<div class="grid grid-cols-2 items-center">
+				<Setting
+					bind:setting={payload.isCoolifyProxyUsed}
+					on:click={() => (payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed)}
+					title="Use Coolify Proxy?"
+					description="This will install a proxy on the destination to allow you to access your applications and services without any manual configuration (recommended for Docker).<br><br>Databases will have their own proxy."
+				/>
+			</div>
+		{/if}
 	</form>
 </div>

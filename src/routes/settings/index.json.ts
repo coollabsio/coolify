@@ -5,9 +5,9 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { promises as dns } from 'dns';
 
 export const get: RequestHandler = async (event) => {
-	const { status, body } = await getUserDetails(event);
+	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
-
+	if (teamId !== '0') return { status: 401, body: { message: 'You are not an admin.' } };
 	try {
 		const settings = await listSettings();
 		return {

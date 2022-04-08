@@ -15,18 +15,20 @@ declare namespace App {
 		readOnly: boolean;
 		source: string;
 		settings: string;
+		database: Record<string, any>;
+		versions: string;
+		privatePort: string;
 	}
 }
 
 interface SessionData {
+	whiteLabeled: boolean;
 	version?: string;
 	userId?: string | null;
 	teamId?: string | null;
 	permission?: string;
 	isAdmin?: boolean;
 	expires?: string | null;
-	gitlabToken?: string | null;
-	ghToken?: string | null;
 }
 
 type DateTimeFormatOptions = {

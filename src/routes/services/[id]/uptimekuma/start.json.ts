@@ -5,6 +5,7 @@ import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
 import { ErrorHandler, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
+import type { ComposeFile } from '$lib/types/composeFile';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -31,7 +32,7 @@ export const post: RequestHandler = async (event) => {
 				config.environmentVariables[secret.name] = secret.value;
 			});
 		}
-		const composeFile = {
+		const composeFile: ComposeFile = {
 			version: '3.8',
 			services: {
 				[id]: {

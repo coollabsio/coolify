@@ -9,23 +9,28 @@ export const get: RequestHandler = async (event) => {
 
 	try {
 		const applicationsCount = await db.prisma.application.count({
-			where: { teams: { some: { id: teamId } } }
+			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
 		});
 		const sourcesCount = await db.prisma.gitSource.count({
-			where: { teams: { some: { id: teamId } } }
+			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
 		});
 		const destinationsCount = await db.prisma.destinationDocker.count({
-			where: { teams: { some: { id: teamId } } }
+			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
 		});
 		const teamsCount = await db.prisma.permission.count({ where: { userId } });
 		const databasesCount = await db.prisma.database.count({
-			where: { teams: { some: { id: teamId } } }
+			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
 		});
 		const servicesCount = await db.prisma.service.count({
-			where: { teams: { some: { id: teamId } } }
+			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
+		});
+		const teams = await db.prisma.permission.findMany({
+			where: { userId },
+			include: { team: { include: { _count: { select: { users: true } } } } }
 		});
 		return {
 			body: {
+				teams,
 				applicationsCount,
 				sourcesCount,
 				destinationsCount,

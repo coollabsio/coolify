@@ -6,7 +6,13 @@ import { getDatabaseImage } from '.';
 import { prisma } from './common';
 
 export async function listDestinations(teamId) {
-	return await prisma.destinationDocker.findMany({ where: { teams: { some: { id: teamId } } } });
+	if (teamId === '0') {
+		return await prisma.destinationDocker.findMany({ include: { teams: true } });
+	}
+	return await prisma.destinationDocker.findMany({
+		where: { teams: { some: { id: teamId } } },
+		include: { teams: true }
+	});
 }
 
 export async function configureDestinationForService({ id, destinationId }) {
@@ -38,9 +44,7 @@ export async function configureDestinationForDatabase({ id, destinationId }) {
 		const host = getEngine(engine);
 		if (type && version) {
 			const baseImage = getDatabaseImage(type);
-			asyncExecShell(
-				`DOCKER_HOST=${host} docker pull ${baseImage}:${version} && echo "FROM ${baseImage}:${version}" | docker build --label coolify.image="true" -t "${baseImage}:${version}" -`
-			);
+			asyncExecShell(`DOCKER_HOST=${host} docker pull ${baseImage}:${version}`);
 		}
 	}
 }
@@ -124,12 +128,17 @@ export async function removeDestination({ id }) {
 }
 
 export async function getDestination({ id, teamId }) {
-	let destination = await prisma.destinationDocker.findFirst({
-		where: { id, teams: { some: { id: teamId } } }
-	});
-	if (destination.remoteEngine) {
-		destination.sshPrivateKey = decrypt(destination.sshPrivateKey);
+	let destination = {};
+	if (teamId === '0') {
+		destination = await prisma.destinationDocker.findFirst({
+			where: { id }
+		});
+	} else {
+		destination = await prisma.destinationDocker.findFirst({
+			where: { id, teams: { some: { id: teamId } } }
+		});
 	}
+
 	return destination;
 }
 export async function getDestinationByApplicationId({ id, teamId }) {

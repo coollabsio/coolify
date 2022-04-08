@@ -43,10 +43,10 @@ export const post: RequestHandler = async (event) => {
 
 	const { id } = event.params;
 
-	const { name } = await event.request.json();
+	const { name, htmlUrl, apiUrl } = await event.request.json();
 
 	try {
-		await db.updateGitsource({ id, name });
+		await db.updateGitsource({ id, name, htmlUrl, apiUrl });
 		return { status: 201 };
 	} catch (error) {
 		return ErrorHandler(error);

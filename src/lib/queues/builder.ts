@@ -20,12 +20,9 @@ import {
 	setDefaultConfiguration
 } from '$lib/buildPacks/common';
 import yaml from 'js-yaml';
+import type { ComposeFile } from '$lib/types/composeFile';
 
 export default async function (job) {
-	/*
-	Edge cases:
-	1 - Change build pack and redeploy, what should happen?
-  */
 	let {
 		id: applicationId,
 		repository,
@@ -274,7 +271,7 @@ export default async function (job) {
 					}
 				};
 			});
-			const compose = {
+			const composeFile: ComposeFile = {
 				version: '3.8',
 				services: {
 					[imageId]: {
@@ -283,7 +280,7 @@ export default async function (job) {
 						volumes,
 						env_file: envFound ? [`${workdir}/.env`] : [],
 						networks: [docker.network],
-						labels: labels,
+						labels,
 						depends_on: [],
 						restart: 'always'
 					}
@@ -295,7 +292,7 @@ export default async function (job) {
 				},
 				volumes: Object.assign({}, ...composeVolumes)
 			};
-			await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(compose));
+			await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
 			await asyncExecShell(
 				`DOCKER_HOST=${host} docker compose --project-directory ${workdir} up -d`
 			);

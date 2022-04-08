@@ -12,7 +12,7 @@
 		if (!session.userId) {
 			return {};
 		}
-		const endpoint = `/teams.json`;
+		const endpoint = `/dashboard.json`;
 		const res = await fetch(endpoint);
 
 		if (res.ok) {
@@ -134,13 +134,18 @@
 
 <svelte:head>
 	<title>Coolify</title>
+	{#if !$session.whiteLabeled}
+		<link rel="icon" href="/favicon.png" />
+	{/if}
 </svelte:head>
 <SvelteToast options={{ intro: { y: -64 }, duration: 3000, pausable: true }} />
 {#if $session.userId}
 	<nav class="nav-main">
 		<div class="flex h-screen w-full flex-col items-center transition-all duration-100">
-			<div class="my-4 h-10 w-10"><img src="/favicon.png" alt="coolLabs logo" /></div>
-			<div class="flex flex-col space-y-4 py-2">
+			{#if !$session.whiteLabeled}
+				<div class="my-4 h-10 w-10"><img src="/favicon.png" alt="coolLabs logo" /></div>
+			{/if}
+			<div class="flex flex-col space-y-4 py-2" class:mt-2={$session.whiteLabeled}>
 				<a
 					sveltekit:prefetch
 					href="/"
@@ -312,7 +317,6 @@
 						<path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-12" />
 					</svg>
 				</a>
-				<div class="border-t border-stone-700" />
 			</div>
 			<div class="flex-1" />
 
@@ -430,13 +434,12 @@
 			<div class="flex flex-col space-y-4 py-2">
 				<a
 					sveltekit:prefetch
-					href="/teams"
-					class="icons tooltip-right bg-coolgray-200 hover:text-cyan-500"
-					class:text-cyan-500={$page.url.pathname.startsWith('/teams')}
-					class:bg-coolgray-500={$page.url.pathname.startsWith('/teams')}
-					data-tooltip="Teams"
-				>
-					<svg
+					href="/iam"
+					class="icons tooltip-right bg-coolgray-200 hover:text-fuchsia-500"
+					class:text-fuchsia-500={$page.url.pathname.startsWith('/iam')}
+					class:bg-coolgray-500={$page.url.pathname.startsWith('/iam')}
+					data-tooltip="IAM"
+					><svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="h-8 w-8"
 						viewBox="0 0 24 24"
@@ -453,6 +456,7 @@
 						<path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
 					</svg>
 				</a>
+
 				{#if $session.teamId === '0'}
 					<a
 						sveltekit:prefetch
@@ -480,6 +484,7 @@
 						</svg>
 					</a>
 				{/if}
+
 				<div
 					class="icons tooltip-right bg-coolgray-200 hover:text-red-500"
 					data-tooltip="Logout"
@@ -514,8 +519,14 @@
 			</div>
 		</div>
 	</nav>
+	{#if $session.whiteLabeled}
+		<span class="fixed  bottom-0 left-[50px] z-50 m-2 px-4 text-xs text-stone-700"
+			>Powered by <a href="https://coolify.io" target="_blank">Coolify</a></span
+		>
+	{/if}
+
 	<select
-		class="fixed right-0 bottom-0 z-50 m-2 w-64 bg-opacity-30 p-2 px-4"
+		class="fixed right-0 bottom-0 z-50 m-2 w-64 bg-opacity-30 p-2 px-4 hover:bg-opacity-100"
 		bind:value={selectedTeamId}
 		on:change={switchTeam}
 	>

@@ -2,6 +2,7 @@
 	export let service;
 	export let isRunning;
 	export let readOnly;
+	export let settings;
 
 	import { page, session } from '$app/stores';
 	import { post } from '$lib/api';
@@ -91,7 +92,22 @@
 					/>
 				</div>
 			</div>
-
+			<div class="grid grid-cols-2 items-center px-10">
+				<label for="version" class="text-base font-bold text-stone-100">Version / Tag</label>
+				<a
+					href={$session.isAdmin
+						? `/services/${id}/configuration/version?from=/services/${id}`
+						: ''}
+					class="no-underline"
+				>
+					<input
+						value={service.version}
+						id="service"
+						disabled
+						class="cursor-pointer hover:bg-coolgray-500"
+					/></a
+				>
+			</div>
 			<div class="grid grid-cols-2 items-center px-10">
 				<label for="destination" class="text-base font-bold text-stone-100">Destination</label>
 				<div>
@@ -143,7 +159,7 @@
 			{:else if service.type === 'vscodeserver'}
 				<VsCodeServer {service} />
 			{:else if service.type === 'wordpress'}
-				<Wordpress bind:service {isRunning} {readOnly} />
+				<Wordpress bind:service {isRunning} {readOnly} {settings} />
 			{:else if service.type === 'ghost'}
 				<Ghost bind:service {readOnly} />
 			{:else if service.type === 'meilisearch'}
@@ -151,17 +167,4 @@
 			{/if}
 		</div>
 	</form>
-	<!-- <div class="font-bold flex space-x-1 pb-5">
-		<div class="text-xl tracking-tight mr-4">Features</div>
-	</div>
-	<div class="px-4 sm:px-6 pb-10">
-		<ul class="mt-2 divide-y divide-stone-800">
-			<Setting
-				bind:setting={isPublic}
-				on:click={() => changeSettings('isPublic')}
-				title="Set it public"
-				description="Your database will be reachable over the internet. <br>Take security seriously in this case!"
-			/>
-		</ul>
-	</div> -->
 </div>

@@ -14,6 +14,7 @@ export const del: RequestHandler = async (event) => {
 			status: 200
 		};
 	} catch (error) {
+		console.log(error);
 		return ErrorHandler(error);
 	}
 };

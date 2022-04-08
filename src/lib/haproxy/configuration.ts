@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import * as db from '$lib/database';
 import { checkContainer, checkHAProxy } from '.';
 import { asyncExecShell, getDomain, getEngine } from '$lib/common';
+import { supportedServiceTypesAndVersions } from '$lib/components/common';
 
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555';
 
@@ -223,7 +224,7 @@ export async function configureHAProxy() {
 			const { fqdn, id, type, destinationDocker, destinationDockerId, updatedAt } = service;
 			if (destinationDockerId) {
 				const { engine } = destinationDocker;
-				const found = db.supportedServiceTypesAndVersions.find((a) => a.name === type);
+				const found = supportedServiceTypesAndVersions.find((a) => a.name === type);
 				if (found) {
 					const port = found.ports.main;
 					const publicPort = service[type]?.publicPort;
