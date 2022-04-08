@@ -13,15 +13,11 @@ export async function listSources(teamId) {
 	});
 }
 
-export async function newSource({ name, teamId, type, htmlUrl, apiUrl, organization }) {
+export async function newSource({ teamId, name }) {
 	return await prisma.gitSource.create({
 		data: {
-			teams: { connect: { id: teamId } },
 			name,
-			type,
-			htmlUrl,
-			apiUrl,
-			organization
+			teams: { connect: { id: teamId } }
 		}
 	});
 }
@@ -55,8 +51,29 @@ export async function getSource({ id, teamId }) {
 	if (body?.gitlabApp?.appSecret) body.gitlabApp.appSecret = decrypt(body.gitlabApp.appSecret);
 	return body;
 }
-export async function addSource({ id, appId, teamId, oauthId, groupName, appSecret }) {
+export async function addGitHubSource({ id, teamId, type, name, htmlUrl, apiUrl }) {
+	await prisma.gitSource.update({ where: { id }, data: { type, name, htmlUrl, apiUrl } });
+	return await prisma.githubApp.create({
+		data: {
+			teams: { connect: { id: teamId } },
+			gitSource: { connect: { id } }
+		}
+	});
+}
+export async function addGitLabSource({
+	id,
+	teamId,
+	type,
+	name,
+	htmlUrl,
+	apiUrl,
+	oauthId,
+	appId,
+	appSecret,
+	groupName
+}) {
 	const encrptedAppSecret = encrypt(appSecret);
+	await prisma.gitSource.update({ where: { id }, data: { type, apiUrl, htmlUrl, name } });
 	return await prisma.gitlabApp.create({
 		data: {
 			teams: { connect: { id: teamId } },
@@ -75,9 +92,9 @@ export async function configureGitsource({ id, gitSourceId }) {
 		data: { gitSource: { connect: { id: gitSourceId } } }
 	});
 }
-export async function updateGitsource({ id, name }) {
+export async function updateGitsource({ id, name, htmlUrl, apiUrl }) {
 	return await prisma.gitSource.update({
 		where: { id },
-		data: { name }
+		data: { name, htmlUrl, apiUrl }
 	});
 }

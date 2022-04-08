@@ -72,7 +72,7 @@
 							<div class="font-bold text-xl text-center truncate">
 								{database.name}
 							</div>
-							{#if $session.teamId === '0'}
+							{#if $session.teamId === '0' && otherDatabases.length > 0}
 								<div class="text-center truncate">{database.teams[0].name}</div>
 							{/if}
 							{#if !database.type}

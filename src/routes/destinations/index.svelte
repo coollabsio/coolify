@@ -68,7 +68,7 @@
 					<a href="/destinations/{destination.id}" class="no-underline p-2 w-96">
 						<div class="box-selection hover:bg-sky-600">
 							<div class="font-bold text-xl text-center truncate">{destination.name}</div>
-							{#if $session.teamId === '0'}
+							{#if $session.teamId === '0' && otherDestinations.length > 0}
 								<div class="text-center truncate">{destination.teams[0].name}</div>
 							{/if}
 							<div class="text-center truncate">{destination.network}</div>

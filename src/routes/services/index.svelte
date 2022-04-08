@@ -13,6 +13,7 @@
 	import Ghost from '$lib/components/svg/services/Ghost.svelte';
 	import MeiliSearch from '$lib/components/svg/services/MeiliSearch.svelte';
 	import { session } from '$app/stores';
+	import { getDomain } from '$lib/components/common';
 
 	export let services;
 	async function newService() {
@@ -87,8 +88,11 @@
 							<div class="font-bold text-xl text-center truncate">
 								{service.name}
 							</div>
-							{#if $session.teamId === '0'}
+							{#if $session.teamId === '0' && otherServices.length > 0}
 								<div class="text-center truncate">{service.teams[0].name}</div>
+							{/if}
+							{#if service.fqdn}
+								<div class="truncate text-center">{getDomain(service.fqdn)}</div>
 							{/if}
 							{#if !service.type || !service.fqdn}
 								<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
@@ -133,6 +137,9 @@
 								</div>
 								{#if $session.teamId === '0'}
 									<div class="text-center truncate">{service.teams[0].name}</div>
+								{/if}
+								{#if service.fqdn}
+									<div class="truncate text-center">{getDomain(service.fqdn)}</div>
 								{/if}
 								{#if !service.type || !service.fqdn}
 									<div class="font-bold text-center truncate text-red-500 group-hover:text-white">

@@ -1,9 +1,26 @@
 <script lang="ts">
 	export let applications: Array<Application>;
 	import { session } from '$app/stores';
-	import Application from './_Application.svelte';
 	import { post } from '$lib/api';
 	import { goto } from '$app/navigation';
+
+	import Rust from '$lib/components/svg/applications/Rust.svelte';
+	import Nodejs from '$lib/components/svg/applications/Nodejs.svelte';
+	import React from '$lib/components/svg/applications/React.svelte';
+	import Svelte from '$lib/components/svg/applications/Svelte.svelte';
+	import Vuejs from '$lib/components/svg/applications/Vuejs.svelte';
+	import PHP from '$lib/components/svg/applications/PHP.svelte';
+	import Python from '$lib/components/svg/applications/Python.svelte';
+	import Static from '$lib/components/svg/applications/Static.svelte';
+	import Nestjs from '$lib/components/svg/applications/Nestjs.svelte';
+	import Nuxtjs from '$lib/components/svg/applications/Nuxtjs.svelte';
+	import Nextjs from '$lib/components/svg/applications/Nextjs.svelte';
+	import Gatsby from '$lib/components/svg/applications/Gatsby.svelte';
+	import Docker from '$lib/components/svg/applications/Docker.svelte';
+	import Astro from '$lib/components/svg/applications/Astro.svelte';
+	import Eleventy from '$lib/components/svg/applications/Eleventy.svelte';
+	import { getDomain } from '$lib/components/common';
+
 	async function newApplication() {
 		const { id } = await post('/applications/new', {});
 		return await goto(`/applications/${id}`, { replaceState: true });
@@ -49,14 +66,108 @@
 		<div class="flex flex-col">
 			<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
 				{#each ownApplications as application}
-					<Application {application} />
+					<a href="/applications/{application.id}" class="w-96 p-2 no-underline">
+						<div class="box-selection group relative hover:bg-green-600">
+							{#if application.buildPack.toLowerCase() === 'rust'}
+								<Rust />
+							{:else if application.buildPack.toLowerCase() === 'node'}
+								<Nodejs />
+							{:else if application.buildPack.toLowerCase() === 'react'}
+								<React />
+							{:else if application.buildPack.toLowerCase() === 'svelte'}
+								<Svelte />
+							{:else if application.buildPack.toLowerCase() === 'vuejs'}
+								<Vuejs />
+							{:else if application.buildPack.toLowerCase() === 'php'}
+								<PHP />
+							{:else if application.buildPack.toLowerCase() === 'python'}
+								<Python />
+							{:else if application.buildPack.toLowerCase() === 'static'}
+								<Static />
+							{:else if application.buildPack.toLowerCase() === 'nestjs'}
+								<Nestjs />
+							{:else if application.buildPack.toLowerCase() === 'nuxtjs'}
+								<Nuxtjs />
+							{:else if application.buildPack.toLowerCase() === 'nextjs'}
+								<Nextjs />
+							{:else if application.buildPack.toLowerCase() === 'gatsby'}
+								<Gatsby />
+							{:else if application.buildPack.toLowerCase() === 'docker'}
+								<Docker />
+							{:else if application.buildPack.toLowerCase() === 'astro'}
+								<Astro />
+							{:else if application.buildPack.toLowerCase() === 'eleventy'}
+								<Eleventy />
+							{/if}
+
+							<div class="truncate text-center text-xl font-bold">{application.name}</div>
+							{#if $session.teamId === '0' && otherApplications.length > 0}
+								<div class="truncate text-center">Team {application.teams[0].name}</div>
+							{/if}
+							{#if application.fqdn}
+								<div class="truncate text-center">{getDomain(application.fqdn)}</div>
+							{/if}
+							{#if !application.gitSourceId || !application.destinationDockerId || !application.fqdn}
+								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
+									Configuration missing
+								</div>
+							{/if}
+						</div>
+					</a>
 				{/each}
 			</div>
 			{#if otherApplications.length > 0 && $session.teamId === '0'}
 				<div class="text-xl font-bold pb-5 pt-10 px-6">Other Applications</div>
 				<div class="flex flex-col md:flex-row flex-wrap px-2 justify-center">
 					{#each otherApplications as application}
-						<Application {application} />
+						<a href="/applications/{application.id}" class="w-96 p-2 no-underline">
+							<div class="box-selection group relative hover:bg-green-600">
+								{#if application.buildPack.toLowerCase() === 'rust'}
+									<Rust />
+								{:else if application.buildPack.toLowerCase() === 'node'}
+									<Nodejs />
+								{:else if application.buildPack.toLowerCase() === 'react'}
+									<React />
+								{:else if application.buildPack.toLowerCase() === 'svelte'}
+									<Svelte />
+								{:else if application.buildPack.toLowerCase() === 'vuejs'}
+									<Vuejs />
+								{:else if application.buildPack.toLowerCase() === 'php'}
+									<PHP />
+								{:else if application.buildPack.toLowerCase() === 'python'}
+									<Python />
+								{:else if application.buildPack.toLowerCase() === 'static'}
+									<Static />
+								{:else if application.buildPack.toLowerCase() === 'nestjs'}
+									<Nestjs />
+								{:else if application.buildPack.toLowerCase() === 'nuxtjs'}
+									<Nuxtjs />
+								{:else if application.buildPack.toLowerCase() === 'nextjs'}
+									<Nextjs />
+								{:else if application.buildPack.toLowerCase() === 'gatsby'}
+									<Gatsby />
+								{:else if application.buildPack.toLowerCase() === 'docker'}
+									<Docker />
+								{:else if application.buildPack.toLowerCase() === 'astro'}
+									<Astro />
+								{:else if application.buildPack.toLowerCase() === 'eleventy'}
+									<Eleventy />
+								{/if}
+
+								<div class="truncate text-center text-xl font-bold">{application.name}</div>
+								{#if $session.teamId === '0'}
+									<div class="truncate text-center">Team {application.teams[0].name}</div>
+								{/if}
+								{#if application.fqdn}
+									<div class="truncate text-center">{getDomain(application.fqdn)}</div>
+								{/if}
+								{#if !application.gitSourceId || !application.destinationDockerId || !application.fqdn}
+									<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
+										Configuration missing
+									</div>
+								{/if}
+							</div>
+						</a>
 					{/each}
 				</div>
 			{/if}

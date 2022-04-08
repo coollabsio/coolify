@@ -36,6 +36,7 @@
 	export let settings;
 	onMount(() => {
 		const { organization, id, htmlUrl } = source;
+		console.log(source);
 		const { fqdn } = settings;
 		const host = dev
 			? 'http://localhost:3000'

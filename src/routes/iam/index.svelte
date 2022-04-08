@@ -55,7 +55,7 @@
 		}
 		try {
 			await post(`/iam/password.json`, { id });
-			toast.push('Password reset successfully.');
+			toast.push('Password reset successfully. Please relogin to reset it.');
 		} catch ({ error }) {
 			return errorNotification(error);
 		}
@@ -80,10 +80,7 @@
 	<div class="mr-4 text-2xl tracking-tight">Identity and Access Management</div>
 </div>
 
-<!-- <div class="flex items-center px-6">
-	<div>{account.email}</div>
-</div> -->
-<div class="mx-auto max-w-4xl px-6">
+<div class="mx-auto max-w-4xl px-6 py-4">
 	{#if $session.teamId === '0' && accounts.length > 0}
 		<div class="title font-bold">Accounts</div>
 	{:else}

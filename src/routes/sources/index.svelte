@@ -22,6 +22,9 @@
 <script lang="ts">
 	export let sources;
 	import { session } from '$app/stores';
+	import { post } from '$lib/api';
+	import { goto } from '$app/navigation';
+	import { getDomain } from '$lib/components/common';
 	const ownSources = sources.filter((source) => {
 		if (source.teams[0].id === $session.teamId) {
 			return source;
@@ -32,12 +35,16 @@
 			return source;
 		}
 	});
+	async function newSource() {
+		const { id } = await post('/sources/new', {});
+		return await goto(`/sources/${id}`, { replaceState: true });
+	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">Git Sources</div>
 	{#if $session.isAdmin}
-		<a href="/new/source" sveltekit:prefetch class="add-icon bg-orange-600 hover:bg-orange-500">
+		<button on:click={newSource} class="add-icon bg-orange-600 hover:bg-orange-500">
 			<svg
 				class="w-6"
 				xmlns="http://www.w3.org/2000/svg"
@@ -51,7 +58,7 @@
 					d="M12 6v6m0 0v6m0-6h6m-6 0H6"
 				/></svg
 			>
-		</a>
+		</button>
 	{/if}
 </div>
 <div class="flex justify-center">
@@ -71,7 +78,7 @@
 							class:border-l-4={source.gitlabApp && !source.gitlabAppId}
 						>
 							<div class="font-bold text-xl text-center truncate">{source.name}</div>
-							{#if $session.teamId === '0'}
+							{#if $session.teamId === '0' && otherSources.length > 0}
 								<div class="text-center truncate">{source.teams[0].name}</div>
 							{/if}
 							{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && !source.githubAppId && !source.githubApp?.installationId)}
@@ -79,7 +86,7 @@
 									Configuration missing
 								</div>
 							{:else}
-								<div class="truncate text-center">{source.htmlUrl}</div>
+								<div class="truncate text-center">{getDomain(source.htmlUrl)}</div>
 							{/if}
 						</div>
 					</a>
