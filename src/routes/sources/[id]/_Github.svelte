@@ -12,8 +12,8 @@
 		try {
 			await post(`/sources/${id}.json`, {
 				name: source.name,
-				htmlUrl: source.htmlUrl,
-				apiUrl: source.apiUrl
+				htmlUrl: source.htmlUrl.replace(/\/$/, ''),
+				apiUrl: source.apiUrl.replace(/\/$/, '')
 			});
 			toast.push('Settings saved.');
 		} catch ({ error }) {
@@ -50,8 +50,8 @@
 			await post(`/sources/${id}/github.json`, {
 				type: 'github',
 				name: source.name,
-				htmlUrl: source.htmlUrl,
-				apiUrl: source.apiUrl
+				htmlUrl: source.htmlUrl.replace(/\/$/, ''),
+				apiUrl: source.apiUrl.replace(/\/$/, '')
 			});
 		} catch ({ error }) {
 			return errorNotification(error);

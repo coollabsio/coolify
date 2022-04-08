@@ -38,8 +38,8 @@
 				await post(`/sources/${id}/gitlab.json`, {
 					type: 'gitlab',
 					name: source.name,
-					htmlUrl: source.htmlUrl,
-					apiUrl: source.apiUrl,
+					htmlUrl: source.htmlUrl.replace(/\/$/, ''),
+					apiUrl: source.apiUrl.replace(/\/$/, ''),
 					oauthId: source.gitlabApp.oauthId,
 					appId: source.gitlabApp.appId,
 					appSecret: source.gitlabApp.appSecret,
@@ -56,8 +56,8 @@
 			try {
 				await post(`/sources/${id}.json`, {
 					name: source.name,
-					htmlUrl: source.htmlUrl,
-					apiUrl: source.apiUrl
+					htmlUrl: source.htmlUrl.replace(/\/$/, ''),
+					apiUrl: source.apiUrl.replace(/\/$/, '')
 				});
 			} catch ({ error }) {
 				return errorNotification(error);
