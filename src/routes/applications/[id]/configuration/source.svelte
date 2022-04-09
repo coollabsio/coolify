@@ -46,15 +46,12 @@
 			(source.type === 'github' && source.githubAppId && source.githubApp.installationId) ||
 			(source.type === 'gitlab' && source.gitlabAppId)
 	);
+	console.log(filteredSources);
 	const ownSources = filteredSources.filter((source) => {
-		if (source.teams[0].id === $session.teamId) {
-			return source;
-		}
+		return source.teams.filter((team) => team.id === $session.teamId);
 	});
 	const otherSources = filteredSources.filter((source) => {
-		if (source.teams[0].id !== $session.teamId) {
-			return source;
-		}
+		return source.teams.filter((team) => team.id !== $session.teamId);
 	});
 
 	async function handleSubmit(gitSourceId) {
