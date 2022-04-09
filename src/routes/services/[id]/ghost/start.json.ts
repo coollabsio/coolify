@@ -44,12 +44,15 @@ export const post: RequestHandler = async (event) => {
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 		const image = getServiceImage(type);
 		const domain = getDomain(fqdn);
+		const isHttps = fqdn.startsWith('https://');
 		const config = {
 			ghost: {
 				image: `${image}:${version}`,
 				volume: `${id}-ghost:/bitnami/ghost`,
 				environmentVariables: {
+					url: fqdn,
 					GHOST_HOST: domain,
+					GHOST_ENABLE_HTTPS: isHttps ? 'yes' : 'no',
 					GHOST_EMAIL: defaultEmail,
 					GHOST_PASSWORD: defaultPassword,
 					GHOST_DATABASE_HOST: `${id}-mariadb`,
