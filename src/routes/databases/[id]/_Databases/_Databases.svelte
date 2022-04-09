@@ -49,7 +49,7 @@
 	$: databaseUrl = generateUrl();
 
 	function generateUrl() {
-		return browser
+		return (databaseUrl = browser
 			? `${database.type}://${
 					databaseDbUser ? databaseDbUser + ':' : ''
 			  }${databaseDbUserPassword}@${
@@ -59,7 +59,7 @@
 							: window.location.hostname
 						: database.id
 			  }:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`
-			: 'Loading...';
+			: 'Loading...');
 	}
 
 	async function changeSettings(name) {
@@ -200,7 +200,7 @@
 					name="url"
 					readonly
 					disabled
-					value={publicLoading || loading ? 'Loading...' : databaseUrl}
+					value={publicLoading || loading ? 'Loading...' : generateUrl()}
 				/>
 			</div>
 		</div>

@@ -68,9 +68,9 @@ export const post: RequestHandler = async (event) => {
 		const database = await db.getDatabase({ id, teamId });
 		if (isRunning) {
 			if (database.dbUserPassword !== dbUserPassword) {
-				await updatePasswordInDb(database, dbUser, dbUserPassword);
+				await updatePasswordInDb(database, dbUser, dbUserPassword, false);
 			} else if (database.rootUserPassword !== rootUserPassword) {
-				await updatePasswordInDb(database, rootUser, rootUserPassword);
+				await updatePasswordInDb(database, rootUser, rootUserPassword, true);
 			}
 		}
 		await db.updateDatabase({
