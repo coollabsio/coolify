@@ -159,6 +159,7 @@ export function generateDatabaseConfiguration(database) {
 			// url: `psql://${dbUser}:${dbUserPassword}@${id}:${isPublic ? port : 5432}/${defaultDatabase}`,
 			privatePort: 5432,
 			environmentVariables: {
+				POSTGRESQL_POSTGRES_PASSWORD: rootUserPassword,
 				POSTGRESQL_PASSWORD: dbUserPassword,
 				POSTGRESQL_USERNAME: dbUser,
 				POSTGRESQL_DATABASE: defaultDatabase

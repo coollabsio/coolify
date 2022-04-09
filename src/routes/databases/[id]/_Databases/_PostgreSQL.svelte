@@ -22,6 +22,19 @@
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center">
+		<label for="rootUser" class="text-base font-bold text-stone-100"
+			>Root (postgres) User Password</label
+		>
+		<CopyPasswordField
+			readonly
+			disabled
+			placeholder="Generated automatically after start"
+			id="rootUserPassword"
+			name="rootUserPassword"
+			value={database.rootUserPassword}
+		/>
+	</div>
+	<div class="grid grid-cols-2 items-center">
 		<label for="dbUser" class="text-base font-bold text-stone-100">User</label>
 		<CopyPasswordField
 			readonly
