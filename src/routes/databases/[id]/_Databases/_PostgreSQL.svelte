@@ -26,12 +26,12 @@
 			>Root (postgres) User Password</label
 		>
 		<CopyPasswordField
-			readonly
-			disabled
+			disabled={!isRunning}
+			readonly={!isRunning}
 			placeholder="Generated automatically after start"
 			id="rootUserPassword"
 			name="rootUserPassword"
-			value={database.rootUserPassword}
+			bind:value={database.rootUserPassword}
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center">
