@@ -82,7 +82,8 @@
 							{#if $session.teamId === '0' && otherSources.length > 0}
 								<div class="truncate text-center">{source.teams[0].name}</div>
 							{/if}
-							{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && !source.githubAppId && !source.githubApp?.installationId)}
+
+							{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && source.githubApp?.installationId === null)}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									Configuration missing
 								</div>
@@ -109,7 +110,7 @@
 								{#if $session.teamId === '0'}
 									<div class="truncate text-center">{source.teams[0].name}</div>
 								{/if}
-								{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && !source.githubAppId && !source.githubApp?.installationId)}
+								{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && source.githubApp?.installationId === null)}
 									<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 										Configuration missing
 									</div>
