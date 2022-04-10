@@ -17,7 +17,7 @@ export const get: RequestHandler = async (event) => {
 	const { id } = event.params;
 	try {
 		const service = await db.getService({ id, teamId });
-		const { destinationDockerId, destinationDocker, type, version } = service;
+		const { destinationDockerId, destinationDocker, type, version, settings } = service;
 
 		let isRunning = false;
 		if (destinationDockerId) {
@@ -46,7 +46,8 @@ export const get: RequestHandler = async (event) => {
 		return {
 			body: {
 				isRunning,
-				service
+				service,
+				settings
 			}
 		};
 	} catch (error) {

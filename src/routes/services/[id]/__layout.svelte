@@ -16,7 +16,7 @@
 		const endpoint = `/services/${params.id}.json`;
 		const res = await fetch(endpoint);
 		if (res.ok) {
-			const { service, isRunning } = await res.json();
+			const { service, isRunning, settings } = await res.json();
 			if (!service || Object.entries(service).length === 0) {
 				return {
 					status: 302,
@@ -45,7 +45,8 @@
 				stuff: {
 					service,
 					isRunning,
-					readOnly
+					readOnly,
+					settings
 				}
 			};
 		}

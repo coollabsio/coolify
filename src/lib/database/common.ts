@@ -1,5 +1,9 @@
 import { dev } from '$app/env';
 import { sentry } from '$lib/common';
+import {
+	supportedDatabaseTypesAndVersions,
+	supportedServiceTypesAndVersions
+} from '$lib/components/common';
 import * as Prisma from '@prisma/client';
 import { default as ProdPrisma } from '@prisma/client';
 import type { PrismaClientOptions } from '@prisma/client/runtime';
@@ -82,134 +86,6 @@ export async function generateSshKeyPair(): Promise<{ publicKey: string; private
 	});
 }
 
-export const supportedDatabaseTypesAndVersions = [
-	{
-		name: 'mongodb',
-		fancyName: 'MongoDB',
-		baseImage: 'bitnami/mongodb',
-		versions: ['5.0.5', '4.4.11', '4.2.18', '4.0.27']
-	},
-	{ name: 'mysql', fancyName: 'MySQL', baseImage: 'bitnami/mysql', versions: ['8.0.27', '5.7.36'] },
-	{
-		name: 'postgresql',
-		fancyName: 'PostgreSQL',
-		baseImage: 'bitnami/postgresql',
-		versions: ['14.1.0', '13.5.0', '12.9.0', '11.14.0', '10.19.0', '9.6.24']
-	},
-	{
-		name: 'redis',
-		fancyName: 'Redis',
-		baseImage: 'bitnami/redis',
-		versions: ['6.2.6', '6.0.16', '5.0.14']
-	},
-	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] }
-];
-export const supportedServiceTypesAndVersions = [
-	{
-		name: 'plausibleanalytics',
-		fancyName: 'Plausible Analytics',
-		baseImage: 'plausible/analytics',
-		images: ['bitnami/postgresql:13.2.0', 'yandex/clickhouse-server:21.3.2.5'],
-		versions: ['latest'],
-		ports: {
-			main: 8000
-		}
-	},
-	{
-		name: 'nocodb',
-		fancyName: 'NocoDB',
-		baseImage: 'nocodb/nocodb',
-		versions: ['latest'],
-		ports: {
-			main: 8080
-		}
-	},
-	{
-		name: 'minio',
-		fancyName: 'MinIO',
-		baseImage: 'minio/minio',
-		versions: ['latest'],
-		ports: {
-			main: 9001
-		}
-	},
-	{
-		name: 'vscodeserver',
-		fancyName: 'VSCode Server',
-		baseImage: 'codercom/code-server',
-		versions: ['latest'],
-		ports: {
-			main: 8080
-		}
-	},
-	{
-		name: 'wordpress',
-		fancyName: 'Wordpress',
-		baseImage: 'wordpress',
-		images: ['bitnami/mysql:5.7'],
-		versions: ['latest', 'php8.1', 'php8.0', 'php7.4', 'php7.3'],
-		ports: {
-			main: 80
-		}
-	},
-	{
-		name: 'vaultwarden',
-		fancyName: 'Vaultwarden',
-		baseImage: 'vaultwarden/server',
-		versions: ['latest'],
-		ports: {
-			main: 80
-		}
-	},
-	{
-		name: 'languagetool',
-		fancyName: 'LanguageTool',
-		baseImage: 'silviof/docker-languagetool',
-		versions: ['latest'],
-		ports: {
-			main: 8010
-		}
-	},
-	{
-		name: 'n8n',
-		fancyName: 'n8n',
-		baseImage: 'n8nio/n8n',
-		versions: ['latest'],
-		ports: {
-			main: 5678
-		}
-	},
-	{
-		name: 'uptimekuma',
-		fancyName: 'Uptime Kuma',
-		baseImage: 'louislam/uptime-kuma',
-		versions: ['latest'],
-		ports: {
-			main: 3001
-		}
-	},
-	{
-		name: 'ghost',
-		fancyName: 'Ghost',
-		baseImage: 'bitnami/ghost',
-		images: ['bitnami/mariadb'],
-		versions: ['latest'],
-		ports: {
-			main: 2368
-		}
-	},
-	{
-		name: 'meilisearch',
-		fancyName: 'Meilisearch',
-		baseImage: 'getmeili/meilisearch',
-		images: [],
-		versions: ['latest'],
-		ports: {
-			main: 7700
-		}
-	}
-];
-
 export function getVersions(type) {
 	const found = supportedDatabaseTypesAndVersions.find((t) => t.name === type);
 	if (found) {
@@ -283,6 +159,7 @@ export function generateDatabaseConfiguration(database) {
 			// url: `psql://${dbUser}:${dbUserPassword}@${id}:${isPublic ? port : 5432}/${defaultDatabase}`,
 			privatePort: 5432,
 			environmentVariables: {
+				POSTGRESQL_POSTGRES_PASSWORD: rootUserPassword,
 				POSTGRESQL_PASSWORD: dbUserPassword,
 				POSTGRESQL_USERNAME: dbUser,
 				POSTGRESQL_DATABASE: defaultDatabase

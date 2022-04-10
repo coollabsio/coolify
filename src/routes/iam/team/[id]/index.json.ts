@@ -4,14 +4,14 @@ import { ErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (event) => {
-	const { userId, status, body } = await getUserDetails(event, false);
+	const { teamId, userId, status, body } = await getUserDetails(event, false);
 	if (status === 401) return { status, body };
 
 	const { id } = event.params;
 
 	try {
 		const user = await db.prisma.user.findFirst({
-			where: { id: userId, teams: { some: { id } } },
+			where: { id: userId, teams: teamId === '0' ? undefined : { some: { id } } },
 			include: { permission: true }
 		});
 		if (!user) {

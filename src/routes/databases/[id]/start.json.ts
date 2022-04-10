@@ -6,6 +6,7 @@ import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
 import { makeLabelForStandaloneDatabase } from '$lib/buildPacks/common';
 import { startTcpProxy } from '$lib/haproxy';
+import type { ComposeFile } from '$lib/types/composeFile';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -33,7 +34,7 @@ export const post: RequestHandler = async (event) => {
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 
-		const composeFile = {
+		const composeFile: ComposeFile = {
 			version: '3.8',
 			services: {
 				[id]: {
