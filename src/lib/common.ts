@@ -46,13 +46,20 @@ const customConfig: Config = {
 export const version = currentVersion;
 export const asyncExecShell = util.promisify(child.exec);
 export const asyncSleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
+
 export const sentry = Sentry;
 
 export const uniqueName = () => uniqueNamesGenerator(customConfig);
 
 export const saveBuildLog = async ({ line, buildId, applicationId }) => {
-	const addTimestamp = `${generateTimestamp()} ${line}`;
-	return await buildLogQueue.add(buildId, { buildId, line: addTimestamp, applicationId });
+	if (line) {
+		if (line.includes('ghs_')) {
+			const regex = /ghs_.*@/g;
+			line = line.replace(regex, '<SENSITIVE_DATA_DELETED>@');
+		}
+		const addTimestamp = `${generateTimestamp()} ${line}`;
+		return await buildLogQueue.add(buildId, { buildId, line: addTimestamp, applicationId });
+	}
 };
 
 export const isTeamIdTokenAvailable = (request) => {
@@ -80,7 +87,7 @@ export const getTeam = (event) => {
 
 export const getUserDetails = async (event, isAdminRequired = true) => {
 	const teamId = getTeam(event);
-	const userId = event.locals.session.data.userId || null;
+	const userId = event?.locals?.session?.data?.userId || null;
 	const { permission = 'read' } = await db.prisma.permission.findFirst({
 		where: { teamId, userId },
 		select: { permission: true },
@@ -95,6 +102,7 @@ export const getUserDetails = async (event, isAdminRequired = true) => {
 			message: 'OK'
 		}
 	};
+
 	if (isAdminRequired && permission !== 'admin' && permission !== 'owner') {
 		payload.status = 401;
 		payload.body.message =

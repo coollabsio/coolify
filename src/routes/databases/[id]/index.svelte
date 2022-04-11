@@ -8,7 +8,8 @@
 					database: stuff.database,
 					versions: stuff.versions,
 					privatePort: stuff.privatePort,
-					settings: stuff.settings
+					settings: stuff.settings,
+					isRunning: stuff.isRunning
 				}
 			};
 		}
@@ -31,37 +32,21 @@
 </script>
 
 <script lang="ts">
-	import Clickhouse from '$lib/components/svg/databases/Clickhouse.svelte';
-	import CouchDb from '$lib/components/svg/databases/CouchDB.svelte';
-	import MongoDb from '$lib/components/svg/databases/MongoDB.svelte';
-	import MySql from '$lib/components/svg/databases/MySQL.svelte';
-	import PostgreSql from '$lib/components/svg/databases/PostgreSQL.svelte';
-	import Redis from '$lib/components/svg/databases/Redis.svelte';
-
+	import DatabaseLinks from '$lib/components/DatabaseLinks.svelte';
 	export let database;
 	export let settings;
 	export let privatePort;
+	export let isRunning;
 </script>
 
 <div class="flex items-center space-x-2 p-6 text-2xl font-bold">
-	<div class="md:max-w-64 truncate text-base tracking-tight md:block md:text-2xl">
-		{database.name}
+	<div class="-mb-5 flex-col">
+		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
+			Configuration
+		</div>
+		<span class="text-xs">{database.name}</span>
 	</div>
-	<span class="relative">
-		{#if database.type === 'clickhouse'}
-			<Clickhouse />
-		{:else if database.type === 'couchdb'}
-			<CouchDb />
-		{:else if database.type === 'mongodb'}
-			<MongoDb />
-		{:else if database.type === 'mysql'}
-			<MySql />
-		{:else if database.type === 'postgresql'}
-			<PostgreSql />
-		{:else if database.type === 'redis'}
-			<Redis />
-		{/if}
-	</span>
+	<DatabaseLinks {database} />
 </div>
 
-<Databases bind:database {privatePort} {settings} />
+<Databases bind:database {privatePort} {settings} {isRunning} />

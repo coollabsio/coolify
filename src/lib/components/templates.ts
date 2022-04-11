@@ -146,6 +146,13 @@ export function findBuildPack(pack, packageManager = 'npm') {
 			port: 80
 		};
 	}
+	if (pack === 'python') {
+		return {
+			...metaData,
+			startCommand: null,
+			port: 8000
+		};
+	}
 	return {
 		name: 'node',
 		fancyName: 'Node.js',
@@ -249,9 +256,18 @@ export const buildPacks = [
 		fancyName: 'Rust',
 		hoverColor: 'hover:bg-pink-700',
 		color: 'bg-pink-700'
+	},
+	{
+		name: 'python',
+		fancyName: 'Python',
+		hoverColor: 'hover:bg-green-700',
+		color: 'bg-green-700'
 	}
 ];
 export const scanningTemplates = {
+	'@sveltejs/kit': {
+		buildPack: 'nodejs'
+	},
 	astro: {
 		buildPack: 'astro'
 	},

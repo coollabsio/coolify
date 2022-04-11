@@ -2,6 +2,8 @@
 	export let database;
 	export let privatePort;
 	export let settings;
+	export let isRunning;
+
 	import { page, session } from '$app/stores';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Setting from '$lib/components/Setting.svelte';
@@ -15,27 +17,39 @@
 	import { browser } from '$app/env';
 	import { post } from '$lib/api';
 	import { getDomain } from '$lib/components/common';
+	import { toast } from '@zerodevx/svelte-toast';
 
 	const { id } = $page.params;
+
 	let loading = false;
+	let publicLoading = false;
+
 	let isPublic = database.settings.isPublic || false;
 	let appendOnly = database.settings.appendOnly;
 
-	let databaseDefault = database.defaultDatabase;
-	let databaseDbUser = database.dbUser;
-	let databaseDbUserPassword = database.dbUserPassword;
-	if (database.type === 'mongodb') {
-		databaseDefault = '?readPreference=primary&ssl=false';
-		databaseDbUser = database.rootUser;
-		databaseDbUserPassword = database.rootUserPassword;
-	} else if (database.type === 'redis') {
-		databaseDefault = '';
-		databaseDbUser = '';
+	let databaseDefault;
+	let databaseDbUser;
+	let databaseDbUserPassword;
+
+	generateDbDetails();
+
+	function generateDbDetails() {
+		databaseDefault = database.defaultDatabase;
+		databaseDbUser = database.dbUser;
+		databaseDbUserPassword = database.dbUserPassword;
+		if (database.type === 'mongodb') {
+			databaseDefault = '?readPreference=primary&ssl=false';
+			databaseDbUser = database.rootUser;
+			databaseDbUserPassword = database.rootUserPassword;
+		} else if (database.type === 'redis') {
+			databaseDefault = '';
+			databaseDbUser = '';
+		}
 	}
-	let databaseUrl = generateUrl();
+	$: databaseUrl = generateUrl();
 
 	function generateUrl() {
-		return browser
+		return (databaseUrl = browser
 			? `${database.type}://${
 					databaseDbUser ? databaseDbUser + ':' : ''
 			  }${databaseDbUserPassword}@${
@@ -45,32 +59,50 @@
 							: window.location.hostname
 						: database.id
 			  }:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`
-			: 'Loading...';
+			: 'Loading...');
 	}
 
 	async function changeSettings(name) {
+		if (publicLoading || !isRunning) return;
+		publicLoading = true;
+		let data = {
+			isPublic,
+			appendOnly
+		};
 		if (name === 'isPublic') {
-			isPublic = !isPublic;
+			data.isPublic = !isPublic;
 		}
 		if (name === 'appendOnly') {
-			appendOnly = !appendOnly;
+			data.appendOnly = !appendOnly;
 		}
 		try {
-			const { publicPort } = await post(`/databases/${id}/settings.json`, { isPublic, appendOnly });
+			const { publicPort } = await post(`/databases/${id}/settings.json`, {
+				isPublic: data.isPublic,
+				appendOnly: data.appendOnly
+			});
+			isPublic = data.isPublic;
+			appendOnly = data.appendOnly;
+			databaseUrl = generateUrl();
 			if (isPublic) {
 				database.publicPort = publicPort;
 			}
-			databaseUrl = generateUrl();
 		} catch ({ error }) {
 			return errorNotification(error);
+		} finally {
+			publicLoading = false;
 		}
 	}
 	async function handleSubmit() {
 		try {
-			await post(`/databases/${id}.json`, { ...database });
-			return window.location.reload();
+			loading = true;
+			await post(`/databases/${id}.json`, { ...database, isRunning });
+			generateDbDetails();
+			databaseUrl = generateUrl();
+			toast.push('Settings saved.');
 		} catch ({ error }) {
 			return errorNotification(error);
+		} finally {
+			loading = false;
 		}
 	}
 </script>
@@ -142,21 +174,21 @@
 					readonly
 					disabled
 					name="publicPort"
-					value={isPublic ? database.publicPort : privatePort}
+					value={publicLoading ? 'Loading...' : isPublic ? database.publicPort : privatePort}
 				/>
 			</div>
 		</div>
 		<div class="grid grid-flow-row gap-2">
 			{#if database.type === 'mysql'}
-				<MySql bind:database />
+				<MySql bind:database {isRunning} />
 			{:else if database.type === 'postgresql'}
-				<PostgreSql bind:database />
+				<PostgreSql bind:database {isRunning} />
 			{:else if database.type === 'mongodb'}
-				<MongoDb {database} />
+				<MongoDb bind:database {isRunning} />
 			{:else if database.type === 'redis'}
-				<Redis {database} />
+				<Redis bind:database {isRunning} />
 			{:else if database.type === 'couchdb'}
-				<CouchDb bind:database />
+				<CouchDb {database} />
 			{/if}
 			<div class="grid grid-cols-2 items-center px-10 pb-8">
 				<label for="url" class="text-base font-bold text-stone-100">Connection String</label>
@@ -168,7 +200,7 @@
 					name="url"
 					readonly
 					disabled
-					value={databaseUrl}
+					value={publicLoading || loading ? 'Loading...' : generateUrl()}
 				/>
 			</div>
 		</div>
@@ -179,10 +211,12 @@
 	<div class="px-10 pb-10">
 		<div class="grid grid-cols-2 items-center">
 			<Setting
+				loading={publicLoading}
 				bind:setting={isPublic}
 				on:click={() => changeSettings('isPublic')}
 				title="Set it public"
 				description="Your database will be reachable over the internet. <br>Take security seriously in this case!"
+				disabled={!isRunning}
 			/>
 		</div>
 		{#if database.type === 'redis'}

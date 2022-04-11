@@ -11,7 +11,12 @@
 				}
 			};
 		}
-
+		if (res.status === 401) {
+			return {
+				status: 302,
+				redirect: '/databases'
+			};
+		}
 		return {
 			status: res.status,
 			error: new Error(`Could not load ${url}`)
@@ -121,7 +126,7 @@
 			<div class="grid grid-flow-row gap-2 px-10">
 				<div class="grid grid-cols-2 items-start">
 					<div class="flex-col">
-						<div class="pt-2 text-base font-bold text-stone-100">Domain (FQDN)</div>
+						<div class="pt-2 text-base font-bold text-stone-100">URL (FQDN)</div>
 						<Explainer
 							text="If you specify <span class='text-yellow-500 font-bold'>https</span>, Coolify will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-yellow-500 font-bold'>www</span>, Coolify will be redirected (302) from non-www and vice versa."
 						/>

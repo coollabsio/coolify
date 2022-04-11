@@ -9,11 +9,12 @@
 	if (isPRMRSecret) value = PRMRSecret.value;
 
 	import { page } from '$app/stores';
-	import { del, post } from '$lib/api';
+	import { del } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { errorNotification } from '$lib/form';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { createEventDispatcher } from 'svelte';
+	import { saveSecret } from './utils';
 
 	const dispatch = createEventDispatcher();
 	const { id } = $page.params;
@@ -30,31 +31,41 @@
 			return errorNotification(error);
 		}
 	}
-	async function saveSecret(isNew = false) {
-		if (!name) return errorNotification('Name is required.');
-		if (!value) return errorNotification('Value is required.');
-		try {
-			await post(`/applications/${id}/secrets.json`, {
-				name,
-				value,
-				isBuildSecret,
-				isPRMRSecret,
-				isNew
-			});
-			dispatch('refresh');
-			if (isNewSecret) {
-				name = '';
-				value = '';
-				isBuildSecret = false;
-			}
-			toast.push('Secret saved.');
-		} catch ({ error }) {
-			return errorNotification(error);
-		}
-	}
-	function setSecretValue() {
+
+	async function createSecret(isNew) {
+		await saveSecret({
+			isNew,
+			name,
+			value,
+			isBuildSecret,
+			isPRMRSecret,
+			isNewSecret,
+			applicationId: id
+		});
 		if (isNewSecret) {
+			name = '';
+			value = '';
+			isBuildSecret = false;
+		}
+		dispatch('refresh');
+		toast.push('Secret saved');
+	}
+
+	async function setSecretValue() {
+		if (!isPRMRSecret) {
 			isBuildSecret = !isBuildSecret;
+			if (!isNewSecret) {
+				await saveSecret({
+					isNew: isNewSecret,
+					name,
+					value,
+					isBuildSecret,
+					isPRMRSecret,
+					isNewSecret,
+					applicationId: id
+				});
+				toast.push('Secret saved');
+			}
 		}
 	}
 </script>
@@ -89,9 +100,9 @@
 		class="relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
 		class:bg-green-600={isBuildSecret}
 		class:bg-stone-700={!isBuildSecret}
-		class:opacity-50={!isNewSecret}
-		class:cursor-not-allowed={!isNewSecret}
-		class:cursor-pointer={isNewSecret}
+		class:opacity-50={isPRMRSecret}
+		class:cursor-not-allowed={isPRMRSecret}
+		class:cursor-pointer={!isPRMRSecret}
 	>
 		<span class="sr-only">Use isBuildSecret</span>
 		<span
@@ -133,12 +144,14 @@
 <td>
 	{#if isNewSecret}
 		<div class="flex items-center justify-center">
-			<button class="bg-green-600 hover:bg-green-500" on:click={() => saveSecret(true)}>Add</button>
+			<button class="bg-green-600 hover:bg-green-500" on:click={() => createSecret(true)}
+				>Add</button
+			>
 		</div>
 	{:else}
 		<div class="flex flex-row justify-center space-x-2">
 			<div class="flex items-center justify-center">
-				<button class="" on:click={() => saveSecret(false)}>Set</button>
+				<button class="" on:click={() => createSecret(false)}>Set</button>
 			</div>
 			{#if !isPRMRSecret}
 				<div class="flex justify-center items-end">

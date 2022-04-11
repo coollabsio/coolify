@@ -20,12 +20,9 @@ import {
 	setDefaultConfiguration
 } from '$lib/buildPacks/common';
 import yaml from 'js-yaml';
+import type { ComposeFile } from '$lib/types/composeFile';
 
 export default async function (job) {
-	/*
-	Edge cases:
-	1 - Change build pack and redeploy, what should happen?
-  */
 	let {
 		id: applicationId,
 		repository,
@@ -51,14 +48,17 @@ export default async function (job) {
 		pullmergeRequestId = null,
 		sourceBranch = null,
 		settings,
-		persistentStorage
+		persistentStorage,
+		pythonWSGI,
+		pythonModule,
+		pythonVariable
 	} = job.data;
 	const { debug } = settings;
 
 	await asyncSleep(500);
 	await db.prisma.build.updateMany({
 		where: {
-			status: 'queued',
+			status: { in: ['queued', 'running'] },
 			id: { not: buildId },
 			applicationId,
 			createdAt: { lt: new Date(new Date().getTime() - 60 * 60 * 1000) }
@@ -114,6 +114,7 @@ export default async function (job) {
 			branch,
 			buildId,
 			apiUrl: gitSource.apiUrl,
+			htmlUrl: gitSource.htmlUrl,
 			projectId,
 			deployKeyId: gitSource.gitlabApp?.deployKeyId || null,
 			privateSshKey: decrypt(gitSource.gitlabApp?.privateSshKey) || null
@@ -127,7 +128,7 @@ export default async function (job) {
 		}
 
 		try {
-			db.prisma.build.update({ where: { id: buildId }, data: { commit } });
+			await db.prisma.build.update({ where: { id: buildId }, data: { commit } });
 		} catch (err) {
 			console.log(err);
 		}
@@ -157,7 +158,7 @@ export default async function (job) {
 				});
 				deployNeeded = true;
 				if (configHash) {
-					saveBuildLog({ line: 'Configuration changed.', buildId, applicationId });
+					await saveBuildLog({ line: 'Configuration changed.', buildId, applicationId });
 				}
 			} else {
 				deployNeeded = false;
@@ -200,16 +201,19 @@ export default async function (job) {
 					startCommand,
 					baseDirectory,
 					secrets,
-					phpModules
+					phpModules,
+					pythonWSGI,
+					pythonModule,
+					pythonVariable
 				});
 			else {
-				saveBuildLog({ line: `Build pack ${buildPack} not found`, buildId, applicationId });
+				await saveBuildLog({ line: `Build pack ${buildPack} not found`, buildId, applicationId });
 				throw new Error(`Build pack ${buildPack} not found.`);
 			}
 			deployNeeded = true;
 		} else {
 			deployNeeded = false;
-			saveBuildLog({ line: 'Nothing changed.', buildId, applicationId });
+			await saveBuildLog({ line: 'Nothing changed.', buildId, applicationId });
 		}
 
 		// Deploy to Docker Engine
@@ -259,15 +263,7 @@ export default async function (job) {
 			//
 		}
 		try {
-			saveBuildLog({ line: 'Deployment started.', buildId, applicationId });
-			// for await (const volume of volumes) {
-			// 	const id = volume.split(':')[0];
-			// 	try {
-			// 		await asyncExecShell(`DOCKER_HOST=${host} docker volume inspect ${id}`);
-			// 	} catch (error) {
-			// 		await asyncExecShell(`DOCKER_HOST=${host} docker volume create ${id}`);
-			// 	}
-			// }
+			await saveBuildLog({ line: 'Deployment started.', buildId, applicationId });
 			const composeVolumes = volumes.map((volume) => {
 				return {
 					[`${volume.split(':')[0]}`]: {
@@ -275,7 +271,7 @@ export default async function (job) {
 					}
 				};
 			});
-			const compose = {
+			const composeFile: ComposeFile = {
 				version: '3.8',
 				services: {
 					[imageId]: {
@@ -284,7 +280,7 @@ export default async function (job) {
 						volumes,
 						env_file: envFound ? [`${workdir}/.env`] : [],
 						networks: [docker.network],
-						labels: labels,
+						labels,
 						depends_on: [],
 						restart: 'always'
 					}
@@ -296,23 +292,16 @@ export default async function (job) {
 				},
 				volumes: Object.assign({}, ...composeVolumes)
 			};
-			await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(compose));
+			await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
 			await asyncExecShell(
 				`DOCKER_HOST=${host} docker compose --project-directory ${workdir} up -d`
 			);
-
-			// const { stderr } = await asyncExecShell(
-			// 	`DOCKER_HOST=${host} docker run ${envFound && `--env-file=${workdir}/.env`} ${labels.join(
-			// 		' '
-			// 	)} --name ${imageId} --network ${docker.network} --restart always ${volumes.length > 0 ? volumes : ''
-			// 	} -d ${applicationId}:${tag}`
-			// );
-			saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
+			await saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
 		} catch (error) {
-			saveBuildLog({ line: error, buildId, applicationId });
+			await saveBuildLog({ line: error, buildId, applicationId });
 			sentry.captureException(error);
 			throw new Error(error);
 		}
-		saveBuildLog({ line: 'Proxy will be updated shortly.', buildId, applicationId });
+		await saveBuildLog({ line: 'Proxy will be updated shortly.', buildId, applicationId });
 	}
 }

@@ -22,6 +22,15 @@ export const post: RequestHandler = async (event) => {
 	const allowedActions = ['opened', 'reopen', 'close', 'open', 'update'];
 	const body = await event.request.json();
 	const buildId = cuid();
+	const webhookToken = event.request.headers.get('x-gitlab-token');
+	if (!webhookToken) {
+		return {
+			status: 500,
+			body: {
+				message: 'Ooops, something is not okay, are you okay?'
+			}
+		};
+	}
 	try {
 		const { object_kind: objectKind } = body;
 		if (objectKind === 'push') {
@@ -77,16 +86,6 @@ export const post: RequestHandler = async (event) => {
 				};
 			}
 		} else if (objectKind === 'merge_request') {
-			const webhookToken = event.request.headers.get('x-gitlab-token');
-			if (!webhookToken) {
-				return {
-					status: 500,
-					body: {
-						message: 'Ooops, something is not okay, are you okay?'
-					}
-				};
-			}
-
 			const isDraft = body.object_attributes.work_in_progress;
 			const action = body.object_attributes.action;
 			const projectId = Number(body.project.id);

@@ -54,10 +54,10 @@ textarea {
 }
 
 #svelte .item.hover {
-	@apply bg-coolgray-100 text-white;
+	@apply bg-coollabs text-white !important;
 }
 #svelte .item.active {
-	@apply bg-coollabs text-white;
+	@apply bg-coolgray-100 text-white;
 }
 
 select {

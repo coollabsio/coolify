@@ -5,7 +5,14 @@ import { generatePassword } from '.';
 import { prisma } from './common';
 
 export async function listServices(teamId) {
-	return await prisma.service.findMany({ where: { teams: { some: { id: teamId } } } });
+	if (teamId === '0') {
+		return await prisma.service.findMany({ include: { teams: true } });
+	} else {
+		return await prisma.service.findMany({
+			where: { teams: { some: { id: teamId } } },
+			include: { teams: true }
+		});
+	}
 }
 
 export async function newService({ name, teamId }) {
@@ -13,18 +20,28 @@ export async function newService({ name, teamId }) {
 }
 
 export async function getService({ id, teamId }) {
-	const body = await prisma.service.findFirst({
-		where: { id, teams: { some: { id: teamId } } },
-		include: {
-			destinationDocker: true,
-			plausibleAnalytics: true,
-			minio: true,
-			vscodeserver: true,
-			wordpress: true,
-			ghost: true,
-			serviceSecret: true
-		}
-	});
+	let body = {};
+	const include = {
+		destinationDocker: true,
+		plausibleAnalytics: true,
+		minio: true,
+		vscodeserver: true,
+		wordpress: true,
+		ghost: true,
+		serviceSecret: true,
+		meiliSearch: true
+	};
+	if (teamId === '0') {
+		body = await prisma.service.findFirst({
+			where: { id },
+			include
+		});
+	} else {
+		body = await prisma.service.findFirst({
+			where: { id, teams: { some: { id: teamId } } },
+			include
+		});
+	}
 
 	if (body.plausibleAnalytics?.postgresqlPassword)
 		body.plausibleAnalytics.postgresqlPassword = decrypt(
@@ -50,14 +67,20 @@ export async function getService({ id, teamId }) {
 		body.ghost.mariadbRootUserPassword = decrypt(body.ghost.mariadbRootUserPassword);
 	if (body.ghost?.defaultPassword) body.ghost.defaultPassword = decrypt(body.ghost.defaultPassword);
 
+	if (body.meiliSearch?.masterKey) body.meiliSearch.masterKey = decrypt(body.meiliSearch.masterKey);
+
 	if (body?.serviceSecret.length > 0) {
 		body.serviceSecret = body.serviceSecret.map((s) => {
 			s.value = decrypt(s.value);
 			return s;
 		});
 	}
+	if (body.wordpress?.ftpPassword) {
+		body.wordpress.ftpPassword = decrypt(body.wordpress.ftpPassword);
+	}
+	const settings = await prisma.setting.findFirst();
 
-	return { ...body };
+	return { ...body, settings };
 }
 
 export async function configureServiceType({ id, type }) {
@@ -142,7 +165,7 @@ export async function configureServiceType({ id, type }) {
 			}
 		});
 	} else if (type === 'ghost') {
-		const defaultEmail = `${cuid()}@coolify.io`;
+		const defaultEmail = `${cuid()}@example.com`;
 		const defaultPassword = encrypt(generatePassword());
 		const mariadbUser = cuid();
 		const mariadbPassword = encrypt(generatePassword());
@@ -163,6 +186,15 @@ export async function configureServiceType({ id, type }) {
 						mariadbRootUserPassword
 					}
 				}
+			}
+		});
+	} else if (type === 'meilisearch') {
+		const masterKey = encrypt(generatePassword(32));
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				meiliSearch: { create: { masterKey } }
 			}
 		});
 	}
@@ -188,15 +220,6 @@ export async function updatePlausibleAnalyticsService({ id, fqdn, email, usernam
 export async function updateService({ id, fqdn, name }) {
 	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
 }
-export async function updateLanguageToolService({ id, fqdn, name }) {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
-}
-export async function updateVaultWardenService({ id, fqdn, name }) {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
-}
-export async function updateVsCodeServer({ id, fqdn, name }) {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
-}
 export async function updateWordpress({ id, fqdn, name, mysqlDatabase, extraConfig }) {
 	return await prisma.service.update({
 		where: { id },
@@ -214,6 +237,7 @@ export async function updateGhostService({ id, fqdn, name, mariadbDatabase }) {
 }
 
 export async function removeService({ id }) {
+	await prisma.meiliSearch.deleteMany({ where: { serviceId: id } });
 	await prisma.ghost.deleteMany({ where: { serviceId: id } });
 	await prisma.plausibleAnalytics.deleteMany({ where: { serviceId: id } });
 	await prisma.minio.deleteMany({ where: { serviceId: id } });

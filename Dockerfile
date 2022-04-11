@@ -20,7 +20,7 @@ COPY --from=coollabsio/prisma-engine:latest /prisma-engines/query-engine /prisma
 COPY --from=install /app/node_modules ./node_modules
 COPY . .
 
-RUN apk add --no-cache git openssh-client curl jq sqlite
+RUN apk add --no-cache git git-lfs openssh-client curl jq cmake sqlite openssl
 RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@6
 RUN pnpm add -g pnpm
 

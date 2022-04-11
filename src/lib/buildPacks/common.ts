@@ -100,6 +100,7 @@ export const setDefaultConfiguration = async (data) => {
 		if (buildPack === 'static') port = 80;
 		else if (buildPack === 'node') port = 3000;
 		else if (buildPack === 'php') port = 80;
+		else if (buildPack === 'python') port = 8000;
 	}
 	if (!installCommand) installCommand = template?.installCommand || 'yarn install';
 	if (!startCommand) startCommand = template?.startCommand || 'yarn start';
@@ -123,20 +124,13 @@ export const setDefaultConfiguration = async (data) => {
 
 export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId) {
 	try {
-		// TODO: Write full .dockerignore for all deployments!!
 		if (buildPack === 'php') {
-			await fs.writeFile(
-				`${workdir}/.htaccess`,
-				`
-        RewriteEngine On
-        RewriteBase /
-        RewriteCond %{REQUEST_FILENAME} !-d
-        RewriteCond %{REQUEST_FILENAME} !-f
-        RewriteRule ^(.+)$ index.php [QSA,L]
-        `
-			);
 			await fs.writeFile(`${workdir}/entrypoint.sh`, `chown -R 1000 /app`);
-			saveBuildLog({ line: 'Copied default configuration file for PHP.', buildId, applicationId });
+			await saveBuildLog({
+				line: 'Copied default configuration file for PHP.',
+				buildId,
+				applicationId
+			});
 		} else if (staticDeployments.includes(buildPack)) {
 			await fs.writeFile(
 				`${workdir}/nginx.conf`,
@@ -190,7 +184,7 @@ export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, ap
             }
             `
 			);
-			saveBuildLog({ line: 'Copied default configuration file.', buildId, applicationId });
+			await saveBuildLog({ line: 'Copied default configuration file.', buildId, applicationId });
 		}
 	} catch (error) {
 		console.log(error);

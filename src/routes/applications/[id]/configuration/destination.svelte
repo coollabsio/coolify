@@ -29,7 +29,7 @@
 <script lang="ts">
 	import type Prisma from '@prisma/client';
 
-	import { page } from '$app/stores';
+	import { page, session } from '$app/stores';
 	import { errorNotification } from '$lib/form';
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/api';
@@ -39,6 +39,16 @@
 
 	export let destinations: Prisma.DestinationDocker[];
 
+	const ownDestinations = destinations.filter((destination) => {
+		if (destination.teams[0].id === $session.teamId) {
+			return destination;
+		}
+	});
+	const otherDestinations = destinations.filter((destination) => {
+		if (destination.teams[0].id !== $session.teamId) {
+			return destination;
+		}
+	});
 	async function handleSubmit(destinationId) {
 		try {
 			await post(`/applications/${id}/configuration/destination.json`, { destinationId });
@@ -52,8 +62,8 @@
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">Configure Destination</div>
 </div>
-<div class="flex justify-center">
-	{#if !destinations || destinations.length === 0}
+<div class="flex flex-col justify-center">
+	{#if !destinations || ownDestinations.length === 0}
 		<div class="flex-col">
 			<div class="pb-2">No configurable Destination found</div>
 			<div class="flex justify-center">
@@ -75,8 +85,23 @@
 			</div>
 		</div>
 	{:else}
-		<div class="flex flex-wrap justify-center">
-			{#each destinations as destination}
+		<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
+			{#each ownDestinations as destination}
+				<div class="p-2">
+					<form on:submit|preventDefault={() => handleSubmit(destination.id)}>
+						<button type="submit" class="box-selection hover:bg-sky-700 font-bold">
+							<div class="font-bold text-xl text-center truncate">{destination.name}</div>
+							<div class="text-center truncate">{destination.network}</div>
+						</button>
+					</form>
+				</div>
+			{/each}
+		</div>
+		{#if otherDestinations.length > 0 && $session.teamId === '0'}
+			<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Destinations</div>
+		{/if}
+		<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
+			{#each otherDestinations as destination}
 				<div class="p-2">
 					<form on:submit|preventDefault={() => handleSubmit(destination.id)}>
 						<button type="submit" class="box-selection hover:bg-sky-700 font-bold">

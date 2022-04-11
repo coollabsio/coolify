@@ -16,7 +16,7 @@ First of all, thank you for considering to contribute to my project! It means a 
 - Push to your fork repo
 - Create a pull request: https://github.com/coollabsio/compare
 - Write a proper description
-- Click "Change to draft"
+- Open the pull request to review
 
 # How to start after you set up your local fork?
 
@@ -29,7 +29,8 @@ You need to have [Docker Engine](https://docs.docker.com/engine/install/) instal
 - Copy `.env.template` to `.env` and set the `COOLIFY_APP_ID` environment variable to something cool.
 - Install dependencies with `pnpm install`.
 - Need to create a local SQlite database with `pnpm db:push`.
-  - This will apply all migrations and seed the database at `db/dev.db`.
+  - This will apply all migrations at `db/dev.db`.
+- Seed the database with base entities with `pnpm db:seed`
 - You can start coding after starting `pnpm dev`.
 
 ## Database migrations

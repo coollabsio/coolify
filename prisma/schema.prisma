@@ -88,6 +88,9 @@ model Application {
   baseDirectory       String?
   publishDirectory    String?
   phpModules          String?
+  pythonWSGI          String?
+  pythonModule        String?
+  pythonVariable      String?
   createdAt           DateTime                       @default(now())
   updatedAt           DateTime                       @updatedAt
   settings            ApplicationSettings?
@@ -115,8 +118,8 @@ model ApplicationSettings {
 model ApplicationPersistentStorage {
   id            String      @id @default(cuid())
   application   Application @relation(fields: [applicationId], references: [id])
-  applicationId String      @unique
-  path          String      @unique
+  applicationId String      
+  path          String      
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -281,6 +284,7 @@ model Service {
   wordpress           Wordpress?
   ghost               Ghost?
   serviceSecret       ServiceSecret[]
+  meiliSearch         MeiliSearch?
 }
 
 model PlausibleAnalytics {
@@ -329,6 +333,12 @@ model Wordpress {
   mysqlRootUserPassword String
   mysqlDatabase         String?
   mysqlPublicPort       Int?
+  ftpEnabled            Boolean  @default(false)
+  ftpUser               String?
+  ftpPassword           String?
+  ftpPublicPort         Int?
+  ftpHostKey            String?
+  ftpHostKeyPrivate     String?
   serviceId             String   @unique
   service               Service  @relation(fields: [serviceId], references: [id])
   createdAt             DateTime @default(now())
@@ -349,4 +359,13 @@ model Ghost {
   service                 Service  @relation(fields: [serviceId], references: [id])
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+}
+
+model MeiliSearch {
+  id        String   @id @default(cuid())
+  masterKey String
+  serviceId String   @unique
+  service   Service  @relation(fields: [serviceId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

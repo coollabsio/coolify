@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import * as db from '$lib/database';
 import { checkContainer, checkHAProxy } from '.';
 import { asyncExecShell, getDomain, getEngine } from '$lib/common';
+import { supportedServiceTypesAndVersions } from '$lib/components/common';
 
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555';
 
@@ -175,7 +176,7 @@ export async function configureHAProxy() {
 							isRunning,
 							isHttps,
 							redirectValue,
-							redirectTo: isWWW ? domain : 'www.' + domain,
+							redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain,
 							updatedAt: updatedAt.getTime()
 						});
 					}
@@ -199,7 +200,7 @@ export async function configureHAProxy() {
 									isRunning,
 									isHttps,
 									redirectValue,
-									redirectTo: isWWW ? previewDomain : 'www.' + previewDomain,
+									redirectTo: isWWW ? previewDomain.replace('www.', '') : 'www.' + previewDomain,
 									updatedAt: updatedAt.getTime()
 								});
 							}
@@ -223,7 +224,7 @@ export async function configureHAProxy() {
 			const { fqdn, id, type, destinationDocker, destinationDockerId, updatedAt } = service;
 			if (destinationDockerId) {
 				const { engine } = destinationDocker;
-				const found = db.supportedServiceTypesAndVersions.find((a) => a.name === type);
+				const found = supportedServiceTypesAndVersions.find((a) => a.name === type);
 				if (found) {
 					const port = found.ports.main;
 					const publicPort = service[type]?.publicPort;
@@ -242,7 +243,7 @@ export async function configureHAProxy() {
 								isRunning,
 								isHttps,
 								redirectValue,
-								redirectTo: isWWW ? domain : 'www.' + domain,
+								redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain,
 								updatedAt: updatedAt.getTime()
 							});
 						}
@@ -262,7 +263,7 @@ export async function configureHAProxy() {
 				domain,
 				isHttps,
 				redirectValue,
-				redirectTo: isWWW ? domain : 'www.' + domain
+				redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain
 			});
 		}
 		const output = mustache.render(template, data);

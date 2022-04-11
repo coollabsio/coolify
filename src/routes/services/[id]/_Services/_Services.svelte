@@ -2,6 +2,7 @@
 	export let service;
 	export let isRunning;
 	export let readOnly;
+	export let settings;
 
 	import { page, session } from '$app/stores';
 	import { post } from '$lib/api';
@@ -11,6 +12,7 @@
 	import { errorNotification } from '$lib/form';
 	import { toast } from '@zerodevx/svelte-toast';
 	import Ghost from './_Ghost.svelte';
+	import MeiliSearch from './_MeiliSearch.svelte';
 	import MinIo from './_MinIO.svelte';
 	import PlausibleAnalytics from './_PlausibleAnalytics.svelte';
 	import VsCodeServer from './_VSCodeServer.svelte';
@@ -90,7 +92,22 @@
 					/>
 				</div>
 			</div>
-
+			<div class="grid grid-cols-2 items-center px-10">
+				<label for="version" class="text-base font-bold text-stone-100">Version / Tag</label>
+				<a
+					href={$session.isAdmin
+						? `/services/${id}/configuration/version?from=/services/${id}`
+						: ''}
+					class="no-underline"
+				>
+					<input
+						value={service.version}
+						id="service"
+						disabled
+						class="cursor-pointer hover:bg-coolgray-500"
+					/></a
+				>
+			</div>
 			<div class="grid grid-cols-2 items-center px-10">
 				<label for="destination" class="text-base font-bold text-stone-100">Destination</label>
 				<div>
@@ -108,9 +125,9 @@
 			</div>
 			<div class="grid grid-cols-2 px-10">
 				<div class="flex-col ">
-					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">Domain (FQDN)</label>
+					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">URL (FQDN)</label>
 					<Explainer
-						text="If you specify <span class='text-pink-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-pink-600 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application."
+						text="If you specify <span class='text-pink-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-pink-600 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the url, you must first stop the application."
 					/>
 				</div>
 
@@ -142,23 +159,12 @@
 			{:else if service.type === 'vscodeserver'}
 				<VsCodeServer {service} />
 			{:else if service.type === 'wordpress'}
-				<Wordpress bind:service {isRunning} {readOnly} />
+				<Wordpress bind:service {isRunning} {readOnly} {settings} />
 			{:else if service.type === 'ghost'}
 				<Ghost bind:service {readOnly} />
+			{:else if service.type === 'meilisearch'}
+				<MeiliSearch bind:service />
 			{/if}
 		</div>
 	</form>
-	<!-- <div class="font-bold flex space-x-1 pb-5">
-		<div class="text-xl tracking-tight mr-4">Features</div>
-	</div>
-	<div class="px-4 sm:px-6 pb-10">
-		<ul class="mt-2 divide-y divide-stone-800">
-			<Setting
-				bind:setting={isPublic}
-				on:click={() => changeSettings('isPublic')}
-				title="Set it public"
-				description="Your database will be reachable over the internet. <br>Take security seriously in this case!"
-			/>
-		</ul>
-	</div> -->
 </div>

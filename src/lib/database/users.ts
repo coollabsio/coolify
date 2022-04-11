@@ -32,26 +32,42 @@ export async function login({ email, password, isLogin }) {
 	if (users === 0) {
 		await prisma.setting.update({ where: { id }, data: { isRegistrationEnabled: false } });
 		// Create default network & start Coolify Proxy
-		asyncExecShell(`docker network create --attachable coolify`)
-			.then(() => {
-				console.log('Network created');
-			})
-			.catch(() => {
-				console.log('Network already exists.');
-			});
-
-		startCoolifyProxy('/var/run/docker.sock')
-			.then(() => {
-				console.log('Coolify Proxy started.');
-			})
-			.catch((err) => {
-				console.log(err);
-			});
+		await asyncExecShell(`docker network create --attachable coolify`);
+		await startCoolifyProxy('/var/run/docker.sock');
 		uid = '0';
 	}
 
 	if (userFound) {
 		if (userFound.type === 'email') {
+			if (userFound.password === 'RESETME') {
+				const hashedPassword = await hashPassword(password);
+				if (userFound.updatedAt < new Date(Date.now() - 1000 * 60 * 10)) {
+					await prisma.user.update({
+						where: { email: userFound.email },
+						data: { password: 'RESETTIMEOUT' }
+					});
+					throw {
+						error: 'Password reset link has expired. Please request a new one.'
+					};
+				} else {
+					await prisma.user.update({
+						where: { email: userFound.email },
+						data: { password: hashedPassword }
+					});
+					return {
+						status: 200,
+						headers: {
+							'Set-Cookie': `teamId=${uid}; HttpOnly; Path=/; Max-Age=15778800;`
+						},
+						body: {
+							userId: userFound.id,
+							teamId: userFound.id,
+							permission: userFound.permission,
+							isAdmin: true
+						}
+					};
+				}
+			}
 			const passwordMatch = await bcrypt.compare(password, userFound.password);
 			if (!passwordMatch) {
 				throw {
