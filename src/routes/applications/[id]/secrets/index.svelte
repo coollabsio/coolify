@@ -61,9 +61,6 @@
 		await refreshSecrets();
 		toast.push('Secrets saved');
 	}
-	function asd() {
-		console.log(secrets);
-	}
 </script>
 
 <div class="flex items-center space-x-2 p-5 px-6 font-bold">
@@ -164,7 +161,6 @@
 			</tr>
 		</tbody>
 	</table>
-	<button on:click={asd}>Save</button>
 	<h2 class="title my-6 font-bold">Paste .env file</h2>
 	<form on:submit|preventDefault={getValues} class="mb-12 w-full">
 		<textarea bind:value={batchSecrets} class="mb-2 min-h-[200px] w-full" />
