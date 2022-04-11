@@ -26,14 +26,17 @@ export default async function ({
 		if (secrets.length > 0) {
 			secrets.forEach((secret) => {
 				if (secret.isBuildSecret) {
-					if (pullmergeRequestId) {
-						if (secret.isPRMRSecret) {
-							Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
-						}
-					} else {
-						if (!secret.isPRMRSecret) {
-							Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
-						}
+					if (
+						(pullmergeRequestId && secret.isPRMRSecret) ||
+						(!pullmergeRequestId && !secret.isPRMRSecret)
+					) {
+						Dockerfile.unshift(`ARG ${secret.name}=${secret.value}`);
+
+						Dockerfile.forEach((line, index) => {
+							if (line.startsWith('FROM')) {
+								Dockerfile.splice(index + 1, 0, `ARG ${secret.name}`);
+							}
+						});
 					}
 				}
 			});
