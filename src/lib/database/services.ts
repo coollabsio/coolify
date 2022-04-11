@@ -177,7 +177,7 @@ export async function configureServiceType({
 			}
 		});
 	} else if (type === 'ghost') {
-		const defaultEmail = `${cuid()}@coolify.io`;
+		const defaultEmail = `${cuid()}@example.com`;
 		const defaultPassword = encrypt(generatePassword());
 		const mariadbUser = cuid();
 		const mariadbPassword = encrypt(generatePassword());

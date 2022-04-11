@@ -19,7 +19,7 @@ export default async function ({
 	repodir: string;
 	privateSshKey: string;
 }): Promise<string> {
-	const url = htmlUrl.replace('https://', '').replace('http://', '');
+	const url = htmlUrl.replace('https://', '').replace('http://', '').replace(/\/$/, '');
 	await saveBuildLog({ line: 'GitLab importer started.', buildId, applicationId });
 	await asyncExecShell(`echo '${privateSshKey}' > ${repodir}/id.rsa`);
 	await asyncExecShell(`chmod 600 ${repodir}/id.rsa`);

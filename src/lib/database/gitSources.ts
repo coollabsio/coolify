@@ -33,17 +33,12 @@ export async function newSource({
 }): Promise<GitSource> {
 	return await prisma.gitSource.create({
 		data: {
-			teams: { connect: { id: teamId } },
 			name,
-			type,
-			htmlUrl,
-			apiUrl,
-			organization
+			teams: { connect: { id: teamId } }
 		}
 	});
 }
 export async function removeSource({ id }: { id: string }): Promise<void> {
-	// TODO: Disconnect application with this sourceId! Maybe not needed?
 	const source = await prisma.gitSource.delete({
 		where: { id },
 		include: { githubApp: true, gitlabApp: true }
@@ -79,22 +74,29 @@ export async function getSource({
 	if (body?.gitlabApp?.appSecret) body.gitlabApp.appSecret = decrypt(body.gitlabApp.appSecret);
 	return body;
 }
-export async function addSource({
+export async function addGitHubSource({ id, teamId, type, name, htmlUrl, apiUrl }) {
+	await prisma.gitSource.update({ where: { id }, data: { type, name, htmlUrl, apiUrl } });
+	return await prisma.githubApp.create({
+		data: {
+			teams: { connect: { id: teamId } },
+			gitSource: { connect: { id } }
+		}
+	});
+}
+export async function addGitLabSource({
 	id,
-	appId,
 	teamId,
+	type,
+	name,
+	htmlUrl,
+	apiUrl,
 	oauthId,
-	groupName,
-	appSecret
-}: {
-	id: string;
-	appId: string;
-	teamId: string;
-	oauthId: number;
-	groupName: string;
-	appSecret: string;
-}): Promise<GitlabApp> {
-	const encryptedAppSecret = encrypt(appSecret);
+	appId,
+	appSecret,
+	groupName
+}) {
+	const encrptedAppSecret = encrypt(appSecret);
+	await prisma.gitSource.update({ where: { id }, data: { type, apiUrl, htmlUrl, name } });
 	return await prisma.gitlabApp.create({
 		data: {
 			teams: { connect: { id: teamId } },
@@ -128,6 +130,6 @@ export async function updateGitsource({
 }): Promise<GitSource> {
 	return await prisma.gitSource.update({
 		where: { id },
-		data: { name }
+		data: { name, htmlUrl, apiUrl }
 	});
 }

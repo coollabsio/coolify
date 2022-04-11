@@ -70,7 +70,11 @@ export async function removeApplication({
 	await prisma.build.deleteMany({ where: { applicationId: id } });
 	await prisma.secret.deleteMany({ where: { applicationId: id } });
 	await prisma.applicationPersistentStorage.deleteMany({ where: { applicationId: id } });
-	await prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } });
+	if (teamId === '0') {
+		await prisma.application.deleteMany({ where: { id } });
+	} else {
+		await prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } });
+	}
 }
 
 export async function getApplicationWebhook({

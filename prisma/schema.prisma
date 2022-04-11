@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  binaryTargets = ["linux-musl"]
 }
 
 datasource db {
@@ -117,8 +118,8 @@ model ApplicationSettings {
 model ApplicationPersistentStorage {
   id            String      @id @default(cuid())
   application   Application @relation(fields: [applicationId], references: [id])
-  applicationId String      @unique
-  path          String      @unique
+  applicationId String      
+  path          String      
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

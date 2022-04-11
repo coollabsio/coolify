@@ -12,8 +12,8 @@
 	import { onMount } from 'svelte';
 	const { id } = $page.params;
 	let cannotDisable = settings.fqdn && destination.engine === '/var/run/docker.sock';
-	// let scannedApps = [];
 	let loading = false;
+	let loadingProxy = false;
 	let restarting = false;
 	async function handleSubmit() {
 		loading = true;
@@ -25,12 +25,6 @@
 			loading = false;
 		}
 	}
-	// async function scanApps() {
-	// 	scannedApps = [];
-	// 	const data = await fetch(`/destinations/${id}/scan.json`);
-	// 	const { containers } = await data.json();
-	// 	scannedApps = containers;
-	// }
 	onMount(async () => {
 		if (state === false && destination.isCoolifyProxyUsed === true) {
 			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
@@ -71,6 +65,7 @@
 			}
 			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
 			try {
+				loadingProxy = true;
 				await post(`/destinations/${id}/settings.json`, {
 					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
 					engine: destination.engine
@@ -82,6 +77,8 @@
 				}
 			} catch ({ error }) {
 				return errorNotification(error);
+			} finally {
+				loadingProxy = false;
 			}
 		}
 	}
@@ -187,6 +184,7 @@
 	{#if $session.teamId === '0'}
 		<div class="grid grid-cols-2 items-center">
 			<Setting
+				loading={loadingProxy}
 				disabled={cannotDisable}
 				bind:setting={destination.isCoolifyProxyUsed}
 				on:click={changeProxySetting}
