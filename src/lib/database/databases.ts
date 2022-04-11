@@ -138,7 +138,7 @@ export async function stopDatabase(database) {
 	return everStarted;
 }
 
-export async function updatePasswordInDb(database, user, newPassword) {
+export async function updatePasswordInDb(database, user, newPassword, isRoot) {
 	const {
 		id,
 		type,
@@ -157,9 +157,15 @@ export async function updatePasswordInDb(database, user, newPassword) {
 				`DOCKER_HOST=${host} docker exec ${id} mysql -u ${rootUser} -p${rootUserPassword} -e \"ALTER USER '${user}'@'%' IDENTIFIED WITH caching_sha2_password BY '${newPassword}';\"`
 			);
 		} else if (type === 'postgresql') {
-			await asyncExecShell(
-				`DOCKER_HOST=${host} docker exec ${id} psql postgresql://${dbUser}:${dbUserPassword}@${id}:5432/${defaultDatabase} -c "ALTER role ${user} WITH PASSWORD '${newPassword}'"`
-			);
+			if (isRoot) {
+				await asyncExecShell(
+					`DOCKER_HOST=${host} docker exec ${id} psql postgresql://postgres:${rootUserPassword}@${id}:5432/${defaultDatabase} -c "ALTER role postgres WITH PASSWORD '${newPassword}'"`
+				);
+			} else {
+				await asyncExecShell(
+					`DOCKER_HOST=${host} docker exec ${id} psql postgresql://${dbUser}:${dbUserPassword}@${id}:5432/${defaultDatabase} -c "ALTER role ${user} WITH PASSWORD '${newPassword}'"`
+				);
+			}
 		} else if (type === 'mongodb') {
 			await asyncExecShell(
 				`DOCKER_HOST=${host} docker exec ${id} mongo 'mongodb://${rootUser}:${rootUserPassword}@${id}:27017/admin?readPreference=primary&ssl=false' --eval "db.changeUserPassword('${user}','${newPassword}')"`
