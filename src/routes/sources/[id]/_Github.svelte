@@ -104,7 +104,7 @@
 				</div>
 			{/if}
 		</form>
-	{:else if source.githubAppId}
+	{:else if source.githubApp?.installationId}
 		<form on:submit|preventDefault={handleSubmit} class="py-4">
 			<div class="flex space-x-1 pb-5 font-bold">
 				<div class="title">General</div>
