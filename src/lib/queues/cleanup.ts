@@ -1,8 +1,6 @@
-import { dev } from '$app/env';
 import { asyncExecShell, getEngine, version } from '$lib/common';
 import { prisma } from '$lib/database';
-import { defaultProxyImageHttp, defaultProxyImageTcp } from '$lib/haproxy';
-export default async function () {
+export default async function (): Promise<void> {
 	const destinationDockers = await prisma.destinationDocker.findMany();
 	for (const destinationDocker of destinationDockers) {
 		const host = getEngine(destinationDocker.engine);

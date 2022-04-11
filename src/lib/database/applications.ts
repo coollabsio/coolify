@@ -1,10 +1,19 @@
 import { decrypt, encrypt } from '$lib/crypto';
 import { asyncExecShell, getEngine } from '$lib/common';
 
-import { getDomain, removeDestinationDocker } from '$lib/common';
+import { removeDestinationDocker } from '$lib/common';
 import { prisma } from './common';
 
-export async function listApplications(teamId) {
+import type {
+	DestinationDocker,
+	GitSource,
+	Secret,
+	ApplicationSettings,
+	Application,
+	ApplicationPersistentStorage
+} from '@prisma/client';
+
+export async function listApplications(teamId: string): Promise<Application[]> {
 	if (teamId === '0') {
 		return await prisma.application.findMany({ include: { teams: true } });
 	}
@@ -14,7 +23,13 @@ export async function listApplications(teamId) {
 	});
 }
 
-export async function newApplication({ name, teamId }) {
+export async function newApplication({
+	name,
+	teamId
+}: {
+	name: string;
+	teamId: string;
+}): Promise<Application> {
 	return await prisma.application.create({
 		data: {
 			name,
@@ -24,34 +39,17 @@ export async function newApplication({ name, teamId }) {
 	});
 }
 
-export async function importApplication({
-	name,
-	teamId,
-	fqdn,
-	port,
-	buildCommand,
-	startCommand,
-	installCommand
-}) {
-	return await prisma.application.create({
-		data: {
-			name,
-			fqdn,
-			port,
-			buildCommand,
-			startCommand,
-			installCommand,
-			teams: { connect: { id: teamId } }
-		}
-	});
-}
-
-export async function removeApplication({ id, teamId }) {
-	const { fqdn, destinationDockerId, destinationDocker } = await prisma.application.findUnique({
+export async function removeApplication({
+	id,
+	teamId
+}: {
+	id: string;
+	teamId: string;
+}): Promise<void> {
+	const { destinationDockerId, destinationDocker } = await prisma.application.findUnique({
 		where: { id },
 		include: { destinationDocker: true }
 	});
-	const domain = getDomain(fqdn);
 	if (destinationDockerId) {
 		const host = getEngine(destinationDocker.engine);
 		const { stdout: containers } = await asyncExecShell(
@@ -62,7 +60,6 @@ export async function removeApplication({ id, teamId }) {
 			for (const container of containersArray) {
 				const containerObj = JSON.parse(container);
 				const id = containerObj.ID;
-				const preview = containerObj.Image.split('-')[1];
 				await removeDestinationDocker({ id, engine: destinationDocker.engine });
 			}
 		}
@@ -80,9 +77,23 @@ export async function removeApplication({ id, teamId }) {
 	}
 }
 
-export async function getApplicationWebhook({ projectId, branch }) {
+export async function getApplicationWebhook({
+	projectId,
+	branch
+}: {
+	projectId: number;
+	branch: string;
+}): Promise<
+	Application & {
+		destinationDocker: DestinationDocker;
+		settings: ApplicationSettings;
+		gitSource: GitSource;
+		secrets: Secret[];
+		persistentStorage: ApplicationPersistentStorage[];
+	}
+> {
 	try {
-		let application = await prisma.application.findFirst({
+		const application = await prisma.application.findFirst({
 			where: { projectId, branch, settings: { autodeploy: true } },
 			include: {
 				destinationDocker: true,
@@ -131,16 +142,17 @@ export async function getApplicationWebhook({ projectId, branch }) {
 		throw { status: 404, body: { message: e.message } };
 	}
 }
-export async function getApplicationById({ id }) {
-	const body = await prisma.application.findFirst({
-		where: { id },
-		include: { destinationDocker: true }
-	});
 
-	return { ...body };
-}
-export async function getApplication({ id, teamId }) {
-	let body = {};
+export async function getApplication({ id, teamId }: { id: string; teamId: string }): Promise<
+	Application & {
+		destinationDocker: DestinationDocker;
+		settings: ApplicationSettings;
+		gitSource: GitSource;
+		secrets: Secret[];
+		persistentStorage: ApplicationPersistentStorage[];
+	}
+> {
+	let body;
 	if (teamId === '0') {
 		body = await prisma.application.findFirst({
 			where: { id },
@@ -194,7 +206,14 @@ export async function configureGitRepository({
 	projectId,
 	webhookToken,
 	autodeploy
-}) {
+}: {
+	id: string;
+	repository: string;
+	branch: string;
+	projectId: number;
+	webhookToken: string;
+	autodeploy: boolean;
+}): Promise<void> {
 	if (webhookToken) {
 		const encryptedWebhookToken = encrypt(webhookToken);
 		await prisma.application.update({
@@ -224,7 +243,10 @@ export async function configureGitRepository({
 	}
 }
 
-export async function configureBuildPack({ id, buildPack }) {
+export async function configureBuildPack({
+	id,
+	buildPack
+}: Pick<Application, 'id' | 'buildPack'>): Promise<Application> {
 	return await prisma.application.update({ where: { id }, data: { buildPack } });
 }
 
@@ -242,7 +264,21 @@ export async function configureApplication({
 	pythonWSGI,
 	pythonModule,
 	pythonVariable
-}) {
+}: {
+	id: string;
+	buildPack: string;
+	name: string;
+	fqdn: string;
+	port: number;
+	installCommand: string;
+	buildCommand: string;
+	startCommand: string;
+	baseDirectory: string;
+	publishDirectory: string;
+	pythonWSGI: string;
+	pythonModule: string;
+	pythonVariable: string;
+}): Promise<Application> {
 	return await prisma.application.update({
 		where: { id },
 		data: {
@@ -262,11 +298,24 @@ export async function configureApplication({
 	});
 }
 
-export async function checkDoubleBranch(branch, projectId) {
+export async function checkDoubleBranch(branch: string, projectId: number): Promise<boolean> {
 	const applications = await prisma.application.findMany({ where: { branch, projectId } });
 	return applications.length > 1;
 }
-export async function setApplicationSettings({ id, debug, previews, dualCerts, autodeploy }) {
+
+export async function setApplicationSettings({
+	id,
+	debug,
+	previews,
+	dualCerts,
+	autodeploy
+}: {
+	id: string;
+	debug: boolean;
+	previews: boolean;
+	dualCerts: boolean;
+	autodeploy: boolean;
+}): Promise<Application & { destinationDocker: DestinationDocker }> {
 	return await prisma.application.update({
 		where: { id },
 		data: { settings: { update: { debug, previews, dualCerts, autodeploy } } },
@@ -274,29 +323,6 @@ export async function setApplicationSettings({ id, debug, previews, dualCerts, a
 	});
 }
 
-export async function createBuild({
-	id,
-	applicationId,
-	destinationDockerId,
-	gitSourceId,
-	githubAppId,
-	gitlabAppId,
-	type
-}) {
-	return await prisma.build.create({
-		data: {
-			id,
-			applicationId,
-			destinationDockerId,
-			gitSourceId,
-			githubAppId,
-			gitlabAppId,
-			status: 'running',
-			type
-		}
-	});
-}
-
-export async function getPersistentStorage(id) {
+export async function getPersistentStorage(id: string): Promise<ApplicationPersistentStorage[]> {
 	return await prisma.applicationPersistentStorage.findMany({ where: { applicationId: id } });
 }

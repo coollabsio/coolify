@@ -3,14 +3,28 @@ import bcrypt from 'bcryptjs';
 
 import { prisma } from './common';
 import { asyncExecShell, uniqueName } from '$lib/common';
-
 import * as db from '$lib/database';
 import { startCoolifyProxy } from '$lib/haproxy';
-export async function hashPassword(password: string) {
+import type { User } from '@prisma/client';
+
+export async function hashPassword(password: string): Promise<string> {
 	const saltRounds = 15;
 	return bcrypt.hash(password, saltRounds);
 }
-export async function login({ email, password, isLogin }) {
+
+export async function login({
+	email,
+	password,
+	isLogin
+}: {
+	email: string;
+	password: string;
+	isLogin: boolean;
+}): Promise<{
+	status: number;
+	headers: { 'Set-Cookie': string };
+	body: { userId: string; teamId: string; permission: string; isAdmin: boolean };
+}> {
 	const users = await prisma.user.count();
 	const userFound = await prisma.user.findUnique({
 		where: { email },
@@ -140,6 +154,6 @@ export async function login({ email, password, isLogin }) {
 	};
 }
 
-export async function getUser({ userId }) {
+export async function getUser({ userId }: { userId: string }): Promise<User> {
 	return await prisma.user.findUnique({ where: { id: userId } });
 }
