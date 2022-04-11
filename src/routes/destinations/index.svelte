@@ -24,6 +24,16 @@
 
 	import { session } from '$app/stores';
 	export let destinations: Prisma.DestinationDocker[];
+	const ownDestinations = destinations.filter((destination) => {
+		if (destination.teams[0].id === $session.teamId) {
+			return destination;
+		}
+	});
+	const otherDestinations = destinations.filter((destination) => {
+		if (destination.teams[0].id !== $session.teamId) {
+			return destination;
+		}
+	});
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -47,20 +57,43 @@
 	{/if}
 </div>
 <div class="flex justify-center">
-	{#if !destinations || destinations.length === 0}
+	{#if !destinations || ownDestinations.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">No destination found</div>
 		</div>
-	{:else}
-		<div class="flex flex-wrap justify-center">
-			{#each destinations as destination}
-				<a href="/destinations/{destination.id}" class="no-underline p-2 w-96">
-					<div class="box-selection hover:bg-sky-600">
-						<div class="font-bold text-xl text-center truncate">{destination.name}</div>
-						<div class="text-center truncate">{destination.network}</div>
-					</div>
-				</a>
-			{/each}
+	{/if}
+	{#if ownDestinations.length > 0 || otherDestinations.length > 0}
+		<div class="flex flex-col">
+			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
+				{#each ownDestinations as destination}
+					<a href="/destinations/{destination.id}" class="w-96 p-2 no-underline">
+						<div class="box-selection hover:bg-sky-600">
+							<div class="truncate text-center text-xl font-bold">{destination.name}</div>
+							{#if $session.teamId === '0' && otherDestinations.length > 0}
+								<div class="truncate text-center">{destination.teams[0].name}</div>
+							{/if}
+							<div class="truncate text-center">{destination.network}</div>
+						</div>
+					</a>
+				{/each}
+			</div>
+
+			{#if otherDestinations.length > 0 && $session.teamId === '0'}
+				<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Destinations</div>
+				<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
+					{#each otherDestinations as destination}
+						<a href="/destinations/{destination.id}" class="w-96 p-2 no-underline">
+							<div class="box-selection hover:bg-sky-600">
+								<div class="truncate text-center text-xl font-bold">{destination.name}</div>
+								{#if $session.teamId === '0'}
+									<div class="truncate text-center">{destination.teams[0].name}</div>
+								{/if}
+								<div class="truncate text-center">{destination.network}</div>
+							</div>
+						</a>
+					{/each}
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>

@@ -11,6 +11,7 @@ import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
 import { ErrorHandler, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
+import type { ComposeFile } from '$lib/types/composeFile';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -43,12 +44,15 @@ export const post: RequestHandler = async (event) => {
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 		const image = getServiceImage(type);
 		const domain = getDomain(fqdn);
+		const isHttps = fqdn.startsWith('https://');
 		const config = {
 			ghost: {
 				image: `${image}:${version}`,
 				volume: `${id}-ghost:/bitnami/ghost`,
 				environmentVariables: {
+					url: fqdn,
 					GHOST_HOST: domain,
+					GHOST_ENABLE_HTTPS: isHttps ? 'yes' : 'no',
 					GHOST_EMAIL: defaultEmail,
 					GHOST_PASSWORD: defaultPassword,
 					GHOST_DATABASE_HOST: `${id}-mariadb`,
@@ -75,7 +79,7 @@ export const post: RequestHandler = async (event) => {
 				config.ghost.environmentVariables[secret.name] = secret.value;
 			});
 		}
-		const composeFile = {
+		const composeFile: ComposeFile = {
 			version: '3.8',
 			services: {
 				[id]: {

@@ -7,7 +7,14 @@ import getPort, { portNumbers } from 'get-port';
 import { asyncExecShell, getEngine, removeContainer } from '$lib/common';
 
 export async function listDatabases(teamId) {
-	return await prisma.database.findMany({ where: { teams: { some: { id: teamId } } } });
+	if (teamId === '0') {
+		return await prisma.database.findMany({ include: { teams: true } });
+	} else {
+		return await prisma.database.findMany({
+			where: { teams: { some: { id: teamId } } },
+			include: { teams: true }
+		});
+	}
 }
 export async function newDatabase({ name, teamId }) {
 	const dbUser = cuid();
@@ -31,10 +38,18 @@ export async function newDatabase({ name, teamId }) {
 }
 
 export async function getDatabase({ id, teamId }) {
-	const body = await prisma.database.findFirst({
-		where: { id, teams: { some: { id: teamId } } },
-		include: { destinationDocker: true, settings: true }
-	});
+	let body = {};
+	if (teamId === '0') {
+		body = await prisma.database.findFirst({
+			where: { id },
+			include: { destinationDocker: true, settings: true }
+		});
+	} else {
+		body = await prisma.database.findFirst({
+			where: { id, teams: { some: { id: teamId } } },
+			include: { destinationDocker: true, settings: true }
+		});
+	}
 
 	if (body.dbUserPassword) body.dbUserPassword = decrypt(body.dbUserPassword);
 	if (body.rootUserPassword) body.rootUserPassword = decrypt(body.rootUserPassword);
@@ -121,4 +136,44 @@ export async function stopDatabase(database) {
 		}
 	}
 	return everStarted;
+}
+
+export async function updatePasswordInDb(database, user, newPassword, isRoot) {
+	const {
+		id,
+		type,
+		rootUser,
+		rootUserPassword,
+		dbUser,
+		dbUserPassword,
+		defaultDatabase,
+		destinationDockerId,
+		destinationDocker: { engine }
+	} = database;
+	if (destinationDockerId) {
+		const host = getEngine(engine);
+		if (type === 'mysql') {
+			await asyncExecShell(
+				`DOCKER_HOST=${host} docker exec ${id} mysql -u ${rootUser} -p${rootUserPassword} -e \"ALTER USER '${user}'@'%' IDENTIFIED WITH caching_sha2_password BY '${newPassword}';\"`
+			);
+		} else if (type === 'postgresql') {
+			if (isRoot) {
+				await asyncExecShell(
+					`DOCKER_HOST=${host} docker exec ${id} psql postgresql://postgres:${rootUserPassword}@${id}:5432/${defaultDatabase} -c "ALTER role postgres WITH PASSWORD '${newPassword}'"`
+				);
+			} else {
+				await asyncExecShell(
+					`DOCKER_HOST=${host} docker exec ${id} psql postgresql://${dbUser}:${dbUserPassword}@${id}:5432/${defaultDatabase} -c "ALTER role ${user} WITH PASSWORD '${newPassword}'"`
+				);
+			}
+		} else if (type === 'mongodb') {
+			await asyncExecShell(
+				`DOCKER_HOST=${host} docker exec ${id} mongo 'mongodb://${rootUser}:${rootUserPassword}@${id}:27017/admin?readPreference=primary&ssl=false' --eval "db.changeUserPassword('${user}','${newPassword}')"`
+			);
+		} else if (type === 'redis') {
+			await asyncExecShell(
+				`DOCKER_HOST=${host} docker exec ${id} redis-cli -u redis://${dbUserPassword}@${id}:6379 --raw CONFIG SET requirepass ${newPassword}`
+			);
+		}
+	}
 }

@@ -7,6 +7,7 @@
 	export let isCenter = true;
 	export let disabled = false;
 	export let dataTooltip = null;
+	export let loading = false;
 </script>
 
 <div class="flex items-center py-4 pr-8">
@@ -26,9 +27,10 @@
 		on:click
 		aria-pressed="false"
 		class="relative mx-20 inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
-		class:opacity-50={disabled}
-		class:bg-green-600={setting}
-		class:bg-stone-700={!setting}
+		class:opacity-50={disabled || loading}
+		class:bg-green-600={!loading && setting}
+		class:bg-stone-700={!loading && !setting}
+		class:bg-yellow-500={loading}
 	>
 		<span class="sr-only">Use setting</span>
 		<span
@@ -40,6 +42,7 @@
 				class=" absolute inset-0 flex h-full w-full items-center justify-center transition-opacity duration-200 ease-in"
 				class:opacity-0={setting}
 				class:opacity-100={!setting}
+				class:animate-spin={loading}
 				aria-hidden="true"
 			>
 				<svg class="h-3 w-3 bg-white text-red-600" fill="none" viewBox="0 0 12 12">
@@ -57,6 +60,7 @@
 				aria-hidden="true"
 				class:opacity-100={setting}
 				class:opacity-0={!setting}
+				class:animate-spin={loading}
 			>
 				<svg class="h-3 w-3 bg-white text-green-600" fill="currentColor" viewBox="0 0 12 12">
 					<path

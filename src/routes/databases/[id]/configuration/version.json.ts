@@ -1,6 +1,7 @@
 import { getUserDetails } from '$lib/common';
+import { supportedDatabaseTypesAndVersions } from '$lib/components/common';
 import * as db from '$lib/database';
-import { ErrorHandler, supportedDatabaseTypesAndVersions } from '$lib/database';
+import { ErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (event) => {

@@ -8,11 +8,22 @@
 	import Redis from '$lib/components/svg/databases/Redis.svelte';
 	import { post } from '$lib/api';
 	import { goto } from '$app/navigation';
+	import { session } from '$app/stores';
 
 	async function newDatabase() {
 		const { id } = await post('/databases/new', {});
 		return await goto(`/databases/${id}`, { replaceState: true });
 	}
+	const ownDatabases = databases.filter((database) => {
+		if (database.teams[0].id === $session.teamId) {
+			return database;
+		}
+	});
+	const otherDatabases = databases.filter((database) => {
+		if (database.teams[0].id !== $session.teamId) {
+			return database;
+		}
+	});
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -34,40 +45,83 @@
 	</div>
 </div>
 
-<div class="flex flex-wrap justify-center">
-	{#if !databases || databases.length === 0}
+<div class="flex flex-col flex-wrap justify-center">
+	{#if !databases || ownDatabases.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">No databases found</div>
 		</div>
-	{:else}
-		{#each databases as database}
-			<a href="/databases/{database.id}" class="no-underline p-2 w-96">
-				<div class="box-selection relative hover:bg-purple-600 group">
-					{#if database.type === 'clickhouse'}
-						<Clickhouse isAbsolute />
-					{:else if database.type === 'couchdb'}
-						<CouchDB isAbsolute />
-					{:else if database.type === 'mongodb'}
-						<MongoDB isAbsolute />
-					{:else if database.type === 'mysql'}
-						<MySQL isAbsolute />
-					{:else if database.type === 'postgresql'}
-						<PostgreSQL isAbsolute />
-					{:else if database.type === 'redis'}
-						<Redis isAbsolute />
-					{/if}
-					<div class="font-bold text-xl text-center truncate">
-						{database.name}
-					</div>
-					{#if !database.type}
-						<div class="font-bold text-center truncate text-red-500 group-hover:text-white">
-							Configuration missing
+	{/if}
+	{#if ownDatabases.length > 0 || otherDatabases.length > 0}
+		<div class="flex flex-col">
+			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
+				{#each ownDatabases as database}
+					<a href="/databases/{database.id}" class="w-96 p-2 no-underline">
+						<div class="box-selection group relative hover:bg-purple-600">
+							{#if database.type === 'clickhouse'}
+								<Clickhouse isAbsolute />
+							{:else if database.type === 'couchdb'}
+								<CouchDB isAbsolute />
+							{:else if database.type === 'mongodb'}
+								<MongoDB isAbsolute />
+							{:else if database.type === 'mysql'}
+								<MySQL isAbsolute />
+							{:else if database.type === 'postgresql'}
+								<PostgreSQL isAbsolute />
+							{:else if database.type === 'redis'}
+								<Redis isAbsolute />
+							{/if}
+							<div class="truncate text-center text-xl font-bold">
+								{database.name}
+							</div>
+							{#if $session.teamId === '0' && otherDatabases.length > 0}
+								<div class="truncate text-center">{database.teams[0].name}</div>
+							{/if}
+							{#if !database.type}
+								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
+									Configuration missing
+								</div>
+							{/if}
 						</div>
-					{:else}
-						<div class="text-center truncate">{database.type}</div>
-					{/if}
+					</a>
+				{/each}
+			</div>
+			{#if otherDatabases.length > 0 && $session.teamId === '0'}
+				<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Databases</div>
+				<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
+					{#each otherDatabases as database}
+						<a href="/databases/{database.id}" class="w-96 p-2 no-underline">
+							<div class="box-selection group relative hover:bg-purple-600">
+								{#if database.type === 'clickhouse'}
+									<Clickhouse isAbsolute />
+								{:else if database.type === 'couchdb'}
+									<CouchDB isAbsolute />
+								{:else if database.type === 'mongodb'}
+									<MongoDB isAbsolute />
+								{:else if database.type === 'mysql'}
+									<MySQL isAbsolute />
+								{:else if database.type === 'postgresql'}
+									<PostgreSQL isAbsolute />
+								{:else if database.type === 'redis'}
+									<Redis isAbsolute />
+								{/if}
+								<div class="truncate text-center text-xl font-bold">
+									{database.name}
+								</div>
+								{#if $session.teamId === '0'}
+									<div class="truncate text-center">{database.teams[0].name}</div>
+								{/if}
+								{#if !database.type}
+									<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
+										Configuration missing
+									</div>
+								{:else}
+									<div class="text-center truncate">{database.type}</div>
+								{/if}
+							</div>
+						</a>
+					{/each}
 				</div>
-			</a>
-		{/each}
+			{/if}
+		</div>
 	{/if}
 </div>

@@ -1,6 +1,11 @@
 import { asyncExecShell, getEngine, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { generateDatabaseConfiguration, getVersions, ErrorHandler } from '$lib/database';
+import {
+	generateDatabaseConfiguration,
+	getVersions,
+	ErrorHandler,
+	updatePasswordInDb
+} from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const get: RequestHandler = async (event) => {
@@ -12,7 +17,7 @@ export const get: RequestHandler = async (event) => {
 		const database = await db.getDatabase({ id, teamId });
 		const { destinationDockerId, destinationDocker } = database;
 
-		let state = 'not started';
+		let isRunning = false;
 		if (destinationDockerId) {
 			const host = getEngine(destinationDocker.engine);
 
@@ -22,7 +27,7 @@ export const get: RequestHandler = async (event) => {
 				);
 
 				if (JSON.parse(stdout).Running) {
-					state = 'running';
+					isRunning = true;
 				}
 			} catch (error) {
 				//
@@ -34,7 +39,7 @@ export const get: RequestHandler = async (event) => {
 			body: {
 				privatePort: configuration?.privatePort,
 				database,
-				state,
+				isRunning,
 				versions: getVersions(database.type),
 				settings
 			}
@@ -48,10 +53,26 @@ export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 	const { id } = event.params;
-	const { name, defaultDatabase, dbUser, dbUserPassword, rootUser, rootUserPassword, version } =
-		await event.request.json();
+	const {
+		name,
+		defaultDatabase,
+		dbUser,
+		dbUserPassword,
+		rootUser,
+		rootUserPassword,
+		version,
+		isRunning
+	} = await event.request.json();
 
 	try {
+		const database = await db.getDatabase({ id, teamId });
+		if (isRunning) {
+			if (database.dbUserPassword !== dbUserPassword) {
+				await updatePasswordInDb(database, dbUser, dbUserPassword, false);
+			} else if (database.rootUserPassword !== rootUserPassword) {
+				await updatePasswordInDb(database, rootUser, rootUserPassword, true);
+			}
+		}
 		await db.updateDatabase({
 			id,
 			name,
