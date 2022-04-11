@@ -435,7 +435,7 @@
 				<a
 					sveltekit:prefetch
 					href="/iam"
-					class="icons tooltip-right bg-coolgray-200 hover:text-fuchsia-500"
+					class="icons tooltip-fuchsia-500 tooltip-right bg-coolgray-200 hover:text-fuchsia-500"
 					class:text-fuchsia-500={$page.url.pathname.startsWith('/iam')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/iam')}
 					data-tooltip="IAM"

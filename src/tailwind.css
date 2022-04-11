@@ -245,9 +245,9 @@ a {
 	@apply bg-pink-500;
 }
 
-/* Cyan 500 */
-.tooltip-cyan-500:after {
-	@apply bg-cyan-500;
+/* Fuchsia 500 */
+.tooltip-fuchsia-500:after {
+	@apply bg-fuchsia-500;
 }
 
 /* Yellow 500 */
