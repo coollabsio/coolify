@@ -1,6 +1,8 @@
 import { dev } from '$app/env';
 import got, { type Got } from 'got';
 import * as db from '$lib/database';
+import mustache from 'mustache';
+import crypto from 'crypto';
 import { checkContainer, checkHAProxy } from '.';
 import { asyncExecShell, getDomain, getEngine } from '$lib/common';
 import { supportedServiceTypesAndVersions } from '$lib/components/common';
@@ -262,36 +264,20 @@ export async function configureHAProxy(): Promise<void> {
 			redirectValue,
 			redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain
 		});
-		for (const service of services) {
-			const { fqdn, id, type, destinationDocker, destinationDockerId, updatedAt } = service;
-			if (destinationDockerId) {
-				const { engine } = destinationDocker;
-				const found = supportedServiceTypesAndVersions.find((a) => a.name === type);
-				if (found) {
-					const port = found.ports.main;
-					const publicPort = service[type]?.publicPort;
-					const isRunning = await checkContainer(engine, id);
-					if (fqdn) {
-						const domain = getDomain(fqdn);
-						const isHttps = fqdn.startsWith('https://');
-						const isWWW = fqdn.includes('www.');
-						const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
-						if (isRunning) {
-							data.services.push({
-								id,
-								port,
-								publicPort,
-								domain,
-								isRunning,
-								isHttps,
-								redirectValue,
-								redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain,
-								updatedAt: updatedAt.getTime()
-							});
-						}
-					}
-				}
+	}
+	const output = mustache.render(template, data);
+	const newHash = crypto.createHash('md5').update(output).digest('hex');
+	const { proxyHash, id } = await db.listSettings();
+	if (proxyHash !== newHash) {
+		await db.prisma.setting.update({ where: { id }, data: { proxyHash: newHash } });
+		await haproxy.post(`v2/services/haproxy/configuration/raw`, {
+			searchParams: {
+				skip_version: true
+			},
+			body: output,
+			headers: {
+				'Content-Type': 'text/plain'
 			}
-		}
+		});
 	}
 }
