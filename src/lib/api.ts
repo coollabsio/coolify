@@ -53,7 +53,7 @@ async function send({
 
 export function get(
 	path: string,
-	headers: Record<string, unknown>
+	headers?: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
 	return send({ method: 'GET', path, headers });
 }
@@ -61,7 +61,7 @@ export function get(
 export function del(
 	path: string,
 	data: Record<string, unknown>,
-	headers: Record<string, unknown>
+	headers?: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
 	return send({ method: 'DELETE', path, data, headers });
 }
@@ -77,7 +77,7 @@ export function post(
 export function put(
 	path: string,
 	data: Record<string, unknown>,
-	headers: Record<string, unknown>
+	headers?: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
 	return send({ method: 'PUT', path, data, headers });
 }
