@@ -219,8 +219,14 @@ export async function generateSSLCerts(): Promise<void> {
 				} else {
 					// Checking DNS entry before generating certificate
 					if (ipv4 || ipv6) {
-						const domains4 = await resolver.resolve4(ssl.domain);
-						const domains6 = await resolver.resolve6(ssl.domain);
+						let domains4 = [];
+						let domains6 = [];
+						try {
+							domains4 = await resolver.resolve4(ssl.domain);
+						} catch (error) {}
+						try {
+							domains6 = await resolver.resolve6(ssl.domain);
+						} catch (error) {}
 						if (domains4.length > 0 || domains6.length > 0) {
 							if (
 								(ipv4 && domains4.includes(ipv4.replace('\n', ''))) ||
@@ -242,8 +248,14 @@ export async function generateSSLCerts(): Promise<void> {
 				} else {
 					// Checking DNS entry before generating certificate
 					if (ipv4 || ipv6) {
-						const domains4 = await resolver.resolve4(ssl.domain);
-						const domains6 = await resolver.resolve6(ssl.domain);
+						let domains4 = [];
+						let domains6 = [];
+						try {
+							domains4 = await resolver.resolve4(ssl.domain);
+						} catch (error) {}
+						try {
+							domains6 = await resolver.resolve6(ssl.domain);
+						} catch (error) {}
 						if (domains4.length > 0 || domains6.length > 0) {
 							if (
 								(ipv4 && domains4.includes(ipv4.replace('\n', ''))) ||
