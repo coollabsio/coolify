@@ -209,7 +209,55 @@ a {
 	padding: 8px;
 	color: #fff;
 	content: attr(data-tooltip);
-	@apply min-w-[100px] rounded bg-coollabs text-center font-normal;
+	@apply min-w-[100px] rounded text-center font-normal;
+}
+
+/* Base colours for tooltips */
+
+/* coollabs - default */
+.tooltip:after,
+[data-tooltip]:after {
+	@apply bg-coollabs;
+}
+
+/* Green 500 */
+.tooltip-green-500:after {
+	@apply bg-green-500;
+}
+
+/* Orange 500 */
+.tooltip-orange-500:after {
+	@apply bg-orange-500;
+}
+
+/* Sky 500 */
+.tooltip-sky-500:after {
+	@apply bg-sky-500;
+}
+
+/* Purple 500 */
+.tooltip-purple-500:after {
+	@apply bg-purple-500;
+}
+
+/* Pink 500 */
+.tooltip-pink-500:after {
+	@apply bg-pink-500;
+}
+
+/* Fuchsia 500 */
+.tooltip-fuchsia-500:after {
+	@apply bg-fuchsia-500;
+}
+
+/* Yellow 500 */
+.tooltip-yellow-500:after {
+	@apply bg-yellow-500;
+}
+
+/* Red-500 */
+.tooltip-red-500:after {
+	@apply bg-red-500;
 }
 
 /* Directions */

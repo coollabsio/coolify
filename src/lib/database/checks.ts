@@ -1,7 +1,16 @@
 import { getDomain } from '$lib/common';
 import { prisma } from './common';
+import type { Application, ServiceSecret, DestinationDocker, Secret } from '@prisma/client';
 
-export async function isBranchAlreadyUsed({ repository, branch, id }) {
+export async function isBranchAlreadyUsed({
+	repository,
+	branch,
+	id
+}: {
+	id: string;
+	repository: string;
+	branch: string;
+}): Promise<Application> {
 	const application = await prisma.application.findUnique({
 		where: { id },
 		include: { gitSource: true }
@@ -11,18 +20,42 @@ export async function isBranchAlreadyUsed({ repository, branch, id }) {
 	});
 }
 
-export async function isDockerNetworkExists({ network }) {
+export async function isDockerNetworkExists({
+	network
+}: {
+	network: string;
+}): Promise<DestinationDocker> {
 	return await prisma.destinationDocker.findFirst({ where: { network } });
 }
 
-export async function isServiceSecretExists({ id, name }) {
+export async function isServiceSecretExists({
+	id,
+	name
+}: {
+	id: string;
+	name: string;
+}): Promise<ServiceSecret> {
 	return await prisma.serviceSecret.findFirst({ where: { name, serviceId: id } });
 }
-export async function isSecretExists({ id, name, isPRMRSecret }) {
+export async function isSecretExists({
+	id,
+	name,
+	isPRMRSecret
+}: {
+	id: string;
+	name: string;
+	isPRMRSecret: boolean;
+}): Promise<Secret> {
 	return await prisma.secret.findFirst({ where: { name, applicationId: id, isPRMRSecret } });
 }
 
-export async function isDomainConfigured({ id, fqdn }) {
+export async function isDomainConfigured({
+	id,
+	fqdn
+}: {
+	id: string;
+	fqdn: string;
+}): Promise<boolean> {
 	const domain = getDomain(fqdn);
 	const nakedDomain = domain.replace('www.', '');
 	const foundApp = await prisma.application.findFirst({
@@ -55,6 +88,5 @@ export async function isDomainConfigured({ id, fqdn }) {
 		},
 		select: { fqdn: true }
 	});
-	if (foundApp || foundService || coolifyFqdn) return true;
-	return false;
+	return !!(foundApp || foundService || coolifyFqdn);
 }

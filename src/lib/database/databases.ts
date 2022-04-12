@@ -1,12 +1,11 @@
 import { decrypt, encrypt } from '$lib/crypto';
-import * as db from '$lib/database';
 import cuid from 'cuid';
 import { generatePassword } from '.';
-import { prisma, ErrorHandler } from './common';
-import getPort, { portNumbers } from 'get-port';
+import { prisma } from './common';
 import { asyncExecShell, getEngine, removeContainer } from '$lib/common';
+import type { Database, DatabaseSettings, DestinationDocker } from '@prisma/client';
 
-export async function listDatabases(teamId) {
+export async function listDatabases(teamId: string): Promise<Database[]> {
 	if (teamId === '0') {
 		return await prisma.database.findMany({ include: { teams: true } });
 	} else {
@@ -16,7 +15,14 @@ export async function listDatabases(teamId) {
 		});
 	}
 }
-export async function newDatabase({ name, teamId }) {
+
+export async function newDatabase({
+	name,
+	teamId
+}: {
+	name: string;
+	teamId: string;
+}): Promise<Database> {
 	const dbUser = cuid();
 	const dbUserPassword = encrypt(generatePassword());
 	const rootUser = cuid();
@@ -37,8 +43,14 @@ export async function newDatabase({ name, teamId }) {
 	});
 }
 
-export async function getDatabase({ id, teamId }) {
-	let body = {};
+export async function getDatabase({
+	id,
+	teamId
+}: {
+	id: string;
+	teamId: string;
+}): Promise<Database & { destinationDocker: DestinationDocker; settings: DatabaseSettings }> {
+	let body;
 	if (teamId === '0') {
 		body = await prisma.database.findFirst({
 			where: { id },
@@ -50,20 +62,25 @@ export async function getDatabase({ id, teamId }) {
 			include: { destinationDocker: true, settings: true }
 		});
 	}
-
 	if (body.dbUserPassword) body.dbUserPassword = decrypt(body.dbUserPassword);
 	if (body.rootUserPassword) body.rootUserPassword = decrypt(body.rootUserPassword);
 
-	return { ...body };
+	return body;
 }
 
-export async function removeDatabase({ id }) {
+export async function removeDatabase({ id }: { id: string }): Promise<void> {
 	await prisma.databaseSettings.deleteMany({ where: { databaseId: id } });
 	await prisma.database.delete({ where: { id } });
 	return;
 }
 
-export async function configureDatabaseType({ id, type }) {
+export async function configureDatabaseType({
+	id,
+	type
+}: {
+	id: string;
+	type: string;
+}): Promise<Database> {
 	return await prisma.database.update({
 		where: { id },
 		data: { type }
@@ -79,7 +96,7 @@ export async function setDatabase({
 	version?: string;
 	isPublic?: boolean;
 	appendOnly?: boolean;
-}) {
+}): Promise<Database> {
 	return await prisma.database.update({
 		where: { id },
 		data: {
@@ -97,7 +114,16 @@ export async function updateDatabase({
 	rootUser,
 	rootUserPassword,
 	version
-}) {
+}: {
+	id: string;
+	name: string;
+	defaultDatabase: string;
+	dbUser: string;
+	dbUserPassword: string;
+	rootUser: string;
+	rootUserPassword: string;
+	version: string;
+}): Promise<Database> {
 	const encryptedDbUserPassword = dbUserPassword && encrypt(dbUserPassword);
 	const encryptedRootUserPassword = rootUserPassword && encrypt(rootUserPassword);
 	return await prisma.database.update({
@@ -114,7 +140,9 @@ export async function updateDatabase({
 	});
 }
 
-export async function stopDatabase(database) {
+export async function stopDatabase(
+	database: Database & { destinationDocker: DestinationDocker }
+): Promise<boolean> {
 	let everStarted = false;
 	const {
 		id,

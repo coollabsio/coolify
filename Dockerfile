@@ -1,31 +1,42 @@
-FROM node:16.14.0-alpine
-RUN apk add --no-cache g++ cmake make python3
-WORKDIR /app
-COPY package*.json .
-RUN yarn install
-COPY . .
-RUN yarn build
-
-FROM node:16.14.0-alpine
+FROM node:16.14.2-alpine as install
 WORKDIR /app
 
-LABEL coolify.managed true
-
-RUN apk add --no-cache git git-lfs openssh-client curl jq cmake sqlite openssl
-
+RUN apk add --no-cache curl
 RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@6
 RUN pnpm add -g pnpm
 
-RUN curl -fsSL "https://download.docker.com/linux/static/stable/x86_64/docker-20.10.9.tgz" | tar -xzvf - docker/docker -C . --strip-components 1 && mv docker /usr/bin/docker
-RUN mkdir -p ~/.docker/cli-plugins/
-RUN curl -SL https://github.com/docker/compose/releases/download/v2.2.2/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
-RUN chmod +x ~/.docker/cli-plugins/docker-compose
+COPY package*.json .
+RUN pnpm install
 
-COPY --from=0 /app/docker-compose.yaml .
-COPY --from=0 /app/build .
-COPY --from=0 /app/package.json .
-COPY --from=0 /app/node_modules ./node_modules
-COPY --from=0 /app/prisma ./prisma
+FROM node:16.14.2-alpine
+ARG TARGETPLATFORM
+
+WORKDIR /app
+
+ENV PRISMA_QUERY_ENGINE_BINARY=/app/prisma-engines/query-engine \
+  PRISMA_MIGRATION_ENGINE_BINARY=/app/prisma-engines/migration-engine \
+  PRISMA_INTROSPECTION_ENGINE_BINARY=/app/prisma-engines/introspection-engine \
+  PRISMA_FMT_BINARY=/app/prisma-engines/prisma-fmt \
+  PRISMA_CLI_QUERY_ENGINE_TYPE=binary \
+  PRISMA_CLIENT_ENGINE_TYPE=binary
+  
+COPY --from=coollabsio/prisma-engine:latest /prisma-engines/query-engine /prisma-engines/migration-engine /prisma-engines/introspection-engine /prisma-engines/prisma-fmt /app/prisma-engines/
+
+COPY --from=install /app/node_modules ./node_modules
+COPY . .
+
+RUN apk add --no-cache git git-lfs openssh-client curl jq cmake sqlite openssl
+RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@6
+RUN pnpm add -g pnpm
+RUN mkdir -p ~/.docker/cli-plugins/
+RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-20.10.9 -o /usr/bin/docker
+RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-compose-linux-2.3.4 -o ~/.docker/cli-plugins/docker-compose
+RUN chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker
+
+RUN pnpm prisma generate
+RUN pnpm build
+
+
 
 EXPOSE 3000
 CMD ["pnpm", "start"]
