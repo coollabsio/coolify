@@ -36,8 +36,15 @@
 		});
 	}
 
+	async function loadBranchesByPage(page = 0) {
+		return await get(`${apiUrl}/repos/${selected.repository}/branches?per_page=100&page=${page}`, {
+			Authorization: `token ${$gitTokens.githubToken}`
+		});
+	}
+
 	let reposSelectOptions;
 	let branchSelectOptions;
+
 	async function loadRepositories() {
 		let page = 1;
 		let reposCount = 0;
@@ -58,24 +65,27 @@
 		}));
 	}
 	async function loadBranches(event) {
+		branches = [];
 		selected.repository = event.detail.value;
+		let page = 1;
+		let branchCount = 0;
 		loading.branches = true;
-		selected.branch = undefined;
-		selected.projectId = repositories.find((repo) => repo.full_name === selected.repository).id;
-		try {
-			branches = await get(`${apiUrl}/repos/${selected.repository}/branches`, {
-				Authorization: `token ${$gitTokens.githubToken}`
-			});
-			branchSelectOptions = branches.map((branch) => ({
-				value: branch.name,
-				label: branch.name
-			}));
-			return;
-		} catch ({ error }) {
-			return errorNotification(error);
-		} finally {
-			loading.branches = false;
+		const loadedBranches = await loadBranchesByPage();
+		branches = branches.concat(loadedBranches);
+		branchCount = branches.length;
+		if (branchCount === 100) {
+			while (branchCount === 100) {
+				page = page + 1;
+				const nextBranches = await loadBranchesByPage(page);
+				branches = branches.concat(nextBranches);
+				branchCount = nextBranches.length;
+			}
 		}
+		loading.branches = false;
+		branchSelectOptions = branches.map((branch) => ({
+			value: branch.name,
+			label: branch.name
+		}));
 	}
 	async function isBranchAlreadyUsed(event) {
 		selected.branch = event.detail.value;
@@ -166,30 +176,36 @@
 {:else}
 	<form on:submit|preventDefault={handleSubmit} class="flex flex-col justify-center text-center">
 		<div class="flex-col space-y-3 md:space-y-0 space-x-1">
-			<div class="flex gap-4">
+			<div class="flex-col md:flex gap-4">
 				<div class="custom-select-wrapper">
 					<Select
 						placeholder={loading.repositories
-							? 'Loading repositories ...'
+							? 'Loading repositories...'
 							: 'Please select a repository'}
 						id="repository"
+						showIndicator={true}
+						isWaiting={loading.repositories}
 						on:select={loadBranches}
 						items={reposSelectOptions}
 						isDisabled={loading.repositories}
+						isClearable={false}
 					/>
 				</div>
 				<input class="hidden" bind:value={selected.projectId} name="projectId" />
 				<div class="custom-select-wrapper">
 					<Select
 						placeholder={loading.branches
-							? 'Loading branches ...'
+							? 'Loading branches...'
 							: !selected.repository
 							? 'Please select a repository first'
 							: 'Please select a branch'}
-						id="repository"
+						isWaiting={loading.branches}
+						showIndicator={selected.repository}
+						id="branches"
 						on:select={isBranchAlreadyUsed}
 						items={branchSelectOptions}
 						isDisabled={loading.branches || !selected.repository}
+						isClearable={false}
 					/>
 				</div>
 			</div>
@@ -202,13 +218,6 @@
 				class:bg-orange-600={showSave}
 				class:hover:bg-orange-500={showSave}>Save</button
 			>
-			<!-- <button class="w-40"
-				><a
-					class="no-underline"
-					href="{apiUrl}/apps/{application.gitSource.githubApp.name}/installations/new"
-					>Modify Repositories</a
-				></button
-			> -->
 		</div>
 	</form>
 {/if}
