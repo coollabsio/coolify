@@ -67,6 +67,7 @@
 	async function loadBranches(event) {
 		branches = [];
 		selected.repository = event.detail.value;
+		selected.projectId = repositories.find((repo) => repo.full_name === selected.repository).id;
 		let page = 1;
 		let branchCount = 0;
 		loading.branches = true;
