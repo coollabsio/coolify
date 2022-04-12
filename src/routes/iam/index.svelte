@@ -32,6 +32,7 @@
 
 	export let account;
 	export let accounts;
+	export let invitations;
 	if (accounts.length === 0) {
 		accounts.push(account);
 	}
@@ -74,12 +75,51 @@
 			return errorNotification(error);
 		}
 	}
+	async function acceptInvitation(id, teamId) {
+		try {
+			await post(`/iam/team/${teamId}/invitation/accept.json`, { id });
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
+	async function revokeInvitation(id, teamId) {
+		try {
+			await post(`/iam/team/${teamId}/invitation/revoke.json`, { id });
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">Identity and Access Management</div>
 </div>
 
+{#if invitations.length > 0}
+	<div class="mx-auto max-w-4xl px-6 py-4">
+		<div class="title font-bold">Pending invitations</div>
+		<div class="pt-10 text-center">
+			{#each invitations as invitation}
+				<div class="flex justify-center space-x-2">
+					<div>
+						Invited to <span class="font-bold text-pink-600">{invitation.teamName}</span> with
+						<span class="font-bold text-rose-600">{invitation.permission}</span> permission.
+					</div>
+					<button
+						class="hover:bg-green-500"
+						on:click={() => acceptInvitation(invitation.id, invitation.teamId)}>Accept</button
+					>
+					<button
+						class="hover:bg-red-600"
+						on:click={() => revokeInvitation(invitation.id, invitation.teamId)}>Delete</button
+					>
+				</div>
+			{/each}
+		</div>
+	</div>
+{/if}
 <div class="mx-auto max-w-4xl px-6 py-4">
 	{#if $session.teamId === '0' && accounts.length > 0}
 		<div class="title font-bold">Accounts</div>
