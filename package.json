@@ -20,9 +20,9 @@
 		"release:production:all": "cross-var docker build --platform linux/amd64,linux/arm64 -t coollabsio/coolify:$npm_package_version -t coollabsio/coolify:latest --push .",
 		"release:staging:all": "cross-var docker build --platform linux/amd64,linux/arm64 -t coollabsio/coolify:$npm_package_version --push .",
 		"release:staging:amd": "cross-var docker build --platform linux/amd64 -t coollabsio/coolify:$npm_package_version --push .",
-		"release:haproxy": "docker build --platform linux/amd64,linux/arm64 -t coollabsio/coolify-haproxy-alpine:latest -t coollabsio/coolify-haproxy-alpine:1.1.0 -f haproxy.Dockerfile --push .",
-		"release:haproxy:tcp": "docker build --platform linux/amd64,linux/arm64 -t coollabsio/coolify-haproxy-tcp-alpine:latest -t coollabsio/coolify-haproxy-tcp-alpine:1.1.0 -f haproxy-tcp.Dockerfile --push .",
-		"release:haproxy:http": "docker build --platform linux/amd64,linux/arm64 -t coollabsio/coolify-haproxy-http-alpine:latest -t coollabsio/coolify-haproxy-http-alpine:1.1.0 -f haproxy-http.Dockerfile --push .",
+		"release:haproxy": "docker build --platform linux/amd64,linux/arm64 -t coollabsio/coolify-haproxy-alpine:latest -t coollabsio/coolify-haproxy-alpine:1.1.0 -f data/haproxy.Dockerfile --push .",
+		"release:haproxy:tcp": "docker build --platform linux/amd64,linux/arm64 -t coollabsio/coolify-haproxy-tcp-alpine:latest -t coollabsio/coolify-haproxy-tcp-alpine:1.1.0 -f data/haproxy-tcp.Dockerfile --push .",
+		"release:haproxy:http": "docker build --platform linux/amd64,linux/arm64 -t coollabsio/coolify-haproxy-http-alpine:latest -t coollabsio/coolify-haproxy-http-alpine:1.1.0 -f data/haproxy-http.Dockerfile --push .",
 		"prepare": "husky install"
 	},
 	"devDependencies": {
