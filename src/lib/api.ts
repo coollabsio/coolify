@@ -1,11 +1,9 @@
-// TODO: Make this functions generic
-
 async function send({
 	method,
 	path,
 	data = {},
 	headers,
-	timeout = 30000
+	timeout = 120000
 }): Promise<Record<string, unknown>> {
 	const controller = new AbortController();
 	const id = setTimeout(() => controller.abort(), timeout);
