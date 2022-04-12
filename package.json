@@ -64,7 +64,7 @@
 		"@prisma/client": "3.11.1",
 		"@sentry/node": "6.19.6",
 		"bcryptjs": "^2.4.3",
-		"bullmq": "1.79.0",
+		"bullmq": "1.80.0",
 		"compare-versions": "4.1.3",
 		"cookie": "0.4.2",
 		"cuid": "2.1.8",

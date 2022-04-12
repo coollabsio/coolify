@@ -18,18 +18,10 @@ export async function listSources(
 
 export async function newSource({
 	name,
-	teamId,
-	type,
-	htmlUrl,
-	apiUrl,
-	organization
+	teamId
 }: {
 	name: string;
 	teamId: string;
-	type: string;
-	htmlUrl: string;
-	apiUrl: string;
-	organization: string;
 }): Promise<GitSource> {
 	return await prisma.gitSource.create({
 		data: {
@@ -74,8 +66,11 @@ export async function getSource({
 	if (body?.gitlabApp?.appSecret) body.gitlabApp.appSecret = decrypt(body.gitlabApp.appSecret);
 	return body;
 }
-export async function addGitHubSource({ id, teamId, type, name, htmlUrl, apiUrl }) {
-	await prisma.gitSource.update({ where: { id }, data: { type, name, htmlUrl, apiUrl } });
+export async function addGitHubSource({ id, teamId, type, name, htmlUrl, apiUrl, organization }) {
+	await prisma.gitSource.update({
+		where: { id },
+		data: { type, name, htmlUrl, apiUrl, organization }
+	});
 	return await prisma.githubApp.create({
 		data: {
 			teams: { connect: { id: teamId } },
@@ -123,10 +118,14 @@ export async function configureGitsource({
 }
 export async function updateGitsource({
 	id,
-	name
+	name,
+	htmlUrl,
+	apiUrl
 }: {
 	id: string;
 	name: string;
+	htmlUrl: string;
+	apiUrl: string;
 }): Promise<GitSource> {
 	return await prisma.gitSource.update({
 		where: { id },
