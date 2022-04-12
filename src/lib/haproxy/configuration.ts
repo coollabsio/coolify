@@ -215,7 +215,8 @@ export async function configureHAProxy(): Promise<void> {
 			plausibleAnalytics: true,
 			vscodeserver: true,
 			wordpress: true,
-			ghost: true
+			ghost: true,
+			meiliSearch: true
 		}
 	});
 

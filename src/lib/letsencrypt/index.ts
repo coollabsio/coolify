@@ -148,7 +148,8 @@ export async function generateSSLCerts(): Promise<void> {
 			plausibleAnalytics: true,
 			vscodeserver: true,
 			wordpress: true,
-			ghost: true
+			ghost: true,
+			meiliSearch: true
 		},
 		orderBy: { createdAt: 'desc' }
 	});
