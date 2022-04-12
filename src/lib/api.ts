@@ -69,7 +69,7 @@ export function del(
 export function post(
 	path: string,
 	data: Record<string, unknown>,
-	headers: Record<string, unknown>
+	headers?: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
 	return send({ method: 'POST', path, data, headers });
 }

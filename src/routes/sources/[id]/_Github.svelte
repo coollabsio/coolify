@@ -2,6 +2,7 @@
 	export let source;
 	import { page, session } from '$app/stores';
 	import { post } from '$lib/api';
+	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
 	import { toast } from '@zerodevx/svelte-toast';
 	const { id } = $page.params;
@@ -51,7 +52,8 @@
 				type: 'github',
 				name: source.name,
 				htmlUrl: source.htmlUrl.replace(/\/$/, ''),
-				apiUrl: source.apiUrl.replace(/\/$/, '')
+				apiUrl: source.apiUrl.replace(/\/$/, ''),
+				organization: source.organization
 			});
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -97,6 +99,22 @@
 					<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
 					<input name="apiUrl" id="apiUrl" required bind:value={source.apiUrl} />
 				</div>
+				<div class="grid grid-cols-2">
+					<div class="flex flex-col">
+						<label for="organization" class="pt-2 text-base font-bold text-stone-100"
+							>Organization</label
+						>
+						<Explainer
+							text="Fill it if you would like to use an organization's as your Git Source. Otherwise your user will be used."
+						/>
+					</div>
+					<input
+						name="organization"
+						id="organization"
+						placeholder="eg: coollabsio"
+						bind:value={source.organization}
+					/>
+				</div>
 			</div>
 			{#if source.apiUrl && source.htmlUrl && source.name}
 				<div class="text-center">
@@ -134,6 +152,21 @@
 				<div class="grid grid-cols-2 items-center">
 					<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
 					<input name="apiUrl" id="apiUrl" required bind:value={source.apiUrl} />
+				</div>
+				<div class="grid grid-cols-2">
+					<div class="flex flex-col">
+						<label for="organization" class="pt-2 text-base font-bold text-stone-100"
+							>Organization</label
+						>
+					</div>
+					<input
+						readonly
+						disabled
+						name="organization"
+						id="organization"
+						placeholder="eg: coollabsio"
+						bind:value={source.organization}
+					/>
 				</div>
 			</div>
 		</form>

@@ -2,7 +2,9 @@ import * as Bullmq from 'bullmq';
 import { default as ProdBullmq, QueueScheduler } from 'bullmq';
 import { dev } from '$app/env';
 import { prisma } from '$lib/database';
+
 import builder from './builder';
+import logger from './logger';
 import cleanup from './cleanup';
 import proxy from './proxy';
 import ssl from './ssl';
@@ -142,5 +144,9 @@ buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
 
 const buildLogQueueName = 'log_queue';
 const buildLogQueue = new Queue(buildLogQueueName, connectionOptions);
+const buildLogWorker = new Worker(buildLogQueueName, async (job) => await logger(job), {
+	concurrency: 1,
+	...connectionOptions
+});
 
 export { buildQueue, buildLogQueue };
