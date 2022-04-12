@@ -18,6 +18,7 @@
 		"db:seed": "prisma db seed",
 		"db:migrate": "COOLIFY_DATABASE_URL=file:../db/migration.db prisma migrate dev --skip-seed --name",
 		"release:production:all": "cross-var docker build --platform linux/amd64,linux/arm64 -t coollabsio/coolify:$npm_package_version -t coollabsio/coolify:latest --push .",
+		"release:production:amd": "cross-var docker build --platform linux/amd64 -t coollabsio/coolify:$npm_package_version -t coollabsio/coolify:latest --push .",
 		"release:staging:all": "cross-var docker build --platform linux/amd64,linux/arm64 -t coollabsio/coolify:$npm_package_version --push .",
 		"release:staging:amd": "cross-var docker build --platform linux/amd64 -t coollabsio/coolify:$npm_package_version --push .",
 		"release:haproxy": "docker build --platform linux/amd64,linux/arm64 -t coollabsio/coolify-haproxy-alpine:latest -t coollabsio/coolify-haproxy-alpine:1.1.0 -f data/haproxy.Dockerfile --push .",
