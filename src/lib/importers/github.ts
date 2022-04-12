@@ -2,11 +2,9 @@ import { asyncExecShell, saveBuildLog } from '$lib/common';
 import got from 'got';
 import jsonwebtoken from 'jsonwebtoken';
 import * as db from '$lib/database';
-import { ErrorHandler } from '$lib/database';
 
 export default async function ({
 	applicationId,
-	debug,
 	workdir,
 	githubAppId,
 	repository,
@@ -14,7 +12,16 @@ export default async function ({
 	htmlUrl,
 	branch,
 	buildId
-}): Promise<any> {
+}: {
+	applicationId: string;
+	workdir: string;
+	githubAppId: string;
+	repository: string;
+	apiUrl: string;
+	htmlUrl: string;
+	branch: string;
+	buildId: string;
+}): Promise<string> {
 	const url = htmlUrl.replace('https://', '').replace('http://', '');
 	await saveBuildLog({ line: 'GitHub importer started.', buildId, applicationId });
 	const { privateKey, appId, installationId } = await db.getUniqueGithubApp({ githubAppId });

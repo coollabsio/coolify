@@ -1,7 +1,15 @@
 import { decrypt, encrypt } from '$lib/crypto';
 import { prisma } from './common';
+import type { GithubApp } from '@prisma/client';
 
-export async function addInstallation({ gitSourceId, installation_id }) {
+// TODO: We should change installation_id to be camelCase
+export async function addInstallation({
+	gitSourceId,
+	installation_id
+}: {
+	gitSourceId: string;
+	installation_id: string;
+}): Promise<GithubApp> {
 	const source = await prisma.gitSource.findUnique({
 		where: { id: gitSourceId },
 		include: { githubApp: true }
@@ -12,8 +20,12 @@ export async function addInstallation({ gitSourceId, installation_id }) {
 	});
 }
 
-export async function getUniqueGithubApp({ githubAppId }) {
-	let body = await prisma.githubApp.findUnique({ where: { id: githubAppId } });
+export async function getUniqueGithubApp({
+	githubAppId
+}: {
+	githubAppId: string;
+}): Promise<GithubApp> {
+	const body = await prisma.githubApp.findUnique({ where: { id: githubAppId } });
 	if (body.privateKey) body.privateKey = decrypt(body.privateKey);
 	return body;
 }
@@ -26,7 +38,15 @@ export async function createGithubApp({
 	pem,
 	webhook_secret,
 	state
-}) {
+}: {
+	id: number;
+	client_id: string;
+	slug: string;
+	client_secret: string;
+	pem: string;
+	webhook_secret: string;
+	state: string;
+}): Promise<GithubApp> {
 	const encryptedClientSecret = encrypt(client_secret);
 	const encryptedWebhookSecret = encrypt(webhook_secret);
 	const encryptedPem = encrypt(pem);
