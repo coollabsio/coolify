@@ -236,9 +236,15 @@ export async function stopCoolifyProxy(
 export async function configureNetworkCoolifyProxy(engine: string): Promise<void> {
 	const host = getEngine(engine);
 	const destinations = await db.prisma.destinationDocker.findMany({ where: { engine } });
+	const { stdout: networks } = await asyncExecShell(
+		`DOCKER_HOST="${host}" docker ps -a --filter name=coolify-haproxy --format '{{json .Networks}}'`
+	);
+	const configuredNetworks = networks.replace(/"/g, '').replace('\n', '').split(',');
 	for (const destination of destinations) {
-		await asyncExecShell(
-			`DOCKER_HOST="${host}" docker network connect ${destination.network} coolify-haproxy`
-		);
+		if (!configuredNetworks.includes(destination.network)) {
+			await asyncExecShell(
+				`DOCKER_HOST="${host}" docker network connect ${destination.network} coolify-haproxy`
+			);
+		}
 	}
 }
