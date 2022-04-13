@@ -1,7 +1,7 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { ErrorHandler, stopDatabase } from '$lib/database';
-import { deleteProxy } from '$lib/haproxy';
+import { stopTcpHttpProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const del: RequestHandler = async (event) => {
@@ -12,7 +12,7 @@ export const del: RequestHandler = async (event) => {
 		const database = await db.getDatabase({ id, teamId });
 		if (database.destinationDockerId) {
 			const everStarted = await stopDatabase(database);
-			if (everStarted) await deleteProxy({ id });
+			if (everStarted) await stopTcpHttpProxy(database.destinationDocker, database.publicPort);
 		}
 		await db.removeDatabase({ id });
 		return { status: 200 };

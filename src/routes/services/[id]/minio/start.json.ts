@@ -4,9 +4,7 @@ import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
 import { startHttpProxy } from '$lib/haproxy';
-import getPort, { portNumbers } from 'get-port';
-import { getDomain } from '$lib/components/common';
-import { ErrorHandler, getServiceImage } from '$lib/database';
+import { ErrorHandler, getFreePort, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 import type { ComposeFile } from '$lib/types/composeFile';
 
@@ -28,13 +26,10 @@ export const post: RequestHandler = async (event) => {
 			serviceSecret
 		} = service;
 
-		const data = await db.prisma.setting.findFirst();
-		const { minPort, maxPort } = data;
-
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
 
-		const publicPort = await getPort({ port: portNumbers(minPort, maxPort) });
+		const publicPort = await getFreePort();
 
 		const consolePort = 9001;
 		const apiPort = 9000;

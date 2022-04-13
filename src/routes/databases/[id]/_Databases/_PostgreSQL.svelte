@@ -34,6 +34,7 @@
 			name="rootUserPassword"
 			bind:value={database.rootUserPassword}
 		/>
+		<Explainer text="Could be changed while the database is running." />
 	</div>
 	<div class="grid grid-cols-2 items-center">
 		<label for="dbUser" class="text-base font-bold text-stone-100">User</label>
