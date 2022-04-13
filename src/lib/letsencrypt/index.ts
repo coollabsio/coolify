@@ -215,7 +215,7 @@ export async function generateSSLCerts(): Promise<void> {
 					certificates.includes(ssl.domain) ||
 					certificates.includes(ssl.domain.replace('www.', ''))
 				) {
-					console.log(`Certificate for ${ssl.domain} already exists`);
+					// console.log(`Certificate for ${ssl.domain} already exists`);
 				} else {
 					// Checking DNS entry before generating certificate
 					if (ipv4 || ipv6) {
@@ -232,7 +232,7 @@ export async function generateSSLCerts(): Promise<void> {
 								(ipv4 && domains4.includes(ipv4.replace('\n', ''))) ||
 								(ipv6 && domains6.includes(ipv6.replace('\n', '')))
 							) {
-								console.log('Generating SSL for', ssl.domain, '.');
+								console.log('Generating SSL for', ssl.domain);
 								return await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
 							}
 						}
@@ -261,7 +261,7 @@ export async function generateSSLCerts(): Promise<void> {
 								(ipv4 && domains4.includes(ipv4.replace('\n', ''))) ||
 								(ipv6 && domains6.includes(ipv6.replace('\n', '')))
 							) {
-								console.log('Generating SSL for', ssl.domain, '.');
+								console.log('Generating SSL for', ssl.domain);
 								return;
 							}
 						}

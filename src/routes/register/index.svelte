@@ -105,6 +105,9 @@
 		{#if userCount === 0}
 			<div class="pt-5">
 				You are registering the first user. It will be the administrator of your Coolify instance.
+				<br />
+				It will take a while, because Coolify will configure itself, the proxy and other docker related
+				stuff.
 			</div>
 		{/if}
 	{/if}

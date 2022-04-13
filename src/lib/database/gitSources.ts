@@ -90,7 +90,7 @@ export async function addGitLabSource({
 	appSecret,
 	groupName
 }) {
-	const encrptedAppSecret = encrypt(appSecret);
+	const encryptedAppSecret = encrypt(appSecret);
 	await prisma.gitSource.update({ where: { id }, data: { type, apiUrl, htmlUrl, name } });
 	return await prisma.gitlabApp.create({
 		data: {
