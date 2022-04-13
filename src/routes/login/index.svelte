@@ -76,10 +76,6 @@
 						on:click|preventDefault={() => goto('/register')}
 						class="bg-transparent hover:bg-coolgray-300	text-white ">Register</button
 					>
-					<button
-						class="bg-transparent hover:bg-coolgray-300"
-						on:click|preventDefault={() => goto('/reset')}>Reset password</button
-					>
 				</div>
 			</form>
 		</div>
