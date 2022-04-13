@@ -29,6 +29,7 @@
 			disabled={!isRunning}
 			readonly={!isRunning}
 			placeholder="Generated automatically after start"
+			isPasswordField
 			id="rootUserPassword"
 			name="rootUserPassword"
 			bind:value={database.rootUserPassword}
