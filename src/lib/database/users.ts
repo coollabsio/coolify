@@ -46,8 +46,12 @@ export async function login({
 	if (users === 0) {
 		await prisma.setting.update({ where: { id }, data: { isRegistrationEnabled: false } });
 		// Create default network & start Coolify Proxy
-		await asyncExecShell(`docker network create --attachable coolify`);
-		await startCoolifyProxy('/var/run/docker.sock');
+		try {
+			await asyncExecShell(`docker network create --attachable coolify`);
+		} catch (error) {}
+		try {
+			await startCoolifyProxy('/var/run/docker.sock');
+		} catch (error) {}
 		uid = '0';
 	}
 
