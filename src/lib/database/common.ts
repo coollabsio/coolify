@@ -219,7 +219,6 @@ export function generateDatabaseConfiguration(database: Database & { settings: D
 		return {
 			privatePort: 5432,
 			environmentVariables: {
-				POSTGRESQL_POSTGRES_PASSWORD: rootUserPassword,
 				POSTGRESQL_PASSWORD: dbUserPassword,
 				POSTGRESQL_USERNAME: dbUser,
 				POSTGRESQL_DATABASE: defaultDatabase
