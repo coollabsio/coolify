@@ -93,11 +93,16 @@ export const getUserDetails = async (
 }> => {
 	const teamId = getTeam(event);
 	const userId = event?.locals?.session?.data?.userId || null;
-	const { permission = 'read' } = await db.prisma.permission.findFirst({
-		where: { teamId, userId },
-		select: { permission: true },
-		rejectOnNotFound: true
-	});
+	let permission = 'read';
+	if (teamId && userId) {
+		const data = await db.prisma.permission.findFirst({
+			where: { teamId, userId },
+			select: { permission: true },
+			rejectOnNotFound: true
+		});
+		if (data.permission) permission = data.permission;
+	}
+
 	const payload = {
 		teamId,
 		userId,

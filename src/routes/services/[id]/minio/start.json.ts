@@ -67,7 +67,15 @@ export const post: RequestHandler = async (event) => {
 					networks: [network],
 					volumes: [config.volume],
 					restart: 'always',
-					labels: makeLabelForServices('minio')
+					labels: makeLabelForServices('minio'),
+					deploy: {
+						restart_policy: {
+							condition: 'on-failure',
+							delay: '5s',
+							max_attempts: 3,
+							window: '120s'
+						}
+					}
 				}
 			},
 			networks: {

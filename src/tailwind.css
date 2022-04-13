@@ -50,7 +50,10 @@ textarea {
 }
 
 #svelte .listContainer {
-	@apply bg-coolgray-400 text-white scrollbar-w-2 scrollbar-thumb-coollabs scrollbar-track-coolgray-200;
+	@apply bg-coolgray-400 text-white scrollbar-w-2 scrollbar-thumb-green-500 scrollbar-track-coolgray-200;
+}
+#svelte .selectedItem {
+	@apply pl-3;
 }
 
 #svelte .item.hover {

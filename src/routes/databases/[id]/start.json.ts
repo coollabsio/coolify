@@ -45,7 +45,15 @@ export const post: RequestHandler = async (event) => {
 					volumes: [volume],
 					ulimits,
 					labels,
-					restart: 'always'
+					restart: 'always',
+					deploy: {
+						restart_policy: {
+							condition: 'on-failure',
+							delay: '5s',
+							max_attempts: 3,
+							window: '120s'
+						}
+					}
 				}
 			},
 			networks: {

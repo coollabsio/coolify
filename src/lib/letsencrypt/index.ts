@@ -6,6 +6,7 @@ import cuid from 'cuid';
 import fs from 'fs/promises';
 import getPort, { portNumbers } from 'get-port';
 import { supportedServiceTypesAndVersions } from '$lib/components/common';
+import { promises as dns } from 'dns';
 
 export async function letsEncrypt(domain: string, id?: string, isCoolify = false): Promise<void> {
 	try {
@@ -148,7 +149,8 @@ export async function generateSSLCerts(): Promise<void> {
 			plausibleAnalytics: true,
 			vscodeserver: true,
 			wordpress: true,
-			ghost: true
+			ghost: true,
+			meiliSearch: true
 		},
 		orderBy: { createdAt: 'desc' }
 	});
@@ -198,6 +200,15 @@ export async function generateSSLCerts(): Promise<void> {
 				file.endsWith('.pem') && certificates.push(file.replace(/\.pem$/, ''));
 			}
 		}
+		const resolver = new dns.Resolver({ timeout: 2000 });
+		resolver.setServers(['8.8.8.8', '1.1.1.1']);
+		let ipv4, ipv6;
+		try {
+			ipv4 = await (await asyncExecShell(`curl -4s https://ifconfig.io`)).stdout;
+		} catch (error) {}
+		try {
+			ipv6 = await (await asyncExecShell(`curl -6s https://ifconfig.io`)).stdout;
+		} catch (error) {}
 		for (const ssl of ssls) {
 			if (!dev) {
 				if (
@@ -206,8 +217,27 @@ export async function generateSSLCerts(): Promise<void> {
 				) {
 					console.log(`Certificate for ${ssl.domain} already exists`);
 				} else {
-					console.log('Generating SSL for', ssl.domain);
-					await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
+					// Checking DNS entry before generating certificate
+					if (ipv4 || ipv6) {
+						let domains4 = [];
+						let domains6 = [];
+						try {
+							domains4 = await resolver.resolve4(ssl.domain);
+						} catch (error) {}
+						try {
+							domains6 = await resolver.resolve6(ssl.domain);
+						} catch (error) {}
+						if (domains4.length > 0 || domains6.length > 0) {
+							if (
+								(ipv4 && domains4.includes(ipv4.replace('\n', ''))) ||
+								(ipv6 && domains6.includes(ipv6.replace('\n', '')))
+							) {
+								console.log('Generating SSL for', ssl.domain, '.');
+								return await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
+							}
+						}
+					}
+					console.log('DNS settings is incorrect for', ssl.domain, 'skipping.');
 				}
 			} else {
 				if (
@@ -216,7 +246,27 @@ export async function generateSSLCerts(): Promise<void> {
 				) {
 					console.log(`Certificate for ${ssl.domain} already exists`);
 				} else {
-					console.log('Generating SSL for', ssl.domain);
+					// Checking DNS entry before generating certificate
+					if (ipv4 || ipv6) {
+						let domains4 = [];
+						let domains6 = [];
+						try {
+							domains4 = await resolver.resolve4(ssl.domain);
+						} catch (error) {}
+						try {
+							domains6 = await resolver.resolve6(ssl.domain);
+						} catch (error) {}
+						if (domains4.length > 0 || domains6.length > 0) {
+							if (
+								(ipv4 && domains4.includes(ipv4.replace('\n', ''))) ||
+								(ipv6 && domains6.includes(ipv6.replace('\n', '')))
+							) {
+								console.log('Generating SSL for', ssl.domain, '.');
+								return;
+							}
+						}
+					}
+					console.log('DNS settings is incorrect for', ssl.domain, 'skipping.');
 				}
 			}
 		}

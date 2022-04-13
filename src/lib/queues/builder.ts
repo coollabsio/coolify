@@ -285,7 +285,15 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 						networks: [docker.network],
 						labels,
 						depends_on: [],
-						restart: 'always'
+						restart: 'always',
+						deploy: {
+							restart_policy: {
+								condition: 'on-failure',
+								delay: '5s',
+								max_attempts: 3,
+								window: '120s'
+							}
+						}
 					}
 				},
 				networks: {

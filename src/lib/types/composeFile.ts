@@ -23,6 +23,14 @@ export type ComposeFileService = {
 		dockerfile: string;
 		args?: Record<string, unknown>;
 	};
+	deploy?: {
+		restart_policy?: {
+			condition?: string;
+			delay?: string;
+			max_attempts?: number;
+			window?: string;
+		};
+	};
 };
 
 export type ComposerFileVersion =
