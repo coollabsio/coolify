@@ -21,11 +21,9 @@ services:
       - coolify-infra
     depends_on: ['redis']
   redis:
-    image: bitnami/redis:6.2
+    image: redis:6.2
     restart: always
     container_name: coolify-redis
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes
     networks:
       - coolify-infra
 
