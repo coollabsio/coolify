@@ -11,7 +11,9 @@
 	let loading = false;
 
 	async function handleSubmit() {
+		if (loading) return;
 		try {
+			loading = true;
 			await post('/new/destination/check.json', { network: payload.network });
 			const { id } = await post('/new/destination/docker.json', {
 				...payload

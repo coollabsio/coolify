@@ -36,18 +36,8 @@
 	if (accounts.length === 0) {
 		accounts.push(account);
 	}
-	export let teams;
-
-	const ownTeams = teams.filter((team) => {
-		if (team.team.id === $session.teamId) {
-			return team;
-		}
-	});
-	const otherTeams = teams.filter((team) => {
-		if (team.team.id !== $session.teamId) {
-			return team;
-		}
-	});
+	export let ownTeams;
+	export let allTeams;
 
 	async function resetPassword(id) {
 		const sure = window.confirm('Are you sure you want to reset the password?');
@@ -167,49 +157,51 @@
 	<div class="title font-bold">Teams</div>
 	<div class="flex items-center justify-center pt-10">
 		<div class="flex flex-col">
-			<div class="flex flex-col flex-wrap justify-center px-2 pb-10 md:flex-row">
+			<div class="flex flex-row flex-wrap justify-center px-2 pb-10 md:flex-row">
 				{#each ownTeams as team}
-					<a href="/iam/team/{team.teamId}" class="w-96 p-2 no-underline">
+					<a href="/iam/team/{team.id}" class="w-96 p-2 no-underline">
 						<div
 							class="box-selection relative"
-							class:hover:bg-cyan-600={team.team?.id !== '0'}
-							class:hover:bg-red-500={team.team?.id === '0'}
+							class:hover:bg-cyan-600={team.id !== '0'}
+							class:hover:bg-red-500={team.id === '0'}
 						>
 							<div class="truncate text-center text-xl font-bold">
-								{team.team.name}
+								{team.name}
 							</div>
 							<div class="truncate text-center font-bold">
-								{team.team?.id === '0' ? 'root team' : ''}
+								{team.id === '0' ? 'root team' : ''}
 							</div>
 
-							<div class="mt-1 text-center">{team.team._count.users} member(s)</div>
+							<div class:mt-6={team.id !== '0'} class="mt-1 text-center">
+								{team.permissions?.length} member(s)
+							</div>
 						</div>
 					</a>
 				{/each}
 			</div>
-			{#if $session.teamId === '0' && otherTeams.length > 0}
+			{#if $session.teamId === '0' && allTeams.length > 0}
 				<div class="pb-5 pt-10 text-xl font-bold">Other Teams</div>
-			{/if}
-			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
-				{#each otherTeams as team}
-					<a href="/iam/team/{team.teamId}" class="w-96 p-2 no-underline">
-						<div
-							class="box-selection relative"
-							class:hover:bg-cyan-600={team.team?.id !== '0'}
-							class:hover:bg-red-500={team.team?.id === '0'}
-						>
-							<div class="truncate text-center text-xl font-bold">
-								{team.team.name}
-							</div>
-							<div class="truncate text-center font-bold">
-								{team.team?.id === '0' ? 'root team' : ''}
-							</div>
+				<div class="flex flex-row flex-wrap justify-center px-2 md:flex-row">
+					{#each allTeams as team}
+						<a href="/iam/team/{team.id}" class="w-96 p-2 no-underline">
+							<div
+								class="box-selection relative"
+								class:hover:bg-cyan-600={team.id !== '0'}
+								class:hover:bg-red-500={team.id === '0'}
+							>
+								<div class="truncate text-center text-xl font-bold">
+									{team.name}
+								</div>
+								<div class="truncate text-center font-bold">
+									{team.id === '0' ? 'root team' : ''}
+								</div>
 
-							<div class="mt-1 text-center">{team.team._count.users} member(s)</div>
-						</div>
-					</a>
-				{/each}
-			</div>
+								<div class="mt-1 text-center">{team.permissions?.length} member(s)</div>
+							</div>
+						</a>
+					{/each}
+				</div>
+			{/if}
 		</div>
 	</div>
 </div>

@@ -127,10 +127,10 @@ export async function startTcpProxy(
 
 	const containerName = `haproxy-for-${publicPort}`;
 	const found = await checkContainer(engine, containerName);
-	const foundDB = await checkContainer(engine, id);
+	const foundDependentContainer = await checkContainer(engine, id);
 
 	try {
-		if (foundDB && !found) {
+		if (foundDependentContainer && !found) {
 			const { stdout: Config } = await asyncExecShell(
 				`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
 			);
@@ -139,6 +139,11 @@ export async function startTcpProxy(
 				`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} ${
 					volume ? `-v ${volume}` : ''
 				} -d coollabsio/${defaultProxyImageTcp}`
+			);
+		}
+		if (!foundDependentContainer && found) {
+			return await asyncExecShell(
+				`DOCKER_HOST=${host} docker stop -t 0 ${containerName} && docker rm ${containerName}`
 			);
 		}
 	} catch (error) {
@@ -157,16 +162,21 @@ export async function startHttpProxy(
 
 	const containerName = `haproxy-for-${publicPort}`;
 	const found = await checkContainer(engine, containerName);
-	const foundDB = await checkContainer(engine, id);
+	const foundDependentContainer = await checkContainer(engine, id);
 
 	try {
-		if (foundDB && !found) {
+		if (foundDependentContainer && !found) {
 			const { stdout: Config } = await asyncExecShell(
 				`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
 			);
 			const ip = JSON.parse(Config)[0].Gateway;
 			return await asyncExecShell(
 				`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} -d coollabsio/${defaultProxyImageHttp}`
+			);
+		}
+		if (!foundDependentContainer && found) {
+			return await asyncExecShell(
+				`DOCKER_HOST=${host} docker stop -t 0 ${containerName} && docker rm ${containerName}`
 			);
 		}
 	} catch (error) {

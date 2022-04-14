@@ -9,6 +9,7 @@ import { default as ProdPrisma } from '@prisma/client';
 import type { Database, DatabaseSettings } from '@prisma/client';
 import generator from 'generate-password';
 import forge from 'node-forge';
+import getPort, { portNumbers } from 'get-port';
 
 export function generatePassword(length = 24): string {
 	return generator.generate({
@@ -250,4 +251,30 @@ export function generateDatabaseConfiguration(database: Database & { settings: D
 			ulimits: {}
 		};
 	}
+}
+
+export async function getFreePort() {
+	const data = await prisma.setting.findFirst();
+	const { minPort, maxPort } = data;
+
+	const dbUsed = await (
+		await prisma.database.findMany({
+			where: { publicPort: { not: null } },
+			select: { publicPort: true }
+		})
+	).map((a) => a.publicPort);
+	const wpFtpUsed = await (
+		await prisma.wordpress.findMany({
+			where: { ftpPublicPort: { not: null } },
+			select: { ftpPublicPort: true }
+		})
+	).map((a) => a.ftpPublicPort);
+	const wpUsed = await (
+		await prisma.wordpress.findMany({
+			where: { mysqlPublicPort: { not: null } },
+			select: { mysqlPublicPort: true }
+		})
+	).map((a) => a.mysqlPublicPort);
+	const usedPorts = [...dbUsed, ...wpFtpUsed, ...wpUsed];
+	return await getPort({ port: portNumbers(minPort, maxPort), exclude: usedPorts });
 }
