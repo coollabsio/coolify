@@ -2,8 +2,9 @@ import { asyncExecShell, getEngine, version } from '$lib/common';
 import { prisma } from '$lib/database';
 export default async function (): Promise<void> {
 	const destinationDockers = await prisma.destinationDocker.findMany();
-	for (const destinationDocker of destinationDockers) {
-		const host = getEngine(destinationDocker.engine);
+	const engines = [...new Set(destinationDockers.map(({ engine }) => engine))];
+	for (const engine of engines) {
+		const host = getEngine(engine);
 		// Cleanup old coolify images
 		try {
 			let { stdout: images } = await asyncExecShell(
@@ -28,7 +29,7 @@ export default async function (): Promise<void> {
 		}
 		// Cleanup old images older than a day
 		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker image prune --filter "until=24h" -a -f`);
+			await asyncExecShell(`DOCKER_HOST=${host} docker image prune --filter "until=72h" -a -f`);
 		} catch (error) {
 			//console.log(error);
 		}
