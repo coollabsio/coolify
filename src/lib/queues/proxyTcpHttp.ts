@@ -1,11 +1,18 @@
 import { ErrorHandler, generateDatabaseConfiguration, prisma } from '$lib/database';
-import { startHttpProxy, startTcpProxy } from '$lib/haproxy';
+import { startCoolifyProxy, startHttpProxy, startTcpProxy } from '$lib/haproxy';
 
 export default async function (): Promise<void | {
 	status: number;
 	body: { message: string; error: string };
 }> {
 	try {
+		// Coolify Proxy
+		const localDocker = await prisma.destinationDocker.findFirst({
+			where: { engine: '/var/run/docker.sock' }
+		});
+		if (localDocker && localDocker.isCoolifyProxyUsed) {
+			await startCoolifyProxy('/var/run/docker.sock');
+		}
 		// TCP Proxies
 		const databasesWithPublicPort = await prisma.database.findMany({
 			where: { publicPort: { not: null } },
