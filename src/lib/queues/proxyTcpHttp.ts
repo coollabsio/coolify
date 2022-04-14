@@ -1,11 +1,12 @@
 import { ErrorHandler, generateDatabaseConfiguration, prisma } from '$lib/database';
-import { checkContainer, startTcpProxy } from '$lib/haproxy';
+import { startHttpProxy, startTcpProxy } from '$lib/haproxy';
 
 export default async function (): Promise<void | {
 	status: number;
 	body: { message: string; error: string };
 }> {
 	try {
+		// TCP Proxies
 		const databasesWithPublicPort = await prisma.database.findMany({
 			where: { publicPort: { not: null } },
 			include: { settings: true, destinationDocker: true }
@@ -26,6 +27,19 @@ export default async function (): Promise<void | {
 			const { destinationDockerId, destinationDocker } = service;
 			if (destinationDockerId) {
 				await startTcpProxy(destinationDocker, `${id}-ftp`, ftpPublicPort, 22);
+			}
+		}
+
+		// HTTP Proxies
+		const minioInstances = await prisma.minio.findMany({
+			where: { publicPort: { not: null } },
+			include: { service: { include: { destinationDocker: true } } }
+		});
+		for (const minio of minioInstances) {
+			const { service, publicPort } = minio;
+			const { destinationDockerId, destinationDocker, id } = service;
+			if (destinationDockerId) {
+				await startHttpProxy(destinationDocker, id, publicPort, 9000);
 			}
 		}
 	} catch (error) {

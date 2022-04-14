@@ -127,10 +127,10 @@ export async function startTcpProxy(
 
 	const containerName = `haproxy-for-${publicPort}`;
 	const found = await checkContainer(engine, containerName);
-	const foundDB = await checkContainer(engine, id);
+	const foundDependentContainer = await checkContainer(engine, id);
 
 	try {
-		if (foundDB && !found) {
+		if (foundDependentContainer && !found) {
 			const { stdout: Config } = await asyncExecShell(
 				`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
 			);
@@ -157,10 +157,10 @@ export async function startHttpProxy(
 
 	const containerName = `haproxy-for-${publicPort}`;
 	const found = await checkContainer(engine, containerName);
-	const foundDB = await checkContainer(engine, id);
+	const foundDependentContainer = await checkContainer(engine, id);
 
 	try {
-		if (foundDB && !found) {
+		if (foundDependentContainer && !found) {
 			const { stdout: Config } = await asyncExecShell(
 				`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
 			);
