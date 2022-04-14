@@ -30,8 +30,8 @@ export default async function (): Promise<void | {
 			include: { service: { include: { destinationDocker: true } } }
 		});
 		for (const ftp of wordpressWithFtp) {
-			const { service, ftpPublicPort, id } = ftp;
-			const { destinationDockerId, destinationDocker } = service;
+			const { service, ftpPublicPort } = ftp;
+			const { destinationDockerId, destinationDocker, id } = service;
 			if (destinationDockerId) {
 				await startTcpProxy(destinationDocker, `${id}-ftp`, ftpPublicPort, 22);
 			}
