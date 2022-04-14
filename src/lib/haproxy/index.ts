@@ -141,6 +141,11 @@ export async function startTcpProxy(
 				} -d coollabsio/${defaultProxyImageTcp}`
 			);
 		}
+		if (!foundDependentContainer && found) {
+			return await asyncExecShell(
+				`DOCKER_HOST=${host} docker stop -t 0 ${containerName} && docker rm ${containerName}`
+			);
+		}
 	} catch (error) {
 		return error;
 	}
@@ -167,6 +172,11 @@ export async function startHttpProxy(
 			const ip = JSON.parse(Config)[0].Gateway;
 			return await asyncExecShell(
 				`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} -d coollabsio/${defaultProxyImageHttp}`
+			);
+		}
+		if (!foundDependentContainer && found) {
+			return await asyncExecShell(
+				`DOCKER_HOST=${host} docker stop -t 0 ${containerName} && docker rm ${containerName}`
 			);
 		}
 	} catch (error) {
