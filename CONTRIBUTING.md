@@ -42,3 +42,76 @@ If the schema is finalized, you need to create a migration file with `pnpm db:mi
 ## Tricky parts
 
 - BullMQ, the queue system Coolify is using, cannot be hot reloaded. So if you change anything in the files related to it, you need to restart the development process. I'm actively looking of a different queue/scheduler library. I'm open for discussion!
+
+# Adding new services
+
+You can add any open-source and self-hostable softwares (service / application) to Coolify, if the following statements are true:
+
+- Self-hostable (obviously)
+- Open-source
+- Maintained (do not want to host softwares with full of bugs)
+
+## Example MinIO
+
+### Backend
+
+(Lots of the code are duplicated, I know.)
+
+I use MinIO as an example, as that is the simplest.
+
+You need to add a new folder to [src/routes/services/[id]/](src/routes/services/[id]/) with the low-capital name of the service.
+
+1. A POST endpoint that updates Coolify's database about the service.
+
+   Basic services only requires to update the URL(fqdn) and the name of the service.
+
+2. A start endpoint that setups the docker-compose file (for Local Docker Engines) and starts the service.
+
+   - To start a service, you need to know Coolify supported images and tags of the service. For that you need to update `supportedServiceTypesAndVersions` function at [src/lib/components/common.ts](src/lib/components/common.ts).
+
+     Example JSON:
+
+     ```json
+     {
+       // Name used to identify the service in Coolify
+       name: 'minio',
+       // Fancier name to show to the user
+       fancyName: 'MinIO',
+       // Docker base image for the service
+       baseImage: 'minio/minio',
+       // Usable tags
+       versions: ['latest'],
+       // Which tag is the recommended
+       recommendedVersion: 'latest',
+       // Application's default port, MinIO listens on 9001 (and 9000, more details later on)
+       ports: {
+         main: 9001
+       }
+     },
+     ```
+
+   - Then you need to define a compose file as `const composeFile: ComposeFile` found in [src/routes/services/[id]/minio/start.json.ts](src/routes/services/[id]/minio/start.json.ts)
+
+     IMPORTANT: It should contain `all the default environment variables` that is required for the service to function properly and `all the volumes to persist data` in restarts.
+
+   - You could also define a `HTTP` or `TCP` proxy for every other ports that should be proxied to your server. (See `startHttpProxy` and `startTcpProxy` functions)
+
+3. A stop endpoints that stops the service.
+
+   It needs stop all the services by their container name and all proxies started.
+
+4. You need to add the automatically generated variables (passwords, users, etc.) for the new service you are adding at [src/lib/database/services.ts](src/lib/database/services.ts) `configureServiceType` function.
+
+### Frontend
+
+1. Need to add a custom logo at [src/lib/components/svg/services/](src/lib/components/svg/services/) as a svelte component.
+
+   SVG is recommended, but you can use PNG as well. It should have the `isAbsolute` variable with the right CSS classes, mostly for sizing and positioning.
+
+2. Need to include it the logo at [src/routes/services/index.svelte](src/routes/services/index.svelte) with `isAbsolute` and [src/lib/components/ServiceLinks.svelte](src/lib/components/ServiceLinks.svelte) with a link to the docs/main site of the service.
+
+3. By default the URL and the name frontend forms are included in [src/routes/services/[id]/\_Services/\_Services.svelte](src/routes/services/[id]/_Services/_Services.svelte).
+
+   If you need to show more details on the frontend, like users/passwords, you need to add Svelte component to [src/routes/services/[id]/\_Services](src/routes/services/[id]/_Services) with an underscore. For examples, see other files in that folder.
+
+   You also need to add the new inputs to the `index.json.ts` file of the specific service, like for MinIO here: [src/routes/services/[id]/minio/index.json.ts](src/routes/services/[id]/minio/index.json.ts)
