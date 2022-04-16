@@ -94,13 +94,13 @@ You need to add a new folder to [src/routes/services/[id]](src/routes/services/[
 
      **IMPORTANT:** It should contain `all the default environment variables` that are required for the service to function correctly and `all the volumes to persist data` in restarts.
 
-   - You could also define an `HTTP` or `TCP` proxy for every other port that should be proxied to your server. (See `startHttpProxy` and `startTcpProxy` functions)
+   - You could also define an `HTTP` or `TCP` proxy for every other port that should be proxied to your server. (See `startHttpProxy` and `startTcpProxy` functions in [src/lib/haproxy/index.ts](src/lib/haproxy/index.ts))
 
 3. `stop.json.ts` A stop endpoint that stops the service.
 
-   It needs to stop all the services by their container name, and all proxies started.
+   It needs to stop all the services by their container name and proxies (if applicable).
 
-4. You need to add the automatically generated variables (passwords, users, etc.) for the new service you are adding at [src/lib/database/services.ts](src/lib/database/services.ts) `configureServiceType` function.
+4. You need to add the automatically generated variables (passwords, users, etc.) for the new service at [src/lib/database/services.ts](src/lib/database/services.ts), `configureServiceType` function.
 
 ## Frontend
 
