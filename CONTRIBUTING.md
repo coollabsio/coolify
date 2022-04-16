@@ -69,7 +69,7 @@ You need to add a new folder to [src/routes/services/[id]](src/routes/services/[
 
      Example JSON:
 
-     ```json
+     ```js
      {
        // Name used to identify the service in Coolify
        name: 'minio',
