@@ -6,7 +6,7 @@ First of all, thank you for considering contributing to my project! It means a l
 
 - Node.js / Javascript
 - Svelte / SvelteKit
-- Prisma.io
+- Prisma.io / SQL
 
 # Recommended Pull Request Guideline
 
@@ -17,6 +17,8 @@ First of all, thank you for considering contributing to my project! It means a l
 - Create a pull request: https://github.com/coollabsio/compare
 - Write a proper description
 - Open the pull request to review
+
+---
 
 # How to start after you set up your local fork?
 
@@ -45,7 +47,7 @@ If the schema is finalized, you need to create a migration file with `pnpm db:mi
 
 ---
 
-# Adding new services
+# How to add new services
 
 You can add any open-source and self-hostable software (service/application) to Coolify if the following statements are true:
 
@@ -90,7 +92,7 @@ You need to add a new folder to [src/routes/services/[id]](src/routes/services/[
 
    - You need to define a compose file as `const composeFile: ComposeFile` found in [src/routes/services/[id]/minio/start.json.ts](src/routes/services/[id]/minio/start.json.ts)
 
-     IMPORTANT: It should contain `all the default environment variables` that are required for the service to function correctly and `all the volumes to persist data` in restarts.
+     **IMPORTANT:** It should contain `all the default environment variables` that are required for the service to function correctly and `all the volumes to persist data` in restarts.
 
    - You could also define an `HTTP` or `TCP` proxy for every other port that should be proxied to your server. (See `startHttpProxy` and `startTcpProxy` functions)
 
