@@ -43,6 +43,8 @@ If the schema is finalized, you need to create a migration file with `pnpm db:mi
 
 - BullMQ, the queue system Coolify is using, cannot be hot reloaded. So if you change anything in the files related to it, you need to restart the development process. I'm actively looking of a different queue/scheduler library. I'm open for discussion!
 
+---
+
 # Adding new services
 
 You can add any open-source and self-hostable softwares (service / application) to Coolify, if the following statements are true:
@@ -51,21 +53,17 @@ You can add any open-source and self-hostable softwares (service / application) 
 - Open-source
 - Maintained (do not want to host softwares with full of bugs)
 
-## Example MinIO
+## Backend
 
-### Backend
+I use MinIO as an example.
 
-(Lots of the code are duplicated, I know.)
+You need to add a new folder to [src/routes/services/[id]](src/routes/services/[id]) with the low-capital name of the service. It should have three files with the following properties:
 
-I use MinIO as an example, as that is the simplest.
-
-You need to add a new folder to [src/routes/services/[id]/](src/routes/services/[id]/) with the low-capital name of the service.
-
-1. A POST endpoint that updates Coolify's database about the service.
+1. `index.json.ts`: A POST endpoint that updates Coolify's database about the service.
 
    Basic services only requires to update the URL(fqdn) and the name of the service.
 
-2. A start endpoint that setups the docker-compose file (for Local Docker Engines) and starts the service.
+2. `start.json.ts`: A start endpoint that setups the docker-compose file (for Local Docker Engines) and starts the service.
 
    - To start a service, you need to know Coolify supported images and tags of the service. For that you need to update `supportedServiceTypesAndVersions` function at [src/lib/components/common.ts](src/lib/components/common.ts).
 
@@ -96,13 +94,13 @@ You need to add a new folder to [src/routes/services/[id]/](src/routes/services/
 
    - You could also define a `HTTP` or `TCP` proxy for every other ports that should be proxied to your server. (See `startHttpProxy` and `startTcpProxy` functions)
 
-3. A stop endpoints that stops the service.
+3. `stop.json.ts` A stop endpoints that stops the service.
 
    It needs stop all the services by their container name and all proxies started.
 
 4. You need to add the automatically generated variables (passwords, users, etc.) for the new service you are adding at [src/lib/database/services.ts](src/lib/database/services.ts) `configureServiceType` function.
 
-### Frontend
+## Frontend
 
 1. Need to add a custom logo at [src/lib/components/svg/services/](src/lib/components/svg/services/) as a svelte component.
 
