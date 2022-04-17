@@ -113,7 +113,7 @@ export const post: RequestHandler = async (event) => {
 					services: {
 						[`${id}-ftp`]: {
 							image: `atmoz/sftp:alpine`,
-							command: `'${ftpUser}:${password.replace('\n', '').replace(/\$/g, '$$$')}:e:1001'`,
+							command: `'${ftpUser}:${password.replace('\n', '').replace(/\$/g, '$$$')}:e:33'`,
 							extra_hosts: ['host.docker.internal:host-gateway'],
 							container_name: `${id}-ftp`,
 							volumes,
