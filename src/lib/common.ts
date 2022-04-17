@@ -61,14 +61,12 @@ export const saveBuildLog = async ({
 	buildId: string;
 	applicationId: string;
 }): Promise<Job> => {
-	if (line) {
-		if (line.includes('ghs_')) {
-			const regex = /ghs_.*@/g;
-			line = line.replace(regex, '<SENSITIVE_DATA_DELETED>@');
-		}
-		const addTimestamp = `${generateTimestamp()} ${line}`;
-		return await buildLogQueue.add(buildId, { buildId, line: addTimestamp, applicationId });
+	if (line && typeof line === 'string' && line.includes('ghs_')) {
+		const regex = /ghs_.*@/g;
+		line = line.replace(regex, '<SENSITIVE_DATA_DELETED>@');
 	}
+	const addTimestamp = `${generateTimestamp()} ${line}`;
+	return await buildLogQueue.add(buildId, { buildId, line: addTimestamp, applicationId });
 };
 
 export const getTeam = (event: RequestEvent): string | null => {
