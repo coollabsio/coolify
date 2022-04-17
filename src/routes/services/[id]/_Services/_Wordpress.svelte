@@ -66,7 +66,7 @@
 		disabled={isRunning}
 		readonly={isRunning}
 		class:resize-none={isRunning}
-		rows={isRunning ? 1 : 5}
+		rows="5"
 		name="extraConfig"
 		id="extraConfig"
 		placeholder={!isRunning
