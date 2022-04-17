@@ -12,17 +12,40 @@ export const post: RequestHandler = async (event) => {
 
 	try {
 		const service = await db.getService({ id, teamId });
-		const { destinationDockerId, destinationDocker, fqdn } = service;
+		const {
+			destinationDockerId,
+			destinationDocker,
+			fqdn,
+			wordpress: { ftpEnabled }
+		} = service;
 		if (destinationDockerId) {
 			const engine = destinationDocker.engine;
 			try {
-				let found = await checkContainer(engine, id);
+				const found = await checkContainer(engine, id);
 				if (found) {
 					await removeDestinationDocker({ id, engine });
 				}
-				found = await checkContainer(engine, `${id}-mysql`);
+			} catch (error) {
+				console.error(error);
+			}
+			try {
+				const found = await checkContainer(engine, `${id}-mysql`);
 				if (found) {
 					await removeDestinationDocker({ id: `${id}-mysql`, engine });
+				}
+			} catch (error) {
+				console.error(error);
+			}
+			try {
+				if (ftpEnabled) {
+					const found = await checkContainer(engine, `${id}-ftp`);
+					if (found) {
+						await removeDestinationDocker({ id: `${id}-ftp`, engine });
+					}
+					await db.prisma.wordpress.update({
+						where: { serviceId: id },
+						data: { ftpEnabled: false }
+					});
 				}
 			} catch (error) {
 				console.error(error);
