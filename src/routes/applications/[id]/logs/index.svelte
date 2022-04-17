@@ -92,14 +92,15 @@
 		logs = allLogs.slice(currentPage * 100 - 100, currentPage * 100);
 	}
 	async function loadNewerLogs() {
+		currentPage -= 1;
 		if (currentPage !== 1) {
 			clearInterval(loadLogsInterval);
 			endOfLogs = false;
 			loadLogsInterval = null;
-			currentPage -= 1;
 			logs = allLogs.slice(currentPage * 100 - 100, currentPage * 100);
 		} else {
 			startOfLogs = true;
+			loadLogs();
 			loadLogsInterval = setInterval(() => {
 				loadLogs();
 			}, 1000);
