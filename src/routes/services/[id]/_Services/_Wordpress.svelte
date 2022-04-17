@@ -62,6 +62,7 @@
 <div class="grid grid-cols-2 items-center px-10">
 	<label for="extraConfig">Extra Config</label>
 	<textarea
+		bind:value={service.wordpress.extraConfig}
 		disabled={isRunning}
 		readonly={isRunning}
 		class:resize-none={isRunning}
@@ -74,8 +75,8 @@
 define('WP_ALLOW_MULTISITE', true);
 define('MULTISITE', true);
 define('SUBDOMAIN_INSTALL', false);`
-			: 'N/A'}>{service.wordpress.extraConfig}</textarea
-	>
+			: 'N/A'}
+	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
 	<Setting
