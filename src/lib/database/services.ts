@@ -27,25 +27,35 @@ export async function newService({
 
 export async function getService({ id, teamId }: { id: string; teamId: string }): Promise<Service> {
 	let body;
-	const include = {
-		destinationDocker: true,
-		plausibleAnalytics: true,
-		minio: true,
-		vscodeserver: true,
-		wordpress: true,
-		ghost: true,
-		serviceSecret: true,
-		meiliSearch: true
-	};
 	if (teamId === '0') {
 		body = await prisma.service.findFirst({
 			where: { id },
-			include
+			include: {
+				destinationDocker: true,
+				plausibleAnalytics: true,
+				minio: true,
+				vscodeserver: true,
+				wordpress: true,
+				ghost: true,
+				serviceSecret: true,
+				meiliSearch: true,
+				persistentStorage: true
+			}
 		});
 	} else {
 		body = await prisma.service.findFirst({
 			where: { id, teams: { some: { id: teamId } } },
-			include
+			include: {
+				destinationDocker: true,
+				plausibleAnalytics: true,
+				minio: true,
+				vscodeserver: true,
+				wordpress: true,
+				ghost: true,
+				serviceSecret: true,
+				meiliSearch: true,
+				persistentStorage: true
+			}
 		});
 	}
 
@@ -362,6 +372,7 @@ export async function updateGhostService({
 }
 
 export async function removeService({ id }: { id: string }): Promise<void> {
+	await prisma.servicePersistentStorage.deleteMany({ where: { serviceId: id } });
 	await prisma.meiliSearch.deleteMany({ where: { serviceId: id } });
 	await prisma.ghost.deleteMany({ where: { serviceId: id } });
 	await prisma.plausibleAnalytics.deleteMany({ where: { serviceId: id } });

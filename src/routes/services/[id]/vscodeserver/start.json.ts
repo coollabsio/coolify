@@ -21,6 +21,7 @@ export const post: RequestHandler = async (event) => {
 			destinationDockerId,
 			destinationDocker,
 			serviceSecret,
+			persistentStorage,
 			vscodeserver: { password }
 		} = service;
 
@@ -42,6 +43,28 @@ export const post: RequestHandler = async (event) => {
 				config.environmentVariables[secret.name] = secret.value;
 			});
 		}
+
+		const volumes =
+			persistentStorage?.map((storage) => {
+				return `${id}${storage.path.replace(/\//gi, '-')}:${storage.path}`;
+			}) || [];
+
+		const composeVolumes = volumes.map((volume) => {
+			return {
+				[`${volume.split(':')[0]}`]: {
+					name: volume.split(':')[0]
+				}
+			};
+		});
+		const volumeMounts = Object.assign(
+			{},
+			{
+				[config.volume.split(':')[0]]: {
+					name: config.volume.split(':')[0]
+				}
+			},
+			...composeVolumes
+		);
 		const composeFile: ComposeFile = {
 			version: '3.8',
 			services: {
@@ -50,7 +73,7 @@ export const post: RequestHandler = async (event) => {
 					image: config.image,
 					environment: config.environmentVariables,
 					networks: [network],
-					volumes: [config.volume],
+					volumes: [config.volume, ...volumes],
 					restart: 'always',
 					labels: makeLabelForServices('vscodeServer'),
 					deploy: {
@@ -68,17 +91,21 @@ export const post: RequestHandler = async (event) => {
 					external: true
 				}
 			},
-			volumes: {
-				[config.volume.split(':')[0]]: {
-					name: config.volume.split(':')[0]
-				}
-			}
+			volumes: volumeMounts
 		};
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
 		await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
 		await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+
+		const changePermissionOn = persistentStorage.map((p) => p.path);
+
+		await asyncExecShell(
+			`DOCKER_HOST=${host} docker exec -u root ${id} chown -R 1000:1000 ${changePermissionOn.join(
+				' '
+			)}`
+		);
 		return {
 			status: 200
 		};
