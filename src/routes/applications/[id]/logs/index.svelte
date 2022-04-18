@@ -33,7 +33,6 @@
 	let currentPage = 1;
 	let endOfLogs = false;
 	let startOfLogs = true;
-	let followingBuild;
 	let followingInterval;
 	let logsEl;
 
@@ -67,21 +66,10 @@
 			return errorNotification(error);
 		}
 	}
-
-	function followBuild() {
-		followingBuild = !followingBuild;
-		if (followingBuild) {
-			followingInterval = setInterval(() => {
-				logsEl.scrollTop = logsEl.scrollHeight;
-				window.scrollTo(0, document.body.scrollHeight);
-			}, 100);
-		} else {
-			window.clearInterval(followingInterval);
-		}
-	}
 	async function loadOlderLogs() {
 		clearInterval(loadLogsInterval);
 		loadLogsInterval = null;
+		logsEl.scrollTop = 0;
 		if (logs.length < 100) {
 			endOfLogs = true;
 			return;
@@ -93,6 +81,7 @@
 	}
 	async function loadNewerLogs() {
 		currentPage -= 1;
+		logsEl.scrollTop = 0;
 		if (currentPage !== 1) {
 			clearInterval(loadLogsInterval);
 			endOfLogs = false;
@@ -236,29 +225,6 @@
 						/>
 					</svg>
 				</button>
-				<!-- <button
-					on:click={followBuild}
-					class="bg-transparent"
-					data-tooltip="Follow logs"
-					class:text-green-500={followingBuild}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<circle cx="12" cy="12" r="9" />
-						<line x1="8" y1="12" x2="12" y2="16" />
-						<line x1="12" y1="8" x2="12" y2="16" />
-						<line x1="16" y1="12" x2="12" y2="16" />
-					</svg>
-				</button> -->
 			</div>
 			<div
 				class="font-mono w-full leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
