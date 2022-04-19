@@ -91,7 +91,8 @@ export const setDefaultConfiguration = async (data) => {
 		startCommand,
 		buildCommand,
 		publishDirectory,
-		baseDirectory
+		baseDirectory,
+		dockerFileLocation
 	} = data;
 	const template = scanningTemplates[buildPack];
 	if (!port) {
@@ -110,6 +111,12 @@ export const setDefaultConfiguration = async (data) => {
 		if (!baseDirectory.startsWith('/')) baseDirectory = `/${baseDirectory}`;
 		if (!baseDirectory.endsWith('/')) baseDirectory = `${baseDirectory}/`;
 	}
+	if (dockerFileLocation) {
+		if (!dockerFileLocation.startsWith('/')) dockerFileLocation = `/${dockerFileLocation}`;
+		if (dockerFileLocation.endsWith('/')) dockerFileLocation = dockerFileLocation.slice(0, -1);
+	} else {
+		dockerFileLocation = '/Dockerfile';
+	}
 
 	return {
 		buildPack,
@@ -118,7 +125,8 @@ export const setDefaultConfiguration = async (data) => {
 		startCommand,
 		buildCommand,
 		publishDirectory,
-		baseDirectory
+		baseDirectory,
+		dockerFileLocation
 	};
 };
 

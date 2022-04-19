@@ -85,7 +85,8 @@ export async function buildImage({
 	docker,
 	buildId,
 	isCache = false,
-	debug = false
+	debug = false,
+	dockerFileLocation = '/Dockerfile'
 }) {
 	if (isCache) {
 		await saveBuildLog({ line: `Building cache image started.`, buildId, applicationId });
@@ -103,7 +104,7 @@ export async function buildImage({
 	const stream = await docker.engine.buildImage(
 		{ src: ['.'], context: workdir },
 		{
-			dockerfile: isCache ? 'Dockerfile-cache' : 'Dockerfile',
+			dockerfile: isCache ? `${dockerFileLocation}-cache` : dockerFileLocation,
 			t: `${applicationId}:${tag}${isCache ? '-cache' : ''}`
 		}
 	);
