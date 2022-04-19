@@ -420,6 +420,18 @@
 					/>
 				</div>
 			{/if}
+			{#if application.buildPack === 'deno'}
+				<div class="grid grid-cols-2 items-center">
+					<label for="startCommand" class="text-base font-bold text-stone-100">Start Command</label>
+					<input
+						readonly={!$session.isAdmin}
+						name="startCommand"
+						id="startCommand"
+						bind:value={application.startCommand}
+						placeholder="default: deno run main.js"
+					/>
+				</div>
+			{/if}
 			<div class="grid grid-cols-2 items-center">
 				<div class="flex-col">
 					<label for="baseDirectory" class="pt-2 text-base font-bold text-stone-100"

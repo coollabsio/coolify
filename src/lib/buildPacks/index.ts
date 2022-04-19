@@ -13,6 +13,7 @@ import rust from './rust';
 import astro from './static';
 import eleventy from './static';
 import python from './python';
+import deno from './deno';
 
 export {
 	node,
@@ -29,5 +30,6 @@ export {
 	rust,
 	astro,
 	eleventy,
-	python
+	python,
+	deno
 };
