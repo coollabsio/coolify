@@ -43,8 +43,15 @@
 	{:else}
 		<div class="flex justify-center px-4">
 			<form on:submit|preventDefault={handleSubmit} class="flex flex-col py-4 space-y-2">
-				<div class="text-6xl font-bold border-gradient w-48 mx-auto border-b-4">Coolify</div>
-				<div class="text-xs text-center font-bold pb-10">v{$session.version}</div>
+				{#if $session.whiteLabelDetails.icon}
+					<img
+						class="w-32 mx-auto pb-8"
+						src={$session.whiteLabelDetails.icon}
+						alt="Icon for white labeled version of Coolify"
+					/>
+				{:else}
+					<div class="text-6xl font-bold border-gradient w-48 mx-auto border-b-4 mb-8">Coolify</div>
+				{/if}
 				<input
 					type="email"
 					name="email"

@@ -8,6 +8,9 @@ import cookie from 'cookie';
 import { dev } from '$app/env';
 
 const whiteLabeled = process.env['COOLIFY_WHITE_LABELED'] === 'true';
+const whiteLabelDetails = {
+	icon: (whiteLabeled && process.env['COOLIFY_WHITE_LABELED_ICON']) || null
+};
 
 export const handle = handleSession(
 	{
@@ -74,6 +77,7 @@ export const getSession: GetSession = function ({ locals }) {
 	return {
 		version,
 		whiteLabeled,
+		whiteLabelDetails,
 		...locals.session.data
 	};
 };
