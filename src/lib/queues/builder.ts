@@ -289,6 +289,9 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 						labels,
 						depends_on: [],
 						restart: 'always',
+						// logging: {
+						// 	driver: 'fluentd',
+						// },
 						deploy: {
 							restart_policy: {
 								condition: 'on-failure',
