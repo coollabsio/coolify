@@ -1,9 +1,15 @@
-async function send({ method, path, data = {}, headers, timeout = 30000 }) {
+async function send({
+	method,
+	path,
+	data = {},
+	headers,
+	timeout = 120000
+}): Promise<Record<string, unknown>> {
 	const controller = new AbortController();
 	const id = setTimeout(() => controller.abort(), timeout);
 	const opts = { method, headers: {}, body: null, signal: controller.signal };
 	if (Object.keys(data).length > 0) {
-		let parsedData = data;
+		const parsedData = data;
 		for (const [key, value] of Object.entries(data)) {
 			if (value === '') {
 				parsedData[key] = null;
@@ -43,18 +49,33 @@ async function send({ method, path, data = {}, headers, timeout = 30000 }) {
 	return responseData;
 }
 
-export function get(path, headers = {}): Promise<any> {
+export function get(
+	path: string,
+	headers?: Record<string, unknown>
+): Promise<Record<string, unknown>> {
 	return send({ method: 'GET', path, headers });
 }
 
-export function del(path, data = {}, headers = {}): Promise<any> {
+export function del(
+	path: string,
+	data: Record<string, unknown>,
+	headers?: Record<string, unknown>
+): Promise<Record<string, unknown>> {
 	return send({ method: 'DELETE', path, data, headers });
 }
 
-export function post(path, data, headers = {}): Promise<any> {
+export function post(
+	path: string,
+	data: Record<string, unknown>,
+	headers?: Record<string, unknown>
+): Promise<Record<string, unknown>> {
 	return send({ method: 'POST', path, data, headers });
 }
 
-export function put(path, data, headers = {}): Promise<any> {
+export function put(
+	path: string,
+	data: Record<string, unknown>,
+	headers?: Record<string, unknown>
+): Promise<Record<string, unknown>> {
 	return send({ method: 'PUT', path, data, headers });
 }

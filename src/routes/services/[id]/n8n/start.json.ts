@@ -44,7 +44,15 @@ export const post: RequestHandler = async (event) => {
 					volumes: [config.volume],
 					environment: config.environmentVariables,
 					restart: 'always',
-					labels: makeLabelForServices('n8n')
+					labels: makeLabelForServices('n8n'),
+					deploy: {
+						restart_policy: {
+							condition: 'on-failure',
+							delay: '5s',
+							max_attempts: 3,
+							window: '120s'
+						}
+					}
 				}
 			},
 			networks: {

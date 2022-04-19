@@ -1,6 +1,5 @@
 import * as Bullmq from 'bullmq';
-import { default as ProdBullmq, Job, QueueEvents, QueueScheduler } from 'bullmq';
-import cuid from 'cuid';
+import { default as ProdBullmq, QueueScheduler } from 'bullmq';
 import { dev } from '$app/env';
 import { prisma } from '$lib/database';
 
@@ -8,6 +7,7 @@ import builder from './builder';
 import logger from './logger';
 import cleanup from './cleanup';
 import proxy from './proxy';
+import proxyTcpHttp from './proxyTcpHttp';
 import ssl from './ssl';
 import sslrenewal from './sslrenewal';
 
@@ -28,19 +28,22 @@ const connectionOptions = {
 	}
 };
 
-const cron = async () => {
+const cron = async (): Promise<void> => {
 	new QueueScheduler('proxy', connectionOptions);
+	new QueueScheduler('proxyTcpHttp', connectionOptions);
 	new QueueScheduler('cleanup', connectionOptions);
 	new QueueScheduler('ssl', connectionOptions);
 	new QueueScheduler('sslRenew', connectionOptions);
 
 	const queue = {
 		proxy: new Queue('proxy', { ...connectionOptions }),
+		proxyTcpHttp: new Queue('proxyTcpHttp', { ...connectionOptions }),
 		cleanup: new Queue('cleanup', { ...connectionOptions }),
 		ssl: new Queue('ssl', { ...connectionOptions }),
 		sslRenew: new Queue('sslRenew', { ...connectionOptions })
 	};
 	await queue.proxy.drain();
+	await queue.proxyTcpHttp.drain();
 	await queue.cleanup.drain();
 	await queue.ssl.drain();
 	await queue.sslRenew.drain();
@@ -49,6 +52,16 @@ const cron = async () => {
 		'proxy',
 		async () => {
 			await proxy();
+		},
+		{
+			...connectionOptions
+		}
+	);
+
+	new Worker(
+		'proxyTcpHttp',
+		async () => {
+			await proxyTcpHttp();
 		},
 		{
 			...connectionOptions
@@ -86,21 +99,10 @@ const cron = async () => {
 	);
 
 	await queue.proxy.add('proxy', {}, { repeat: { every: 10000 } });
+	await queue.proxyTcpHttp.add('proxyTcpHttp', {}, { repeat: { every: 10000 } });
 	await queue.ssl.add('ssl', {}, { repeat: { every: dev ? 10000 : 60000 } });
 	if (!dev) await queue.cleanup.add('cleanup', {}, { repeat: { every: 300000 } });
 	await queue.sslRenew.add('sslRenew', {}, { repeat: { every: 1800000 } });
-
-	const events = {
-		proxy: new QueueEvents('proxy', { ...connectionOptions }),
-		ssl: new QueueEvents('ssl', { ...connectionOptions })
-	};
-
-	events.proxy.on('completed', (data) => {
-		// console.log(data)
-	});
-	events.ssl.on('completed', (data) => {
-		// console.log(data)
-	});
 };
 cron().catch((error) => {
 	console.log('cron failed to start');

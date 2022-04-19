@@ -12,7 +12,8 @@ import { version as currentVersion } from '../../package.json';
 import dayjs from 'dayjs';
 import Cookie from 'cookie';
 import os from 'os';
-import cuid from 'cuid';
+import type { RequestEvent } from '@sveltejs/kit/types/internal';
+import type { Job } from 'bullmq';
 
 try {
 	if (!dev) {
@@ -45,13 +46,21 @@ const customConfig: Config = {
 
 export const version = currentVersion;
 export const asyncExecShell = util.promisify(child.exec);
-export const asyncSleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
-
+export const asyncSleep = (delay: number): Promise<unknown> =>
+	new Promise((resolve) => setTimeout(resolve, delay));
 export const sentry = Sentry;
 
-export const uniqueName = () => uniqueNamesGenerator(customConfig);
+export const uniqueName = (): string => uniqueNamesGenerator(customConfig);
 
-export const saveBuildLog = async ({ line, buildId, applicationId }) => {
+export const saveBuildLog = async ({
+	line,
+	buildId,
+	applicationId
+}: {
+	line: string;
+	buildId: string;
+	applicationId: string;
+}): Promise<Job> => {
 	if (line) {
 		if (line.includes('ghs_')) {
 			const regex = /ghs_.*@/g;
@@ -62,20 +71,7 @@ export const saveBuildLog = async ({ line, buildId, applicationId }) => {
 	}
 };
 
-export const isTeamIdTokenAvailable = (request) => {
-	const cookie = request.headers.cookie
-		?.split(';')
-		.map((s) => s.trim())
-		.find((s) => s.startsWith('teamId='))
-		?.split('=')[1];
-	if (!cookie) {
-		return getTeam(request);
-	} else {
-		return cookie;
-	}
-};
-
-export const getTeam = (event) => {
+export const getTeam = (event: RequestEvent): string | null => {
 	const cookies = Cookie.parse(event.request.headers.get('cookie'));
 	if (cookies?.teamId) {
 		return cookies.teamId;
@@ -85,14 +81,28 @@ export const getTeam = (event) => {
 	return null;
 };
 
-export const getUserDetails = async (event, isAdminRequired = true) => {
+export const getUserDetails = async (
+	event: RequestEvent,
+	isAdminRequired = true
+): Promise<{
+	teamId: string;
+	userId: string;
+	permission: string;
+	status: number;
+	body: { message: string };
+}> => {
 	const teamId = getTeam(event);
 	const userId = event?.locals?.session?.data?.userId || null;
-	const { permission = 'read' } = await db.prisma.permission.findFirst({
-		where: { teamId, userId },
-		select: { permission: true },
-		rejectOnNotFound: true
-	});
+	let permission = 'read';
+	if (teamId && userId) {
+		const data = await db.prisma.permission.findFirst({
+			where: { teamId, userId },
+			select: { permission: true },
+			rejectOnNotFound: true
+		});
+		if (data.permission) permission = data.permission;
+	}
+
 	const payload = {
 		teamId,
 		userId,
@@ -112,11 +122,11 @@ export const getUserDetails = async (event, isAdminRequired = true) => {
 	return payload;
 };
 
-export function getEngine(engine) {
+export function getEngine(engine: string): string {
 	return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : engine;
 }
 
-export async function removeContainer(id, engine) {
+export async function removeContainer(id: string, engine: string): Promise<void> {
 	const host = getEngine(engine);
 	try {
 		const { stdout } = await asyncExecShell(
@@ -132,11 +142,23 @@ export async function removeContainer(id, engine) {
 	}
 }
 
-export const removeDestinationDocker = async ({ id, engine }) => {
+export const removeDestinationDocker = async ({
+	id,
+	engine
+}: {
+	id: string;
+	engine: string;
+}): Promise<void> => {
 	return await removeContainer(id, engine);
 };
 
-export const createDirectories = async ({ repository, buildId }) => {
+export const createDirectories = async ({
+	repository,
+	buildId
+}: {
+	repository: string;
+	buildId: string;
+}): Promise<{ workdir: string; repodir: string }> => {
 	const repodir = `/tmp/build-sources/${repository}/`;
 	const workdir = `/tmp/build-sources/${repository}/${buildId}`;
 
@@ -148,20 +170,10 @@ export const createDirectories = async ({ repository, buildId }) => {
 	};
 };
 
-export function generateTimestamp() {
+export function generateTimestamp(): string {
 	return `${dayjs().format('HH:mm:ss.SSS')} `;
 }
 
-export function getDomain(domain) {
+export function getDomain(domain: string): string {
 	return domain?.replace('https://', '').replace('http://', '');
-}
-
-export function dashify(str: string, options?: any): string {
-	if (typeof str !== 'string') return str;
-	return str
-		.trim()
-		.replace(/\W/g, (m) => (/[À-ž]/.test(m) ? m : '-'))
-		.replace(/^-+|-+$/g, '')
-		.replace(/-{2,}/g, (m) => (options && options.condense ? '-' : m))
-		.toLowerCase();
 }

@@ -1,16 +1,15 @@
 import { dev } from '$app/env';
-import got from 'got';
+import got, { type Got } from 'got';
+import * as db from '$lib/database';
 import mustache from 'mustache';
 import crypto from 'crypto';
-
-import * as db from '$lib/database';
 import { checkContainer, checkHAProxy } from '.';
 import { asyncExecShell, getDomain, getEngine } from '$lib/common';
 import { supportedServiceTypesAndVersions } from '$lib/components/common';
 
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555';
 
-let template = `program api 
+const template = `program api 
   command /usr/bin/dataplaneapi -f /usr/local/etc/haproxy/dataplaneapi.hcl --userlist haproxy-dataplaneapi
   no option start-on-reload
 	
@@ -21,10 +20,10 @@ global
 defaults 
   mode http
   log global
-  timeout http-request 60s
+  timeout http-request 120s
   timeout connect 10s
-  timeout client 60s
-  timeout server 60s
+  timeout client 120s
+  timeout server 120s
 
 userlist haproxy-dataplaneapi 
   user admin insecure-password "\${HAPROXY_PASSWORD}"
@@ -128,7 +127,8 @@ backend {{domain}}
   server {{id}} {{id}}:{{port}} check fall 10
 {{/coolify}}
 `;
-export async function haproxyInstance() {
+
+export async function haproxyInstance(): Promise<Got> {
 	const { proxyPassword } = await db.listSettings();
 	return got.extend({
 		prefixUrl: url,
@@ -137,31 +137,97 @@ export async function haproxyInstance() {
 	});
 }
 
-export async function configureHAProxy() {
+export async function configureHAProxy(): Promise<void> {
 	const haproxy = await haproxyInstance();
 	await checkHAProxy(haproxy);
 
-	try {
-		const data = {
-			applications: [],
-			services: [],
-			coolify: []
-		};
-		const applications = await db.prisma.application.findMany({
-			include: { destinationDocker: true, settings: true }
-		});
-		for (const application of applications) {
-			const {
-				fqdn,
-				id,
-				port,
-				destinationDocker,
-				destinationDockerId,
-				settings: { previews },
-				updatedAt
-			} = application;
-			if (destinationDockerId) {
-				const { engine, network } = destinationDocker;
+	const data = {
+		applications: [],
+		services: [],
+		coolify: []
+	};
+	const applications = await db.prisma.application.findMany({
+		include: { destinationDocker: true, settings: true }
+	});
+	for (const application of applications) {
+		const {
+			fqdn,
+			id,
+			port,
+			destinationDocker,
+			destinationDockerId,
+			settings: { previews },
+			updatedAt
+		} = application;
+		if (destinationDockerId) {
+			const { engine, network } = destinationDocker;
+			const isRunning = await checkContainer(engine, id);
+			if (fqdn) {
+				const domain = getDomain(fqdn);
+				const isHttps = fqdn.startsWith('https://');
+				const isWWW = fqdn.includes('www.');
+				const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
+				if (isRunning) {
+					data.applications.push({
+						id,
+						port: port || 3000,
+						domain,
+						isRunning,
+						isHttps,
+						redirectValue,
+						redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain,
+						updatedAt: updatedAt.getTime()
+					});
+				}
+				if (previews) {
+					const host = getEngine(engine);
+					const { stdout } = await asyncExecShell(
+						`DOCKER_HOST=${host} docker container ls --filter="status=running" --filter="network=${network}" --filter="name=${id}-" --format="{{json .Names}}"`
+					);
+					const containers = stdout
+						.trim()
+						.split('\n')
+						.filter((a) => a)
+						.map((c) => c.replace(/"/g, ''));
+					if (containers.length > 0) {
+						for (const container of containers) {
+							const previewDomain = `${container.split('-')[1]}.${domain}`;
+							data.applications.push({
+								id: container,
+								port: port || 3000,
+								domain: previewDomain,
+								isRunning,
+								isHttps,
+								redirectValue,
+								redirectTo: isWWW ? previewDomain.replace('www.', '') : 'www.' + previewDomain,
+								updatedAt: updatedAt.getTime()
+							});
+						}
+					}
+				}
+			}
+		}
+	}
+	const services = await db.prisma.service.findMany({
+		include: {
+			destinationDocker: true,
+			minio: true,
+			plausibleAnalytics: true,
+			vscodeserver: true,
+			wordpress: true,
+			ghost: true,
+			meiliSearch: true
+		}
+	});
+
+	for (const service of services) {
+		const { fqdn, id, type, destinationDocker, destinationDockerId, updatedAt } = service;
+		if (destinationDockerId) {
+			const { engine } = destinationDocker;
+			const found = supportedServiceTypesAndVersions.find((a) => a.name === type);
+			if (found) {
+				const port = found.ports.main;
+				const publicPort = service[type]?.publicPort;
 				const isRunning = await checkContainer(engine, id);
 				if (fqdn) {
 					const domain = getDomain(fqdn);
@@ -169,9 +235,10 @@ export async function configureHAProxy() {
 					const isWWW = fqdn.includes('www.');
 					const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
 					if (isRunning) {
-						data.applications.push({
+						data.services.push({
 							id,
-							port: port || 3000,
+							port,
+							publicPort,
 							domain,
 							isRunning,
 							isHttps,
@@ -180,108 +247,38 @@ export async function configureHAProxy() {
 							updatedAt: updatedAt.getTime()
 						});
 					}
-					if (previews) {
-						const host = getEngine(engine);
-						const { stdout } = await asyncExecShell(
-							`DOCKER_HOST=${host} docker container ls --filter="status=running" --filter="network=${network}" --filter="name=${id}-" --format="{{json .Names}}"`
-						);
-						const containers = stdout
-							.trim()
-							.split('\n')
-							.filter((a) => a)
-							.map((c) => c.replace(/"/g, ''));
-						if (containers.length > 0) {
-							for (const container of containers) {
-								let previewDomain = `${container.split('-')[1]}.${domain}`;
-								data.applications.push({
-									id: container,
-									port: port || 3000,
-									domain: previewDomain,
-									isRunning,
-									isHttps,
-									redirectValue,
-									redirectTo: isWWW ? previewDomain.replace('www.', '') : 'www.' + previewDomain,
-									updatedAt: updatedAt.getTime()
-								});
-							}
-						}
-					}
 				}
 			}
 		}
-		const services = await db.prisma.service.findMany({
-			include: {
-				destinationDocker: true,
-				minio: true,
-				plausibleAnalytics: true,
-				vscodeserver: true,
-				wordpress: true,
-				ghost: true
+	}
+	const { fqdn } = await db.prisma.setting.findFirst();
+	if (fqdn) {
+		const domain = getDomain(fqdn);
+		const isHttps = fqdn.startsWith('https://');
+		const isWWW = fqdn.includes('www.');
+		const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
+		data.coolify.push({
+			id: dev ? 'host.docker.internal' : 'coolify',
+			port: 3000,
+			domain,
+			isHttps,
+			redirectValue,
+			redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain
+		});
+	}
+	const output = mustache.render(template, data);
+	const newHash = crypto.createHash('md5').update(output).digest('hex');
+	const { proxyHash, id } = await db.listSettings();
+	if (proxyHash !== newHash) {
+		await db.prisma.setting.update({ where: { id }, data: { proxyHash: newHash } });
+		await haproxy.post(`v2/services/haproxy/configuration/raw`, {
+			searchParams: {
+				skip_version: true
+			},
+			body: output,
+			headers: {
+				'Content-Type': 'text/plain'
 			}
 		});
-
-		for (const service of services) {
-			const { fqdn, id, type, destinationDocker, destinationDockerId, updatedAt } = service;
-			if (destinationDockerId) {
-				const { engine } = destinationDocker;
-				const found = supportedServiceTypesAndVersions.find((a) => a.name === type);
-				if (found) {
-					const port = found.ports.main;
-					const publicPort = service[type]?.publicPort;
-					const isRunning = await checkContainer(engine, id);
-					if (fqdn) {
-						const domain = getDomain(fqdn);
-						const isHttps = fqdn.startsWith('https://');
-						const isWWW = fqdn.includes('www.');
-						const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
-						if (isRunning) {
-							data.services.push({
-								id,
-								port,
-								publicPort,
-								domain,
-								isRunning,
-								isHttps,
-								redirectValue,
-								redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain,
-								updatedAt: updatedAt.getTime()
-							});
-						}
-					}
-				}
-			}
-		}
-		const { fqdn } = await db.prisma.setting.findFirst();
-		if (fqdn) {
-			const domain = getDomain(fqdn);
-			const isHttps = fqdn.startsWith('https://');
-			const isWWW = fqdn.includes('www.');
-			const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
-			data.coolify.push({
-				id: dev ? 'host.docker.internal' : 'coolify',
-				port: 3000,
-				domain,
-				isHttps,
-				redirectValue,
-				redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain
-			});
-		}
-		const output = mustache.render(template, data);
-		const newHash = crypto.createHash('md5').update(output).digest('hex');
-		const { proxyHash, id } = await db.listSettings();
-		if (proxyHash !== newHash) {
-			await db.prisma.setting.update({ where: { id }, data: { proxyHash: newHash } });
-			await haproxy.post(`v2/services/haproxy/configuration/raw`, {
-				searchParams: {
-					skip_version: true
-				},
-				body: output,
-				headers: {
-					'Content-Type': 'text/plain'
-				}
-			});
-		}
-	} catch (error) {
-		throw error;
 	}
 }

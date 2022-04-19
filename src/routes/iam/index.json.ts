@@ -13,20 +13,25 @@ export const get: RequestHandler = async (event) => {
 			select: { id: true, email: true, teams: true }
 		});
 		let accounts = [];
+		let allTeams = [];
 		if (teamId === '0') {
 			accounts = await db.prisma.user.findMany({ select: { id: true, email: true, teams: true } });
+			allTeams = await db.prisma.team.findMany({
+				where: { users: { none: { id: userId } } },
+				include: { permissions: true }
+			});
 		}
-
-		const teams = await db.prisma.permission.findMany({
-			where: { userId: teamId === '0' ? undefined : userId },
-			include: { team: { include: { _count: { select: { users: true } } } } }
+		const ownTeams = await db.prisma.team.findMany({
+			where: { users: { some: { id: userId } } },
+			include: { permissions: true }
 		});
 
 		const invitations = await db.prisma.teamInvitation.findMany({ where: { uid: userId } });
 		return {
 			status: 200,
 			body: {
-				teams,
+				ownTeams,
+				allTeams,
 				invitations,
 				account,
 				accounts

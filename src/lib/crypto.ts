@@ -1,13 +1,13 @@
 import crypto from 'crypto';
 const algorithm = 'aes-256-ctr';
 
-export const base64Encode = (text: string) => {
+export const base64Encode = (text: string): string => {
 	return Buffer.from(text).toString('base64');
 };
-export const base64Decode = (text: string) => {
+export const base64Decode = (text: string): string => {
 	return Buffer.from(text, 'base64').toString('ascii');
 };
-export const encrypt = (text: string) => {
+export const encrypt = (text: string): string => {
 	if (text) {
 		const iv = crypto.randomBytes(16);
 		const cipher = crypto.createCipheriv(algorithm, process.env['COOLIFY_SECRET_KEY'], iv);
@@ -19,7 +19,7 @@ export const encrypt = (text: string) => {
 	}
 };
 
-export const decrypt = (hashString: string) => {
+export const decrypt = (hashString: string): string => {
 	if (hashString) {
 		const hash: Hash = JSON.parse(hashString);
 		const decipher = crypto.createDecipheriv(

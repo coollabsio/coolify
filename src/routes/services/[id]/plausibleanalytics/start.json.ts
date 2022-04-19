@@ -133,7 +133,15 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 					environment: config.plausibleAnalytics.environmentVariables,
 					restart: 'always',
 					depends_on: [`${id}-postgresql`, `${id}-clickhouse`],
-					labels: makeLabelForServices('plausibleAnalytics')
+					labels: makeLabelForServices('plausibleAnalytics'),
+					deploy: {
+						restart_policy: {
+							condition: 'on-failure',
+							delay: '10s',
+							max_attempts: 5,
+							window: '120s'
+						}
+					}
 				},
 				[`${id}-postgresql`]: {
 					container_name: `${id}-postgresql`,
@@ -141,7 +149,15 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 					networks: [network],
 					environment: config.postgresql.environmentVariables,
 					volumes: [config.postgresql.volume],
-					restart: 'always'
+					restart: 'always',
+					deploy: {
+						restart_policy: {
+							condition: 'on-failure',
+							delay: '10s',
+							max_attempts: 5,
+							window: '120s'
+						}
+					}
 				},
 				[`${id}-clickhouse`]: {
 					build: workdir,
@@ -149,7 +165,15 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 					networks: [network],
 					environment: config.clickhouse.environmentVariables,
 					volumes: [config.clickhouse.volume],
-					restart: 'always'
+					restart: 'always',
+					deploy: {
+						restart_policy: {
+							condition: 'on-failure',
+							delay: '10s',
+							max_attempts: 5,
+							window: '120s'
+						}
+					}
 				}
 			},
 			networks: {

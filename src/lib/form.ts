@@ -1,5 +1,6 @@
 import { toast } from '@zerodevx/svelte-toast';
-export function errorNotification(message: string) {
+
+export function errorNotification(message: string): void {
 	console.error(message);
 	if (typeof message !== 'string') {
 		toast.push('Ooops, something is not okay, are you okay?');
@@ -30,7 +31,7 @@ export function enhance(
 		e.preventDefault();
 
 		let body = new FormData(form);
-		let parsedData = body;
+		const parsedData = body;
 
 		body.forEach((data, key) => {
 			if (data === '' || data === null) parsedData.delete(key);
