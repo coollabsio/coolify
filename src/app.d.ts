@@ -6,7 +6,11 @@ declare namespace App {
 		cookies: Record<string, string>;
 	}
 	interface Platform {}
-	interface Session extends SessionData {}
+	interface Session extends SessionData {
+		whiteLabelDetails: {
+			icon: string | null;
+		};
+	}
 	interface Stuff {
 		service: any;
 		application: any;

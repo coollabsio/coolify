@@ -27,6 +27,7 @@ export const get: RequestHandler = async (event) => {
 								.split('\n')
 								.map((l) => l.slice(8))
 								.filter((a) => a)
+								.reverse()
 						}
 					};
 				}

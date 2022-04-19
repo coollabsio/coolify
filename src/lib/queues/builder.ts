@@ -56,7 +56,8 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 		buildCommand,
 		startCommand,
 		baseDirectory,
-		publishDirectory
+		publishDirectory,
+		dockerFileLocation
 	} = job.data;
 	const { debug } = settings;
 
@@ -107,6 +108,7 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 		buildCommand = configuration.buildCommand;
 		publishDirectory = configuration.publishDirectory;
 		baseDirectory = configuration.baseDirectory;
+		dockerFileLocation = configuration.dockerFileLocation;
 
 		const commit = await importers[gitSource.type]({
 			applicationId,
@@ -209,7 +211,8 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 					phpModules,
 					pythonWSGI,
 					pythonModule,
-					pythonVariable
+					pythonVariable,
+					dockerFileLocation
 				});
 			else {
 				await saveBuildLog({ line: `Build pack ${buildPack} not found`, buildId, applicationId });

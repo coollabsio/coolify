@@ -24,19 +24,21 @@
 	export let application;
 	import { page } from '$app/stores';
 	import LoadingLogs from './_Loading.svelte';
-	import { getDomain } from '$lib/components/common';
 	import { get } from '$lib/api';
 	import { errorNotification } from '$lib/form';
 
 	let loadLogsInterval = null;
+	let allLogs = [];
 	let logs = [];
-	let followingBuild;
+	let currentPage = 1;
+	let endOfLogs = false;
+	let startOfLogs = true;
 	let followingInterval;
 	let logsEl;
 
 	const { id } = $page.params;
 	onMount(async () => {
-		loadLogs();
+		loadAllLogs();
 		loadLogsInterval = setInterval(() => {
 			loadLogs();
 		}, 1000);
@@ -45,25 +47,52 @@
 		clearInterval(loadLogsInterval);
 		clearInterval(followingInterval);
 	});
-	async function loadLogs() {
+	async function loadAllLogs() {
 		try {
-			const newLogs = await get(`/applications/${id}/logs.json`);
-			logs = newLogs.logs;
+			const data = await get(`/applications/${id}/logs.json`);
+			allLogs = data.logs;
+			logs = data.logs.slice(0, 100);
 			return;
 		} catch ({ error }) {
 			return errorNotification(error);
 		}
 	}
-
-	function followBuild() {
-		followingBuild = !followingBuild;
-		if (followingBuild) {
-			followingInterval = setInterval(() => {
-				logsEl.scrollTop = logsEl.scrollHeight;
-				window.scrollTo(0, document.body.scrollHeight);
-			}, 100);
+	async function loadLogs() {
+		try {
+			const newLogs = await get(`/applications/${id}/logs.json`);
+			logs = newLogs.logs.slice(0, 100);
+			return;
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
+	async function loadOlderLogs() {
+		clearInterval(loadLogsInterval);
+		loadLogsInterval = null;
+		logsEl.scrollTop = 0;
+		if (logs.length < 100) {
+			endOfLogs = true;
+			return;
+		}
+		startOfLogs = false;
+		endOfLogs = false;
+		currentPage += 1;
+		logs = allLogs.slice(currentPage * 100 - 100, currentPage * 100);
+	}
+	async function loadNewerLogs() {
+		currentPage -= 1;
+		logsEl.scrollTop = 0;
+		if (currentPage !== 1) {
+			clearInterval(loadLogsInterval);
+			endOfLogs = false;
+			loadLogsInterval = null;
+			logs = allLogs.slice(currentPage * 100 - 100, currentPage * 100);
 		} else {
-			window.clearInterval(followingInterval);
+			startOfLogs = true;
+			loadLogs();
+			loadLogsInterval = setInterval(() => {
+				loadLogs();
+			}, 1000);
 		}
 	}
 </script>
@@ -145,13 +174,17 @@
 		<div class="text-xl font-bold tracking-tighter">Waiting for the logs...</div>
 	{:else}
 		<div class="relative w-full">
-			<LoadingLogs />
-			<div class="flex justify-end sticky top-0 p-2">
+			<div class="text-right " />
+			{#if loadLogsInterval}
+				<LoadingLogs />
+			{/if}
+			<div class="flex justify-end sticky top-0 p-2 mx-1">
 				<button
-					on:click={followBuild}
+					on:click={loadOlderLogs}
+					class:text-coolgray-100={endOfLogs}
+					class:hover:bg-coolgray-400={!endOfLogs}
 					class="bg-transparent"
-					data-tooltip="Follow logs"
-					class:text-green-500={followingBuild}
+					disabled={endOfLogs}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -164,10 +197,32 @@
 						stroke-linejoin="round"
 					>
 						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<circle cx="12" cy="12" r="9" />
-						<line x1="8" y1="12" x2="12" y2="16" />
-						<line x1="12" y1="8" x2="12" y2="16" />
-						<line x1="16" y1="12" x2="12" y2="16" />
+						<path
+							d="M20 15h-8v3.586a1 1 0 0 1 -1.707 .707l-6.586 -6.586a1 1 0 0 1 0 -1.414l6.586 -6.586a1 1 0 0 1 1.707 .707v3.586h8a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1z"
+						/>
+					</svg>
+				</button>
+				<button
+					on:click={loadNewerLogs}
+					class:text-coolgray-100={startOfLogs}
+					class:hover:bg-coolgray-400={!startOfLogs}
+					class="bg-transparent"
+					disabled={startOfLogs}
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path
+							d="M4 9h8v-3.586a1 1 0 0 1 1.707 -.707l6.586 6.586a1 1 0 0 1 0 1.414l-6.586 6.586a1 1 0 0 1 -1.707 -.707v-3.586h-8a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1z"
+						/>
 					</svg>
 				</button>
 			</div>
@@ -175,7 +230,7 @@
 				class="font-mono w-full leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
 				bind:this={logsEl}
 			>
-				<div class="px-2">
+				<div class="px-2 pr-14">
 					{#each logs as log}
 						{log + '\n'}
 					{/each}

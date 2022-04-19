@@ -56,7 +56,8 @@ export const post: RequestHandler = async (event) => {
 		publishDirectory,
 		pythonWSGI,
 		pythonModule,
-		pythonVariable
+		pythonVariable,
+		dockerFileLocation
 	} = await event.request.json();
 	if (port) port = Number(port);
 
@@ -68,7 +69,8 @@ export const post: RequestHandler = async (event) => {
 			startCommand,
 			buildCommand,
 			publishDirectory,
-			baseDirectory
+			baseDirectory,
+			dockerFileLocation
 		});
 		await db.configureApplication({
 			id,
@@ -84,6 +86,7 @@ export const post: RequestHandler = async (event) => {
 			pythonWSGI,
 			pythonModule,
 			pythonVariable,
+			dockerFileLocation,
 			...defaultConfiguration
 		});
 		return { status: 201 };

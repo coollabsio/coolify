@@ -263,7 +263,8 @@ export async function configureApplication({
 	publishDirectory,
 	pythonWSGI,
 	pythonModule,
-	pythonVariable
+	pythonVariable,
+	dockerFileLocation
 }: {
 	id: string;
 	buildPack: string;
@@ -278,6 +279,7 @@ export async function configureApplication({
 	pythonWSGI: string;
 	pythonModule: string;
 	pythonVariable: string;
+	dockerFileLocation: string;
 }): Promise<Application> {
 	return await prisma.application.update({
 		where: { id },
@@ -293,7 +295,8 @@ export async function configureApplication({
 			publishDirectory,
 			pythonWSGI,
 			pythonModule,
-			pythonVariable
+			pythonVariable,
+			dockerFileLocation
 		}
 	});
 }
