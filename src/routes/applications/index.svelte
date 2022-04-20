@@ -19,6 +19,7 @@
 	import Docker from '$lib/components/svg/applications/Docker.svelte';
 	import Astro from '$lib/components/svg/applications/Astro.svelte';
 	import Eleventy from '$lib/components/svg/applications/Eleventy.svelte';
+	import Deno from '$lib/components/svg/applications/Deno.svelte';
 	import { getDomain } from '$lib/components/common';
 
 	async function newApplication() {
@@ -100,6 +101,8 @@
 									<Astro />
 								{:else if application.buildPack.toLowerCase() === 'eleventy'}
 									<Eleventy />
+								{:else if application.buildPack.toLowerCase() === 'deno'}
+									<Deno />
 								{/if}
 							{/if}
 
@@ -156,6 +159,8 @@
 										<Astro />
 									{:else if application.buildPack.toLowerCase() === 'eleventy'}
 										<Eleventy />
+									{:else if application.buildPack.toLowerCase() === 'deno'}
+										<Deno />
 									{/if}
 								{/if}
 

@@ -153,6 +153,16 @@ export function findBuildPack(pack, packageManager = 'npm') {
 			port: 8000
 		};
 	}
+	if (pack === 'deno') {
+		return {
+			...metaData,
+			installCommand: `yarn install`,
+			buildCommand: `yarn build`,
+			startCommand: null,
+			publishDirectory: `_site`,
+			port: 80
+		};
+	}
 	return {
 		name: 'node',
 		fancyName: 'Node.js',
@@ -260,6 +270,12 @@ export const buildPacks = [
 	{
 		name: 'python',
 		fancyName: 'Python',
+		hoverColor: 'hover:bg-green-700',
+		color: 'bg-green-700'
+	},
+	{
+		name: 'deno',
+		fancyName: 'Deno',
 		hoverColor: 'hover:bg-green-700',
 		color: 'bg-green-700'
 	}
