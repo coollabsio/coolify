@@ -446,8 +446,7 @@
 					/>
 				</div>
 				<div class="grid grid-cols-2 items-center">
-					<label for="denoOptions" class="text-base font-bold text-stone-100">List of Options</label
-					>
+					<label for="denoOptions" class="text-base font-bold text-stone-100">Arguments</label>
 					<input
 						readonly={!$session.isAdmin}
 						name="denoOptions"
@@ -456,7 +455,7 @@
 						placeholder="eg: --allow-net --allow-hrtime --config path/to/file.json"
 					/>
 					<Explainer
-						text="List of options to pass to <span class='text-green-500 font-bold'>deno</span> command. Could include permissions, configurations files, etc."
+						text="List of arguments to pass to <span class='text-green-500 font-bold'>deno run</span> command. Could include permissions, configurations files, etc."
 					/>
 				</div>
 			{/if}
