@@ -35,6 +35,7 @@ export const post: RequestHandler = async (event) => {
 			data: {
 				id: buildId,
 				applicationId: id,
+				branch: applicationFound.branch,
 				destinationDockerId: applicationFound.destinationDocker.id,
 				gitSourceId: applicationFound.gitSource.id,
 				githubAppId: applicationFound.gitSource.githubApp?.id,

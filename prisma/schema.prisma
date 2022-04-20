@@ -183,6 +183,7 @@ model Build {
   githubAppId         String?
   gitlabAppId         String?
   commit              String?
+  branch              String?
   status              String?  @default("queued")
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt

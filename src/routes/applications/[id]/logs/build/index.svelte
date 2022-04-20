@@ -173,7 +173,7 @@
 				>
 					<div class="flex-col px-2">
 						<div class="text-sm font-bold">
-							{application.branch}
+							{build.branch || application.branch}
 						</div>
 						<div class="text-xs">
 							{build.type}

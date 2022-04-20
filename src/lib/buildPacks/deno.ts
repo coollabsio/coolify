@@ -34,7 +34,6 @@ const createDockerfile = async (data, image): Promise<void> => {
 		Dockerfile.push(`COPY .${baseDirectory || ''}/deps.ts /app`);
 		Dockerfile.push(`RUN deno cache deps.ts`);
 	}
-	console.log(denoOptions && denoOptions.split());
 	Dockerfile.push(`COPY ${denoMainFile} /app`);
 	Dockerfile.push(`RUN deno cache ${denoMainFile}`);
 	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
