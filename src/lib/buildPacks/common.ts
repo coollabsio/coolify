@@ -92,7 +92,8 @@ export const setDefaultConfiguration = async (data) => {
 		buildCommand,
 		publishDirectory,
 		baseDirectory,
-		dockerFileLocation
+		dockerFileLocation,
+		denoMainFile
 	} = data;
 	const template = scanningTemplates[buildPack];
 	if (!port) {
@@ -103,9 +104,11 @@ export const setDefaultConfiguration = async (data) => {
 		else if (buildPack === 'php') port = 80;
 		else if (buildPack === 'python') port = 8000;
 	}
-	if (!installCommand) installCommand = template?.installCommand || 'yarn install';
-	if (!startCommand) startCommand = template?.startCommand || 'yarn start';
-	if (!buildCommand) buildCommand = template?.buildCommand || null;
+	if (!installCommand && buildPack !== 'static')
+		installCommand = template?.installCommand || 'yarn install';
+	if (!startCommand && buildPack !== 'static')
+		startCommand = template?.startCommand || 'yarn start';
+	if (!buildCommand && buildPack !== 'static') buildCommand = template?.buildCommand || null;
 	if (!publishDirectory) publishDirectory = template?.publishDirectory || null;
 	if (baseDirectory) {
 		if (!baseDirectory.startsWith('/')) baseDirectory = `/${baseDirectory}`;
@@ -117,6 +120,9 @@ export const setDefaultConfiguration = async (data) => {
 	} else {
 		dockerFileLocation = '/Dockerfile';
 	}
+	if (!denoMainFile) {
+		denoMainFile = 'main.ts';
+	}
 
 	return {
 		buildPack,
@@ -126,7 +132,8 @@ export const setDefaultConfiguration = async (data) => {
 		buildCommand,
 		publishDirectory,
 		baseDirectory,
-		dockerFileLocation
+		dockerFileLocation,
+		denoMainFile
 	};
 };
 
@@ -192,7 +199,11 @@ export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, ap
             }
             `
 			);
-			await saveBuildLog({ line: 'Copied default configuration file.', buildId, applicationId });
+			await saveBuildLog({
+				line: 'Copied default configuration file for Nginx.',
+				buildId,
+				applicationId
+			});
 		}
 	} catch (error) {
 		console.log(error);

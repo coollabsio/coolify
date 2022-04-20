@@ -2,8 +2,15 @@ import { buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
 
 const createDockerfile = async (data, image): Promise<void> => {
-	const { workdir, port, startCommand, baseDirectory, secrets, pullmergeRequestId } = data;
+	const { workdir, port, baseDirectory, secrets, pullmergeRequestId, denoMainFile, denoOptions } =
+		data;
 	const Dockerfile: Array<string> = [];
+
+	let depsFound = false;
+	try {
+		await fs.readFile(`${workdir}${baseDirectory || ''}/deps.ts`);
+		depsFound = true;
+	} catch (error) {}
 
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push('WORKDIR /app');
@@ -23,10 +30,17 @@ const createDockerfile = async (data, image): Promise<void> => {
 			}
 		});
 	}
+	if (depsFound) {
+		Dockerfile.push(`COPY .${baseDirectory || ''}/deps.ts /app`);
+		Dockerfile.push(`RUN deno cache deps.ts`);
+	}
+	console.log(denoOptions && denoOptions.split());
+	Dockerfile.push(`COPY ${denoMainFile} /app`);
+	Dockerfile.push(`RUN deno cache ${denoMainFile}`);
 	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	Dockerfile.push(`ENV NO_COLOR true`);
 	Dockerfile.push(`EXPOSE ${port}`);
-	Dockerfile.push(`CMD ${startCommand}`);
+	Dockerfile.push(`CMD deno run ${denoOptions ? denoOptions.split(' ') : ''} ${denoMainFile}`);
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };
 

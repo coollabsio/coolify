@@ -156,11 +156,11 @@ export function findBuildPack(pack, packageManager = 'npm') {
 	if (pack === 'deno') {
 		return {
 			...metaData,
-			installCommand: `yarn install`,
-			buildCommand: `yarn build`,
+			installCommand: null,
+			buildCommand: null,
 			startCommand: null,
-			publishDirectory: `_site`,
-			port: 80
+			publishDirectory: null,
+			port: 8000
 		};
 	}
 	return {
