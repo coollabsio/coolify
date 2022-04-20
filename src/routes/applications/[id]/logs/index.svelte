@@ -28,7 +28,9 @@
 	import { errorNotification } from '$lib/form';
 
 	let loadLogsInterval = null;
-	let allLogs = [];
+	let allLogs = {
+		logs: []
+	};
 	let logs = [];
 	let currentPage = 1;
 	let endOfLogs = false;
@@ -49,9 +51,12 @@
 	});
 	async function loadAllLogs() {
 		try {
-			const data = await get(`/applications/${id}/logs.json`);
+			const data: any = await get(`/applications/${id}/logs.json`);
 			allLogs = data.logs;
 			logs = data.logs.slice(0, 100);
+			if (logs.length < 100) {
+				endOfLogs = true;
+			}
 			return;
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -183,7 +188,8 @@
 					on:click={loadOlderLogs}
 					class:text-coolgray-100={endOfLogs}
 					class:hover:bg-coolgray-400={!endOfLogs}
-					class="bg-transparent"
+					class="bg-transparent tooltip-bottom"
+					data-tooltip="Older logs"
 					disabled={endOfLogs}
 				>
 					<svg
@@ -206,7 +212,8 @@
 					on:click={loadNewerLogs}
 					class:text-coolgray-100={startOfLogs}
 					class:hover:bg-coolgray-400={!startOfLogs}
-					class="bg-transparent"
+					class="bg-transparent tooltip-bottom"
+					data-tooltip="Newer logs"
 					disabled={startOfLogs}
 				>
 					<svg
