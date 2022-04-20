@@ -21,12 +21,11 @@
 
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { changeQueryParams, dateOptions, getDomain } from '$lib/components/common';
+	import { changeQueryParams, dateOptions } from '$lib/components/common';
 
 	import BuildLog from './_BuildLog.svelte';
 	import { get } from '$lib/api';
 	import { errorNotification } from '$lib/form';
-	import { goto } from '$app/navigation';
 
 	export let builds;
 	export let application;

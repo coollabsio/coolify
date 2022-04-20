@@ -22,7 +22,9 @@ export const get: RequestHandler = async (event) => {
 				if (container) {
 					return {
 						body: {
-							logs: (await container.logs({ stdout: true, stderr: true, timestamps: true }))
+							logs: (
+								await container.logs({ stdout: true, stderr: true, timestamps: true, tail: 5000 })
+							)
 								.toString()
 								.split('\n')
 								.map((l) => l.slice(8))

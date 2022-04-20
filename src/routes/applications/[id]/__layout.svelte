@@ -75,15 +75,18 @@
 	import { errorNotification } from '$lib/form';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import Loading from '$lib/components/Loading.svelte';
-	import { del, post } from '$lib/api';
+	import { del, get, post } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { gitTokens } from '$lib/store';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { disabledButton } from '$lib/store';
+	import { onDestroy, onMount } from 'svelte';
+
 	if (githubToken) $gitTokens.githubToken = githubToken;
 	if (gitlabToken) $gitTokens.gitlabToken = gitlabToken;
 
 	let loading = false;
+	let statusInterval;
 	$disabledButton =
 		!$session.isAdmin ||
 		!application.fqdn ||
@@ -130,6 +133,19 @@
 			return errorNotification(error);
 		}
 	}
+	async function getStatus() {
+		statusInterval = setInterval(async () => {
+			const data = await get(`/applications/${id}.json`);
+			isRunning = data.isRunning;
+			isExited = data.isExited;
+		}, 1000);
+	}
+	onDestroy(() => {
+		clearInterval(statusInterval);
+	});
+	onMount(async () => {
+		await getStatus();
+	});
 </script>
 
 <nav class="nav-side">

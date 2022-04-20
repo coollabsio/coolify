@@ -65,9 +65,9 @@ export const post: RequestHandler = async (event) => {
 		denoOptions
 	} = await event.request.json();
 	if (port) port = Number(port);
+	if (denoOptions) denoOptions = denoOptions.trim();
 
 	try {
-		console.log(buildPack);
 		const defaultConfiguration = await setDefaultConfiguration({
 			buildPack,
 			port,
