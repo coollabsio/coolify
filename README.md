@@ -22,7 +22,7 @@ If you would like no questions during installation
 
 ### Git Sources
 
-You can use the following Git Sources to be auto-deployed to your Coolifyt instance! (Self hosted versions also supported.)
+You can use the following Git Sources to be auto-deployed to your Coolifyt instance! (Self-hosted versions are also supported.)
 
 - Github
 - GitLab
@@ -38,7 +38,7 @@ You can deploy your applications to the following destinations:
 
 ### Applications
 
-These are the predefined build packs, but with the Docker build pack, you can host basically anything that is hostable with a single Dockerfile.
+These are the predefined build packs, but with the Docker build pack, you can host anything that is hostable with a single Dockerfile.
 
 - Static sites
 - NodeJS
