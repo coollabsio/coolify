@@ -10,15 +10,16 @@ export default async function ({
 	buildId,
 	baseDirectory,
 	secrets,
-	pullmergeRequestId
+	pullmergeRequestId,
+	dockerFileLocation
 }) {
 	try {
-		let file = `${workdir}/Dockerfile`;
+		const file = `${workdir}${dockerFileLocation}`;
+		let dockerFileOut = `${workdir}`;
 		if (baseDirectory) {
-			file = `${workdir}/${baseDirectory}/Dockerfile`;
-			workdir = `${workdir}/${baseDirectory}`;
+			dockerFileOut = `${workdir}${baseDirectory}`;
+			workdir = `${workdir}${baseDirectory}`;
 		}
-
 		const Dockerfile: Array<string> = (await fs.readFile(`${file}`, 'utf8'))
 			.toString()
 			.trim()
@@ -41,8 +42,8 @@ export default async function ({
 				}
 			});
 		}
-		await fs.writeFile(`${file}`, Dockerfile.join('\n'));
-		await buildImage({ applicationId, tag, workdir, docker, buildId, debug });
+		await fs.writeFile(`${dockerFileOut}${dockerFileLocation}`, Dockerfile.join('\n'));
+		await buildImage({ applicationId, tag, workdir, docker, buildId, debug, dockerFileLocation });
 	} catch (error) {
 		throw error;
 	}

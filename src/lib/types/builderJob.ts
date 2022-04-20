@@ -21,6 +21,7 @@ export type BuilderJob = {
 	pythonWSGI: string;
 	pythonModule: string;
 	pythonVariable: string;
+	dockerFileLocation: string;
 	createdAt: string;
 	updatedAt: string;
 	destinationDockerId: string;

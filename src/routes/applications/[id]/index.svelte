@@ -68,11 +68,6 @@
 			value: 'Gunicorn',
 			label: 'Gunicorn'
 		}
-		// },
-		// {
-		// 	value: 'uWSGI',
-		// 	label: 'uWSGI'
-		// }
 	];
 
 	if (browser && window.location.hostname === 'demo.coolify.io' && !application.fqdn) {
@@ -417,6 +412,23 @@
 						id="startCommand"
 						bind:value={application.startCommand}
 						placeholder="default: yarn start"
+					/>
+				</div>
+			{/if}
+			{#if application.buildPack === 'docker'}
+				<div class="grid grid-cols-2 items-center">
+					<label for="dockerFileLocation" class="text-base font-bold text-stone-100"
+						>Dockerfile Location</label
+					>
+					<input
+						readonly={!$session.isAdmin}
+						name="dockerFileLocation"
+						id="dockerFileLocation"
+						bind:value={application.dockerFileLocation}
+						placeholder="default: /Dockerfile"
+					/>
+					<Explainer
+						text="Does not rely on Base Directory. <br>Should be absolute path, like <span class='text-green-500 font-bold'>/data/Dockerfile</span> or <span class='text-green-500 font-bold'>/Dockerfile.</span>"
 					/>
 				</div>
 			{/if}

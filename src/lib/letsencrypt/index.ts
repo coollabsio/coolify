@@ -10,6 +10,9 @@ import { promises as dns } from 'dns';
 
 export async function letsEncrypt(domain: string, id?: string, isCoolify = false): Promise<void> {
 	try {
+		const certbotImage =
+			process.arch === 'x64' ? 'certbot/certbot' : 'certbot/certbot:arm64v8-latest';
+
 		const data = await db.prisma.setting.findFirst();
 		const { minPort, maxPort } = data;
 
@@ -63,7 +66,7 @@ export async function letsEncrypt(domain: string, id?: string, isCoolify = false
 			if (found) return;
 
 			await asyncExecShell(
-				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p 9080:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${nakedDomain} -d ${wwwDomain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
+				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p 9080:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" ${certbotImage} --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${nakedDomain} -d ${wwwDomain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
 					dev ? '--test-cert' : ''
 				}`
 			);
@@ -83,7 +86,7 @@ export async function letsEncrypt(domain: string, id?: string, isCoolify = false
 			}
 			if (found) return;
 			await asyncExecShell(
-				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p 9080:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${domain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
+				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p 9080:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" ${certbotImage} --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${domain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
 					dev ? '--test-cert' : ''
 				}`
 			);

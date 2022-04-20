@@ -1,10 +1,10 @@
 {
 	"name": "coolify",
 	"description": "An open-source & self-hostable Heroku / Netlify alternative.",
-	"version": "2.4.10",
+	"version": "2.4.11",
 	"license": "AGPL-3.0",
 	"scripts": {
-		"dev": "docker-compose -f docker-compose-dev.yaml up -d && cross-env NODE_ENV=development & svelte-kit dev",
+		"dev": "docker-compose -f docker-compose-dev.yaml up -d && cross-env NODE_ENV=development & svelte-kit dev --host 0.0.0.0",
 		"dev:stop": "docker-compose -f docker-compose-dev.yaml down",
 		"dev:logs": "docker-compose -f docker-compose-dev.yaml logs -f --tail 10",
 		"studio": "npx prisma studio",
@@ -63,7 +63,7 @@
 		"@iarna/toml": "2.2.5",
 		"@prisma/client": "3.11.1",
 		"@sentry/node": "6.19.6",
-		"bcryptjs": "^2.4.3",
+		"bcryptjs": "2.4.3",
 		"bullmq": "1.80.0",
 		"compare-versions": "4.1.3",
 		"cookie": "0.4.2",

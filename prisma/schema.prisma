@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
-  binaryTargets = ["linux-musl"]
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl"]
 }
 
 datasource db {
@@ -91,6 +91,7 @@ model Application {
   pythonWSGI          String?
   pythonModule        String?
   pythonVariable      String?
+  dockerFileLocation  String?                         
   createdAt           DateTime                       @default(now())
   updatedAt           DateTime                       @updatedAt
   settings            ApplicationSettings?
@@ -118,12 +119,23 @@ model ApplicationSettings {
 model ApplicationPersistentStorage {
   id            String      @id @default(cuid())
   application   Application @relation(fields: [applicationId], references: [id])
-  applicationId String      
-  path          String      
+  applicationId String
+  path          String
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
   @@unique([applicationId, path])
+}
+
+model ServicePersistentStorage {
+  id        String   @id @default(cuid())
+  service   Service  @relation(fields: [serviceId], references: [id])
+  serviceId String
+  path      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([serviceId, path])
 }
 
 model Secret {
@@ -267,17 +279,17 @@ model DatabaseSettings {
 }
 
 model Service {
-  id                  String              @id @default(cuid())
+  id                  String                     @id @default(cuid())
   name                String
   fqdn                String?
-  dualCerts           Boolean             @default(false)
+  dualCerts           Boolean                    @default(false)
   type                String?
   version             String?
   teams               Team[]
   destinationDockerId String?
-  destinationDocker   DestinationDocker?  @relation(fields: [destinationDockerId], references: [id])
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+  destinationDocker   DestinationDocker?         @relation(fields: [destinationDockerId], references: [id])
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
   plausibleAnalytics  PlausibleAnalytics?
   minio               Minio?
   vscodeserver        Vscodeserver?
@@ -285,6 +297,7 @@ model Service {
   ghost               Ghost?
   serviceSecret       ServiceSecret[]
   meiliSearch         MeiliSearch?
+  persistentStorage   ServicePersistentStorage[]
 }
 
 model PlausibleAnalytics {
