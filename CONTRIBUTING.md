@@ -16,7 +16,7 @@ First of all, thank you for considering contributing to my project! It means a l
 - Push to your fork repo
 - Create a pull request: https://github.com/coollabsio/compare
 - Write a proper description
-- Open the pull request to review
+- Open the pull request to review against `next` branch
 
 ---
 
