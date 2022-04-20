@@ -19,13 +19,14 @@
 			const tempBuildPack = JSON.parse(
 				JSON.stringify(findBuildPack(buildPack.name, packageManager))
 			);
+
 			delete tempBuildPack.name;
 			delete tempBuildPack.fancyName;
 			delete tempBuildPack.color;
 			delete tempBuildPack.hoverColor;
 
 			if (foundConfig.buildPack !== name) {
-				await post(`/applications/${id}.json`, { ...tempBuildPack });
+				await post(`/applications/${id}.json`, { ...tempBuildPack, buildPack: name });
 			}
 			await post(`/applications/${id}/configuration/buildpack.json`, { buildPack: name });
 			return await goto(from || `/applications/${id}`);

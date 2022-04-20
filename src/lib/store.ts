@@ -5,3 +5,4 @@ export const gitTokens: Writable<{ githubToken: string | null; gitlabToken: stri
 		githubToken: null,
 		gitlabToken: null
 	});
+export const disabledButton: Writable<boolean> = writable(false);

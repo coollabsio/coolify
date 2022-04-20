@@ -109,6 +109,7 @@ export async function buildImage({
 		}
 	);
 	await streamEvents({ stream, docker, buildId, applicationId, debug });
+	await saveBuildLog({ line: `Building image successful!`, buildId, applicationId });
 }
 
 export function dockerInstance({ destinationDocker }): { engine: Dockerode; network: string } {

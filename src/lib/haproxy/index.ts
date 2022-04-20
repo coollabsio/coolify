@@ -126,8 +126,8 @@ export async function startTcpProxy(
 	const host = getEngine(engine);
 
 	const containerName = `haproxy-for-${publicPort}`;
-	const found = await checkContainer(engine, containerName);
-	const foundDependentContainer = await checkContainer(engine, id);
+	const found = await checkContainer(engine, containerName, true);
+	const foundDependentContainer = await checkContainer(engine, id, true);
 
 	try {
 		if (foundDependentContainer && !found) {
@@ -161,8 +161,8 @@ export async function startHttpProxy(
 	const host = getEngine(engine);
 
 	const containerName = `haproxy-for-${publicPort}`;
-	const found = await checkContainer(engine, containerName);
-	const foundDependentContainer = await checkContainer(engine, id);
+	const found = await checkContainer(engine, containerName, true);
+	const foundDependentContainer = await checkContainer(engine, id, true);
 
 	try {
 		if (foundDependentContainer && !found) {
@@ -186,7 +186,7 @@ export async function startHttpProxy(
 
 export async function startCoolifyProxy(engine: string): Promise<void> {
 	const host = getEngine(engine);
-	const found = await checkContainer(engine, 'coolify-haproxy');
+	const found = await checkContainer(engine, 'coolify-haproxy', true);
 	const { proxyPassword, proxyUser, id } = await db.listSettings();
 	if (!found) {
 		const { stdout: Config } = await asyncExecShell(
@@ -201,7 +201,25 @@ export async function startCoolifyProxy(engine: string): Promise<void> {
 	await configureNetworkCoolifyProxy(engine);
 }
 
-export async function checkContainer(engine: string, container: string): Promise<boolean> {
+export async function isContainerExited(engine: string, containerName: string): Promise<boolean> {
+	let isExited = false;
+	const host = getEngine(engine);
+	try {
+		const { stdout } = await asyncExecShell(
+			`DOCKER_HOST="${host}" docker inspect -f '{{.State.Status}}' ${containerName}`
+		);
+		if (stdout.trim() === 'exited') {
+			isExited = true;
+		}
+	} catch (error) {}
+
+	return isExited;
+}
+export async function checkContainer(
+	engine: string,
+	container: string,
+	remove: boolean = false
+): Promise<boolean> {
 	const host = getEngine(engine);
 	let containerFound = false;
 
@@ -212,7 +230,10 @@ export async function checkContainer(engine: string, container: string): Promise
 		const parsedStdout = JSON.parse(stdout);
 		const status = parsedStdout.Status;
 		const isRunning = status === 'running';
-		if (status === 'exited' || status === 'created') {
+		if (status === 'created') {
+			await asyncExecShell(`DOCKER_HOST="${host}" docker rm ${container}`);
+		}
+		if (remove && status === 'exited') {
 			await asyncExecShell(`DOCKER_HOST="${host}" docker rm ${container}`);
 		}
 		if (isRunning) {

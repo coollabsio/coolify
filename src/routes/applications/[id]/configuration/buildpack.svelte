@@ -31,7 +31,7 @@
 
 	import { buildPacks, findBuildPack, scanningTemplates } from '$lib/components/templates';
 	import BuildPack from './_BuildPack.svelte';
-	import { page, session } from '$app/stores';
+	import { page } from '$app/stores';
 	import { get } from '$lib/api';
 	import { errorNotification } from '$lib/form';
 	import { gitTokens } from '$lib/store';
@@ -221,7 +221,7 @@
 	<div class="max-w-7xl mx-auto flex flex-wrap justify-center">
 		{#each buildPacks as buildPack}
 			<div class="p-2">
-				<BuildPack {buildPack} {scanning} {packageManager} bind:foundConfig />
+				<BuildPack {buildPack} {scanning} bind:foundConfig />
 			</div>
 		{/each}
 	</div>

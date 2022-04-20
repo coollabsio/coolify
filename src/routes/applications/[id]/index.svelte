@@ -48,6 +48,7 @@
 	import { post } from '$lib/api';
 	import cuid from 'cuid';
 	import { browser } from '$app/env';
+	import { disabledButton } from '$lib/store';
 	const { id } = $page.params;
 
 	let domainEl: HTMLInputElement;
@@ -122,7 +123,8 @@
 		try {
 			await post(`/applications/${id}/check.json`, { fqdn: application.fqdn, forceSave });
 			await post(`/applications/${id}.json`, { ...application });
-			return window.location.reload();
+			$disabledButton = false;
+			return toast.push('Configurations saved.');
 		} catch ({ error }) {
 			if (error?.startsWith('DNS not set')) {
 				forceSave = true;
@@ -434,13 +436,27 @@
 			{/if}
 			{#if application.buildPack === 'deno'}
 				<div class="grid grid-cols-2 items-center">
-					<label for="startCommand" class="text-base font-bold text-stone-100">Start Command</label>
+					<label for="denoMainFile" class="text-base font-bold text-stone-100">Main File</label>
 					<input
 						readonly={!$session.isAdmin}
-						name="startCommand"
-						id="startCommand"
-						bind:value={application.startCommand}
-						placeholder="default: deno run main.js"
+						name="denoMainFile"
+						id="denoMainFile"
+						bind:value={application.denoMainFile}
+						placeholder="default: main.ts"
+					/>
+				</div>
+				<div class="grid grid-cols-2 items-center">
+					<label for="denoOptions" class="text-base font-bold text-stone-100">List of Options</label
+					>
+					<input
+						readonly={!$session.isAdmin}
+						name="denoOptions"
+						id="denoOptions"
+						bind:value={application.denoOptions}
+						placeholder="eg: --allow-net --allow-hrtime --config path/to/file.json"
+					/>
+					<Explainer
+						text="List of options to pass to <span class='text-green-500 font-bold'>deno</span> command. Could include permissions, configurations files, etc."
 					/>
 				</div>
 			{/if}
