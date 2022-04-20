@@ -264,7 +264,9 @@ export async function configureApplication({
 	pythonWSGI,
 	pythonModule,
 	pythonVariable,
-	dockerFileLocation
+	dockerFileLocation,
+	denoMainFile,
+	denoOptions
 }: {
 	id: string;
 	buildPack: string;
@@ -280,6 +282,8 @@ export async function configureApplication({
 	pythonModule: string;
 	pythonVariable: string;
 	dockerFileLocation: string;
+	denoMainFile: string;
+	denoOptions: string;
 }): Promise<Application> {
 	return await prisma.application.update({
 		where: { id },
@@ -296,7 +300,9 @@ export async function configureApplication({
 			pythonWSGI,
 			pythonModule,
 			pythonVariable,
-			dockerFileLocation
+			dockerFileLocation,
+			denoMainFile,
+			denoOptions
 		}
 	});
 }

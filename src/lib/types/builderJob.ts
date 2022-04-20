@@ -22,6 +22,8 @@ export type BuilderJob = {
 	pythonModule: string;
 	pythonVariable: string;
 	dockerFileLocation: string;
+	denoMainFile: string;
+	denoOptions: string;
 	createdAt: string;
 	updatedAt: string;
 	destinationDockerId: string;

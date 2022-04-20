@@ -46,7 +46,8 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 		persistentStorage,
 		pythonWSGI,
 		pythonModule,
-		pythonVariable
+		pythonVariable,
+		denoOptions
 	} = job.data;
 	let {
 		branch,
@@ -57,7 +58,8 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 		startCommand,
 		baseDirectory,
 		publishDirectory,
-		dockerFileLocation
+		dockerFileLocation,
+		denoMainFile
 	} = job.data;
 	const { debug } = settings;
 
@@ -109,6 +111,7 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 		publishDirectory = configuration.publishDirectory;
 		baseDirectory = configuration.baseDirectory;
 		dockerFileLocation = configuration.dockerFileLocation;
+		denoMainFile = configuration.denoMainFile;
 
 		const commit = await importers[gitSource.type]({
 			applicationId,
@@ -212,7 +215,9 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 					pythonWSGI,
 					pythonModule,
 					pythonVariable,
-					dockerFileLocation
+					dockerFileLocation,
+					denoMainFile,
+					denoOptions
 				});
 			else {
 				await saveBuildLog({ line: `Build pack ${buildPack} not found`, buildId, applicationId });

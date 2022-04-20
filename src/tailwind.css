@@ -119,7 +119,7 @@ a {
 }
 
 .icons {
-	@apply rounded p-2 transition duration-200 hover:bg-coolgray-500 disabled:bg-coolblack !important;
+	@apply rounded p-2 transition duration-200 hover:bg-coolgray-500 disabled:bg-coolblack disabled:text-coolgray-500 !important;
 }
 
 .arrow-right-applications {
