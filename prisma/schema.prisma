@@ -91,7 +91,9 @@ model Application {
   pythonWSGI          String?
   pythonModule        String?
   pythonVariable      String?
-  dockerFileLocation  String?                         
+  dockerFileLocation  String?  
+  denoMainFile        String?
+  denoOptions         String?                       
   createdAt           DateTime                       @default(now())
   updatedAt           DateTime                       @updatedAt
   settings            ApplicationSettings?
