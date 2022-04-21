@@ -29,15 +29,12 @@
 	import { t } from '$lib/translations';
 
 	let loadLogsInterval = null;
-	let allLogs = {
-		logs: []
-	};
 	let logs = [];
-	let currentPage = 1;
-	let endOfLogs = false;
-	let startOfLogs = true;
+	let lastLog = null;
 	let followingInterval;
+	let followingLogs;
 	let logsEl;
+	let position = 0;
 
 	const { id } = $page.params;
 	onMount(async () => {
@@ -53,11 +50,8 @@
 	async function loadAllLogs() {
 		try {
 			const data: any = await get(`/applications/${id}/logs.json`);
-			allLogs = data.logs;
-			logs = data.logs.slice(0, 100);
-			if (logs.length < 100) {
-				endOfLogs = true;
-			}
+			lastLog = data.logs[data.logs.length - 1];
+			logs = data.logs;
 			return;
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -65,40 +59,40 @@
 	}
 	async function loadLogs() {
 		try {
-			const newLogs = await get(`/applications/${id}/logs.json`);
-			logs = newLogs.logs.slice(0, 100);
+			const newLogs: any = await get(
+				`/applications/${id}/logs.json?since=${lastLog.split(' ')[0]}`
+			);
+			if (newLogs.logs[newLogs.logs.length - 1] !== logs[logs.length - 1]) {
+				logs = logs.concat(newLogs.logs);
+				lastLog = newLogs.logs[newLogs.logs.length - 1];
+			}
+
 			return;
 		} catch ({ error }) {
 			return errorNotification(error);
 		}
 	}
-	async function loadOlderLogs() {
-		clearInterval(loadLogsInterval);
-		loadLogsInterval = null;
-		logsEl.scrollTop = 0;
-		if (logs.length < 100) {
-			endOfLogs = true;
-			return;
-		}
-		startOfLogs = false;
-		endOfLogs = false;
-		currentPage += 1;
-		logs = allLogs.slice(currentPage * 100 - 100, currentPage * 100);
-	}
-	async function loadNewerLogs() {
-		currentPage -= 1;
-		logsEl.scrollTop = 0;
-		if (currentPage !== 1) {
-			clearInterval(loadLogsInterval);
-			endOfLogs = false;
-			loadLogsInterval = null;
-			logs = allLogs.slice(currentPage * 100 - 100, currentPage * 100);
+	function detect() {
+		if (position < logsEl.scrollTop) {
+			position = logsEl.scrollTop;
 		} else {
-			startOfLogs = true;
-			loadLogs();
-			loadLogsInterval = setInterval(() => {
-				loadLogs();
+			if (followingLogs) {
+				clearInterval(followingInterval);
+				followingLogs = false;
+			}
+			position = logsEl.scrollTop;
+		}
+	}
+
+	function followBuild() {
+		followingLogs = !followingLogs;
+		if (followingLogs) {
+			followingInterval = setInterval(() => {
+				logsEl.scrollTop = logsEl.scrollHeight;
+				window.scrollTo(0, document.body.scrollHeight);
 			}, 1000);
+		} else {
+			clearInterval(followingInterval);
 		}
 	}
 </script>
@@ -186,12 +180,10 @@
 			{/if}
 			<div class="flex justify-end sticky top-0 p-2 mx-1">
 				<button
-					on:click={loadOlderLogs}
-					class:text-coolgray-100={endOfLogs}
-					class:hover:bg-coolgray-400={!endOfLogs}
-					class="bg-transparent tooltip-bottom"
-					data-tooltip="Older logs"
-					disabled={endOfLogs}
+					on:click={followBuild}
+					class="bg-transparent"
+					data-tooltip="Follow logs"
+					class:text-green-500={followingLogs}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -204,39 +196,17 @@
 						stroke-linejoin="round"
 					>
 						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<path
-							d="M20 15h-8v3.586a1 1 0 0 1 -1.707 .707l-6.586 -6.586a1 1 0 0 1 0 -1.414l6.586 -6.586a1 1 0 0 1 1.707 .707v3.586h8a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1z"
-						/>
-					</svg>
-				</button>
-				<button
-					on:click={loadNewerLogs}
-					class:text-coolgray-100={startOfLogs}
-					class:hover:bg-coolgray-400={!startOfLogs}
-					class="bg-transparent tooltip-bottom"
-					data-tooltip="Newer logs"
-					disabled={startOfLogs}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<path
-							d="M4 9h8v-3.586a1 1 0 0 1 1.707 -.707l6.586 6.586a1 1 0 0 1 0 1.414l-6.586 6.586a1 1 0 0 1 -1.707 -.707v-3.586h-8a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1z"
-						/>
+						<circle cx="12" cy="12" r="9" />
+						<line x1="8" y1="12" x2="12" y2="16" />
+						<line x1="12" y1="8" x2="12" y2="16" />
+						<line x1="16" y1="12" x2="12" y2="16" />
 					</svg>
 				</button>
 			</div>
 			<div
 				class="font-mono w-full leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
 				bind:this={logsEl}
+				on:scroll={detect}
 			>
 				<div class="px-2 pr-14">
 					{#each logs as log}
