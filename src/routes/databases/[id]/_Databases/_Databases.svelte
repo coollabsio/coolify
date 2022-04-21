@@ -60,7 +60,7 @@
 							: window.location.hostname
 						: database.id
 			  }:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`
-			: $t('forms.loading');
+			: $t('forms.loading'));
 	}
 
 	async function changeSettings(name) {

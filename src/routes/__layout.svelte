@@ -1,8 +1,13 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	import { publicPaths } from '$lib/settings';
-
+	import { locale, loadTranslations } from '$lib/translations';
 	export const load: Load = async ({ fetch, url, session }) => {
+		const { pathname } = url;
+		const defaultLocale = 'en';
+		const initLocale = locale.get() || defaultLocale;
+		await loadTranslations(initLocale, pathname);
+
 		if (!session.userId && !publicPaths.includes(url.pathname)) {
 			return {
 				status: 302,
