@@ -1,6 +1,7 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { listSettings, ErrorHandler } from '$lib/database';
+import { t } from '$lib/translations';
 import type { RequestHandler } from '@sveltejs/kit';
 import { promises as dns } from 'dns';
 
@@ -27,7 +28,7 @@ export const del: RequestHandler = async (event) => {
 		return {
 			status: 401,
 			body: {
-				message: 'You do not have permission to do this. \nAsk an admin to modify your permissions.'
+				message: t.get('setting.permission_denied')
 			}
 		};
 	if (status === 401) return { status, body };
@@ -44,7 +45,7 @@ export const del: RequestHandler = async (event) => {
 		return {
 			status: 200,
 			body: {
-				message: 'Domain removed',
+				message: t.get('setting.domain_removed'),
 				redirect: ip ? `http://${ip[0]}:3000/settings` : undefined
 			}
 		};
@@ -58,7 +59,7 @@ export const post: RequestHandler = async (event) => {
 		return {
 			status: 401,
 			body: {
-				message: 'You do not have permission to do this. \nAsk an admin to modify your permissions.'
+				message: t.get('setting.permission_denied')
 			}
 		};
 	if (status === 401) return { status, body };

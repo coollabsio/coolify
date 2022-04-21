@@ -81,6 +81,7 @@
 	import { toast } from '@zerodevx/svelte-toast';
 	import { disabledButton } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
+	import { t } from '$lib/translations';
 
 	if (githubToken) $gitTokens.githubToken = githubToken;
 	if (gitlabToken) $gitTokens.gitlabToken = gitlabToken;
@@ -99,7 +100,7 @@
 	async function handleDeploySubmit() {
 		try {
 			const { buildId } = await post(`/applications/${id}/deploy.json`, { ...application });
-			toast.push('Deployment queued.');
+			toast.push($t('application.deployment_queued'));
 			if ($page.url.pathname.startsWith(`/applications/${id}/logs/build`)) {
 				return window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
 			} else {
@@ -113,7 +114,7 @@
 	}
 
 	async function deleteApplication(name) {
-		const sure = confirm(`Are you sure you would like to delete '${name}'?`);
+		const sure = confirm($t('application.confirm_to_delete', { name }));
 		if (sure) {
 			loading = true;
 			try {
@@ -186,8 +187,8 @@
 				disabled={$disabledButton}
 				class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
 				data-tooltip={$session.isAdmin
-					? 'Stop application'
-					: 'You do not have permission to stop the application.'}
+					? $t('application.stop_application')
+					: $t('application.permission_denied_stop_application')}
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -400,10 +401,10 @@
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs`}
 		>
 			<button
-				title="Application Logs"
+				title={$t('application.build_logs')}
 				disabled={$disabledButton}
 				class="icons bg-transparent tooltip-bottom text-sm"
-				data-tooltip="Application Logs"
+				data-tooltip={$t('application.build_logs')}
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -463,14 +464,14 @@
 
 		<button
 			on:click={() => deleteApplication(application.name)}
-			title="Delete application"
+			title={$t('application.delete_application')}
 			type="submit"
 			disabled={!$session.isAdmin}
 			class:hover:text-red-500={$session.isAdmin}
 			class="icons bg-transparent  tooltip-bottom text-sm"
 			data-tooltip={$session.isAdmin
-				? 'Delete application'
-				: 'You do not have permission to delete this application'}
+				? $t('application.delete_application')
+				: $t('application.permission_denied_delete_application')}
 		>
 			<DeleteIcon />
 		</button>

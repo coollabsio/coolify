@@ -5,6 +5,7 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
 	import { toast } from '@zerodevx/svelte-toast';
+	import { t } from '$lib/translations';
 	const { id } = $page.params;
 
 	let loading = false;
@@ -125,7 +126,7 @@
 	{:else if source.githubApp?.installationId}
 		<form on:submit|preventDefault={handleSubmit} class="py-4">
 			<div class="flex space-x-1 pb-5 font-bold">
-				<div class="title">General</div>
+				<div class="title">{$t('general')}</div>
 				{#if $session.isAdmin}
 					<button
 						type="submit"
@@ -134,14 +135,14 @@
 						disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
 					>
 					<button on:click|preventDefault={() => installRepositories(source)}
-						>Change GitHub App Settings</button
+						>{$t('source.change_app_settings', { name: 'GitHub' })}</button
 					>
 				{/if}
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
 				<div class="grid grid-flow-row gap-2">
 					<div class="mt-2 grid grid-cols-2 items-center">
-						<label for="name" class="text-base font-bold text-stone-100">Name</label>
+						<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 						<input name="name" id="name" required bind:value={source.name} />
 					</div>
 				</div>

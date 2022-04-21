@@ -4,6 +4,7 @@
 	import { session } from '$app/stores';
 	import { post } from '$lib/api';
 	import { errorNotification } from '$lib/form';
+	import { t } from '$lib/translations';
 	import { onMount } from 'svelte';
 	let loading = false;
 	let emailEl;
@@ -37,9 +38,13 @@
 	}
 </script>
 
+<svelt:head>
+	<title>{$t('login.login')}</title>
+</svelt:head>
+
 <div class="flex h-screen flex-col items-center justify-center">
 	{#if $session.userId}
-		<div class="flex justify-center px-4 text-xl font-bold">Already logged in...</div>
+		<div class="flex justify-center px-4 text-xl font-bold">{$t('login.already_logged_in')}</div>
 	{:else}
 		<div class="flex justify-center px-4">
 			<form on:submit|preventDefault={handleSubmit} class="flex flex-col py-4 space-y-2">
@@ -55,7 +60,7 @@
 				<input
 					type="email"
 					name="email"
-					placeholder="Email"
+					placeholder={$t('forms.email')}
 					autocomplete="off"
 					required
 					bind:this={emailEl}
@@ -64,7 +69,7 @@
 				<input
 					type="password"
 					name="password"
-					placeholder="Password"
+					placeholder={$t('forms.password')}
 					bind:value={password}
 					required
 				/>
@@ -76,12 +81,14 @@
 						class="hover:opacity-90 text-white"
 						class:bg-transparent={loading}
 						class:text-stone-600={loading}
-						class:bg-coollabs={!loading}>{loading ? 'Authenticating...' : 'Login'}</button
+						class:bg-coollabs={!loading}
+						>{loading ? $t('login.authenticating') : $t('login.login')}</button
 					>
 
 					<button
 						on:click|preventDefault={() => goto('/register')}
-						class="bg-transparent hover:bg-coolgray-300	text-white ">Register</button
+						class="bg-transparent hover:bg-coolgray-300	text-white "
+						>{$t('register.register')}</button
 					>
 				</div>
 			</form>

@@ -2,6 +2,7 @@
 	import LocalDocker from './_LocalDocker.svelte';
 	import cuid from 'cuid';
 	import RemoteDocker from './_RemoteDocker.svelte';
+	import { t } from '$lib/translations';
 	let payload = {};
 	let selected = 'localDocker';
 
@@ -10,7 +11,7 @@
 		switch (type) {
 			case 'localDocker':
 				payload = {
-					name: 'Local Docker',
+					name: t.get('sources.local_docker'),
 					engine: '/var/run/docker.sock',
 					remoteEngine: false,
 					network: cuid(),
@@ -19,7 +20,7 @@
 				break;
 			case 'remoteDocker':
 				payload = {
-					name: 'Remote Docker',
+					name: $t('sources.remote_docker'),
 					remoteEngine: true,
 					ipAddress: null,
 					user: 'root',
@@ -36,12 +37,14 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Add New Destination</div>
+	<div class="mr-4 text-2xl tracking-tight">{$t('destination.new.add_new_destination')}</div>
 </div>
 <div class="flex-col space-y-2 pb-10 text-center">
-	<div class="text-xl font-bold text-white">Predefined destinations</div>
+	<div class="text-xl font-bold text-white">{$t('destination.new.predefined_destinations')}</div>
 	<div class="flex justify-center space-x-2">
-		<button class="w-32" on:click={() => setPredefined('localDocker')}>Local Docker</button>
+		<button class="w-32" on:click={() => setPredefined('localDocker')}
+			>{$t('sources.local_docker')}</button
+		>
 		<!-- <button class="w-32" on:click={() => setPredefined('remoteDocker')}>Remote Docker</button> -->
 		<button class="w-32" on:click={() => setPredefined('kubernetes')}>Kubernetes</button>
 	</div>
@@ -51,5 +54,5 @@
 {:else if selected === 'remoteDocker'}
 	<RemoteDocker {payload} />
 {:else}
-	<div class="text-center font-bold text-4xl py-10">Not implemented yet</div>
+	<div class="text-center font-bold text-4xl py-10">{$t('index.not_implemented_yet')}</div>
 {/if}

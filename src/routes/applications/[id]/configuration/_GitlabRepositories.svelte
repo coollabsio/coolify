@@ -9,6 +9,7 @@
 	import { goto } from '$app/navigation';
 	import { del, get, post, put } from '$lib/api';
 	import { gitTokens } from '$lib/store';
+	import { t } from '$lib/translations';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -139,9 +140,7 @@
 				`/applications/${id}/configuration/repository.json?repository=${selected.project.path_with_namespace}&branch=${selected.branch.name}`
 			);
 			if (data.used) {
-				const sure = confirm(
-					`This branch is already used by another application. Webhooks won't work in this case for both applications. Are you sure you want to use it?`
-				);
+				const sure = confirm($t('application.configuration.branch_already_in_use'));
 				if (sure) {
 					autodeploy = false;
 					showSave = true;
@@ -270,11 +269,11 @@
 	<div class="flex flex-col space-y-2 px-4 xl:flex-row xl:space-y-0 xl:space-x-2 ">
 		{#if loading.base}
 			<select name="group" disabled class="w-96">
-				<option selected value="">Loading groups...</option>
+				<option selected value="">{$t('application.configuration.loading_groups')}</option>
 			</select>
 		{:else}
 			<select name="group" class="w-96" bind:value={selected.group} on:change={loadProjects}>
-				<option value="" disabled selected>Please select a group</option>
+				<option value="" disabled selected>{$t('application.configuration.select_a_group')}</option>
 				{#each groups as group}
 					<option value={group}>{group.full_name}</option>
 				{/each}
@@ -282,7 +281,7 @@
 		{/if}
 		{#if loading.projects}
 			<select name="project" disabled class="w-96">
-				<option selected value="">Loading projects...</option>
+				<option selected value="">{$t('application.configuration.loading_projects')}</option>
 			</select>
 		{:else if !loading.projects && projects.length > 0}
 			<select
@@ -292,20 +291,24 @@
 				on:change={loadBranches}
 				disabled={!selected.group}
 			>
-				<option value="" disabled selected>Please select a project</option>
+				<option value="" disabled selected
+					>{$t('application.configuration.select_a_project')}</option
+				>
 				{#each projects as project}
 					<option value={project}>{project.name}</option>
 				{/each}
 			</select>
 		{:else}
 			<select name="project" disabled class="w-96">
-				<option disabled selected value="">No projects found</option>
+				<option disabled selected value=""
+					>{$t('application.configuration.no_projects_found')}</option
+				>
 			</select>
 		{/if}
 
 		{#if loading.branches}
 			<select name="branch" disabled class="w-96">
-				<option selected value="">Loading branches...</option>
+				<option selected value="">{$t('application.configuration.loading_branches')}</option>
 			</select>
 		{:else if !loading.branches && branches.length > 0}
 			<select
@@ -315,14 +318,17 @@
 				on:change={isBranchAlreadyUsed}
 				disabled={!selected.project}
 			>
-				<option value="" disabled selected>Please select a branch</option>
+				<option value="" disabled selected>{$t('application.configuration.select_a_branch')}</option
+				>
 				{#each branches as branch}
 					<option value={branch}>{branch.name}</option>
 				{/each}
 			</select>
 		{:else}
 			<select name="project" disabled class="w-96">
-				<option disabled selected value="">No branches found</option>
+				<option disabled selected value=""
+					>{$t('application.configuration.no_branches_found')}</option
+				>
 			</select>
 		{/if}
 	</div>
@@ -334,7 +340,7 @@
 			disabled={!showSave || loading.save}
 			class:bg-orange-600={showSave && !loading.save}
 			class:hover:bg-orange-500={showSave && !loading.save}
-			>{loading.save ? 'Saving...' : 'Save'}</button
+			>{loading.save ? $t('forms.saving') : $t('forms.save')}</button
 		>
 	</div>
 </form>
