@@ -8,7 +8,7 @@ import { promises as dns } from 'dns';
 export const get: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
-	if (teamId !== '0') return { status: 401, body: { message: 'You are not an admin.' } };
+	if (teamId !== '0') return { status: 200, body: { settings: {} } };
 	try {
 		const settings = await listSettings();
 		return {

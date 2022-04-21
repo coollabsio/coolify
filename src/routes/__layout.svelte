@@ -4,8 +4,10 @@
 	import { locale, loadTranslations } from '$lib/translations';
 	export const load: Load = async ({ fetch, url, session }) => {
 		const { pathname } = url;
+
 		const defaultLocale = 'en';
-		const initLocale = locale.get() || defaultLocale;
+		const sessionLocale = session.lang;
+		const initLocale = sessionLocale || locale.get() || defaultLocale;
 		await loadTranslations(initLocale, pathname);
 
 		if (!session.userId && !publicPaths.includes(url.pathname)) {
@@ -44,7 +46,7 @@
 	import { asyncSleep } from '$lib/components/common';
 	import { del, get, post } from '$lib/api';
 	import { browser, dev } from '$app/env';
-
+	import Select from 'svelte-select';
 	let isUpdateAvailable = false;
 
 	let updateStatus = {
@@ -461,34 +463,31 @@
 						<path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
 					</svg>
 				</a>
-
-				{#if $session.teamId === '0'}
-					<a
-						sveltekit:prefetch
-						href="/settings"
-						class="icons tooltip-yellow-500 tooltip-right bg-coolgray-200 hover:text-yellow-500"
-						class:text-yellow-500={$page.url.pathname.startsWith('/settings')}
-						class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
-						data-tooltip="Settings"
+				<a
+					sveltekit:prefetch
+					href="/settings"
+					class="icons tooltip-yellow-500 tooltip-right bg-coolgray-200 hover:text-yellow-500"
+					class:text-yellow-500={$page.url.pathname.startsWith('/settings')}
+					class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
+					data-tooltip="Settings"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-8 w-8"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
 					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-8 w-8"
-							viewBox="0 0 24 24"
-							stroke-width="1.5"
-							stroke="currentColor"
-							fill="none"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						>
-							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-							<path
-								d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"
-							/>
-							<circle cx="12" cy="12" r="3" />
-						</svg>
-					</a>
-				{/if}
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path
+							d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"
+						/>
+						<circle cx="12" cy="12" r="3" />
+					</svg>
+				</a>
 
 				<div
 					class="icons tooltip-red-500 tooltip-right bg-coolgray-200 hover:text-red-500"

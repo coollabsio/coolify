@@ -28,6 +28,8 @@
 	import { session } from '$app/stores';
 
 	export let settings;
+	import Cookies from 'js-cookie';
+	import langs from '$lib/lang.json';
 	import Setting from '$lib/components/Setting.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
@@ -37,6 +39,8 @@
 	import { getDomain } from '$lib/components/common';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
+
+	import Language from './_Language.svelte';
 
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
 	let dualCerts = settings.dualCerts;
@@ -125,6 +129,7 @@
 				{/if}
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
+				<Language />
 				<div class="grid grid-cols-2 items-start">
 					<div class="flex-col">
 						<div class="pt-2 text-base font-bold text-stone-100">
@@ -225,5 +230,9 @@
 				/>
 			</div>
 		</div>
+	</div>
+{:else}
+	<div class="mx-auto max-w-4xl px-6">
+		<Language />
 	</div>
 {/if}

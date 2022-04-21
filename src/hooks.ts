@@ -48,8 +48,7 @@ export const handle = handleSession(
 						teamId,
 						permission,
 						isAdmin: permission === 'admin' || permission === 'owner',
-						expires: event.locals.session.data.expires,
-						lang: locale
+						expires: event.locals.session.data.expires
 					};
 
 					if (JSON.stringify(event.locals.session.data) !== JSON.stringify(newSession)) {
@@ -105,18 +104,8 @@ export const handle = handleSession(
 );
 
 export const getSession: GetSession = function ({ locals }) {
-	// Get defined locales
-	const supportedLocales = locales.get();
-	let locale;
-
-	if (locals.cookies) {
-		locale = supportedLocales.find(
-			(l) => `${l}`.toLowerCase() === `${locals.cookies['lang']}`.toLowerCase()
-		);
-	}
-
 	return {
-		lang: locale,
+		lang: locals.cookies.lang,
 		version,
 		whiteLabeled,
 		whiteLabelDetails,

@@ -294,6 +294,7 @@
 		"no_service": "No services found"
 	},
 	"setting": {
+		"change_language": "Change Language",
 		"permission_denied": "You do not have permission to do this. \\nAsk an admin to modify your permissions.",
 		"domain_removed": "Domain removed",
 		"ssl_explainer": "If you specify <span class='text-yellow-500 font-bold'>https</span>, Coolify will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-yellow-500 font-bold'>www</span>, Coolify will be redirected (302) from non-www and vice versa.",

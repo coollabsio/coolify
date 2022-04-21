@@ -34,7 +34,7 @@
 		if (name) {
 			try {
 				const { id } = await post('/new/team.json', { name });
-				return await goto(`/teams/${id}`);
+				return await goto(`/iam/team/${id}`);
 			} catch ({ error }) {
 				return errorNotification(error);
 			}
@@ -50,7 +50,7 @@
 	<form on:submit|preventDefault={handleSubmit}>
 		<div class="flex flex-col items-center space-y-4">
 			<input name="name" placeholder="Team name" required bind:this={autofocus} bind:value={name} />
-			<button type="submit" class="bg-green-600 hover:bg-green-500">Save</button>
+			<button type="submit" class="bg-fuchsia-600 hover:bg-fuchsia-500">Save</button>
 		</div>
 	</form>
 </div>
