@@ -129,7 +129,7 @@
 				{/if}
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
-				<Language />
+				<!-- <Language /> -->
 				<div class="grid grid-cols-2 items-start">
 					<div class="flex-col">
 						<div class="pt-2 text-base font-bold text-stone-100">
@@ -233,6 +233,6 @@
 	</div>
 {:else}
 	<div class="mx-auto max-w-4xl px-6">
-		<Language />
+		<!-- <Language /> -->
 	</div>
 {/if}
