@@ -46,7 +46,6 @@
 	import { asyncSleep } from '$lib/components/common';
 	import { del, get, post } from '$lib/api';
 	import { browser, dev } from '$app/env';
-	import Select from 'svelte-select';
 	let isUpdateAvailable = false;
 
 	let updateStatus = {

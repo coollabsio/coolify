@@ -96,14 +96,14 @@
 
 <div class="flex space-x-1 p-6 px-6 text-2xl font-bold">
 	<div class="tracking-tight">{$t('index.team')}</div>
-	<span class="arrow-right-applications px-1 text-cyan-500">></span>
+	<span class="arrow-right-applications px-1 text-fuchsia-500">></span>
 	<span class="pr-2">{team.name}</span>
 </div>
 <div class="mx-auto max-w-4xl px-6">
 	<form on:submit|preventDefault={handleSubmit} class=" py-4">
 		<div class="flex space-x-1 pb-5">
 			<div class="title font-bold">{$t('index.settings')}</div>
-			<button class="bg-cyan-600 hover:bg-cyan-500" type="submit">{$t('forms.save')}</button>
+			<button class="bg-fuchsia-600 hover:bg-fuchsia-500" type="submit">{$t('forms.save')}</button>
 		</div>
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="mt-2 grid grid-cols-2">
@@ -186,7 +186,7 @@
 			<div class="flex space-x-1">
 				<div class="flex space-x-1">
 					<div class="title font-bold">{$t('team.invite_new_member')}</div>
-					<button class="bg-cyan-600 hover:bg-cyan-500" type="submit"
+					<button class="bg-fuchsia-600 hover:bg-fuchsia-500" type="submit"
 						>{$t('team.send_invitation')}</button
 					>
 				</div>
@@ -206,7 +206,7 @@
 						class="rounded-none rounded-l border border-dashed border-transparent"
 						type="button"
 						class:border-coolgray-300={invitation.permission !== 'read'}
-						class:bg-pink-500={invitation.permission === 'read'}>{$t('team.read')}</button
+						class:bg-fuchsia-500={invitation.permission === 'read'}>{$t('team.read')}</button
 					>
 					<button
 						on:click={() => (invitation.permission = 'admin')}

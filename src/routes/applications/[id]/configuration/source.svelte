@@ -80,7 +80,7 @@
 <div class="flex flex-col justify-center">
 	{#if !filteredSources || ownSources.length === 0}
 		<div class="flex-col">
-			<div class="pb-2">{$t('application.configuration.no_configurable_git')}</div>
+			<div class="pb-2 text-center">{$t('application.configuration.no_configurable_git')}</div>
 			<div class="flex justify-center">
 				<button on:click={newSource} class="add-icon bg-orange-600 hover:bg-orange-500">
 					<svg

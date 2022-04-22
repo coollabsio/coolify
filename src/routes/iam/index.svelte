@@ -149,14 +149,14 @@
 						<td class="flex space-x-2">
 							<form on:submit|preventDefault={() => resetPassword(account.id)}>
 								<button
-									class="mx-auto my-4 w-32 bg-coollabs hover:bg-coollabs-100 disabled:bg-coolgray-200"
+									class="mx-auto my-4 w-32 bg-fuchsia-600 hover:bg-fuchsia-500 disabled:bg-coolgray-200"
 									>Reset Password</button
 								>
 							</form>
 							<form on:submit|preventDefault={() => deleteUser(account.id)}>
 								<button
 									disabled={account.id === $session.userId}
-									class="mx-auto my-4 w-32 bg-coollabs hover:bg-coollabs-100 disabled:bg-coolgray-200"
+									class="mx-auto my-4 w-32 bg-red-600 hover:bg-red-500 disabled:bg-coolgray-200"
 									type="submit">Delete User</button
 								>
 							</form>
@@ -177,7 +177,7 @@
 					<a href="/iam/team/{team.id}" class="w-96 p-2 no-underline">
 						<div
 							class="box-selection relative"
-							class:hover:bg-cyan-600={team.id !== '0'}
+							class:hover:bg-fuchsia-600={team.id !== '0'}
 							class:hover:bg-red-500={team.id === '0'}
 						>
 							<div class="truncate text-center text-xl font-bold">
@@ -201,7 +201,7 @@
 						<a href="/iam/team/{team.id}" class="w-96 p-2 no-underline">
 							<div
 								class="box-selection relative"
-								class:hover:bg-cyan-600={team.id !== '0'}
+								class:hover:bg-fuchsia-600={team.id !== '0'}
 								class:hover:bg-red-500={team.id === '0'}
 							>
 								<div class="truncate text-center text-xl font-bold">
