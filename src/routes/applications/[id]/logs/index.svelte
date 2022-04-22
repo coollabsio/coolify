@@ -50,25 +50,26 @@
 	async function loadAllLogs() {
 		try {
 			const data: any = await get(`/applications/${id}/logs.json`);
-			lastLog = data.logs[data.logs.length - 1];
-			logs = data.logs;
-			return;
-		} catch ({ error }) {
+			if (data?.logs) {
+				lastLog = data.logs[data.logs.length - 1];
+				logs = data.logs;
+			}
+		} catch (error) {
+			console.log(error);
 			return errorNotification(error);
 		}
 	}
 	async function loadLogs() {
 		try {
 			const newLogs: any = await get(
-				`/applications/${id}/logs.json?since=${lastLog.split(' ')[0]}`
+				`/applications/${id}/logs.json?since=${lastLog?.split(' ')[0] || 0}`
 			);
-			if (newLogs.logs[newLogs.logs.length - 1] !== logs[logs.length - 1]) {
+
+			if (newLogs?.logs && newLogs.logs[newLogs.logs.length - 1] !== logs[logs.length - 1]) {
 				logs = logs.concat(newLogs.logs);
 				lastLog = newLogs.logs[newLogs.logs.length - 1];
 			}
-
-			return;
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}
