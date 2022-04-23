@@ -1,25 +1,26 @@
 <script lang="ts">
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
+	import { t } from '$lib/translations';
 
 	export let service;
 </script>
 
 <div class="flex space-x-1 py-5 font-bold">
-	<div class="title">MinIO Server</div>
+	<div class="title">MinIO</div>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="rootUser">Root User</label>
+	<label for="rootUser">{$t('forms.root_user')}</label>
 	<input
 		name="rootUser"
 		id="rootUser"
-		placeholder="User to login"
+		placeholder={$t('forms.username')}
 		value={service.minio.rootUser}
 		disabled
 		readonly
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="rootUserPassword">Root's Password</label>
+	<label for="rootUserPassword">{$t('forms.roots_password')}</label>
 	<CopyPasswordField
 		id="rootUserPassword"
 		isPasswordField
@@ -30,13 +31,13 @@
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="publicPort">API Port</label>
+	<label for="publicPort">{$t('forms.api_port')}</label>
 	<input
 		name="publicPort"
 		id="publicPort"
 		value={service.minio.publicPort}
 		disabled
 		readonly
-		placeholder="Generated automatically after start"
+		placeholder={$t('forms.generated_automatically_after_start')}
 	/>
 </div>

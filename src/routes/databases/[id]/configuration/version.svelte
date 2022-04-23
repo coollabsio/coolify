@@ -31,6 +31,7 @@
 	import { enhance, errorNotification } from '$lib/form';
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/api';
+	import { t } from '$lib/translations';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -47,7 +48,7 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Select a Database version</div>
+	<div class="mr-4 text-2xl tracking-tight">{$t('database.select_database_version')}</div>
 </div>
 
 <div class="flex flex-wrap justify-center">

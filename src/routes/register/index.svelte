@@ -6,6 +6,7 @@
 	import { session } from '$app/stores';
 	import { post } from '$lib/api';
 	import { errorNotification } from '$lib/form';
+	import { t } from '$lib/translations';
 	import { onMount } from 'svelte';
 
 	let loading = false;
@@ -23,7 +24,7 @@
 		if (loading) return;
 
 		if (password !== passwordCheck) {
-			return errorNotification('Passwords do not match.');
+			return errorNotification($t('forms.passwords_not_match'));
 		}
 		loading = true;
 		try {
@@ -60,7 +61,7 @@
 </div>
 <div class="flex h-screen flex-col items-center justify-center">
 	{#if $session.userId}
-		<div class="flex justify-center px-4 text-xl font-bold">Already logged in...</div>
+		<div class="flex justify-center px-4 text-xl font-bold">{$t('login.already_logged_in')}</div>
 	{:else}
 		<div class="flex justify-center px-4">
 			<form on:submit|preventDefault={handleSubmit} class="flex flex-col py-4 space-y-2">
@@ -76,7 +77,7 @@
 				<input
 					type="email"
 					name="email"
-					placeholder="Email"
+					placeholder={$t('forms.email')}
 					autocomplete="off"
 					required
 					bind:this={emailEl}
@@ -85,14 +86,14 @@
 				<input
 					type="password"
 					name="password"
-					placeholder="Password"
+					placeholder={$t('forms.password')}
 					bind:value={password}
 					required
 				/>
 				<input
 					type="password"
 					name="passwordCheck"
-					placeholder="Password again"
+					placeholder={$t('forms.password_again')}
 					bind:value={passwordCheck}
 					required
 				/>
@@ -104,17 +105,15 @@
 						disabled={loading}
 						class:bg-transparent={loading}
 						class:text-stone-600={loading}
-						class:bg-coollabs={!loading}>{loading ? 'Registering...' : 'Register'}</button
+						class:bg-coollabs={!loading}
+						>{loading ? $t('register.registering') : $t('register.register')}</button
 					>
 				</div>
 			</form>
 		</div>
 		{#if userCount === 0}
 			<div class="pt-5">
-				You are registering the first user. It will be the administrator of your Coolify instance.
-				<br />
-				It will take a while, because Coolify will configure itself, the proxy and other docker related
-				stuff.
+				{$t('register.first_user')}
 			</div>
 		{/if}
 	{/if}

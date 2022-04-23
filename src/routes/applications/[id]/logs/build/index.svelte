@@ -26,6 +26,7 @@
 	import BuildLog from './_BuildLog.svelte';
 	import { get } from '$lib/api';
 	import { errorNotification } from '$lib/form';
+	import { t } from '$lib/translations';
 
 	export let builds;
 	export let application;
@@ -86,7 +87,9 @@
 
 <div class="flex items-center space-x-2 p-5 px-6 font-bold">
 	<div class="-mb-5 flex-col">
-		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">Build Logs</div>
+		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
+			{$t('application.build_logs')}
+		</div>
 		<span class="text-xs">{application.name} </span>
 	</div>
 
@@ -183,12 +186,14 @@
 
 					<div class="w-48 text-center text-xs">
 						{#if build.status === 'running'}
-							<div class="font-bold">Running</div>
+							<div class="font-bold">{$t('application.build.running')}</div>
 						{:else if build.status === 'queued'}
-							<div class="font-bold">Queued</div>
+							<div class="font-bold">{$t('application.build.queued')}</div>
 						{:else}
 							<div>{build.since}</div>
-							<div>Finished in <span class="font-bold">{build.took}s</span></div>
+							<div>
+								{$t('application.build.finished_in')} <span class="font-bold">{build.took}s</span>
+							</div>
 						{/if}
 					</div>
 				</div>
@@ -197,7 +202,8 @@
 		{#if !noMoreBuilds}
 			{#if buildCount > 5}
 				<div class="flex space-x-2">
-					<button disabled={noMoreBuilds} class="w-full" on:click={loadMoreBuilds}>Load More</button
+					<button disabled={noMoreBuilds} class="w-full" on:click={loadMoreBuilds}
+						>{$t('application.build.load_more')}</button
 					>
 				</div>
 			{/if}
@@ -212,5 +218,5 @@
 	</div>
 </div>
 {#if buildCount === 0}
-	<div class="text-center text-xl font-bold">No logs found</div>
+	<div class="text-center text-xl font-bold">{$t('application.build.no_logs')}</div>
 {/if}

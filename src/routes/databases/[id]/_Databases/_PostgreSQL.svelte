@@ -3,6 +3,7 @@
 	export let isRunning;
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
+	import { t } from '$lib/translations';
 </script>
 
 <div class="flex space-x-1 py-5 font-bold">
@@ -10,12 +11,14 @@
 </div>
 <div class="space-y-2 px-10">
 	<div class="grid grid-cols-2 items-center">
-		<label for="defaultDatabase" class="text-base font-bold text-stone-100">Default Database</label>
+		<label for="defaultDatabase" class="text-base font-bold text-stone-100"
+			>{$t('database.default_database')}</label
+		>
 		<CopyPasswordField
 			required
 			readonly={database.defaultDatabase}
 			disabled={database.defaultDatabase}
-			placeholder="eg: mydb"
+			placeholder="{$t('forms.eg')}: mydb"
 			id="defaultDatabase"
 			name="defaultDatabase"
 			bind:value={database.defaultDatabase}
@@ -37,22 +40,24 @@
 		<Explainer text="Could be changed while the database is running." />
 	</div>
 	<div class="grid grid-cols-2 items-center">
-		<label for="dbUser" class="text-base font-bold text-stone-100">User</label>
+		<label for="dbUser" class="text-base font-bold text-stone-100">{$t('forms.user')}</label>
 		<CopyPasswordField
 			readonly
 			disabled
-			placeholder="Generated automatically after start"
+			placeholder={$t('forms.generated_automatically_after_start')}
 			id="dbUser"
 			name="dbUser"
 			value={database.dbUser}
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center">
-		<label for="dbUserPassword" class="text-base font-bold text-stone-100">Password</label>
+		<label for="dbUserPassword" class="text-base font-bold text-stone-100"
+			>{$t('forms.password')}</label
+		>
 		<CopyPasswordField
 			disabled={!isRunning}
 			readonly={!isRunning}
-			placeholder="Generated automatically after start"
+			placeholder={$t('forms.generated_automatically_after_start')}
 			isPasswordField
 			id="dbUserPassword"
 			name="dbUserPassword"

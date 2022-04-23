@@ -9,6 +9,7 @@
 	import { post } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { session } from '$app/stores';
+	import { t } from '$lib/translations';
 
 	async function newDatabase() {
 		const { id } = await post('/databases/new', {});
@@ -27,7 +28,7 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Databases</div>
+	<div class="mr-4 text-2xl tracking-tight">{$t('index.databases')}</div>
 	<div on:click={newDatabase} class="add-icon cursor-pointer bg-purple-600 hover:bg-purple-500">
 		<svg
 			class="w-6"
@@ -48,7 +49,7 @@
 <div class="flex flex-col flex-wrap justify-center">
 	{#if !databases || ownDatabases.length === 0}
 		<div class="flex-col">
-			<div class="text-center text-xl font-bold">No databases found</div>
+			<div class="text-center text-xl font-bold">{$t('database.no_databases_found')}</div>
 		</div>
 	{/if}
 	{#if ownDatabases.length > 0 || otherDatabases.length > 0}
@@ -78,7 +79,7 @@
 							{/if}
 							{#if !database.type}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
-									Configuration missing
+									{$t('application.configuration.configuration_missing')}
 								</div>
 							{/if}
 						</div>

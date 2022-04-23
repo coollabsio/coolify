@@ -26,6 +26,7 @@
 	import { getDomain } from '$lib/components/common';
 	import { page } from '$app/stores';
 	import { get } from '$lib/api';
+	import { t } from '$lib/translations';
 	import ServiceLinks from '$lib/components/ServiceLinks.svelte';
 
 	const { id } = $page.params;
@@ -42,7 +43,9 @@
 	class:p-6={!service.fqdn}
 >
 	<div class="-mb-5 flex-col">
-		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">Secrets</div>
+		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
+			{$t('application.secret')}
+		</div>
 		<span class="text-xs">{service.name}</span>
 	</div>
 	{#if service.fqdn}
@@ -74,9 +77,9 @@
 	<table class="mx-auto border-separate text-left">
 		<thead>
 			<tr class="h-12">
-				<th scope="col">Name</th>
-				<th scope="col">Value</th>
-				<th scope="col" class="w-96 text-center">Action</th>
+				<th scope="col">{$t('forms.name')}</th>
+				<th scope="col">{$t('forms.value')}</th>
+				<th scope="col" class="w-96 text-center">{$t('forms.action')}</th>
 			</tr>
 		</thead>
 		<tbody>

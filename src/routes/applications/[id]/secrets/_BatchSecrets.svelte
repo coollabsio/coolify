@@ -6,6 +6,7 @@
 	import { saveSecret } from './utils';
 	import pLimit from 'p-limit';
 	import { createEventDispatcher } from 'svelte';
+	import { t } from '$lib/translations';
 	const dispatch = createEventDispatcher();
 
 	let batchSecrets = '';
@@ -38,11 +39,11 @@
 	}
 </script>
 
-<h2 class="title my-6 font-bold">Paste .env file</h2>
+<h2 class="title my-6 font-bold">{$t('application.secret__batch_dot_env')}</h2>
 <form on:submit|preventDefault={getValues} class="mb-12 w-full">
 	<textarea bind:value={batchSecrets} class="mb-2 min-h-[200px] w-full" />
 	<button
 		class="bg-green-600 hover:bg-green-500 disabled:text-white disabled:opacity-40"
-		type="submit">Batch add secrets</button
+		type="submit">{$t('application.batch_secrets')}</button
 	>
 </form>

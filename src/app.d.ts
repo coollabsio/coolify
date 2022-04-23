@@ -31,6 +31,7 @@ interface SessionData {
 	userId?: string | null;
 	teamId?: string | null;
 	permission?: string;
+	lang?: string;
 	isAdmin?: boolean;
 	expires?: string | null;
 }
