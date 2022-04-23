@@ -87,6 +87,15 @@ I use MinIO as an example.
 
 You need to add a new folder to [src/routes/services/[id]](src/routes/services/[id]) with the low-capital name of the service. It should have three files with the following properties:
 
+1. If you need to store passwords or any persistent data for the service, do the followings:
+
+- Update Prisma schema in [prisma/schema.prisma](prisma/schema.prisma). Add a new model with details about the required fields.
+- If you finished with the Prism schema, update the database schema with `pnpm db:push` command. It will also generate the Prisma Typescript types for you.
+  - Tip: If you use VSCode, you probably need to restart the `Typescript Language Server` to get the new types loaded in the running VSCode.
+- Include the new service to `listServicesWithIncludes` function in `src/lib/database/services.ts`
+
+**Important**: You need to take care of encryption / decryption of the data (where applicable).
+
 1. `index.json.ts`: A POST endpoint that updates Coolify's database about the service.
 
    Basic services only require updating the URL(fqdn) and the name of the service.
@@ -164,19 +173,3 @@ If your language doesn't appear in the [locales folder list](src/lib/locales/), 
 1.  In `src/lib/locales/`, Copy paste `en.json` and rename it with your language (eg: `cz.json`).
 2.  In the [lang.json](src/lib/lang.json) file, add a line after the first bracket (`{`) with `"ISO of your language": "Language",` (eg: `"cz": "Czech",`).
 3.  Have fun translating!
-
-### Additionnal pull requests steps
-
-Please add the emoji 🌐 to your pull request title to indicate that it is a translation.
-
-## 📄 Help sorting out the issues
-
-ToDo
-
-## 🎯 Test Pull Requests
-
-ToDo
-
-## ✒️ Help with the documentation
-
-ToDo
