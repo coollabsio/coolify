@@ -36,10 +36,11 @@
 	import type Prisma from '@prisma/client';
 	import LocalDocker from './_LocalDocker.svelte';
 	import RemoteDocker from './_RemoteDocker.svelte';
+	import { t } from '$lib/translations';
 </script>
 
 <div class="flex space-x-1 p-6 text-2xl font-bold">
-	<div class="tracking-tight">Destination</div>
+	<div class="tracking-tight">{$t('application.destination')}</div>
 	<span class="arrow-right-applications px-1">></span>
 	<span class="pr-2">{destination.name}</span>
 </div>

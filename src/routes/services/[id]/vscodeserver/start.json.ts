@@ -100,12 +100,13 @@ export const post: RequestHandler = async (event) => {
 		await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
 
 		const changePermissionOn = persistentStorage.map((p) => p.path);
-
-		await asyncExecShell(
-			`DOCKER_HOST=${host} docker exec -u root ${id} chown -R 1000:1000 ${changePermissionOn.join(
-				' '
-			)}`
-		);
+		if (changePermissionOn.length > 0) {
+			await asyncExecShell(
+				`DOCKER_HOST=${host} docker exec -u root ${id} chown -R 1000:1000 ${changePermissionOn.join(
+					' '
+				)}`
+			);
+		}
 		return {
 			status: 200
 		};

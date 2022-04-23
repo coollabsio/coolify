@@ -10,6 +10,10 @@ export const get: RequestHandler = async (event) => {
 	if (status === 401) return { status, body };
 
 	const { id } = event.params;
+	let since = event.url.searchParams.get('since') || 0;
+	if (since !== 0) {
+		since = dayjs(since).unix();
+	}
 	try {
 		const { destinationDockerId, destinationDocker } = await db.prisma.application.findUnique({
 			where: { id },
@@ -20,16 +24,22 @@ export const get: RequestHandler = async (event) => {
 			try {
 				const container = await docker.engine.getContainer(id);
 				if (container) {
+					const logs = (
+						await container.logs({
+							stdout: true,
+							stderr: true,
+							timestamps: true,
+							since,
+							tail: 5000
+						})
+					)
+						.toString()
+						.split('\n')
+						.map((l) => l.slice(8))
+						.filter((a) => a);
 					return {
 						body: {
-							logs: (
-								await container.logs({ stdout: true, stderr: true, timestamps: true, tail: 5000 })
-							)
-								.toString()
-								.split('\n')
-								.map((l) => l.slice(8))
-								.filter((a) => a)
-								.reverse()
+							logs
 						}
 					};
 				}

@@ -10,6 +10,7 @@
 	import LoadingLogs from '../_Loading.svelte';
 	import { get } from '$lib/api';
 	import { errorNotification } from '$lib/form';
+	import { t } from '$lib/translations';
 
 	let logs = [];
 	let loading = true;
@@ -84,7 +85,7 @@
 			<LoadingLogs />
 		{/if}
 		{#if currentStatus === 'queued'}
-			<div class="text-center font-bold text-xl">Queued and waiting for execution.</div>
+			<div class="text-center font-bold text-xl">{$t('application.build.queued_waiting_exec')}</div>
 		{:else}
 			<div class="flex justify-end sticky top-0 p-2">
 				<button

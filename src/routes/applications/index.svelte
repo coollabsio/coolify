@@ -3,6 +3,8 @@
 	import { session } from '$app/stores';
 	import { post } from '$lib/api';
 	import { goto } from '$app/navigation';
+	import { t } from '$lib/translations';
+	import { getDomain } from '$lib/components/common';
 
 	import Rust from '$lib/components/svg/applications/Rust.svelte';
 	import Nodejs from '$lib/components/svg/applications/Nodejs.svelte';
@@ -20,7 +22,6 @@
 	import Astro from '$lib/components/svg/applications/Astro.svelte';
 	import Eleventy from '$lib/components/svg/applications/Eleventy.svelte';
 	import Deno from '$lib/components/svg/applications/Deno.svelte';
-	import { getDomain } from '$lib/components/common';
 
 	async function newApplication() {
 		const { id } = await post('/applications/new', {});
@@ -39,7 +40,7 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl ">Applications</div>
+	<div class="mr-4 text-2xl ">{$t('index.applications')}</div>
 	{#if $session.isAdmin}
 		<div on:click={newApplication} class="add-icon cursor-pointer bg-green-600 hover:bg-green-500">
 			<svg
@@ -61,7 +62,7 @@
 <div class="flex flex-col flex-wrap justify-center">
 	{#if !applications || ownApplications.length === 0}
 		<div class="flex-col">
-			<div class="text-center text-xl font-bold">No applications found</div>
+			<div class="text-center text-xl font-bold">{$t('application.no_applications_found')}</div>
 		</div>
 	{/if}
 	{#if ownApplications.length > 0 || otherApplications.length > 0}

@@ -27,6 +27,7 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
 	import { post } from '$lib/api';
+	import { t } from '$lib/translations';
 	const { id } = $page.params;
 	let invitation = {
 		teamName: team.name,
@@ -94,25 +95,22 @@
 </script>
 
 <div class="flex space-x-1 p-6 px-6 text-2xl font-bold">
-	<div class="tracking-tight">Team</div>
-	<span class="arrow-right-applications px-1 text-cyan-500">></span>
+	<div class="tracking-tight">{$t('index.team')}</div>
+	<span class="arrow-right-applications px-1 text-fuchsia-500">></span>
 	<span class="pr-2">{team.name}</span>
 </div>
 <div class="mx-auto max-w-4xl px-6">
 	<form on:submit|preventDefault={handleSubmit} class=" py-4">
 		<div class="flex space-x-1 pb-5">
-			<div class="title font-bold">Settings</div>
-			<button class="bg-cyan-600 hover:bg-cyan-500" type="submit">Save</button>
+			<div class="title font-bold">{$t('index.settings')}</div>
+			<button class="bg-fuchsia-600 hover:bg-fuchsia-500" type="submit">{$t('forms.save')}</button>
 		</div>
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="mt-2 grid grid-cols-2">
 				<div class="flex-col">
-					<label for="name" class="text-base font-bold text-stone-100">Name</label>
+					<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 					{#if team.id === '0'}
-						<Explainer
-							customClass="w-full"
-							text="This is the <span class='text-red-500 font-bold'>root</span> team. That means members of this group can manage instance wide settings and have all the priviliges in Coolify (imagine like root user on Linux)."
-						/>
+						<Explainer customClass="w-full" text={$t('team.root_team_explainer')} />
 					{/if}
 				</div>
 				<input id="name" name="name" placeholder="name" bind:value={team.name} />
@@ -121,22 +119,23 @@
 	</form>
 
 	<div class="flex space-x-1 py-5 pt-10 font-bold">
-		<div class="title">Members</div>
+		<div class="title">{$t('team.members')}</div>
 	</div>
 	<div class="px-4 sm:px-6">
 		<table class="w-full border-separate text-left">
 			<thead>
 				<tr class="h-8 border-b border-coolgray-400">
-					<th scope="col">Email</th>
-					<th scope="col">Permission</th>
-					<th scope="col" class="text-center">Actions</th>
+					<th scope="col">{$t('forms.email')}</th>
+					<th scope="col">{$t('team.permission')}</th>
+					<th scope="col" class="text-center">{$t('forms.action')}</th>
 				</tr>
 			</thead>
 			{#each permissions as permission}
 				<tr class="text-xs">
 					<td class="py-4"
 						>{permission.user.email}
-						<span class="font-bold">{permission.user.id === $session.userId ? '(You)' : ''}</span
+						<span class="font-bold"
+							>{permission.user.id === $session.userId ? $t('team.you') : ''}</span
 						></td
 					>
 					<td class="py-4">{permission.permission}</td>
@@ -144,17 +143,21 @@
 						<td class="flex flex-col items-center justify-center space-y-2 py-4 text-center">
 							<button
 								class="w-52 bg-red-600 hover:bg-red-500"
-								on:click={() => removeFromTeam(permission.user.id)}>Remove</button
+								on:click={() => removeFromTeam(permission.user.id)}>{$t('forms.remove')}</button
 							>
 							<button
 								class="w-52"
 								on:click={() =>
 									changePermission(permission.user.id, permission.id, permission.permission)}
-								>Promote to {permission.permission === 'admin' ? 'read' : 'admin'}</button
+								>{$t('team.promote_to', {
+									grade: permission.permission === 'admin' ? 'read' : 'admin'
+								})}</button
 							>
 						</td>
 					{:else}
-						<td class="text-center py-4 flex-col space-y-2"> No actions available </td>
+						<td class="text-center py-4 flex-col space-y-2">
+							{$t('forms.no_actions_available')}
+						</td>
 					{/if}
 				</tr>
 			{/each}
@@ -167,11 +170,12 @@
 						<td class="flex-col space-y-2 py-4 text-center">
 							<button
 								class="w-52 bg-red-600 hover:bg-red-500"
-								on:click={() => revokeInvitation(invitation.id)}>Revoke invitation</button
+								on:click={() => revokeInvitation(invitation.id)}
+								>{$t('team.revoke_invitation')}</button
 							>
 						</td>
 					{:else}
-						<td class="text-center py-4 flex-col space-y-2">Pending invitation</td>
+						<td class="text-center py-4 flex-col space-y-2">{$t('team.pending_invitation')}</td>
 					{/if}
 				</tr>
 			{/each}
@@ -181,18 +185,18 @@
 		<form on:submit|preventDefault={sendInvitation} class="py-5 pt-10">
 			<div class="flex space-x-1">
 				<div class="flex space-x-1">
-					<div class="title font-bold">Invite new member</div>
-					<button class="bg-cyan-600 hover:bg-cyan-500" type="submit">Send invitation</button>
+					<div class="title font-bold">{$t('team.invite_new_member')}</div>
+					<button class="bg-fuchsia-600 hover:bg-fuchsia-500" type="submit"
+						>{$t('team.send_invitation')}</button
+					>
 				</div>
 			</div>
-			<Explainer
-				text="You can only invite registered users at the moment - will be extended soon."
-			/>
+			<Explainer text={$t('team.invite_only_register_explainer')} />
 			<div class="flex-col space-y-2 px-4 pt-5 sm:px-6">
 				<div class="flex space-x-0">
 					<input
 						bind:value={invitation.email}
-						placeholder="Email address"
+						placeholder={$t('forms.email')}
 						class="mr-2 w-full"
 						required
 					/>
@@ -202,14 +206,14 @@
 						class="rounded-none rounded-l border border-dashed border-transparent"
 						type="button"
 						class:border-coolgray-300={invitation.permission !== 'read'}
-						class:bg-pink-500={invitation.permission === 'read'}>Read</button
+						class:bg-fuchsia-500={invitation.permission === 'read'}>{$t('team.read')}</button
 					>
 					<button
 						on:click={() => (invitation.permission = 'admin')}
 						class="rounded-none rounded-r border border-dashed border-transparent"
 						type="button"
 						class:border-coolgray-300={invitation.permission !== 'admin'}
-						class:bg-red-500={invitation.permission === 'admin'}>Admin</button
+						class:bg-red-500={invitation.permission === 'admin'}>{$t('team.admin')}</button
 					>
 				</div>
 			</div>

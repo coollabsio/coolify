@@ -32,6 +32,7 @@
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/api';
 	import { supportedServiceTypesAndVersions } from '$lib/components/common';
+	import { t } from '$lib/translations';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -52,7 +53,7 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Select a Service version</div>
+	<div class="mr-4 text-2xl tracking-tight">{$t('forms.select_a_service_version')}</div>
 </div>
 {#if from}
 	<div class="pb-10 text-center">

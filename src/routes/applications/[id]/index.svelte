@@ -49,6 +49,7 @@
 	import cuid from 'cuid';
 	import { browser } from '$app/env';
 	import { disabledButton } from '$lib/store';
+	import { t } from '$lib/translations';
 	const { id } = $page.params;
 
 	let domainEl: HTMLInputElement;
@@ -101,7 +102,7 @@
 				branch: application.branch,
 				projectId: application.projectId
 			});
-			return toast.push('Settings saved.');
+			return toast.push($t('application.settings_saved'));
 		} catch ({ error }) {
 			if (name === 'debug') {
 				debug = !debug;
@@ -126,7 +127,7 @@
 			$disabledButton = false;
 			return toast.push('Configurations saved.');
 		} catch ({ error }) {
-			if (error?.startsWith('DNS not set')) {
+			if (error?.startsWith($t('application.dns_not_set_partial_error'))) {
 				forceSave = true;
 			}
 			return errorNotification(error);
@@ -216,7 +217,7 @@
 	<!-- svelte-ignore missing-declaration -->
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
 		<div class="flex space-x-1 pb-5 font-bold">
-			<div class="title">General</div>
+			<div class="title">{$t('general')}</div>
 			{#if $session.isAdmin}
 				<button
 					type="submit"
@@ -225,13 +226,17 @@
 					class:hover:bg-green-500={!loading}
 					class:hover:bg-orange-400={forceSave}
 					disabled={loading}
-					>{loading ? 'Saving...' : forceSave ? 'Are you sure to continue?' : 'Save'}</button
+					>{loading
+						? $t('forms.saving')
+						: forceSave
+						? $t('forms.confirm_continue')
+						: $t('forms.save')}</button
 				>
 			{/if}
 		</div>
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="mt-2 grid grid-cols-2 items-center">
-				<label for="name" class="text-base font-bold text-stone-100">Name</label>
+				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 				<input
 					readonly={!$session.isAdmin}
 					name="name"
@@ -241,7 +246,9 @@
 				/>
 			</div>
 			<div class="grid grid-cols-2 items-center">
-				<label for="gitSource" class="text-base font-bold text-stone-100">Git Source</label>
+				<label for="gitSource" class="text-base font-bold text-stone-100"
+					>{$t('application.git_source')}</label
+				>
 				<a
 					href={$session.isAdmin
 						? `/applications/${id}/configuration/source?from=/applications/${id}`
@@ -256,7 +263,9 @@
 				>
 			</div>
 			<div class="grid grid-cols-2 items-center">
-				<label for="repository" class="text-base font-bold text-stone-100">Git Repository</label>
+				<label for="repository" class="text-base font-bold text-stone-100"
+					>{$t('application.git_repository')}</label
+				>
 				<a
 					href={$session.isAdmin
 						? `/applications/${id}/configuration/repository?from=/applications/${id}&to=/applications/${id}/configuration/buildpack`
@@ -271,7 +280,9 @@
 				>
 			</div>
 			<div class="grid grid-cols-2 items-center">
-				<label for="buildPack" class="text-base font-bold text-stone-100">Build Pack</label>
+				<label for="buildPack" class="text-base font-bold text-stone-100"
+					>{$t('application.build_pack')}</label
+				>
 				<a
 					href={$session.isAdmin
 						? `/applications/${id}/configuration/buildpack?from=/applications/${id}`
@@ -287,7 +298,9 @@
 				>
 			</div>
 			<div class="grid grid-cols-2 items-center pb-8">
-				<label for="destination" class="text-base font-bold text-stone-100">Destination</label>
+				<label for="destination" class="text-base font-bold text-stone-100"
+					>{$t('application.destination')}</label
+				>
 				<div class="no-underline">
 					<input
 						value={application.destinationDocker.name}
@@ -299,20 +312,20 @@
 			</div>
 		</div>
 		<div class="flex space-x-1 py-5 font-bold">
-			<div class="title">Application</div>
+			<div class="title">{$t('application.application')}</div>
 		</div>
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="grid grid-cols-2">
 				<div class="flex-col">
-					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">URL (FQDN)</label>
+					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100"
+						>{$t('application.url_fqdn')}</label
+					>
 					{#if browser && window.location.hostname === 'demo.coolify.io'}
 						<Explainer
 							text="<span class='text-white font-bold'>You can use the predefined random url name or enter your own domain name.</span>"
 						/>
 					{/if}
-					<Explainer
-						text="If you specify <span class='text-green-500 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-green-500 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the url, you must first stop the application.<br><br><span class='text-white font-bold'>You must set your DNS to point to the server IP in advance.</span>"
-					/>
+					<Explainer text={$t('application.https_explainer')} />
 				</div>
 				<input
 					readonly={!$session.isAdmin || isRunning}
@@ -328,12 +341,12 @@
 			</div>
 			<div class="grid grid-cols-2 items-center pb-8">
 				<Setting
-					dataTooltip="Must be stopped to modify."
+					dataTooltip={$t('forms.must_be_stopped_to_modify')}
 					disabled={isRunning}
 					isCenter={false}
 					bind:setting={dualCerts}
-					title="Generate SSL for www and non-www?"
-					description="It will generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-green-500'>both DNS entries</span> set in advance.<br><br>Useful if you expect to have visitors on both."
+					title={$t('application.ssl_www_and_non_www')}
+					description={$t('application.ssl_explainer')}
 					on:click={() => !isRunning && changeSettings('dualCerts')}
 				/>
 			</div>
@@ -372,13 +385,13 @@
 			{/if}
 			{#if !staticDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-2 items-center">
-					<label for="port" class="text-base font-bold text-stone-100">Port</label>
+					<label for="port" class="text-base font-bold text-stone-100">{$t('forms.port')}</label>
 					<input
 						readonly={!$session.isAdmin}
 						name="port"
 						id="port"
 						bind:value={application.port}
-						placeholder={application.buildPack === 'python' ? '8000' : '3000'}
+						placeholder="{$t('forms.default')}: 'python' ? '8000' : '3000'"
 					/>
 				</div>
 			{/if}
@@ -386,34 +399,38 @@
 			{#if !notNodeDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-2 items-center">
 					<label for="installCommand" class="text-base font-bold text-stone-100"
-						>Install Command</label
+						>{$t('application.install_command')}</label
 					>
 					<input
 						readonly={!$session.isAdmin}
 						name="installCommand"
 						id="installCommand"
 						bind:value={application.installCommand}
-						placeholder="default: yarn install"
+						placeholder="{$t('forms.default')}: yarn install"
 					/>
 				</div>
 				<div class="grid grid-cols-2 items-center">
-					<label for="buildCommand" class="text-base font-bold text-stone-100">Build Command</label>
+					<label for="buildCommand" class="text-base font-bold text-stone-100"
+						>{$t('application.build_command')}</label
+					>
 					<input
 						readonly={!$session.isAdmin}
 						name="buildCommand"
 						id="buildCommand"
 						bind:value={application.buildCommand}
-						placeholder="default: yarn build"
+						placeholder="{$t('forms.default')}: yarn build"
 					/>
 				</div>
 				<div class="grid grid-cols-2 items-center">
-					<label for="startCommand" class="text-base font-bold text-stone-100">Start Command</label>
+					<label for="startCommand" class="text-base font-bold text-stone-100"
+						>{$t('application.start_command')}</label
+					>
 					<input
 						readonly={!$session.isAdmin}
 						name="startCommand"
 						id="startCommand"
 						bind:value={application.startCommand}
-						placeholder="default: yarn start"
+						placeholder="{$t('forms.default')}: yarn start"
 					/>
 				</div>
 			{/if}
@@ -462,29 +479,25 @@
 			<div class="grid grid-cols-2 items-center">
 				<div class="flex-col">
 					<label for="baseDirectory" class="pt-2 text-base font-bold text-stone-100"
-						>Base Directory</label
+						>{$t('forms.base_directory')}</label
 					>
-					<Explainer
-						text="Directory to use as the base for all commands.<br>Could be useful with <span class='text-green-500 font-bold'>monorepos</span>."
-					/>
+					<Explainer text={$t('application.directory_to_use_explainer')} />
 				</div>
 				<input
 					readonly={!$session.isAdmin}
 					name="baseDirectory"
 					id="baseDirectory"
 					bind:value={application.baseDirectory}
-					placeholder="default: /"
+					placeholder="{$t('forms.default')}: /"
 				/>
 			</div>
 			{#if !notNodeDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-2 items-center">
 					<div class="flex-col">
 						<label for="publishDirectory" class="pt-2 text-base font-bold text-stone-100"
-							>Publish Directory</label
+							>{$t('forms.publish_directory')}</label
 						>
-						<Explainer
-							text="Directory containing all the assets for deployment. <br> For example: <span class='text-green-500 font-bold'>dist</span>,<span class='text-green-500 font-bold'>_site</span> or <span class='text-green-500 font-bold'>public</span>."
-						/>
+						<Explainer text={$t('application.publish_directory_explainer')} />
 					</div>
 
 					<input
@@ -492,14 +505,14 @@
 						name="publishDirectory"
 						id="publishDirectory"
 						bind:value={application.publishDirectory}
-						placeholder=" default: /"
+						placeholder=" {$t('forms.default')}: /"
 					/>
 				</div>
 			{/if}
 		</div>
 	</form>
 	<div class="flex space-x-1 pb-5 font-bold">
-		<div class="title">Features</div>
+		<div class="title">{$t('application.features')}</div>
 	</div>
 	<div class="px-10 pb-10">
 		<div class="grid grid-cols-2 items-center">
@@ -507,8 +520,8 @@
 				isCenter={false}
 				bind:setting={autodeploy}
 				on:click={() => changeSettings('autodeploy')}
-				title="Enable Automatic Deployment"
-				description="Enable automatic deployment through webhooks."
+				title={$t('application.enable_automatic_deployment')}
+				description={$t('application.enable_auto_deploy_webhooks')}
 			/>
 		</div>
 		<div class="grid grid-cols-2 items-center">
@@ -516,8 +529,8 @@
 				isCenter={false}
 				bind:setting={previews}
 				on:click={() => changeSettings('previews')}
-				title="Enable MR/PR Previews"
-				description="Enable preview deployments from pull or merge requests."
+				title={$t('application.enable_mr_pr_previews')}
+				description={$t('application.enable_preview_deploy_mr_pr_requests')}
 			/>
 		</div>
 		<div class="grid grid-cols-2 items-center">
@@ -525,8 +538,8 @@
 				isCenter={false}
 				bind:setting={debug}
 				on:click={() => changeSettings('debug')}
-				title="Debug Logs"
-				description="Enable debug logs during build phase.<br><span class='text-red-500 font-bold'>Sensitive information</span> could be visible and saved in logs."
+				title={$t('application.debug_logs')}
+				description={$t('application.enable_debug_log_during_build')}
 			/>
 		</div>
 	</div>

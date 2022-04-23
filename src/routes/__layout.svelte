@@ -1,8 +1,15 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	import { publicPaths } from '$lib/settings';
-
+	import { locale, loadTranslations } from '$lib/translations';
 	export const load: Load = async ({ fetch, url, session }) => {
+		const { pathname } = url;
+
+		const defaultLocale = 'en';
+		const sessionLocale = session.lang;
+		const initLocale = sessionLocale || locale.get() || defaultLocale;
+		await loadTranslations(initLocale, pathname);
+
 		if (!session.userId && !publicPaths.includes(url.pathname)) {
 			return {
 				status: 302,
@@ -39,7 +46,6 @@
 	import { asyncSleep } from '$lib/components/common';
 	import { del, get, post } from '$lib/api';
 	import { browser, dev } from '$app/env';
-
 	let isUpdateAvailable = false;
 
 	let updateStatus = {
@@ -456,7 +462,6 @@
 						<path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
 					</svg>
 				</a>
-
 				{#if $session.teamId === '0'}
 					<a
 						sveltekit:prefetch

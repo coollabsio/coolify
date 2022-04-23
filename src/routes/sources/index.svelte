@@ -39,10 +39,11 @@
 		const { id } = await post('/sources/new', {});
 		return await goto(`/sources/${id}`, { replaceState: true });
 	}
+	import { t } from '$lib/translations';
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Git Sources</div>
+	<div class="mr-4 text-2xl tracking-tight">{$t('index.git_sources')}</div>
 	{#if $session.isAdmin}
 		<button on:click={newSource} class="add-icon bg-orange-600 hover:bg-orange-500">
 			<svg
@@ -64,7 +65,7 @@
 <div class="flex flex-col flex-wrap justify-center">
 	{#if !sources || ownSources.length === 0}
 		<div class="flex-col">
-			<div class="text-center text-xl font-bold">No git sources found</div>
+			<div class="text-center text-xl font-bold">{$t('source.no_git_sources_found')}</div>
 		</div>
 	{/if}
 	{#if ownSources.length > 0 || otherSources.length > 0}
@@ -85,7 +86,7 @@
 
 							{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && source.githubApp?.installationId === null)}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
-									Configuration missing
+									{$t('application.configuration.configuration_missing')}
 								</div>
 							{:else}
 								<div class="truncate text-center">{getDomain(source.htmlUrl) || ''}</div>
@@ -112,7 +113,7 @@
 								{/if}
 								{#if (source.type === 'gitlab' && !source.gitlabAppId) || (source.type === 'github' && source.githubApp?.installationId === null)}
 									<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
-										Configuration missing
+										{$t('application.configuration.configuration_missing')}
 									</div>
 								{:else}
 									<div class="truncate text-center">{source.htmlUrl}</div>

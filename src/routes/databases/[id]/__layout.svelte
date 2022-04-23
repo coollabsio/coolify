@@ -63,6 +63,7 @@
 	import Loading from '$lib/components/Loading.svelte';
 	import { del, post } from '$lib/api';
 	import { goto } from '$app/navigation';
+	import { t } from '$lib/translations';
 
 	export let database;
 	export let isRunning;
@@ -83,7 +84,7 @@
 		}
 	}
 	async function stopDatabase() {
-		const sure = confirm(`Are you sure you would like to stop '${database.name}'?`);
+		const sure = confirm($t('database.confirm_stop', { name: database.name }));
 		if (sure) {
 			loading = true;
 			try {
@@ -113,13 +114,13 @@
 			{#if isRunning}
 				<button
 					on:click={stopDatabase}
-					title="Stop database"
+					title={$t('database.stop_database')}
 					type="submit"
 					disabled={!$session.isAdmin}
 					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
 					data-tooltip={$session.isAdmin
-						? 'Stop database'
-						: 'You do not have permission to stop the database.'}
+						? $t('database.stop_database')
+						: $t('database.permission_denied_stop_database')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -139,13 +140,13 @@
 			{:else}
 				<button
 					on:click={startDatabase}
-					title="Start database"
+					title={$t('database.start_database')}
 					type="submit"
 					disabled={!$session.isAdmin}
 					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
 					data-tooltip={$session.isAdmin
-						? 'Start database'
-						: 'You do not have permission to start the database.'}
+						? $t('database.start_database')
+						: $t('database.permission_denied_start_database')}
 					><svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="w-6 h-6"
@@ -164,14 +165,14 @@
 		{/if}
 		<button
 			on:click={deleteDatabase}
-			title="Delete Database"
+			title={$t('database.delete_database')}
 			type="submit"
 			disabled={!$session.isAdmin}
 			class:hover:text-red-500={$session.isAdmin}
 			class="icons bg-transparent tooltip-bottom text-sm"
 			data-tooltip={$session.isAdmin
-				? 'Delete Database'
-				: 'You do not have permission to delete a Database'}><DeleteIcon /></button
+				? $t('database.delete_database')
+				: $t('database.permission_denied_delete_database')}><DeleteIcon /></button
 		>
 	{/if}
 </nav>

@@ -12,6 +12,11 @@ const config = {
 		vite: {
 			optimizeDeps: {
 				exclude: ['svelte-kit-cookie-session']
+			},
+			server: {
+				fs: {
+					allow: ['./src/lib/locales/']
+				}
 			}
 		}
 	}

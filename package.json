@@ -1,7 +1,7 @@
 {
 	"name": "coolify",
 	"description": "An open-source & self-hostable Heroku / Netlify alternative.",
-	"version": "2.5.0",
+	"version": "2.5.1",
 	"license": "AGPL-3.0",
 	"scripts": {
 		"dev": "docker-compose -f docker-compose-dev.yaml up -d && cross-env NODE_ENV=development & svelte-kit dev --host 0.0.0.0",
@@ -56,6 +56,7 @@
 		"svelte-preprocess": "4.10.6",
 		"svelte-select": "4.4.7",
 		"tailwindcss": "3.0.24",
+		"sveltekit-i18n": "2.1.2",
 		"ts-node": "10.7.0",
 		"tslib": "2.3.1",
 		"typescript": "4.6.3"

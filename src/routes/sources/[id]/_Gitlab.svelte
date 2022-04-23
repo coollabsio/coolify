@@ -10,6 +10,7 @@
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { toast } from '@zerodevx/svelte-toast';
 
+	import { t } from '$lib/translations';
 	const { id } = $page.params;
 	let url = browser ? (settings.fqdn ? settings.fqdn : window.location.origin) : '';
 
@@ -130,10 +131,12 @@
 					type="submit"
 					class:bg-orange-600={!loading}
 					class:hover:bg-orange-500={!loading}
-					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
+					disabled={loading}>{loading ? $t('forms.saving') : $t('forms.save')}</button
 				>
 				{#if source.gitlabAppId}
-					<button on:click|preventDefault={changeSettings}>Change GitLab App Settings</button>
+					<button on:click|preventDefault={changeSettings}
+						>{$t('source.change_app_settings', { name: 'GitLab' })}</button
+					>
 				{/if}
 			{/if}
 		</div>
@@ -144,10 +147,10 @@
 						>GitLab Application Type</label
 					>
 					<select name="type" id="type" class="w-96" bind:value={applicationType}>
-						<option value="user">User owned application</option>
-						<option value="group">Group owned application</option>
+						<option value="user">{$t('source.gitlab.user_owned')}</option>
+						<option value="group">{$t('source.gitlab.group_owned')}</option>
 						{#if source.htmlUrl !== 'https://gitlab.com'}
-							<option value="instance">Instance-wide application (self-hosted)</option>
+							<option value="instance">{$t('source.gitlab.self_hosted')}</option>
 						{/if}
 					</select>
 				</div>
@@ -167,13 +170,15 @@
 
 			<div class="grid grid-flow-row gap-2">
 				<div class="mt-2 grid grid-cols-2 items-center">
-					<label for="name" class="text-base font-bold text-stone-100">Name</label>
+					<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 					<input name="name" id="name" required bind:value={source.name} />
 				</div>
 			</div>
 			{#if source.gitlabApp.groupName}
 				<div class="grid grid-cols-2 items-center">
-					<label for="groupName" class="text-base font-bold text-stone-100">Group Name</label>
+					<label for="groupName" class="text-base font-bold text-stone-100"
+						>{$t('source.group_name')}</label
+					>
 					<input
 						name="groupName"
 						id="groupName"
@@ -194,11 +199,11 @@
 			</div>
 			<div class="grid grid-cols-2 items-start">
 				<div class="flex-col">
-					<label for="oauthId" class="pt-2 text-base font-bold text-stone-100">OAuth ID</label>
+					<label for="oauthId" class="pt-2 text-base font-bold text-stone-100"
+						>{$t('source.oauth_id')}</label
+					>
 					{#if !source.gitlabAppId}
-						<Explainer
-							text="The OAuth ID is the unique identifier of the GitLab application. <br>You can find it <span class='font-bold text-orange-600' >in the URL</span> of your GitLab OAuth Application."
-						/>
+						<Explainer text={$t('source.oauth_id_explainer')} />
 					{/if}
 				</div>
 				<input
@@ -215,7 +220,9 @@
 			</div>
 
 			<div class="grid grid-cols-2 items-center">
-				<label for="appId" class="text-base font-bold text-stone-100">Application ID</label>
+				<label for="appId" class="text-base font-bold text-stone-100"
+					>{$t('source.application_id')}</label
+				>
 				<input
 					name="appId"
 					id="appId"
@@ -226,7 +233,9 @@
 				/>
 			</div>
 			<div class="grid grid-cols-2 items-center">
-				<label for="appSecret" class="text-base font-bold text-stone-100">Secret</label>
+				<label for="appSecret" class="text-base font-bold text-stone-100"
+					>{$t('index.secret')}</label
+				>
 				<CopyPasswordField
 					disabled={source.gitlabAppId}
 					readonly={source.gitlabAppId}

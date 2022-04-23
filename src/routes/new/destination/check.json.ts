@@ -1,5 +1,6 @@
 import { getUserDetails } from '$lib/common';
 import { isDockerNetworkExists, ErrorHandler } from '$lib/database';
+import { t } from '$lib/translations';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler = async (event) => {
@@ -9,9 +10,10 @@ export const post: RequestHandler = async (event) => {
 	const { network } = await event.request.json();
 	try {
 		const found = await isDockerNetworkExists({ network });
+
 		if (found) {
 			throw {
-				error: `Network ${network} already configured for another team!`
+				error: t.get('destination.new_error_network_already_exists', { network: network })
 			};
 		}
 		return {

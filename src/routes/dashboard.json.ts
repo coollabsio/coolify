@@ -57,7 +57,8 @@ export const post: RequestHandler = async (event) => {
 		headers: {
 			'set-cookie': [
 				`${cookie}=${value}; HttpOnly; Path=/; Max-Age=15778800;`,
-				'gitlabToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+				'gitlabToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT',
+				'githubToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
 			],
 			Location: from
 		}
