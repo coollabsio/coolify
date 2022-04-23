@@ -92,9 +92,9 @@ You need to add a new folder to [src/routes/services/[id]](src/routes/services/[
 - Update Prisma schema in [prisma/schema.prisma](prisma/schema.prisma). Add a new model with details about the required fields.
 - If you finished with the Prism schema, update the database schema with `pnpm db:push` command. It will also generate the Prisma Typescript types for you.
   - Tip: If you use VSCode, you probably need to restart the `Typescript Language Server` to get the new types loaded in the running VSCode.
-- Include the new service to `listServicesWithIncludes` function in `src/lib/database/services.ts`
+- Include the new service to `listServicesWithIncludes` function in [src/lib/database/services.ts](src/lib/database/services.ts)
 
-**Important**: You need to take care of encryption / decryption of the data (where applicable).
+  **Important**: You need to take care of encryption / decryption of the data (where applicable).
 
 2. `index.json.ts`: A POST endpoint that updates Coolify's database about the service.
 
