@@ -96,11 +96,11 @@ You need to add a new folder to [src/routes/services/[id]](src/routes/services/[
 
 **Important**: You need to take care of encryption / decryption of the data (where applicable).
 
-1. `index.json.ts`: A POST endpoint that updates Coolify's database about the service.
+2. `index.json.ts`: A POST endpoint that updates Coolify's database about the service.
 
    Basic services only require updating the URL(fqdn) and the name of the service.
 
-2. `start.json.ts`: A start endpoint that setups the docker-compose file (for Local Docker Engines) and starts the service.
+3. `start.json.ts`: A start endpoint that setups the docker-compose file (for Local Docker Engines) and starts the service.
 
    - To start a service, you need to know Coolify supported images and tags of the service. For that you need to update `supportedServiceTypesAndVersions` function at [src/lib/components/common.ts](src/lib/components/common.ts).
 
@@ -131,11 +131,11 @@ You need to add a new folder to [src/routes/services/[id]](src/routes/services/[
 
    - You could also define an `HTTP` or `TCP` proxy for every other port that should be proxied to your server. (See `startHttpProxy` and `startTcpProxy` functions in [src/lib/haproxy/index.ts](src/lib/haproxy/index.ts))
 
-3. `stop.json.ts` A stop endpoint that stops the service.
+4. `stop.json.ts` A stop endpoint that stops the service.
 
    It needs to stop all the services by their container name and proxies (if applicable).
 
-4. You need to add the automatically generated variables (passwords, users, etc.) for the new service at [src/lib/database/services.ts](src/lib/database/services.ts), `configureServiceType` function.
+5. You need to add the automatically generated variables (passwords, users, etc.) for the new service at [src/lib/database/services.ts](src/lib/database/services.ts), `configureServiceType` function.
 
 ## Frontend
 
