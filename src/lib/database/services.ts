@@ -4,6 +4,20 @@ import cuid from 'cuid';
 import { generatePassword } from '.';
 import { prisma } from './common';
 
+export async function listServicesWithIncludes() {
+	return await prisma.service.findMany({
+		include: {
+			destinationDocker: true,
+			minio: true,
+			plausibleAnalytics: true,
+			vscodeserver: true,
+			wordpress: true,
+			ghost: true,
+			meiliSearch: true
+		},
+		orderBy: { createdAt: 'desc' }
+	});
+}
 export async function listServices(teamId: string): Promise<Service[]> {
 	if (teamId === '0') {
 		return await prisma.service.findMany({ include: { teams: true } });
