@@ -12,9 +12,6 @@ This is a little list of what you can do to help the project:
 
 - [🧑‍💻 Develop your own ideas](#developer-contribution)
 - [🌐 Translate the project](#translation)
-- [📄 Help sorting out the issues](#help-sorting-out-the-issues)
-- [🎯 Test Pull Requests](#test-pull-requests)
-- [✒️ Help with the documentation](#help-with-the-documentation)
 
 ## 👋 Introduction
 
@@ -60,6 +57,7 @@ You need to have [Docker Engine](https://docs.docker.com/engine/install/) instal
 - **Languages**: Node.js / Javascript / Typescript
 - **Framework JS/TS**: Svelte / SvelteKit
 - **Database ORM**: Prisma.io
+- **Docker Engine**
 
 ### Database migrations
 
@@ -83,59 +81,159 @@ You can add any open-source and self-hostable software (service/application) to 
 
 ## Backend
 
-I use MinIO as an example.
+There are 5 steps you should make on the backend side.
 
-You need to add a new folder to [src/routes/services/[id]](src/routes/services/[id]) with the low-capital name of the service. It should have three files with the following properties:
+1. Create Prisma / database schema for the new service.
+2. Add supported versions of the service.
+3. Update global functions.
+4. Create API endpoints.
+5. Define automatically generated variables.
 
-1. If you need to store passwords or any persistent data for the service, do the followings:
+> I will use [Umami](https://umami.is/) as an example service.
 
-- Update Prisma schema in [prisma/schema.prisma](prisma/schema.prisma). Add a new model with details about the required fields.
-- If you finished with the Prism schema, update the database schema with `pnpm db:push` command. It will also generate the Prisma Typescript types for you.
-  - Tip: If you use VSCode, you probably need to restart the `Typescript Language Server` to get the new types loaded in the running VSCode.
-- Include the new service to `listServicesWithIncludes` function in [src/lib/database/services.ts](src/lib/database/services.ts)
+### Create Prisma / database schema for the new service.
 
-  **Important**: You need to take care of encryption / decryption of the data (where applicable).
+You only need to do this if you store passwords or any persistent configuration. Mostly it is required by all services, but there are some exceptions, like NocoDB.
 
-2. `index.json.ts`: A POST endpoint that updates Coolify's database about the service.
+Update Prisma schema in [prisma/schema.prisma](prisma/schema.prisma).
 
-   Basic services only require updating the URL(fqdn) and the name of the service.
+- Add new model with the new service name.
+- Make a relationshup with `Service` model.
+- In the `Service` model, the name of the new field should be with low-capital.
+- If the service needs a database, define a `publicPort` field to be able to make it's database public, example field name in case of PostgreSQL: `postgresqlPublicPort`. It should be a optional field.
 
-3. `start.json.ts`: A start endpoint that setups the docker-compose file (for Local Docker Engines) and starts the service.
+If you are finished with the Prisma schema, you should update the database schema with `pnpm db:push` command.
 
-   - To start a service, you need to know Coolify supported images and tags of the service. For that you need to update `supportedServiceTypesAndVersions` function at [src/lib/components/common.ts](src/lib/components/common.ts).
+> You must restart the running development environment to be able to use the new model
 
-     Example JSON:
+> If you use VSCode, you probably need to restart the `Typescript Language Server` to get the new types loaded in the running VSCode.
 
-     ```js
+### Add supported versions
+
+Supported versions are hardcoded into Coolify (for now).
+
+You need to update `supportedServiceTypesAndVersions` function at [src/lib/components/common.ts](src/lib/components/common.ts). Example JSON:
+
+```js
      {
-       // Name used to identify the service in Coolify
-       name: 'minio',
+       // Name used to identify the service internally
+       name: 'umami',
        // Fancier name to show to the user
-       fancyName: 'MinIO',
+       fancyName: 'Umami',
        // Docker base image for the service
-       baseImage: 'minio/minio',
+       baseImage: 'ghcr.io/mikecao/umami',
+       // Optional: If there is any dependent image, you should list it here
+       images: [],
        // Usable tags
-       versions: ['latest'],
+       versions: ['postgresql-latest'],
        // Which tag is the recommended
-       recommendedVersion: 'latest',
-       // Application's default port, MinIO listens on 9001 (and 9000, more details later on)
+       recommendedVersion: 'postgresql-latest',
+       // Application's default port, Umami listens on 3000
        ports: {
-         main: 9001
+         main: 3000
        }
-     },
-     ```
+     }
+```
 
-   - You need to define a compose file as `const composeFile: ComposeFile` found in [src/routes/services/[id]/minio/start.json.ts](src/routes/services/[id]/minio/start.json.ts)
+### Update global functions
 
-     **IMPORTANT:** It should contain `all the default environment variables` that are required for the service to function correctly and `all the volumes to persist data` in restarts.
+1. Add the new service to the `include` variable in [src/lib/database/services.ts](src/lib/database/services.ts), so it will be included in all places in the database queries where it is required.
 
-   - You could also define an `HTTP` or `TCP` proxy for every other port that should be proxied to your server. (See `startHttpProxy` and `startTcpProxy` functions in [src/lib/haproxy/index.ts](src/lib/haproxy/index.ts))
+```js
+const include: Prisma.ServiceInclude = {
+	destinationDocker: true,
+	persistentStorage: true,
+	serviceSecret: true,
+	minio: true,
+	plausibleAnalytics: true,
+	vscodeserver: true,
+	wordpress: true,
+	ghost: true,
+	meiliSearch: true,
+	umami: true // This line!
+};
+```
 
-4. `stop.json.ts` A stop endpoint that stops the service.
+2. Update the database update query with the new service type to `configureServiceType` function in [src/lib/database/services.ts](src/lib/database/services.ts). This function defines the automatically generated variables (passwords, users, etc.) and it's encryption process (if applicable).
 
-   It needs to stop all the services by their container name and proxies (if applicable).
+```js
+[...]
+else if (type === 'umami') {
+		const postgresqlUser = cuid();
+		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlDatabase = 'umami';
+		const hashSalt = encrypt(generatePassword(64));
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				umami: {
+					create: {
+						postgresqlDatabase,
+						postgresqlPassword,
+						postgresqlUser,
+						hashSalt,
+					}
+				}
+			}
+		});
+	}
+```
 
-5. You need to add the automatically generated variables (passwords, users, etc.) for the new service at [src/lib/database/services.ts](src/lib/database/services.ts), `configureServiceType` function.
+3. Add decryption process for configurations and passwords to `getService` function in [src/lib/database/services.ts](src/lib/database/services.ts)
+
+```js
+if (body.umami?.postgresqlPassword)
+	body.umami.postgresqlPassword = decrypt(body.umami.postgresqlPassword);
+
+if (body.umami?.hashSalt) body.umami.hashSalt = decrypt(body.umami.hashSalt);
+```
+
+4. Add service deletion query to `removeService` function in [src/lib/database/services.ts](src/lib/database/services.ts)
+
+### Create API endpoints.
+
+You need to add a new folder under [src/routes/services/[id]](src/routes/services/[id]) with the low-capital name of the service. You need 3 default files in that folder.
+
+#### `index.json.ts`:
+
+It has a POST endpoint that updates the service details in Coolify's database, such as name, url, other configurations, like passwords. It should look something like this:
+
+```js
+import { getUserDetails } from '$lib/common';
+import * as db from '$lib/database';
+import { ErrorHandler } from '$lib/database';
+import type { RequestHandler } from '@sveltejs/kit';
+
+export const post: RequestHandler = async (event) => {
+	const { status, body } = await getUserDetails(event);
+	if (status === 401) return { status, body };
+
+	const { id } = event.params;
+
+	let { name, fqdn } = await event.request.json();
+	if (fqdn) fqdn = fqdn.toLowerCase();
+
+	try {
+		await db.updateService({ id, fqdn, name });
+		return { status: 201 };
+	} catch (error) {
+		return ErrorHandler(error);
+	}
+};
+```
+
+If it's necessary, you can create your own database update function, specifically for the new service.
+
+#### `start.json.ts`
+
+It has a POST endpoint that sets all the required secrets, persistent volumes, `docker-compose.yaml` file and sends a request to the specified docker engine.
+
+You could also define an `HTTP` or `TCP` proxy for every other port that should be proxied to your server. (See `startHttpProxy` and `startTcpProxy` functions in [src/lib/haproxy/index.ts](src/lib/haproxy/index.ts))
+
+#### `stop.json.ts`
+
+It has a POST endpoint that stops the service and all dependent (TCP/HTTP proxies) containers. If publicPort is specified it also needs to cleanup it from the database.
 
 ## Frontend
 
