@@ -304,7 +304,7 @@
 		"coolify_proxy_settings": "Coolify Proxy Settings",
 		"credential_stat_explainer": "Credentials for <a class=\"text-white font-bold\" href=\"{{link}}\" target=\"_blank\">stats</a> page.",
 		"auto_update_enabled": "Auto update enabled?",
-		"auto_update_enabled_explainer": "Enable automatic updates for Coolify."
+		"auto_update_enabled_explainer": "Enable automatic updates for Coolify. It will be done automatically behind the scenes, if there is no build process running."
 	},
 	"team": {
 		"pending_invitations": "Pending invitations",

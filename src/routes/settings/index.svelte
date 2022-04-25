@@ -194,14 +194,16 @@
 						on:click={() => changeSettings('isRegistrationEnabled')}
 					/>
 				</div>
-				<div class="grid grid-cols-2 items-center">
-					<Setting
-						bind:setting={isAutoUpdateEnabled}
-						title={$t('setting.auto_update_enabled')}
-						description={$t('setting.auto_update_enabled_explainer')}
-						on:click={() => changeSettings('isAutoUpdateEnabled')}
-					/>
-				</div>
+				{#if browser && window.location.hostname === 'staging.coolify.io'}
+					<div class="grid grid-cols-2 items-center">
+						<Setting
+							bind:setting={isAutoUpdateEnabled}
+							title={$t('setting.auto_update_enabled')}
+							description={$t('setting.auto_update_enabled_explainer')}
+							on:click={() => changeSettings('isAutoUpdateEnabled')}
+						/>
+					</div>
+				{/if}
 			</div>
 		</form>
 		<div class="flex space-x-1 pt-6 font-bold">

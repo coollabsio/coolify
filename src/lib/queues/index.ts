@@ -130,6 +130,9 @@ const buildWorker = new Worker(buildQueueName, async (job) => await builder(job)
 	concurrency: 1,
 	...connectionOptions
 });
+buildQueue.resume().catch((err) => {
+	console.log('Build queue failed to resume!', err);
+});
 
 buildWorker.on('completed', async (job: Bullmq.Job) => {
 	try {
@@ -138,7 +141,6 @@ buildWorker.on('completed', async (job: Bullmq.Job) => {
 		setTimeout(async () => {
 			await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'success' } });
 		}, 1234);
-		console.log(error);
 	} finally {
 		const workdir = `/tmp/build-sources/${job.data.repository}/${job.data.build_id}`;
 		if (!dev) await asyncExecShell(`rm -fr ${workdir}`);
@@ -154,7 +156,6 @@ buildWorker.on('failed', async (job: Bullmq.Job, failedReason) => {
 		setTimeout(async () => {
 			await prisma.build.update({ where: { id: job.data.build_id }, data: { status: 'failed' } });
 		}, 1234);
-		console.log(error);
 	} finally {
 		const workdir = `/tmp/build-sources/${job.data.repository}`;
 		if (!dev) await asyncExecShell(`rm -fr ${workdir}`);
