@@ -194,7 +194,7 @@
 						on:click={() => changeSettings('isRegistrationEnabled')}
 					/>
 				</div>
-				{#if browser && window.location.hostname === 'staging.coolify.io'}
+				{#if browser && (window.location.hostname === 'staging.coolify.io' || window.location.hostname === 'localhost')}
 					<div class="grid grid-cols-2 items-center">
 						<Setting
 							bind:setting={isAutoUpdateEnabled}
