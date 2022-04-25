@@ -18,6 +18,7 @@ model Setting {
   proxyPassword         String
   proxyUser             String
   proxyHash             String?
+  isAutoUpdateEnabled   Boolean  @default(false)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }

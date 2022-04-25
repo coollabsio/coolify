@@ -10,6 +10,7 @@ import proxy from './proxy';
 import proxyTcpHttp from './proxyTcpHttp';
 import ssl from './ssl';
 import sslrenewal from './sslrenewal';
+import autoUpdater from './autoUpdater';
 
 import { asyncExecShell, saveBuildLog } from '$lib/common';
 
@@ -34,19 +35,22 @@ const cron = async (): Promise<void> => {
 	new QueueScheduler('cleanup', connectionOptions);
 	new QueueScheduler('ssl', connectionOptions);
 	new QueueScheduler('sslRenew', connectionOptions);
+	new QueueScheduler('autoUpdater', connectionOptions);
 
 	const queue = {
 		proxy: new Queue('proxy', { ...connectionOptions }),
 		proxyTcpHttp: new Queue('proxyTcpHttp', { ...connectionOptions }),
 		cleanup: new Queue('cleanup', { ...connectionOptions }),
 		ssl: new Queue('ssl', { ...connectionOptions }),
-		sslRenew: new Queue('sslRenew', { ...connectionOptions })
+		sslRenew: new Queue('sslRenew', { ...connectionOptions }),
+		autoUpdater: new Queue('autoUpdater', { ...connectionOptions })
 	};
 	await queue.proxy.drain();
 	await queue.proxyTcpHttp.drain();
 	await queue.cleanup.drain();
 	await queue.ssl.drain();
 	await queue.sslRenew.drain();
+	await queue.autoUpdater.drain();
 
 	new Worker(
 		'proxy',
@@ -98,11 +102,22 @@ const cron = async (): Promise<void> => {
 		}
 	);
 
+	new Worker(
+		'autoUpdater',
+		async () => {
+			await autoUpdater();
+		},
+		{
+			...connectionOptions
+		}
+	);
+
 	await queue.proxy.add('proxy', {}, { repeat: { every: 10000 } });
 	await queue.proxyTcpHttp.add('proxyTcpHttp', {}, { repeat: { every: 10000 } });
 	await queue.ssl.add('ssl', {}, { repeat: { every: dev ? 10000 : 60000 } });
 	if (!dev) await queue.cleanup.add('cleanup', {}, { repeat: { every: 300000 } });
 	await queue.sslRenew.add('sslRenew', {}, { repeat: { every: 1800000 } });
+	await queue.autoUpdater.add('autoUpdater', {}, { repeat: { every: 60000 } });
 };
 cron().catch((error) => {
 	console.log('cron failed to start');
