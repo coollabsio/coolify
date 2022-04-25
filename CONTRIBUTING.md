@@ -241,7 +241,11 @@ It has a POST endpoint that stops the service and all dependent (TCP/HTTP proxie
 
    SVG is recommended, but you can use PNG as well. It should have the `isAbsolute` variable with the suitable CSS classes, primarily for sizing and positioning.
 
-2. You need to include it the logo at [src/routes/services/index.svelte](src/routes/services/index.svelte) with `isAbsolute` and [src/lib/components/ServiceLinks.svelte](src/lib/components/ServiceLinks.svelte) with a link to the docs/main site of the service.
+2. You need to include it the logo at
+
+- [src/routes/services/index.svelte](src/routes/services/index.svelte) with `isAbsolute` in two places,
+- [src/lib/components/ServiceLinks.svelte](src/lib/components/ServiceLinks.svelte) with `isAbsolute` and a link to the docs/main site of the service
+- [src/routes/services/[id]/configuration/type.svelte](src/routes/services/[id]/configuration/type.svelte) with `isAbsolute`.
 
 3. By default the URL and the name frontend forms are included in [src/routes/services/[id]/\_Services/\_Services.svelte](src/routes/services/[id]/_Services/_Services.svelte).
 
