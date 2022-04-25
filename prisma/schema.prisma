@@ -105,6 +105,7 @@ model Application {
   gitSource           GitSource?                     @relation(fields: [gitSourceId], references: [id])
   secrets             Secret[]
   persistentStorage   ApplicationPersistentStorage[]
+  baseImage           String?
 }
 
 model ApplicationSettings {

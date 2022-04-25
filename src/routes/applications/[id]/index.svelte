@@ -310,6 +310,14 @@
 					/>
 				</div>
 			</div>
+			<div class="grid grid-cols-2 items-center pb-8">
+				<label for="baseImage" class="text-base font-bold text-stone-100"
+					>{$t('application.base_image')}</label
+				>
+				<div class="no-underline">
+					<input value={application.baseImage} id="baseImage" disabled class="bg-transparent " />
+				</div>
+			</div>
 		</div>
 		<div class="flex space-x-1 py-5 font-bold">
 			<div class="title">{$t('application.application')}</div>

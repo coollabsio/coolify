@@ -41,10 +41,11 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 		Dockerfile.push('RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm');
 		Dockerfile.push('RUN pnpm add -g pnpm');
 	}
-	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	if (installCommand) {
+		Dockerfile.push(`COPY .${baseDirectory || ''}/package.json ./`);
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
+	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	Dockerfile.push(`RUN ${buildCommand}`);
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
 	await buildImage({ applicationId, tag, workdir, docker, buildId, isCache: true, debug });

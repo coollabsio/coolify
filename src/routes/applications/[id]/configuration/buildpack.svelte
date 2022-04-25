@@ -225,7 +225,7 @@
 	<div class="max-w-7xl mx-auto flex flex-wrap justify-center">
 		{#each buildPacks as buildPack}
 			<div class="p-2">
-				<BuildPack {buildPack} {scanning} bind:foundConfig />
+				<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
 			</div>
 		{/each}
 	</div>
