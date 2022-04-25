@@ -15,7 +15,6 @@ export function findBuildPack(pack, packageManager = 'npm') {
 			...metaData,
 			...defaultBuildAndDeploy(packageManager),
 			buildCommand: null,
-			startCommand: null,
 			publishDirectory: null,
 			port: null
 		};
