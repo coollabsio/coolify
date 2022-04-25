@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { checkContainer, checkHAProxy } from '.';
 import { asyncExecShell, getDomain, getEngine } from '$lib/common';
 import { supportedServiceTypesAndVersions } from '$lib/components/common';
+import { listServicesWithIncludes } from '$lib/database';
 
 const url = dev ? 'http://localhost:5555' : 'http://coolify-haproxy:5555';
 
@@ -208,17 +209,7 @@ export async function configureHAProxy(): Promise<void> {
 			}
 		}
 	}
-	const services = await db.prisma.service.findMany({
-		include: {
-			destinationDocker: true,
-			minio: true,
-			plausibleAnalytics: true,
-			vscodeserver: true,
-			wordpress: true,
-			ghost: true,
-			meiliSearch: true
-		}
-	});
+	const services = await listServicesWithIncludes();
 
 	for (const service of services) {
 		const { fqdn, id, type, destinationDocker, destinationDockerId, updatedAt } = service;

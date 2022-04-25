@@ -7,6 +7,7 @@ import fs from 'fs/promises';
 import getPort, { portNumbers } from 'get-port';
 import { supportedServiceTypesAndVersions } from '$lib/components/common';
 import { promises as dns } from 'dns';
+import { listServicesWithIncludes } from '$lib/database';
 
 export async function letsEncrypt(domain: string, id?: string, isCoolify = false): Promise<void> {
 	try {
@@ -145,18 +146,7 @@ export async function generateSSLCerts(): Promise<void> {
 			console.log(`Error during generateSSLCerts with ${application.fqdn}: ${error}`);
 		}
 	}
-	const services = await db.prisma.service.findMany({
-		include: {
-			destinationDocker: true,
-			minio: true,
-			plausibleAnalytics: true,
-			vscodeserver: true,
-			wordpress: true,
-			ghost: true,
-			meiliSearch: true
-		},
-		orderBy: { createdAt: 'desc' }
-	});
+	const services = await listServicesWithIncludes();
 
 	for (const service of services) {
 		try {

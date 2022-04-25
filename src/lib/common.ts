@@ -26,7 +26,7 @@ try {
 			initialScope: {
 				tags: {
 					appId: process.env['COOLIFY_APP_ID'],
-					'os.arch': os.arch(),
+					'os.arch': getOsArch(),
 					'os.platform': os.platform(),
 					'os.release': os.release()
 				}
@@ -174,4 +174,8 @@ export function generateTimestamp(): string {
 
 export function getDomain(domain: string): string {
 	return domain?.replace('https://', '').replace('http://', '');
+}
+
+export function getOsArch() {
+	return os.arch();
 }

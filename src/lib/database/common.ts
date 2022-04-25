@@ -154,6 +154,7 @@ export function generateDatabaseConfiguration(database: Database & { settings: D
 			ulimits: Record<string, unknown>;
 			privatePort: number;
 			environmentVariables: {
+				POSTGRESQL_POSTGRES_PASSWORD: string;
 				POSTGRESQL_USERNAME: string;
 				POSTGRESQL_PASSWORD: string;
 				POSTGRESQL_DATABASE: string;
@@ -220,6 +221,7 @@ export function generateDatabaseConfiguration(database: Database & { settings: D
 		return {
 			privatePort: 5432,
 			environmentVariables: {
+				POSTGRESQL_POSTGRES_PASSWORD: rootUserPassword,
 				POSTGRESQL_PASSWORD: dbUserPassword,
 				POSTGRESQL_USERNAME: dbUser,
 				POSTGRESQL_DATABASE: defaultDatabase

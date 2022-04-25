@@ -15,6 +15,7 @@
 	import MeiliSearch from '$lib/components/svg/services/MeiliSearch.svelte';
 	import { session } from '$app/stores';
 	import { getDomain } from '$lib/components/common';
+	import Umami from '$lib/components/svg/services/Umami.svelte';
 
 	export let services;
 	async function newService() {
@@ -86,6 +87,8 @@
 								<Ghost isAbsolute />
 							{:else if service.type === 'meilisearch'}
 								<MeiliSearch isAbsolute />
+							{:else if service.type === 'umami'}
+								<Umami isAbsolute />
 							{/if}
 							<div class="truncate text-center text-xl font-bold">
 								{service.name}
@@ -133,6 +136,8 @@
 									<Ghost isAbsolute />
 								{:else if service.type === 'meilisearch'}
 									<MeiliSearch isAbsolute />
+								{:else if service.type === 'umami'}
+									<Umami isAbsolute />
 								{/if}
 								<div class="truncate text-center text-xl font-bold">
 									{service.name}

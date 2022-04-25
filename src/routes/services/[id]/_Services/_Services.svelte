@@ -16,6 +16,7 @@
 	import MeiliSearch from './_MeiliSearch.svelte';
 	import MinIo from './_MinIO.svelte';
 	import PlausibleAnalytics from './_PlausibleAnalytics.svelte';
+	import Umami from './_Umami.svelte';
 	import VsCodeServer from './_VSCodeServer.svelte';
 	import Wordpress from './_Wordpress.svelte';
 
@@ -169,6 +170,8 @@
 				<Ghost bind:service {readOnly} />
 			{:else if service.type === 'meilisearch'}
 				<MeiliSearch bind:service />
+			{:else if service.type === 'umami'}
+				<Umami bind:service />
 			{/if}
 		</div>
 	</form>

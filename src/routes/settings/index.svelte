@@ -40,10 +40,9 @@
 	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
 
-	import Language from './_Language.svelte';
-
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
 	let dualCerts = settings.dualCerts;
+	let isAutoUpdateEnabled = settings.isAutoUpdateEnabled;
 
 	let minPort = settings.minPort;
 	let maxPort = settings.maxPort;
@@ -76,7 +75,10 @@
 			if (name === 'dualCerts') {
 				dualCerts = !dualCerts;
 			}
-			await post(`/settings.json`, { isRegistrationEnabled, dualCerts });
+			if (name === 'isAutoUpdateEnabled') {
+				isAutoUpdateEnabled = !isAutoUpdateEnabled;
+			}
+			await post(`/settings.json`, { isRegistrationEnabled, dualCerts, isAutoUpdateEnabled });
 			return toast.push(t.get('application.settings_saved'));
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -192,6 +194,16 @@
 						on:click={() => changeSettings('isRegistrationEnabled')}
 					/>
 				</div>
+				{#if browser && (window.location.hostname === 'staging.coolify.io' || window.location.hostname === 'localhost')}
+					<div class="grid grid-cols-2 items-center">
+						<Setting
+							bind:setting={isAutoUpdateEnabled}
+							title={$t('setting.auto_update_enabled')}
+							description={$t('setting.auto_update_enabled_explainer')}
+							on:click={() => changeSettings('isAutoUpdateEnabled')}
+						/>
+					</div>
+				{/if}
 			</div>
 		</form>
 		<div class="flex space-x-1 pt-6 font-bold">

@@ -401,10 +401,10 @@
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs`}
 		>
 			<button
-				title={$t('application.build_logs')}
+				title={$t('application.logs')}
 				disabled={$disabledButton}
 				class="icons bg-transparent tooltip-bottom text-sm"
-				data-tooltip={$t('application.build_logs')}
+				data-tooltip={$t('application.logs')}
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"

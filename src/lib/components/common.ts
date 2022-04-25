@@ -180,5 +180,16 @@ export const supportedServiceTypesAndVersions = [
 		ports: {
 			main: 7700
 		}
+	},
+	{
+		name: 'umami',
+		fancyName: 'Umami',
+		baseImage: 'ghcr.io/mikecao/umami',
+		images: ['postgres:12-alpine'],
+		versions: ['postgresql-latest'],
+		recommendedVersion: 'postgresql-latest',
+		ports: {
+			main: 3000
+		}
 	}
 ];

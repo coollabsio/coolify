@@ -50,6 +50,20 @@ async function main() {
 			}
 		});
 	}
+
+	// Set auto-update based on env variable
+	const isAutoUpdateEnabled = process.env['COOLIFY_AUTO_UPDATE'] === 'true';
+	const settings = await prisma.setting.findFirst({});
+	if (settings) {
+		await prisma.setting.update({
+			where: {
+				id: settings.id
+			},
+			data: {
+				isAutoUpdateEnabled
+			}
+		});
+	}
 }
 main()
 	.catch((e) => {

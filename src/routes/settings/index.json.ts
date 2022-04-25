@@ -64,10 +64,14 @@ export const post: RequestHandler = async (event) => {
 		};
 	if (status === 401) return { status, body };
 
-	const { fqdn, isRegistrationEnabled, dualCerts, minPort, maxPort } = await event.request.json();
+	const { fqdn, isRegistrationEnabled, dualCerts, minPort, maxPort, isAutoUpdateEnabled } =
+		await event.request.json();
 	try {
 		const { id } = await db.listSettings();
-		await db.prisma.setting.update({ where: { id }, data: { isRegistrationEnabled, dualCerts } });
+		await db.prisma.setting.update({
+			where: { id },
+			data: { isRegistrationEnabled, dualCerts, isAutoUpdateEnabled }
+		});
 		if (fqdn) {
 			await db.prisma.setting.update({ where: { id }, data: { fqdn } });
 		}

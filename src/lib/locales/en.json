@@ -302,7 +302,9 @@
 		"registration_allowed": "Registration allowed?",
 		"registration_allowed_explainer": "Allow further registrations to the application. <br>It's turned off after the first registration.",
 		"coolify_proxy_settings": "Coolify Proxy Settings",
-		"credential_stat_explainer": "Credentials for <a class=\"text-white font-bold\" href=\"{{link}}\" target=\"_blank\">stats</a> page."
+		"credential_stat_explainer": "Credentials for <a class=\"text-white font-bold\" href=\"{{link}}\" target=\"_blank\">stats</a> page.",
+		"auto_update_enabled": "Auto update enabled?",
+		"auto_update_enabled_explainer": "Enable automatic updates for Coolify. It will be done automatically behind the scenes, if there is no build process running."
 	},
 	"team": {
 		"pending_invitations": "Pending invitations",
