@@ -6,6 +6,7 @@
 	import N8n from './svg/services/N8n.svelte';
 	import NocoDb from './svg/services/NocoDB.svelte';
 	import PlausibleAnalytics from './svg/services/PlausibleAnalytics.svelte';
+	import Umami from './svg/services/Umami.svelte';
 	import UptimeKuma from './svg/services/UptimeKuma.svelte';
 	import VaultWarden from './svg/services/VaultWarden.svelte';
 	import VsCodeServer from './svg/services/VSCodeServer.svelte';
@@ -51,5 +52,9 @@
 {:else if service.type === 'ghost'}
 	<a href="https://ghost.org" target="_blank">
 		<Ghost />
+	</a>
+{:else if service.type === 'umami'}
+	<a href="https://umami.is" target="_blank">
+		<Umami />
 	</a>
 {/if}

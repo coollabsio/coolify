@@ -3,10 +3,11 @@ import * as db from '$lib/database';
 import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
-import { ErrorHandler, getFreePort, getServiceImage } from '$lib/database';
+import { ErrorHandler, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 import type { ComposeFile } from '$lib/types/composeFile';
-import type { Service, DestinationDocker, ServiceSecret, Prisma } from '@prisma/client';
+import type { Service, DestinationDocker, Prisma } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -61,7 +62,7 @@ export const post: RequestHandler = async (event) => {
 				config.umami.environmentVariables[secret.name] = secret.value;
 			});
 		}
-		console.log(umamiAdminPassword);
+
 		const initDbSQL = `
 		drop table if exists event;
 		drop table if exists pageview;
@@ -136,7 +137,10 @@ export const post: RequestHandler = async (event) => {
 		create index event_website_id_idx on event(website_id);
 		create index event_session_id_idx on event(session_id);
 		
-		insert into account (username, password, is_admin) values ('admin', '$2b$10$BUli0c.muyCW1ErNJc3jL.vFRFtFJWrT8/GcR4A.sUdCznaXiqFXa', true);`;
+		insert into account (username, password, is_admin) values ('admin', '${bcrypt.hashSync(
+			umamiAdminPassword,
+			10
+		)}', true);`;
 		await fs.writeFile(`${workdir}/schema.postgresql.sql`, initDbSQL);
 		const Dockerfile = `
 	  FROM ${config.postgresql.image}

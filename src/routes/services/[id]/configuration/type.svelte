@@ -43,6 +43,7 @@
 	import Ghost from '$lib/components/svg/services/Ghost.svelte';
 	import { t } from '$lib/translations';
 	import MeiliSearch from '$lib/components/svg/services/MeiliSearch.svelte';
+	import Umami from '$lib/components/svg/services/Umami.svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -90,6 +91,8 @@
 						<Ghost isAbsolute />
 					{:else if type.name === 'meilisearch'}
 						<MeiliSearch isAbsolute />
+					{:else if type.name === 'umami'}
+						<Umami isAbsolute />
 					{/if}{type.fancyName}
 				</button>
 			</form>
