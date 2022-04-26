@@ -63,7 +63,8 @@ export const post: RequestHandler = async (event) => {
 		dockerFileLocation,
 		denoMainFile,
 		denoOptions,
-		baseImage
+		baseImage,
+		baseBuildImage
 	} = await event.request.json();
 	if (port) port = Number(port);
 	if (denoOptions) denoOptions = denoOptions.trim();
@@ -98,6 +99,7 @@ export const post: RequestHandler = async (event) => {
 			denoMainFile,
 			denoOptions,
 			baseImage,
+			baseBuildImage,
 			...defaultConfiguration
 		});
 		return { status: 201 };

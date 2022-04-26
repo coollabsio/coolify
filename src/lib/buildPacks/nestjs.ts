@@ -22,11 +22,9 @@ const createDockerfile = async (data, image): Promise<void> => {
 
 export default async function (data) {
 	try {
-		const image = 'node:lts';
-		const imageForBuild = 'node:lts';
-
-		await buildCacheImageWithNode(data, imageForBuild);
-		await createDockerfile(data, image);
+		const { baseImage, baseBuildImage } = data;
+		await buildCacheImageWithNode(data, baseBuildImage);
+		await createDockerfile(data, baseImage);
 		await buildImage(data);
 	} catch (error) {
 		throw error;

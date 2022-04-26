@@ -34,6 +34,8 @@ export type BuilderJob = {
 	persistentStorage: { path: string }[];
 	pullmergeRequestId?: unknown;
 	sourceBranch?: string;
+	baseImage: string;
+	baseBuildImage: string;
 };
 
 // TODO: Add the other build types

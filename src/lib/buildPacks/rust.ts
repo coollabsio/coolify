@@ -27,14 +27,12 @@ const createDockerfile = async (data, image, name): Promise<void> => {
 
 export default async function (data) {
 	try {
-		const { workdir } = data;
-		const image = 'rust:latest';
-		const imageForBuild = 'rust:latest';
+		const { workdir, baseImage, baseBuildImage } = data;
 		const { stdout: cargoToml } = await asyncExecShell(`cat ${workdir}/Cargo.toml`);
 		const parsedToml: any = TOML.parse(cargoToml);
 		const name = parsedToml.package.name;
-		await buildCacheImageWithCargo(data, imageForBuild);
-		await createDockerfile(data, image, name);
+		await buildCacheImageWithCargo(data, baseBuildImage);
+		await createDockerfile(data, baseImage, name);
 		await buildImage(data);
 	} catch (error) {
 		throw error;

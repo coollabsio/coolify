@@ -12,17 +12,7 @@ import type {
 	Application,
 	ApplicationPersistentStorage
 } from '@prisma/client';
-const nodeBased = [
-	'react',
-	'vuejs',
-	'static',
-	'svelte',
-	'gatsby',
-	'php',
-	'astro',
-	'eleventy',
-	'node'
-];
+import { setDefaultBaseImage } from '$lib/buildPacks/common';
 
 export async function listApplications(teamId: string): Promise<Application[]> {
 	if (teamId === '0') {
@@ -206,26 +196,18 @@ export async function getApplication({ id, teamId }: { id: string; teamId: strin
 			return s;
 		});
 	}
+	const { baseImage, baseBuildImage, baseBuildImages, baseImages } = setDefaultBaseImage(
+		body.buildPack
+	);
+
 	// Set default build images
 	if (!body.baseImage) {
-		if (nodeBased.includes(body.buildPack)) {
-			body.baseImage = 'node:lts';
-		}
-		if (body.buildPack === 'python') {
-			body.baseImage = 'python:3-alpine';
-		}
-		if (body.buildPack === 'rust') {
-			body.baseImage = 'rust:latest';
-		}
-		if (body.buildPack === 'deno') {
-			body.baseImage = 'denoland/deno:latest';
-		}
-		if (body.buildPack === 'php') {
-			body.baseImage = 'webdevops/php-apache:8.0-alpine';
-		}
+		body.baseImage = baseImage;
 	}
-
-	return { ...body };
+	if (!body.baseBuildImage) {
+		body.baseBuildImage = baseBuildImage;
+	}
+	return { ...body, baseBuildImages, baseImages };
 }
 
 export async function configureGitRepository({
@@ -296,7 +278,8 @@ export async function configureApplication({
 	dockerFileLocation,
 	denoMainFile,
 	denoOptions,
-	baseImage
+	baseImage,
+	baseBuildImage
 }: {
 	id: string;
 	buildPack: string;
@@ -315,6 +298,7 @@ export async function configureApplication({
 	denoMainFile: string;
 	denoOptions: string;
 	baseImage: string;
+	baseBuildImage: string;
 }): Promise<Application> {
 	return await prisma.application.update({
 		where: { id },
@@ -334,7 +318,8 @@ export async function configureApplication({
 			dockerFileLocation,
 			denoMainFile,
 			denoOptions,
-			baseImage
+			baseImage,
+			baseBuildImage
 		}
 	});
 }

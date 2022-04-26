@@ -185,6 +185,7 @@
 		"git_repository": "Git Repository",
 		"build_pack": "Build Pack",
 		"base_image": "Base Image",
+		"base_build_image": "Base Build Image",
 		"destination": "Destination",
 		"application": "Application",
 		"url_fqdn": "URL (FQDN)",

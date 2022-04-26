@@ -5,6 +5,9 @@ import { scanningTemplates } from '$lib/components/templates';
 import { promises as fs } from 'fs';
 import { staticDeployments } from '$lib/components/common';
 
+const staticApps = ['static', 'react', 'vuejs', 'svelte', 'gatsby', 'astro', 'eleventy'];
+const nodeBased = ['react', 'vuejs', 'svelte', 'gatsby', 'php', 'astro', 'eleventy', 'node'];
+
 export function makeLabelForStandaloneApplication({
 	applicationId,
 	fqdn,
@@ -137,7 +140,13 @@ export const setDefaultConfiguration = async (data) => {
 	};
 };
 
-export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId) {
+export async function copyBaseConfigurationFiles(
+	buildPack,
+	workdir,
+	buildId,
+	applicationId,
+	baseImage
+) {
 	try {
 		if (buildPack === 'php') {
 			await fs.writeFile(`${workdir}/entrypoint.sh`, `chown -R 1000 /app`);
@@ -146,7 +155,7 @@ export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, ap
 				buildId,
 				applicationId
 			});
-		} else if (staticDeployments.includes(buildPack)) {
+		} else if (staticDeployments.includes(buildPack) && baseImage.includes('nginx')) {
 			await fs.writeFile(
 				`${workdir}/nginx.conf`,
 				`user  nginx;
@@ -199,11 +208,6 @@ export async function copyBaseConfigurationFiles(buildPack, workdir, buildId, ap
             }
             `
 			);
-			await saveBuildLog({
-				line: 'Copied default configuration file for Nginx.',
-				buildId,
-				applicationId
-			});
 		}
 	} catch (error) {
 		console.log(error);
@@ -217,4 +221,208 @@ export function checkPnpm(installCommand = null, buildCommand = null, startComma
 		buildCommand?.includes('pnpm') ||
 		startCommand?.includes('pnpm')
 	);
+}
+
+export function setDefaultBaseImage(buildPack) {
+	const nodeVersions = [
+		{
+			value: 'node:lts',
+			label: 'node:lts'
+		},
+		{
+			value: 'node:18',
+			label: 'node:18'
+		},
+		{
+			value: 'node:17',
+			label: 'node:17'
+		},
+		{
+			value: 'node:16',
+			label: 'node:16'
+		},
+		{
+			value: 'node:14',
+			label: 'node:14'
+		},
+		{
+			value: 'node:12',
+			label: 'node:12'
+		}
+	];
+	const staticVersions = [
+		{
+			value: 'webdevops/nginx:alpine',
+			label: 'webdevops/nginx:alpine'
+		},
+		{
+			value: 'webdevops/apache:alpine',
+			label: 'webdevops/apache:alpine'
+		}
+	];
+	const rustVersions = [
+		{
+			value: 'rust:latest',
+			label: 'rust:latest'
+		},
+		{
+			value: 'rust:1.60',
+			label: 'rust:1.60'
+		},
+		{
+			value: 'rust:1.60-buster',
+			label: 'rust:1.60-buster'
+		},
+		{
+			value: 'rust:1.60-bullseye',
+			label: 'rust:1.60-bullseye'
+		},
+		{
+			value: 'rust:1.60-slim-buster',
+			label: 'rust:1.60-slim-buster'
+		},
+		{
+			value: 'rust:1.60-slim-bullseye',
+			label: 'rust:1.60-slim-bullseye'
+		},
+		{
+			value: 'rust:1.60-alpine3.14',
+			label: 'rust:1.60-alpine3.14'
+		},
+		{
+			value: 'rust:1.60-alpine3.15',
+			label: 'rust:1.60-alpine3.15'
+		}
+	];
+	const phpVersions = [
+		{
+			value: 'webdevops/php-apache:8.0',
+			label: 'webdevops/php-apache:8.0'
+		},
+		{
+			value: 'webdevops/php-nginx:8.0',
+			label: 'webdevops/php-nginx:8.0'
+		},
+		{
+			value: 'webdevops/php-apache:7.4',
+			label: 'webdevops/php-apache:7.4'
+		},
+		{
+			value: 'webdevops/php-nginx:7.4',
+			label: 'webdevops/php-nginx:7.4'
+		},
+		{
+			value: 'webdevops/php-apache:7.3',
+			label: 'webdevops/php-apache:7.3'
+		},
+		{
+			value: 'webdevops/php-nginx:7.3',
+			label: 'webdevops/php-nginx:7.3'
+		},
+		{
+			value: 'webdevops/php-apache:7.2',
+			label: 'webdevops/php-apache:7.2'
+		},
+		{
+			value: 'webdevops/php-nginx:7.2',
+			label: 'webdevops/php-nginx:7.2'
+		},
+		{
+			value: 'webdevops/php-apache:7.1',
+			label: 'webdevops/php-apache:7.1'
+		},
+		{
+			value: 'webdevops/php-nginx:7.1',
+			label: 'webdevops/php-nginx:7.1'
+		},
+		{
+			value: 'webdevops/php-apache:7.0',
+			label: 'webdevops/php-apache:7.0'
+		},
+		{
+			value: 'webdevops/php-nginx:7.0',
+			label: 'webdevops/php-nginx:7.0'
+		},
+		{
+			value: 'webdevops/php-apache:5.6',
+			label: 'webdevops/php-apache:5.6'
+		},
+		{
+			value: 'webdevops/php-nginx:5.6',
+			label: 'webdevops/php-nginx:5.6'
+		},
+		{
+			value: 'webdevops/php-apache:8.0-alpine',
+			label: 'webdevops/php-apache:8.0-alpine'
+		},
+		{
+			value: 'webdevops/php-nginx:8.0-alpine',
+			label: 'webdevops/php-nginx:8.0-alpine'
+		},
+		{
+			value: 'webdevops/php-apache:7.4-alpine',
+			label: 'webdevops/php-apache:7.4-alpine'
+		},
+		{
+			value: 'webdevops/php-nginx:7.4-alpine',
+			label: 'webdevops/php-nginx:7.4-alpine'
+		},
+		{
+			value: 'webdevops/php-apache:7.3-alpine',
+			label: 'webdevops/php-apache:7.3-alpine'
+		},
+		{
+			value: 'webdevops/php-nginx:7.3-alpine',
+			label: 'webdevops/php-nginx:7.3-alpine'
+		},
+		{
+			value: 'webdevops/php-apache:7.2-alpine',
+			label: 'webdevops/php-apache:7.2-alpine'
+		},
+		{
+			value: 'webdevops/php-nginx:7.2-alpine',
+			label: 'webdevops/php-nginx:7.2-alpine'
+		},
+		{
+			value: 'webdevops/php-apache:7.1-alpine',
+			label: 'webdevops/php-apache:7.1-alpine'
+		},
+		{
+			value: 'webdevops/php-nginx:7.1-alpine',
+			label: 'webdevops/php-nginx:7.1-alpine'
+		}
+	];
+	let payload = {
+		baseImage: null,
+		baseBuildImage: null,
+		baseImages: [],
+		baseBuildImages: []
+	};
+	if (nodeBased.includes(buildPack)) {
+		payload.baseImage = 'node:lts';
+		payload.baseImages = nodeVersions;
+	}
+	if (staticApps.includes(buildPack)) {
+		payload.baseImage = 'webdevops/nginx:alpine';
+		payload.baseImages = staticVersions;
+		payload.baseBuildImage = 'node:lts';
+		payload.baseBuildImages = nodeVersions;
+	}
+	if (buildPack === 'python') {
+		payload.baseImage = 'python:3-alpine';
+	}
+	if (buildPack === 'rust') {
+		payload.baseImage = 'rust:latest';
+		payload.baseBuildImage = 'rust:latest';
+		payload.baseImages = rustVersions;
+		payload.baseBuildImages = rustVersions;
+	}
+	if (buildPack === 'deno') {
+		payload.baseImage = 'denoland/deno:latest';
+	}
+	if (buildPack === 'php') {
+		payload.baseImage = 'webdevops/php-apache:8.0-alpine';
+		payload.baseImages = phpVersions;
+	}
+	return payload;
 }

@@ -106,6 +106,7 @@ model Application {
   secrets             Secret[]
   persistentStorage   ApplicationPersistentStorage[]
   baseImage           String?
+  baseBuildImage      String?
 }
 
 model ApplicationSettings {
