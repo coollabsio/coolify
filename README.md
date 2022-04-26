@@ -77,6 +77,8 @@ You can host cool open-source services as well:
 - [LanguageTool](https://languagetool.org)
 - [n8n](https://n8n.io)
 - [Uptime Kuma](https://github.com/louislam/uptime-kuma)
+- [MeiliSearch](https://github.com/meilisearch/meilisearch)
+- [Umami](https://github.com/mikecao/umami)
 
 ## Migration from v1
 
