@@ -305,6 +305,7 @@ model Service {
   meiliSearch         MeiliSearch?
   persistentStorage   ServicePersistentStorage[]
   umami               Umami?
+  hasura              Hasura?
 }
 
 model PlausibleAnalytics {
@@ -399,6 +400,19 @@ model Umami {
   postgresqlPublicPort Int?
   umamiAdminPassword   String
   hashSalt             String
+  service              Service  @relation(fields: [serviceId], references: [id])
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Hasura {
+  id                   String   @id @default(cuid())
+  serviceId            String   @unique
+  postgresqlUser       String
+  postgresqlPassword   String
+  postgresqlDatabase   String
+  postgresqlPublicPort Int?
+  graphQLAdminPassword String
   service              Service  @relation(fields: [serviceId], references: [id])
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

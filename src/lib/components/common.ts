@@ -191,5 +191,16 @@ export const supportedServiceTypesAndVersions = [
 		ports: {
 			main: 3000
 		}
+	},
+	{
+		name: 'hasura',
+		fancyName: 'Hasura',
+		baseImage: 'hasura/graphql-engine',
+		images: ['postgres:12-alpine'],
+		versions: ['latest', 'v2.5.1'],
+		recommendedVersion: 'v2.5.1',
+		ports: {
+			main: 8080
+		}
 	}
 ];

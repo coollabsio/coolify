@@ -13,6 +13,7 @@
 	import { t } from '$lib/translations';
 	import { toast } from '@zerodevx/svelte-toast';
 	import Ghost from './_Ghost.svelte';
+	import Hasura from './_Hasura.svelte';
 	import MeiliSearch from './_MeiliSearch.svelte';
 	import MinIo from './_MinIO.svelte';
 	import PlausibleAnalytics from './_PlausibleAnalytics.svelte';
@@ -172,6 +173,8 @@
 				<MeiliSearch bind:service />
 			{:else if service.type === 'umami'}
 				<Umami bind:service />
+			{:else if service.type === 'hasura'}
+				<Hasura bind:service />
 			{/if}
 		</div>
 	</form>
