@@ -237,7 +237,6 @@ export async function copyBaseConfigurationFiles(
 
 			    include             /etc/nginx/mime.types;
     			default_type        application/octet-stream;
-				
                 server {
                     listen       80;
                     server_name  _;
