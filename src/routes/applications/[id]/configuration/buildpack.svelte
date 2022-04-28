@@ -85,13 +85,14 @@
 				const composerPHP = files.find(
 					(file) => file.name === 'composer.json' && file.type === 'blob'
 				);
+				const laravel = files.find((file) => file.name === 'artisan' && file.type === 'blob');
 
 				if (yarnLock) packageManager = 'yarn';
 				if (pnpmLock) packageManager = 'pnpm';
 
 				if (dockerfile) {
 					foundConfig = findBuildPack('docker', packageManager);
-				} else if (packageJson) {
+				} else if (packageJson && !laravel) {
 					const path = packageJson.path;
 					const data = await get(
 						`${apiUrl}/v4/projects/${projectId}/repository/files/${path}/raw?ref=${branch}`,
@@ -107,8 +108,10 @@
 					foundConfig = findBuildPack('python');
 				} else if (indexHtml) {
 					foundConfig = findBuildPack('static', packageManager);
-				} else if (indexPHP || composerPHP) {
+				} else if ((indexPHP || composerPHP) && !laravel) {
 					foundConfig = findBuildPack('php');
+				} else if (laravel) {
+					foundConfig = findBuildPack('laravel');
 				} else {
 					foundConfig = findBuildPack('node', packageManager);
 				}
@@ -134,13 +137,14 @@
 				const composerPHP = files.find(
 					(file) => file.name === 'composer.json' && file.type === 'file'
 				);
+				const laravel = files.find((file) => file.name === 'artisan' && file.type === 'file');
 
 				if (yarnLock) packageManager = 'yarn';
 				if (pnpmLock) packageManager = 'pnpm';
 
 				if (dockerfile) {
 					foundConfig = findBuildPack('docker', packageManager);
-				} else if (packageJson) {
+				} else if (packageJson && !laravel) {
 					const data = await get(`${packageJson.git_url}`, {
 						Authorization: `Bearer ${$gitTokens.githubToken}`,
 						Accept: 'application/vnd.github.v2.raw'
@@ -153,8 +157,10 @@
 					foundConfig = findBuildPack('python');
 				} else if (indexHtml) {
 					foundConfig = findBuildPack('static', packageManager);
-				} else if (indexPHP || composerPHP) {
+				} else if ((indexPHP || composerPHP) && !laravel) {
 					foundConfig = findBuildPack('php');
+				} else if (laravel) {
+					foundConfig = findBuildPack('laravel');
 				} else {
 					foundConfig = findBuildPack('node', packageManager);
 				}

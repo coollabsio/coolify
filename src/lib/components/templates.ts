@@ -162,6 +162,16 @@ export function findBuildPack(pack, packageManager = 'npm') {
 			port: 8000
 		};
 	}
+	if (pack === 'laravel') {
+		return {
+			...metaData,
+			installCommand: null,
+			buildCommand: null,
+			startCommand: null,
+			publishDirectory: null,
+			port: 80
+		};
+	}
 	return {
 		name: 'node',
 		fancyName: 'Node.js',
@@ -187,17 +197,24 @@ export const buildPacks = [
 		hoverColor: 'hover:bg-orange-700',
 		color: 'bg-orange-700'
 	},
-	{
-		name: 'docker',
-		fancyName: 'Docker',
-		hoverColor: 'hover:bg-sky-700',
-		color: 'bg-sky-700'
-	},
+
 	{
 		name: 'php',
 		fancyName: 'PHP',
 		hoverColor: 'hover:bg-indigo-700',
 		color: 'bg-indigo-700'
+	},
+	{
+		name: 'laravel',
+		fancyName: 'Laravel',
+		hoverColor: 'hover:bg-indigo-700',
+		color: 'bg-indigo-700'
+	},
+	{
+		name: 'docker',
+		fancyName: 'Docker',
+		hoverColor: 'hover:bg-sky-700',
+		color: 'bg-sky-700'
 	},
 	{
 		name: 'svelte',

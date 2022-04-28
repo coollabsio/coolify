@@ -340,7 +340,7 @@
 					/>
 				</div>
 			</div>
-			{#if application.buildCommand || application.buildPack === 'rust'}
+			{#if application.buildCommand || application.buildPack === 'rust' || application.buildPack === 'laravel'}
 				<div class="grid grid-cols-2 items-center pb-8">
 					<label for="baseBuildImage" class="text-base font-bold text-stone-100"
 						>{$t('application.base_build_image')}</label
@@ -525,21 +525,23 @@
 					/>
 				</div>
 			{/if}
-			<div class="grid grid-cols-2 items-center">
-				<div class="flex-col">
-					<label for="baseDirectory" class="pt-2 text-base font-bold text-stone-100"
-						>{$t('forms.base_directory')}</label
-					>
-					<Explainer text={$t('application.directory_to_use_explainer')} />
+			{#if application.buildPack !== 'laravel'}
+				<div class="grid grid-cols-2 items-center">
+					<div class="flex-col">
+						<label for="baseDirectory" class="pt-2 text-base font-bold text-stone-100"
+							>{$t('forms.base_directory')}</label
+						>
+						<Explainer text={$t('application.directory_to_use_explainer')} />
+					</div>
+					<input
+						readonly={!$session.isAdmin}
+						name="baseDirectory"
+						id="baseDirectory"
+						bind:value={application.baseDirectory}
+						placeholder="{$t('forms.default')}: /"
+					/>
 				</div>
-				<input
-					readonly={!$session.isAdmin}
-					name="baseDirectory"
-					id="baseDirectory"
-					bind:value={application.baseDirectory}
-					placeholder="{$t('forms.default')}: /"
-				/>
-			</div>
+			{/if}
 			{#if !notNodeDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-2 items-center">
 					<div class="flex-col">

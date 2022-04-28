@@ -107,11 +107,12 @@ export const setDefaultConfiguration = async (data) => {
 		else if (buildPack === 'php') port = 80;
 		else if (buildPack === 'python') port = 8000;
 	}
-	if (!installCommand && buildPack !== 'static')
+	if (!installCommand && buildPack !== 'static' && buildPack !== 'laravel')
 		installCommand = template?.installCommand || 'yarn install';
-	if (!startCommand && buildPack !== 'static')
+	if (!startCommand && buildPack !== 'static' && buildPack !== 'laravel')
 		startCommand = template?.startCommand || 'yarn start';
-	if (!buildCommand && buildPack !== 'static') buildCommand = template?.buildCommand || null;
+	if (!buildCommand && buildPack !== 'static' && buildPack !== 'laravel')
+		buildCommand = template?.buildCommand || null;
 	if (!publishDirectory) publishDirectory = template?.publishDirectory || null;
 	if (baseDirectory) {
 		if (!baseDirectory.startsWith('/')) baseDirectory = `/${baseDirectory}`;
@@ -205,6 +206,71 @@ export async function copyBaseConfigurationFiles(
             
                 }
             
+            }
+            `
+			);
+		} else if (buildPack === 'laravel') {
+			await fs.writeFile(
+				`${workdir}/nginx.conf`,
+				`user  nginx;
+            worker_processes  auto;
+            
+            error_log  /docker.stdout;
+            pid        /run/nginx.pid;
+            
+            events {
+                worker_connections  1024;
+            }
+            
+            http {
+				log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+				'$status $body_bytes_sent "$http_referer" '
+				'"$http_user_agent" "$http_x_forwarded_for"';
+
+                access_log  /docker.stdout main;
+
+				sendfile            on;
+				tcp_nopush          on;
+				tcp_nodelay         on;
+				keepalive_timeout   65;
+				types_hash_max_size 2048;
+
+			    include             /etc/nginx/mime.types;
+    			default_type        application/octet-stream;
+    
+                server {
+                    listen       80;
+                    server_name  localhost;
+
+					add_header X-Frame-Options "SAMEORIGIN";
+					add_header X-XSS-Protection "1; mode=block";
+					add_header X-Content-Type-Options "nosniff";
+				
+					index index.html index.htm index.php;
+
+					charset utf-8;
+
+                    location / {
+                        root   /app/public;
+                        try_files $uri $uri/ /index.php?$query_string;
+                    }
+
+					location = /favicon.ico { access_log off; log_not_found off; }
+					location = /robots.txt  { access_log off; log_not_found off; }
+
+					error_page 404 /index.php;
+
+					location ~ \.php$ {
+						fastcgi_pass 127.0.0.1:9000;
+						fastcgi_index index.php;
+						fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+						include fastcgi_params;
+					}
+				
+					location ~ /\.(?!well-known).* {
+						deny all;
+					}
+                }
             }
             `
 			);
@@ -392,6 +458,16 @@ export function setDefaultBaseImage(buildPack) {
 			label: 'webdevops/php-nginx:7.1-alpine'
 		}
 	];
+	const laravelVersions = [
+		{
+			value: 'webdevops/php-nginx:8.0-alpine',
+			label: 'webdevops/php-nginx:8.0-alpine'
+		},
+		{
+			value: 'webdevops/php-apache:8.0-alpine',
+			label: 'webdevops/php-apache:8.0-alpine'
+		}
+	];
 	let payload = {
 		baseImage: null,
 		baseBuildImage: null,
@@ -423,6 +499,12 @@ export function setDefaultBaseImage(buildPack) {
 	if (buildPack === 'php') {
 		payload.baseImage = 'webdevops/php-apache:8.0-alpine';
 		payload.baseImages = phpVersions;
+	}
+	if (buildPack === 'laravel') {
+		payload.baseImage = 'webdevops/php-nginx:8.0-alpine';
+		payload.baseBuildImage = 'node:18';
+		payload.baseImages = laravelVersions;
+		payload.baseBuildImages = nodeVersions;
 	}
 	return payload;
 }

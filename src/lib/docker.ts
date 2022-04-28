@@ -3,6 +3,34 @@ import { promises as fs } from 'fs';
 import { checkPnpm } from './buildPacks/common';
 import { saveBuildLog } from './common';
 
+export async function buildCacheImageForLaravel(data, imageForBuild) {
+	const { applicationId, tag, workdir, docker, buildId, debug, secrets, pullmergeRequestId } = data;
+	const Dockerfile: Array<string> = [];
+	Dockerfile.push(`FROM ${imageForBuild}`);
+	Dockerfile.push('WORKDIR /app');
+	Dockerfile.push(`LABEL coolify.image=true`);
+	if (secrets.length > 0) {
+		secrets.forEach((secret) => {
+			if (secret.isBuildSecret) {
+				if (pullmergeRequestId) {
+					if (secret.isPRMRSecret) {
+						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
+					}
+				} else {
+					if (!secret.isPRMRSecret) {
+						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
+					}
+				}
+			}
+		});
+	}
+	Dockerfile.push(`COPY *.json *.mix.js /app/`);
+	Dockerfile.push(`COPY resources /app/resources`);
+	Dockerfile.push(`RUN yarn install && yarn production`);
+	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
+	await buildImage({ applicationId, tag, workdir, docker, buildId, isCache: true, debug });
+}
+
 export async function buildCacheImageWithNode(data, imageForBuild) {
 	const {
 		applicationId,
