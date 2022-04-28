@@ -6,9 +6,14 @@ import cuid from 'cuid';
 import fs from 'fs/promises';
 import getPort, { portNumbers } from 'get-port';
 import { supportedServiceTypesAndVersions } from '$lib/components/common';
+import { promises as dns } from 'dns';
+import { listServicesWithIncludes } from '$lib/database';
 
-export async function letsEncrypt(domain, id = null, isCoolify = false) {
+export async function letsEncrypt(domain: string, id?: string, isCoolify = false): Promise<void> {
 	try {
+		const certbotImage =
+			process.arch === 'x64' ? 'certbot/certbot' : 'certbot/certbot:arm64v8-latest';
+
 		const data = await db.prisma.setting.findFirst();
 		const { minPort, maxPort } = data;
 
@@ -62,7 +67,7 @@ export async function letsEncrypt(domain, id = null, isCoolify = false) {
 			if (found) return;
 
 			await asyncExecShell(
-				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p 9080:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${nakedDomain} -d ${wwwDomain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
+				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p 9080:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" ${certbotImage} --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${nakedDomain} -d ${wwwDomain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
 					dev ? '--test-cert' : ''
 				}`
 			);
@@ -82,7 +87,7 @@ export async function letsEncrypt(domain, id = null, isCoolify = false) {
 			}
 			if (found) return;
 			await asyncExecShell(
-				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p 9080:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${domain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
+				`DOCKER_HOST=${host} docker run --rm --name certbot-${randomCuid} -p 9080:${randomPort} -v "coolify-letsencrypt:/etc/letsencrypt" ${certbotImage} --logs-dir /etc/letsencrypt/logs certonly --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port ${randomPort} -d ${domain} --expand --agree-tos --non-interactive --register-unsafely-without-email ${
 					dev ? '--test-cert' : ''
 				}`
 			);
@@ -98,7 +103,7 @@ export async function letsEncrypt(domain, id = null, isCoolify = false) {
 	}
 }
 
-export async function generateSSLCerts() {
+export async function generateSSLCerts(): Promise<void> {
 	const ssls = [];
 	const applications = await db.prisma.application.findMany({
 		include: { destinationDocker: true, settings: true },
@@ -131,7 +136,7 @@ export async function generateSSLCerts() {
 						.map((c) => c.replace(/"/g, ''));
 					if (containers.length > 0) {
 						for (const container of containers) {
-							let previewDomain = `${container.split('-')[1]}.${domain}`;
+							const previewDomain = `${container.split('-')[1]}.${domain}`;
 							if (isHttps) ssls.push({ domain: previewDomain, id, isCoolify: false });
 						}
 					}
@@ -141,17 +146,7 @@ export async function generateSSLCerts() {
 			console.log(`Error during generateSSLCerts with ${application.fqdn}: ${error}`);
 		}
 	}
-	const services = await db.prisma.service.findMany({
-		include: {
-			destinationDocker: true,
-			minio: true,
-			plausibleAnalytics: true,
-			vscodeserver: true,
-			wordpress: true,
-			ghost: true
-		},
-		orderBy: { createdAt: 'desc' }
-	});
+	const services = await listServicesWithIncludes();
 
 	for (const service of services) {
 		try {
@@ -198,16 +193,44 @@ export async function generateSSLCerts() {
 				file.endsWith('.pem') && certificates.push(file.replace(/\.pem$/, ''));
 			}
 		}
+		const resolver = new dns.Resolver({ timeout: 2000 });
+		resolver.setServers(['8.8.8.8', '1.1.1.1']);
+		let ipv4, ipv6;
+		try {
+			ipv4 = await (await asyncExecShell(`curl -4s https://ifconfig.io`)).stdout;
+		} catch (error) {}
+		try {
+			ipv6 = await (await asyncExecShell(`curl -6s https://ifconfig.io`)).stdout;
+		} catch (error) {}
 		for (const ssl of ssls) {
 			if (!dev) {
 				if (
 					certificates.includes(ssl.domain) ||
 					certificates.includes(ssl.domain.replace('www.', ''))
 				) {
-					console.log(`Certificate for ${ssl.domain} already exists`);
+					// console.log(`Certificate for ${ssl.domain} already exists`);
 				} else {
-					console.log('Generating SSL for', ssl.domain);
-					await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
+					// Checking DNS entry before generating certificate
+					if (ipv4 || ipv6) {
+						let domains4 = [];
+						let domains6 = [];
+						try {
+							domains4 = await resolver.resolve4(ssl.domain);
+						} catch (error) {}
+						try {
+							domains6 = await resolver.resolve6(ssl.domain);
+						} catch (error) {}
+						if (domains4.length > 0 || domains6.length > 0) {
+							if (
+								(ipv4 && domains4.includes(ipv4.replace('\n', ''))) ||
+								(ipv6 && domains6.includes(ipv6.replace('\n', '')))
+							) {
+								console.log('Generating SSL for', ssl.domain);
+								return await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
+							}
+						}
+					}
+					console.log('DNS settings is incorrect for', ssl.domain, 'skipping.');
 				}
 			} else {
 				if (
@@ -216,7 +239,27 @@ export async function generateSSLCerts() {
 				) {
 					console.log(`Certificate for ${ssl.domain} already exists`);
 				} else {
-					console.log('Generating SSL for', ssl.domain);
+					// Checking DNS entry before generating certificate
+					if (ipv4 || ipv6) {
+						let domains4 = [];
+						let domains6 = [];
+						try {
+							domains4 = await resolver.resolve4(ssl.domain);
+						} catch (error) {}
+						try {
+							domains6 = await resolver.resolve6(ssl.domain);
+						} catch (error) {}
+						if (domains4.length > 0 || domains6.length > 0) {
+							if (
+								(ipv4 && domains4.includes(ipv4.replace('\n', ''))) ||
+								(ipv6 && domains6.includes(ipv6.replace('\n', '')))
+							) {
+								console.log('Generating SSL for', ssl.domain);
+								return;
+							}
+						}
+					}
+					console.log('DNS settings is incorrect for', ssl.domain, 'skipping.');
 				}
 			}
 		}

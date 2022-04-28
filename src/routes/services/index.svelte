@@ -11,9 +11,11 @@
 	import N8n from '$lib/components/svg/services/N8n.svelte';
 	import UptimeKuma from '$lib/components/svg/services/UptimeKuma.svelte';
 	import Ghost from '$lib/components/svg/services/Ghost.svelte';
+	import { t } from '$lib/translations';
 	import MeiliSearch from '$lib/components/svg/services/MeiliSearch.svelte';
 	import { session } from '$app/stores';
 	import { getDomain } from '$lib/components/common';
+	import Umami from '$lib/components/svg/services/Umami.svelte';
 
 	export let services;
 	async function newService() {
@@ -33,7 +35,7 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Services</div>
+	<div class="mr-4 text-2xl tracking-tight">{$t('index.services')}</div>
 	<div on:click={newService} class="add-icon cursor-pointer bg-pink-600 hover:bg-pink-500">
 		<svg
 			class="w-6"
@@ -54,7 +56,7 @@
 <div class="flex flex-col flex-wrap justify-center">
 	{#if !services || ownServices.length === 0}
 		<div class="flex-col">
-			<div class="text-center text-xl font-bold">No services found</div>
+			<div class="text-center text-xl font-bold">{$t('service.no_service')}</div>
 		</div>
 	{/if}
 	{#if ownServices.length > 0 || otherServices.length > 0}
@@ -85,6 +87,8 @@
 								<Ghost isAbsolute />
 							{:else if service.type === 'meilisearch'}
 								<MeiliSearch isAbsolute />
+							{:else if service.type === 'umami'}
+								<Umami isAbsolute />
 							{/if}
 							<div class="truncate text-center text-xl font-bold">
 								{service.name}
@@ -97,7 +101,7 @@
 							{/if}
 							{#if !service.type || !service.fqdn}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
-									Configuration missing
+									{$t('application.configuration.configuration_missing')}
 								</div>
 							{/if}
 						</div>
@@ -132,6 +136,8 @@
 									<Ghost isAbsolute />
 								{:else if service.type === 'meilisearch'}
 									<MeiliSearch isAbsolute />
+								{:else if service.type === 'umami'}
+									<Umami isAbsolute />
 								{/if}
 								<div class="truncate text-center text-xl font-bold">
 									{service.name}

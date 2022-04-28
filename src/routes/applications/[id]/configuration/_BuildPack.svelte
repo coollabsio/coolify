@@ -5,6 +5,7 @@
 	import { post } from '$lib/api';
 	import { findBuildPack } from '$lib/components/templates';
 	import { errorNotification } from '$lib/form';
+	import { t } from '$lib/translations';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -19,13 +20,14 @@
 			const tempBuildPack = JSON.parse(
 				JSON.stringify(findBuildPack(buildPack.name, packageManager))
 			);
+
 			delete tempBuildPack.name;
 			delete tempBuildPack.fancyName;
 			delete tempBuildPack.color;
 			delete tempBuildPack.hoverColor;
 
 			if (foundConfig.buildPack !== name) {
-				await post(`/applications/${id}.json`, { ...tempBuildPack });
+				await post(`/applications/${id}.json`, { ...tempBuildPack, buildPack: name });
 			}
 			await post(`/applications/${id}/configuration/buildpack.json`, { buildPack: name });
 			return await goto(from || `/applications/${id}`);
@@ -42,7 +44,9 @@
 			buildPack.name && buildPack.color}"
 		><span>{buildPack.fancyName}</span>
 		{#if !scanning && foundConfig?.name === buildPack.name}
-			<span class="absolute bottom-0 pb-2 text-xs">Choose this one...</span>
+			<span class="absolute bottom-0 pb-2 text-xs"
+				>{$t('application.configuration.buildpack.choose_this_one')}</span
+			>
 		{/if}
 	</button>
 </form>

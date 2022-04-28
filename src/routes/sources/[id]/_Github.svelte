@@ -2,8 +2,10 @@
 	export let source;
 	import { page, session } from '$app/stores';
 	import { post } from '$lib/api';
+	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
 	import { toast } from '@zerodevx/svelte-toast';
+	import { t } from '$lib/translations';
 	const { id } = $page.params;
 
 	let loading = false;
@@ -51,7 +53,8 @@
 				type: 'github',
 				name: source.name,
 				htmlUrl: source.htmlUrl.replace(/\/$/, ''),
-				apiUrl: source.apiUrl.replace(/\/$/, '')
+				apiUrl: source.apiUrl.replace(/\/$/, ''),
+				organization: source.organization
 			});
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -97,6 +100,22 @@
 					<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
 					<input name="apiUrl" id="apiUrl" required bind:value={source.apiUrl} />
 				</div>
+				<div class="grid grid-cols-2">
+					<div class="flex flex-col">
+						<label for="organization" class="pt-2 text-base font-bold text-stone-100"
+							>Organization</label
+						>
+						<Explainer
+							text="Fill it if you would like to use an organization's as your Git Source. Otherwise your user will be used."
+						/>
+					</div>
+					<input
+						name="organization"
+						id="organization"
+						placeholder="eg: coollabsio"
+						bind:value={source.organization}
+					/>
+				</div>
 			</div>
 			{#if source.apiUrl && source.htmlUrl && source.name}
 				<div class="text-center">
@@ -107,7 +126,7 @@
 	{:else if source.githubApp?.installationId}
 		<form on:submit|preventDefault={handleSubmit} class="py-4">
 			<div class="flex space-x-1 pb-5 font-bold">
-				<div class="title">General</div>
+				<div class="title">{$t('general')}</div>
 				{#if $session.isAdmin}
 					<button
 						type="submit"
@@ -116,14 +135,14 @@
 						disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
 					>
 					<button on:click|preventDefault={() => installRepositories(source)}
-						>Change GitHub App Settings</button
+						>{$t('source.change_app_settings', { name: 'GitHub' })}</button
 					>
 				{/if}
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
 				<div class="grid grid-flow-row gap-2">
 					<div class="mt-2 grid grid-cols-2 items-center">
-						<label for="name" class="text-base font-bold text-stone-100">Name</label>
+						<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 						<input name="name" id="name" required bind:value={source.name} />
 					</div>
 				</div>
@@ -134,6 +153,21 @@
 				<div class="grid grid-cols-2 items-center">
 					<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
 					<input name="apiUrl" id="apiUrl" required bind:value={source.apiUrl} />
+				</div>
+				<div class="grid grid-cols-2">
+					<div class="flex flex-col">
+						<label for="organization" class="pt-2 text-base font-bold text-stone-100"
+							>Organization</label
+						>
+					</div>
+					<input
+						readonly
+						disabled
+						name="organization"
+						id="organization"
+						placeholder="eg: coollabsio"
+						bind:value={source.organization}
+					/>
 				</div>
 			</div>
 		</form>

@@ -1,20 +1,16 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
-import { generateDatabaseConfiguration, ErrorHandler } from '$lib/database';
+import { generateDatabaseConfiguration, ErrorHandler, getFreePort } from '$lib/database';
 import { startTcpProxy, stopTcpHttpProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
-import getPort, { portNumbers } from 'get-port';
 
 export const post: RequestHandler = async (event) => {
 	const { status, body, teamId } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 
 	const { id } = event.params;
-	const data = await db.prisma.setting.findFirst();
-	const { minPort, maxPort } = data;
-
 	const { isPublic, appendOnly = true } = await event.request.json();
-	const publicPort = await getPort({ port: portNumbers(minPort, maxPort) });
+	const publicPort = await getFreePort();
 
 	try {
 		await db.setDatabase({ id, isPublic, appendOnly });

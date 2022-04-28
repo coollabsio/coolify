@@ -43,7 +43,15 @@ export const post: RequestHandler = async (event) => {
 					networks: [network],
 					volumes: [config.volume],
 					restart: 'always',
-					labels: makeLabelForServices('vaultWarden')
+					labels: makeLabelForServices('vaultWarden'),
+					deploy: {
+						restart_policy: {
+							condition: 'on-failure',
+							delay: '5s',
+							max_attempts: 3,
+							window: '120s'
+						}
+					}
 				}
 			},
 			networks: {
@@ -60,11 +68,7 @@ export const post: RequestHandler = async (event) => {
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 		try {
-			if (version === 'latest') {
-				await asyncExecShell(
-					`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`
-				);
-			}
+			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
 			return {
 				status: 200

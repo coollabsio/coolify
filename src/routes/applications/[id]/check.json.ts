@@ -5,6 +5,7 @@ import { ErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import { promises as dns } from 'dns';
 import getPort from 'get-port';
+import { t } from '$lib/translations';
 
 export const post: RequestHandler = async (event) => {
 	const { status, body } = await getUserDetails(event);
@@ -19,7 +20,9 @@ export const post: RequestHandler = async (event) => {
 		const found = await db.isDomainConfigured({ id, fqdn });
 		if (found) {
 			throw {
-				message: `Domain ${getDomain(fqdn).replace('www.', '')} is already used.`
+				message: t.get('application.domain_already_in_use', {
+					domain: getDomain(fqdn).replace('www.', '')
+				})
 			};
 		}
 		if (!dev && !forceSave) {
@@ -37,7 +40,7 @@ export const post: RequestHandler = async (event) => {
 			if (localIp?.length > 0) {
 				if (ip?.length === 0 || !ip.includes(localIp[0])) {
 					throw {
-						message: `DNS not set or propogated for ${domain}.<br><br>Please check your DNS settings.`
+						message: t.get('application.dns_not_set_error', { domain: domain })
 					};
 				}
 			}

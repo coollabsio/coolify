@@ -77,7 +77,15 @@ export const post: RequestHandler = async (event) => {
 					networks: [network],
 					restart: 'always',
 					depends_on: [`${id}-mysql`],
-					labels: makeLabelForServices('wordpress')
+					labels: makeLabelForServices('wordpress'),
+					deploy: {
+						restart_policy: {
+							condition: 'on-failure',
+							delay: '5s',
+							max_attempts: 3,
+							window: '120s'
+						}
+					}
 				},
 				[`${id}-mysql`]: {
 					container_name: `${id}-mysql`,
@@ -85,7 +93,15 @@ export const post: RequestHandler = async (event) => {
 					volumes: [config.mysql.volume],
 					environment: config.mysql.environmentVariables,
 					networks: [network],
-					restart: 'always'
+					restart: 'always',
+					deploy: {
+						restart_policy: {
+							condition: 'on-failure',
+							delay: '5s',
+							max_attempts: 3,
+							window: '120s'
+						}
+					}
 				}
 			},
 			networks: {
@@ -105,11 +121,7 @@ export const post: RequestHandler = async (event) => {
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 		try {
-			if (version === 'latest') {
-				await asyncExecShell(
-					`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`
-				);
-			}
+			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
 			return {
 				status: 200

@@ -65,6 +65,7 @@
 	import Loading from '$lib/components/Loading.svelte';
 	import { del, post } from '$lib/api';
 	import { goto } from '$app/navigation';
+	import { t } from '$lib/translations';
 	const { id } = $page.params;
 
 	export let service;
@@ -73,7 +74,7 @@
 	let loading = false;
 
 	async function deleteService() {
-		const sure = confirm(`Are you sure you would like to delete '${service.name}'?`);
+		const sure = confirm($t('application.confirm_to_delete', { name: service.name }));
 		if (sure) {
 			loading = true;
 			try {
@@ -88,7 +89,7 @@
 		}
 	}
 	async function stopService() {
-		const sure = confirm(`Are you sure you would like to stop '${service.name}'?`);
+		const sure = confirm($t('database.confirm_stop', { name: service.name }));
 		if (sure) {
 			loading = true;
 			try {
@@ -122,13 +123,13 @@
 			{#if isRunning}
 				<button
 					on:click={stopService}
-					title="Stop Service"
+					title={$t('service.stop_service')}
 					type="submit"
 					disabled={!$session.isAdmin}
 					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
 					data-tooltip={$session.isAdmin
-						? 'Stop Service'
-						: 'You do not have permission to stop the service.'}
+						? $t('service.stop_service')
+						: $t('service.permission_denied_stop_service')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -148,13 +149,13 @@
 			{:else}
 				<button
 					on:click={startService}
-					title="Start Service"
+					title={$t('service.start_service')}
 					type="submit"
 					disabled={!$session.isAdmin}
 					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
 					data-tooltip={$session.isAdmin
-						? 'Start Service'
-						: 'You do not have permission to start the service.'}
+						? $t('service.start_service')
+						: $t('service.permission_denied_start_service')}
 					><svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="w-6 h-6"
@@ -181,9 +182,9 @@
 				class:bg-coolgray-500={$page.url.pathname === `/services/${id}`}
 			>
 				<button
-					title="Configurations"
+					title={$t('application.configurations')}
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-					data-tooltip="Configurations"
+					data-tooltip={$t('application.configurations')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -216,9 +217,9 @@
 				class:bg-coolgray-500={$page.url.pathname === `/services/${id}/secrets`}
 			>
 				<button
-					title="Secrets"
+					title={$t('application.secret')}
 					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-					data-tooltip="Secrets"
+					data-tooltip={$t('application.secret')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -239,18 +240,47 @@
 					</svg></button
 				></a
 			>
+			<a
+				href="/services/{id}/storage"
+				sveltekit:prefetch
+				class="hover:text-pink-500 rounded"
+				class:text-pink-500={$page.url.pathname === `/services/${id}/storage`}
+				class:bg-coolgray-500={$page.url.pathname === `/services/${id}/storage`}
+			>
+				<button
+					title="Persistent Storage"
+					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
+					data-tooltip="Persistent Storage"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<ellipse cx="12" cy="6" rx="8" ry="3" />
+						<path d="M4 6v6a8 3 0 0 0 16 0v-6" />
+						<path d="M4 12v6a8 3 0 0 0 16 0v-6" />
+					</svg>
+				</button></a
+			>
 			<div class="border border-stone-700 h-8" />
 		{/if}
 		<button
 			on:click={deleteService}
-			title="Delete Service"
+			title={$t('service.delete_service')}
 			type="submit"
 			disabled={!$session.isAdmin}
 			class:hover:text-red-500={$session.isAdmin}
 			class="icons bg-transparent tooltip-bottom text-sm"
 			data-tooltip={$session.isAdmin
-				? 'Delete Service'
-				: 'You do not have permission to delete a service.'}><DeleteIcon /></button
+				? $t('service.delete_service')
+				: $t('service.permission_denied_delete_service')}><DeleteIcon /></button
 		>
 	{/if}
 </nav>

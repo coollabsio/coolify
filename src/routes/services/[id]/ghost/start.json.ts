@@ -90,7 +90,15 @@ export const post: RequestHandler = async (event) => {
 					environment: config.ghost.environmentVariables,
 					restart: 'always',
 					labels: makeLabelForServices('ghost'),
-					depends_on: [`${id}-mariadb`]
+					depends_on: [`${id}-mariadb`],
+					deploy: {
+						restart_policy: {
+							condition: 'on-failure',
+							delay: '5s',
+							max_attempts: 3,
+							window: '120s'
+						}
+					}
 				},
 				[`${id}-mariadb`]: {
 					container_name: `${id}-mariadb`,
@@ -98,7 +106,15 @@ export const post: RequestHandler = async (event) => {
 					networks: [network],
 					volumes: [config.mariadb.volume],
 					environment: config.mariadb.environmentVariables,
-					restart: 'always'
+					restart: 'always',
+					deploy: {
+						restart_policy: {
+							condition: 'on-failure',
+							delay: '5s',
+							max_attempts: 3,
+							window: '120s'
+						}
+					}
 				}
 			},
 			networks: {
@@ -119,11 +135,7 @@ export const post: RequestHandler = async (event) => {
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
 		try {
-			if (version === 'latest') {
-				await asyncExecShell(
-					`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`
-				);
-			}
+			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
 			return {
 				status: 200

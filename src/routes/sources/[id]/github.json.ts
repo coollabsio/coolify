@@ -9,8 +9,8 @@ export const post: RequestHandler = async (event) => {
 	const { id } = event.params;
 
 	try {
-		let { type, name, htmlUrl, apiUrl } = await event.request.json();
-		await db.addGitHubSource({ id, teamId, type, name, htmlUrl, apiUrl });
+		let { type, name, htmlUrl, apiUrl, organization } = await event.request.json();
+		await db.addGitHubSource({ id, teamId, type, name, htmlUrl, apiUrl, organization });
 		return { status: 201 };
 	} catch (error) {
 		return ErrorHandler(error);

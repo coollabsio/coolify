@@ -1,7 +1,7 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
-import { checkContainer } from '$lib/haproxy';
+import { checkContainer, isContainerExited } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 import jsonwebtoken from 'jsonwebtoken';
 import { get as getRequest } from '$lib/api';
@@ -16,17 +16,20 @@ export const get: RequestHandler = async (event) => {
 
 	const appId = process.env['COOLIFY_APP_ID'];
 	let isRunning = false;
+	let isExited = false;
 	let githubToken = event.locals.cookies?.githubToken || null;
 	let gitlabToken = event.locals.cookies?.gitlabToken || null;
 	try {
 		const application = await db.getApplication({ id, teamId });
 		if (application.destinationDockerId) {
 			isRunning = await checkContainer(application.destinationDocker.engine, id);
+			isExited = await isContainerExited(application.destinationDocker.engine, id);
 		}
 		return {
 			status: 200,
 			body: {
 				isRunning,
+				isExited,
 				application,
 				appId,
 				githubToken,
@@ -58,16 +61,16 @@ export const post: RequestHandler = async (event) => {
 		publishDirectory,
 		pythonWSGI,
 		pythonModule,
-		pythonVariable
+		pythonVariable,
+		dockerFileLocation,
+		denoMainFile,
+		denoOptions
 	} = await event.request.json();
 	if (port) port = Number(port);
 	if (exposePort) {
 		exposePort = Number(exposePort);
-		const publicPort = await getPort({ port: exposePort });
-		if (exposePort !== publicPort) {
-			exposePort = -1;
-		}
 	}
+	if (denoOptions) denoOptions = denoOptions.trim();
 
 	try {
 		const defaultConfiguration = await setDefaultConfiguration({
@@ -77,7 +80,9 @@ export const post: RequestHandler = async (event) => {
 			startCommand,
 			buildCommand,
 			publishDirectory,
-			baseDirectory
+			baseDirectory,
+			dockerFileLocation,
+			denoMainFile
 		});
 		await db.configureApplication({
 			id,
@@ -94,6 +99,9 @@ export const post: RequestHandler = async (event) => {
 			pythonWSGI,
 			pythonModule,
 			pythonVariable,
+			dockerFileLocation,
+			denoMainFile,
+			denoOptions,
 			...defaultConfiguration
 		});
 		return { status: 201 };

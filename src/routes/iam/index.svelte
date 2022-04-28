@@ -32,21 +32,12 @@
 
 	export let account;
 	export let accounts;
+	export let invitations;
 	if (accounts.length === 0) {
 		accounts.push(account);
 	}
-	export let teams;
-
-	const ownTeams = teams.filter((team) => {
-		if (team.team.id === $session.teamId) {
-			return team;
-		}
-	});
-	const otherTeams = teams.filter((team) => {
-		if (team.team.id !== $session.teamId) {
-			return team;
-		}
-	});
+	export let ownTeams;
+	export let allTeams;
 
 	async function resetPassword(id) {
 		const sure = window.confirm('Are you sure you want to reset the password?');
@@ -74,12 +65,66 @@
 			return errorNotification(error);
 		}
 	}
+	async function acceptInvitation(id, teamId) {
+		try {
+			await post(`/iam/team/${teamId}/invitation/accept.json`, { id });
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
+	async function revokeInvitation(id, teamId) {
+		try {
+			await post(`/iam/team/${teamId}/invitation/revoke.json`, { id });
+			return window.location.reload();
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">Identity and Access Management</div>
+	<a href="/new/team" class="add-icon cursor-pointer bg-fuchsia-600 hover:bg-fuchsia-500">
+		<svg
+			class="w-6"
+			xmlns="http://www.w3.org/2000/svg"
+			fill="none"
+			viewBox="0 0 24 24"
+			stroke="currentColor"
+			><path
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				stroke-width="2"
+				d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+			/></svg
+		>
+	</a>
 </div>
 
+{#if invitations.length > 0}
+	<div class="mx-auto max-w-4xl px-6 py-4">
+		<div class="title font-bold">Pending invitations</div>
+		<div class="pt-10 text-center">
+			{#each invitations as invitation}
+				<div class="flex justify-center space-x-2">
+					<div>
+						Invited to <span class="font-bold text-pink-600">{invitation.teamName}</span> with
+						<span class="font-bold text-rose-600">{invitation.permission}</span> permission.
+					</div>
+					<button
+						class="hover:bg-green-500"
+						on:click={() => acceptInvitation(invitation.id, invitation.teamId)}>Accept</button
+					>
+					<button
+						class="hover:bg-red-600"
+						on:click={() => revokeInvitation(invitation.id, invitation.teamId)}>Delete</button
+					>
+				</div>
+			{/each}
+		</div>
+	</div>
+{/if}
 <div class="mx-auto max-w-4xl px-6 py-4">
 	{#if $session.teamId === '0' && accounts.length > 0}
 		<div class="title font-bold">Accounts</div>
@@ -104,14 +149,14 @@
 						<td class="flex space-x-2">
 							<form on:submit|preventDefault={() => resetPassword(account.id)}>
 								<button
-									class="mx-auto my-4 w-32 bg-coollabs hover:bg-coollabs-100 disabled:bg-coolgray-200"
+									class="mx-auto my-4 w-32 bg-fuchsia-600 hover:bg-fuchsia-500 disabled:bg-coolgray-200"
 									>Reset Password</button
 								>
 							</form>
 							<form on:submit|preventDefault={() => deleteUser(account.id)}>
 								<button
 									disabled={account.id === $session.userId}
-									class="mx-auto my-4 w-32 bg-coollabs hover:bg-coollabs-100 disabled:bg-coolgray-200"
+									class="mx-auto my-4 w-32 bg-red-600 hover:bg-red-500 disabled:bg-coolgray-200"
 									type="submit">Delete User</button
 								>
 							</form>
@@ -127,49 +172,51 @@
 	<div class="title font-bold">Teams</div>
 	<div class="flex items-center justify-center pt-10">
 		<div class="flex flex-col">
-			<div class="flex flex-col flex-wrap justify-center px-2 pb-10 md:flex-row">
+			<div class="flex flex-row flex-wrap justify-center px-2 pb-10 md:flex-row">
 				{#each ownTeams as team}
-					<a href="/iam/team/{team.teamId}" class="w-96 p-2 no-underline">
+					<a href="/iam/team/{team.id}" class="w-96 p-2 no-underline">
 						<div
 							class="box-selection relative"
-							class:hover:bg-cyan-600={team.team?.id !== '0'}
-							class:hover:bg-red-500={team.team?.id === '0'}
+							class:hover:bg-fuchsia-600={team.id !== '0'}
+							class:hover:bg-red-500={team.id === '0'}
 						>
 							<div class="truncate text-center text-xl font-bold">
-								{team.team.name}
+								{team.name}
 							</div>
 							<div class="truncate text-center font-bold">
-								{team.team?.id === '0' ? 'root team' : ''}
+								{team.id === '0' ? 'root team' : ''}
 							</div>
 
-							<div class="mt-1 text-center">{team.team._count.users} member(s)</div>
+							<div class:mt-6={team.id !== '0'} class="mt-1 text-center">
+								{team.permissions?.length} member(s)
+							</div>
 						</div>
 					</a>
 				{/each}
 			</div>
-			{#if $session.teamId === '0' && otherTeams.length > 0}
+			{#if $session.teamId === '0' && allTeams.length > 0}
 				<div class="pb-5 pt-10 text-xl font-bold">Other Teams</div>
-			{/if}
-			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
-				{#each otherTeams as team}
-					<a href="/iam/team/{team.teamId}" class="w-96 p-2 no-underline">
-						<div
-							class="box-selection relative"
-							class:hover:bg-cyan-600={team.team?.id !== '0'}
-							class:hover:bg-red-500={team.team?.id === '0'}
-						>
-							<div class="truncate text-center text-xl font-bold">
-								{team.team.name}
-							</div>
-							<div class="truncate text-center font-bold">
-								{team.team?.id === '0' ? 'root team' : ''}
-							</div>
+				<div class="flex flex-row flex-wrap justify-center px-2 md:flex-row">
+					{#each allTeams as team}
+						<a href="/iam/team/{team.id}" class="w-96 p-2 no-underline">
+							<div
+								class="box-selection relative"
+								class:hover:bg-fuchsia-600={team.id !== '0'}
+								class:hover:bg-red-500={team.id === '0'}
+							>
+								<div class="truncate text-center text-xl font-bold">
+									{team.name}
+								</div>
+								<div class="truncate text-center font-bold">
+									{team.id === '0' ? 'root team' : ''}
+								</div>
 
-							<div class="mt-1 text-center">{team.team._count.users} member(s)</div>
-						</div>
-					</a>
-				{/each}
-			</div>
+								<div class="mt-1 text-center">{team.permissions?.length} member(s)</div>
+							</div>
+						</a>
+					{/each}
+				</div>
+			{/if}
 		</div>
 	</div>
 </div>

@@ -1,8 +1,15 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	import { publicPaths } from '$lib/settings';
-
+	import { locale, loadTranslations } from '$lib/translations';
 	export const load: Load = async ({ fetch, url, session }) => {
+		const { pathname } = url;
+
+		const defaultLocale = 'en';
+		const sessionLocale = session.lang;
+		const initLocale = sessionLocale || locale.get() || defaultLocale;
+		await loadTranslations(initLocale, pathname);
+
 		if (!session.userId && !publicPaths.includes(url.pathname)) {
 			return {
 				status: 302,
@@ -39,7 +46,6 @@
 	import { asyncSleep } from '$lib/components/common';
 	import { del, get, post } from '$lib/api';
 	import { browser, dev } from '$app/env';
-
 	let isUpdateAvailable = false;
 
 	let updateStatus = {
@@ -176,7 +182,7 @@
 				<a
 					sveltekit:prefetch
 					href="/applications"
-					class="icons tooltip-right bg-coolgray-200 hover:text-green-500"
+					class="icons tooltip-green-500 tooltip-right bg-coolgray-200 hover:text-green-500"
 					class:text-green-500={$page.url.pathname.startsWith('/applications') ||
 						$page.url.pathname.startsWith('/new/application')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/applications') ||
@@ -204,7 +210,7 @@
 				<a
 					sveltekit:prefetch
 					href="/sources"
-					class="icons tooltip-right bg-coolgray-200 hover:text-orange-500"
+					class="icons tooltip-orange-500 tooltip-right bg-coolgray-200 hover:text-orange-500"
 					class:text-orange-500={$page.url.pathname.startsWith('/sources') ||
 						$page.url.pathname.startsWith('/new/source')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/sources') ||
@@ -234,7 +240,7 @@
 				<a
 					sveltekit:prefetch
 					href="/destinations"
-					class="icons tooltip-right bg-coolgray-200 hover:text-sky-500"
+					class="icons tooltip-sky-500 tooltip-right bg-coolgray-200 hover:text-sky-500"
 					class:text-sky-500={$page.url.pathname.startsWith('/destinations') ||
 						$page.url.pathname.startsWith('/new/destination')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/destinations') ||
@@ -269,7 +275,7 @@
 				<a
 					sveltekit:prefetch
 					href="/databases"
-					class="icons tooltip-right bg-coolgray-200 hover:text-purple-500"
+					class="icons tooltip-purple-500 tooltip-right bg-coolgray-200 hover:text-purple-500"
 					class:text-purple-500={$page.url.pathname.startsWith('/databases') ||
 						$page.url.pathname.startsWith('/new/database')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/databases') ||
@@ -296,7 +302,7 @@
 				<a
 					sveltekit:prefetch
 					href="/services"
-					class="icons tooltip-right bg-coolgray-200 hover:text-pink-500"
+					class="icons tooltip-pink-500 tooltip-right bg-coolgray-200 hover:text-pink-500"
 					class:text-pink-500={$page.url.pathname.startsWith('/services') ||
 						$page.url.pathname.startsWith('/new/service')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/services') ||
@@ -348,7 +354,7 @@
 							{:else if updateStatus.success === null}
 								<svg
 									xmlns="http://www.w3.org/2000/svg"
-									class="w-8 h-9"
+									class="h-9 w-8"
 									viewBox="0 0 24 24"
 									stroke-width="1.5"
 									stroke="currentColor"
@@ -363,7 +369,7 @@
 									<line x1="16" y1="12" x2="12" y2="8" />
 								</svg>
 							{:else if updateStatus.success}
-								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" class="w-8 h-9"
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" class="h-9 w-8"
 									><path
 										fill="#DD2E44"
 										d="M11.626 7.488c-.112.112-.197.247-.268.395l-.008-.008L.134 33.141l.011.011c-.208.403.14 1.223.853 1.937.713.713 1.533 1.061 1.936.853l.01.01L28.21 24.735l-.008-.009c.147-.07.282-.155.395-.269 1.562-1.562-.971-6.627-5.656-11.313-4.687-4.686-9.752-7.218-11.315-5.656z"
@@ -408,7 +414,7 @@
 									/></svg
 								>
 							{:else}
-								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" class="w-8 h-9"
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" class="h-9 w-8"
 									><path
 										fill="#FFCC4D"
 										d="M36 18c0 9.941-8.059 18-18 18S0 27.941 0 18 8.059 0 18 0s18 8.059 18 18"
@@ -435,7 +441,7 @@
 				<a
 					sveltekit:prefetch
 					href="/iam"
-					class="icons tooltip-right bg-coolgray-200 hover:text-fuchsia-500"
+					class="icons tooltip-fuchsia-500 tooltip-right bg-coolgray-200 hover:text-fuchsia-500"
 					class:text-fuchsia-500={$page.url.pathname.startsWith('/iam')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/iam')}
 					data-tooltip="IAM"
@@ -456,12 +462,11 @@
 						<path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
 					</svg>
 				</a>
-
 				{#if $session.teamId === '0'}
 					<a
 						sveltekit:prefetch
 						href="/settings"
-						class="icons tooltip-right bg-coolgray-200 hover:text-yellow-500"
+						class="icons tooltip-yellow-500 tooltip-right bg-coolgray-200 hover:text-yellow-500"
 						class:text-yellow-500={$page.url.pathname.startsWith('/settings')}
 						class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
 						data-tooltip="Settings"
@@ -486,7 +491,7 @@
 				{/if}
 
 				<div
-					class="icons tooltip-right bg-coolgray-200 hover:text-red-500"
+					class="icons tooltip-red-500 tooltip-right bg-coolgray-200 hover:text-red-500"
 					data-tooltip="Logout"
 					on:click={logout}
 				>

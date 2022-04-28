@@ -2,10 +2,8 @@ version: '3.8'
 
 services:
   redis:
-    image: 'bitnami/redis:6.2'
+    image: redis:6.2-alpine
     container_name: coolify-redis
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes
     networks:
       - coolify-infra
     ports:
@@ -13,7 +11,24 @@ services:
         published: 6379
         protocol: tcp
         mode: host
-
+  # fluentbit:
+  #     container_name: coolify-fluentbit
+  #     build:
+  #       context: ./data/fluentd
+  #       dockerfile: Dockerfile-dev
+  #     ports:
+  #       - target: 24224
+  #         published: 24224
+  #         protocol: tcp
+  #         mode: host
+  #       - target: 24224
+  #         published: 24224
+  #         protocol: udp
+  #         mode: host
+  #     networks:
+  #       - coolify-infra
+  #     extra_hosts:
+  #       - 'host.docker.internal:host-gateway'
 networks:
   coolify-infra:
     attachable: true

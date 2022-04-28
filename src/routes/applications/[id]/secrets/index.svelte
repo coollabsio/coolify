@@ -25,6 +25,7 @@
 	import pLimit from 'p-limit';
 	import Secret from './_Secret.svelte';
 	import { page } from '$app/stores';
+	import { t } from '$lib/translations';
 	import { get } from '$lib/api';
 	import { saveSecret } from './utils';
 	import { toast } from '@zerodevx/svelte-toast';
@@ -61,14 +62,13 @@
 		await refreshSecrets();
 		toast.push('Secrets saved');
 	}
-	function asd() {
-		console.log(secrets);
-	}
 </script>
 
 <div class="flex items-center space-x-2 p-5 px-6 font-bold">
 	<div class="-mb-5 flex-col">
-		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">Secrets</div>
+		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
+			{$t('application.secret')}
+		</div>
 		<span class="text-xs">{application.name} </span>
 	</div>
 
@@ -140,10 +140,12 @@
 	<table class="mx-auto border-separate text-left">
 		<thead>
 			<tr class="h-12">
-				<th scope="col">Name</th>
-				<th scope="col">Value</th>
-				<th scope="col" class="w-64 text-center">Need during buildtime?</th>
-				<th scope="col" class="w-96 text-center">Action</th>
+				<th scope="col">{$t('forms.name')}</th>
+				<th scope="col">{$t('forms.value')}</th>
+				<th scope="col" class="w-64 text-center"
+					>{$t('application.preview.need_during_buildtime')}</th
+				>
+				<th scope="col" class="w-96 text-center">{$t('forms.action')}</th>
 			</tr>
 		</thead>
 		<tbody>
@@ -164,7 +166,6 @@
 			</tr>
 		</tbody>
 	</table>
-	<button on:click={asd}>Save</button>
 	<h2 class="title my-6 font-bold">Paste .env file</h2>
 	<form on:submit|preventDefault={getValues} class="mb-12 w-full">
 		<textarea bind:value={batchSecrets} class="mb-2 min-h-[200px] w-full" />

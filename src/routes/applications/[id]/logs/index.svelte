@@ -24,19 +24,21 @@
 	export let application;
 	import { page } from '$app/stores';
 	import LoadingLogs from './_Loading.svelte';
-	import { getDomain } from '$lib/components/common';
 	import { get } from '$lib/api';
 	import { errorNotification } from '$lib/form';
+	import { t } from '$lib/translations';
 
 	let loadLogsInterval = null;
 	let logs = [];
-	let followingBuild;
+	let lastLog = null;
 	let followingInterval;
+	let followingLogs;
 	let logsEl;
+	let position = 0;
 
 	const { id } = $page.params;
 	onMount(async () => {
-		loadLogs();
+		loadAllLogs();
 		loadLogsInterval = setInterval(() => {
 			loadLogs();
 		}, 1000);
@@ -45,25 +47,53 @@
 		clearInterval(loadLogsInterval);
 		clearInterval(followingInterval);
 	});
+	async function loadAllLogs() {
+		try {
+			const data: any = await get(`/applications/${id}/logs.json`);
+			if (data?.logs) {
+				lastLog = data.logs[data.logs.length - 1];
+				logs = data.logs;
+			}
+		} catch (error) {
+			console.log(error);
+			return errorNotification(error);
+		}
+	}
 	async function loadLogs() {
 		try {
-			const newLogs = await get(`/applications/${id}/logs.json`);
-			logs = newLogs.logs;
-			return;
-		} catch ({ error }) {
+			const newLogs: any = await get(
+				`/applications/${id}/logs.json?since=${lastLog?.split(' ')[0] || 0}`
+			);
+
+			if (newLogs?.logs && newLogs.logs[newLogs.logs.length - 1] !== logs[logs.length - 1]) {
+				logs = logs.concat(newLogs.logs);
+				lastLog = newLogs.logs[newLogs.logs.length - 1];
+			}
+		} catch (error) {
 			return errorNotification(error);
+		}
+	}
+	function detect() {
+		if (position < logsEl.scrollTop) {
+			position = logsEl.scrollTop;
+		} else {
+			if (followingLogs) {
+				clearInterval(followingInterval);
+				followingLogs = false;
+			}
+			position = logsEl.scrollTop;
 		}
 	}
 
 	function followBuild() {
-		followingBuild = !followingBuild;
-		if (followingBuild) {
+		followingLogs = !followingLogs;
+		if (followingLogs) {
 			followingInterval = setInterval(() => {
 				logsEl.scrollTop = logsEl.scrollHeight;
 				window.scrollTo(0, document.body.scrollHeight);
-			}, 100);
+			}, 1000);
 		} else {
-			window.clearInterval(followingInterval);
+			clearInterval(followingInterval);
 		}
 	}
 </script>
@@ -142,16 +172,19 @@
 </div>
 <div class="flex flex-row justify-center space-x-2 px-10 pt-6">
 	{#if logs.length === 0}
-		<div class="text-xl font-bold tracking-tighter">Waiting for the logs...</div>
+		<div class="text-xl font-bold tracking-tighter">{$t('application.build.waiting_logs')}</div>
 	{:else}
 		<div class="relative w-full">
-			<LoadingLogs />
-			<div class="flex justify-end sticky top-0 p-2">
+			<div class="text-right " />
+			{#if loadLogsInterval}
+				<LoadingLogs />
+			{/if}
+			<div class="flex justify-end sticky top-0 p-2 mx-1">
 				<button
 					on:click={followBuild}
 					class="bg-transparent"
 					data-tooltip="Follow logs"
-					class:text-green-500={followingBuild}
+					class:text-green-500={followingLogs}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -174,8 +207,9 @@
 			<div
 				class="font-mono w-full leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
 				bind:this={logsEl}
+				on:scroll={detect}
 			>
-				<div class="px-2">
+				<div class="px-2 pr-14">
 					{#each logs as log}
 						{log + '\n'}
 					{/each}

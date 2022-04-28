@@ -12,6 +12,7 @@
 	import { del } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { errorNotification } from '$lib/form';
+	import { t } from '$lib/translations';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { createEventDispatcher } from 'svelte';
 	import { saveSecret } from './utils';
@@ -104,7 +105,7 @@
 		class:cursor-not-allowed={isPRMRSecret}
 		class:cursor-pointer={!isPRMRSecret}
 	>
-		<span class="sr-only">Use isBuildSecret</span>
+		<span class="sr-only">{$t('application.secrets.use_isbuildsecret')}</span>
 		<span
 			class="pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ease-in-out"
 			class:translate-x-5={isBuildSecret}
@@ -145,17 +146,19 @@
 	{#if isNewSecret}
 		<div class="flex items-center justify-center">
 			<button class="bg-green-600 hover:bg-green-500" on:click={() => createSecret(true)}
-				>Add</button
+				>{$t('forms.add')}</button
 			>
 		</div>
 	{:else}
 		<div class="flex flex-row justify-center space-x-2">
 			<div class="flex items-center justify-center">
-				<button class="" on:click={() => createSecret(false)}>Set</button>
+				<button class="" on:click={() => createSecret(false)}>{$t('forms.set')}</button>
 			</div>
 			{#if !isPRMRSecret}
 				<div class="flex justify-center items-end">
-					<button class="bg-red-600 hover:bg-red-500" on:click={removeSecret}>Remove</button>
+					<button class="bg-red-600 hover:bg-red-500" on:click={removeSecret}
+						>{$t('forms.remove')}</button
+					>
 				</div>
 			{/if}
 		</div>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
+	import { t } from '$lib/translations';
 	export let service;
 </script>
 
@@ -7,7 +8,7 @@
 	<div class="title">MeiliSearch</div>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="masterKey">Admin API key</label>
+	<label for="masterKey">{$t('forms.admin_api_key')}</label>
 	<CopyPasswordField
 		id="masterKey"
 		isPasswordField

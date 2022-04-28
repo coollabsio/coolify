@@ -1,10 +1,28 @@
-import { asyncExecShell, getEngine } from '$lib/common';
 import { decrypt, encrypt } from '$lib/crypto';
+import type { Minio, Prisma, Service } from '@prisma/client';
 import cuid from 'cuid';
 import { generatePassword } from '.';
 import { prisma } from './common';
 
-export async function listServices(teamId) {
+const include: Prisma.ServiceInclude = {
+	destinationDocker: true,
+	persistentStorage: true,
+	serviceSecret: true,
+	minio: true,
+	plausibleAnalytics: true,
+	vscodeserver: true,
+	wordpress: true,
+	ghost: true,
+	meiliSearch: true,
+	umami: true
+};
+export async function listServicesWithIncludes() {
+	return await prisma.service.findMany({
+		include,
+		orderBy: { createdAt: 'desc' }
+	});
+}
+export async function listServices(teamId: string): Promise<Service[]> {
 	if (teamId === '0') {
 		return await prisma.service.findMany({ include: { teams: true } });
 	} else {
@@ -15,22 +33,18 @@ export async function listServices(teamId) {
 	}
 }
 
-export async function newService({ name, teamId }) {
+export async function newService({
+	name,
+	teamId
+}: {
+	name: string;
+	teamId: string;
+}): Promise<Service> {
 	return await prisma.service.create({ data: { name, teams: { connect: { id: teamId } } } });
 }
 
-export async function getService({ id, teamId }) {
-	let body = {};
-	const include = {
-		destinationDocker: true,
-		plausibleAnalytics: true,
-		minio: true,
-		vscodeserver: true,
-		wordpress: true,
-		ghost: true,
-		serviceSecret: true,
-		meiliSearch: true
-	};
+export async function getService({ id, teamId }: { id: string; teamId: string }): Promise<Service> {
+	let body;
 	if (teamId === '0') {
 		body = await prisma.service.findFirst({
 			where: { id },
@@ -43,6 +57,12 @@ export async function getService({ id, teamId }) {
 		});
 	}
 
+	if (body?.serviceSecret.length > 0) {
+		body.serviceSecret = body.serviceSecret.map((s) => {
+			s.value = decrypt(s.value);
+			return s;
+		});
+	}
 	if (body.plausibleAnalytics?.postgresqlPassword)
 		body.plausibleAnalytics.postgresqlPassword = decrypt(
 			body.plausibleAnalytics.postgresqlPassword
@@ -69,21 +89,26 @@ export async function getService({ id, teamId }) {
 
 	if (body.meiliSearch?.masterKey) body.meiliSearch.masterKey = decrypt(body.meiliSearch.masterKey);
 
-	if (body?.serviceSecret.length > 0) {
-		body.serviceSecret = body.serviceSecret.map((s) => {
-			s.value = decrypt(s.value);
-			return s;
-		});
-	}
-	if (body.wordpress?.ftpPassword) {
-		body.wordpress.ftpPassword = decrypt(body.wordpress.ftpPassword);
-	}
+	if (body.wordpress?.ftpPassword) body.wordpress.ftpPassword = decrypt(body.wordpress.ftpPassword);
+
+	if (body.umami?.postgresqlPassword)
+		body.umami.postgresqlPassword = decrypt(body.umami.postgresqlPassword);
+	if (body.umami?.umamiAdminPassword)
+		body.umami.umamiAdminPassword = decrypt(body.umami.umamiAdminPassword);
+	if (body.umami?.hashSalt) body.umami.hashSalt = decrypt(body.umami.hashSalt);
+
 	const settings = await prisma.setting.findFirst();
 
 	return { ...body, settings };
 }
 
-export async function configureServiceType({ id, type }) {
+export async function configureServiceType({
+	id,
+	type
+}: {
+	id: string;
+	type: string;
+}): Promise<void> {
 	if (type === 'plausibleanalytics') {
 		const password = encrypt(generatePassword());
 		const postgresqlUser = cuid();
@@ -197,48 +222,184 @@ export async function configureServiceType({ id, type }) {
 				meiliSearch: { create: { masterKey } }
 			}
 		});
+	} else if (type === 'umami') {
+		const umamiAdminPassword = encrypt(generatePassword());
+		const postgresqlUser = cuid();
+		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlDatabase = 'umami';
+		const hashSalt = encrypt(generatePassword(64));
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				umami: {
+					create: {
+						umamiAdminPassword,
+						postgresqlDatabase,
+						postgresqlPassword,
+						postgresqlUser,
+						hashSalt
+					}
+				}
+			}
+		});
 	}
 }
-export async function setServiceVersion({ id, version }) {
+
+export async function setServiceVersion({
+	id,
+	version
+}: {
+	id: string;
+	version: string;
+}): Promise<Service> {
 	return await prisma.service.update({
 		where: { id },
 		data: { version }
 	});
 }
 
-export async function setServiceSettings({ id, dualCerts }) {
+export async function setServiceSettings({
+	id,
+	dualCerts
+}: {
+	id: string;
+	dualCerts: boolean;
+}): Promise<Service> {
 	return await prisma.service.update({
 		where: { id },
 		data: { dualCerts }
 	});
 }
 
-export async function updatePlausibleAnalyticsService({ id, fqdn, email, username, name }) {
+export async function updatePlausibleAnalyticsService({
+	id,
+	fqdn,
+	email,
+	username,
+	name
+}: {
+	id: string;
+	fqdn: string;
+	name: string;
+	email: string;
+	username: string;
+}): Promise<void> {
 	await prisma.plausibleAnalytics.update({ where: { serviceId: id }, data: { email, username } });
 	await prisma.service.update({ where: { id }, data: { name, fqdn } });
 }
-export async function updateService({ id, fqdn, name }) {
+
+export async function updateService({
+	id,
+	fqdn,
+	name
+}: {
+	id: string;
+	fqdn: string;
+	name: string;
+}): Promise<Service> {
 	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
 }
-export async function updateWordpress({ id, fqdn, name, mysqlDatabase, extraConfig }) {
+
+export async function updateLanguageToolService({
+	id,
+	fqdn,
+	name
+}: {
+	id: string;
+	fqdn: string;
+	name: string;
+}): Promise<Service> {
+	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
+}
+
+export async function updateMeiliSearchService({
+	id,
+	fqdn,
+	name
+}: {
+	id: string;
+	fqdn: string;
+	name: string;
+}): Promise<Service> {
+	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
+}
+
+export async function updateVaultWardenService({
+	id,
+	fqdn,
+	name
+}: {
+	id: string;
+	fqdn: string;
+	name: string;
+}): Promise<Service> {
+	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
+}
+
+export async function updateVsCodeServer({
+	id,
+	fqdn,
+	name
+}: {
+	id: string;
+	fqdn: string;
+	name: string;
+}): Promise<Service> {
+	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
+}
+
+export async function updateWordpress({
+	id,
+	fqdn,
+	name,
+	mysqlDatabase,
+	extraConfig
+}: {
+	id: string;
+	fqdn: string;
+	name: string;
+	mysqlDatabase: string;
+	extraConfig: string;
+}): Promise<Service> {
 	return await prisma.service.update({
 		where: { id },
 		data: { fqdn, name, wordpress: { update: { mysqlDatabase, extraConfig } } }
 	});
 }
-export async function updateMinioService({ id, publicPort }) {
+
+export async function updateMinioService({
+	id,
+	publicPort
+}: {
+	id: string;
+	publicPort: number;
+}): Promise<Minio> {
 	return await prisma.minio.update({ where: { serviceId: id }, data: { publicPort } });
 }
-export async function updateGhostService({ id, fqdn, name, mariadbDatabase }) {
+
+export async function updateGhostService({
+	id,
+	fqdn,
+	name,
+	mariadbDatabase
+}: {
+	id: string;
+	fqdn: string;
+	name: string;
+	mariadbDatabase: string;
+}): Promise<Service> {
 	return await prisma.service.update({
 		where: { id },
 		data: { fqdn, name, ghost: { update: { mariadbDatabase } } }
 	});
 }
 
-export async function removeService({ id }) {
+export async function removeService({ id }: { id: string }): Promise<void> {
+	await prisma.servicePersistentStorage.deleteMany({ where: { serviceId: id } });
 	await prisma.meiliSearch.deleteMany({ where: { serviceId: id } });
 	await prisma.ghost.deleteMany({ where: { serviceId: id } });
+	await prisma.umami.deleteMany({ where: { serviceId: id } });
 	await prisma.plausibleAnalytics.deleteMany({ where: { serviceId: id } });
 	await prisma.minio.deleteMany({ where: { serviceId: id } });
 	await prisma.vscodeserver.deleteMany({ where: { serviceId: id } });

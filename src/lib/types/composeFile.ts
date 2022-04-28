@@ -18,10 +18,19 @@ export type ComposeFileService = {
 	restart: ComposeFileRestartOption;
 	depends_on?: string[];
 	command?: string;
+	ports?: string[];
 	build?: {
 		context: string;
 		dockerfile: string;
 		args?: Record<string, unknown>;
+	};
+	deploy?: {
+		restart_policy?: {
+			condition?: string;
+			delay?: string;
+			max_attempts?: number;
+			window?: string;
+		};
 	};
 };
 

@@ -18,6 +18,8 @@
 </script>
 
 <script lang="ts">
+	import { t } from '$lib/translations';
+
 	export let application;
 	export let appId;
 
@@ -26,7 +28,9 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Select a Repository / Project</div>
+	<div class="mr-4 text-2xl tracking-tight">
+		{$t('application.configuration.select_a_repository_project')}
+	</div>
 </div>
 <div class="flex flex-wrap justify-center">
 	{#if application.gitSource.type === 'github'}

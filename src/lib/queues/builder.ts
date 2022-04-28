@@ -20,28 +20,22 @@ import {
 	setDefaultConfiguration
 } from '$lib/buildPacks/common';
 import yaml from 'js-yaml';
+import type { Job } from 'bullmq';
+import type { BuilderJob } from '$lib/types/builderJob';
+
 import type { ComposeFile } from '$lib/types/composeFile';
 
-export default async function (job) {
-	let {
+export default async function (job: Job<BuilderJob, void, string>): Promise<void> {
+	const {
 		id: applicationId,
 		repository,
-		branch,
-		buildPack,
 		name,
 		destinationDocker,
 		destinationDockerId,
 		gitSource,
 		build_id: buildId,
 		configHash,
-		port,
-		exposePort,
-		installCommand,
-		buildCommand,
-		startCommand,
 		fqdn,
-		baseDirectory,
-		publishDirectory,
 		projectId,
 		secrets,
 		phpModules,
@@ -52,7 +46,21 @@ export default async function (job) {
 		persistentStorage,
 		pythonWSGI,
 		pythonModule,
-		pythonVariable
+		pythonVariable,
+		denoOptions,
+		exposePort
+	} = job.data;
+	let {
+		branch,
+		buildPack,
+		port,
+		installCommand,
+		buildCommand,
+		startCommand,
+		baseDirectory,
+		publishDirectory,
+		dockerFileLocation,
+		denoMainFile
 	} = job.data;
 	const { debug } = settings;
 
@@ -68,7 +76,7 @@ export default async function (job) {
 	});
 	let imageId = applicationId;
 	let domain = getDomain(fqdn);
-	let volumes =
+	const volumes =
 		persistentStorage?.map((storage) => {
 			return `${applicationId}${storage.path.replace(/\//gi, '-')}:${
 				buildPack !== 'docker' ? '/app' : ''
@@ -103,8 +111,10 @@ export default async function (job) {
 		buildCommand = configuration.buildCommand;
 		publishDirectory = configuration.publishDirectory;
 		baseDirectory = configuration.baseDirectory;
+		dockerFileLocation = configuration.dockerFileLocation;
+		denoMainFile = configuration.denoMainFile;
 
-		let commit = await importers[gitSource.type]({
+		const commit = await importers[gitSource.type]({
 			applicationId,
 			debug,
 			workdir,
@@ -179,6 +189,7 @@ export default async function (job) {
 		}
 		if (!imageFound || deployNeeded) {
 			await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId);
+			console.log(exposePort ? `${exposePort}:${port}` : port);
 			if (buildpacks[buildPack])
 				await buildpacks[buildPack]({
 					buildId,
@@ -197,7 +208,7 @@ export default async function (job) {
 					tag,
 					workdir,
 					docker,
-					port,
+					port: exposePort ? `${exposePort}:${port}` : port,
 					installCommand,
 					buildCommand,
 					startCommand,
@@ -206,15 +217,16 @@ export default async function (job) {
 					phpModules,
 					pythonWSGI,
 					pythonModule,
-					pythonVariable
+					pythonVariable,
+					dockerFileLocation,
+					denoMainFile,
+					denoOptions
 				});
 			else {
 				await saveBuildLog({ line: `Build pack ${buildPack} not found`, buildId, applicationId });
 				throw new Error(`Build pack ${buildPack} not found.`);
 			}
-			deployNeeded = true;
 		} else {
-			deployNeeded = false;
 			await saveBuildLog({ line: 'Nothing changed.', buildId, applicationId });
 		}
 
@@ -250,7 +262,7 @@ export default async function (job) {
 			repository,
 			branch,
 			projectId,
-			port,
+			port: exposePort ? `${exposePort}:${port}` : port,
 			commit,
 			installCommand,
 			buildCommand,
@@ -282,10 +294,21 @@ export default async function (job) {
 						volumes,
 						env_file: envFound ? [`${workdir}/.env`] : [],
 						networks: [docker.network],
-						ports: exposePort ? [`${exposePort}:${port}`] : [],
 						labels,
 						depends_on: [],
-						restart: 'always'
+						restart: 'always',
+						...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+						// logging: {
+						// 	driver: 'fluentd',
+						// },
+						deploy: {
+							restart_policy: {
+								condition: 'on-failure',
+								delay: '5s',
+								max_attempts: 3,
+								window: '120s'
+							}
+						}
 					}
 				},
 				networks: {

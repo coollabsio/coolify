@@ -31,12 +31,12 @@
 <script>
 	import { dev } from '$app/env';
 	import { getDomain, dashify } from '$lib/components/common';
+	import { t } from '$lib/translations';
 
 	export let source;
 	export let settings;
 	onMount(() => {
 		const { organization, id, htmlUrl } = source;
-		console.log(source);
 		const { fqdn } = settings;
 		const host = dev
 			? 'http://localhost:3000'
@@ -85,5 +85,5 @@
 </script>
 
 <div class="flex h-screen items-center justify-center text-3xl font-bold">
-	Redirecting to Github...
+	{$t('source.github.redirecting')}
 </div>

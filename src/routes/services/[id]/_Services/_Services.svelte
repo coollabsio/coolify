@@ -10,11 +10,13 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 	import { errorNotification } from '$lib/form';
+	import { t } from '$lib/translations';
 	import { toast } from '@zerodevx/svelte-toast';
 	import Ghost from './_Ghost.svelte';
 	import MeiliSearch from './_MeiliSearch.svelte';
 	import MinIo from './_MinIO.svelte';
 	import PlausibleAnalytics from './_PlausibleAnalytics.svelte';
+	import Umami from './_Umami.svelte';
 	import VsCodeServer from './_VSCodeServer.svelte';
 	import Wordpress from './_Wordpress.svelte';
 
@@ -40,7 +42,7 @@
 		loadingVerification = true;
 		try {
 			await post(`/services/${id}/${service.type}/activate.json`, { id: service.id });
-			toast.push('All email verified. You can login now.');
+			toast.push(t.get('services.all_email_verified'));
 		} catch ({ error }) {
 			return errorNotification(error);
 		} finally {
@@ -53,7 +55,7 @@
 				dualCerts = !dualCerts;
 			}
 			await post(`/services/${id}/settings.json`, { dualCerts });
-			return toast.push('Settings saved.');
+			return toast.push(t.get('application.settings_saved'));
 		} catch ({ error }) {
 			return errorNotification(error);
 		}
@@ -63,25 +65,27 @@
 <div class="mx-auto max-w-4xl px-6 pb-12">
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
 		<div class="flex space-x-1 pb-5 font-bold">
-			<div class="title">General</div>
+			<div class="title">{$t('general')}</div>
 			{#if $session.isAdmin}
 				<button
 					type="submit"
 					class:bg-pink-600={!loading}
 					class:hover:bg-pink-500={!loading}
-					disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
+					disabled={loading}>{loading ? $t('forms.saving') : $t('forms.save')}</button
 				>
 			{/if}
 			{#if service.type === 'plausibleanalytics' && isRunning}
 				<button on:click|preventDefault={setEmailsToVerified} disabled={loadingVerification}
-					>{loadingVerification ? 'Verifying' : 'Verify emails without SMTP'}</button
+					>{loadingVerification
+						? $t('forms.verifying')
+						: $t('forms.verify_emails_without_smtp')}</button
 				>
 			{/if}
 		</div>
 
 		<div class="grid grid-flow-row gap-2">
 			<div class="mt-2 grid grid-cols-2 items-center px-10">
-				<label for="name" class="text-base font-bold text-stone-100">Name</label>
+				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 				<div>
 					<input
 						readonly={!$session.isAdmin}
@@ -109,7 +113,9 @@
 				>
 			</div>
 			<div class="grid grid-cols-2 items-center px-10">
-				<label for="destination" class="text-base font-bold text-stone-100">Destination</label>
+				<label for="destination" class="text-base font-bold text-stone-100"
+					>{$t('application.destination')}</label
+				>
 				<div>
 					{#if service.destinationDockerId}
 						<div class="no-underline">
@@ -125,10 +131,10 @@
 			</div>
 			<div class="grid grid-cols-2 px-10">
 				<div class="flex-col ">
-					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">URL (FQDN)</label>
-					<Explainer
-						text="If you specify <span class='text-pink-600 font-bold'>https</span>, the application will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-pink-600 font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the url, you must first stop the application."
-					/>
+					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100"
+						>{$t('application.url_fqdn')}</label
+					>
+					<Explainer text={$t('application.https_explainer')} />
 				</div>
 
 				<CopyPasswordField
@@ -145,10 +151,10 @@
 			<div class="grid grid-cols-2 items-center px-10">
 				<Setting
 					disabled={isRunning}
-					dataTooltip="Must be stopped to modify."
+					dataTooltip={$t('forms.must_be_stopped_to_modify')}
 					bind:setting={dualCerts}
-					title="Generate SSL for www and non-www?"
-					description="It will generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-pink-600'>both DNS entries</span> set in advance.<br><br>Service needs to be restarted."
+					title={$t('application.ssl_www_and_non_www')}
+					description={$t('services.generate_www_non_www_ssl')}
 					on:click={() => !isRunning && changeSettings('dualCerts')}
 				/>
 			</div>
@@ -164,6 +170,8 @@
 				<Ghost bind:service {readOnly} />
 			{:else if service.type === 'meilisearch'}
 				<MeiliSearch bind:service />
+			{:else if service.type === 'umami'}
+				<Umami bind:service />
 			{/if}
 		</div>
 	</form>

@@ -2,7 +2,7 @@ import { dev } from '$app/env';
 import { asyncExecShell, getEngine, getUserDetails } from '$lib/common';
 import { decrypt, encrypt } from '$lib/crypto';
 import * as db from '$lib/database';
-import { generateDatabaseConfiguration, ErrorHandler, generatePassword } from '$lib/database';
+import { ErrorHandler, generatePassword, getFreePort } from '$lib/database';
 import { checkContainer, startTcpProxy, stopTcpHttpProxy } from '$lib/haproxy';
 import type { ComposeFile } from '$lib/types/composeFile';
 import type { RequestHandler } from '@sveltejs/kit';
@@ -16,11 +16,10 @@ export const post: RequestHandler = async (event) => {
 	if (status === 401) return { status, body };
 
 	const { id } = event.params;
-	const data = await db.prisma.setting.findFirst();
-	const { minPort, maxPort } = data;
 
 	const { ftpEnabled } = await event.request.json();
-	const publicPort = await getPort({ port: portNumbers(minPort, maxPort) });
+	const publicPort = await getFreePort();
+
 	let ftpUser = cuid();
 	let ftpPassword = generatePassword();
 
@@ -114,7 +113,7 @@ export const post: RequestHandler = async (event) => {
 					services: {
 						[`${id}-ftp`]: {
 							image: `atmoz/sftp:alpine`,
-							command: `'${ftpUser}:${password.replace('\n', '').replace(/\$/g, '$$$')}:e:1001'`,
+							command: `'${ftpUser}:${password.replace('\n', '').replace(/\$/g, '$$$')}:e:33'`,
 							extra_hosts: ['host.docker.internal:host-gateway'],
 							container_name: `${id}-ftp`,
 							volumes,

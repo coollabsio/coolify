@@ -42,7 +42,15 @@ export const post: RequestHandler = async (event) => {
 					volumes: [config.volume],
 					environment: config.environmentVariables,
 					restart: 'always',
-					labels: makeLabelForServices('uptimekuma')
+					labels: makeLabelForServices('uptimekuma'),
+					deploy: {
+						restart_policy: {
+							condition: 'on-failure',
+							delay: '5s',
+							max_attempts: 3,
+							window: '120s'
+						}
+					}
 				}
 			},
 			networks: {
@@ -60,11 +68,7 @@ export const post: RequestHandler = async (event) => {
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
 		try {
-			if (version === 'latest') {
-				await asyncExecShell(
-					`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`
-				);
-			}
+			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
 			return {
 				status: 200

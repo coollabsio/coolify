@@ -23,6 +23,8 @@
 	import type Prisma from '@prisma/client';
 
 	import { session } from '$app/stores';
+	import { t } from '$lib/translations';
+
 	export let destinations: Prisma.DestinationDocker[];
 	const ownDestinations = destinations.filter((destination) => {
 		if (destination.teams[0].id === $session.teamId) {
@@ -37,7 +39,7 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Destinations</div>
+	<div class="mr-4 text-2xl tracking-tight">{$t('index.destinations')}</div>
 	{#if $session.isAdmin}
 		<a href="/new/destination" class="add-icon bg-sky-600 hover:bg-sky-500">
 			<svg
@@ -59,7 +61,7 @@
 <div class="flex justify-center">
 	{#if !destinations || ownDestinations.length === 0}
 		<div class="flex-col">
-			<div class="text-center text-xl font-bold">No destination found</div>
+			<div class="text-center text-xl font-bold">{$t('destination.no_destination_found')}</div>
 		</div>
 	{/if}
 	{#if ownDestinations.length > 0 || otherDestinations.length > 0}

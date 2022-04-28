@@ -37,10 +37,11 @@
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import { del } from '$lib/api';
 	import { goto } from '$app/navigation';
+	import { t } from '$lib/translations';
 
 	export let destination;
 	async function deleteDestination(destination) {
-		const sure = confirm(`Are you sure you would like to delete '${destination.name}'?`);
+		const sure = confirm($t('application.confirm_to_delete', { name: destination.name }));
 		if (sure) {
 			try {
 				await del(`/destinations/${destination.id}.json`, { id: destination.id });
@@ -55,14 +56,14 @@
 <nav class="nav-side">
 	<button
 		on:click={() => deleteDestination(destination)}
-		title="Delete Destination"
+		title={$t('destination.delete_destination')}
 		type="submit"
 		disabled={!$session.isAdmin}
 		class:hover:text-red-500={$session.isAdmin}
 		class="icons tooltip-bottom bg-transparent text-sm"
 		data-tooltip={$session.isAdmin
-			? 'Delete Destination'
-			: 'You do not have permission to delete this destination'}><DeleteIcon /></button
+			? $t('destination.delete_destination')
+			: $t('destination.permission_denied_delete_destination')}><DeleteIcon /></button
 	>
 </nav>
 <slot />
