@@ -9,17 +9,21 @@ const createDockerfile = async (data, image): Promise<void> => {
 	Dockerfile.push(`LABEL coolify.image=true`);
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`COPY /nginx.conf /etc/nginx/nginx.conf`);
-	Dockerfile.push(`COPY composer.* ./`);
-	Dockerfile.push(`COPY database/ database/`);
+	Dockerfile.push(`COPY --chown=application:application composer.* ./`);
+	Dockerfile.push(`COPY --chown=application:application database/ database/`);
 	Dockerfile.push(
 		`RUN composer install --ignore-platform-reqs --no-interaction --no-plugins --no-scripts --prefer-dist`
 	);
-	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app/public/js/ /app/public/js/`);
-	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app/public/css/ /app/public/css/`);
 	Dockerfile.push(
-		`COPY --from=${applicationId}:${tag}-cache /app/mix-manifest.json /app/public/mix-manifest.json`
+		`COPY --chown=application:application --from=${applicationId}:${tag}-cache /app/public/js/ /app/public/js/`
 	);
-	Dockerfile.push(`COPY . ./`);
+	Dockerfile.push(
+		`COPY --chown=application:application --from=${applicationId}:${tag}-cache /app/public/css/ /app/public/css/`
+	);
+	Dockerfile.push(
+		`COPY --chown=application:application --from=${applicationId}:${tag}-cache /app/mix-manifest.json /app/public/mix-manifest.json`
+	);
+	Dockerfile.push(`COPY --chown=application:application . ./`);
 	Dockerfile.push(`EXPOSE 80`);
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };

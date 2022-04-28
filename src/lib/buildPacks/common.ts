@@ -184,7 +184,7 @@ export async function copyBaseConfigurationFiles(
 
 			    include             /etc/nginx/mime.types;
     			default_type        application/octet-stream;
-    
+				
                 server {
                     listen       80;
                     server_name  localhost;
@@ -237,21 +237,22 @@ export async function copyBaseConfigurationFiles(
 
 			    include             /etc/nginx/mime.types;
     			default_type        application/octet-stream;
-    
+				
                 server {
                     listen       80;
-                    server_name  localhost;
+                    server_name  _;
+					disable_symlinks off;
 
 					add_header X-Frame-Options "SAMEORIGIN";
 					add_header X-XSS-Protection "1; mode=block";
 					add_header X-Content-Type-Options "nosniff";
-				
+
+					root   /app/public;
 					index index.html index.htm index.php;
 
 					charset utf-8;
 
                     location / {
-                        root   /app/public;
                         try_files $uri $uri/ /index.php?$query_string;
                     }
 
@@ -260,7 +261,11 @@ export async function copyBaseConfigurationFiles(
 
 					error_page 404 /index.php;
 
-					location ~ \.php$ {
+				   location ~ \.php$ {
+						fastcgi_split_path_info ^(.+\.php)(/.+)$;
+						if (!-f $document_root$fastcgi_script_name) {
+							return 404;
+						}
 						fastcgi_pass 127.0.0.1:9000;
 						fastcgi_index index.php;
 						fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
