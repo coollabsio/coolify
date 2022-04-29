@@ -2,13 +2,13 @@ import { buildCacheImageForLaravel, buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
 
 const createDockerfile = async (data, image): Promise<void> => {
-	const { workdir, applicationId, tag } = data;
+	const { workdir, applicationId, tag, baseImage } = data;
 	const Dockerfile: Array<string> = [];
 
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push(`LABEL coolify.image=true`);
 	Dockerfile.push('WORKDIR /app');
-	Dockerfile.push(`COPY /nginx.conf /etc/nginx/nginx.conf`);
+	Dockerfile.push(`ENV WEB_DOCUMENT_ROOT /app/public`);
 	Dockerfile.push(`COPY --chown=application:application composer.* ./`);
 	Dockerfile.push(`COPY --chown=application:application database/ database/`);
 	Dockerfile.push(
