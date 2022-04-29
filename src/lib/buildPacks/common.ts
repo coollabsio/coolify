@@ -395,10 +395,6 @@ export function setDefaultBaseImage(buildPack) {
 	];
 	const laravelVersions = [
 		{
-			value: 'webdevops/php-nginx:8.0-alpine',
-			label: 'webdevops/php-nginx:8.0-alpine'
-		},
-		{
 			value: 'webdevops/php-apache:8.0-alpine',
 			label: 'webdevops/php-apache:8.0-alpine'
 		}
@@ -436,9 +432,8 @@ export function setDefaultBaseImage(buildPack) {
 		payload.baseImages = phpVersions;
 	}
 	if (buildPack === 'laravel') {
-		payload.baseImage = 'webdevops/php-nginx:8.0-alpine';
+		payload.baseImage = 'webdevops/php-apache:8.0-alpine';
 		payload.baseBuildImage = 'node:18';
-		payload.baseImages = laravelVersions;
 		payload.baseBuildImages = nodeVersions;
 	}
 	return payload;
