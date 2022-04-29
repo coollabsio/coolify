@@ -12,6 +12,7 @@
 	import { errorNotification } from '$lib/form';
 	import { t } from '$lib/translations';
 	import { toast } from '@zerodevx/svelte-toast';
+	import Fider from './_Fider.svelte';
 	import Ghost from './_Ghost.svelte';
 	import Hasura from './_Hasura.svelte';
 	import MeiliSearch from './_MeiliSearch.svelte';
@@ -175,6 +176,8 @@
 				<Umami bind:service />
 			{:else if service.type === 'hasura'}
 				<Hasura bind:service />
+			{:else if service.type === 'fider'}
+				<Fider bind:service {readOnly} />
 			{/if}
 		</div>
 	</form>

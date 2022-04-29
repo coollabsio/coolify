@@ -202,5 +202,16 @@ export const supportedServiceTypesAndVersions = [
 		ports: {
 			main: 8080
 		}
+	},
+	{
+		name: 'fider',
+		fancyName: 'Fider',
+		baseImage: 'getfider/fider',
+		images: ['postgres:12-alpine'],
+		versions: ['stable'],
+		recommendedVersion: 'stable',
+		ports: {
+			main: 3000
+		}
 	}
 ];

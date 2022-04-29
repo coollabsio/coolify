@@ -17,6 +17,7 @@
 	import { getDomain } from '$lib/components/common';
 	import Umami from '$lib/components/svg/services/Umami.svelte';
 	import Hasura from '$lib/components/svg/services/Hasura.svelte';
+	import Fider from '$lib/components/svg/services/Fider.svelte';
 
 	export let services;
 	async function newService() {
@@ -92,6 +93,8 @@
 								<Umami isAbsolute />
 							{:else if service.type === 'hasura'}
 								<Hasura isAbsolute />
+							{:else if service.type === 'fider'}
+								<Fider isAbsolute />
 							{/if}
 							<div class="truncate text-center text-xl font-bold">
 								{service.name}
@@ -143,6 +146,8 @@
 									<Umami isAbsolute />
 								{:else if service.type === 'hasura'}
 									<Hasura isAbsolute />
+								{:else if service.type === 'fider'}
+									<Fider isAbsolute />
 								{/if}
 								<div class="truncate text-center text-xl font-bold">
 									{service.name}

@@ -12,6 +12,7 @@
 	import VaultWarden from './svg/services/VaultWarden.svelte';
 	import VsCodeServer from './svg/services/VSCodeServer.svelte';
 	import Wordpress from './svg/services/Wordpress.svelte';
+	import Fider from './svg/services/Fider.svelte';
 </script>
 
 {#if service.type === 'plausibleanalytics'}
@@ -61,5 +62,9 @@
 {:else if service.type === 'hasura'}
 	<a href="https://hasura.io" target="_blank">
 		<Hasura />
+	</a>
+{:else if service.type === 'fider'}
+	<a href="https://fider.io" target="_blank">
+		<Fider />
 	</a>
 {/if}
