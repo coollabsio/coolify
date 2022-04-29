@@ -228,7 +228,8 @@
 		"permission_denied_start_database": "You do not have permission to start the database.",
 		"delete_database": "Delete Database",
 		"permission_denied_delete_database": "You do not have permission to delete a Database",
-		"no_databases_found": "No databases found"
+		"no_databases_found": "No databases found",
+		"logs": "Database Logs"
 	},
 	"destination": {
 		"delete_destination": "Delete Destination",
@@ -293,7 +294,8 @@
 		"permission_denied_start_service": "You do not have permission to start the service.",
 		"delete_service": "Delete Service",
 		"permission_denied_delete_service": "You do not have permission to delete a service.",
-		"no_service": "No services found"
+		"no_service": "No services found",
+		"logs": "Service Logs"
 	},
 	"setting": {
 		"change_language": "Change Language",

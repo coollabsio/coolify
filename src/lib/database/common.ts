@@ -11,11 +11,12 @@ import generator from 'generate-password';
 import forge from 'node-forge';
 import getPort, { portNumbers } from 'get-port';
 
-export function generatePassword(length = 24): string {
+export function generatePassword(length = 24, symbols = false): string {
 	return generator.generate({
 		length,
 		numbers: true,
-		strict: true
+		strict: true,
+		symbols
 	});
 }
 

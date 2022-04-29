@@ -345,6 +345,7 @@
 					<label for="baseBuildImage" class="text-base font-bold text-stone-100"
 						>{$t('application.base_build_image')}</label
 					>
+
 					<div class="custom-select-wrapper">
 						<Select
 							isDisabled={!$session.isAdmin || isRunning}
@@ -357,6 +358,9 @@
 							isClearable={false}
 						/>
 					</div>
+					{#if application.buildPack === 'laravel'}
+						<Explainer text="For building frontend assets with webpack." />
+					{/if}
 				</div>
 			{/if}
 		</div>
