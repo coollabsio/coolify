@@ -38,6 +38,7 @@ export const post: RequestHandler = async (event) => {
 				emailNoreply,
 				emailMailgunApiKey,
 				emailMailgunDomain,
+				emailMailgunRegion,
 				emailSmtpHost,
 				emailSmtpPort,
 				emailSmtpUser,
@@ -59,8 +60,14 @@ export const post: RequestHandler = async (event) => {
 					DATABASE_URL: `postgresql://${postgresqlUser}:${postgresqlPassword}@${id}-postgresql:5432/${postgresqlDatabase}?sslmode=disable`,
 					JWT_SECRET: `${jwtSecret.replace(/\$/g, '$$$')}`,
 					EMAIL_NOREPLY: emailNoreply,
-					EMAIL_MAILGUN_API: emailMailgunApiKey || null,
-					EMAIL_MAILGUN_DOMAIN: emailMailgunDomain || null
+					EMAIL_MAILGUN_API: emailMailgunApiKey,
+					EMAIL_MAILGUN_REGION: emailMailgunRegion,
+					EMAIL_MAILGUN_DOMAIN: emailMailgunDomain,
+					EMAIL_SMTP_HOST: emailSmtpHost,
+					EMAIL_SMTP_PORT: emailSmtpPort,
+					EMAIL_SMTP_USER: emailSmtpUser,
+					EMAIL_SMTP_PASSWORD: emailSmtpPassword,
+					EMAIL_SMTP_ENABLE_STARTTLS: emailSmtpEnableStartTls
 				}
 			},
 			postgresql: {
