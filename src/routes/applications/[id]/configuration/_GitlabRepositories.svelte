@@ -10,7 +10,6 @@
 	import { del, get, post, put } from '$lib/api';
 	import { gitTokens } from '$lib/store';
 	import { t } from '$lib/translations';
-	import { getIP } from '$lib/components/common';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -41,7 +40,7 @@
 	};
 	onMount(async () => {
 		if (!$gitTokens.gitlabToken) {
-			await getGitlabToken();
+			getGitlabToken();
 		} else {
 			loading.base = true;
 			try {
@@ -50,7 +49,7 @@
 				});
 				username = user.username;
 			} catch (error) {
-				return await getGitlabToken();
+				return getGitlabToken();
 			}
 			try {
 				groups = await get(`${apiUrl}/v4/groups?per_page=5000`, {
@@ -65,12 +64,11 @@
 		}
 	});
 
-	async function getGitlabToken() {
-		const ip = await getIP();
+	function getGitlabToken() {
 		const left = screen.width / 2 - 1020 / 2;
 		const top = screen.height / 2 - 618 / 2;
 		const newWindow = open(
-			`${htmlUrl}/oauth/authorize?client_id=${application.gitSource.gitlabApp.appId}&redirect_uri=${ip}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${$page.params.id}`,
+			`${htmlUrl}/oauth/authorize?client_id=${application.gitSource.gitlabApp.appId}&redirect_uri=${window.location.origin}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${$page.params.id}`,
 			'GitLab',
 			'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
 				top +
@@ -165,10 +163,9 @@
 		}
 	}
 	async function setWebhook(url, webhookToken) {
-		const ip = await getIP();
 		const host = dev
 			? 'https://webhook.site/0e5beb2c-4e9b-40e2-a89e-32295e570c21'
-			: `${ip}/webhooks/gitlab/events`;
+			: `${window.location.origin}/webhooks/gitlab/events`;
 		try {
 			await post(
 				url,

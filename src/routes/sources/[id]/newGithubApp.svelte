@@ -30,21 +30,21 @@
 
 <script>
 	import { dev } from '$app/env';
-	import { getDomain, dashify, getIP } from '$lib/components/common';
+	import { getDomain, dashify } from '$lib/components/common';
 	import { t } from '$lib/translations';
 
 	export let source;
 	export let settings;
-	onMount(async () => {
+	onMount(() => {
 		const { organization, id, htmlUrl } = source;
 		const { fqdn } = settings;
-		const ip = await getIP();
-		let host = `http://${ip}`;
-		if (fqdn && fqdn.startsWith('https')) {
-			host = `https://${ip}`;
-		}
-		console.log(ip, host);
+		const host = dev
+			? 'http://localhost:3000'
+			: fqdn
+			? fqdn
+			: `http://${window.location.host}` || '';
 		const domain = getDomain(fqdn);
+
 		let url = 'settings/apps/new';
 		if (organization) url = `organizations/${organization}/settings/apps/new`;
 		const name = dashify(domain) || 'app';

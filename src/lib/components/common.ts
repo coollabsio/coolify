@@ -1,5 +1,3 @@
-import { dev } from '$app/env';
-
 export const asyncSleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
 export const dateOptions: DateTimeFormatOptions = {
 	year: 'numeric',
@@ -22,18 +20,6 @@ export const staticDeployments = [
 	'eleventy'
 ];
 export const notNodeDeployments = ['php', 'docker', 'rust', 'python', 'deno', 'laravel'];
-
-export async function getIP() {
-	if (dev) {
-		return 'localhost:3000';
-	}
-	const response = await fetch(`https://api.ipify.org?format=json`);
-	if (response.ok) {
-		const json = await response.json();
-		return `http://${json.ip}`;
-	}
-	return window.location.origin;
-}
 
 export function getDomain(domain) {
 	return domain?.replace('https://', '').replace('http://', '');
