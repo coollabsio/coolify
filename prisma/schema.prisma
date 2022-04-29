@@ -430,7 +430,7 @@ model Fider {
   emailNoreply            String?
   emailMailgunApiKey      String?
   emailMailgunDomain      String?
-  emailMailgunRegion      String?
+  emailMailgunRegion      String   @default("EU")
   emailSmtpHost           String?
   emailSmtpPort           Int?
   emailSmtpUser           String?

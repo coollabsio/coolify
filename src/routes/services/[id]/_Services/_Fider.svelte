@@ -80,6 +80,7 @@
 		<Select
 			id="baseBuildImages"
 			items={mailgunRegions}
+			showIndicator
 			on:select={(event) => (service.fider.emailMailgunRegion = event.detail.value)}
 			value={service.fider.emailMailgunRegion || 'EU'}
 			isClearable={false}
