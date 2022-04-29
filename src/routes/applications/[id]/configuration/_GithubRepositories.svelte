@@ -8,6 +8,7 @@
 	import { onMount } from 'svelte';
 	import { gitTokens } from '$lib/store';
 	import { t } from '$lib/translations';
+	import { getIP } from '$lib/components/common';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -113,6 +114,7 @@
 	}
 
 	onMount(async () => {
+		const ip = await getIP();
 		try {
 			if (!$gitTokens.githubToken) {
 				const { token } = await get(`/applications/${id}/configuration/githubToken.json`);
@@ -131,7 +133,7 @@
 					const left = screen.width / 2 - 1020 / 2;
 					const top = screen.height / 2 - 618 / 2;
 					const newWindow = open(
-						`${htmlUrl}/oauth/authorize?client_id=${application.gitSource.gitlabApp.appId}&redirect_uri=${window.location.origin}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${$page.params.id}`,
+						`${htmlUrl}/oauth/authorize?client_id=${application.gitSource.gitlabApp.appId}&redirect_uri=${ip}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${$page.params.id}`,
 						'GitLab',
 						'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
 							top +

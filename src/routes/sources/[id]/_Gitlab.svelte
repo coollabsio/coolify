@@ -11,6 +11,7 @@
 	import { toast } from '@zerodevx/svelte-toast';
 
 	import { t } from '$lib/translations';
+	import { getIP } from '$lib/components/common';
 	const { id } = $page.params;
 	let url = browser ? (settings.fqdn ? settings.fqdn : window.location.origin) : '';
 
@@ -26,7 +27,8 @@
 			appSecret: null
 		};
 	}
-	onMount(() => {
+	onMount(async () => {
+		url = await getIP();
 		oauthIdEl && oauthIdEl.focus();
 	});
 
