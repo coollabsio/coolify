@@ -43,6 +43,7 @@
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
 	let dualCerts = settings.dualCerts;
 	let isAutoUpdateEnabled = settings.isAutoUpdateEnabled;
+	let isDNSCheckEnabled = settings.isDNSCheckEnabled;
 
 	let minPort = settings.minPort;
 	let maxPort = settings.maxPort;
@@ -78,7 +79,15 @@
 			if (name === 'isAutoUpdateEnabled') {
 				isAutoUpdateEnabled = !isAutoUpdateEnabled;
 			}
-			await post(`/settings.json`, { isRegistrationEnabled, dualCerts, isAutoUpdateEnabled });
+			if (name === 'isDNSCheckEnabled') {
+				isDNSCheckEnabled = !isDNSCheckEnabled;
+			}
+			await post(`/settings.json`, {
+				isRegistrationEnabled,
+				dualCerts,
+				isAutoUpdateEnabled,
+				isDNSCheckEnabled
+			});
 			return toast.push(t.get('application.settings_saved'));
 		} catch ({ error }) {
 			return errorNotification(error);
@@ -178,11 +187,19 @@
 				</div>
 				<div class="grid grid-cols-2 items-center">
 					<Setting
+						bind:setting={isDNSCheckEnabled}
+						title={$t('setting.is_dns_check_enabled')}
+						description={$t('setting.is_dns_check_enabled_explainer')}
+						on:click={() => changeSettings('isDNSCheckEnabled')}
+					/>
+				</div>
+				<div class="grid grid-cols-2 items-center">
+					<Setting
 						dataTooltip={$t('setting.must_remove_domain_before_changing')}
 						disabled={isFqdnSet}
 						bind:setting={dualCerts}
 						title={$t('application.ssl_www_and_non_www')}
-						description={$t('services.generate_www_non_www_ssl')}
+						description={$t('setting.generate_www_non_www_ssl')}
 						on:click={() => !isFqdnSet && changeSettings('dualCerts')}
 					/>
 				</div>
