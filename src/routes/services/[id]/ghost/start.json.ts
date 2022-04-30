@@ -12,12 +12,15 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { ErrorHandler, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 import type { ComposeFile } from '$lib/types/composeFile';
+import { getServiceMainPort } from '$lib/components/common';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 
 	const { id } = event.params;
+
+	const port = getServiceMainPort('ghost');
 
 	try {
 		const service = await db.getService({ id, teamId });
@@ -27,6 +30,7 @@ export const post: RequestHandler = async (event) => {
 			destinationDockerId,
 			destinationDocker,
 			serviceSecret,
+			exposePort,
 			fqdn,
 			ghost: {
 				defaultEmail,
@@ -89,6 +93,7 @@ export const post: RequestHandler = async (event) => {
 					volumes: [config.ghost.volume],
 					environment: config.ghost.environmentVariables,
 					restart: 'always',
+					...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
 					labels: makeLabelForServices('ghost'),
 					depends_on: [`${id}-mariadb`],
 					deploy: {

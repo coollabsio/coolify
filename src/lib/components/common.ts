@@ -193,3 +193,11 @@ export const supportedServiceTypesAndVersions = [
 		}
 	}
 ];
+
+export const getServiceMainPort = (service: string) => {
+	const serviceType = supportedServiceTypesAndVersions.find((s) => s.name === service);
+	if (serviceType) {
+		return serviceType.ports.main;
+	}
+	return null;
+};

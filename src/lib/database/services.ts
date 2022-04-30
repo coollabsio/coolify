@@ -276,95 +276,109 @@ export async function updatePlausibleAnalyticsService({
 	id,
 	fqdn,
 	email,
+	exposePort,
 	username,
 	name
 }: {
 	id: string;
 	fqdn: string;
+	exposePort?: number;
 	name: string;
 	email: string;
 	username: string;
 }): Promise<void> {
 	await prisma.plausibleAnalytics.update({ where: { serviceId: id }, data: { email, username } });
-	await prisma.service.update({ where: { id }, data: { name, fqdn } });
+	await prisma.service.update({ where: { id }, data: { name, fqdn, exposePort } });
 }
 
 export async function updateService({
 	id,
 	fqdn,
+	exposePort,
 	name
 }: {
 	id: string;
 	fqdn: string;
+	exposePort?: number;
 	name: string;
 }): Promise<Service> {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
+	return await prisma.service.update({ where: { id }, data: { fqdn, name, exposePort } });
 }
 
 export async function updateLanguageToolService({
 	id,
 	fqdn,
+	exposePort,
 	name
 }: {
 	id: string;
 	fqdn: string;
+	exposePort?: number;
 	name: string;
 }): Promise<Service> {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
+	return await prisma.service.update({ where: { id }, data: { fqdn, name, exposePort } });
 }
 
 export async function updateMeiliSearchService({
 	id,
 	fqdn,
+	exposePort,
 	name
 }: {
 	id: string;
 	fqdn: string;
+	exposePort?: number;
 	name: string;
 }): Promise<Service> {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
+	return await prisma.service.update({ where: { id }, data: { fqdn, name, exposePort } });
 }
 
 export async function updateVaultWardenService({
 	id,
 	fqdn,
+	exposePort,
 	name
 }: {
 	id: string;
 	fqdn: string;
+	exposePort?: number;
 	name: string;
 }): Promise<Service> {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
+	return await prisma.service.update({ where: { id }, data: { fqdn, name, exposePort } });
 }
 
 export async function updateVsCodeServer({
 	id,
 	fqdn,
+	exposePort,
 	name
 }: {
 	id: string;
 	fqdn: string;
+	exposePort?: number;
 	name: string;
 }): Promise<Service> {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
+	return await prisma.service.update({ where: { id }, data: { fqdn, name, exposePort } });
 }
 
 export async function updateWordpress({
 	id,
 	fqdn,
 	name,
+	exposePort,
 	mysqlDatabase,
 	extraConfig
 }: {
 	id: string;
 	fqdn: string;
 	name: string;
+	exposePort?: number;
 	mysqlDatabase: string;
 	extraConfig: string;
 }): Promise<Service> {
 	return await prisma.service.update({
 		where: { id },
-		data: { fqdn, name, wordpress: { update: { mysqlDatabase, extraConfig } } }
+		data: { fqdn, name, exposePort, wordpress: { update: { mysqlDatabase, extraConfig } } }
 	});
 }
 
@@ -382,16 +396,18 @@ export async function updateGhostService({
 	id,
 	fqdn,
 	name,
+	exposePort,
 	mariadbDatabase
 }: {
 	id: string;
 	fqdn: string;
 	name: string;
+	exposePort?: number;
 	mariadbDatabase: string;
 }): Promise<Service> {
 	return await prisma.service.update({
 		where: { id },
-		data: { fqdn, name, ghost: { update: { mariadbDatabase } } }
+		data: { fqdn, name, exposePort, ghost: { update: { mariadbDatabase } } }
 	});
 }
 

@@ -6,6 +6,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { ErrorHandler, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 import type { ComposeFile } from '$lib/types/composeFile';
+import { getServiceMainPort } from '$lib/components/common';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -22,11 +23,13 @@ export const post: RequestHandler = async (event) => {
 			destinationDocker,
 			serviceSecret,
 			persistentStorage,
+			exposePort,
 			vscodeserver: { password }
 		} = service;
 
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
+		const port = getServiceMainPort('vscodeserver');
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 		const image = getServiceImage(type);
@@ -75,6 +78,7 @@ export const post: RequestHandler = async (event) => {
 					networks: [network],
 					volumes: [config.volume, ...volumes],
 					restart: 'always',
+					...(exposePort ? { ports: [`${port}:${exposePort}`] } : {}),
 					labels: makeLabelForServices('vscodeServer'),
 					deploy: {
 						restart_policy: {

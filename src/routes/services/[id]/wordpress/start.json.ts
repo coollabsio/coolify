@@ -6,6 +6,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { ErrorHandler, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 import type { ComposeFile } from '$lib/types/composeFile';
+import { getServiceMainPort } from '$lib/components/common';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -22,6 +23,7 @@ export const post: RequestHandler = async (event) => {
 			destinationDockerId,
 			serviceSecret,
 			destinationDocker,
+			exposePort,
 			wordpress: {
 				mysqlDatabase,
 				mysqlUser,
@@ -35,6 +37,7 @@ export const post: RequestHandler = async (event) => {
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
 		const image = getServiceImage(type);
+		const port = getServiceMainPort('wordpress');
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 		const config = {
@@ -76,6 +79,7 @@ export const post: RequestHandler = async (event) => {
 					volumes: [config.wordpress.volume],
 					networks: [network],
 					restart: 'always',
+					...(exposePort ? { ports: [`${port}:${port}`] } : {}),
 					depends_on: [`${id}-mysql`],
 					labels: makeLabelForServices('wordpress'),
 					deploy: {

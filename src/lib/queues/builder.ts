@@ -189,7 +189,7 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 		}
 		if (!imageFound || deployNeeded) {
 			await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId);
-			console.log(exposePort ? `${exposePort}:${port}` : port);
+
 			if (buildpacks[buildPack])
 				await buildpacks[buildPack]({
 					buildId,

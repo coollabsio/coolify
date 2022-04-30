@@ -287,6 +287,7 @@ model Service {
   id                  String                     @id @default(cuid())
   name                String
   fqdn                String?
+  exposePort          Int?
   dualCerts           Boolean                    @default(false)
   type                String?
   version             String?
