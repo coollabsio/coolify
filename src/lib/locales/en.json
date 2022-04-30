@@ -200,6 +200,7 @@
 		"enable_automatic_deployment": "Enable Automatic Deployment",
 		"enable_auto_deploy_webhooks": "Enable automatic deployment through webhooks.",
 		"enable_mr_pr_previews": "Enable MR/PR Previews",
+		"expose_a_port": "Expose a port",
 		"enable_preview_deploy_mr_pr_requests": "Enable preview deployments from pull or merge requests.",
 		"debug_logs": "Debug Logs",
 		"enable_debug_log_during_build": "Enable debug logs during build phase.<br><span class='text-red-500 font-bold'>Sensitive information</span> could be visible and saved in logs.",

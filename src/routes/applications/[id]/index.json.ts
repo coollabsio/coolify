@@ -3,10 +3,7 @@ import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
 import { checkContainer, isContainerExited } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
-import jsonwebtoken from 'jsonwebtoken';
-import { get as getRequest } from '$lib/api';
 import { setDefaultConfiguration } from '$lib/buildPacks/common';
-import getPort from 'get-port';
 
 export const get: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);

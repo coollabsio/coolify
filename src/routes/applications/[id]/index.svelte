@@ -60,6 +60,7 @@
 	let previews = application.settings.previews;
 	let dualCerts = application.settings.dualCerts;
 	let autodeploy = application.settings.autodeploy;
+	let showExposePort = application.exposePort !== null;
 
 	let wsgis = [
 		{
@@ -155,29 +156,6 @@
 	{#if application.fqdn}
 		<a
 			href={application.fqdn}
-			target="_blank"
-			class="icons tooltip-bottom flex items-center bg-transparent text-sm"
-			><svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="h-6 w-6"
-				viewBox="0 0 24 24"
-				stroke-width="1.5"
-				stroke="currentColor"
-				fill="none"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			>
-				<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-				<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
-				<line x1="10" y1="14" x2="20" y2="4" />
-				<polyline points="15 4 20 4 20 9" />
-			</svg></a
-		>
-	{/if}
-
-	{#if application.exposePort}
-		<a
-			href={`${window.location.origin.split(':').slice(0, 2).join(':')}:${application.exposePort}`}
 			target="_blank"
 			class="icons tooltip-bottom flex items-center bg-transparent text-sm"
 			><svg
@@ -423,15 +401,30 @@
 			{/if}
 			{#if !staticDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-2 items-center">
-					<label for="exposePort" class="text-base font-bold text-stone-100">Expose Port</label>
-					<input
-						readonly={!$session.isAdmin}
-						name="exposePort"
-						id="exposePort"
-						bind:value={application.exposePort}
-						placeholder="12345"
+					<Setting
+						isCenter={false}
+						bind:setting={showExposePort}
+						on:click={() => {
+							showExposePort = !showExposePort;
+							application.exposePort = undefined;
+						}}
+						title={$t('application.expose_a_port')}
+						description="Expose a port to the host system"
 					/>
 				</div>
+
+				{#if showExposePort}
+					<div class="grid grid-cols-2 items-center">
+						<label for="exposePort" class="text-base font-bold text-stone-100">Expose Port</label>
+						<input
+							readonly={!$session.isAdmin}
+							name="exposePort"
+							id="exposePort"
+							bind:value={application.exposePort}
+							placeholder="12345"
+						/>
+					</div>
+				{/if}
 			{/if}
 			{#if !notNodeDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-2 items-center">

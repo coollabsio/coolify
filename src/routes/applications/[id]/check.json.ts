@@ -54,9 +54,6 @@ export const post: RequestHandler = async (event) => {
 			}
 
 			const publicPort = await getPort({ port: exposePort });
-			if (exposePort !== publicPort) {
-				throw { message: `Expose Port ${exposePort} is already in use` };
-			}
 		}
 
 		return {

@@ -8,7 +8,6 @@ import type { ComposeFile } from '$lib/types/composeFile';
 import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
 import fs from 'fs/promises';
-import getPort, { portNumbers } from 'get-port';
 import yaml from 'js-yaml';
 
 export const post: RequestHandler = async (event) => {
