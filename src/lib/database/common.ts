@@ -127,60 +127,73 @@ export function getServiceImages(type: string): string[] {
 
 export function generateDatabaseConfiguration(database: Database & { settings: DatabaseSettings }):
 	| {
-			volume: string;
-			image: string;
-			ulimits: Record<string, unknown>;
-			privatePort: number;
-			environmentVariables: {
-				MYSQL_DATABASE: string;
-				MYSQL_PASSWORD: string;
-				MYSQL_ROOT_USER: string;
-				MYSQL_USER: string;
-				MYSQL_ROOT_PASSWORD: string;
-			};
-	  }
+		volume: string;
+		image: string;
+		ulimits: Record<string, unknown>;
+		privatePort: number;
+		environmentVariables: {
+			MYSQL_DATABASE: string;
+			MYSQL_PASSWORD: string;
+			MYSQL_ROOT_USER: string;
+			MYSQL_USER: string;
+			MYSQL_ROOT_PASSWORD: string;
+		};
+	}
 	| {
-			volume: string;
-			image: string;
-			ulimits: Record<string, unknown>;
-			privatePort: number;
-			environmentVariables: {
-				MONGODB_ROOT_USER: string;
-				MONGODB_ROOT_PASSWORD: string;
-			};
-	  }
+		volume: string;
+		image: string;
+		ulimits: Record<string, unknown>;
+		privatePort: number;
+		environmentVariables: {
+			MONGODB_ROOT_USER: string;
+			MONGODB_ROOT_PASSWORD: string;
+		};
+	}
 	| {
-			volume: string;
-			image: string;
-			ulimits: Record<string, unknown>;
-			privatePort: number;
-			environmentVariables: {
-				POSTGRESQL_POSTGRES_PASSWORD: string;
-				POSTGRESQL_USERNAME: string;
-				POSTGRESQL_PASSWORD: string;
-				POSTGRESQL_DATABASE: string;
-			};
-	  }
+		volume: string;
+		image: string;
+		ulimits: Record<string, unknown>;
+		privatePort: number;
+		environmentVariables: {
+			MARIADB_ROOT_USER: string;
+			MARIADB_ROOT_PASSWORD: string;
+			MARIADB_USER: string;
+			MARIADB_PASSWORD: string;
+			MARIADB_DATABASE: string;
+		};
+	}
 	| {
-			volume: string;
-			image: string;
-			ulimits: Record<string, unknown>;
-			privatePort: number;
-			environmentVariables: {
-				REDIS_AOF_ENABLED: string;
-				REDIS_PASSWORD: string;
-			};
-	  }
+		volume: string;
+		image: string;
+		ulimits: Record<string, unknown>;
+		privatePort: number;
+		environmentVariables: {
+			POSTGRESQL_POSTGRES_PASSWORD: string;
+			POSTGRESQL_USERNAME: string;
+			POSTGRESQL_PASSWORD: string;
+			POSTGRESQL_DATABASE: string;
+		};
+	}
 	| {
-			volume: string;
-			image: string;
-			ulimits: Record<string, unknown>;
-			privatePort: number;
-			environmentVariables: {
-				COUCHDB_PASSWORD: string;
-				COUCHDB_USER: string;
-			};
-	  } {
+		volume: string;
+		image: string;
+		ulimits: Record<string, unknown>;
+		privatePort: number;
+		environmentVariables: {
+			REDIS_AOF_ENABLED: string;
+			REDIS_PASSWORD: string;
+		};
+	}
+	| {
+		volume: string;
+		image: string;
+		ulimits: Record<string, unknown>;
+		privatePort: number;
+		environmentVariables: {
+			COUCHDB_PASSWORD: string;
+			COUCHDB_USER: string;
+		};
+	} {
 	const {
 		id,
 		dbUser,
@@ -205,6 +218,20 @@ export function generateDatabaseConfiguration(database: Database & { settings: D
 			},
 			image: `${baseImage}:${version}`,
 			volume: `${id}-${type}-data:/bitnami/mysql/data`,
+			ulimits: {}
+		};
+	} else if (type === 'mariadb') {
+		return {
+			privatePort: 3306,
+			environmentVariables: {
+				MARIADB_ROOT_USER: rootUser,
+				MARIADB_ROOT_PASSWORD: rootUserPassword,
+				MARIADB_USER: dbUser,
+				MARIADB_PASSWORD: dbUserPassword,
+				MARIADB_DATABASE: defaultDatabase
+			},
+			image: `${baseImage}:${version}`,
+			volume: `${id}-${type}-data:/bitnami/mariadb`,
 			ulimits: {}
 		};
 	} else if (type === 'mongodb') {

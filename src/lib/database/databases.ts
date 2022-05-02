@@ -184,6 +184,10 @@ export async function updatePasswordInDb(database, user, newPassword, isRoot) {
 			await asyncExecShell(
 				`DOCKER_HOST=${host} docker exec ${id} mysql -u ${rootUser} -p${rootUserPassword} -e \"ALTER USER '${user}'@'%' IDENTIFIED WITH caching_sha2_password BY '${newPassword}';\"`
 			);
+		} else if (type === 'mariadb') {
+			await asyncExecShell(
+				`DOCKER_HOST=${host} docker exec ${id} mysql -u ${rootUser} -p${rootUserPassword} -e \"SET PASSWORD FOR '${user}'@'%' = PASSWORD('${newPassword}');\"`
+			);
 		} else if (type === 'postgresql') {
 			if (isRoot) {
 				await asyncExecShell(
