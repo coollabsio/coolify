@@ -6,7 +6,17 @@ import { promises as fs } from 'fs';
 import { staticDeployments } from '$lib/components/common';
 
 const staticApps = ['static', 'react', 'vuejs', 'svelte', 'gatsby', 'astro', 'eleventy'];
-const nodeBased = ['react', 'vuejs', 'svelte', 'gatsby', 'php', 'astro', 'eleventy', 'node'];
+const nodeBased = [
+	'react',
+	'vuejs',
+	'svelte',
+	'gatsby',
+	'php',
+	'astro',
+	'eleventy',
+	'node',
+	'nestjs'
+];
 
 export function makeLabelForStandaloneApplication({
 	applicationId,
@@ -393,12 +403,7 @@ export function setDefaultBaseImage(buildPack) {
 			label: 'webdevops/php-nginx:7.1-alpine'
 		}
 	];
-	const laravelVersions = [
-		{
-			value: 'webdevops/php-apache:8.0-alpine',
-			label: 'webdevops/php-apache:8.0-alpine'
-		}
-	];
+
 	let payload = {
 		baseImage: null,
 		baseBuildImage: null,
@@ -408,6 +413,8 @@ export function setDefaultBaseImage(buildPack) {
 	if (nodeBased.includes(buildPack)) {
 		payload.baseImage = 'node:lts';
 		payload.baseImages = nodeVersions;
+		payload.baseBuildImage = 'node:lts';
+		payload.baseBuildImages = nodeVersions;
 	}
 	if (staticApps.includes(buildPack)) {
 		payload.baseImage = 'webdevops/nginx:alpine';

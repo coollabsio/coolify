@@ -1,3 +1,4 @@
+import { browser } from '$app/env';
 import { writable, type Writable, type Readable, readable } from 'svelte/store';
 
 export const gitTokens: Writable<{ githubToken: string | null; gitlabToken: string | null }> =
@@ -8,6 +9,6 @@ export const gitTokens: Writable<{ githubToken: string | null; gitlabToken: stri
 export const disabledButton: Writable<boolean> = writable(false);
 
 export const features: Readable<{ latestVersion: string; beta: boolean }> = readable({
-	beta: window.localStorage.getItem('beta') === 'true',
-	latestVersion: window.localStorage.getItem('latestVersion')
+	beta: browser && window.localStorage.getItem('beta') === 'true',
+	latestVersion: browser && window.localStorage.getItem('latestVersion')
 });
