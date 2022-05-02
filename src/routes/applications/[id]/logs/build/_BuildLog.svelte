@@ -20,6 +20,8 @@
 	let followingInterval;
 	let logsEl;
 
+	let cancelInprogress = false;
+
 	const { id } = $page.params;
 
 	const cleanAnsiCodes = (str: string) => str.replace(/\x1B\[(\d+)m/g, '');
@@ -68,10 +70,17 @@
 		}
 	}
 	async function cancelBuild() {
-		return await post(`/applications/${id}/cancel.json`, {
-			buildId,
-			applicationId: id
-		});
+		if (cancelInprogress) return;
+		try {
+			cancelInprogress = true;
+			await post(`/applications/${id}/cancel.json`, {
+				buildId,
+				applicationId: id
+			});
+		} catch (error) {
+			console.log(error);
+			return errorNotification(error);
+		}
 	}
 	onDestroy(() => {
 		clearInterval(streamInterval);
@@ -96,7 +105,7 @@
 			<div class="flex justify-end sticky top-0 p-2">
 				<button
 					on:click={followBuild}
-					class="bg-transparent"
+					class="bg-transparent hover:text-green-500 hover:bg-coolgray-500"
 					data-tooltip="Follow logs"
 					class:text-green-500={followingBuild}
 				>
@@ -118,7 +127,11 @@
 					</svg>
 				</button>
 				{#if currentStatus === 'running'}
-					<button on:click={cancelBuild} class="bg-transparent" data-tooltip="Cancel build">
+					<button
+						on:click={cancelBuild}
+						class="bg-transparent hover:text-red-500 hover:bg-coolgray-500"
+						data-tooltip="Cancel build"
+					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							class="w-6 h-6"
@@ -130,8 +143,8 @@
 							stroke-linejoin="round"
 						>
 							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-							<line x1="18" y1="6" x2="6" y2="18" />
-							<line x1="6" y1="6" x2="18" y2="18" />
+							<circle cx="12" cy="12" r="9" />
+							<path d="M10 10l4 4m0 -4l-4 4" />
 						</svg>
 					</button>
 				{/if}

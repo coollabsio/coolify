@@ -15,15 +15,19 @@ export const post: RequestHandler = async (event) => {
 	}
 	try {
 		let count = 0;
-		await new Promise(async (resolve, reject) => {
+		await new Promise<void>(async (resolve, reject) => {
 			const job = await buildQueue.getJob(buildId);
 			const {
 				destinationDocker: { engine }
 			} = job.data;
 			const host = getEngine(engine);
 			let interval = setInterval(async () => {
-				console.log(`Checking build ${buildId}, try ${count}`);
-				if (count > 100) {
+				const { status } = await db.prisma.build.findUnique({ where: { id: buildId } });
+				if (status === 'failed') {
+					clearInterval(interval);
+					return resolve();
+				}
+				if (count > 1200) {
 					clearInterval(interval);
 					reject(new Error('Could not cancel build.'));
 				}
@@ -51,7 +55,7 @@ export const post: RequestHandler = async (event) => {
 				} catch (error) {}
 			}, 100);
 
-			resolve('Canceled');
+			resolve();
 		});
 
 		return {
