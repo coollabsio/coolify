@@ -41,7 +41,8 @@
 	import { errorNotification } from '$lib/form';
 	import { asyncSleep } from '$lib/components/common';
 	import { del, get, post } from '$lib/api';
-	import { browser, dev } from '$app/env';
+	import { dev } from '$app/env';
+	import { features } from '$lib/store';
 	let isUpdateAvailable = false;
 
 	let updateStatus = {
@@ -52,7 +53,7 @@
 	let latestVersion = 'latest';
 	onMount(async () => {
 		if ($session.userId) {
-			const overrideVersion = browser && window.localStorage.getItem('latestVersion');
+			const overrideVersion = $features.latestVersion;
 			try {
 				await get(`/login.json`);
 			} catch ({ error }) {

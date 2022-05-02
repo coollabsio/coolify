@@ -28,8 +28,6 @@
 	import { session } from '$app/stores';
 
 	export let settings;
-	import Cookies from 'js-cookie';
-	import langs from '$lib/lang.json';
 	import Setting from '$lib/components/Setting.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
@@ -39,6 +37,7 @@
 	import { getDomain } from '$lib/components/common';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
+	import { features } from '$lib/store';
 
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
 	let dualCerts = settings.dualCerts;
@@ -211,7 +210,7 @@
 						on:click={() => changeSettings('isRegistrationEnabled')}
 					/>
 				</div>
-				{#if browser && (window.location.hostname === 'staging.coolify.io' || window.location.hostname === 'localhost')}
+				{#if browser && $features.beta}
 					<div class="grid grid-cols-2 items-center">
 						<Setting
 							bind:setting={isAutoUpdateEnabled}
