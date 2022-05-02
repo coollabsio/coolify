@@ -339,6 +339,7 @@
 						isClearable={false}
 					/>
 				</div>
+				<Explainer text={$t('application.base_image_explainer')} />
 			</div>
 			{#if application.buildCommand || application.buildPack === 'rust' || application.buildPack === 'laravel'}
 				<div class="grid grid-cols-2 items-center pb-8">
@@ -360,6 +361,8 @@
 					</div>
 					{#if application.buildPack === 'laravel'}
 						<Explainer text="For building frontend assets with webpack." />
+					{:else}
+						<Explainer text={$t('application.base_build_image_explainer')} />
 					{/if}
 				</div>
 			{/if}

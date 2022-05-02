@@ -11,13 +11,14 @@ const createDockerfile = async (data, image): Promise<void> => {
 		publishDirectory,
 		secrets,
 		pullmergeRequestId,
-		baseImage
+		baseImage,
+		buildId
 	} = data;
 	const Dockerfile: Array<string> = [];
 
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push('WORKDIR /app');
-	Dockerfile.push(`LABEL coolify.image=true`);
+	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {
 			if (secret.isBuildSecret) {

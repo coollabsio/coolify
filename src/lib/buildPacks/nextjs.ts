@@ -4,6 +4,7 @@ import { checkPnpm } from './common';
 
 const createDockerfile = async (data, image): Promise<void> => {
 	const {
+		buildId,
 		workdir,
 		port,
 		installCommand,
@@ -17,7 +18,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	const isPnpm = checkPnpm(installCommand, buildCommand, startCommand);
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push('WORKDIR /app');
-	Dockerfile.push(`LABEL coolify.image=true`);
+	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {
 			if (secret.isBuildSecret) {

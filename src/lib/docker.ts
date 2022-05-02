@@ -8,7 +8,7 @@ export async function buildCacheImageForLaravel(data, imageForBuild) {
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild}`);
 	Dockerfile.push('WORKDIR /app');
-	Dockerfile.push(`LABEL coolify.image=true`);
+	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {
 			if (secret.isBuildSecret) {
@@ -49,7 +49,7 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild}`);
 	Dockerfile.push('WORKDIR /app');
-	Dockerfile.push(`LABEL coolify.image=true`);
+	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {
 			if (secret.isBuildSecret) {
@@ -94,11 +94,13 @@ export async function buildCacheImageWithCargo(data, imageForBuild) {
 	} = data;
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild} as planner-${applicationId}`);
+	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push('RUN cargo install cargo-chef');
 	Dockerfile.push('COPY . .');
 	Dockerfile.push('RUN cargo chef prepare --recipe-path recipe.json');
 	Dockerfile.push(`FROM ${imageForBuild}`);
+	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push('RUN cargo install cargo-chef');
 	Dockerfile.push(`COPY --from=planner-${applicationId} /app/recipe.json recipe.json`);

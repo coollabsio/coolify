@@ -2,8 +2,16 @@ import { buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
 
 const createDockerfile = async (data, image): Promise<void> => {
-	const { workdir, port, baseDirectory, secrets, pullmergeRequestId, denoMainFile, denoOptions } =
-		data;
+	const {
+		workdir,
+		port,
+		baseDirectory,
+		secrets,
+		pullmergeRequestId,
+		denoMainFile,
+		denoOptions,
+		buildId
+	} = data;
 	const Dockerfile: Array<string> = [];
 
 	let depsFound = false;
@@ -14,7 +22,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push('WORKDIR /app');
-	Dockerfile.push(`LABEL coolify.image=true`);
+	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {
 			if (secret.isBuildSecret) {

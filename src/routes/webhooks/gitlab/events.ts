@@ -73,11 +73,15 @@ export const post: RequestHandler = async (event) => {
 						type: 'webhook_commit'
 					}
 				});
-				await buildQueue.add(buildId, {
-					build_id: buildId,
-					type: 'webhook_commit',
-					...applicationFound
-				});
+				await buildQueue.add(
+					buildId,
+					{
+						build_id: buildId,
+						type: 'webhook_commit',
+						...applicationFound
+					},
+					{ jobId: buildId }
+				);
 				return {
 					status: 200,
 					body: {
@@ -156,13 +160,17 @@ export const post: RequestHandler = async (event) => {
 								type: 'webhook_mr'
 							}
 						});
-						await buildQueue.add(buildId, {
-							build_id: buildId,
-							type: 'webhook_mr',
-							...applicationFound,
-							sourceBranch,
-							pullmergeRequestId
-						});
+						await buildQueue.add(
+							buildId,
+							{
+								build_id: buildId,
+								type: 'webhook_mr',
+								...applicationFound,
+								sourceBranch,
+								pullmergeRequestId
+							},
+							{ jobId: buildId }
+						);
 						return {
 							status: 200,
 							body: {

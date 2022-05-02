@@ -2,7 +2,7 @@ import { buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
 
 const createDockerfile = async (data, image, htaccessFound): Promise<void> => {
-	const { workdir, baseDirectory } = data;
+	const { workdir, baseDirectory, buildId } = data;
 	const Dockerfile: Array<string> = [];
 	let composerFound = false;
 	try {
@@ -11,7 +11,7 @@ const createDockerfile = async (data, image, htaccessFound): Promise<void> => {
 	} catch (error) {}
 
 	Dockerfile.push(`FROM ${image}`);
-	Dockerfile.push(`LABEL coolify.image=true`);
+	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`COPY .${baseDirectory || ''} /app`);
 	if (htaccessFound) {

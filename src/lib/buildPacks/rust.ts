@@ -4,11 +4,11 @@ import { promises as fs } from 'fs';
 import TOML from '@iarna/toml';
 
 const createDockerfile = async (data, image, name): Promise<void> => {
-	const { workdir, port, applicationId, tag } = data;
+	const { workdir, port, applicationId, tag, buildId } = data;
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push('WORKDIR /app');
-	Dockerfile.push(`LABEL coolify.image=true`);
+	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app/target target`);
 	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /usr/local/cargo /usr/local/cargo`);
 	Dockerfile.push(`COPY . .`);

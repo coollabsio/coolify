@@ -2,11 +2,11 @@ import { buildCacheImageWithNode, buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
 
 const createDockerfile = async (data, image): Promise<void> => {
-	const { applicationId, tag, workdir, publishDirectory, baseImage } = data;
+	const { applicationId, tag, workdir, publishDirectory, baseImage, buildId } = data;
 	const Dockerfile: Array<string> = [];
 
 	Dockerfile.push(`FROM ${image}`);
-	Dockerfile.push(`LABEL coolify.image=true`);
+	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app/${publishDirectory} ./`);
 	if (baseImage.includes('nginx')) {

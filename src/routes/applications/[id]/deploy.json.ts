@@ -45,15 +45,23 @@ export const post: RequestHandler = async (event) => {
 			}
 		});
 		if (pullmergeRequestId) {
-			await buildQueue.add(buildId, {
-				build_id: buildId,
-				type: 'manual',
-				...applicationFound,
-				sourceBranch: branch,
-				pullmergeRequestId
-			});
+			await buildQueue.add(
+				buildId,
+				{
+					build_id: buildId,
+					type: 'manual',
+					...applicationFound,
+					sourceBranch: branch,
+					pullmergeRequestId
+				},
+				{ jobId: buildId }
+			);
 		} else {
-			await buildQueue.add(buildId, { build_id: buildId, type: 'manual', ...applicationFound });
+			await buildQueue.add(
+				buildId,
+				{ build_id: buildId, type: 'manual', ...applicationFound },
+				{ jobId: buildId }
+			);
 		}
 		return {
 			status: 200,
