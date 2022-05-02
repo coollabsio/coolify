@@ -62,7 +62,9 @@ export const post: RequestHandler = async (event) => {
 		pythonVariable,
 		dockerFileLocation,
 		denoMainFile,
-		denoOptions
+		denoOptions,
+		baseImage,
+		baseBuildImage
 	} = await event.request.json();
 	if (port) port = Number(port);
 	if (denoOptions) denoOptions = denoOptions.trim();
@@ -96,6 +98,8 @@ export const post: RequestHandler = async (event) => {
 			dockerFileLocation,
 			denoMainFile,
 			denoOptions,
+			baseImage,
+			baseBuildImage,
 			...defaultConfiguration
 		});
 		return { status: 201 };

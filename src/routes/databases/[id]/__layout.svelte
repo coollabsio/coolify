@@ -57,13 +57,15 @@
 </script>
 
 <script>
-	import { session } from '$app/stores';
+	import { page, session } from '$app/stores';
 	import { errorNotification } from '$lib/form';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import Loading from '$lib/components/Loading.svelte';
 	import { del, post } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { t } from '$lib/translations';
+
+	const { id } = $page.params;
 
 	export let database;
 	export let isRunning;
@@ -163,6 +165,75 @@
 				</button>
 			{/if}
 		{/if}
+		<div class="border border-stone-700 h-8" />
+		<a
+			href="/databases/{id}"
+			sveltekit:prefetch
+			class="hover:text-yellow-500 rounded"
+			class:text-yellow-500={$page.url.pathname === `/databases/${id}`}
+			class:bg-coolgray-500={$page.url.pathname === `/databases/${id}`}
+		>
+			<button
+				title={$t('application.configurations')}
+				class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
+				data-tooltip={$t('application.configurations')}
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-6 w-6"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<rect x="4" y="8" width="4" height="4" />
+					<line x1="6" y1="4" x2="6" y2="8" />
+					<line x1="6" y1="12" x2="6" y2="20" />
+					<rect x="10" y="14" width="4" height="4" />
+					<line x1="12" y1="4" x2="12" y2="14" />
+					<line x1="12" y1="18" x2="12" y2="20" />
+					<rect x="16" y="5" width="4" height="4" />
+					<line x1="18" y1="4" x2="18" y2="5" />
+					<line x1="18" y1="9" x2="18" y2="20" />
+				</svg></button
+			></a
+		>
+		<div class="border border-stone-700 h-8" />
+		<a
+			href={isRunning ? `/databases/${id}/logs` : null}
+			sveltekit:prefetch
+			class="hover:text-pink-500 rounded"
+			class:text-pink-500={$page.url.pathname === `/databases/${id}/logs`}
+			class:bg-coolgray-500={$page.url.pathname === `/databases/${id}/logs`}
+		>
+			<button
+				title={$t('database.logs')}
+				disabled={!isRunning}
+				class="icons bg-transparent tooltip-bottom text-sm"
+				data-tooltip={$t('database.logs')}
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-6 w-6"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
+					<path d="M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
+					<line x1="3" y1="6" x2="3" y2="19" />
+					<line x1="12" y1="6" x2="12" y2="19" />
+					<line x1="21" y1="6" x2="21" y2="19" />
+				</svg></button
+			></a
+		>
 		<button
 			on:click={deleteDatabase}
 			title={$t('database.delete_database')}

@@ -109,6 +109,7 @@ export async function generateSSLCerts(): Promise<void> {
 		include: { destinationDocker: true, settings: true },
 		orderBy: { createdAt: 'desc' }
 	});
+	const { fqdn, isDNSCheckEnabled } = await db.prisma.setting.findFirst();
 	for (const application of applications) {
 		try {
 			if (application.fqdn && application.destinationDockerId) {
@@ -147,7 +148,6 @@ export async function generateSSLCerts(): Promise<void> {
 		}
 	}
 	const services = await listServicesWithIncludes();
-
 	for (const service of services) {
 		try {
 			if (service.fqdn && service.destinationDockerId) {
@@ -171,7 +171,6 @@ export async function generateSSLCerts(): Promise<void> {
 			console.log(`Error during generateSSLCerts with ${service.fqdn}: ${error}`);
 		}
 	}
-	const { fqdn } = await db.prisma.setting.findFirst();
 	if (fqdn) {
 		const domain = getDomain(fqdn);
 		const isHttps = fqdn.startsWith('https://');
@@ -193,73 +192,99 @@ export async function generateSSLCerts(): Promise<void> {
 				file.endsWith('.pem') && certificates.push(file.replace(/\.pem$/, ''));
 			}
 		}
-		const resolver = new dns.Resolver({ timeout: 2000 });
-		resolver.setServers(['8.8.8.8', '1.1.1.1']);
-		let ipv4, ipv6;
-		try {
-			ipv4 = await (await asyncExecShell(`curl -4s https://ifconfig.io`)).stdout;
-		} catch (error) {}
-		try {
-			ipv6 = await (await asyncExecShell(`curl -6s https://ifconfig.io`)).stdout;
-		} catch (error) {}
-		for (const ssl of ssls) {
-			if (!dev) {
-				if (
-					certificates.includes(ssl.domain) ||
-					certificates.includes(ssl.domain.replace('www.', ''))
-				) {
-					// console.log(`Certificate for ${ssl.domain} already exists`);
-				} else {
-					// Checking DNS entry before generating certificate
-					if (ipv4 || ipv6) {
-						let domains4 = [];
-						let domains6 = [];
-						try {
-							domains4 = await resolver.resolve4(ssl.domain);
-						} catch (error) {}
-						try {
-							domains6 = await resolver.resolve6(ssl.domain);
-						} catch (error) {}
-						if (domains4.length > 0 || domains6.length > 0) {
-							if (
-								(ipv4 && domains4.includes(ipv4.replace('\n', ''))) ||
-								(ipv6 && domains6.includes(ipv6.replace('\n', '')))
-							) {
-								console.log('Generating SSL for', ssl.domain);
-								return await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
+		if (isDNSCheckEnabled) {
+			const resolver = new dns.Resolver({ timeout: 2000 });
+			resolver.setServers(['8.8.8.8', '1.1.1.1']);
+			let ipv4, ipv6;
+			try {
+				ipv4 = await (await asyncExecShell(`curl -4s https://ifconfig.io`)).stdout;
+			} catch (error) {}
+			try {
+				ipv6 = await (await asyncExecShell(`curl -6s https://ifconfig.io`)).stdout;
+			} catch (error) {}
+			for (const ssl of ssls) {
+				if (!dev) {
+					if (
+						certificates.includes(ssl.domain) ||
+						certificates.includes(ssl.domain.replace('www.', ''))
+					) {
+						// console.log(`Certificate for ${ssl.domain} already exists`);
+					} else {
+						// Checking DNS entry before generating certificate
+						if (ipv4 || ipv6) {
+							let domains4 = [];
+							let domains6 = [];
+							try {
+								domains4 = await resolver.resolve4(ssl.domain);
+							} catch (error) {}
+							try {
+								domains6 = await resolver.resolve6(ssl.domain);
+							} catch (error) {}
+							if (domains4.length > 0 || domains6.length > 0) {
+								if (
+									(ipv4 && domains4.includes(ipv4.replace('\n', ''))) ||
+									(ipv6 && domains6.includes(ipv6.replace('\n', '')))
+								) {
+									console.log('Generating SSL for', ssl.domain);
+									return await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
+								}
 							}
 						}
+						console.log('DNS settings is incorrect for', ssl.domain, 'skipping.');
 					}
-					console.log('DNS settings is incorrect for', ssl.domain, 'skipping.');
+				} else {
+					if (
+						certificates.includes(ssl.domain) ||
+						certificates.includes(ssl.domain.replace('www.', ''))
+					) {
+						console.log(`Certificate for ${ssl.domain} already exists`);
+					} else {
+						// Checking DNS entry before generating certificate
+						if (ipv4 || ipv6) {
+							let domains4 = [];
+							let domains6 = [];
+							try {
+								domains4 = await resolver.resolve4(ssl.domain);
+							} catch (error) {}
+							try {
+								domains6 = await resolver.resolve6(ssl.domain);
+							} catch (error) {}
+							if (domains4.length > 0 || domains6.length > 0) {
+								if (
+									(ipv4 && domains4.includes(ipv4.replace('\n', ''))) ||
+									(ipv6 && domains6.includes(ipv6.replace('\n', '')))
+								) {
+									console.log('Generating SSL for', ssl.domain);
+									return;
+								}
+							}
+						}
+						console.log('DNS settings is incorrect for', ssl.domain, 'skipping.');
+					}
+				}
+			}
+		} else {
+			if (!dev) {
+				for (const ssl of ssls) {
+					if (
+						certificates.includes(ssl.domain) ||
+						certificates.includes(ssl.domain.replace('www.', ''))
+					) {
+					} else {
+						console.log('Generating SSL for', ssl.domain);
+						return await letsEncrypt(ssl.domain, ssl.id, ssl.isCoolify);
+					}
 				}
 			} else {
-				if (
-					certificates.includes(ssl.domain) ||
-					certificates.includes(ssl.domain.replace('www.', ''))
-				) {
-					console.log(`Certificate for ${ssl.domain} already exists`);
-				} else {
-					// Checking DNS entry before generating certificate
-					if (ipv4 || ipv6) {
-						let domains4 = [];
-						let domains6 = [];
-						try {
-							domains4 = await resolver.resolve4(ssl.domain);
-						} catch (error) {}
-						try {
-							domains6 = await resolver.resolve6(ssl.domain);
-						} catch (error) {}
-						if (domains4.length > 0 || domains6.length > 0) {
-							if (
-								(ipv4 && domains4.includes(ipv4.replace('\n', ''))) ||
-								(ipv6 && domains6.includes(ipv6.replace('\n', '')))
-							) {
-								console.log('Generating SSL for', ssl.domain);
-								return;
-							}
-						}
+				for (const ssl of ssls) {
+					if (
+						certificates.includes(ssl.domain) ||
+						certificates.includes(ssl.domain.replace('www.', ''))
+					) {
+						console.log(`Certificate for ${ssl.domain} already exists`);
+					} else {
+						console.log('Generating SSL for', ssl.domain);
 					}
-					console.log('DNS settings is incorrect for', ssl.domain, 'skipping.');
 				}
 			}
 		}

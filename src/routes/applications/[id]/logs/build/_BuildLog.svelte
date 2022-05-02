@@ -8,7 +8,7 @@
 
 	import Loading from '$lib/components/Loading.svelte';
 	import LoadingLogs from '../_Loading.svelte';
-	import { get } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/form';
 	import { t } from '$lib/translations';
 
@@ -19,6 +19,8 @@
 	let followingBuild;
 	let followingInterval;
 	let logsEl;
+
+	let cancelInprogress = false;
 
 	const { id } = $page.params;
 
@@ -67,6 +69,19 @@
 			return errorNotification(error);
 		}
 	}
+	async function cancelBuild() {
+		if (cancelInprogress) return;
+		try {
+			cancelInprogress = true;
+			await post(`/applications/${id}/cancel.json`, {
+				buildId,
+				applicationId: id
+			});
+		} catch (error) {
+			console.log(error);
+			return errorNotification(error);
+		}
+	}
 	onDestroy(() => {
 		clearInterval(streamInterval);
 		clearInterval(followingInterval);
@@ -90,7 +105,7 @@
 			<div class="flex justify-end sticky top-0 p-2">
 				<button
 					on:click={followBuild}
-					class="bg-transparent"
+					class="bg-transparent hover:text-green-500 hover:bg-coolgray-500"
 					data-tooltip="Follow logs"
 					class:text-green-500={followingBuild}
 				>
@@ -111,7 +126,30 @@
 						<line x1="16" y1="12" x2="12" y2="16" />
 					</svg>
 				</button>
+				{#if currentStatus === 'running'}
+					<button
+						on:click={cancelBuild}
+						class="bg-transparent hover:text-red-500 hover:bg-coolgray-500"
+						data-tooltip="Cancel build"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="w-6 h-6"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<circle cx="12" cy="12" r="9" />
+							<path d="M10 10l4 4m0 -4l-4 4" />
+						</svg>
+					</button>
+				{/if}
 			</div>
+
 			<div
 				class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
 				bind:this={logsEl}

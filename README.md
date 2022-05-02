@@ -13,10 +13,16 @@ https://demo.coolify.io/
 Installation is automated with the following command:
 
 ```bash
-/bin/bash -c "$(curl -fsSL https://get.coollabs.io/coolify/install.sh)"
+wget -q https://get.coollabs.io/coolify/install.sh -O install.sh; sudo bash ./install.sh
 ```
 
-If you would like no questions during installation
+If you would like no questions during installation:
+
+```bash
+wget -q https://get.coollabs.io/coolify/install.sh -O install.sh; sudo bash ./install.sh -f
+```
+
+For more details goto the [docs](https://docs.coollabs.io/coolify/installation).
 
 ## Features
 
@@ -77,6 +83,8 @@ You can host cool open-source services as well:
 - [LanguageTool](https://languagetool.org)
 - [n8n](https://n8n.io)
 - [Uptime Kuma](https://github.com/louislam/uptime-kuma)
+- [MeiliSearch](https://github.com/meilisearch/meilisearch)
+- [Umami](https://github.com/mikecao/umami)
 
 ## Migration from v1
 

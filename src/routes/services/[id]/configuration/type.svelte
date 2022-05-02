@@ -44,6 +44,8 @@
 	import { t } from '$lib/translations';
 	import MeiliSearch from '$lib/components/svg/services/MeiliSearch.svelte';
 	import Umami from '$lib/components/svg/services/Umami.svelte';
+	import Hasura from '$lib/components/svg/services/Hasura.svelte';
+	import Fider from '$lib/components/svg/services/Fider.svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -93,6 +95,10 @@
 						<MeiliSearch isAbsolute />
 					{:else if type.name === 'umami'}
 						<Umami isAbsolute />
+					{:else if type.name === 'hasura'}
+						<Hasura isAbsolute />
+					{:else if type.name === 'fider'}
+						<Fider isAbsolute />
 					{/if}{type.fancyName}
 				</button>
 			</form>

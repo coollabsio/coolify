@@ -10,12 +10,13 @@ const createDockerfile = async (data, image): Promise<void> => {
 		pullmergeRequestId,
 		pythonWSGI,
 		pythonModule,
-		pythonVariable
+		pythonVariable,
+		buildId
 	} = data;
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push('WORKDIR /app');
-	Dockerfile.push(`LABEL coolify.image=true`);
+	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {
 			if (secret.isBuildSecret) {
@@ -62,8 +63,8 @@ const createDockerfile = async (data, image): Promise<void> => {
 
 export default async function (data) {
 	try {
-		const image = 'python:3-alpine';
-		await createDockerfile(data, image);
+		const { baseImage, baseBuildImage } = data;
+		await createDockerfile(data, baseImage);
 		await buildImage(data);
 	} catch (error) {
 		throw error;

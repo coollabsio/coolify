@@ -46,14 +46,14 @@ textarea {
 }
 
 #svelte .custom-select-wrapper .selectContainer {
-	@apply h-12 w-96 rounded border-none bg-coolgray-200 p-2 text-xs font-bold tracking-tight  outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 md:text-sm;
+	@apply h-12 w-96 rounded border-none bg-coolgray-200 p-2 px-0 text-xs  tracking-tight  outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 md:text-sm;
 }
 
 #svelte .listContainer {
 	@apply bg-coolgray-400 text-white scrollbar-w-2 scrollbar-thumb-green-500 scrollbar-track-coolgray-200;
 }
 #svelte .selectedItem {
-	@apply pl-3;
+	@apply pl-2;
 }
 
 #svelte .item.hover {
@@ -64,7 +64,7 @@ textarea {
 }
 
 select {
-	@apply h-12 w-96 rounded bg-coolgray-200  p-2 text-xs font-bold tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:text-stone-600 md:text-sm;
+	@apply h-12 w-96 rounded bg-coolgray-200 p-2 text-xs font-bold tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:text-stone-600 md:text-sm;
 }
 .svelte-select {
 	--background: rgb(32 32 32);

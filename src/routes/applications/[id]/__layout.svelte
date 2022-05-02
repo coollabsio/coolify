@@ -394,7 +394,7 @@
 		>
 		<div class="border border-coolgray-500 h-8" />
 		<a
-			href={!$disabledButton ? `/applications/${id}/logs` : null}
+			href={!$disabledButton && isRunning ? `/applications/${id}/logs` : null}
 			sveltekit:prefetch
 			class="hover:text-sky-500 rounded"
 			class:text-sky-500={$page.url.pathname === `/applications/${id}/logs`}
@@ -402,7 +402,7 @@
 		>
 			<button
 				title={$t('application.logs')}
-				disabled={$disabledButton}
+				disabled={$disabledButton || !isRunning}
 				class="icons bg-transparent tooltip-bottom text-sm"
 				data-tooltip={$t('application.logs')}
 			>

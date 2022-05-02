@@ -33,6 +33,8 @@
 		gitlabApp: Prisma.GitlabApp;
 		gitSource: Prisma.GitSource;
 		destinationDocker: Prisma.DestinationDocker;
+		baseImages: Array<{ value: string; label: string }>;
+		baseBuildImages: Array<{ value: string; label: string }>;
 	};
 	export let isRunning;
 	import { page, session } from '$app/stores';
@@ -71,11 +73,14 @@
 			label: 'Gunicorn'
 		}
 	];
-
+	function containerClass() {
+		if (!$session.isAdmin || isRunning) {
+			return 'text-white border border-dashed border-coolgray-300 bg-transparent font-thin px-0';
+		}
+	}
 	if (browser && window.location.hostname === 'demo.coolify.io' && !application.fqdn) {
 		application.fqdn = `http://${cuid()}.demo.coolify.io`;
 	}
-
 	onMount(() => {
 		domainEl.focus();
 	});
@@ -137,6 +142,14 @@
 	}
 	async function selectWSGI(event) {
 		application.pythonWSGI = event.detail.value;
+	}
+	async function selectBaseImage(event) {
+		application.baseImage = event.detail.value;
+		await handleSubmit();
+	}
+	async function selectBaseBuildImage(event) {
+		application.baseBuildImage = event.detail.value;
+		await handleSubmit();
 	}
 </script>
 
@@ -310,6 +323,49 @@
 					/>
 				</div>
 			</div>
+			<div class="grid grid-cols-2 items-center">
+				<label for="baseImage" class="text-base font-bold text-stone-100"
+					>{$t('application.base_image')}</label
+				>
+				<div class="custom-select-wrapper">
+					<Select
+						isDisabled={!$session.isAdmin || isRunning}
+						containerClasses={containerClass()}
+						id="baseImages"
+						showIndicator={!isRunning}
+						items={application.baseImages}
+						on:select={selectBaseImage}
+						value={application.baseImage}
+						isClearable={false}
+					/>
+				</div>
+				<Explainer text={$t('application.base_image_explainer')} />
+			</div>
+			{#if application.buildCommand || application.buildPack === 'rust' || application.buildPack === 'laravel'}
+				<div class="grid grid-cols-2 items-center pb-8">
+					<label for="baseBuildImage" class="text-base font-bold text-stone-100"
+						>{$t('application.base_build_image')}</label
+					>
+
+					<div class="custom-select-wrapper">
+						<Select
+							isDisabled={!$session.isAdmin || isRunning}
+							containerClasses={containerClass()}
+							id="baseBuildImages"
+							showIndicator={!isRunning}
+							items={application.baseBuildImages}
+							on:select={selectBaseBuildImage}
+							value={application.baseBuildImage}
+							isClearable={false}
+						/>
+					</div>
+					{#if application.buildPack === 'laravel'}
+						<Explainer text="For building frontend assets with webpack." />
+					{:else}
+						<Explainer text={$t('application.base_build_image_explainer')} />
+					{/if}
+				</div>
+			{/if}
 		</div>
 		<div class="flex space-x-1 py-5 font-bold">
 			<div class="title">{$t('application.application')}</div>
@@ -476,21 +532,23 @@
 					/>
 				</div>
 			{/if}
-			<div class="grid grid-cols-2 items-center">
-				<div class="flex-col">
-					<label for="baseDirectory" class="pt-2 text-base font-bold text-stone-100"
-						>{$t('forms.base_directory')}</label
-					>
-					<Explainer text={$t('application.directory_to_use_explainer')} />
+			{#if application.buildPack !== 'laravel'}
+				<div class="grid grid-cols-2 items-center">
+					<div class="flex-col">
+						<label for="baseDirectory" class="pt-2 text-base font-bold text-stone-100"
+							>{$t('forms.base_directory')}</label
+						>
+						<Explainer text={$t('application.directory_to_use_explainer')} />
+					</div>
+					<input
+						readonly={!$session.isAdmin}
+						name="baseDirectory"
+						id="baseDirectory"
+						bind:value={application.baseDirectory}
+						placeholder="{$t('forms.default')}: /"
+					/>
 				</div>
-				<input
-					readonly={!$session.isAdmin}
-					name="baseDirectory"
-					id="baseDirectory"
-					bind:value={application.baseDirectory}
-					placeholder="{$t('forms.default')}: /"
-				/>
-			</div>
+			{/if}
 			{#if !notNodeDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-2 items-center">
 					<div class="flex-col">

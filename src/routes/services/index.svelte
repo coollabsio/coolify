@@ -16,6 +16,8 @@
 	import { session } from '$app/stores';
 	import { getDomain } from '$lib/components/common';
 	import Umami from '$lib/components/svg/services/Umami.svelte';
+	import Hasura from '$lib/components/svg/services/Hasura.svelte';
+	import Fider from '$lib/components/svg/services/Fider.svelte';
 
 	export let services;
 	async function newService() {
@@ -89,6 +91,10 @@
 								<MeiliSearch isAbsolute />
 							{:else if service.type === 'umami'}
 								<Umami isAbsolute />
+							{:else if service.type === 'hasura'}
+								<Hasura isAbsolute />
+							{:else if service.type === 'fider'}
+								<Fider isAbsolute />
 							{/if}
 							<div class="truncate text-center text-xl font-bold">
 								{service.name}
@@ -138,6 +144,10 @@
 									<MeiliSearch isAbsolute />
 								{:else if service.type === 'umami'}
 									<Umami isAbsolute />
+								{:else if service.type === 'hasura'}
+									<Hasura isAbsolute />
+								{:else if service.type === 'fider'}
+									<Fider isAbsolute />
 								{/if}
 								<div class="truncate text-center text-xl font-bold">
 									{service.name}

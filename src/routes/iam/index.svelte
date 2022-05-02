@@ -25,7 +25,7 @@
 </script>
 
 <script lang="ts">
-	import { session } from '$app/stores';
+	import { page, session } from '$app/stores';
 	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/form';
 	import { toast } from '@zerodevx/svelte-toast';
@@ -79,6 +79,18 @@
 			return window.location.reload();
 		} catch ({ error }) {
 			return errorNotification(error);
+		}
+	}
+
+	async function switchTeam(selectedTeamId) {
+		try {
+			await post(`/dashboard.json?from=${$page.url.pathname}`, {
+				cookie: 'teamId',
+				value: selectedTeamId
+			});
+			return window.location.reload();
+		} catch (error) {
+			return window.location.reload();
 		}
 	}
 </script>
@@ -175,20 +187,39 @@
 			<div class="flex flex-row flex-wrap justify-center px-2 pb-10 md:flex-row">
 				{#each ownTeams as team}
 					<a href="/iam/team/{team.id}" class="w-96 p-2 no-underline">
-						<div
-							class="box-selection relative"
-							class:hover:bg-fuchsia-600={team.id !== '0'}
-							class:hover:bg-red-500={team.id === '0'}
-						>
-							<div class="truncate text-center text-xl font-bold">
-								{team.name}
+						<div class="box-selection relative">
+							<div>
+								<div class="truncate text-center text-xl font-bold">
+									{team.name}
+								</div>
+								<div class="mt-1 text-center text-xs">
+									{team.permissions?.length} member(s)
+								</div>
 							</div>
-							<div class="truncate text-center font-bold">
-								{team.id === '0' ? 'root team' : ''}
-							</div>
-
-							<div class:mt-6={team.id !== '0'} class="mt-1 text-center">
-								{team.permissions?.length} member(s)
+							<div class="flex items-center justify-center pt-3">
+								<button
+									on:click|preventDefault={() => switchTeam(team.id)}
+									class:bg-fuchsia-600={$session.teamId !== team.id}
+									class:hover:bg-fuchsia-500={$session.teamId !== team.id}
+									class:bg-transparent={$session.teamId === team.id}
+									disabled={$session.teamId === team.id}
+									><svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="h-6 w-6"
+										viewBox="0 0 24 24"
+										stroke-width="1.5"
+										stroke="currentColor"
+										fill="none"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+										<path d="M3 17h5l1.67 -2.386m3.66 -5.227l1.67 -2.387h6" />
+										<path d="M18 4l3 3l-3 3" />
+										<path d="M3 7h5l7 10h6" />
+										<path d="M18 20l3 -3l-3 -3" />
+									</svg></button
+								>
 							</div>
 						</div>
 					</a>
@@ -206,9 +237,6 @@
 							>
 								<div class="truncate text-center text-xl font-bold">
 									{team.name}
-								</div>
-								<div class="truncate text-center font-bold">
-									{team.id === '0' ? 'root team' : ''}
 								</div>
 
 								<div class="mt-1 text-center">{team.permissions?.length} member(s)</div>

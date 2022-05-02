@@ -14,7 +14,9 @@ const include: Prisma.ServiceInclude = {
 	wordpress: true,
 	ghost: true,
 	meiliSearch: true,
-	umami: true
+	umami: true,
+	hasura: true,
+	fider: true
 };
 export async function listServicesWithIncludes() {
 	return await prisma.service.findMany({
@@ -96,6 +98,17 @@ export async function getService({ id, teamId }: { id: string; teamId: string })
 	if (body.umami?.umamiAdminPassword)
 		body.umami.umamiAdminPassword = decrypt(body.umami.umamiAdminPassword);
 	if (body.umami?.hashSalt) body.umami.hashSalt = decrypt(body.umami.hashSalt);
+
+	if (body.hasura?.postgresqlPassword)
+		body.hasura.postgresqlPassword = decrypt(body.hasura.postgresqlPassword);
+	if (body.hasura?.graphQLAdminPassword)
+		body.hasura.graphQLAdminPassword = decrypt(body.hasura.graphQLAdminPassword);
+
+	if (body.fider?.postgresqlPassword)
+		body.fider.postgresqlPassword = decrypt(body.fider.postgresqlPassword);
+	if (body.fider?.jwtSecret) body.fider.jwtSecret = decrypt(body.fider.jwtSecret);
+	if (body.fider?.emailSmtpPassword)
+		body.fider.emailSmtpPassword = decrypt(body.fider.emailSmtpPassword);
 
 	const settings = await prisma.setting.findFirst();
 
@@ -243,6 +256,44 @@ export async function configureServiceType({
 				}
 			}
 		});
+	} else if (type === 'hasura') {
+		const postgresqlUser = cuid();
+		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlDatabase = 'hasura';
+		const graphQLAdminPassword = encrypt(generatePassword());
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				hasura: {
+					create: {
+						postgresqlDatabase,
+						postgresqlPassword,
+						postgresqlUser,
+						graphQLAdminPassword
+					}
+				}
+			}
+		});
+	} else if (type === 'fider') {
+		const postgresqlUser = cuid();
+		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlDatabase = 'fider';
+		const jwtSecret = encrypt(generatePassword(64, true));
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				fider: {
+					create: {
+						postgresqlDatabase,
+						postgresqlPassword,
+						postgresqlUser,
+						jwtSecret
+					}
+				}
+			}
+		});
 	}
 }
 
@@ -301,52 +352,53 @@ export async function updateService({
 	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
 }
 
-export async function updateLanguageToolService({
+export async function updateFiderService({
 	id,
 	fqdn,
-	name
+	name,
+	emailNoreply,
+	emailMailgunApiKey,
+	emailMailgunDomain,
+	emailMailgunRegion,
+	emailSmtpHost,
+	emailSmtpPort,
+	emailSmtpUser,
+	emailSmtpPassword,
+	emailSmtpEnableStartTls
 }: {
 	id: string;
 	fqdn: string;
 	name: string;
+	emailNoreply: string;
+	emailMailgunApiKey: string;
+	emailMailgunDomain: string;
+	emailMailgunRegion: string;
+	emailSmtpHost: string;
+	emailSmtpPort: number;
+	emailSmtpUser: string;
+	emailSmtpPassword: string;
+	emailSmtpEnableStartTls: boolean;
 }): Promise<Service> {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
-}
-
-export async function updateMeiliSearchService({
-	id,
-	fqdn,
-	name
-}: {
-	id: string;
-	fqdn: string;
-	name: string;
-}): Promise<Service> {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
-}
-
-export async function updateVaultWardenService({
-	id,
-	fqdn,
-	name
-}: {
-	id: string;
-	fqdn: string;
-	name: string;
-}): Promise<Service> {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
-}
-
-export async function updateVsCodeServer({
-	id,
-	fqdn,
-	name
-}: {
-	id: string;
-	fqdn: string;
-	name: string;
-}): Promise<Service> {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
+	return await prisma.service.update({
+		where: { id },
+		data: {
+			fqdn,
+			name,
+			fider: {
+				update: {
+					emailNoreply,
+					emailMailgunApiKey,
+					emailMailgunDomain,
+					emailMailgunRegion,
+					emailSmtpHost,
+					emailSmtpPort,
+					emailSmtpUser,
+					emailSmtpPassword,
+					emailSmtpEnableStartTls
+				}
+			}
+		}
+	});
 }
 
 export async function updateWordpress({
@@ -398,8 +450,10 @@ export async function updateGhostService({
 export async function removeService({ id }: { id: string }): Promise<void> {
 	await prisma.servicePersistentStorage.deleteMany({ where: { serviceId: id } });
 	await prisma.meiliSearch.deleteMany({ where: { serviceId: id } });
+	await prisma.fider.deleteMany({ where: { serviceId: id } });
 	await prisma.ghost.deleteMany({ where: { serviceId: id } });
 	await prisma.umami.deleteMany({ where: { serviceId: id } });
+	await prisma.hasura.deleteMany({ where: { serviceId: id } });
 	await prisma.plausibleAnalytics.deleteMany({ where: { serviceId: id } });
 	await prisma.minio.deleteMany({ where: { serviceId: id } });
 	await prisma.vscodeserver.deleteMany({ where: { serviceId: id } });

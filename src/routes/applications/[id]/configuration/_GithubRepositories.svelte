@@ -185,7 +185,7 @@
 							? $t('application.configuration.loading_repositories')
 							: $t('application.configuration.select_a_repository')}
 						id="repository"
-						showIndicator={true}
+						showIndicator={!loading.repositories}
 						isWaiting={loading.repositories}
 						on:select={loadBranches}
 						items={reposSelectOptions}
@@ -202,7 +202,7 @@
 							? $t('application.configuration.select_a_repository_first')
 							: $t('application.configuration.select_a_branch')}
 						isWaiting={loading.branches}
-						showIndicator={selected.repository}
+						showIndicator={selected.repository && !loading.branches}
 						id="branches"
 						on:select={isBranchAlreadyUsed}
 						items={branchSelectOptions}

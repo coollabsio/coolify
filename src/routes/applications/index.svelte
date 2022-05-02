@@ -22,6 +22,7 @@
 	import Astro from '$lib/components/svg/applications/Astro.svelte';
 	import Eleventy from '$lib/components/svg/applications/Eleventy.svelte';
 	import Deno from '$lib/components/svg/applications/Deno.svelte';
+	import Laravel from '$lib/components/svg/applications/Laravel.svelte';
 
 	async function newApplication() {
 		const { id } = await post('/applications/new', {});
@@ -104,6 +105,8 @@
 									<Eleventy />
 								{:else if application.buildPack.toLowerCase() === 'deno'}
 									<Deno />
+								{:else if application.buildPack.toLowerCase() === 'laravel'}
+									<Laravel />
 								{/if}
 							{/if}
 
@@ -162,6 +165,8 @@
 										<Eleventy />
 									{:else if application.buildPack.toLowerCase() === 'deno'}
 										<Deno />
+									{:else if application.buildPack.toLowerCase() === 'laravel'}
+										<Laravel />
 									{/if}
 								{/if}
 

@@ -24,6 +24,7 @@ export default async function ({
 			.toString()
 			.trim()
 			.split('\n');
+		Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 		if (secrets.length > 0) {
 			secrets.forEach((secret) => {
 				if (secret.isBuildSecret) {
@@ -42,6 +43,7 @@ export default async function ({
 				}
 			});
 		}
+
 		await fs.writeFile(`${dockerFileOut}${dockerFileLocation}`, Dockerfile.join('\n'));
 		await buildImage({ applicationId, tag, workdir, docker, buildId, debug, dockerFileLocation });
 	} catch (error) {

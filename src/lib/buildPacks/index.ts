@@ -14,6 +14,7 @@ import astro from './static';
 import eleventy from './static';
 import python from './python';
 import deno from './deno';
+import laravel from './laravel';
 
 export {
 	node,
@@ -31,5 +32,6 @@ export {
 	astro,
 	eleventy,
 	python,
-	deno
+	deno,
+	laravel
 };

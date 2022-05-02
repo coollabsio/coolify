@@ -12,6 +12,7 @@ import type {
 	Application,
 	ApplicationPersistentStorage
 } from '@prisma/client';
+import { setDefaultBaseImage } from '$lib/buildPacks/common';
 
 export async function listApplications(teamId: string): Promise<Application[]> {
 	if (teamId === '0') {
@@ -195,8 +196,18 @@ export async function getApplication({ id, teamId }: { id: string; teamId: strin
 			return s;
 		});
 	}
+	const { baseImage, baseBuildImage, baseBuildImages, baseImages } = setDefaultBaseImage(
+		body.buildPack
+	);
 
-	return { ...body };
+	// Set default build images
+	if (!body.baseImage) {
+		body.baseImage = baseImage;
+	}
+	if (!body.baseBuildImage) {
+		body.baseBuildImage = baseBuildImage;
+	}
+	return { ...body, baseBuildImages, baseImages };
 }
 
 export async function configureGitRepository({
@@ -266,7 +277,9 @@ export async function configureApplication({
 	pythonVariable,
 	dockerFileLocation,
 	denoMainFile,
-	denoOptions
+	denoOptions,
+	baseImage,
+	baseBuildImage
 }: {
 	id: string;
 	buildPack: string;
@@ -284,6 +297,8 @@ export async function configureApplication({
 	dockerFileLocation: string;
 	denoMainFile: string;
 	denoOptions: string;
+	baseImage: string;
+	baseBuildImage: string;
 }): Promise<Application> {
 	return await prisma.application.update({
 		where: { id },
@@ -302,7 +317,9 @@ export async function configureApplication({
 			pythonVariable,
 			dockerFileLocation,
 			denoMainFile,
-			denoOptions
+			denoOptions,
+			baseImage,
+			baseBuildImage
 		}
 	});
 }

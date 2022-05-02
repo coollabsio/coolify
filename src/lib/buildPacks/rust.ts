@@ -4,11 +4,11 @@ import { promises as fs } from 'fs';
 import TOML from '@iarna/toml';
 
 const createDockerfile = async (data, image, name): Promise<void> => {
-	const { workdir, port, applicationId, tag } = data;
+	const { workdir, port, applicationId, tag, buildId } = data;
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push('WORKDIR /app');
-	Dockerfile.push(`LABEL coolify.image=true`);
+	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app/target target`);
 	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /usr/local/cargo /usr/local/cargo`);
 	Dockerfile.push(`COPY . .`);
@@ -27,14 +27,12 @@ const createDockerfile = async (data, image, name): Promise<void> => {
 
 export default async function (data) {
 	try {
-		const { workdir } = data;
-		const image = 'rust:latest';
-		const imageForBuild = 'rust:latest';
+		const { workdir, baseImage, baseBuildImage } = data;
 		const { stdout: cargoToml } = await asyncExecShell(`cat ${workdir}/Cargo.toml`);
 		const parsedToml: any = TOML.parse(cargoToml);
 		const name = parsedToml.package.name;
-		await buildCacheImageWithCargo(data, imageForBuild);
-		await createDockerfile(data, image, name);
+		await buildCacheImageWithCargo(data, baseBuildImage);
+		await createDockerfile(data, baseImage, name);
 		await buildImage(data);
 	} catch (error) {
 		throw error;
