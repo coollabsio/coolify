@@ -311,7 +311,7 @@
 		"auto_update_enabled_explainer": "Enable automatic updates for Coolify. It will be done automatically behind the scenes, if there is no build process running.",
 		"generate_www_non_www_ssl": "It will generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-yellow-500'>both DNS entries</span> set in advance.<br><br>Service needs to be restarted.",
 		"is_dns_check_enabled": "DNS check enabled?",
-		"is_dns_check_enabled_explainer": "Enable DNS check during SSL certificate generation. <br>It will check if the DNS entries are set correctly, before trying to get a new cert from Let's Encrypt."
+		"is_dns_check_enabled_explainer": "You can disable DNS check before creating SSL certificates.<br><br>Useful when Coolify is behind a reverse proxy or tunnel."
 	},
 	"team": {
 		"pending_invitations": "Pending invitations",
