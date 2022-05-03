@@ -56,6 +56,7 @@ These are the predefined build packs, but with the Docker build pack, you can ho
 - Gatsby
 - Svelte
 - PHP
+- Laravel
 - Rust
 - Docker
 
@@ -85,6 +86,8 @@ You can host cool open-source services as well:
 - [Uptime Kuma](https://github.com/louislam/uptime-kuma)
 - [MeiliSearch](https://github.com/meilisearch/meilisearch)
 - [Umami](https://github.com/mikecao/umami)
+- [Fider](https://fider.io)
+- [Hasura](https://hasura.io)
 
 ## Migration from v1
 
