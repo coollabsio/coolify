@@ -8,14 +8,16 @@ import { staticDeployments } from '$lib/components/common';
 const staticApps = ['static', 'react', 'vuejs', 'svelte', 'gatsby', 'astro', 'eleventy'];
 const nodeBased = [
 	'react',
+	'preact',
 	'vuejs',
 	'svelte',
 	'gatsby',
-	'php',
 	'astro',
 	'eleventy',
 	'node',
-	'nestjs'
+	'nestjs',
+	'nuxtjs',
+	'nextjs'
 ];
 
 export function makeLabelForStandaloneApplication({

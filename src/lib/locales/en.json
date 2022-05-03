@@ -184,7 +184,7 @@
 		"git_source": "Git Source",
 		"git_repository": "Git Repository",
 		"build_pack": "Build Pack",
-		"base_image": "Deplyoment Image",
+		"base_image": "Deployment Image",
 		"base_image_explainer": "Image that will be used for the deployment.",
 		"base_build_image": "Build Image",
 		"base_build_image_explainer": "Image that will be used during the build process.",
