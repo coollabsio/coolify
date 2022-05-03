@@ -138,7 +138,18 @@ export async function getApplicationWebhook({
 				return s;
 			});
 		}
-		return { ...application };
+		const { baseImage, baseBuildImage, baseBuildImages, baseImages } = setDefaultBaseImage(
+			application.buildPack
+		);
+
+		// Set default build images
+		if (!application.baseImage) {
+			application.baseImage = baseImage;
+		}
+		if (!application.baseBuildImage) {
+			application.baseBuildImage = baseBuildImage;
+		}
+		return { ...application, baseBuildImages, baseImages };
 	} catch (e) {
 		throw { status: 404, body: { message: e.message } };
 	}
