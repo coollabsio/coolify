@@ -25,7 +25,6 @@
 		if (res.ok) {
 			return {
 				props: {
-					selectedTeamId: session.teamId,
 					...(await res.json())
 				}
 			};
@@ -35,9 +34,6 @@
 </script>
 
 <script>
-	export let teams;
-	export let selectedTeamId;
-
 	import '../tailwind.css';
 	import { SvelteToast, toast } from '@zerodevx/svelte-toast';
 	import { page, session } from '$app/stores';
@@ -45,7 +41,8 @@
 	import { errorNotification } from '$lib/form';
 	import { asyncSleep } from '$lib/components/common';
 	import { del, get, post } from '$lib/api';
-	import { browser, dev } from '$app/env';
+	import { dev } from '$app/env';
+	import { features } from '$lib/store';
 	let isUpdateAvailable = false;
 
 	let updateStatus = {
@@ -56,7 +53,7 @@
 	let latestVersion = 'latest';
 	onMount(async () => {
 		if ($session.userId) {
-			const overrideVersion = browser && window.localStorage.getItem('latestVersion');
+			const overrideVersion = $features.latestVersion;
 			try {
 				await get(`/login.json`);
 			} catch ({ error }) {
@@ -87,17 +84,6 @@
 			return window.location.reload();
 		} catch ({ error }) {
 			return errorNotification(error);
-		}
-	}
-	async function switchTeam() {
-		try {
-			await post(`/dashboard.json?from=${$page.url.pathname}`, {
-				cookie: 'teamId',
-				value: selectedTeamId
-			});
-			return window.location.reload();
-		} catch (error) {
-			return window.location.reload();
 		}
 	}
 
@@ -525,21 +511,10 @@
 		</div>
 	</nav>
 	{#if $session.whiteLabeled}
-		<span class="fixed  bottom-0 left-[50px] z-50 m-2 px-4 text-xs text-stone-700"
+		<span class="fixed bottom-0 left-[50px] z-50 m-2 px-4 text-xs text-stone-700"
 			>Powered by <a href="https://coolify.io" target="_blank">Coolify</a></span
 		>
 	{/if}
-
-	<select
-		class="fixed right-0 bottom-0 z-50 m-2 w-64 bg-opacity-30 p-2 px-4 hover:bg-opacity-100"
-		bind:value={selectedTeamId}
-		on:change={switchTeam}
-	>
-		<option value="" disabled selected>Switch to a different team...</option>
-		{#each teams as team}
-			<option value={team.teamId}>{team.team.name} - {team.permission}</option>
-		{/each}
-	</select>
 {/if}
 <main>
 	<slot />

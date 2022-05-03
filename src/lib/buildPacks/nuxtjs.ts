@@ -11,13 +11,14 @@ const createDockerfile = async (data, image): Promise<void> => {
 		startCommand,
 		baseDirectory,
 		secrets,
-		pullmergeRequestId
+		pullmergeRequestId,
+		buildId
 	} = data;
 	const Dockerfile: Array<string> = [];
 	const isPnpm = checkPnpm(installCommand, buildCommand, startCommand);
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push('WORKDIR /app');
-	Dockerfile.push(`LABEL coolify.image=true`);
+	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {
 			if (secret.isBuildSecret) {
@@ -49,8 +50,8 @@ const createDockerfile = async (data, image): Promise<void> => {
 
 export default async function (data) {
 	try {
-		const image = 'node:lts';
-		await createDockerfile(data, image);
+		const { baseImage, baseBuildImage } = data;
+		await createDockerfile(data, baseImage);
 		await buildImage(data);
 	} catch (error) {
 		throw error;

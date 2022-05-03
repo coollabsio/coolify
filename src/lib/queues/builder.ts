@@ -48,7 +48,9 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 		pythonModule,
 		pythonVariable,
 		denoOptions,
-		exposePort
+		exposePort,
+		baseImage,
+		baseBuildImage
 	} = job.data;
 	let {
 		branch,
@@ -188,8 +190,7 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 			//
 		}
 		if (!imageFound || deployNeeded) {
-			await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId);
-
+			await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId, baseImage);
 			if (buildpacks[buildPack])
 				await buildpacks[buildPack]({
 					buildId,
@@ -220,7 +221,9 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 					pythonVariable,
 					dockerFileLocation,
 					denoMainFile,
-					denoOptions
+					denoOptions,
+					baseImage,
+					baseBuildImage
 				});
 			else {
 				await saveBuildLog({ line: `Build pack ${buildPack} not found`, buildId, applicationId });

@@ -19,6 +19,7 @@ model Setting {
   proxyUser             String
   proxyHash             String?
   isAutoUpdateEnabled   Boolean  @default(false)
+  isDNSCheckEnabled     Boolean  @default(true)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
@@ -106,6 +107,8 @@ model Application {
   gitSource           GitSource?                     @relation(fields: [gitSourceId], references: [id])
   secrets             Secret[]
   persistentStorage   ApplicationPersistentStorage[]
+  baseImage           String?
+  baseBuildImage      String?
 }
 
 model ApplicationSettings {
@@ -305,6 +308,8 @@ model Service {
   meiliSearch         MeiliSearch?
   persistentStorage   ServicePersistentStorage[]
   umami               Umami?
+  hasura              Hasura?
+  fider               Fider?
 }
 
 model PlausibleAnalytics {
@@ -402,4 +407,39 @@ model Umami {
   service              Service  @relation(fields: [serviceId], references: [id])
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+}
+
+model Hasura {
+  id                   String   @id @default(cuid())
+  serviceId            String   @unique
+  postgresqlUser       String
+  postgresqlPassword   String
+  postgresqlDatabase   String
+  postgresqlPublicPort Int?
+  graphQLAdminPassword String
+  service              Service  @relation(fields: [serviceId], references: [id])
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Fider {
+  id                      String   @id @default(cuid())
+  serviceId               String   @unique
+  postgresqlUser          String
+  postgresqlPassword      String
+  postgresqlDatabase      String
+  postgresqlPublicPort    Int?
+  jwtSecret               String
+  emailNoreply            String?
+  emailMailgunApiKey      String?
+  emailMailgunDomain      String?
+  emailMailgunRegion      String   @default("EU")
+  emailSmtpHost           String?
+  emailSmtpPort           Int?
+  emailSmtpUser           String?
+  emailSmtpPassword       String?
+  emailSmtpEnableStartTls Boolean  @default(false)
+  service                 Service  @relation(fields: [serviceId], references: [id])
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 }

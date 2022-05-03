@@ -98,12 +98,12 @@
 	}
 </script>
 
-<div class="flex items-center space-x-2 p-5 px-6 font-bold">
+<div class="flex h-20 items-center space-x-2 p-5 px-6 font-bold">
 	<div class="-mb-5 flex-col">
 		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
 			Application Logs
 		</div>
-		<span class="text-xs">{application.name} </span>
+		<span class="text-xs">{application.name}</span>
 	</div>
 
 	{#if application.fqdn}

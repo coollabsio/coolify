@@ -1,7 +1,7 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
-import { ErrorHandler } from '$lib/database';
+import { ErrorHandler, generatePassword } from '$lib/database';
 
 export const get: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -34,6 +34,30 @@ export const post: RequestHandler = async (event) => {
 
 	try {
 		await db.configureBuildPack({ id, buildPack });
+
+		// Generate default secrets
+		if (buildPack === 'laravel') {
+			let found = await db.isSecretExists({ id, name: 'APP_ENV', isPRMRSecret: false });
+			if (!found) {
+				await db.createSecret({
+					id,
+					name: 'APP_ENV',
+					value: 'production',
+					isBuildSecret: false,
+					isPRMRSecret: false
+				});
+			}
+			found = await db.isSecretExists({ id, name: 'APP_KEY', isPRMRSecret: false });
+			if (!found) {
+				await db.createSecret({
+					id,
+					name: 'APP_KEY',
+					value: generatePassword(32),
+					isBuildSecret: false,
+					isPRMRSecret: false
+				});
+			}
+		}
 		return { status: 201 };
 	} catch (error) {
 		return ErrorHandler(error);

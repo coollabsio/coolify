@@ -270,6 +270,38 @@
 				</button></a
 			>
 			<div class="border border-stone-700 h-8" />
+			<a
+				href={isRunning ? `/services/${id}/logs` : null}
+				sveltekit:prefetch
+				class="hover:text-pink-500 rounded"
+				class:text-pink-500={$page.url.pathname === `/services/${id}/logs`}
+				class:bg-coolgray-500={$page.url.pathname === `/services/${id}/logs`}
+			>
+				<button
+					title={$t('service.logs')}
+					disabled={!isRunning}
+					class="icons bg-transparent tooltip-bottom text-sm"
+					data-tooltip={$t('service.logs')}
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-6 w-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
+						<path d="M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
+						<line x1="3" y1="6" x2="3" y2="19" />
+						<line x1="12" y1="6" x2="12" y2="19" />
+						<line x1="21" y1="6" x2="21" y2="19" />
+					</svg></button
+				></a
+			>
 		{/if}
 		<button
 			on:click={deleteService}

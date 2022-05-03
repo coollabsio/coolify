@@ -19,7 +19,7 @@ export const staticDeployments = [
 	'astro',
 	'eleventy'
 ];
-export const notNodeDeployments = ['php', 'docker', 'rust', 'python', 'deno'];
+export const notNodeDeployments = ['php', 'docker', 'rust', 'python', 'deno', 'laravel'];
 
 export function getDomain(domain) {
 	return domain?.replace('https://', '').replace('http://', '');
@@ -188,6 +188,28 @@ export const supportedServiceTypesAndVersions = [
 		images: ['postgres:12-alpine'],
 		versions: ['postgresql-latest'],
 		recommendedVersion: 'postgresql-latest',
+		ports: {
+			main: 3000
+		}
+	},
+	{
+		name: 'hasura',
+		fancyName: 'Hasura',
+		baseImage: 'hasura/graphql-engine',
+		images: ['postgres:12-alpine'],
+		versions: ['latest', 'v2.5.1'],
+		recommendedVersion: 'v2.5.1',
+		ports: {
+			main: 8080
+		}
+	},
+	{
+		name: 'fider',
+		fancyName: 'Fider',
+		baseImage: 'getfider/fider',
+		images: ['postgres:12-alpine'],
+		versions: ['stable'],
+		recommendedVersion: 'stable',
 		ports: {
 			main: 3000
 		}

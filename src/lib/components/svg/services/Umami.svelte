@@ -5,8 +5,6 @@
 <svg
 	version="1.0"
 	xmlns="http://www.w3.org/2000/svg"
-	width="856.000000pt"
-	height="856.000000pt"
 	viewBox="0 0 856.000000 856.000000"
 	preserveAspectRatio="xMidYMid meet"
 	class={isAbsolute ? 'w-10 h-10 absolute top-0 left-0 -m-5' : 'w-8 mx-auto'}
