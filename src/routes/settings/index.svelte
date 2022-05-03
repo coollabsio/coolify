@@ -111,6 +111,14 @@
 			loading.save = false;
 		}
 	}
+	async function renewCerts() {
+		try {
+			toast.push('Renewing certificates...');
+			return await post(`/settings/renew.json`, {});
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -218,6 +226,19 @@
 							description={$t('setting.auto_update_enabled_explainer')}
 							on:click={() => changeSettings('isAutoUpdateEnabled')}
 						/>
+					</div>
+					<div class="grid grid-cols-2 items-center">
+						<div class="flex flex-col">
+							<div class="pt-2 text-base font-bold text-stone-100">
+								Renew SSL Certificates manually
+							</div>
+							<Explainer text="It will check and renew certificates manually" />
+						</div>
+						<div class="mx-auto ">
+							<button class="w-32 bg-coollabs hover:bg-coollabs-100" on:click={renewCerts}
+								>SSL renew manually</button
+							>
+						</div>
 					</div>
 				{/if}
 			</div>

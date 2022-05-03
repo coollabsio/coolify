@@ -2,6 +2,7 @@ import { dev } from '$app/env';
 import { asyncExecShell, version } from '$lib/common';
 import { asyncSleep } from '$lib/components/common';
 import { ErrorHandler } from '$lib/database';
+import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import compare from 'compare-versions';
 import got from 'got';
@@ -36,8 +37,12 @@ export const post: RequestHandler = async (event) => {
 	if (type === 'update') {
 		try {
 			if (!dev) {
+				const { isAutoUpdateEnabled } = await db.prisma.setting.findFirst();
 				await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
 				await asyncExecShell(`env | grep COOLIFY > .env`);
+				await asyncExecShell(
+					`sed -i '/COOLIFY_AUTO_UPDATE=/c\COOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env`
+				);
 				await asyncExecShell(
 					`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify coolify-redis && docker rm coolify coolify-redis && docker compose up -d --force-recreate"`
 				);
