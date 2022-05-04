@@ -1,9 +1,8 @@
 name: release-coolify
 
 on:
-  push:
-    branches:
-      - 'gh-actions'
+  release:
+    types: published
 
 jobs:
   make-it-coolifyed:
