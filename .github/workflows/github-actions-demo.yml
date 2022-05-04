@@ -3,7 +3,7 @@ name: push-new-image
 on:
   push:
     branches:
-      - 'main'
+      - 'gh-actions'
 
 jobs:
   docker:
