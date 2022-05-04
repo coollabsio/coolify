@@ -25,9 +25,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
        - 
-        name: Read package.json version
-        uses: dutscher/read-package-json-endpoint-actions@v1.3.37
-        id: packagejson
+         name: Get current package version
+         uses: martinbeentjes/npm-get-version-action@v1.2.3
        -
         name: Build and push
         uses: docker/build-push-action@v2
@@ -35,6 +34,6 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: coollabsio/coolify-test:latest,coollabsio/coolify-test:${{ steps.packagejson.outputs.version }}
+          tags: coollabsio/coolify-test:latest,coollabsio/coolify-test:${{ steps.package-version.outputs.current-version }}
           cache-from: type=registry,ref=coollabsio/coolify-test:buildcache
           cache-to: type=registry,ref=coollabsio/coolify-test:buildcache,mode=max
