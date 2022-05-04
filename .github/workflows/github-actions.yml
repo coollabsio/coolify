@@ -6,7 +6,7 @@ on:
       - 'gh-actions'
 
 jobs:
-  build:
+  make-it-coolifyed:
     runs-on: ubuntu-latest
     steps:
        -
