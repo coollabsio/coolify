@@ -6,7 +6,7 @@ on:
       - 'gh-actions'
 
 jobs:
-  docker:
+  build:
     runs-on: ubuntu-latest
     steps:
        -
