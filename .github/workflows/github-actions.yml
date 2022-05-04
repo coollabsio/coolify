@@ -24,6 +24,20 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+       - 
+        name: Cache pnpm modules
+        uses: actions/cache@v2
+        with:
+           path: ~/.pnpm-store
+           key: ${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+           restore-keys: |
+             ${{ runner.os }}-
+
+       - 
+         uses: pnpm/action-setup@v2.1.0
+         with:
+            version: 7.0.0
+            run_install: false
        -
         name: Build and push
         uses: docker/build-push-action@v2
