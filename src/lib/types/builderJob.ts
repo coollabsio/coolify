@@ -12,6 +12,7 @@ export type BuilderJob = {
 	buildPack: BuildPackName;
 	projectId: number;
 	port: number;
+	exposePort?: number;
 	installCommand: string;
 	buildCommand?: string;
 	startCommand?: string;

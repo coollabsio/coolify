@@ -62,6 +62,7 @@
 	let previews = application.settings.previews;
 	let dualCerts = application.settings.dualCerts;
 	let autodeploy = application.settings.autodeploy;
+	let showExposePort = application.exposePort !== null;
 
 	let wsgis = [
 		{
@@ -127,7 +128,11 @@
 	async function handleSubmit() {
 		loading = true;
 		try {
-			await post(`/applications/${id}/check.json`, { fqdn: application.fqdn, forceSave });
+			await post(`/applications/${id}/check.json`, {
+				fqdn: application.fqdn,
+				forceSave,
+				exposePort: application.exposePort
+			});
 			await post(`/applications/${id}.json`, { ...application });
 			$disabledButton = false;
 			return toast.push('Configurations saved.');
@@ -392,7 +397,6 @@
 					bind:value={application.fqdn}
 					pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 					placeholder="eg: https://coollabs.io"
-					required
 				/>
 			</div>
 			<div class="grid grid-cols-2 items-center pb-8">
@@ -451,7 +455,33 @@
 					/>
 				</div>
 			{/if}
+			{#if !staticDeployments.includes(application.buildPack)}
+				<div class="grid grid-cols-2 items-center">
+					<Setting
+						isCenter={false}
+						bind:setting={showExposePort}
+						on:click={() => {
+							showExposePort = !showExposePort;
+							application.exposePort = undefined;
+						}}
+						title={$t('application.expose_a_port')}
+						description="Expose a port to the host system"
+					/>
+				</div>
 
+				{#if showExposePort}
+					<div class="grid grid-cols-2 items-center">
+						<label for="exposePort" class="text-base font-bold text-stone-100">Expose Port</label>
+						<input
+							readonly={!$session.isAdmin}
+							name="exposePort"
+							id="exposePort"
+							bind:value={application.exposePort}
+							placeholder="12345"
+						/>
+					</div>
+				{/if}
+			{/if}
 			{#if !notNodeDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-2 items-center">
 					<label for="installCommand" class="text-base font-bold text-stone-100"

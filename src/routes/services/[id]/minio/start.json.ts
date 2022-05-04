@@ -7,6 +7,7 @@ import { startHttpProxy } from '$lib/haproxy';
 import { ErrorHandler, getFreePort, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 import type { ComposeFile } from '$lib/types/composeFile';
+import { getServiceMainPort } from '$lib/components/common';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -22,12 +23,14 @@ export const post: RequestHandler = async (event) => {
 			fqdn,
 			destinationDockerId,
 			destinationDocker,
+			exposePort,
 			minio: { rootUser, rootUserPassword },
 			serviceSecret
 		} = service;
 
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
+		const port = getServiceMainPort('minio');
 
 		const publicPort = await getFreePort();
 
@@ -62,6 +65,7 @@ export const post: RequestHandler = async (event) => {
 					networks: [network],
 					volumes: [config.volume],
 					restart: 'always',
+					...(exposePort && { ports: [`${port}:${port}`] }),
 					labels: makeLabelForServices('minio'),
 					deploy: {
 						restart_policy: {

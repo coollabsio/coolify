@@ -4,6 +4,7 @@ import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import { promises as dns } from 'dns';
+import getPort from 'get-port';
 import { t } from '$lib/translations';
 
 export const post: RequestHandler = async (event) => {
@@ -11,7 +12,7 @@ export const post: RequestHandler = async (event) => {
 	if (status === 401) return { status, body };
 
 	const { id } = event.params;
-	let { fqdn, forceSave } = await event.request.json();
+	let { exposePort, fqdn, forceSave } = await event.request.json();
 	fqdn = fqdn.toLowerCase();
 
 	try {
@@ -43,6 +44,16 @@ export const post: RequestHandler = async (event) => {
 					};
 				}
 			}
+		}
+
+		if (exposePort) {
+			exposePort = Number(exposePort);
+
+			if (exposePort < 1024 || exposePort > 65535) {
+				throw { message: `Expose Port needs to be between 1024 and 65535` };
+			}
+
+			const publicPort = await getPort({ port: exposePort });
 		}
 
 		return {

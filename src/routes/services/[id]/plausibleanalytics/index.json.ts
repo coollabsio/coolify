@@ -11,14 +11,16 @@ export const post: RequestHandler = async (event) => {
 	let {
 		name,
 		fqdn,
+		exposePort,
 		plausibleAnalytics: { email, username }
 	} = await event.request.json();
 
 	if (fqdn) fqdn = fqdn.toLowerCase();
 	if (email) email = email.toLowerCase();
+	if (exposePort) exposePort = Number(exposePort);
 
 	try {
-		await db.updatePlausibleAnalyticsService({ id, fqdn, name, email, username });
+		await db.updatePlausibleAnalyticsService({ id, fqdn, name, email, username, exposePort });
 		return { status: 201 };
 	} catch (error) {
 		return ErrorHandler(error);
