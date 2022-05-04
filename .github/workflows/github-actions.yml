@@ -27,6 +27,7 @@ jobs:
        - 
          name: Get current package version
          uses: martinbeentjes/npm-get-version-action@v1.2.3
+         id: package-version
        -
         name: Build and push
         uses: docker/build-push-action@v2
@@ -34,6 +35,6 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: coollabsio/coolify-test:latest,coollabsio/coolify-test:${{ steps.package-version.outputs.current-version }}
+          tags: coollabsio/coolify-test:latest,coollabsio/coolify-test:${{steps.package-version.outputs.current-version}}
           cache-from: type=registry,ref=coollabsio/coolify-test:buildcache
           cache-to: type=registry,ref=coollabsio/coolify-test:buildcache,mode=max
