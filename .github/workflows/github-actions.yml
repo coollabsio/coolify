@@ -35,6 +35,6 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: coollabsio/coolify-test:latest,coollabsio/coolify-test:${{ steps.packagejson.version }}
+          tags: coollabsio/coolify-test:latest,coollabsio/coolify-test:${{ steps.packagejson.outputs.version }}
           cache-from: type=registry,ref=coollabsio/coolify-test:buildcache
           cache-to: type=registry,ref=coollabsio/coolify-test:buildcache,mode=max
