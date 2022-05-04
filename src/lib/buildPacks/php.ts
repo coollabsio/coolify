@@ -2,7 +2,7 @@ import { buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
 
 const createDockerfile = async (data, image, htaccessFound): Promise<void> => {
-	const { workdir, baseDirectory, buildId } = data;
+	const { workdir, baseDirectory, buildId, port } = data;
 	const Dockerfile: Array<string> = [];
 	let composerFound = false;
 	try {
@@ -22,7 +22,7 @@ const createDockerfile = async (data, image, htaccessFound): Promise<void> => {
 	}
 
 	Dockerfile.push(`COPY /entrypoint.sh /opt/docker/provision/entrypoint.d/30-entrypoint.sh`);
-	Dockerfile.push(`EXPOSE 80`);
+	Dockerfile.push(`EXPOSE ${port}`);
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };
 

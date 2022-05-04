@@ -62,7 +62,6 @@
 	let previews = application.settings.previews;
 	let dualCerts = application.settings.dualCerts;
 	let autodeploy = application.settings.autodeploy;
-	let showExposePort = application.exposePort !== null;
 
 	let wsgis = [
 		{
@@ -455,35 +454,23 @@
 					/>
 				</div>
 			{/if}
-			{#if !staticDeployments.includes(application.buildPack)}
+			{#if application.buildPack !== 'docker'}
 				<div class="grid grid-cols-2 items-center">
-					<Setting
-						isCenter={false}
-						bind:setting={showExposePort}
-						on:click={() => {
-							showExposePort = !showExposePort;
-							application.exposePort = undefined;
-						}}
-						title={$t('application.expose_a_port')}
-						description="Expose a port to the host system"
+					<label for="exposePort" class="text-base font-bold text-stone-100">Exposed Port</label>
+					<input
+						readonly={!$session.isAdmin}
+						name="exposePort"
+						id="exposePort"
+						bind:value={application.exposePort}
+						placeholder="12345"
+					/>
+					<Explainer
+						text={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
 					/>
 				</div>
-
-				{#if showExposePort}
-					<div class="grid grid-cols-2 items-center">
-						<label for="exposePort" class="text-base font-bold text-stone-100">Expose Port</label>
-						<input
-							readonly={!$session.isAdmin}
-							name="exposePort"
-							id="exposePort"
-							bind:value={application.exposePort}
-							placeholder="12345"
-						/>
-					</div>
-				{/if}
 			{/if}
 			{#if !notNodeDeployments.includes(application.buildPack)}
-				<div class="grid grid-cols-2 items-center">
+				<div class="grid grid-cols-2 items-center pt-4">
 					<label for="installCommand" class="text-base font-bold text-stone-100"
 						>{$t('application.install_command')}</label
 					>
@@ -521,7 +508,7 @@
 				</div>
 			{/if}
 			{#if application.buildPack === 'docker'}
-				<div class="grid grid-cols-2 items-center">
+				<div class="grid grid-cols-2 items-center pt-4">
 					<label for="dockerFileLocation" class="text-base font-bold text-stone-100"
 						>Dockerfile Location</label
 					>
