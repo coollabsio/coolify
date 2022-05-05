@@ -11,6 +11,7 @@
 
 	import MySql from './_MySQL.svelte';
 	import MongoDb from './_MongoDB.svelte';
+	import MariaDb from './_MariaDB.svelte';
 	import PostgreSql from './_PostgreSQL.svelte';
 	import Redis from './_Redis.svelte';
 	import CouchDb from './_CouchDb.svelte';
@@ -190,6 +191,8 @@
 				<PostgreSql bind:database {isRunning} />
 			{:else if database.type === 'mongodb'}
 				<MongoDb bind:database {isRunning} />
+			{:else if database.type === 'mariadb'}
+				<MariaDb bind:database {isRunning} />
 			{:else if database.type === 'redis'}
 				<Redis bind:database {isRunning} />
 			{:else if database.type === 'couchdb'}
