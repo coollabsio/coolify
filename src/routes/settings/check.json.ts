@@ -45,11 +45,21 @@ export const post: RequestHandler = async (event) => {
 								resolves = await dns.resolve4(event.url.hostname);
 							}
 							console.log({ resolves });
-							if (resolves.includes(ipDomain) || resolves.includes(ipDomainDualCert)) {
-								console.log('OK');
-							} else {
-								throw false;
+							for (const ip of ipDomain) {
+								if (resolves.includes(ip)) {
+									return {
+										status: 200
+									};
+								}
 							}
+							for (const ip of ipDomainDualCert) {
+								if (resolves.includes(ip)) {
+									return {
+										status: 200
+									};
+								}
+							}
+							throw false;
 						} else {
 							throw false;
 						}
@@ -70,11 +80,14 @@ export const post: RequestHandler = async (event) => {
 							resolves = await dns.resolve4(event.url.hostname);
 						}
 						console.log({ resolves });
-						if (resolves.includes(ipDomain)) {
-							console.log('OK');
-						} else {
-							throw false;
+						for (const ip of ipDomain) {
+							if (resolves.includes(ip)) {
+								return {
+									status: 200
+								};
+							}
 						}
+						throw false;
 					} catch (error) {
 						console.log(error);
 						throw {
