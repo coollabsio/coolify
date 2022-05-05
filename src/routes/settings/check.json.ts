@@ -34,6 +34,7 @@ export const post: RequestHandler = async (event) => {
 						const ipDomain = await dns.resolve4(domain);
 						const ipDomainDualCert = await dns.resolve4(domainDualCert);
 						console.log({ ipDomain, ipDomainDualCert });
+						// TODO: Check if ipDomain and ipDomainDualCert are the same, but not like this
 						if (
 							ipDomain.length === ipDomainDualCert.length &&
 							ipDomain.every((v) => ipDomainDualCert.indexOf(v) >= 0)
