@@ -292,26 +292,28 @@ export async function generateSSLCerts(): Promise<void> {
 }
 
 export async function renewSSLCerts(): Promise<void> {
-	const host = 'unix:///var/run/docker.sock';
-	await asyncExecShell(`docker pull alpine:latest`);
-	const certbotImage =
-		process.arch === 'x64' ? 'certbot/certbot' : 'certbot/certbot:arm64v8-latest';
+	if (!dev) {
+		const host = 'unix:///var/run/docker.sock';
+		await asyncExecShell(`docker pull alpine:latest`);
+		const certbotImage =
+			process.arch === 'x64' ? 'certbot/certbot' : 'certbot/certbot:arm64v8-latest';
 
-	const { stdout: certificates } = await asyncExecShell(
-		`DOCKER_HOST=${host} docker run --rm -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" alpine:latest sh -c "ls -1 /etc/letsencrypt/live/ | grep -v README"`
-	);
+		const { stdout: certificates } = await asyncExecShell(
+			`DOCKER_HOST=${host} docker run --rm -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" alpine:latest sh -c "ls -1 /etc/letsencrypt/live/ | grep -v README"`
+		);
 
-	for (const certificate of certificates.trim().split('\n')) {
-		try {
-			await asyncExecShell(
-				`DOCKER_HOST=${host} docker run --rm --name certbot-renewal -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" ${certbotImage} --cert-name ${certificate} --logs-dir /etc/letsencrypt/logs renew --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080`
-			);
-			await asyncExecShell(
-				`DOCKER_HOST=${host} docker run --rm -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" alpine:latest sh -c "test -d /etc/letsencrypt/live/${certificate}/ && cat /etc/letsencrypt/live/${certificate}/fullchain.pem /etc/letsencrypt/live/${certificate}/privkey.pem > /app/ssl/${certificate}.pem"`
-			);
-		} catch (error) {
-			console.log(error);
+		for (const certificate of certificates.trim().split('\n')) {
+			try {
+				await asyncExecShell(
+					`DOCKER_HOST=${host} docker run --rm --name certbot-renewal -p 9080:9080 -v "coolify-letsencrypt:/etc/letsencrypt" ${certbotImage} --cert-name ${certificate} --logs-dir /etc/letsencrypt/logs renew --standalone --preferred-challenges http --http-01-address 0.0.0.0 --http-01-port 9080`
+				);
+				await asyncExecShell(
+					`DOCKER_HOST=${host} docker run --rm -v "coolify-letsencrypt:/etc/letsencrypt" -v "coolify-ssl-certs:/app/ssl" alpine:latest sh -c "test -d /etc/letsencrypt/live/${certificate}/ && cat /etc/letsencrypt/live/${certificate}/fullchain.pem /etc/letsencrypt/live/${certificate}/privkey.pem > /app/ssl/${certificate}.pem"`
+				);
+			} catch (error) {
+				console.log(error);
+			}
 		}
+		await reloadHaproxy('unix:///var/run/docker.sock');
 	}
-	await reloadHaproxy('unix:///var/run/docker.sock');
 }
