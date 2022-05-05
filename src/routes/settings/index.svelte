@@ -47,6 +47,7 @@
 	let minPort = settings.minPort;
 	let maxPort = settings.maxPort;
 
+	let forceSave = false;
 	let fqdn = settings.fqdn;
 	let isFqdnSet = !!settings.fqdn;
 	let loading = {
@@ -96,7 +97,7 @@
 		try {
 			loading.save = true;
 			if (fqdn !== settings.fqdn) {
-				await post(`/settings/check.json`, { fqdn });
+				await post(`/settings/check.json`, { fqdn, forceSave, dualCerts, isDNSCheckEnabled });
 				await post(`/settings.json`, { fqdn });
 				return window.location.reload();
 			}
@@ -106,6 +107,9 @@
 				settings.maxPort = maxPort;
 			}
 		} catch ({ error }) {
+			if (error?.startsWith($t('application.dns_not_set_partial_error'))) {
+				forceSave = true;
+			}
 			return errorNotification(error);
 		} finally {
 			loading.save = false;
@@ -131,11 +135,18 @@
 				<div class="title font-bold">{$t('index.global_settings')}</div>
 				<button
 					type="submit"
+					class:bg-green-600={!loading.save}
+					class:bg-orange-600={forceSave}
+					class:hover:bg-green-500={!loading.save}
+					class:hover:bg-orange-400={forceSave}
 					disabled={loading.save}
-					class:bg-yellow-500={!loading.save}
-					class:hover:bg-yellow-400={!loading.save}
-					class="mx-2 ">{loading.save ? $t('forms.saving') : $t('forms.save')}</button
+					>{loading.save
+						? $t('forms.saving')
+						: forceSave
+						? $t('forms.confirm_continue')
+						: $t('forms.save')}</button
 				>
+
 				{#if isFqdnSet}
 					<button
 						on:click|preventDefault={removeFqdn}

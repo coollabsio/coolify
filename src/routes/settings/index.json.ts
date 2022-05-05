@@ -1,3 +1,4 @@
+import { dev } from '$app/env';
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { listSettings, ErrorHandler } from '$lib/database';
@@ -71,7 +72,8 @@ export const post: RequestHandler = async (event) => {
 		minPort,
 		maxPort,
 		isAutoUpdateEnabled,
-		isDNSCheckEnabled
+		isDNSCheckEnabled,
+		forceSave
 	} = await event.request.json();
 	try {
 		const { id } = await db.listSettings();
