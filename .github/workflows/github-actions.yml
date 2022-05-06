@@ -3,7 +3,7 @@ name: release-coolify
 on:
   push:
     branches:    
-      - 'main'
+      - main
 
 jobs:
   make-it-coolifyed:
@@ -12,8 +12,6 @@ jobs:
        -
         name: Checkout
         uses: actions/checkout@v2
-        with:
-          path: main
        - 
         name: Set up QEMU
         uses: docker/setup-qemu-action@v1
