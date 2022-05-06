@@ -37,6 +37,7 @@
 	import Clickhouse from '$lib/components/svg/databases/Clickhouse.svelte';
 	import CouchDB from '$lib/components/svg/databases/CouchDB.svelte';
 	import MongoDB from '$lib/components/svg/databases/MongoDB.svelte';
+	import MariaDB from '$lib/components/svg/databases/MariaDB.svelte';
 	import MySQL from '$lib/components/svg/databases/MySQL.svelte';
 	import PostgreSQL from '$lib/components/svg/databases/PostgreSQL.svelte';
 	import Redis from '$lib/components/svg/databases/Redis.svelte';
@@ -68,6 +69,8 @@
 						<CouchDB isAbsolute />
 					{:else if type.name === 'mongodb'}
 						<MongoDB isAbsolute />
+					{:else if type.name === 'mariadb'}
+						<MariaDB isAbsolute />
 					{:else if type.name === 'mysql'}
 						<MySQL isAbsolute />
 					{:else if type.name === 'postgresql'}

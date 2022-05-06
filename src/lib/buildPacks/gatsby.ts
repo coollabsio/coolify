@@ -2,7 +2,7 @@ import { buildCacheImageWithNode, buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
 
 const createDockerfile = async (data, imageforBuild): Promise<void> => {
-	const { applicationId, tag, workdir, publishDirectory, baseImage, buildId } = data;
+	const { applicationId, tag, workdir, publishDirectory, baseImage, buildId, port } = data;
 	const Dockerfile: Array<string> = [];
 
 	Dockerfile.push(`FROM ${imageforBuild}`);
@@ -12,7 +12,7 @@ const createDockerfile = async (data, imageforBuild): Promise<void> => {
 	if (baseImage.includes('nginx')) {
 		Dockerfile.push(`COPY /nginx.conf /etc/nginx/nginx.conf`);
 	}
-	Dockerfile.push(`EXPOSE 80`);
+	Dockerfile.push(`EXPOSE ${port}`);
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };
 

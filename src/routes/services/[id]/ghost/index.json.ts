@@ -11,11 +11,12 @@ export const post: RequestHandler = async (event) => {
 	let {
 		name,
 		fqdn,
+		exposePort,
 		ghost: { mariadbDatabase }
 	} = await event.request.json();
 	if (fqdn) fqdn = fqdn.toLowerCase();
 	try {
-		await db.updateGhostService({ id, fqdn, name, mariadbDatabase });
+		await db.updateGhostService({ id, fqdn, name, exposePort, mariadbDatabase });
 		return { status: 201 };
 	} catch (error) {
 		return ErrorHandler(error);

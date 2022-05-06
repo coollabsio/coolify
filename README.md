@@ -55,7 +55,6 @@ These are the predefined build packs, but with the Docker build pack, you can ho
 - NuxtJS
 - NextJS
 - React/Preact
-- NextJS
 - Gatsby
 - Svelte
 - PHP
@@ -68,6 +67,7 @@ These are the predefined build packs, but with the Docker build pack, you can ho
 One-click database is ready to be used internally or shared over the internet:
 
 - MongoDB
+- MariaDB
 - MySQL
 - PostgreSQL
 - CouchDB

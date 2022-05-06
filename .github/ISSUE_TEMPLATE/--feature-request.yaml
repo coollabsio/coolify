@@ -1,0 +1,31 @@
+name: 🛠️ Feature request
+description: Suggest an idea to improve coolify
+title: '[Feature]: '
+labels: [Enhancement]
+assignees:
+  - andrasbacsai
+  - vasani-arpit
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to request a feature for coolify! Please also add your request here to get feedback from the community: https://feedback.coolify.io/!
+  - type: checkboxes
+    attributes:
+      label: Is there an existing issue for this?
+      description: Please search to see if an issue related to this feature request already exists.
+      options:
+        - label: I have searched the existing issues
+          required: true
+  - type: textarea
+    attributes:
+      label: Summary
+      description: One paragraph description of the feature.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Why should this be worked on?
+      description: A concise description of the problems or use cases for this feature request.
+    validations:
+      required: true

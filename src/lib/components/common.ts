@@ -53,6 +53,12 @@ export const supportedDatabaseTypesAndVersions = [
 	},
 	{ name: 'mysql', fancyName: 'MySQL', baseImage: 'bitnami/mysql', versions: ['8.0', '5.7'] },
 	{
+		name: 'mariadb',
+		fancyName: 'MariaDB',
+		baseImage: 'bitnami/mariadb',
+		versions: ['10.7', '10.6', '10.5', '10.4', '10.3', '10.2']
+	},
+	{
 		name: 'postgresql',
 		fancyName: 'PostgreSQL',
 		baseImage: 'bitnami/postgresql',
@@ -215,3 +221,11 @@ export const supportedServiceTypesAndVersions = [
 		}
 	}
 ];
+
+export const getServiceMainPort = (service: string) => {
+	const serviceType = supportedServiceTypesAndVersions.find((s) => s.name === service);
+	if (serviceType) {
+		return serviceType.ports.main;
+	}
+	return null;
+};

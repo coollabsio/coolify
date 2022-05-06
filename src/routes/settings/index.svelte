@@ -31,7 +31,7 @@
 	import Setting from '$lib/components/Setting.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
-	import { del, post } from '$lib/api';
+	import { del, get, post } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { browser } from '$app/env';
 	import { getDomain } from '$lib/components/common';
@@ -47,7 +47,11 @@
 	let minPort = settings.minPort;
 	let maxPort = settings.maxPort;
 
+	let forceSave = false;
 	let fqdn = settings.fqdn;
+	let nonWWWDomain = fqdn && getDomain(fqdn).replace(/^www\./, '');
+	let isNonWWWDomainOK = false;
+	let isWWWDomainOK = false;
 	let isFqdnSet = !!settings.fqdn;
 	let loading = {
 		save: false,
@@ -69,6 +73,7 @@
 	}
 	async function changeSettings(name) {
 		try {
+			resetView();
 			if (name === 'isRegistrationEnabled') {
 				isRegistrationEnabled = !isRegistrationEnabled;
 			}
@@ -95,8 +100,10 @@
 	async function handleSubmit() {
 		try {
 			loading.save = true;
+			nonWWWDomain = fqdn && getDomain(fqdn).replace(/^www\./, '');
+
 			if (fqdn !== settings.fqdn) {
-				await post(`/settings/check.json`, { fqdn });
+				await post(`/settings/check.json`, { fqdn, forceSave, dualCerts, isDNSCheckEnabled });
 				await post(`/settings.json`, { fqdn });
 				return window.location.reload();
 			}
@@ -105,7 +112,22 @@
 				settings.minPort = minPort;
 				settings.maxPort = maxPort;
 			}
+			forceSave = false;
 		} catch ({ error }) {
+			if (error?.startsWith($t('application.dns_not_set_partial_error'))) {
+				forceSave = true;
+				if (dualCerts) {
+					isNonWWWDomainOK = await isDNSValid(getDomain(nonWWWDomain), false);
+					isWWWDomainOK = await isDNSValid(getDomain(`www.${nonWWWDomain}`), true);
+				} else {
+					const isWWW = getDomain(settings.fqdn).includes('www.');
+					if (isWWW) {
+						isWWWDomainOK = await isDNSValid(getDomain(`www.${nonWWWDomain}`), true);
+					} else {
+						isNonWWWDomainOK = await isDNSValid(getDomain(nonWWWDomain), false);
+					}
+				}
+			}
 			return errorNotification(error);
 		} finally {
 			loading.save = false;
@@ -119,6 +141,21 @@
 			return errorNotification(error);
 		}
 	}
+	async function isDNSValid(domain, isWWW) {
+		try {
+			await get(`/settings/check.json?domain=${domain}`);
+			toast.push('DNS configuration is valid.');
+			isWWW ? (isWWWDomainOK = true) : (isNonWWWDomainOK = true);
+			return true;
+		} catch ({ error }) {
+			errorNotification(error);
+			isWWW ? (isWWWDomainOK = false) : (isNonWWWDomainOK = false);
+			return false;
+		}
+	}
+	function resetView() {
+		forceSave = false;
+	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -131,11 +168,18 @@
 				<div class="title font-bold">{$t('index.global_settings')}</div>
 				<button
 					type="submit"
+					class:bg-green-600={!loading.save}
+					class:bg-orange-600={forceSave}
+					class:hover:bg-green-500={!loading.save}
+					class:hover:bg-orange-400={forceSave}
 					disabled={loading.save}
-					class:bg-yellow-500={!loading.save}
-					class:hover:bg-yellow-400={!loading.save}
-					class="mx-2 ">{loading.save ? $t('forms.saving') : $t('forms.save')}</button
+					>{loading.save
+						? $t('forms.saving')
+						: forceSave
+						? $t('forms.confirm_continue')
+						: $t('forms.save')}</button
 				>
+
 				{#if isFqdnSet}
 					<button
 						on:click|preventDefault={removeFqdn}
@@ -160,11 +204,47 @@
 							bind:value={fqdn}
 							readonly={!$session.isAdmin || isFqdnSet}
 							disabled={!$session.isAdmin || isFqdnSet}
+							on:input={resetView}
 							name="fqdn"
 							id="fqdn"
 							pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 							placeholder="{$t('forms.eg')}: https://coolify.io"
 						/>
+
+						{#if forceSave}
+							<div class="flex-col space-y-2 pt-4 text-center">
+								{#if isNonWWWDomainOK}
+									<button
+										class="bg-green-600 hover:bg-green-500"
+										on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+										>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
+									>
+								{:else}
+									<button
+										class="bg-red-600 hover:bg-red-500"
+										on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+										>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
+									>
+								{/if}
+								{#if dualCerts}
+									{#if isWWWDomainOK}
+										<button
+											class="bg-green-600 hover:bg-green-500"
+											on:click|preventDefault={() =>
+												isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+											>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
+										>
+									{:else}
+										<button
+											class="bg-red-600 hover:bg-red-500"
+											on:click|preventDefault={() =>
+												isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+											>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
+										>
+									{/if}
+								{/if}
+							</div>
+						{/if}
 					</div>
 				</div>
 				<div class="grid grid-cols-2 items-start py-6">

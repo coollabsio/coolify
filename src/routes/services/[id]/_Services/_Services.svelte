@@ -27,6 +27,7 @@
 	let loading = false;
 	let loadingVerification = false;
 	let dualCerts = service.dualCerts;
+	let showExposePort = service.exposePort !== null;
 
 	async function handleSubmit() {
 		loading = true;
@@ -160,6 +161,32 @@
 					on:click={() => !isRunning && changeSettings('dualCerts')}
 				/>
 			</div>
+			<div class="grid grid-cols-2 items-center">
+				<Setting
+					isCenter={false}
+					bind:setting={showExposePort}
+					on:click={() => {
+						showExposePort = !showExposePort;
+						service.exposePort = undefined;
+					}}
+					title={$t('application.expose_a_port')}
+					description="Expose a port to the host system"
+				/>
+			</div>
+
+			{#if showExposePort}
+				<div class="grid grid-cols-2 items-center">
+					<label for="exposePort" class="text-base font-bold text-stone-100">Expose Port</label>
+					<input
+						readonly={!$session.isAdmin}
+						name="exposePort"
+						id="exposePort"
+						bind:value={service.exposePort}
+						placeholder="12345"
+					/>
+				</div>
+			{/if}
+
 			{#if service.type === 'plausibleanalytics'}
 				<PlausibleAnalytics bind:service {readOnly} />
 			{:else if service.type === 'minio'}

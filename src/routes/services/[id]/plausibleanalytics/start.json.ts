@@ -6,6 +6,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { ErrorHandler, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 import type { ComposeFile } from '$lib/types/composeFile';
+import { getServiceMainPort } from '$lib/components/common';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -22,6 +23,7 @@ export const post: RequestHandler = async (event) => {
 			destinationDockerId,
 			destinationDocker,
 			serviceSecret,
+			exposePort,
 			plausibleAnalytics: {
 				id: plausibleDbId,
 				username,
@@ -78,6 +80,7 @@ export const post: RequestHandler = async (event) => {
 		}
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
+		const port = getServiceMainPort('plausibleanalytics');
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 
@@ -132,6 +135,7 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 					networks: [network],
 					environment: config.plausibleAnalytics.environmentVariables,
 					restart: 'always',
+					...(exposePort && { ports: [`${port}:${exposePort}`] }),
 					depends_on: [`${id}-postgresql`, `${id}-clickhouse`],
 					labels: makeLabelForServices('plausibleAnalytics'),
 					deploy: {

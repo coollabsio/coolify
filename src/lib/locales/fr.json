@@ -61,6 +61,7 @@
 		"enable_debug_log_during_build": "Activez les journaux de débogage pendant la phase de build.<br><span class='text-red-500 font-bold'>Les informations sensibles</span> peuvent être visibles et enregistrées dans les journaux.",
 		"enable_mr_pr_previews": "Activer les aperçus MR/PR",
 		"enable_preview_deploy_mr_pr_requests": "Activez les déploiements de prévisualisation à partir de demandes d'extraction ou de fusion.",
+		"expose_a_port": "Exposer un port",
 		"features": "Caractéristiques",
 		"git_repository": "Dépôt Git",
 		"git_source": "Source Git",

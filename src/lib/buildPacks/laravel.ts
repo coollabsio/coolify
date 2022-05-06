@@ -2,7 +2,7 @@ import { buildCacheImageForLaravel, buildImage } from '$lib/docker';
 import { promises as fs } from 'fs';
 
 const createDockerfile = async (data, image): Promise<void> => {
-	const { workdir, applicationId, tag, buildId } = data;
+	const { workdir, applicationId, tag, buildId, port } = data;
 	const Dockerfile: Array<string> = [];
 
 	Dockerfile.push(`FROM ${image}`);
@@ -24,7 +24,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 		`COPY --chown=application:application --from=${applicationId}:${tag}-cache /app/mix-manifest.json /app/public/mix-manifest.json`
 	);
 	Dockerfile.push(`COPY --chown=application:application . ./`);
-	Dockerfile.push(`EXPOSE 80`);
+	Dockerfile.push(`EXPOSE ${port}`);
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };
 

@@ -12,7 +12,8 @@ const createDockerfile = async (data, image): Promise<void> => {
 		secrets,
 		pullmergeRequestId,
 		baseImage,
-		buildId
+		buildId,
+		port
 	} = data;
 	const Dockerfile: Array<string> = [];
 
@@ -42,7 +43,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	if (baseImage.includes('nginx')) {
 		Dockerfile.push(`COPY /nginx.conf /etc/nginx/nginx.conf`);
 	}
-	Dockerfile.push(`EXPOSE 80`);
+	Dockerfile.push(`EXPOSE ${port}`);
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };
 

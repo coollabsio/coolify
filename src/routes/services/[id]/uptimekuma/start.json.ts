@@ -6,6 +6,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { ErrorHandler, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 import type { ComposeFile } from '$lib/types/composeFile';
+import { getServiceMainPort } from '$lib/components/common';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -15,9 +16,11 @@ export const post: RequestHandler = async (event) => {
 
 	try {
 		const service = await db.getService({ id, teamId });
-		const { type, version, destinationDockerId, destinationDocker, serviceSecret } = service;
+		const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort } =
+			service;
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
+		const port = getServiceMainPort('uptimekuma');
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 		const image = getServiceImage(type);
@@ -42,6 +45,7 @@ export const post: RequestHandler = async (event) => {
 					volumes: [config.volume],
 					environment: config.environmentVariables,
 					restart: 'always',
+					...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
 					labels: makeLabelForServices('uptimekuma'),
 					deploy: {
 						restart_policy: {

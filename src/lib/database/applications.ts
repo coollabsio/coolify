@@ -278,6 +278,7 @@ export async function configureApplication({
 	name,
 	fqdn,
 	port,
+	exposePort,
 	installCommand,
 	buildCommand,
 	startCommand,
@@ -297,6 +298,7 @@ export async function configureApplication({
 	name: string;
 	fqdn: string;
 	port: number;
+	exposePort: number;
 	installCommand: string;
 	buildCommand: string;
 	startCommand: string;
@@ -318,6 +320,7 @@ export async function configureApplication({
 			buildPack,
 			fqdn,
 			port,
+			exposePort,
 			installCommand,
 			buildCommand,
 			startCommand,
