@@ -1,11 +1,31 @@
 import { dev } from '$app/env';
-import { asyncExecShell, getDomain, getEngine, getUserDetails } from '$lib/common';
+import { checkDomainsIsValidInDNS, getDomain, getUserDetails, isDNSValid } from '$lib/common';
 import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
 import { t } from '$lib/translations';
-import { promises as dns } from 'dns';
 import type { RequestHandler } from '@sveltejs/kit';
-import { isIP } from 'is-ip';
+
+export const get: RequestHandler = async (event) => {
+	const { status, body } = await getUserDetails(event);
+	if (status === 401) return { status, body };
+	const domain = event.url.searchParams.get('domain');
+	if (!domain) {
+		return {
+			status: 500,
+			body: {
+				message: t.get('application.domain_required')
+			}
+		};
+	}
+	try {
+		await isDNSValid(event, domain);
+		return {
+			status: 200
+		};
+	} catch (error) {
+		return ErrorHandler(error);
+	}
+};
 
 export const post: RequestHandler = async (event) => {
 	const { status, body } = await getUserDetails(event);
@@ -14,11 +34,9 @@ export const post: RequestHandler = async (event) => {
 
 	let { fqdn, forceSave, dualCerts, isDNSCheckEnabled } = await event.request.json();
 	if (fqdn) fqdn = fqdn.toLowerCase();
-
 	try {
-		const domain = getDomain(fqdn);
-		const domainDualCert = domain.includes('www.') ? domain.replace('www.', '') : `www.${domain}`;
 		const found = await db.isDomainConfigured({ id, fqdn });
+		console.log(found);
 		if (found) {
 			throw {
 				message: t.get('application.domain_already_in_use', {
@@ -26,111 +44,9 @@ export const post: RequestHandler = async (event) => {
 				})
 			};
 		}
-		if (isDNSCheckEnabled) {
-			if (!forceSave) {
-				dns.setServers(['1.1.1.1', '8.8.8.8']);
-				if (dualCerts) {
-					try {
-						const ipDomain = await dns.resolve4(domain);
-						const ipDomainDualCert = await dns.resolve4(domainDualCert);
-						console.log({ ipDomain, ipDomainDualCert });
-						// TODO: Check if ipDomain and ipDomainDualCert are the same, but not like this
-						if (
-							ipDomain.length === ipDomainDualCert.length &&
-							ipDomain.every((v) => ipDomainDualCert.indexOf(v) >= 0)
-						) {
-							let resolves = [];
-							if (isIP(event.url.hostname)) {
-								resolves = [event.url.hostname];
-							} else {
-								resolves = await dns.resolve4(event.url.hostname);
-							}
-							console.log({ resolves });
-							for (const ip of ipDomain) {
-								if (resolves.includes(ip)) {
-									return {
-										status: 200
-									};
-								}
-							}
-							for (const ip of ipDomainDualCert) {
-								if (resolves.includes(ip)) {
-									return {
-										status: 200
-									};
-								}
-							}
-							throw false;
-						} else {
-							throw false;
-						}
-					} catch (error) {
-						console.log(error);
-						throw {
-							message: t.get('application.dns_not_set_error', { domain })
-						};
-					}
-				} else {
-					let resolves = [];
-					try {
-						const ipDomain = await dns.resolve4(domain);
-						console.log({ ipDomain });
-						if (isIP(event.url.hostname)) {
-							resolves = [event.url.hostname];
-						} else {
-							resolves = await dns.resolve4(event.url.hostname);
-						}
-						console.log({ resolves });
-						for (const ip of ipDomain) {
-							if (resolves.includes(ip)) {
-								return {
-									status: 200
-								};
-							}
-						}
-						throw false;
-					} catch (error) {
-						console.log(error);
-						throw {
-							message: t.get('application.dns_not_set_error', { domain })
-						};
-					}
-				}
-				// let localReverseDomains = [];
-				// let newIps = [];
-				// let newIpsWWW = [];
-				// let localIps = [];
-				// try {
-				// 	localReverseDomains = await dns.reverse(event.url.hostname)
-				// } catch (error) { }
-				// try {
-				// 	localIps = await dns.resolve4(event.url.hostname);
-				// } catch (error) { }
-				// try {
-				// 	newIps = await dns.resolve4(domain);
-				// 	if (dualCerts) {
-				// 		newIpsWWW = await dns.resolve4(`${isWWW ? nonWWW : domain}`)
-				// 	}
-				// 	console.log(newIps)
-				// } catch (error) { }
-				// console.log({ localIps, newIps, localReverseDomains, dualCerts, isWWW, nonWWW })
-				// if (localReverseDomains?.length > 0) {
-				// 	if ((newIps?.length === 0 || !newIps.includes(event.url.hostname)) || (dualCerts && newIpsWWW?.length === 0 && !newIpsWWW.includes(`${isWWW ? nonWWW : domain}`))) {
-				// 		throw {
-				// 			message: t.get('application.dns_not_set_error', { domain })
-				// 		};
-				// 	}
-				// }
-				// if (localIps?.length > 0) {
-				// 	if (newIps?.length === 0 || !localIps.includes(newIps[0])) {
-				// 		throw {
-				// 			message: t.get('application.dns_not_set_error', { domain })
-				// 		};
-				// 	}
-				// }
-			}
+		if (isDNSCheckEnabled && !forceSave) {
+			return await checkDomainsIsValidInDNS({ event, fqdn, dualCerts });
 		}
-
 		return {
 			status: 200
 		};

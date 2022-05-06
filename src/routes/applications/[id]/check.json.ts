@@ -1,5 +1,5 @@
 import { dev } from '$app/env';
-import { getDomain, getUserDetails } from '$lib/common';
+import { checkDomainsIsValidInDNS, getDomain, getUserDetails, isDNSValid } from '$lib/common';
 import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
@@ -7,16 +7,38 @@ import { promises as dns } from 'dns';
 import getPort from 'get-port';
 import { t } from '$lib/translations';
 
+export const get: RequestHandler = async (event) => {
+	const { status, body } = await getUserDetails(event);
+	if (status === 401) return { status, body };
+	const domain = event.url.searchParams.get('domain');
+	if (!domain) {
+		return {
+			status: 500,
+			body: {
+				message: t.get('application.domain_required')
+			}
+		};
+	}
+	try {
+		await isDNSValid(event, domain);
+		return {
+			status: 200
+		};
+	} catch (error) {
+		return ErrorHandler(error);
+	}
+};
+
 export const post: RequestHandler = async (event) => {
 	const { status, body } = await getUserDetails(event);
 	if (status === 401) return { status, body };
 
 	const { id } = event.params;
-	let { exposePort, fqdn, forceSave } = await event.request.json();
+	let { exposePort, fqdn, forceSave, dualCerts } = await event.request.json();
 	fqdn = fqdn.toLowerCase();
 
 	try {
-		const domain = getDomain(fqdn);
+		const { isDNSCheckEnabled } = await db.prisma.setting.findFirst({});
 		const found = await db.isDomainConfigured({ id, fqdn });
 		if (found) {
 			throw {
@@ -24,26 +46,6 @@ export const post: RequestHandler = async (event) => {
 					domain: getDomain(fqdn).replace('www.', '')
 				})
 			};
-		}
-		if (!dev && !forceSave) {
-			let ip = [];
-			let localIp = [];
-			dns.setServers(['1.1.1.1', '8.8.8.8']);
-
-			try {
-				localIp = await dns.resolve4(event.url.hostname);
-			} catch (error) {}
-			try {
-				ip = await dns.resolve4(domain);
-			} catch (error) {}
-
-			if (localIp?.length > 0) {
-				if (ip?.length === 0 || !ip.includes(localIp[0])) {
-					throw {
-						message: t.get('application.dns_not_set_error', { domain: domain })
-					};
-				}
-			}
 		}
 
 		if (exposePort) {
@@ -57,6 +59,10 @@ export const post: RequestHandler = async (event) => {
 			if (publicPort !== exposePort) {
 				throw { message: `Port ${exposePort} is already in use.` };
 			}
+		}
+
+		if (isDNSCheckEnabled && !forceSave) {
+			return await checkDomainsIsValidInDNS({ event, fqdn, dualCerts });
 		}
 
 		return {

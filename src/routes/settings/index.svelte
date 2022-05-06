@@ -31,7 +31,7 @@
 	import Setting from '$lib/components/Setting.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { errorNotification } from '$lib/form';
-	import { del, post } from '$lib/api';
+	import { del, get, post } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { browser } from '$app/env';
 	import { getDomain } from '$lib/components/common';
@@ -49,6 +49,7 @@
 
 	let forceSave = false;
 	let fqdn = settings.fqdn;
+	let nonWWWDomain = fqdn && getDomain(fqdn).replace(/^www\./, '');
 	let isFqdnSet = !!settings.fqdn;
 	let loading = {
 		save: false,
@@ -96,6 +97,7 @@
 	async function handleSubmit() {
 		try {
 			loading.save = true;
+			nonWWWDomain = fqdn && getDomain(fqdn).replace(/^www\./, '');
 			if (fqdn !== settings.fqdn) {
 				await post(`/settings/check.json`, { fqdn, forceSave, dualCerts, isDNSCheckEnabled });
 				await post(`/settings.json`, { fqdn });
@@ -106,6 +108,7 @@
 				settings.minPort = minPort;
 				settings.maxPort = maxPort;
 			}
+			forceSave = false;
 		} catch ({ error }) {
 			if (error?.startsWith($t('application.dns_not_set_partial_error'))) {
 				forceSave = true;
@@ -119,6 +122,14 @@
 		try {
 			toast.push('Renewing certificates...');
 			return await post(`/settings/renew.json`, {});
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
+	async function isDNSValid(domain) {
+		try {
+			await get(`/settings/check.json?domain=${domain}`);
+			toast.push('Domain is valid in DNS.');
 		} catch ({ error }) {
 			return errorNotification(error);
 		}
@@ -176,6 +187,23 @@
 							pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 							placeholder="{$t('forms.eg')}: https://coolify.io"
 						/>
+
+						{#if forceSave}
+							<div class="pt-4">
+								<button
+									class="bg-coollabs hover:bg-coollabs-100"
+									on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain))}
+									>Check {nonWWWDomain} DNS Record</button
+								>
+								{#if dualCerts}
+									<button
+										class="bg-coollabs hover:bg-coollabs-100"
+										on:click|preventDefault={() => isDNSValid(getDomain(`www.${nonWWWDomain}`))}
+										>Check www.{nonWWWDomain} DNS Record</button
+									>
+								{/if}
+							</div>
+						{/if}
 					</div>
 				</div>
 				<div class="grid grid-cols-2 items-start py-6">

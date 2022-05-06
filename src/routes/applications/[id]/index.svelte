@@ -45,9 +45,9 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 	import type Prisma from '@prisma/client';
-	import { notNodeDeployments, staticDeployments } from '$lib/components/common';
+	import { getDomain, notNodeDeployments, staticDeployments } from '$lib/components/common';
 	import { toast } from '@zerodevx/svelte-toast';
-	import { post } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import cuid from 'cuid';
 	import { browser } from '$app/env';
 	import { disabledButton } from '$lib/store';
@@ -62,6 +62,8 @@
 	let previews = application.settings.previews;
 	let dualCerts = application.settings.dualCerts;
 	let autodeploy = application.settings.autodeploy;
+
+	let nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
 
 	let wsgis = [
 		{
@@ -127,13 +129,16 @@
 	async function handleSubmit() {
 		loading = true;
 		try {
+			nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
 			await post(`/applications/${id}/check.json`, {
 				fqdn: application.fqdn,
 				forceSave,
+				dualCerts,
 				exposePort: application.exposePort
 			});
 			await post(`/applications/${id}.json`, { ...application });
 			$disabledButton = false;
+			forceSave = false;
 			return toast.push('Configurations saved.');
 		} catch ({ error }) {
 			if (error?.startsWith($t('application.dns_not_set_partial_error'))) {
@@ -154,6 +159,14 @@
 	async function selectBaseBuildImage(event) {
 		application.baseBuildImage = event.detail.value;
 		await handleSubmit();
+	}
+	async function isDNSValid(domain) {
+		try {
+			await get(`/applications/${id}/check.json?domain=${domain}`);
+			toast.push('Domain is valid in DNS.');
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
 	}
 </script>
 
@@ -387,16 +400,34 @@
 					{/if}
 					<Explainer text={$t('application.https_explainer')} />
 				</div>
-				<input
-					readonly={!$session.isAdmin || isRunning}
-					disabled={!$session.isAdmin || isRunning}
-					bind:this={domainEl}
-					name="fqdn"
-					id="fqdn"
-					bind:value={application.fqdn}
-					pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-					placeholder="eg: https://coollabs.io"
-				/>
+				<div>
+					<input
+						readonly={!$session.isAdmin || isRunning}
+						disabled={!$session.isAdmin || isRunning}
+						bind:this={domainEl}
+						name="fqdn"
+						id="fqdn"
+						bind:value={application.fqdn}
+						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+						placeholder="eg: https://coollabs.io"
+					/>
+					{#if forceSave}
+						<div class="pt-4">
+							<button
+								class="bg-coollabs hover:bg-coollabs-100"
+								on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain))}
+								>Check {nonWWWDomain} DNS Record</button
+							>
+							{#if dualCerts}
+								<button
+									class="bg-coollabs hover:bg-coollabs-100"
+									on:click|preventDefault={() => isDNSValid(getDomain(`www.${nonWWWDomain}`))}
+									>Check www.{nonWWWDomain} DNS Record</button
+								>
+							{/if}
+						</div>
+					{/if}
+				</div>
 			</div>
 			<div class="grid grid-cols-2 items-center pb-8">
 				<Setting
