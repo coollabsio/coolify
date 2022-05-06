@@ -193,8 +193,7 @@ export async function isDNSValid(event: any, domain: string): Promise<any> {
 		}
 	} catch (error) {
 		throw {
-			message:
-				"Could not resolve domain or it's not pointing to the server IP address. <br><br>Please check your domain name and try again."
+			message: t.get('application.dns_not_set_error', { domain })
 		};
 	}
 
@@ -230,7 +229,7 @@ export async function checkDomainsIsValidInDNS({ event, fqdn, dualCerts }): Prom
 		}
 	} catch (error) {
 		throw {
-			message: t.get('application.dns_not_set_error', { domain: domain })
+			message: t.get('application.dns_not_set_error', { domain })
 		};
 	}
 
