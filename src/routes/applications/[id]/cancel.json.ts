@@ -31,7 +31,7 @@ async function stopBuild(buildId, applicationId) {
 				}
 				if (count > 100) {
 					clearInterval(interval);
-					return resolve();
+					return reject(new Error('Build canceled'));
 				}
 
 				const { stdout: buildContainers } = await asyncExecShell(
@@ -70,7 +70,6 @@ export const post: RequestHandler = async (event) => {
 	}
 	try {
 		await stopBuild(buildId, applicationId);
-		await cleanupDB(buildId);
 		return {
 			status: 200,
 			body: {

@@ -58,7 +58,7 @@ export function ErrorHandler(e: {
 		truncatedError.message = 'git clone failed';
 	}
 	if (!e.message?.includes('Coolify Proxy is not running')) {
-		sentry.captureException(truncatedError);
+		// sentry.captureException(truncatedError);
 	}
 	const payload = {
 		status: truncatedError.status || 500,
@@ -127,73 +127,73 @@ export function getServiceImages(type: string): string[] {
 
 export function generateDatabaseConfiguration(database: Database & { settings: DatabaseSettings }):
 	| {
-		volume: string;
-		image: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			MYSQL_DATABASE: string;
-			MYSQL_PASSWORD: string;
-			MYSQL_ROOT_USER: string;
-			MYSQL_USER: string;
-			MYSQL_ROOT_PASSWORD: string;
-		};
-	}
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				MYSQL_DATABASE: string;
+				MYSQL_PASSWORD: string;
+				MYSQL_ROOT_USER: string;
+				MYSQL_USER: string;
+				MYSQL_ROOT_PASSWORD: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			MONGODB_ROOT_USER: string;
-			MONGODB_ROOT_PASSWORD: string;
-		};
-	}
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				MONGODB_ROOT_USER: string;
+				MONGODB_ROOT_PASSWORD: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			MARIADB_ROOT_USER: string;
-			MARIADB_ROOT_PASSWORD: string;
-			MARIADB_USER: string;
-			MARIADB_PASSWORD: string;
-			MARIADB_DATABASE: string;
-		};
-	}
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				MARIADB_ROOT_USER: string;
+				MARIADB_ROOT_PASSWORD: string;
+				MARIADB_USER: string;
+				MARIADB_PASSWORD: string;
+				MARIADB_DATABASE: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			POSTGRESQL_POSTGRES_PASSWORD: string;
-			POSTGRESQL_USERNAME: string;
-			POSTGRESQL_PASSWORD: string;
-			POSTGRESQL_DATABASE: string;
-		};
-	}
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				POSTGRESQL_POSTGRES_PASSWORD: string;
+				POSTGRESQL_USERNAME: string;
+				POSTGRESQL_PASSWORD: string;
+				POSTGRESQL_DATABASE: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			REDIS_AOF_ENABLED: string;
-			REDIS_PASSWORD: string;
-		};
-	}
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				REDIS_AOF_ENABLED: string;
+				REDIS_PASSWORD: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			COUCHDB_PASSWORD: string;
-			COUCHDB_USER: string;
-		};
-	} {
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				COUCHDB_PASSWORD: string;
+				COUCHDB_USER: string;
+			};
+	  } {
 	const {
 		id,
 		dbUser,

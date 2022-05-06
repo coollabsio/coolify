@@ -328,7 +328,7 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 			await saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
 		} catch (error) {
 			await saveBuildLog({ line: error, buildId, applicationId });
-			sentry.captureException(error);
+			// sentry.captureException(error);
 			throw new Error(error);
 		}
 		await saveBuildLog({ line: 'Proxy will be updated shortly.', buildId, applicationId });
