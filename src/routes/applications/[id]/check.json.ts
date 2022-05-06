@@ -61,7 +61,7 @@ export const post: RequestHandler = async (event) => {
 			}
 		}
 
-		if (isDNSCheckEnabled && !forceSave) {
+		if (isDNSCheckEnabled && !dev && !forceSave) {
 			return await checkDomainsIsValidInDNS({ event, fqdn, dualCerts });
 		}
 
