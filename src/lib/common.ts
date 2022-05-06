@@ -20,21 +20,21 @@ import { t } from './translations';
 
 try {
 	if (!dev) {
-		Sentry.init({
-			dsn: process.env['COOLIFY_SENTRY_DSN'],
-			tracesSampleRate: 0,
-			environment: 'production',
-			debug: true,
-			release: currentVersion,
-			initialScope: {
-				tags: {
-					appId: process.env['COOLIFY_APP_ID'],
-					'os.arch': getOsArch(),
-					'os.platform': os.platform(),
-					'os.release': os.release()
-				}
-			}
-		});
+		// Sentry.init({
+		// 	dsn: process.env['COOLIFY_SENTRY_DSN'],
+		// 	tracesSampleRate: 0,
+		// 	environment: 'production',
+		// 	debug: true,
+		// 	release: currentVersion,
+		// 	initialScope: {
+		// 		tags: {
+		// 			appId: process.env['COOLIFY_APP_ID'],
+		// 			'os.arch': getOsArch(),
+		// 			'os.platform': os.platform(),
+		// 			'os.release': os.release()
+		// 		}
+		// 	}
+		// });
 	}
 } catch (err) {
 	console.log('Could not initialize Sentry, no worries.');
