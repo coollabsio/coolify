@@ -17,9 +17,12 @@ export const post: RequestHandler = async (event) => {
 		let count = 0;
 		await new Promise<void>(async (resolve, reject) => {
 			const job = await buildQueue.getJob(buildId);
+			if (!job) {
+				return resolve();
+			}
 			const {
 				destinationDocker: { engine }
-			} = job.data;
+			} = job?.data;
 			const host = getEngine(engine);
 			let interval = setInterval(async () => {
 				try {
@@ -58,7 +61,10 @@ export const post: RequestHandler = async (event) => {
 
 			resolve();
 		});
-
+		const data = await db.prisma.build.findUnique({ where: { id: buildId } });
+		if (data?.status === 'queued' || data?.status === 'running') {
+			await db.prisma.build.update({ where: { id: buildId }, data: { status: 'failed' } });
+		}
 		return {
 			status: 200,
 			body: {
