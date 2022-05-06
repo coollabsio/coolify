@@ -64,6 +64,8 @@
 	let autodeploy = application.settings.autodeploy;
 
 	let nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
+	let isNonWWWDomainOK = false;
+	let isWWWDomainOK = false;
 
 	let wsgis = [
 		{
@@ -143,6 +145,17 @@
 		} catch ({ error }) {
 			if (error?.startsWith($t('application.dns_not_set_partial_error'))) {
 				forceSave = true;
+				if (dualCerts) {
+					isNonWWWDomainOK = await isDNSValid(getDomain(nonWWWDomain), false);
+					isWWWDomainOK = await isDNSValid(getDomain(`www.${nonWWWDomain}`), true);
+				} else {
+					const isWWW = getDomain(application.fqdn).includes('www.');
+					if (isWWW) {
+						isWWWDomainOK = await isDNSValid(getDomain(`www.${nonWWWDomain}`), true);
+					} else {
+						isNonWWWDomainOK = await isDNSValid(getDomain(nonWWWDomain), false);
+					}
+				}
 			}
 			return errorNotification(error);
 		} finally {
@@ -160,12 +173,17 @@
 		application.baseBuildImage = event.detail.value;
 		await handleSubmit();
 	}
-	async function isDNSValid(domain) {
+
+	async function isDNSValid(domain, isWWW) {
 		try {
 			await get(`/applications/${id}/check.json?domain=${domain}`);
-			toast.push('Domain is valid in DNS.');
+			toast.push('DNS configuration is valid.');
+			isWWW ? (isWWWDomainOK = true) : (isNonWWWDomainOK = true);
+			return true;
 		} catch ({ error }) {
-			return errorNotification(error);
+			errorNotification(error);
+			isWWW ? (isWWWDomainOK = false) : (isNonWWWDomainOK = false);
+			return false;
 		}
 	}
 </script>
@@ -412,18 +430,36 @@
 						placeholder="eg: https://coollabs.io"
 					/>
 					{#if forceSave}
-						<div class="pt-4">
-							<button
-								class="bg-coollabs hover:bg-coollabs-100"
-								on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain))}
-								>Check {nonWWWDomain} DNS Record</button
-							>
-							{#if dualCerts}
+						<div class="flex-col space-y-2 pt-4 text-center">
+							{#if isNonWWWDomainOK}
 								<button
-									class="bg-coollabs hover:bg-coollabs-100"
-									on:click|preventDefault={() => isDNSValid(getDomain(`www.${nonWWWDomain}`))}
-									>Check www.{nonWWWDomain} DNS Record</button
+									class="bg-green-600 hover:bg-green-500"
+									on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+									>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
 								>
+							{:else}
+								<button
+									class="bg-red-600 hover:bg-red-500"
+									on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+									>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
+								>
+							{/if}
+							{#if dualCerts}
+								{#if isWWWDomainOK}
+									<button
+										class="bg-green-600 hover:bg-green-500"
+										on:click|preventDefault={() =>
+											isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+										>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
+									>
+								{:else}
+									<button
+										class="bg-red-600 hover:bg-red-500"
+										on:click|preventDefault={() =>
+											isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+										>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
+									>
+								{/if}
 							{/if}
 						</div>
 					{/if}

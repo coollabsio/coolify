@@ -50,6 +50,8 @@
 	let forceSave = false;
 	let fqdn = settings.fqdn;
 	let nonWWWDomain = fqdn && getDomain(fqdn).replace(/^www\./, '');
+	let isNonWWWDomainOK = false;
+	let isWWWDomainOK = false;
 	let isFqdnSet = !!settings.fqdn;
 	let loading = {
 		save: false,
@@ -71,6 +73,7 @@
 	}
 	async function changeSettings(name) {
 		try {
+			resetView();
 			if (name === 'isRegistrationEnabled') {
 				isRegistrationEnabled = !isRegistrationEnabled;
 			}
@@ -98,6 +101,7 @@
 		try {
 			loading.save = true;
 			nonWWWDomain = fqdn && getDomain(fqdn).replace(/^www\./, '');
+
 			if (fqdn !== settings.fqdn) {
 				await post(`/settings/check.json`, { fqdn, forceSave, dualCerts, isDNSCheckEnabled });
 				await post(`/settings.json`, { fqdn });
@@ -112,6 +116,17 @@
 		} catch ({ error }) {
 			if (error?.startsWith($t('application.dns_not_set_partial_error'))) {
 				forceSave = true;
+				if (dualCerts) {
+					isNonWWWDomainOK = await isDNSValid(getDomain(nonWWWDomain), false);
+					isWWWDomainOK = await isDNSValid(getDomain(`www.${nonWWWDomain}`), true);
+				} else {
+					const isWWW = getDomain(settings.fqdn).includes('www.');
+					if (isWWW) {
+						isWWWDomainOK = await isDNSValid(getDomain(`www.${nonWWWDomain}`), true);
+					} else {
+						isNonWWWDomainOK = await isDNSValid(getDomain(nonWWWDomain), false);
+					}
+				}
 			}
 			return errorNotification(error);
 		} finally {
@@ -126,13 +141,20 @@
 			return errorNotification(error);
 		}
 	}
-	async function isDNSValid(domain) {
+	async function isDNSValid(domain, isWWW) {
 		try {
 			await get(`/settings/check.json?domain=${domain}`);
-			toast.push('Domain is valid in DNS.');
+			toast.push('DNS configuration is valid.');
+			isWWW ? (isWWWDomainOK = true) : (isNonWWWDomainOK = true);
+			return true;
 		} catch ({ error }) {
-			return errorNotification(error);
+			errorNotification(error);
+			isWWW ? (isWWWDomainOK = false) : (isNonWWWDomainOK = false);
+			return false;
 		}
+	}
+	function resetView() {
+		forceSave = false;
 	}
 </script>
 
@@ -182,6 +204,7 @@
 							bind:value={fqdn}
 							readonly={!$session.isAdmin || isFqdnSet}
 							disabled={!$session.isAdmin || isFqdnSet}
+							on:input={resetView}
 							name="fqdn"
 							id="fqdn"
 							pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
@@ -189,18 +212,36 @@
 						/>
 
 						{#if forceSave}
-							<div class="pt-4">
-								<button
-									class="bg-coollabs hover:bg-coollabs-100"
-									on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain))}
-									>Check {nonWWWDomain} DNS Record</button
-								>
-								{#if dualCerts}
+							<div class="flex-col space-y-2 pt-4 text-center">
+								{#if isNonWWWDomainOK}
 									<button
-										class="bg-coollabs hover:bg-coollabs-100"
-										on:click|preventDefault={() => isDNSValid(getDomain(`www.${nonWWWDomain}`))}
-										>Check www.{nonWWWDomain} DNS Record</button
+										class="bg-green-600 hover:bg-green-500"
+										on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+										>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
 									>
+								{:else}
+									<button
+										class="bg-red-600 hover:bg-red-500"
+										on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+										>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
+									>
+								{/if}
+								{#if dualCerts}
+									{#if isWWWDomainOK}
+										<button
+											class="bg-green-600 hover:bg-green-500"
+											on:click|preventDefault={() =>
+												isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+											>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
+										>
+									{:else}
+										<button
+											class="bg-red-600 hover:bg-red-500"
+											on:click|preventDefault={() =>
+												isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+											>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
+										>
+									{/if}
 								{/if}
 							</div>
 						{/if}
