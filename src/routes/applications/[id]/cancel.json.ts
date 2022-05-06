@@ -22,16 +22,17 @@ export const post: RequestHandler = async (event) => {
 			} = job.data;
 			const host = getEngine(engine);
 			let interval = setInterval(async () => {
-				const { status } = await db.prisma.build.findUnique({ where: { id: buildId } });
-				if (status === 'failed') {
-					clearInterval(interval);
-					return resolve();
-				}
-				if (count > 1200) {
-					clearInterval(interval);
-					reject(new Error('Could not cancel build.'));
-				}
 				try {
+					const data = await db.prisma.build.findUnique({ where: { id: buildId } });
+					if (data?.status === 'failed') {
+						clearInterval(interval);
+						return resolve();
+					}
+					if (count > 60) {
+						clearInterval(interval);
+						reject(new Error('Could not cancel build.'));
+					}
+
 					const { stdout: buildContainers } = await asyncExecShell(
 						`DOCKER_HOST=${host} docker container ls --filter "label=coolify.buildId=${buildId}" --format '{{json .}}'`
 					);
@@ -53,7 +54,7 @@ export const post: RequestHandler = async (event) => {
 					}
 					count++;
 				} catch (error) {}
-			}, 100);
+			}, 1000);
 
 			resolve();
 		});
