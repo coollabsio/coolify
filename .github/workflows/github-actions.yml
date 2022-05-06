@@ -1,8 +1,9 @@
 name: release-coolify
 
 on:
-  release:
-    types: published
+  push:
+    branches:    
+      - 'main'
 
 jobs:
   make-it-coolifyed:
