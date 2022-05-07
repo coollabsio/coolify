@@ -358,24 +358,26 @@
 					/>
 				</div>
 			</div>
-			<div class="grid grid-cols-2 items-center">
-				<label for="baseImage" class="text-base font-bold text-stone-100"
-					>{$t('application.base_image')}</label
-				>
-				<div class="custom-select-wrapper">
-					<Select
-						isDisabled={!$session.isAdmin || isRunning}
-						containerClasses={containerClass()}
-						id="baseImages"
-						showIndicator={!isRunning}
-						items={application.baseImages}
-						on:select={selectBaseImage}
-						value={application.baseImage}
-						isClearable={false}
-					/>
+			{#if application.buildPack !== 'docker'}
+				<div class="grid grid-cols-2 items-center">
+					<label for="baseImage" class="text-base font-bold text-stone-100"
+						>{$t('application.base_image')}</label
+					>
+					<div class="custom-select-wrapper">
+						<Select
+							isDisabled={!$session.isAdmin || isRunning}
+							containerClasses={containerClass()}
+							id="baseImages"
+							showIndicator={!isRunning}
+							items={application.baseImages}
+							on:select={selectBaseImage}
+							value={application.baseImage}
+							isClearable={false}
+						/>
+					</div>
+					<Explainer text={$t('application.base_image_explainer')} />
 				</div>
-				<Explainer text={$t('application.base_image_explainer')} />
-			</div>
+			{/if}
 			{#if application.buildCommand || application.buildPack === 'rust' || application.buildPack === 'laravel'}
 				<div class="grid grid-cols-2 items-center pb-8">
 					<label for="baseBuildImage" class="text-base font-bold text-stone-100"
