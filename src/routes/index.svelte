@@ -21,6 +21,9 @@
 
 <script lang="ts">
 	import { t } from '$lib/translations';
+	import { get } from '$lib/api';
+	import { onDestroy, onMount } from 'svelte';
+	import Loading from './applications/[id]/logs/_Loading.svelte';
 
 	export let applicationsCount: number;
 	export let sourcesCount: number;
@@ -28,89 +31,206 @@
 	export let teamsCount: number;
 	export let databasesCount: number;
 	export let servicesCount: number;
+	let loading = {
+		usage: false
+	};
+	let usageInterval = null;
+	let memoryWarning = false;
+	let cpuWarning = false;
+	let diskWarning = false;
+
+	let usage = {
+		cpu: {
+			load: [0, 0, 0],
+			count: 0,
+			usage: 0
+		},
+		memory: {
+			totalMemMb: 0,
+			freeMemMb: 0,
+			usedMemMb: 0,
+			freeMemPercentage: 0
+		},
+		disk: {
+			freePercentage: 0,
+			totalGb: 0,
+			usedGb: 0
+		}
+	};
+	async function getStatus() {
+		if (loading.usage) return;
+		try {
+			loading.usage = true;
+			const data = await get(`/dashboard.json?usage=true`);
+			usage = data;
+			if (usage.memory.freeMemPercentage < 15) {
+				memoryWarning = true;
+			} else {
+				memoryWarning = false;
+			}
+			if (usage.cpu.usage > 90) {
+				cpuWarning = true;
+			} else {
+				cpuWarning = false;
+			}
+			if (usage.disk.freePercentage < 10) {
+				diskWarning = true;
+			} else {
+				diskWarning = false;
+			}
+		} catch (error) {
+		} finally {
+			loading.usage = false;
+		}
+	}
+	onDestroy(() => {
+		clearInterval(usageInterval);
+	});
+	onMount(async () => {
+		await getStatus();
+		usageInterval = setInterval(async () => {
+			await getStatus();
+		}, 1000);
+	});
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">{$t('index.dashboard')}</div>
 </div>
-
 <div class="mt-10 pb-12 tracking-tight sm:pb-16">
-	<div class="relative">
-		<div class="absolute inset-0 h-1/2" />
-		<div class="relative mx-auto px-4 sm:px-6 lg:px-8">
-			<div class="mx-auto max-w-4xl">
-				<dl class="gap-5 gap-y-16 sm:grid sm:grid-cols-3">
-					<a
-						href="/applications"
-						sveltekit:prefetch
-						class="flex cursor-pointer flex-col rounded p-6 text-center text-green-500 no-underline transition duration-150 hover:bg-green-500 hover:text-white"
-					>
-						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
-							{$t('index.applications')}
-						</dt>
-						<dd class="order-1 text-5xl font-extrabold ">
-							{applicationsCount}
-						</dd>
-					</a>
-					<a
-						href="/destinations"
-						sveltekit:prefetch
-						class="flex cursor-pointer flex-col rounded p-6 text-center text-sky-500 no-underline transition duration-150 hover:bg-sky-500 hover:text-white"
-					>
-						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
-							{$t('index.destinations')}
-						</dt>
-						<dd class="order-1 text-5xl font-extrabold ">
-							{destinationsCount}
-						</dd>
-					</a>
-					<a
-						href="/sources"
-						sveltekit:prefetch
-						class="flex cursor-pointer flex-col rounded p-6 text-center text-orange-500 no-underline transition duration-150 hover:bg-orange-500 hover:text-white"
-					>
-						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
-							{$t('index.git_sources')}
-						</dt>
-						<dd class="order-1 text-5xl font-extrabold ">
-							{sourcesCount}
-						</dd>
-					</a>
-					<a
-						href="/databases"
-						sveltekit:prefetch
-						class="flex cursor-pointer flex-col rounded p-6 text-center text-purple-500 no-underline transition duration-150 hover:bg-purple-500 hover:text-white"
-					>
-						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
-							{$t('index.databases')}
-						</dt>
-						<dd class="order-1 text-5xl font-extrabold ">{databasesCount}</dd>
-					</a>
-					<a
-						href="/services"
-						sveltekit:prefetch
-						class="flex cursor-pointer flex-col rounded p-6 text-center text-pink-500 no-underline transition duration-150 hover:bg-pink-500 hover:text-white"
-					>
-						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
-							{$t('index.services')}
-						</dt>
-						<dd class="order-1 text-5xl font-extrabold ">{servicesCount}</dd>
-					</a>
+	<div class="mx-auto max-w-4xl">
+		<div class="title font-bold">Server Usage</div>
 
-					<a
-						href="/iam"
-						sveltekit:prefetch
-						class="flex cursor-pointer flex-col rounded p-6 text-center text-cyan-500 no-underline transition duration-150 hover:bg-cyan-500 hover:text-white"
-					>
-						<dt class="order-2 mt-2 text-sm font-bold uppercase leading-6 text-white">
-							{$t('index.teams')}
-						</dt>
-						<dd class="order-1 text-5xl font-extrabold ">
-							{teamsCount}
-						</dd>
-					</a>
-				</dl>
+		<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+			<Loading />
+			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+				<dt class="truncate text-sm font-medium text-white">Total Memory</dt>
+				<dd class="mt-1 text-3xl font-semibold text-white">
+					{(usage?.memory.totalMemMb).toFixed(0)}
+				</dd>
 			</div>
-		</div>
+
+			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+				<dt class="truncate text-sm font-medium text-white">Used Memory</dt>
+				<dd class="mt-1 text-3xl font-semibold text-white ">
+					{(usage?.memory.usedMemMb).toFixed(0)}
+				</dd>
+			</div>
+
+			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6" class:bg-red-500={memoryWarning}>
+				<dt class="truncate text-sm font-medium text-white">Free Memory</dt>
+				<dd class="mt-1 text-3xl font-semibold text-white">
+					{usage?.memory.freeMemPercentage}%
+				</dd>
+			</div>
+		</dl>
+		<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+				<dt class="truncate text-sm font-medium text-white">Total CPUs</dt>
+				<dd class="mt-1 text-3xl font-semibold text-white">
+					{(usage?.cpu.count).toFixed(0)}
+				</dd>
+			</div>
+			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+				<dt class="truncate text-sm font-medium text-white">Load Average</dt>
+				<dd class="mt-1 text-3xl font-semibold text-white">
+					{usage?.cpu.load}
+				</dd>
+			</div>
+			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6" class:bg-red-500={cpuWarning}>
+				<dt class="truncate text-sm font-medium text-white">CPU Usage</dt>
+				<dd class="mt-1 text-3xl font-semibold text-white">
+					{(usage?.cpu.usage).toFixed(0)}%
+				</dd>
+			</div>
+		</dl>
+		<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+				<dt class="truncate text-sm font-medium text-white">Total Disk</dt>
+				<dd class="mt-1 text-3xl font-semibold text-white">
+					{usage?.disk.totalGb}GB
+				</dd>
+			</div>
+			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+				<dt class="truncate text-sm font-medium text-white">Used Disk</dt>
+				<dd class="mt-1 text-3xl font-semibold text-white">
+					{usage?.disk.usedGb}GB
+				</dd>
+			</div>
+			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6" class:bg-red-500={diskWarning}>
+				<dt class="truncate text-sm font-medium text-white">Free Disk</dt>
+				<dd class="mt-1 text-3xl font-semibold text-white">
+					{usage?.disk.freePercentage}%
+				</dd>
+			</div>
+		</dl>
+		<div class="title pt-20 font-bold">Resources</div>
+		<dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+			<a
+				href="/applications"
+				sveltekit:prefetch
+				class="overflow-hidden rounded-lg px-4 py-5 text-green-500 no-underline transition-all duration-100 hover:bg-green-500 hover:text-white sm:p-6"
+			>
+				<dt class="truncate text-sm font-medium text-white">{$t('index.applications')}</dt>
+				<dd class="mt-1 text-3xl font-semibold ">
+					{applicationsCount}
+				</dd>
+			</a>
+			<a
+				href="/destinations"
+				sveltekit:prefetch
+				class="overflow-hidden rounded-lg px-4 py-5 text-sky-500 no-underline transition-all duration-100 hover:bg-sky-500 hover:text-white sm:p-6"
+			>
+				<dt class="truncate text-sm font-medium text-white">{$t('index.destinations')}</dt>
+				<dd class="mt-1 text-3xl font-semibold ">
+					{destinationsCount}
+				</dd>
+			</a>
+
+			<a
+				href="/sources"
+				sveltekit:prefetch
+				class="overflow-hidden rounded-lg px-4 py-5 text-orange-500 no-underline transition-all duration-100 hover:bg-orange-500 hover:text-white sm:p-6"
+			>
+				<dt class="truncate text-sm font-medium text-white">{$t('index.git_sources')}</dt>
+				<dd class="mt-1 text-3xl font-semibold">
+					{sourcesCount}
+				</dd>
+			</a>
+		</dl>
+		<dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+			<a
+				href="/databases"
+				sveltekit:prefetch
+				class="overflow-hidden rounded-lg px-4 py-5 text-purple-500 no-underline transition-all duration-100 hover:bg-purple-500 hover:text-white sm:p-6"
+			>
+				<dt class="truncate text-sm font-medium text-white">{$t('index.databases')}</dt>
+				<dd class="mt-1 text-3xl font-semibold ">
+					{databasesCount}
+				</dd>
+			</a>
+
+			<a
+				href="/services"
+				sveltekit:prefetch
+				class="overflow-hidden rounded-lg px-4 py-5 text-pink-500 no-underline transition-all duration-100 hover:bg-pink-500 hover:text-white sm:p-6"
+			>
+				<dt class="truncate text-sm font-medium text-white">{$t('index.services')}</dt>
+				<dd class="mt-1 text-3xl font-semibold ">
+					{servicesCount}
+				</dd>
+			</a>
+
+			<a
+				href="/iam"
+				sveltekit:prefetch
+				class="overflow-hidden rounded-lg px-4 py-5 text-cyan-500 no-underline transition-all duration-100 hover:bg-cyan-500 hover:text-white sm:p-6"
+			>
+				<dt class="truncate text-sm font-medium text-white">{$t('index.teams')}</dt>
+				<dd class="mt-1 text-3xl font-semibold ">
+					{teamsCount}
+				</dd>
+			</a>
+		</dl>
 	</div>
 </div>

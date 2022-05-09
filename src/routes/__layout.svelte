@@ -78,6 +78,7 @@
 			}
 		}
 	});
+
 	async function logout() {
 		try {
 			await del(`/logout.json`, {});
