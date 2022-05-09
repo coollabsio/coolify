@@ -25,6 +25,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import Loading from './applications/[id]/logs/_Loading.svelte';
 	import Trend from './_Trend.svelte';
+	import { session } from '$app/stores';
 
 	export let applicationsCount: number;
 	export let sourcesCount: number;
@@ -122,10 +123,12 @@
 		clearInterval(usageInterval);
 	});
 	onMount(async () => {
-		await getStatus();
-		usageInterval = setInterval(async () => {
+		if ($session.teamId === '0') {
 			await getStatus();
-		}, 1000);
+			usageInterval = setInterval(async () => {
+				await getStatus();
+			}, 1000);
+		}
 	});
 </script>
 
@@ -134,80 +137,82 @@
 </div>
 <div class="mt-10 pb-12 tracking-tight sm:pb-16">
 	<div class="mx-auto max-w-4xl">
-		<div class="title font-bold">Server Usage</div>
-		<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-			<Loading />
-			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
-				<dt class="truncate text-sm font-medium text-white">Total Memory</dt>
-				<dd class="mt-1 text-3xl font-semibold text-white">
-					{(usage?.memory.totalMemMb).toFixed(0)}
-				</dd>
-			</div>
+		{#if $session.teamId === '0'}
+			<div class="title font-bold">Server Usage</div>
+			<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+				<Loading />
+				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+					<dt class="truncate text-sm font-medium text-white">Total Memory</dt>
+					<dd class="mt-1 text-3xl font-semibold text-white">
+						{(usage?.memory.totalMemMb).toFixed(0)}
+					</dd>
+				</div>
 
-			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
-				<dt class="truncate text-sm font-medium text-white">Used Memory</dt>
-				<dd class="mt-1 text-3xl font-semibold text-white ">
-					{(usage?.memory.usedMemMb).toFixed(0)}
-				</dd>
-			</div>
+				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+					<dt class="truncate text-sm font-medium text-white">Used Memory</dt>
+					<dd class="mt-1 text-3xl font-semibold text-white ">
+						{(usage?.memory.usedMemMb).toFixed(0)}
+					</dd>
+				</div>
 
-			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6" class:bg-red-500={memoryWarning}>
-				<dt class="truncate text-sm font-medium text-white">Free Memory</dt>
-				<dd class="mt-1 flex items-center text-3xl font-semibold text-white">
-					{usage?.memory.freeMemPercentage}%
-					{#if !memoryWarning}
-						<Trend trend={trends.memory} />
-					{/if}
-				</dd>
-			</div>
-		</dl>
-		<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
-				<dt class="truncate text-sm font-medium text-white">Total CPUs</dt>
-				<dd class="mt-1 text-3xl font-semibold text-white">
-					{usage?.cpu.count}
-				</dd>
-			</div>
-			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
-				<dt class="truncate text-sm font-medium text-white">Load Average (5/10/30mins)</dt>
-				<dd class="mt-1 text-3xl font-semibold text-white">
-					{usage?.cpu.load.join('/')}
-				</dd>
-			</div>
-			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6" class:bg-red-500={cpuWarning}>
-				<dt class="truncate text-sm font-medium text-white">CPU Usage</dt>
-				<dd class="mt-1 flex items-center text-3xl  font-semibold text-white">
-					{usage?.cpu.usage}%
-					{#if !cpuWarning}
-						<Trend trend={trends.cpu} />
-					{/if}
-				</dd>
-			</div>
-		</dl>
-		<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
-				<dt class="truncate text-sm font-medium text-white">Total Disk</dt>
-				<dd class="mt-1 text-3xl font-semibold text-white">
-					{usage?.disk.totalGb}GB
-				</dd>
-			</div>
-			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
-				<dt class="truncate text-sm font-medium text-white">Used Disk</dt>
-				<dd class="mt-1 text-3xl font-semibold text-white">
-					{usage?.disk.usedGb}GB
-				</dd>
-			</div>
-			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6" class:bg-red-500={diskWarning}>
-				<dt class="truncate text-sm font-medium text-white">Free Disk</dt>
-				<dd class="mt-1 flex items-center text-3xl font-semibold text-white">
-					{usage?.disk.freePercentage}%
-					{#if !diskWarning}
-						<Trend trend={trends.disk} />
-					{/if}
-				</dd>
-			</div>
-		</dl>
-		<div class="title pt-20 font-bold">Resources</div>
+				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6" class:bg-red-500={memoryWarning}>
+					<dt class="truncate text-sm font-medium text-white">Free Memory</dt>
+					<dd class="mt-1 flex items-center text-3xl font-semibold text-white">
+						{usage?.memory.freeMemPercentage}%
+						{#if !memoryWarning}
+							<Trend trend={trends.memory} />
+						{/if}
+					</dd>
+				</div>
+			</dl>
+			<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+					<dt class="truncate text-sm font-medium text-white">Total CPUs</dt>
+					<dd class="mt-1 text-3xl font-semibold text-white">
+						{usage?.cpu.count}
+					</dd>
+				</div>
+				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+					<dt class="truncate text-sm font-medium text-white">Load Average (5/10/30mins)</dt>
+					<dd class="mt-1 text-3xl font-semibold text-white">
+						{usage?.cpu.load.join('/')}
+					</dd>
+				</div>
+				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6" class:bg-red-500={cpuWarning}>
+					<dt class="truncate text-sm font-medium text-white">CPU Usage</dt>
+					<dd class="mt-1 flex items-center text-3xl  font-semibold text-white">
+						{usage?.cpu.usage}%
+						{#if !cpuWarning}
+							<Trend trend={trends.cpu} />
+						{/if}
+					</dd>
+				</div>
+			</dl>
+			<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+					<dt class="truncate text-sm font-medium text-white">Total Disk</dt>
+					<dd class="mt-1 text-3xl font-semibold text-white">
+						{usage?.disk.totalGb}GB
+					</dd>
+				</div>
+				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+					<dt class="truncate text-sm font-medium text-white">Used Disk</dt>
+					<dd class="mt-1 text-3xl font-semibold text-white">
+						{usage?.disk.usedGb}GB
+					</dd>
+				</div>
+				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6" class:bg-red-500={diskWarning}>
+					<dt class="truncate text-sm font-medium text-white">Free Disk</dt>
+					<dd class="mt-1 flex items-center text-3xl font-semibold text-white">
+						{usage?.disk.freePercentage}%
+						{#if !diskWarning}
+							<Trend trend={trends.disk} />
+						{/if}
+					</dd>
+				</div>
+			</dl>
+			<div class="title pt-20 font-bold">Resources</div>
+		{/if}
 		<dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
 			<a
 				href="/applications"
