@@ -223,7 +223,6 @@
 						<polyline points="10 15 13 18 10 21" />
 					</svg>
 				</a>
-				<div class="border-t border-stone-700" />
 				<a
 					sveltekit:prefetch
 					href="/destinations"
@@ -285,7 +284,6 @@
 						<path d="M4 12v6a8 3 0 0 0 16 0v-6" />
 					</svg>
 				</a>
-				<div class="border-t border-stone-700" />
 				<a
 					sveltekit:prefetch
 					href="/services"
