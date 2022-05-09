@@ -159,7 +159,7 @@ export const post: RequestHandler = async (event) => {
 					networks: [network],
 					volumes: [],
 					restart: 'always',
-					...(exposePort ? { ports: [`${port}:${port}`] } : {}),
+					...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
 					labels: makeLabelForServices('umami'),
 					deploy: {
 						restart_policy: {

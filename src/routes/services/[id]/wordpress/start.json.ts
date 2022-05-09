@@ -79,7 +79,7 @@ export const post: RequestHandler = async (event) => {
 					volumes: [config.wordpress.volume],
 					networks: [network],
 					restart: 'always',
-					...(exposePort ? { ports: [`${port}:${port}`] } : {}),
+					...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
 					depends_on: [`${id}-mysql`],
 					labels: makeLabelForServices('wordpress'),
 					deploy: {

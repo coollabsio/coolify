@@ -527,7 +527,8 @@
 				<div class="grid grid-cols-2 items-center">
 					<label for="exposePort" class="text-base font-bold text-stone-100">Exposed Port</label>
 					<input
-						readonly={!$session.isAdmin}
+						readonly={!$session.isAdmin && !isRunning}
+						disabled={!$session.isAdmin || isRunning}
 						name="exposePort"
 						id="exposePort"
 						bind:value={application.exposePort}

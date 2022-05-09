@@ -135,7 +135,7 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 					networks: [network],
 					environment: config.plausibleAnalytics.environmentVariables,
 					restart: 'always',
-					...(exposePort && { ports: [`${port}:${exposePort}`] }),
+					...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
 					depends_on: [`${id}-postgresql`, `${id}-clickhouse`],
 					labels: makeLabelForServices('plausibleAnalytics'),
 					deploy: {
@@ -195,6 +195,7 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 			}
 		};
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
+		console.log(JSON.stringify(composeFile, null, 2));
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 		await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
 		await asyncExecShell(
