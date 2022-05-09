@@ -39,6 +39,11 @@
 	let cpuWarning = false;
 	let diskWarning = false;
 
+	let trends = {
+		memory: 'stable',
+		cpu: 'stable',
+		disk: 'stable'
+	};
 	let usage = {
 		cpu: {
 			load: [0, 0, 0],
@@ -62,6 +67,36 @@
 		try {
 			loading.usage = true;
 			const data = await get(`/dashboard.json?usage=true`);
+			console.log(usage.memory.freeMemPercentage);
+			if (data.memory.freeMemPercentage === usage.memory.freeMemPercentage) {
+				trends.memory = 'stable';
+			} else {
+				if (data.memory.freeMemPercentage > usage.memory.freeMemPercentage) {
+					trends.memory = 'up';
+				} else {
+					trends.memory = 'down';
+				}
+			}
+			if (data.cpu.usage === usage.cpu.usage) {
+				trends.cpu = 'stable';
+			} else {
+				if (data.cpu.usage > usage.cpu.usage) {
+					trends.cpu = 'up';
+				} else {
+					trends.cpu = 'down';
+				}
+			}
+
+			if (data.disk.freePercentage === usage.disk.freePercentage) {
+				trends.disk = 'stable';
+			} else {
+				if (data.disk.freePercentage > usage.disk.freePercentage) {
+					trends.disk = 'up';
+				} else {
+					trends.disk = 'down';
+				}
+			}
+
 			usage = data;
 			if (usage.memory.freeMemPercentage < 15) {
 				memoryWarning = true;
@@ -119,8 +154,59 @@
 
 			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6" class:bg-red-500={memoryWarning}>
 				<dt class="truncate text-sm font-medium text-white">Free Memory</dt>
-				<dd class="mt-1 text-3xl font-semibold text-white">
+				<dd class="mt-1 flex items-center text-3xl font-semibold text-white">
 					{usage?.memory.freeMemPercentage}%
+					{#if trends.memory === 'stable' || trends.memory === '' || usage.memory.freeMemPercentage === 0}
+						<span class="px-2 text-yellow-400"
+							><svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-8 w-8"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<path d="M5 9h14m-14 6h14" />
+							</svg></span
+						>
+					{:else if trends.memory === 'up'}
+						<span class="text-green-500 px-2">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="w-8 h-8"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<line x1="17" y1="7" x2="7" y2="17" />
+								<polyline points="8 7 17 7 17 16" />
+							</svg></span
+						>
+					{:else if trends.memory === 'down'}
+						<span class="text-red-500 px-2">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="w-8 h-8"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<line x1="7" y1="7" x2="17" y2="17" />
+								<polyline points="17 8 17 17 8 17" />
+							</svg>
+						</span>
+					{/if}
 				</dd>
 			</div>
 		</dl>
@@ -139,8 +225,59 @@
 			</div>
 			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6" class:bg-red-500={cpuWarning}>
 				<dt class="truncate text-sm font-medium text-white">CPU Usage</dt>
-				<dd class="mt-1 text-3xl font-semibold text-white">
+				<dd class="mt-1 flex items-center text-3xl  font-semibold text-white">
 					{(usage?.cpu.usage).toFixed(0)}%
+					{#if trends.cpu === 'stable' || trends.cpu === '' || usage.cpu.usage === 0}
+						<span class="px-2 text-yellow-400"
+							><svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-8 w-8"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<path d="M5 9h14m-14 6h14" />
+							</svg></span
+						>
+					{:else if trends.cpu === 'up'}
+						<span class="text-green-500 px-2">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="w-8 h-8"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<line x1="17" y1="7" x2="7" y2="17" />
+								<polyline points="8 7 17 7 17 16" />
+							</svg></span
+						>
+					{:else if trends.cpu === 'down'}
+						<span class="text-red-500 px-2">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="w-8 h-8"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<line x1="7" y1="7" x2="17" y2="17" />
+								<polyline points="17 8 17 17 8 17" />
+							</svg>
+						</span>
+					{/if}
 				</dd>
 			</div>
 		</dl>
@@ -159,8 +296,59 @@
 			</div>
 			<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6" class:bg-red-500={diskWarning}>
 				<dt class="truncate text-sm font-medium text-white">Free Disk</dt>
-				<dd class="mt-1 text-3xl font-semibold text-white">
+				<dd class="mt-1 flex items-center text-3xl font-semibold text-white">
 					{usage?.disk.freePercentage}%
+					{#if trends.disk === 'stable' || trends.disk === '' || usage.disk.freePercentage === 0}
+						<span class="px-2 text-yellow-400"
+							><svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-8 w-8"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<path d="M5 9h14m-14 6h14" />
+							</svg></span
+						>
+					{:else if trends.disk === 'up'}
+						<span class="text-green-500 px-2">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="w-8 h-8"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<line x1="17" y1="7" x2="7" y2="17" />
+								<polyline points="8 7 17 7 17 16" />
+							</svg></span
+						>
+					{:else if trends.disk === 'down'}
+						<span class="text-red-500 px-2">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="w-8 h-8"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<line x1="7" y1="7" x2="17" y2="17" />
+								<polyline points="17 8 17 17 8 17" />
+							</svg>
+						</span>
+					{/if}
 				</dd>
 			</div>
 		</dl>
