@@ -55,6 +55,9 @@ frontend http
   http-request redirect location {{{redirectValue}}} code ${
 		dev ? 302 : 301
 	} if { req.hdr(host) -i {{redirectTo}} }
+  {{#scriptName}}
+    http-request set-path /js/plausible.js if { hdr(host) -i {{domain}} } { path_beg -i /js/{{scriptName}} }
+  {{/scriptName}}
   {{/services}}
 
   {{#coolify}}
@@ -218,7 +221,15 @@ export async function configureHAProxy(): Promise<void> {
 	const services = await listServicesWithIncludes();
 
 	for (const service of services) {
-		const { fqdn, id, type, destinationDocker, destinationDockerId, updatedAt } = service;
+		const {
+			fqdn,
+			id,
+			type,
+			destinationDocker,
+			destinationDockerId,
+			updatedAt,
+			plausibleAnalytics
+		} = service;
 		if (destinationDockerId) {
 			const { engine } = destinationDocker;
 			const found = supportedServiceTypesAndVersions.find((a) => a.name === type);
@@ -232,6 +243,12 @@ export async function configureHAProxy(): Promise<void> {
 					const isWWW = fqdn.includes('www.');
 					const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
 					if (isRunning) {
+						// Plausible Analytics custom script
+						let scriptName = false;
+						if (type === 'plausibleanalytics' && plausibleAnalytics.scriptName !== 'plausible.js') {
+							scriptName = plausibleAnalytics.scriptName;
+						}
+
 						data.services.push({
 							id,
 							port,
@@ -241,7 +258,8 @@ export async function configureHAProxy(): Promise<void> {
 							isHttps,
 							redirectValue,
 							redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain,
-							updatedAt: updatedAt.getTime()
+							updatedAt: updatedAt.getTime(),
+							scriptName
 						});
 					}
 				}

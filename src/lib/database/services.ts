@@ -329,7 +329,8 @@ export async function updatePlausibleAnalyticsService({
 	email,
 	exposePort,
 	username,
-	name
+	name,
+	scriptName
 }: {
 	id: string;
 	fqdn: string;
@@ -337,8 +338,12 @@ export async function updatePlausibleAnalyticsService({
 	name: string;
 	email: string;
 	username: string;
+	scriptName: string;
 }): Promise<void> {
-	await prisma.plausibleAnalytics.update({ where: { serviceId: id }, data: { email, username } });
+	await prisma.plausibleAnalytics.update({
+		where: { serviceId: id },
+		data: { email, username, scriptName }
+	});
 	await prisma.service.update({ where: { id }, data: { name, fqdn, exposePort } });
 }
 

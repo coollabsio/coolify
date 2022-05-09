@@ -1,12 +1,31 @@
 <script lang="ts">
+	import { session } from '$app/stores';
+
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
+	import Explainer from '$lib/components/Explainer.svelte';
 	import { t } from '$lib/translations';
 	export let service;
 	export let readOnly;
+	export let isRunning;
 </script>
 
 <div class="flex space-x-1 py-5 font-bold">
 	<div class="title">Plausible Analytics</div>
+</div>
+<div class="grid grid-cols-2 items-center px-10">
+	<label for="scriptName">Script Name</label>
+	<input
+		name="scriptName"
+		id="scriptName"
+		readonly={!$session.isAdmin && !isRunning}
+		disabled={!$session.isAdmin || isRunning}
+		placeholder="plausible.js"
+		bind:value={service.plausibleAnalytics.scriptName}
+		required
+	/>
+	<Explainer
+		text="Useful if you would like to rename the collector script to prevent it blocked by AdBlockers."
+	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
 	<label for="email">{$t('forms.email')}</label>

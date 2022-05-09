@@ -188,7 +188,7 @@
 			{/if}
 
 			{#if service.type === 'plausibleanalytics'}
-				<PlausibleAnalytics bind:service {readOnly} />
+				<PlausibleAnalytics bind:service {isRunning} {readOnly} />
 			{:else if service.type === 'minio'}
 				<MinIo {service} />
 			{:else if service.type === 'vscodeserver'}
