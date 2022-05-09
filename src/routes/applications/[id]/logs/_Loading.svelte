@@ -1,4 +1,8 @@
-<div class="lds-ripple absolute left-0">
+<script>
+	export let position = 'absolute';
+</script>
+
+<div class="lds-ripple {position} left-0">
 	<div />
 	<div />
 </div>
