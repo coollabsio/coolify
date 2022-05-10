@@ -61,6 +61,7 @@ These are the predefined build packs, but with the Docker build pack, you can ho
 - Laravel
 - Rust
 - Docker
+- Python
 
 ### Databases
 
@@ -77,9 +78,9 @@ One-click database is ready to be used internally or shared over the internet:
 
 You can host cool open-source services as well:
 
-- [WordPress](https://wordpress.org)
+- [WordPress](https://docs.coollabs.io/coolify/services/wordpress)
 - [Ghost](https://ghost.org)
-- [Plausible Analytics](https://plausible.io)
+- [Plausible Analytics](https://docs.coollabs.io/coolify/services/plausible-analytics)
 - [NocoDB](https://nocodb.com)
 - [VSCode Server](https://github.com/cdr/code-server)
 - [MinIO](https://min.io)

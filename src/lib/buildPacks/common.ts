@@ -407,6 +407,10 @@ export function setDefaultBaseImage(buildPack) {
 	];
 	const pythonVersions = [
 		{
+			value: 'python:3.10-alpine',
+			label: 'python:3.10-alpine'
+		},
+		{
 			value: 'python:3.10-buster',
 			label: 'python:3.10-buster'
 		},
@@ -486,7 +490,7 @@ export function setDefaultBaseImage(buildPack) {
 		payload.baseBuildImages = nodeVersions;
 	}
 	if (buildPack === 'python') {
-		payload.baseImage = 'python:3-alpine';
+		payload.baseImage = 'python:3.10-alpine';
 		payload.baseImages = pythonVersions;
 	}
 	if (buildPack === 'rust') {

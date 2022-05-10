@@ -140,7 +140,6 @@
 		{#if $session.teamId === '0'}
 			<div class="px-6 text-2xl font-bold">Server Usage</div>
 			<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-				<Loading />
 				<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
 					<dt class="truncate text-sm font-medium text-white">Total Memory</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
@@ -175,12 +174,6 @@
 						{usage?.cpu.count}
 					</dd>
 				</div>
-				<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
-					<dt class="truncate text-sm font-medium text-white">Load Average (5/10/30mins)</dt>
-					<dd class="mt-1 text-3xl font-semibold text-white">
-						{usage?.cpu.load.join('/')}
-					</dd>
-				</div>
 				<div
 					class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left"
 					class:bg-red-500={cpuWarning}
@@ -191,6 +184,12 @@
 						{#if !cpuWarning}
 							<Trend trend={trends.cpu} />
 						{/if}
+					</dd>
+				</div>
+				<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
+					<dt class="truncate text-sm font-medium text-white">Load Average (5/10/30mins)</dt>
+					<dd class="mt-1 text-3xl font-semibold text-white">
+						{usage?.cpu.load.join('/')}
 					</dd>
 				</div>
 			</dl>
@@ -255,7 +254,7 @@
 				</dd>
 			</a>
 		</dl>
-		<dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+		<dl class="mt-5 grid grid-cols-1 gap-5 px-2 sm:grid-cols-3">
 			<a
 				href="/databases"
 				sveltekit:prefetch
