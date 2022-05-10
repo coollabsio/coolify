@@ -78,7 +78,7 @@ export const post: RequestHandler = async (event) => {
 					networks: [network],
 					volumes: [config.volume, ...volumes],
 					restart: 'always',
-					...(exposePort ? { ports: [`${port}:${exposePort}`] } : {}),
+					...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
 					labels: makeLabelForServices('vscodeServer'),
 					deploy: {
 						restart_policy: {

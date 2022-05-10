@@ -27,7 +27,6 @@
 	let loading = false;
 	let loadingVerification = false;
 	let dualCerts = service.dualCerts;
-	let showExposePort = service.exposePort !== null;
 
 	async function handleSubmit() {
 		loading = true;
@@ -161,34 +160,23 @@
 					on:click={() => !isRunning && changeSettings('dualCerts')}
 				/>
 			</div>
-			<div class="grid grid-cols-2 items-center">
-				<Setting
-					isCenter={false}
-					bind:setting={showExposePort}
-					on:click={() => {
-						showExposePort = !showExposePort;
-						service.exposePort = undefined;
-					}}
-					title={$t('application.expose_a_port')}
-					description="Expose a port to the host system"
+			<div class="grid grid-cols-2 items-center  px-10">
+				<label for="exposePort" class="text-base font-bold text-stone-100">Exposed Port</label>
+				<input
+					readonly={!$session.isAdmin && !isRunning}
+					disabled={!$session.isAdmin || isRunning}
+					name="exposePort"
+					id="exposePort"
+					bind:value={service.exposePort}
+					placeholder="12345"
+				/>
+				<Explainer
+					text={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
 				/>
 			</div>
 
-			{#if showExposePort}
-				<div class="grid grid-cols-2 items-center">
-					<label for="exposePort" class="text-base font-bold text-stone-100">Expose Port</label>
-					<input
-						readonly={!$session.isAdmin}
-						name="exposePort"
-						id="exposePort"
-						bind:value={service.exposePort}
-						placeholder="12345"
-					/>
-				</div>
-			{/if}
-
 			{#if service.type === 'plausibleanalytics'}
-				<PlausibleAnalytics bind:service {readOnly} />
+				<PlausibleAnalytics bind:service {isRunning} {readOnly} />
 			{:else if service.type === 'minio'}
 				<MinIo {service} />
 			{:else if service.type === 'vscodeserver'}

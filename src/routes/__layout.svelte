@@ -78,6 +78,7 @@
 			}
 		}
 	});
+
 	async function logout() {
 		try {
 			await del(`/logout.json`, {});
@@ -137,7 +138,7 @@
 			{#if !$session.whiteLabeled}
 				<div class="my-4 h-10 w-10"><img src="/favicon.png" alt="coolLabs logo" /></div>
 			{/if}
-			<div class="flex flex-col space-y-4 py-2" class:mt-2={$session.whiteLabeled}>
+			<div class="flex flex-col space-y-2 py-2" class:mt-2={$session.whiteLabeled}>
 				<a
 					sveltekit:prefetch
 					href="/"
@@ -222,7 +223,6 @@
 						<polyline points="10 15 13 18 10 21" />
 					</svg>
 				</a>
-				<div class="border-t border-stone-700" />
 				<a
 					sveltekit:prefetch
 					href="/destinations"
@@ -284,7 +284,6 @@
 						<path d="M4 12v6a8 3 0 0 0 16 0v-6" />
 					</svg>
 				</a>
-				<div class="border-t border-stone-700" />
 				<a
 					sveltekit:prefetch
 					href="/services"
@@ -423,7 +422,7 @@
 					{/if}
 				{/if}
 			</div>
-			<div class="flex flex-col space-y-4 py-2">
+			<div class="flex flex-col space-y-2 py-2">
 				<a
 					sveltekit:prefetch
 					href="/iam"

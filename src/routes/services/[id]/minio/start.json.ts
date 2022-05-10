@@ -65,7 +65,7 @@ export const post: RequestHandler = async (event) => {
 					networks: [network],
 					volumes: [config.volume],
 					restart: 'always',
-					...(exposePort && { ports: [`${port}:${port}`] }),
+					...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
 					labels: makeLabelForServices('minio'),
 					deploy: {
 						restart_policy: {

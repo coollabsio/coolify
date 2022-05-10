@@ -47,7 +47,7 @@
 	</div>
 </div>
 
-<div class="flex flex-col flex-wrap justify-center">
+<div class="flex justify-center">
 	{#if !databases || ownDatabases.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">{$t('database.no_databases_found')}</div>

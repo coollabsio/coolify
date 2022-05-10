@@ -322,6 +322,7 @@ model PlausibleAnalytics {
   postgresqlDatabase   String
   postgresqlPublicPort Int?
   secretKeyBase        String?
+  scriptName           String   @default("plausible.js")
   serviceId            String   @unique
   service              Service  @relation(fields: [serviceId], references: [id])
   createdAt            DateTime @default(now())
@@ -352,6 +353,9 @@ model Wordpress {
   id                    String   @id @default(cuid())
   extraConfig           String?
   tablePrefix           String?
+  ownMysql              Boolean  @default(false)
+  mysqlHost             String?
+  mysqlPort             Int?
   mysqlUser             String
   mysqlPassword         String
   mysqlRootUser         String

@@ -128,9 +128,7 @@ export function findBuildPack(pack, packageManager = 'npm') {
 	if (pack === 'astro') {
 		return {
 			...metaData,
-			installCommand: `yarn install`,
-			buildCommand: `yarn build`,
-			startCommand: null,
+			...defaultBuildAndDeploy(packageManager),
 			publishDirectory: `dist`,
 			port: 80
 		};
@@ -138,9 +136,7 @@ export function findBuildPack(pack, packageManager = 'npm') {
 	if (pack === 'eleventy') {
 		return {
 			...metaData,
-			installCommand: `yarn install`,
-			buildCommand: `yarn build`,
-			startCommand: null,
+			...defaultBuildAndDeploy(packageManager),
 			publishDirectory: `_site`,
 			port: 80
 		};

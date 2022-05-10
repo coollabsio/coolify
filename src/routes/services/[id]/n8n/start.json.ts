@@ -48,6 +48,7 @@ export const post: RequestHandler = async (event) => {
 					environment: config.environmentVariables,
 					restart: 'always',
 					labels: makeLabelForServices('n8n'),
+					...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
 					deploy: {
 						restart_policy: {
 							condition: 'on-failure',
