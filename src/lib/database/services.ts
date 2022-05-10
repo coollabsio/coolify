@@ -418,20 +418,27 @@ export async function updateWordpress({
 	fqdn,
 	name,
 	exposePort,
+	ownMysql,
 	mysqlDatabase,
 	extraConfig,
 	mysqlHost,
-	mysqlPort
+	mysqlPort,
+	mysqlUser,
+	mysqlPassword
 }: {
 	id: string;
 	fqdn: string;
 	name: string;
 	exposePort?: number;
+	ownMysql: boolean;
 	mysqlDatabase: string;
 	extraConfig: string;
 	mysqlHost?: string;
 	mysqlPort?: number;
+	mysqlUser?: string;
+	mysqlPassword?: string;
 }): Promise<Service> {
+	mysqlPassword = encrypt(mysqlPassword);
 	return await prisma.service.update({
 		where: { id },
 		data: {
@@ -443,6 +450,8 @@ export async function updateWordpress({
 					mysqlDatabase,
 					extraConfig,
 					mysqlHost,
+					mysqlUser,
+					mysqlPassword,
 					mysqlPort
 				}
 			}

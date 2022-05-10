@@ -175,8 +175,8 @@ define('SUBDOMAIN_INSTALL', false);`
 			id="mysqlRootUser"
 			placeholder="MySQL {$t('forms.root_user')}"
 			value={service.wordpress.mysqlRootUser}
-			readonly={isRunning || !service.wordpress.ownMysq}
-			disabled={isRunning || !service.wordpress.ownMysq}
+			readonly={isRunning || !service.wordpress.ownMysql}
+			disabled={isRunning || !service.wordpress.ownMysql}
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center px-10">
@@ -184,8 +184,8 @@ define('SUBDOMAIN_INSTALL', false);`
 		<CopyPasswordField
 			id="mysqlRootUserPassword"
 			isPasswordField
-			readonly={isRunning || !service.wordpress.ownMysq}
-			disabled={isRunning || !service.wordpress.ownMysq}
+			readonly={isRunning || !service.wordpress.ownMysql}
+			disabled={isRunning || !service.wordpress.ownMysql}
 			name="mysqlRootUserPassword"
 			value={service.wordpress.mysqlRootUserPassword}
 		/>
@@ -196,7 +196,7 @@ define('SUBDOMAIN_INSTALL', false);`
 	<input
 		name="mysqlUser"
 		id="mysqlUser"
-		value={service.wordpress.mysqlUser}
+		bind:value={service.wordpress.mysqlUser}
 		readonly={isRunning || !service.wordpress.ownMysql}
 		disabled={isRunning || !service.wordpress.ownMysql}
 	/>
@@ -209,6 +209,6 @@ define('SUBDOMAIN_INSTALL', false);`
 		readonly={isRunning || !service.wordpress.ownMysql}
 		disabled={isRunning || !service.wordpress.ownMysql}
 		name="mysqlPassword"
-		value={service.wordpress.mysqlPassword}
+		bind:value={service.wordpress.mysqlPassword}
 	/>
 </div>

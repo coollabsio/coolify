@@ -12,23 +12,25 @@ export const post: RequestHandler = async (event) => {
 		name,
 		fqdn,
 		exposePort,
-		wordpress: { extraConfig, mysqlDatabase, mysqlHost, mysqlPort }
+		ownMysql,
+		wordpress: { extraConfig, mysqlDatabase, mysqlHost, mysqlPort, mysqlUser, mysqlPassword }
 	} = await event.request.json();
-
 	if (fqdn) fqdn = fqdn.toLowerCase();
 	if (exposePort) exposePort = Number(exposePort);
 	if (mysqlPort) mysqlPort = Number(mysqlPort);
-
 	try {
 		await db.updateWordpress({
 			id,
 			fqdn,
 			name,
 			extraConfig,
+			ownMysql,
 			mysqlDatabase,
 			exposePort,
 			mysqlHost,
-			mysqlPort
+			mysqlPort,
+			mysqlUser,
+			mysqlPassword
 		});
 		return { status: 201 };
 	} catch (error) {
