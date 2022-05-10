@@ -407,26 +407,6 @@ export function setDefaultBaseImage(buildPack) {
 	];
 	const pythonVersions = [
 		{
-			value: 'python:3.11-alpine',
-			label: 'python:3.11-alpine'
-		},
-		{
-			value: 'python:3.11-buster',
-			label: 'python:3.11-buster'
-		},
-		{
-			value: 'python:3.11-bullseye',
-			label: 'python:3.11-bullseye'
-		},
-		{
-			value: 'python:3.11-slim-bullseye',
-			label: 'python:3.11-slim-bullseye'
-		},
-		{
-			value: 'python:3.11-alpine',
-			label: 'python:3.11-alpine'
-		},
-		{
 			value: 'python:3.10-buster',
 			label: 'python:3.10-buster'
 		},
