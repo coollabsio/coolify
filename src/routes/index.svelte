@@ -138,24 +138,27 @@
 <div class="mt-10 pb-12 tracking-tight sm:pb-16">
 	<div class="mx-auto max-w-4xl">
 		{#if $session.teamId === '0'}
-			<div class="title font-bold">Server Usage</div>
+			<div class="px-6 text-2xl font-bold">Server Usage</div>
 			<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
 				<Loading />
-				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
+				<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
 					<dt class="truncate text-sm font-medium text-white">Total Memory</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
 						{(usage?.memory.totalMemMb).toFixed(0)}<span class="text-sm">MB</span>
 					</dd>
 				</div>
 
-				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
+				<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
 					<dt class="truncate text-sm font-medium text-white">Used Memory</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white ">
 						{(usage?.memory.usedMemMb).toFixed(0)}<span class="text-sm">MB</span>
 					</dd>
 				</div>
 
-				<div class="overflow-hidden rounded px-4 py-5 sm:p-6" class:bg-red-500={memoryWarning}>
+				<div
+					class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left"
+					class:bg-red-500={memoryWarning}
+				>
 					<dt class="truncate text-sm font-medium text-white">Free Memory</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
 						{usage?.memory.freeMemPercentage}<span class="text-sm">%</span>
@@ -166,19 +169,22 @@
 				</div>
 			</dl>
 			<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
+				<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
 					<dt class="truncate text-sm font-medium text-white">Total CPUs</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
 						{usage?.cpu.count}
 					</dd>
 				</div>
-				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
+				<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
 					<dt class="truncate text-sm font-medium text-white">Load Average (5/10/30mins)</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
 						{usage?.cpu.load.join('/')}
 					</dd>
 				</div>
-				<div class="overflow-hidden rounded px-4 py-5 sm:p-6" class:bg-red-500={cpuWarning}>
+				<div
+					class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left"
+					class:bg-red-500={cpuWarning}
+				>
 					<dt class="truncate text-sm font-medium text-white">CPU Usage</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
 						{usage?.cpu.usage}<span class="text-sm">%</span>
@@ -189,19 +195,22 @@
 				</div>
 			</dl>
 			<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
+				<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
 					<dt class="truncate text-sm font-medium text-white">Total Disk</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
 						{usage?.disk.totalGb}<span class="text-sm">GB</span>
 					</dd>
 				</div>
-				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
+				<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
 					<dt class="truncate text-sm font-medium text-white">Used Disk</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
 						{usage?.disk.usedGb}<span class="text-sm">GB</span>
 					</dd>
 				</div>
-				<div class="overflow-hidden rounded px-4 py-5 sm:p-6" class:bg-red-500={diskWarning}>
+				<div
+					class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left"
+					class:bg-red-500={diskWarning}
+				>
 					<dt class="truncate text-sm font-medium text-white">Free Disk</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
 						{usage?.disk.freePercentage}<span class="text-sm">%</span>
@@ -211,13 +220,13 @@
 					</dd>
 				</div>
 			</dl>
-			<div class="title pt-20 font-bold">Resources</div>
+			<div class="px-6 pt-20 text-2xl font-bold">Resources</div>
 		{/if}
-		<dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+		<dl class="mt-5 grid grid-cols-1 gap-5 px-2 sm:grid-cols-3">
 			<a
 				href="/applications"
 				sveltekit:prefetch
-				class="overflow-hidden rounded px-4 py-5 text-green-500 no-underline transition-all duration-100 hover:bg-green-500 hover:text-white sm:p-6"
+				class="overflow-hidden rounded px-4 py-5 text-center text-green-500 no-underline transition-all duration-100 hover:bg-green-500 hover:text-white sm:p-6 sm:text-left"
 			>
 				<dt class="truncate text-sm font-medium text-white">{$t('index.applications')}</dt>
 				<dd class="mt-1 text-3xl font-semibold ">
@@ -227,7 +236,7 @@
 			<a
 				href="/destinations"
 				sveltekit:prefetch
-				class="overflow-hidden rounded px-4 py-5 text-sky-500 no-underline transition-all duration-100 hover:bg-sky-500 hover:text-white sm:p-6"
+				class="overflow-hidden rounded px-4 py-5 text-center text-sky-500 no-underline transition-all duration-100 hover:bg-sky-500 hover:text-white sm:p-6 sm:text-left"
 			>
 				<dt class="truncate text-sm font-medium text-white">{$t('index.destinations')}</dt>
 				<dd class="mt-1 text-3xl font-semibold ">
@@ -238,7 +247,7 @@
 			<a
 				href="/sources"
 				sveltekit:prefetch
-				class="overflow-hidden rounded px-4 py-5 text-orange-500 no-underline transition-all duration-100 hover:bg-orange-500 hover:text-white sm:p-6"
+				class="overflow-hidden rounded px-4 py-5 text-center text-orange-500 no-underline transition-all duration-100 hover:bg-orange-500 hover:text-white sm:p-6 sm:text-left"
 			>
 				<dt class="truncate text-sm font-medium text-white">{$t('index.git_sources')}</dt>
 				<dd class="mt-1 text-3xl font-semibold">
@@ -250,7 +259,7 @@
 			<a
 				href="/databases"
 				sveltekit:prefetch
-				class="overflow-hidden rounded px-4 py-5 text-purple-500 no-underline transition-all duration-100 hover:bg-purple-500 hover:text-white sm:p-6"
+				class="overflow-hidden rounded px-4 py-5 text-center text-purple-500 no-underline transition-all duration-100 hover:bg-purple-500 hover:text-white sm:p-6 sm:text-left"
 			>
 				<dt class="truncate text-sm font-medium text-white">{$t('index.databases')}</dt>
 				<dd class="mt-1 text-3xl font-semibold ">
@@ -261,7 +270,7 @@
 			<a
 				href="/services"
 				sveltekit:prefetch
-				class="overflow-hidden rounded px-4 py-5 text-pink-500 no-underline transition-all duration-100 hover:bg-pink-500 hover:text-white sm:p-6"
+				class="overflow-hidden rounded px-4 py-5 text-center text-pink-500 no-underline transition-all duration-100 hover:bg-pink-500 hover:text-white sm:p-6 sm:text-left"
 			>
 				<dt class="truncate text-sm font-medium text-white">{$t('index.services')}</dt>
 				<dd class="mt-1 text-3xl font-semibold ">
@@ -272,7 +281,7 @@
 			<a
 				href="/iam"
 				sveltekit:prefetch
-				class="overflow-hidden rounded px-4 py-5 text-cyan-500 no-underline transition-all duration-100 hover:bg-cyan-500 hover:text-white sm:p-6"
+				class="overflow-hidden rounded px-4 py-5 text-center text-cyan-500 no-underline transition-all duration-100 hover:bg-cyan-500 hover:text-white sm:p-6 sm:text-left"
 			>
 				<dt class="truncate text-sm font-medium text-white">{$t('index.teams')}</dt>
 				<dd class="mt-1 text-3xl font-semibold ">
