@@ -3,7 +3,7 @@
 </script>
 
 {#if trend === 'up'}
-	<span class="px-2 text-green-500">
+	<span class="-mt-1 inline-flex px-2 text-green-500">
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
 			class="h-8 w-8"
@@ -20,7 +20,7 @@
 		</svg></span
 	>
 {:else if trend === 'down'}
-	<span class="text-red-500 px-2">
+	<span class="text-red-500 px-2 inline-flex -mt-1">
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
 			class="w-8 h-8"

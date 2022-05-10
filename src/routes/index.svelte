@@ -144,21 +144,21 @@
 				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
 					<dt class="truncate text-sm font-medium text-white">Total Memory</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
-						{(usage?.memory.totalMemMb).toFixed(0)}
+						{(usage?.memory.totalMemMb).toFixed(0)}<span class="text-sm">MB</span>
 					</dd>
 				</div>
 
 				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
 					<dt class="truncate text-sm font-medium text-white">Used Memory</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white ">
-						{(usage?.memory.usedMemMb).toFixed(0)}
+						{(usage?.memory.usedMemMb).toFixed(0)}<span class="text-sm">MB</span>
 					</dd>
 				</div>
 
 				<div class="overflow-hidden rounded px-4 py-5 sm:p-6" class:bg-red-500={memoryWarning}>
 					<dt class="truncate text-sm font-medium text-white">Free Memory</dt>
-					<dd class="mt-1 flex items-center text-3xl font-semibold text-white">
-						{usage?.memory.freeMemPercentage}%
+					<dd class="mt-1 text-3xl font-semibold text-white">
+						{usage?.memory.freeMemPercentage}<span class="text-sm">%</span>
 						{#if !memoryWarning}
 							<Trend trend={trends.memory} />
 						{/if}
@@ -180,8 +180,8 @@
 				</div>
 				<div class="overflow-hidden rounded px-4 py-5 sm:p-6" class:bg-red-500={cpuWarning}>
 					<dt class="truncate text-sm font-medium text-white">CPU Usage</dt>
-					<dd class="mt-1 flex items-center text-3xl  font-semibold text-white">
-						{usage?.cpu.usage}%
+					<dd class="mt-1 text-3xl font-semibold text-white">
+						{usage?.cpu.usage}<span class="text-sm">%</span>
 						{#if !cpuWarning}
 							<Trend trend={trends.cpu} />
 						{/if}
@@ -192,19 +192,19 @@
 				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
 					<dt class="truncate text-sm font-medium text-white">Total Disk</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
-						{usage?.disk.totalGb}GB
+						{usage?.disk.totalGb}<span class="text-sm">GB</span>
 					</dd>
 				</div>
 				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
 					<dt class="truncate text-sm font-medium text-white">Used Disk</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
-						{usage?.disk.usedGb}GB
+						{usage?.disk.usedGb}<span class="text-sm">GB</span>
 					</dd>
 				</div>
 				<div class="overflow-hidden rounded px-4 py-5 sm:p-6" class:bg-red-500={diskWarning}>
 					<dt class="truncate text-sm font-medium text-white">Free Disk</dt>
-					<dd class="mt-1 flex items-center text-3xl font-semibold text-white">
-						{usage?.disk.freePercentage}%
+					<dd class="mt-1 text-3xl font-semibold text-white">
+						{usage?.disk.freePercentage}<span class="text-sm">%</span>
 						{#if !diskWarning}
 							<Trend trend={trends.disk} />
 						{/if}
