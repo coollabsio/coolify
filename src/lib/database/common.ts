@@ -28,7 +28,7 @@ if (!dev) {
 }
 
 export const prisma = new PrismaClient({
-	errorFormat: 'pretty',
+	errorFormat: 'minimal',
 	rejectOnNotFound: false
 });
 

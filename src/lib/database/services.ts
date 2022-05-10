@@ -419,7 +419,9 @@ export async function updateWordpress({
 	name,
 	exposePort,
 	mysqlDatabase,
-	extraConfig
+	extraConfig,
+	mysqlHost,
+	mysqlPort
 }: {
 	id: string;
 	fqdn: string;
@@ -427,10 +429,24 @@ export async function updateWordpress({
 	exposePort?: number;
 	mysqlDatabase: string;
 	extraConfig: string;
+	mysqlHost?: string;
+	mysqlPort?: number;
 }): Promise<Service> {
 	return await prisma.service.update({
 		where: { id },
-		data: { fqdn, name, exposePort, wordpress: { update: { mysqlDatabase, extraConfig } } }
+		data: {
+			fqdn,
+			name,
+			exposePort,
+			wordpress: {
+				update: {
+					mysqlDatabase,
+					extraConfig,
+					mysqlHost,
+					mysqlPort
+				}
+			}
+		}
 	});
 }
 

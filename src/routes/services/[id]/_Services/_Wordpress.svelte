@@ -18,6 +18,7 @@
 	let ftpUser = service.wordpress.ftpUser;
 	let ftpPassword = service.wordpress.ftpPassword;
 	let ftpLoading = false;
+	let ownMysql = service.wordpress.ownMysql;
 
 	function generateUrl(publicPort) {
 		return browser
@@ -40,7 +41,7 @@
 					publicPort,
 					ftpUser: user,
 					ftpPassword: password
-				} = await post(`/services/${id}/wordpress/settings.json`, {
+				} = await post(`/services/${id}/wordpress/ftp.json`, {
 					ftpEnabled
 				});
 				ftpUrl = generateUrl(publicPort);
@@ -51,6 +52,18 @@
 				return errorNotification(error);
 			} finally {
 				ftpLoading = false;
+			}
+		} else {
+			try {
+				if (name === 'ownMysql') {
+					ownMysql = !ownMysql;
+				}
+				await post(`/services/${id}/wordpress/settings.json`, {
+					ownMysql
+				});
+				service.wordpress.ownMysql = ownMysql;
+			} catch ({ error }) {
+				return errorNotification(error);
 			}
 		}
 	}
@@ -107,50 +120,94 @@ define('SUBDOMAIN_INSTALL', false);`
 	<div class="title">MySQL</div>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
+	<Setting
+		dataTooltip={$t('forms.must_be_stopped_to_modify')}
+		bind:setting={service.wordpress.ownMysql}
+		disabled={isRunning}
+		on:click={() => !isRunning && changeSettings('ownMysql')}
+		title="Use your own MySQL server"
+		description="Enables the use of your own MySQL server. If you don't have one, you can use the one provided by Coolify."
+	/>
+</div>
+{#if service.wordpress.ownMysql}
+	<div class="grid grid-cols-2 items-center px-10">
+		<label for="mysqlHost">Host</label>
+		<input
+			name="mysqlHost"
+			id="mysqlHost"
+			required
+			readonly={isRunning}
+			disabled={isRunning}
+			bind:value={service.wordpress.mysqlHost}
+			placeholder="{$t('forms.eg')}: db.coolify.io"
+		/>
+	</div>
+	<div class="grid grid-cols-2 items-center px-10">
+		<label for="mysqlPort">Port</label>
+		<input
+			name="mysqlPort"
+			id="mysqlPort"
+			required
+			readonly={isRunning}
+			disabled={isRunning}
+			bind:value={service.wordpress.mysqlPort}
+			placeholder="{$t('forms.eg')}: 3306"
+		/>
+	</div>
+{/if}
+<div class="grid grid-cols-2 items-center px-10">
 	<label for="mysqlDatabase">{$t('index.database')}</label>
 	<input
 		name="mysqlDatabase"
 		id="mysqlDatabase"
 		required
-		readonly={readOnly}
-		disabled={readOnly}
+		readonly={readOnly && !service.wordpress.ownMysql}
+		disabled={readOnly && !service.wordpress.ownMysql}
 		bind:value={service.wordpress.mysqlDatabase}
 		placeholder="{$t('forms.eg')}: wordpress_db"
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="mysqlRootUser">{$t('forms.root_user')}</label>
-	<input
-		name="mysqlRootUser"
-		id="mysqlRootUser"
-		placeholder="MySQL {$t('forms.root_user')}"
-		value={service.wordpress.mysqlRootUser}
-		disabled
-		readonly
-	/>
-</div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="mysqlRootUserPassword">{$t('forms.roots_password')}</label>
-	<CopyPasswordField
-		id="mysqlRootUserPassword"
-		isPasswordField
-		readonly
-		disabled
-		name="mysqlRootUserPassword"
-		value={service.wordpress.mysqlRootUserPassword}
-	/>
-</div>
+{#if !service.wordpress.ownMysql}
+	<div class="grid grid-cols-2 items-center px-10">
+		<label for="mysqlRootUser">{$t('forms.root_user')}</label>
+		<input
+			name="mysqlRootUser"
+			id="mysqlRootUser"
+			placeholder="MySQL {$t('forms.root_user')}"
+			value={service.wordpress.mysqlRootUser}
+			readonly={isRunning || !service.wordpress.ownMysq}
+			disabled={isRunning || !service.wordpress.ownMysq}
+		/>
+	</div>
+	<div class="grid grid-cols-2 items-center px-10">
+		<label for="mysqlRootUserPassword">{$t('forms.roots_password')}</label>
+		<CopyPasswordField
+			id="mysqlRootUserPassword"
+			isPasswordField
+			readonly={isRunning || !service.wordpress.ownMysq}
+			disabled={isRunning || !service.wordpress.ownMysq}
+			name="mysqlRootUserPassword"
+			value={service.wordpress.mysqlRootUserPassword}
+		/>
+	</div>
+{/if}
 <div class="grid grid-cols-2 items-center px-10">
 	<label for="mysqlUser">{$t('forms.user')}</label>
-	<input name="mysqlUser" id="mysqlUser" value={service.wordpress.mysqlUser} disabled readonly />
+	<input
+		name="mysqlUser"
+		id="mysqlUser"
+		value={service.wordpress.mysqlUser}
+		readonly={isRunning || !service.wordpress.ownMysql}
+		disabled={isRunning || !service.wordpress.ownMysql}
+	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
 	<label for="mysqlPassword">{$t('forms.password')}</label>
 	<CopyPasswordField
 		id="mysqlPassword"
 		isPasswordField
-		readonly
-		disabled
+		readonly={isRunning || !service.wordpress.ownMysql}
+		disabled={isRunning || !service.wordpress.ownMysql}
 		name="mysqlPassword"
 		value={service.wordpress.mysqlPassword}
 	/>

@@ -353,6 +353,9 @@ model Wordpress {
   id                    String   @id @default(cuid())
   extraConfig           String?
   tablePrefix           String?
+  ownMysql              Boolean  @default(false)
+  mysqlHost             String?
+  mysqlPort             Int?
   mysqlUser             String
   mysqlPassword         String
   mysqlRootUser         String

@@ -141,21 +141,21 @@
 			<div class="title font-bold">Server Usage</div>
 			<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
 				<Loading />
-				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
 					<dt class="truncate text-sm font-medium text-white">Total Memory</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
 						{(usage?.memory.totalMemMb).toFixed(0)}
 					</dd>
 				</div>
 
-				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
 					<dt class="truncate text-sm font-medium text-white">Used Memory</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white ">
 						{(usage?.memory.usedMemMb).toFixed(0)}
 					</dd>
 				</div>
 
-				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6" class:bg-red-500={memoryWarning}>
+				<div class="overflow-hidden rounded px-4 py-5 sm:p-6" class:bg-red-500={memoryWarning}>
 					<dt class="truncate text-sm font-medium text-white">Free Memory</dt>
 					<dd class="mt-1 flex items-center text-3xl font-semibold text-white">
 						{usage?.memory.freeMemPercentage}%
@@ -166,19 +166,19 @@
 				</div>
 			</dl>
 			<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
 					<dt class="truncate text-sm font-medium text-white">Total CPUs</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
 						{usage?.cpu.count}
 					</dd>
 				</div>
-				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
 					<dt class="truncate text-sm font-medium text-white">Load Average (5/10/30mins)</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
 						{usage?.cpu.load.join('/')}
 					</dd>
 				</div>
-				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6" class:bg-red-500={cpuWarning}>
+				<div class="overflow-hidden rounded px-4 py-5 sm:p-6" class:bg-red-500={cpuWarning}>
 					<dt class="truncate text-sm font-medium text-white">CPU Usage</dt>
 					<dd class="mt-1 flex items-center text-3xl  font-semibold text-white">
 						{usage?.cpu.usage}%
@@ -189,19 +189,19 @@
 				</div>
 			</dl>
 			<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
 					<dt class="truncate text-sm font-medium text-white">Total Disk</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
 						{usage?.disk.totalGb}GB
 					</dd>
 				</div>
-				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6">
+				<div class="overflow-hidden rounded px-4 py-5 sm:p-6">
 					<dt class="truncate text-sm font-medium text-white">Used Disk</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
 						{usage?.disk.usedGb}GB
 					</dd>
 				</div>
-				<div class="overflow-hidden rounded-lg px-4 py-5 sm:p-6" class:bg-red-500={diskWarning}>
+				<div class="overflow-hidden rounded px-4 py-5 sm:p-6" class:bg-red-500={diskWarning}>
 					<dt class="truncate text-sm font-medium text-white">Free Disk</dt>
 					<dd class="mt-1 flex items-center text-3xl font-semibold text-white">
 						{usage?.disk.freePercentage}%
@@ -217,7 +217,7 @@
 			<a
 				href="/applications"
 				sveltekit:prefetch
-				class="overflow-hidden rounded-lg px-4 py-5 text-green-500 no-underline transition-all duration-100 hover:bg-green-500 hover:text-white sm:p-6"
+				class="overflow-hidden rounded px-4 py-5 text-green-500 no-underline transition-all duration-100 hover:bg-green-500 hover:text-white sm:p-6"
 			>
 				<dt class="truncate text-sm font-medium text-white">{$t('index.applications')}</dt>
 				<dd class="mt-1 text-3xl font-semibold ">
@@ -227,7 +227,7 @@
 			<a
 				href="/destinations"
 				sveltekit:prefetch
-				class="overflow-hidden rounded-lg px-4 py-5 text-sky-500 no-underline transition-all duration-100 hover:bg-sky-500 hover:text-white sm:p-6"
+				class="overflow-hidden rounded px-4 py-5 text-sky-500 no-underline transition-all duration-100 hover:bg-sky-500 hover:text-white sm:p-6"
 			>
 				<dt class="truncate text-sm font-medium text-white">{$t('index.destinations')}</dt>
 				<dd class="mt-1 text-3xl font-semibold ">
@@ -238,7 +238,7 @@
 			<a
 				href="/sources"
 				sveltekit:prefetch
-				class="overflow-hidden rounded-lg px-4 py-5 text-orange-500 no-underline transition-all duration-100 hover:bg-orange-500 hover:text-white sm:p-6"
+				class="overflow-hidden rounded px-4 py-5 text-orange-500 no-underline transition-all duration-100 hover:bg-orange-500 hover:text-white sm:p-6"
 			>
 				<dt class="truncate text-sm font-medium text-white">{$t('index.git_sources')}</dt>
 				<dd class="mt-1 text-3xl font-semibold">
@@ -250,7 +250,7 @@
 			<a
 				href="/databases"
 				sveltekit:prefetch
-				class="overflow-hidden rounded-lg px-4 py-5 text-purple-500 no-underline transition-all duration-100 hover:bg-purple-500 hover:text-white sm:p-6"
+				class="overflow-hidden rounded px-4 py-5 text-purple-500 no-underline transition-all duration-100 hover:bg-purple-500 hover:text-white sm:p-6"
 			>
 				<dt class="truncate text-sm font-medium text-white">{$t('index.databases')}</dt>
 				<dd class="mt-1 text-3xl font-semibold ">
@@ -261,7 +261,7 @@
 			<a
 				href="/services"
 				sveltekit:prefetch
-				class="overflow-hidden rounded-lg px-4 py-5 text-pink-500 no-underline transition-all duration-100 hover:bg-pink-500 hover:text-white sm:p-6"
+				class="overflow-hidden rounded px-4 py-5 text-pink-500 no-underline transition-all duration-100 hover:bg-pink-500 hover:text-white sm:p-6"
 			>
 				<dt class="truncate text-sm font-medium text-white">{$t('index.services')}</dt>
 				<dd class="mt-1 text-3xl font-semibold ">
@@ -272,7 +272,7 @@
 			<a
 				href="/iam"
 				sveltekit:prefetch
-				class="overflow-hidden rounded-lg px-4 py-5 text-cyan-500 no-underline transition-all duration-100 hover:bg-cyan-500 hover:text-white sm:p-6"
+				class="overflow-hidden rounded px-4 py-5 text-cyan-500 no-underline transition-all duration-100 hover:bg-cyan-500 hover:text-white sm:p-6"
 			>
 				<dt class="truncate text-sm font-medium text-white">{$t('index.teams')}</dt>
 				<dd class="mt-1 text-3xl font-semibold ">

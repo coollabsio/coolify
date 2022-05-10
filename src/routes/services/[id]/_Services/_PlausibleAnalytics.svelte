@@ -96,16 +96,3 @@
 		disabled
 	/>
 </div>
-<!-- <div class="grid grid-cols-3 items-center">
-	<label for="postgresqlPublicPort">Public Port</label>
-	<div class="col-span-2 ">
-		<CopyPasswordField
-			placeholder="{ $t('forms.generated_automatically_after_start') }"
-			readonly
-			disabled
-			id="postgresqlPublicPort"
-			name="postgresqlPublicPort"
-			value={service.plausibleAnalytics.postgresqlPublicPort}
-		/>
-	</div>
-</div> -->

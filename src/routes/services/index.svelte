@@ -55,7 +55,7 @@
 	</div>
 </div>
 
-<div class="flex flex-col flex-wrap justify-center">
+<div class="flex justify-center">
 	{#if !services || ownServices.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">{$t('service.no_service')}</div>
