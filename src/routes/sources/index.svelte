@@ -62,7 +62,7 @@
 		</button>
 	{/if}
 </div>
-<div class="flex justify-center">
+<div class="flex-col justify-center">
 	{#if !sources || ownSources.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">{$t('source.no_git_sources_found')}</div>
