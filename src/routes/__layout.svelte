@@ -138,7 +138,7 @@
 			{#if !$session.whiteLabeled}
 				<div class="my-4 h-10 w-10"><img src="/favicon.png" alt="coolLabs logo" /></div>
 			{/if}
-			<div class="flex flex-col space-y-4 py-2" class:mt-2={$session.whiteLabeled}>
+			<div class="flex flex-col space-y-2 py-2" class:mt-2={$session.whiteLabeled}>
 				<a
 					sveltekit:prefetch
 					href="/"
@@ -422,7 +422,7 @@
 					{/if}
 				{/if}
 			</div>
-			<div class="flex flex-col space-y-4 py-2">
+			<div class="flex flex-col space-y-2 py-2">
 				<a
 					sveltekit:prefetch
 					href="/iam"
