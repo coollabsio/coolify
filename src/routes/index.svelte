@@ -140,7 +140,6 @@
 		{#if $session.teamId === '0'}
 			<div class="px-6 text-2xl font-bold">Server Usage</div>
 			<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-				<Loading />
 				<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
 					<dt class="truncate text-sm font-medium text-white">Total Memory</dt>
 					<dd class="mt-1 text-3xl font-semibold text-white">
