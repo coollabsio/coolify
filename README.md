@@ -8,6 +8,9 @@ https://demo.coolify.io/
 
 (If it is unresponsive, that means someone overloaded the server. 🙃)
 
+## Feedback
+If you have a new service / build pack you would like to add, raise an idea [here](https://feedback.coolify.io/) to get feedback from the community!
+
 ## How to install
 
 Installation is automated with the following command:
