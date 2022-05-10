@@ -174,12 +174,6 @@
 						{usage?.cpu.count}
 					</dd>
 				</div>
-				<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
-					<dt class="truncate text-sm font-medium text-white">Load Average (5/10/30mins)</dt>
-					<dd class="mt-1 text-3xl font-semibold text-white">
-						{usage?.cpu.load.join('/')}
-					</dd>
-				</div>
 				<div
 					class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left"
 					class:bg-red-500={cpuWarning}
@@ -190,6 +184,12 @@
 						{#if !cpuWarning}
 							<Trend trend={trends.cpu} />
 						{/if}
+					</dd>
+				</div>
+				<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
+					<dt class="truncate text-sm font-medium text-white">Load Average (5/10/30mins)</dt>
+					<dd class="mt-1 text-3xl font-semibold text-white">
+						{usage?.cpu.load.join('/')}
 					</dd>
 				</div>
 			</dl>
