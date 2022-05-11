@@ -45,9 +45,9 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 	import type Prisma from '@prisma/client';
-	import { getDomain, notNodeDeployments, staticDeployments } from '$lib/components/common';
+	import { notNodeDeployments, staticDeployments } from '$lib/components/common';
 	import { toast } from '@zerodevx/svelte-toast';
-	import { get, post } from '$lib/api';
+	import { post } from '$lib/api';
 	import cuid from 'cuid';
 	import { browser } from '$app/env';
 	import { disabledButton } from '$lib/store';
@@ -63,10 +63,6 @@
 	let dualCerts = application.settings.dualCerts;
 	let autodeploy = application.settings.autodeploy;
 
-	let nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
-	let isNonWWWDomainOK = false;
-	let isWWWDomainOK = false;
-
 	let wsgis = [
 		{
 			value: 'None',
@@ -75,6 +71,10 @@
 		{
 			value: 'Gunicorn',
 			label: 'Gunicorn'
+		},
+		{
+			value: 'Uvicorn',
+			label: 'Uvicorn'
 		}
 	];
 	function containerClass() {
@@ -131,31 +131,13 @@
 	async function handleSubmit() {
 		loading = true;
 		try {
-			nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
-			await post(`/applications/${id}/check.json`, {
-				fqdn: application.fqdn,
-				forceSave,
-				dualCerts,
-				exposePort: application.exposePort
-			});
+			await post(`/applications/${id}/check.json`, { fqdn: application.fqdn, forceSave });
 			await post(`/applications/${id}.json`, { ...application });
 			$disabledButton = false;
-			forceSave = false;
 			return toast.push('Configurations saved.');
 		} catch ({ error }) {
 			if (error?.startsWith($t('application.dns_not_set_partial_error'))) {
 				forceSave = true;
-				if (dualCerts) {
-					isNonWWWDomainOK = await isDNSValid(getDomain(nonWWWDomain), false);
-					isWWWDomainOK = await isDNSValid(getDomain(`www.${nonWWWDomain}`), true);
-				} else {
-					const isWWW = getDomain(application.fqdn).includes('www.');
-					if (isWWW) {
-						isWWWDomainOK = await isDNSValid(getDomain(`www.${nonWWWDomain}`), true);
-					} else {
-						isNonWWWDomainOK = await isDNSValid(getDomain(nonWWWDomain), false);
-					}
-				}
 			}
 			return errorNotification(error);
 		} finally {
@@ -172,19 +154,6 @@
 	async function selectBaseBuildImage(event) {
 		application.baseBuildImage = event.detail.value;
 		await handleSubmit();
-	}
-
-	async function isDNSValid(domain, isWWW) {
-		try {
-			await get(`/applications/${id}/check.json?domain=${domain}`);
-			toast.push('DNS configuration is valid.');
-			isWWW ? (isWWWDomainOK = true) : (isNonWWWDomainOK = true);
-			return true;
-		} catch ({ error }) {
-			errorNotification(error);
-			isWWW ? (isWWWDomainOK = false) : (isNonWWWDomainOK = false);
-			return false;
-		}
 	}
 </script>
 
@@ -358,26 +327,24 @@
 					/>
 				</div>
 			</div>
-			{#if application.buildPack !== 'docker'}
-				<div class="grid grid-cols-2 items-center">
-					<label for="baseImage" class="text-base font-bold text-stone-100"
-						>{$t('application.base_image')}</label
-					>
-					<div class="custom-select-wrapper">
-						<Select
-							isDisabled={!$session.isAdmin || isRunning}
-							containerClasses={containerClass()}
-							id="baseImages"
-							showIndicator={!isRunning}
-							items={application.baseImages}
-							on:select={selectBaseImage}
-							value={application.baseImage}
-							isClearable={false}
-						/>
-					</div>
-					<Explainer text={$t('application.base_image_explainer')} />
+			<div class="grid grid-cols-2 items-center">
+				<label for="baseImage" class="text-base font-bold text-stone-100"
+					>{$t('application.base_image')}</label
+				>
+				<div class="custom-select-wrapper">
+					<Select
+						isDisabled={!$session.isAdmin || isRunning}
+						containerClasses={containerClass()}
+						id="baseImages"
+						showIndicator={!isRunning}
+						items={application.baseImages}
+						on:select={selectBaseImage}
+						value={application.baseImage}
+						isClearable={false}
+					/>
 				</div>
-			{/if}
+				<Explainer text={$t('application.base_image_explainer')} />
+			</div>
 			{#if application.buildCommand || application.buildPack === 'rust' || application.buildPack === 'laravel'}
 				<div class="grid grid-cols-2 items-center pb-8">
 					<label for="baseBuildImage" class="text-base font-bold text-stone-100"
@@ -420,52 +387,17 @@
 					{/if}
 					<Explainer text={$t('application.https_explainer')} />
 				</div>
-				<div>
-					<input
-						readonly={!$session.isAdmin || isRunning}
-						disabled={!$session.isAdmin || isRunning}
-						bind:this={domainEl}
-						name="fqdn"
-						id="fqdn"
-						bind:value={application.fqdn}
-						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-						placeholder="eg: https://coollabs.io"
-					/>
-					{#if forceSave}
-						<div class="flex-col space-y-2 pt-4 text-center">
-							{#if isNonWWWDomainOK}
-								<button
-									class="bg-green-600 hover:bg-green-500"
-									on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
-									>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
-								>
-							{:else}
-								<button
-									class="bg-red-600 hover:bg-red-500"
-									on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
-									>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
-								>
-							{/if}
-							{#if dualCerts}
-								{#if isWWWDomainOK}
-									<button
-										class="bg-green-600 hover:bg-green-500"
-										on:click|preventDefault={() =>
-											isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
-										>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
-									>
-								{:else}
-									<button
-										class="bg-red-600 hover:bg-red-500"
-										on:click|preventDefault={() =>
-											isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
-										>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
-									>
-								{/if}
-							{/if}
-						</div>
-					{/if}
-				</div>
+				<input
+					readonly={!$session.isAdmin || isRunning}
+					disabled={!$session.isAdmin || isRunning}
+					bind:this={domainEl}
+					name="fqdn"
+					id="fqdn"
+					bind:value={application.fqdn}
+					pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+					placeholder="eg: https://coollabs.io"
+					required
+				/>
 			</div>
 			<div class="grid grid-cols-2 items-center pb-8">
 				<Setting
@@ -480,7 +412,7 @@
 			</div>
 			{#if application.buildPack === 'python'}
 				<div class="grid grid-cols-2 items-center">
-					<label for="pythonModule" class="text-base font-bold text-stone-100">WSGI</label>
+					<label for="pythonModule" class="text-base font-bold text-stone-100">WSGI / ASGI</label>
 					<div class="custom-select-wrapper">
 						<Select id="wsgi" items={wsgis} on:select={selectWSGI} value={application.pythonWSGI} />
 					</div>
@@ -494,10 +426,23 @@
 						id="pythonModule"
 						required
 						bind:value={application.pythonModule}
-						placeholder={application.pythonWSGI?.toLowerCase() !== 'gunicorn' ? 'main.py' : 'main'}
+						placeholder={application.pythonWSGI?.toLowerCase() !== 'none' ? 'main' : 'main.py'}
 					/>
 				</div>
 				{#if application.pythonWSGI?.toLowerCase() === 'gunicorn'}
+					<div class="grid grid-cols-2 items-center">
+						<label for="pythonVariable" class="text-base font-bold text-stone-100">Variable</label>
+						<input
+							readonly={!$session.isAdmin}
+							name="pythonVariable"
+							id="pythonVariable"
+							required
+							bind:value={application.pythonVariable}
+							placeholder="default: app"
+						/>
+					</div>
+				{/if}
+				{#if application.pythonWSGI?.toLowerCase() === 'uvicorn'}
 					<div class="grid grid-cols-2 items-center">
 						<label for="pythonVariable" class="text-base font-bold text-stone-100">Variable</label>
 						<input
@@ -523,24 +468,9 @@
 					/>
 				</div>
 			{/if}
-			{#if application.buildPack !== 'docker'}
-				<div class="grid grid-cols-2 items-center">
-					<label for="exposePort" class="text-base font-bold text-stone-100">Exposed Port</label>
-					<input
-						readonly={!$session.isAdmin && !isRunning}
-						disabled={!$session.isAdmin || isRunning}
-						name="exposePort"
-						id="exposePort"
-						bind:value={application.exposePort}
-						placeholder="12345"
-					/>
-					<Explainer
-						text={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
-					/>
-				</div>
-			{/if}
+
 			{#if !notNodeDeployments.includes(application.buildPack)}
-				<div class="grid grid-cols-2 items-center pt-4">
+				<div class="grid grid-cols-2 items-center">
 					<label for="installCommand" class="text-base font-bold text-stone-100"
 						>{$t('application.install_command')}</label
 					>
@@ -578,7 +508,7 @@
 				</div>
 			{/if}
 			{#if application.buildPack === 'docker'}
-				<div class="grid grid-cols-2 items-center pt-4">
+				<div class="grid grid-cols-2 items-center">
 					<label for="dockerFileLocation" class="text-base font-bold text-stone-100"
 						>Dockerfile Location</label
 					>
