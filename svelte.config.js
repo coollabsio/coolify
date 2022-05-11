@@ -1,17 +1,5 @@
 import preprocess from 'svelte-preprocess';
 import adapter from '@sveltejs/adapter-node';
-
-import { Server } from 'socket.io';
-const webSocketServer = {
-	name: 'webSocketServer',
-	configureServer(server) {
-		const io = new Server(server.httpServer);
-		io.on('connection', (socket) => {
-			socket.emit('eventFromServer', 'Hello, World 👋');
-		});
-	}
-};
-
 const config = {
 	preprocess: preprocess(),
 	kit: {
@@ -21,7 +9,12 @@ const config = {
 		},
 		floc: true,
 		vite: {
-			plugins: [webSocketServer],
+			proxy: {
+				'/api/v2': {
+					target: 'http://localhost:3001/api/v2',
+					changeOrigin: true
+				}
+			},
 			optimizeDeps: {
 				exclude: ['svelte-kit-cookie-session']
 			},
