@@ -43,6 +43,7 @@
 	import { del, get, post } from '$lib/api';
 	import { dev } from '$app/env';
 	import { features } from '$lib/store';
+	import { io } from '$lib/realtime';
 	let isUpdateAvailable = false;
 
 	let updateStatus = {
@@ -51,6 +52,11 @@
 		success: null
 	};
 	let latestVersion = 'latest';
+
+	io.on('eventFromServer', (message) => {
+		console.log(message);
+	});
+
 	onMount(async () => {
 		if ($session.userId) {
 			const overrideVersion = $features.latestVersion;
