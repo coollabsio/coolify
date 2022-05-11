@@ -31,7 +31,10 @@
 	async function handleSubmit() {
 		loading = true;
 		try {
-			await post(`/services/${id}/check.json`, { fqdn: service.fqdn });
+			await post(`/services/${id}/check.json`, {
+				fqdn: service.fqdn,
+				exposePort: service.exposePort
+			});
 			await post(`/services/${id}/${service.type}.json`, { ...service });
 			return window.location.reload();
 		} catch ({ error }) {

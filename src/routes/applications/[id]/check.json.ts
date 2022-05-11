@@ -52,7 +52,7 @@ export const post: RequestHandler = async (event) => {
 			exposePort = Number(exposePort);
 
 			if (exposePort < 1024 || exposePort > 65535) {
-				throw { message: `Expose Port needs to be between 1024 and 65535.` };
+				throw { message: `Exposed Port needs to be between 1024 and 65535.` };
 			}
 
 			const publicPort = await getPort({ port: exposePort });
