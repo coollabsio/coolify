@@ -9,6 +9,7 @@ https://demo.coolify.io/
 (If it is unresponsive, that means someone overloaded the server. 🙃)
 
 ## Feedback
+
 If you have a new service / build pack you would like to add, raise an idea [here](https://feedback.coolify.io/) to get feedback from the community!
 
 ## How to install
@@ -62,6 +63,7 @@ These are the predefined build packs, but with the Docker build pack, you can ho
 - Rust
 - Docker
 - Python
+- Deno
 
 ### Databases
 
