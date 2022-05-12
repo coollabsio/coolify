@@ -6,6 +6,7 @@ services:
     command:
       - --api.insecure=true
       - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
       - --providers.docker=false
       - --providers.docker.exposedbydefault=false
       - --providers.http.endpoint=http://host.docker.internal:3000/traefik.json

@@ -49,6 +49,7 @@ export const get: RequestHandler = async (event) => {
 				where: { userId },
 				include: { team: { include: { _count: { select: { users: true } } } } }
 			});
+			const settings = await db.prisma.setting.findFirst();
 			return {
 				body: {
 					teams,
@@ -57,7 +58,8 @@ export const get: RequestHandler = async (event) => {
 					destinationsCount,
 					teamsCount,
 					databasesCount,
-					servicesCount
+					servicesCount,
+					settings
 				}
 			};
 		} catch (error) {

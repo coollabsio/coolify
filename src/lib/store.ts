@@ -12,3 +12,5 @@ export const features: Readable<{ latestVersion: string; beta: boolean }> = read
 	beta: browser && window.localStorage.getItem('beta') === 'true',
 	latestVersion: browser && window.localStorage.getItem('latestVersion')
 });
+
+export const isTraefikUsed: Writable<boolean> = writable(false);

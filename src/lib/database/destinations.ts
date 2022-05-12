@@ -1,6 +1,6 @@
 import { asyncExecShell, getEngine } from '$lib/common';
 import { dockerInstance } from '$lib/docker';
-import { startCoolifyProxy } from '$lib/haproxy';
+import { startCoolifyProxy, startTraefikProxy } from '$lib/haproxy';
 import { getDatabaseImage } from '.';
 import { prisma } from './common';
 import type { DestinationDocker, Service, Application, Prisma } from '@prisma/client';
@@ -125,7 +125,14 @@ export async function newLocalDestination({
 		}
 		await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } });
 	}
-	if (isCoolifyProxyUsed) await startCoolifyProxy(engine);
+	if (isCoolifyProxyUsed) {
+		const settings = await prisma.setting.findFirst();
+		if (settings?.isTraefikUsed) {
+			await startTraefikProxy(engine);
+		} else {
+			await startCoolifyProxy(engine);
+		}
+	}
 	return destination.id;
 }
 export async function removeDestination({ id }: Pick<DestinationDocker, 'id'>): Promise<void> {
@@ -133,12 +140,14 @@ export async function removeDestination({ id }: Pick<DestinationDocker, 'id'>): 
 	if (destination.isCoolifyProxyUsed) {
 		const host = getEngine(destination.engine);
 		const { network } = destination;
+		const settings = await prisma.setting.findFirst();
+		const containerName = settings.isTraefikUsed ? 'coolify-proxy' : 'coolify-haproxy';
 		const { stdout: found } = await asyncExecShell(
-			`DOCKER_HOST=${host} docker ps -a --filter network=${network} --filter name=coolify-haproxy --format '{{.}}'`
+			`DOCKER_HOST=${host} docker ps -a --filter network=${network} --filter name=${containerName} --format '{{.}}'`
 		);
 		if (found) {
 			await asyncExecShell(
-				`DOCKER_HOST="${host}" docker network disconnect ${network} coolify-haproxy`
+				`DOCKER_HOST="${host}" docker network disconnect ${network} ${containerName}`
 			);
 			await asyncExecShell(`DOCKER_HOST="${host}" docker network rm ${network}`);
 		}

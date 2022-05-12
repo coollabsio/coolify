@@ -3,7 +3,12 @@ import { asyncExecShell, getEngine, getUserDetails } from '$lib/common';
 import { decrypt, encrypt } from '$lib/crypto';
 import * as db from '$lib/database';
 import { ErrorHandler, generatePassword, getFreePort } from '$lib/database';
-import { checkContainer, startTcpProxy, stopTcpHttpProxy } from '$lib/haproxy';
+import {
+	checkContainer,
+	startTcpProxy,
+	startTraefikTCPProxy,
+	stopTcpHttpProxy
+} from '$lib/haproxy';
 import type { ComposeFile } from '$lib/types/composeFile';
 import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
@@ -142,8 +147,12 @@ export const post: RequestHandler = async (event) => {
 				await asyncExecShell(
 					`DOCKER_HOST=${host} docker compose -f ${hostkeyDir}/${id}-docker-compose.yml up -d`
 				);
-
-				await startTcpProxy(destinationDocker, `${id}-ftp`, publicPort, 22);
+				const settings = await db.prisma.setting.findFirst();
+				if (settings.isTraefikUsed) {
+					await startTraefikTCPProxy(destinationDocker, `${id}-ftp`, publicPort, 22);
+				} else {
+					await startTcpProxy(destinationDocker, `${id}-ftp`, publicPort, 22);
+				}
 			} else {
 				await db.prisma.wordpress.update({
 					where: { serviceId: id },

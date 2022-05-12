@@ -34,6 +34,7 @@
 </script>
 
 <script>
+	export let settings;
 	import '../tailwind.css';
 	import { SvelteToast, toast } from '@zerodevx/svelte-toast';
 	import { page, session } from '$app/stores';
@@ -42,9 +43,11 @@
 	import { asyncSleep } from '$lib/components/common';
 	import { del, get, post } from '$lib/api';
 	import { dev } from '$app/env';
-	import { features } from '$lib/store';
-	let isUpdateAvailable = false;
+	import { features, isTraefikUsed } from '$lib/store';
 
+	$isTraefikUsed = settings?.isTraefikUsed || false;
+
+	let isUpdateAvailable = false;
 	let updateStatus = {
 		found: false,
 		loading: false,
@@ -121,13 +124,6 @@
 		} catch ({ error }) {
 			updateStatus.success = false;
 			updateStatus.loading = false;
-			return errorNotification(error);
-		}
-	}
-	async function migrateToTraefik() {
-		try {
-			await post(`/update.json`, { type: 'migrateToTraefik' });
-		} catch ({ error }) {
 			return errorNotification(error);
 		}
 	}
@@ -522,13 +518,15 @@
 			>Powered by <a href="https://coolify.io" target="_blank">Coolify</a></span
 		>
 	{/if}
-	<span class="fixed bottom-[20px] right-[10px] z-50 m-2 px-4 text-xs ">
-		<button on:click={migrateToTraefik}
-			>New proxy is available! <br />It is based on Traefik! Why?<br /><br />Haproxy uses a lots of
-			unnecessary memory. The update will cause a small interruption, but everything should go back
-			to normal in a few seconds!</button
-		>
-	</span>
+	{#if !$isTraefikUsed}
+		<span class="fixed bottom-[20px] right-[10px] z-50 m-2 px-4 text-xs ">
+			<a href="/settings"
+				><button class="bg-coollabs hover:bg-coollabs-100"
+					>New proxy is available! <br />Click here to get more details</button
+				></a
+			>
+		</span>
+	{/if}
 {/if}
 <main>
 	<slot />

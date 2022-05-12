@@ -1,5 +1,13 @@
 import { ErrorHandler, generateDatabaseConfiguration, prisma } from '$lib/database';
-import { startCoolifyProxy, startHttpProxy, startTcpProxy } from '$lib/haproxy';
+import {
+	startCoolifyProxy,
+	startHttpProxy,
+	startTcpProxy,
+	startTraefikHTTPProxy,
+	startTraefikProxy,
+	startTraefikTCPProxy,
+	stopTcpHttpProxy
+} from '$lib/haproxy';
 
 export default async function (): Promise<void | {
 	status: number;
@@ -11,11 +19,14 @@ export default async function (): Promise<void | {
 		const localDocker = await prisma.destinationDocker.findFirst({
 			where: { engine: '/var/run/docker.sock' }
 		});
-		console.log(settings.disableHaproxy);
-		if (localDocker && localDocker.isCoolifyProxyUsed && !settings.disableHaproxy) {
-			console.log('asd');
-			await startCoolifyProxy('/var/run/docker.sock');
+		if (localDocker && localDocker.isCoolifyProxyUsed) {
+			if (settings.isTraefikUsed) {
+				await startTraefikProxy('/var/run/docker.sock');
+			} else {
+				await startCoolifyProxy('/var/run/docker.sock');
+			}
 		}
+
 		// TCP Proxies
 		const databasesWithPublicPort = await prisma.database.findMany({
 			where: { publicPort: { not: null } },
@@ -24,8 +35,16 @@ export default async function (): Promise<void | {
 		for (const database of databasesWithPublicPort) {
 			const { destinationDockerId, destinationDocker, publicPort, id } = database;
 			if (destinationDockerId) {
-				const { privatePort } = generateDatabaseConfiguration(database);
-				await startTcpProxy(destinationDocker, id, publicPort, privatePort);
+				if (destinationDocker.isCoolifyProxyUsed) {
+					const { privatePort } = generateDatabaseConfiguration(database);
+					if (settings.isTraefikUsed) {
+						await stopTcpHttpProxy(destinationDocker, publicPort, `haproxy-for-${publicPort}`);
+						await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
+					} else {
+						await stopTcpHttpProxy(destinationDocker, publicPort, `proxy-for-${publicPort}`);
+						await startTcpProxy(destinationDocker, id, publicPort, privatePort);
+					}
+				}
 			}
 		}
 		const wordpressWithFtp = await prisma.wordpress.findMany({
@@ -36,7 +55,15 @@ export default async function (): Promise<void | {
 			const { service, ftpPublicPort } = ftp;
 			const { destinationDockerId, destinationDocker, id } = service;
 			if (destinationDockerId) {
-				await startTcpProxy(destinationDocker, `${id}-ftp`, ftpPublicPort, 22);
+				if (destinationDocker.isCoolifyProxyUsed) {
+					if (settings.isTraefikUsed) {
+						await stopTcpHttpProxy(destinationDocker, ftpPublicPort, `${id}-ftp`);
+						await startTraefikTCPProxy(destinationDocker, `${id}-ftp`, ftpPublicPort, 22);
+					} else {
+						await stopTcpHttpProxy(destinationDocker, ftpPublicPort, `${id}-ftp`);
+						await startTcpProxy(destinationDocker, `${id}-ftp`, ftpPublicPort, 22);
+					}
+				}
 			}
 		}
 
@@ -49,7 +76,15 @@ export default async function (): Promise<void | {
 			const { service, publicPort } = minio;
 			const { destinationDockerId, destinationDocker, id } = service;
 			if (destinationDockerId) {
-				await startHttpProxy(destinationDocker, id, publicPort, 9000);
+				if (destinationDocker.isCoolifyProxyUsed) {
+					if (settings.isTraefikUsed) {
+						await stopTcpHttpProxy(destinationDocker, publicPort, `haproxy-for-${publicPort}`);
+						await startTraefikHTTPProxy(destinationDocker, id, publicPort, 9000);
+					} else {
+						await stopTcpHttpProxy(destinationDocker, publicPort, `proxy-for-${publicPort}`);
+						await startHttpProxy(destinationDocker, id, publicPort, 9000);
+					}
+				}
 			}
 		}
 	} catch (error) {
