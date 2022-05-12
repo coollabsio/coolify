@@ -6,11 +6,14 @@ export default async function (): Promise<void | {
 	body: { message: string; error: string };
 }> {
 	try {
+		const settings = await prisma.setting.findFirst();
 		// Coolify Proxy
 		const localDocker = await prisma.destinationDocker.findFirst({
 			where: { engine: '/var/run/docker.sock' }
 		});
-		if (localDocker && localDocker.isCoolifyProxyUsed) {
+		console.log(settings.disableHaproxy);
+		if (localDocker && localDocker.isCoolifyProxyUsed && !settings.disableHaproxy) {
+			console.log('asd');
 			await startCoolifyProxy('/var/run/docker.sock');
 		}
 		// TCP Proxies

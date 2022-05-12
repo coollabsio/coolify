@@ -20,6 +20,7 @@ model Setting {
   proxyHash             String?
   isAutoUpdateEnabled   Boolean  @default(false)
   isDNSCheckEnabled     Boolean  @default(true)
+  disableHaproxy        Boolean  @default(false)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }

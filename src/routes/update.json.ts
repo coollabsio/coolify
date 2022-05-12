@@ -61,6 +61,22 @@ export const post: RequestHandler = async (event) => {
 		} catch (error) {
 			return ErrorHandler(error);
 		}
+	} else if (type === 'migrateToTraefik') {
+		try {
+			const settings = await db.prisma.setting.findFirst({});
+			await db.prisma.setting.update({
+				where: { id: settings.id },
+				data: { disableHaproxy: true }
+			});
+			await asyncExecShell(`docker stop -t 0 coolify-haproxy`);
+			await asyncExecShell(`docker rm coolify-haproxy`);
+			return {
+				status: 200,
+				body: {}
+			};
+		} catch (error) {
+			return ErrorHandler(error);
+		}
 	}
 	return {
 		status: 500

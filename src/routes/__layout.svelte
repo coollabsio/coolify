@@ -124,6 +124,13 @@
 			return errorNotification(error);
 		}
 	}
+	async function migrateToTraefik() {
+		try {
+			await post(`/update.json`, { type: 'migrateToTraefik' });
+		} catch ({ error }) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 <svelte:head>
@@ -515,6 +522,13 @@
 			>Powered by <a href="https://coolify.io" target="_blank">Coolify</a></span
 		>
 	{/if}
+	<span class="fixed bottom-[20px] right-[10px] z-50 m-2 px-4 text-xs ">
+		<button on:click={migrateToTraefik}
+			>New proxy is available! <br />It is based on Traefik! Why?<br /><br />Haproxy uses a lots of
+			unnecessary memory. The update will cause a small interruption, but everything should go back
+			to normal in a few seconds!</button
+		>
+	</span>
 {/if}
 <main>
 	<slot />
