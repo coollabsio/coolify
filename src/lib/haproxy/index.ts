@@ -336,14 +336,14 @@ export async function startCoolifyProxy(engine: string): Promise<void> {
 export async function startTraefikProxy(engine: string): Promise<void> {
 	const host = getEngine(engine);
 	const found = await checkContainer(engine, 'coolify-proxy', true);
-	const { id } = await db.listSettings();
+	const { id, proxyPassword, proxyUser } = await db.listSettings();
 	if (!found) {
 		const { stdout: Config } = await asyncExecShell(
 			`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
 		);
 		const ip = JSON.parse(Config)[0].Gateway;
 		await asyncExecShell(
-			`DOCKER_HOST="${host}" docker run --restart always --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl -v /var/run/docker.sock:/var/run/docker.sock --network coolify-infra -p "80:80" -p "443:443" -p "8080:8080" --name coolify-proxy -d ${defaultTraefikImage} --api.insecure=true --entrypoints.web.address=:80 --entrypoints.websecure.address=:443  --providers.docker=false --providers.docker.exposedbydefault=false --providers.http.endpoint=${coolifyEndpoint} --providers.http.pollTimeout=5s --log.level=error`
+			`DOCKER_HOST="${host}" docker run --restart always --label "traefik.http.middlewares.dashboard.basicauth.users=${proxyUser}:${proxyPassword}" --label "traefik.http.routers.dashboard.service=api@internal" --label "traefik.http.routers.dashboard.middlewares=auth" --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl -v /var/run/docker.sock:/var/run/docker.sock --network coolify-infra -p "80:80" -p "443:443" -p "8080:8080" --name coolify-proxy -d ${defaultTraefikImage} --api.dashboard=true --entrypoints.web.address=:80 --entrypoints.websecure.address=:443  --providers.docker=false --providers.docker.exposedbydefault=false --providers.http.endpoint=${coolifyEndpoint} --providers.http.pollTimeout=5s --log.level=error`
 		);
 		await db.prisma.setting.update({ where: { id }, data: { proxyHash: null } });
 		await db.setDestinationSettings({ engine, isCoolifyProxyUsed: true });
