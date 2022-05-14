@@ -210,7 +210,7 @@
 			<div class="grid grid-flow-row gap-2 px-10">
 				<!-- <Language /> -->
 				<div class="grid grid-cols-2 items-center">
-					<div class="flex items-center py-4 pr-8">
+					<div class="flex items-center py-2 pr-8">
 						<div class="flex w-96 flex-col">
 							<div class="text-xs font-bold text-stone-100 md:text-base">New Proxy Available!</div>
 							<Explainer

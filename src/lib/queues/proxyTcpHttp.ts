@@ -57,10 +57,14 @@ export default async function (): Promise<void | {
 			if (destinationDockerId) {
 				if (destinationDocker.isCoolifyProxyUsed) {
 					if (settings.isTraefikUsed) {
-						await stopTcpHttpProxy(destinationDocker, ftpPublicPort, `${id}-ftp`);
+						await stopTcpHttpProxy(
+							destinationDocker,
+							ftpPublicPort,
+							`haproxy-for-${ftpPublicPort}`
+						);
 						await startTraefikTCPProxy(destinationDocker, `${id}-ftp`, ftpPublicPort, 22);
 					} else {
-						await stopTcpHttpProxy(destinationDocker, ftpPublicPort, `${id}-ftp`);
+						await stopTcpHttpProxy(destinationDocker, ftpPublicPort, `proxy-for-${ftpPublicPort}`);
 						await startTcpProxy(destinationDocker, `${id}-ftp`, ftpPublicPort, 22);
 					}
 				}

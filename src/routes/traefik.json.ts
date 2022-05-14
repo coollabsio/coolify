@@ -14,28 +14,53 @@ export const get: RequestHandler = async (event) => {
 		const type = event.url.searchParams.get('type');
 		let traefik = {};
 		if (publicPort) {
-			traefik = {
-				[type]: {
-					routers: {
-						[id]: {
-							entrypoints: [type],
-							rule: `HostSNI(\`*\`)`,
-							service: id
-						}
-					},
-					services: {
-						[id]: {
-							loadbalancer: {
-								servers: []
+			if (type === 'tcp') {
+				traefik = {
+					[type]: {
+						routers: {
+							[id]: {
+								entrypoints: [type],
+								rule: `HostSNI(\`*\`)`,
+								service: id
+							}
+						},
+						services: {
+							[id]: {
+								loadbalancer: {
+									servers: []
+								}
 							}
 						}
 					}
+				};
+			} else if (type === 'http') {
+				const service = await db.prisma.service.findFirst({ where: { id } });
+				if (service?.fqdn) {
+					const domain = getDomain(service.fqdn);
+					traefik = {
+						[type]: {
+							routers: {
+								[id]: {
+									entrypoints: [type],
+									rule: `Host(\`${domain}\`)`,
+									service: id
+								}
+							},
+							services: {
+								[id]: {
+									loadbalancer: {
+										servers: []
+									}
+								}
+							}
+						}
+					};
 				}
-			};
+			}
 		}
 		if (type === 'tcp') {
 			traefik[type].services[id].loadbalancer.servers.push({ address: `${id}:${privatePort}` });
-		} else {
+		} else if (type === 'http') {
 			traefik[type].services[id].loadbalancer.servers.push({ url: `http://${id}:${privatePort}` });
 		}
 		return {
