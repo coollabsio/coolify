@@ -11,9 +11,14 @@ export const defaultProxyImage = `coolify-haproxy-alpine:latest`;
 export const defaultProxyImageTcp = `coolify-haproxy-tcp-alpine:latest`;
 export const defaultProxyImageHttp = `coolify-haproxy-http-alpine:latest`;
 export const defaultTraefikImage = `traefik:v2.6`;
-const coolifyEndpoint = dev
-	? 'http://host.docker.internal:3000/traefik.json'
-	: 'http://coolify:3000/traefik.json';
+
+const mainTraefikEndpoint = dev
+	? 'http://host.docker.internal:3000/webhooks/traefik/main.json'
+	: 'http://coolify:3000/webhooks/traefik/main.json';
+
+const otherTraefikEndpoint = dev
+	? 'http://host.docker.internal:3000/webhooks/traefik/other.json'
+	: 'http://coolify:3000/webhooks/traefik/other.json';
 
 export async function haproxyInstance(): Promise<Got> {
 	const { proxyPassword } = await db.listSettings();
@@ -154,7 +159,7 @@ export async function startTraefikTCPProxy(
 						image: 'traefik:v2.6',
 						command: [
 							`--entrypoints.tcp.address=:${publicPort}`,
-							`--providers.http.endpoint=${coolifyEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp`,
+							`--providers.http.endpoint=${otherTraefikEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp`,
 							'--providers.http.pollTimeout=2s',
 							'--log.level=error'
 						],
@@ -250,7 +255,7 @@ export async function startTraefikHTTPProxy(
 						image: 'traefik:v2.6',
 						command: [
 							`--entrypoints.http.address=:${publicPort}`,
-							`--providers.http.endpoint=${coolifyEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=http`,
+							`--providers.http.endpoint=${otherTraefikEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=http`,
 							'--providers.http.pollTimeout=2s',
 							'--log.level=error'
 						],
@@ -359,7 +364,7 @@ export async function startTraefikProxy(engine: string): Promise<void> {
 			--entrypoints.websecure.address=:443 \
 			--providers.docker=true \
 			--providers.docker.exposedbydefault=false \
-			--providers.http.endpoint=${coolifyEndpoint} \
+			--providers.http.endpoint=${mainTraefikEndpoint} \
 			--providers.http.pollTimeout=5s \
 			--certificatesresolvers.letsencrypt.acme.httpchallenge=true \
 			--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json \
