@@ -6,16 +6,49 @@ import { listServicesWithIncludes } from '$lib/database';
 import { checkContainer } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
+function generateMiddleware({ id, isDualCerts, isWWW, isHttps, traefik }) {
+	if (!isDualCerts) {
+		if (isWWW) {
+			if (isHttps) {
+				traefik.http.routers[id].middlewares?.length > 0
+					? traefik.http.routers[id].middlewares.push('https-redirect-non-www-to-www')
+					: (traefik.http.routers[id].middlewares = [
+							'https-redirect-non-www-to-www',
+							'http-to-https'
+					  ]);
+			} else {
+				traefik.http.routers[id].middlewares?.length > 0
+					? traefik.http.routers[id].middlewares.push('http-redirect-non-www-to-www')
+					: (traefik.http.routers[id].middlewares = [
+							'http-redirect-non-www-to-www',
+							'https-to-http'
+					  ]);
+			}
+		} else {
+			if (isHttps) {
+				traefik.http.routers[id].middlewares?.length > 0
+					? traefik.http.routers[id].middlewares.push('https-redirect-www-to-non-www')
+					: (traefik.http.routers[id].middlewares = [
+							'https-redirect-www-to-non-www',
+							'http-to-https'
+					  ]);
+			} else {
+				traefik.http.routers[id]?.middlewares?.length > 0
+					? traefik.http.routers[id].middlewares.push('http-redirect-www-to-non-www')
+					: (traefik.http.routers[id].middlewares = ['http-redirect-www-to-non-www']);
+			}
+		}
+	}
+}
 export const get: RequestHandler = async (event) => {
 	const id = event.url.searchParams.get('id');
 	if (id) {
 		const privatePort = event.url.searchParams.get('privatePort');
 		const publicPort = event.url.searchParams.get('publicPort');
 		const type = event.url.searchParams.get('type');
-		let traefik = {};
 		if (publicPort) {
 			if (type === 'tcp') {
-				traefik = {
+				const traefik = {
 					[type]: {
 						routers: {
 							[id]: {
@@ -27,47 +60,64 @@ export const get: RequestHandler = async (event) => {
 						services: {
 							[id]: {
 								loadbalancer: {
-									servers: []
+									servers: [{ address: `${id}:${privatePort}` }]
 								}
 							}
+						},
+						middlewares: {
+							['global-compress']: {
+								compress: true
+							}
 						}
+					}
+				};
+				return {
+					status: 200,
+					body: {
+						...traefik
 					}
 				};
 			} else if (type === 'http') {
 				const service = await db.prisma.service.findFirst({ where: { id } });
 				if (service?.fqdn) {
 					const domain = getDomain(service.fqdn);
-					traefik = {
+					const isWWW = domain.startsWith('www.');
+					const traefik = {
 						[type]: {
 							routers: {
 								[id]: {
 									entrypoints: [type],
-									rule: `Host(\`${domain}\`)`,
+									rule: isWWW
+										? `Host(\`${domain}\`) || Host(\`www.${domain}\`)`
+										: `Host(\`${domain}\`)`,
 									service: id
 								}
 							},
 							services: {
 								[id]: {
 									loadbalancer: {
-										servers: []
+										servers: [{ url: `http://${id}:${privatePort}` }]
 									}
 								}
+							},
+							middlewares: {
+								['global-compress']: {
+									compress: true
+								}
 							}
+						}
+					};
+					return {
+						status: 200,
+						body: {
+							...traefik
 						}
 					};
 				}
 			}
 		}
-		if (type === 'tcp') {
-			traefik[type].services[id].loadbalancer.servers.push({ address: `${id}:${privatePort}` });
-		} else if (type === 'http') {
-			traefik[type].services[id].loadbalancer.servers.push({ url: `http://${id}:${privatePort}` });
-		}
 		return {
-			status: 200,
-			body: {
-				...traefik
-			}
+			status: 500
 		};
 	} else {
 		const applications = await db.prisma.application.findMany({
@@ -85,27 +135,26 @@ export const get: RequestHandler = async (event) => {
 				port,
 				destinationDocker,
 				destinationDockerId,
-				settings: { previews },
-				updatedAt
+				settings: { previews, dualCerts }
 			} = application;
 			if (destinationDockerId) {
 				const { engine, network } = destinationDocker;
 				const isRunning = await checkContainer(engine, id);
 				if (fqdn) {
 					const domain = getDomain(fqdn);
+					const nakedDomain = domain.replace(/^www\./, '');
 					const isHttps = fqdn.startsWith('https://');
 					const isWWW = fqdn.includes('www.');
-					const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
 					if (isRunning) {
 						data.applications.push({
 							id,
 							port: port || 3000,
 							domain,
+							nakedDomain,
 							isRunning,
 							isHttps,
-							redirectValue,
-							redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain,
-							updatedAt: updatedAt.getTime()
+							isWWW,
+							isDualCerts: dualCerts
 						});
 					}
 					if (previews) {
@@ -127,9 +176,7 @@ export const get: RequestHandler = async (event) => {
 									domain: previewDomain,
 									isRunning,
 									isHttps,
-									redirectValue,
-									redirectTo: isWWW ? previewDomain.replace('www.', '') : 'www.' + previewDomain,
-									updatedAt: updatedAt.getTime()
+									isWWW
 								});
 							}
 						}
@@ -144,9 +191,9 @@ export const get: RequestHandler = async (event) => {
 				fqdn,
 				id,
 				type,
+				dualCerts,
 				destinationDocker,
 				destinationDockerId,
-				updatedAt,
 				plausibleAnalytics
 			} = service;
 			if (destinationDockerId) {
@@ -158,9 +205,9 @@ export const get: RequestHandler = async (event) => {
 					const isRunning = await checkContainer(engine, id);
 					if (fqdn) {
 						const domain = getDomain(fqdn);
+						const nakedDomain = domain.replace(/^www\./, '');
 						const isHttps = fqdn.startsWith('https://');
 						const isWWW = fqdn.includes('www.');
-						const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
 						if (isRunning) {
 							// Plausible Analytics custom script
 							let scriptName = false;
@@ -170,17 +217,16 @@ export const get: RequestHandler = async (event) => {
 							) {
 								scriptName = plausibleAnalytics.scriptName;
 							}
-
 							data.services.push({
 								id,
 								port,
 								publicPort,
 								domain,
+								nakedDomain,
 								isRunning,
 								isHttps,
-								redirectValue,
-								redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain,
-								updatedAt: updatedAt.getTime(),
+								isWWW,
+								isDualCerts: dualCerts,
 								scriptName
 							});
 						}
@@ -189,34 +235,115 @@ export const get: RequestHandler = async (event) => {
 			}
 		}
 
-		const { fqdn } = await db.prisma.setting.findFirst();
+		const { fqdn, dualCerts } = await db.prisma.setting.findFirst();
 		if (fqdn) {
 			const domain = getDomain(fqdn);
+			const nakedDomain = domain.replace(/^www\./, '');
 			const isHttps = fqdn.startsWith('https://');
 			const isWWW = fqdn.includes('www.');
-			const redirectValue = `${isHttps ? 'https://' : 'http://'}${domain}%[capture.req.uri]`;
 			data.coolify.push({
 				id: dev ? 'host.docker.internal' : 'coolify',
 				port: 3000,
 				domain,
+				nakedDomain,
 				isHttps,
-				redirectValue,
-				redirectTo: isWWW ? domain.replace('www.', '') : 'www.' + domain
+				isWWW,
+				isDualCerts: dualCerts
 			});
 		}
 		const traefik = {
 			http: {
 				routers: {},
-				services: {}
+				services: {},
+				middlewares: {
+					['global-compress']: {
+						compress: true
+					},
+					['https-redirect-non-www-to-www']: {
+						redirectregex: {
+							regex: '^https://(?:www\\.)?(.+)',
+							replacement: 'https://www.${1}',
+							permanent: dev ? false : true
+						}
+					},
+					['http-redirect-non-www-to-www']: {
+						redirectregex: {
+							regex: '^http://(?:www\\.)?(.+)',
+							replacement: 'http://www.${1}',
+							permanent: dev ? false : true
+						}
+					},
+					['https-redirect-www-to-non-www']: {
+						redirectregex: {
+							regex: '^https?://www\\.(.+)',
+							replacement: 'https://${1}',
+							permanent: dev ? false : true
+						}
+					},
+					['http-redirect-www-to-non-www']: {
+						redirectregex: {
+							regex: '^http?://www\\.(.+)',
+							replacement: 'http://${1}',
+							permanent: dev ? false : true
+						}
+					},
+					['http-to-https']: {
+						redirectregex: {
+							regex: '^http?://(.+)',
+							replacement: 'https://${1}',
+							permanent: dev ? false : true
+						}
+					},
+					['https-to-http']: {
+						redirectregex: {
+							regex: '^https?://(.+)',
+							replacement: 'http://${1}',
+							permanent: dev ? false : true
+						}
+					},
+					['https-http']: {
+						redirectscheme: {
+							scheme: 'http',
+							permanent: false
+						}
+					}
+				}
 			}
 		};
 		for (const application of data.applications) {
-			const { id, port, domain, isHttps, redirectValue, redirectTo, updatedAt } = application;
-			traefik.http.routers[id] = {
-				entrypoints: ['web'],
-				rule: `Host(\`${domain}\`)`,
-				service: id
-			};
+			const { id, port, domain, nakedDomain, isHttps, isWWW, isDualCerts } = application;
+			if (isHttps) {
+				traefik.http.routers[id] = {
+					entrypoints: ['web'],
+					rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
+					middlewares: ['http-to-https'],
+					service: id
+				};
+				traefik.http.routers[`${id}-secure`] = {
+					entrypoints: ['websecure'],
+					rule: isWWW
+						? isDualCerts
+							? `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`
+							: `Host(\`${nakedDomain}\`)`
+						: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
+					service: id
+				};
+			} else {
+				traefik.http.routers[id] = {
+					entrypoints: ['web'],
+					rule: isWWW
+						? `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`
+						: `Host(\`${nakedDomain}\`)`,
+					service: id
+				};
+				traefik.http.routers[`${id}-secure`] = {
+					entrypoints: ['websecure'],
+					rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
+					middlewares: ['https-http'],
+					service: id
+				};
+			}
+
 			traefik.http.services[id] = {
 				loadbalancer: {
 					servers: [
@@ -226,14 +353,23 @@ export const get: RequestHandler = async (event) => {
 					]
 				}
 			};
+			if (isHttps && !dev) {
+				traefik.http.routers[id].tls = {
+					certresolver: 'letsencrypt'
+				};
+			}
+			generateMiddleware({ id, isDualCerts, isWWW, isHttps, traefik });
 		}
-		for (const application of data.services) {
-			const { id, port, domain, isHttps, redirectValue, redirectTo, updatedAt, scriptName } =
-				application;
+		for (const service of data.services) {
+			const { id, port, domain, nakedDomain, isHttps, isWWW, isDualCerts, scriptName } = service;
 
 			traefik.http.routers[id] = {
-				entrypoints: ['web'],
-				rule: `Host(\`${domain}\`)`,
+				entrypoints: isHttps ? ['web', 'websecure'] : ['web'],
+				rule: isWWW
+					? isDualCerts
+						? `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`
+						: `Host(\`${nakedDomain}\`)`
+					: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
 				service: id
 			};
 			traefik.http.services[id] = {
@@ -245,22 +381,33 @@ export const get: RequestHandler = async (event) => {
 					]
 				}
 			};
+			if (isHttps && !dev) {
+				traefik.http.routers[id].tls = {
+					certresolver: 'letsencrypt'
+				};
+			}
 			if (scriptName) {
 				if (!traefik.http.middlewares) traefik.http.middlewares = {};
 				traefik.http.middlewares[`${id}-redir`] = {
 					replacepathregex: {
 						regex: `/js/${scriptName}`,
-						replacement: '/js/plausible.js'
+						replacement: '/js/plausible.js',
+						permanent: false
 					}
 				};
 				traefik.http.routers[id].middlewares = [`${id}-redir`];
 			}
+			generateMiddleware({ id, isDualCerts, isWWW, isHttps, traefik });
 		}
-		for (const application of data.coolify) {
-			const { domain, id, port } = application;
+		for (const coolify of data.coolify) {
+			const { nakedDomain, domain, id, port, isHttps, isWWW, isDualCerts } = coolify;
 			traefik.http.routers['coolify'] = {
-				entrypoints: ['web'],
-				rule: `Host(\`${domain}\`)`,
+				entrypoints: isHttps ? ['web', 'websecure'] : ['web'],
+				rule: isWWW
+					? isDualCerts
+						? `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`
+						: `Host(\`${nakedDomain}\`)`
+					: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
 				service: id
 			};
 			traefik.http.services[id] = {
@@ -272,61 +419,18 @@ export const get: RequestHandler = async (event) => {
 					]
 				}
 			};
+			if (isHttps && !dev) {
+				traefik.http.routers[id].tls = {
+					certresolver: 'letsencrypt'
+				};
+			}
+			generateMiddleware({ id, isDualCerts, isWWW, isHttps, traefik });
 		}
 
 		return {
 			status: 200,
 			body: {
 				...traefik
-				// "http": {
-				// 	"routers": {
-				// 		"coolify": {
-				// 			"entrypoints": [
-				// 				"web"
-				// 			],
-				// 			"middlewares": [
-				// 				"coolify-hc"
-				// 			],
-				// 			"rule": "Host(`staging.coolify.io`)",
-				// 			"service": "coolify"
-				// 		},
-				// 		"static.example.coolify.io": {
-				// 			"entrypoints": [
-				// 				"web"
-				// 			],
-				// 			"rule": "Host(`static.example.coolify.io`)",
-				// 			"service": "static.example.coolify.io"
-				// 		}
-				// 	},
-				// 	"services": {
-				// 		"coolify": {
-				// 			"loadbalancer": {
-				// 				"servers": [
-				// 					{
-				// 						"url": "http://coolify:3000"
-				// 					}
-				// 				]
-				// 			}
-				// 		},
-				// 		"static.example.coolify.io": {
-				// 			"loadbalancer": {
-				// 				"servers": [
-				// 					{
-				// 						"url": "http://cl32p06f58068518cs3thg6vbc7:80"
-				// 					}
-				// 				]
-				// 			}
-				// 		}
-				// 	},
-				// 	"middlewares": {
-				// 		"coolify-hc": {
-				// 			"replacepathregex": {
-				// 				"regex": "/dead.json",
-				// 				"replacement": "/undead.json"
-				// 			}
-				// 		}
-				// 	}
-				// }
 			}
 		};
 	}

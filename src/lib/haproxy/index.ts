@@ -156,7 +156,7 @@ export async function startTraefikTCPProxy(
 							`--entrypoints.tcp.address=:${publicPort}`,
 							`--providers.http.endpoint=${coolifyEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp`,
 							'--providers.http.pollTimeout=2s',
-							'--log.level=debug'
+							'--log.level=error'
 						],
 						ports: [`${publicPort}:${publicPort}`],
 						extra_hosts: ['host.docker.internal:host-gateway', `host.docker.internal:${ip}`],
@@ -252,7 +252,7 @@ export async function startTraefikHTTPProxy(
 							`--entrypoints.http.address=:${publicPort}`,
 							`--providers.http.endpoint=${coolifyEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=http`,
 							'--providers.http.pollTimeout=2s',
-							'--log.level=debug'
+							'--log.level=error'
 						],
 						ports: [`${publicPort}:${publicPort}`],
 						extra_hosts: ['host.docker.internal:host-gateway', `host.docker.internal:${ip}`],
@@ -343,7 +343,28 @@ export async function startTraefikProxy(engine: string): Promise<void> {
 		);
 		const ip = JSON.parse(Config)[0].Gateway;
 		await asyncExecShell(
-			`DOCKER_HOST="${host}" docker run --restart always --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl -v /var/run/docker.sock:/var/run/docker.sock --network coolify-infra -p "80:80" -p "443:443" -p "8080:8080" --name coolify-proxy -d ${defaultTraefikImage} --entrypoints.web.address=:80 --entrypoints.websecure.address=:443 --providers.docker=true --providers.docker.exposedbydefault=false --providers.http.endpoint=${coolifyEndpoint} --providers.http.pollTimeout=5s --log.level=error`
+			`DOCKER_HOST="${host}" docker run --restart always \
+			--add-host 'host.docker.internal:host-gateway' \
+			--add-host 'host.docker.internal:${ip}' \
+			-v coolify-traefik-letsencrypt:/etc/traefik/acme \
+			-v /var/run/docker.sock:/var/run/docker.sock \
+			--network coolify-infra \
+			-p "80:80" \
+			-p "443:443" \
+			-p "8080:8080" \
+			--name coolify-proxy \
+			-d ${defaultTraefikImage} \
+			--api.insecure=true \
+			--entrypoints.web.address=:80 \
+			--entrypoints.websecure.address=:443 \
+			--providers.docker=true \
+			--providers.docker.exposedbydefault=false \
+			--providers.http.endpoint=${coolifyEndpoint} \
+			--providers.http.pollTimeout=5s \
+			--certificatesresolvers.letsencrypt.acme.httpchallenge=true \
+			--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json \
+			--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web \
+			--log.level=debug`
 		);
 		await db.prisma.setting.update({ where: { id }, data: { proxyHash: null } });
 		await db.setDestinationSettings({ engine, isCoolifyProxyUsed: true });

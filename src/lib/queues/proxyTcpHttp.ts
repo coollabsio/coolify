@@ -1,12 +1,15 @@
 import { ErrorHandler, generateDatabaseConfiguration, prisma } from '$lib/database';
 import {
+	checkContainer,
 	startCoolifyProxy,
 	startHttpProxy,
 	startTcpProxy,
 	startTraefikHTTPProxy,
 	startTraefikProxy,
 	startTraefikTCPProxy,
-	stopTcpHttpProxy
+	stopCoolifyProxy,
+	stopTcpHttpProxy,
+	stopTraefikProxy
 } from '$lib/haproxy';
 
 export default async function (): Promise<void | {
@@ -14,16 +17,21 @@ export default async function (): Promise<void | {
 	body: { message: string; error: string };
 }> {
 	try {
-		const settings = await prisma.setting.findFirst();
 		// Coolify Proxy
+		const engine = '/var/run/docker.sock';
+		const settings = await prisma.setting.findFirst();
 		const localDocker = await prisma.destinationDocker.findFirst({
-			where: { engine: '/var/run/docker.sock' }
+			where: { engine }
 		});
 		if (localDocker && localDocker.isCoolifyProxyUsed) {
 			if (settings.isTraefikUsed) {
-				await startTraefikProxy('/var/run/docker.sock');
+				const found = await checkContainer(engine, 'coolify-haproxy');
+				if (found) await stopCoolifyProxy(engine);
+				await startTraefikProxy(engine);
 			} else {
-				await startCoolifyProxy('/var/run/docker.sock');
+				const found = await checkContainer(engine, 'coolify-proxy');
+				if (found) await stopTraefikProxy(engine);
+				await startCoolifyProxy(engine);
 			}
 		}
 
