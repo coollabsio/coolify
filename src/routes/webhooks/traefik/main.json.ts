@@ -37,23 +37,13 @@ const traefik = {
 	}
 };
 
-function configureMiddleware({ id, port, nakedDomain, isHttps, isWWW, isDualCerts }) {
+function configureMiddleware({ id, port, domain, nakedDomain, isHttps, isWWW, isDualCerts }) {
 	if (isHttps) {
 		traefik.http.routers[id] = {
 			entrypoints: ['web'],
 			rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
 			service: `${id}`,
 			middlewares: ['redirect-to-https']
-		};
-
-		traefik.http.routers[`${id}-secure`] = {
-			entrypoints: ['websecure'],
-			rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
-			service: `${id}`,
-			tls: {
-				certresolver: 'letsencrypt'
-			},
-			middlewares: []
 		};
 
 		traefik.http.services[id] = {
@@ -66,13 +56,61 @@ function configureMiddleware({ id, port, nakedDomain, isHttps, isWWW, isDualCert
 			}
 		};
 
-		if (!isDualCerts) {
+		if (isDualCerts) {
+			traefik.http.routers[`${id}-secure`] = {
+				entrypoints: ['websecure'],
+				rule: `Host(\`${domain}\`) || Host(\`www.${nakedDomain}\`)`,
+				service: `${id}`,
+				tls: {
+					certresolver: 'letsencrypt'
+				},
+				middlewares: []
+			};
+		} else {
 			if (isWWW) {
+				traefik.http.routers[`${id}-secure-www`] = {
+					entrypoints: ['websecure'],
+					rule: `Host(\`www.${nakedDomain}\`)`,
+					service: `${id}`,
+					tls: {
+						certresolver: 'letsencrypt'
+					},
+					middlewares: []
+				};
+				traefik.http.routers[`${id}-secure`] = {
+					entrypoints: ['websecure'],
+					rule: `Host(\`${nakedDomain}\`)`,
+					service: `${id}`,
+					tls: {
+						domains: {
+							main: `${domain}`
+						}
+					},
+					middlewares: ['redirect-to-www']
+				};
 				traefik.http.routers[`${id}`].middlewares.push('redirect-to-www');
-				traefik.http.routers[`${id}-secure`].middlewares.push('redirect-to-www');
 			} else {
+				traefik.http.routers[`${id}-secure-www`] = {
+					entrypoints: ['websecure'],
+					rule: `Host(\`www.${nakedDomain}\`)`,
+					service: `${id}`,
+					tls: {
+						domains: {
+							main: `${domain}`
+						}
+					},
+					middlewares: ['redirect-to-non-www']
+				};
+				traefik.http.routers[`${id}-secure`] = {
+					entrypoints: ['websecure'],
+					rule: `Host(\`${domain}\`)`,
+					service: `${id}`,
+					tls: {
+						certresolver: 'letsencrypt'
+					},
+					middlewares: []
+				};
 				traefik.http.routers[`${id}`].middlewares.push('redirect-to-non-www');
-				traefik.http.routers[`${id}-secure`].middlewares.push('redirect-to-non-www');
 			}
 		}
 	} else {

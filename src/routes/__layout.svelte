@@ -133,6 +133,8 @@
 	<title>Coolify</title>
 	{#if !$session.whiteLabeled}
 		<link rel="icon" href="/favicon.png" />
+	{:else if $session.whiteLabelDetails.icon}
+		<link rel="icon" href={$session.whiteLabelDetails.icon} />
 	{/if}
 </svelte:head>
 <SvelteToast options={{ intro: { y: -64 }, duration: 3000, pausable: true }} />
