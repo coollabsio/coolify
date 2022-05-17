@@ -38,12 +38,15 @@
 	import '../tailwind.css';
 	import { SvelteToast, toast } from '@zerodevx/svelte-toast';
 	import { page, session } from '$app/stores';
+	import { fade } from 'svelte/transition';
 	import { onMount } from 'svelte';
 	import { errorNotification } from '$lib/form';
 	import { asyncSleep } from '$lib/components/common';
 	import { del, get, post } from '$lib/api';
 	import { dev } from '$app/env';
 	import { features, isTraefikUsed } from '$lib/store';
+	import { navigating } from '$app/stores';
+	import PageLoader from '$lib/components/PageLoader.svelte';
 
 	$isTraefikUsed = settings?.isTraefikUsed || false;
 
@@ -141,6 +144,11 @@
 	{/if}
 </svelte:head>
 <SvelteToast options={{ intro: { y: -64 }, duration: 3000, pausable: true }} />
+{#if $navigating}
+	<div out:fade={{ delay: 100 }}>
+		<PageLoader />
+	</div>
+{/if}
 {#if $session.userId}
 	<nav class="nav-main">
 		<div class="flex h-screen w-full flex-col items-center transition-all duration-100">

@@ -140,6 +140,7 @@
 		$status.application.initialLoading = false;
 	}
 	onDestroy(() => {
+		$status.application.initialLoading = true;
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
