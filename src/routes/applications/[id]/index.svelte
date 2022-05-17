@@ -74,6 +74,7 @@
 	let isNonWWWDomainOK = false;
 	let isWWWDomainOK = false;
 
+	$: isDisabled = !$session.isAdmin || $status.application.isRunning;
 	let wsgis = [
 		{
 			value: 'None',
@@ -85,9 +86,7 @@
 		}
 	];
 	function containerClass() {
-		if (!$session.isAdmin || $status.application.isRunning) {
-			return 'text-white border border-dashed border-coolgray-300 bg-transparent font-thin px-0';
-		}
+		return 'text-white border border-dashed border-coolgray-300 bg-transparent font-thin px-0';
 	}
 	if (browser && window.location.hostname === 'demo.coolify.io' && !application.fqdn) {
 		application.fqdn = `http://${cuid()}.demo.coolify.io`;
@@ -402,7 +401,7 @@
 						value={application.destinationDocker.name}
 						id="destination"
 						disabled
-						class="bg-transparent "
+						class="bg-transparent"
 					/>
 				</div>
 			</div>
@@ -413,8 +412,8 @@
 					>
 					<div class="custom-select-wrapper">
 						<Select
-							isDisabled={!$session.isAdmin || $status.application.isRunning}
-							containerClasses={containerClass()}
+							{isDisabled}
+							containerClasses={isDisabled && containerClass()}
 							id="baseImages"
 							showIndicator={!$status.application.isRunning}
 							items={application.baseImages}
@@ -434,8 +433,8 @@
 
 					<div class="custom-select-wrapper">
 						<Select
-							isDisabled={!$session.isAdmin || $status.application.isRunning}
-							containerClasses={containerClass()}
+							{isDisabled}
+							containerClasses={isDisabled && containerClass()}
 							id="baseBuildImages"
 							showIndicator={!$status.application.isRunning}
 							items={application.baseBuildImages}
@@ -470,8 +469,8 @@
 				</div>
 				<div>
 					<input
-						readonly={!$session.isAdmin || $status.application.isRunning}
-						disabled={!$session.isAdmin || $status.application.isRunning}
+						readonly={isDisabled}
+						disabled={isDisabled}
 						bind:this={domainEl}
 						name="fqdn"
 						id="fqdn"
@@ -576,7 +575,7 @@
 					<label for="exposePort" class="text-base font-bold text-stone-100">Exposed Port</label>
 					<input
 						readonly={!$session.isAdmin && !$status.application.isRunning}
-						disabled={!$session.isAdmin || $status.application.isRunning}
+						disabled={isDisabled}
 						name="exposePort"
 						id="exposePort"
 						bind:value={application.exposePort}

@@ -59,7 +59,7 @@ function configureMiddleware({ id, port, domain, nakedDomain, isHttps, isWWW, is
 		if (isDualCerts) {
 			traefik.http.routers[`${id}-secure`] = {
 				entrypoints: ['websecure'],
-				rule: `Host(\`${domain}\`) || Host(\`www.${nakedDomain}\`)`,
+				rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
 				service: `${id}`,
 				tls: {
 					certresolver: 'letsencrypt'
