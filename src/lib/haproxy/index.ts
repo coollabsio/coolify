@@ -166,13 +166,17 @@ export async function startTraefikTCPProxy(
 						ports: [`${publicPort}:${publicPort}`],
 						extra_hosts: ['host.docker.internal:host-gateway', `host.docker.internal:${ip}`],
 						volumes: ['/var/run/docker.sock:/var/run/docker.sock'],
-						networks: [network]
+						networks: ['coolify-infra', network]
 					}
 				},
 				networks: {
 					[network]: {
 						external: false,
 						name: network
+					},
+					'coolify-infra': {
+						external: false,
+						name: 'coolify-infra'
 					}
 				}
 			};
@@ -262,13 +266,17 @@ export async function startTraefikHTTPProxy(
 						ports: [`${publicPort}:${publicPort}`],
 						extra_hosts: ['host.docker.internal:host-gateway', `host.docker.internal:${ip}`],
 						volumes: ['/var/run/docker.sock:/var/run/docker.sock'],
-						networks: [network]
+						networks: ['coolify-infra', network]
 					}
 				},
 				networks: {
 					[network]: {
 						external: false,
 						name: network
+					},
+					'coolify-infra': {
+						external: false,
+						name: 'coolify-infra'
 					}
 				}
 			};

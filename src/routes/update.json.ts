@@ -6,12 +6,7 @@ import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import compare from 'compare-versions';
 import got from 'got';
-import {
-	checkContainer,
-	configureNetworkTraefikProxy,
-	startCoolifyProxy,
-	startTraefikProxy
-} from '$lib/haproxy';
+import { checkContainer, startCoolifyProxy, startTraefikProxy } from '$lib/haproxy';
 
 export const get: RequestHandler = async (request) => {
 	try {
