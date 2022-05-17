@@ -131,7 +131,6 @@
 	}
 	async function getStatus() {
 		if ($status.application.loading) return;
-		console.log('getStatus');
 		$status.application.loading = true;
 		const data = await get(`/applications/${id}/status.json`);
 		$status.application.isRunning = data.isRunning;
