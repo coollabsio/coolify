@@ -12,7 +12,7 @@ CREATE TABLE "new_Setting" (
     "proxyHash" TEXT,
     "isAutoUpdateEnabled" BOOLEAN NOT NULL DEFAULT false,
     "isDNSCheckEnabled" BOOLEAN NOT NULL DEFAULT true,
-    "isTraefikUsed" BOOLEAN NOT NULL DEFAULT false,
+    "isTraefikUsed" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );

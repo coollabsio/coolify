@@ -421,6 +421,21 @@ export async function checkContainer(
 	return containerFound;
 }
 
+export async function getContainerUsage(engine: string, container: string): Promise<any> {
+	const host = getEngine(engine);
+	try {
+		const { stdout } = await asyncExecShell(
+			`DOCKER_HOST="${host}" docker container stats ${container} --no-stream --no-trunc --format "{{json .}}"`
+		);
+		return JSON.parse(stdout);
+	} catch (err) {
+		return {
+			MemUsage: 0,
+			CPUPerc: 0,
+			NetIO: 0
+		};
+	}
+}
 export async function stopCoolifyProxy(
 	engine: string
 ): Promise<{ stdout: string; stderr: string } | Error> {

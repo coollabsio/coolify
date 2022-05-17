@@ -17,7 +17,7 @@
 		const endpoint = `/applications/${params.id}.json`;
 		const res = await fetch(endpoint);
 		if (res.ok) {
-			let { application, isRunning, isExited, appId, githubToken, gitlabToken } = await res.json();
+			let { application, appId, githubToken, gitlabToken } = await res.json();
 			if (!application || Object.entries(application).length === 0) {
 				return {
 					status: 302,
@@ -45,13 +45,10 @@
 			return {
 				props: {
 					application,
-					isRunning,
-					isExited,
 					githubToken,
 					gitlabToken
 				},
 				stuff: {
-					isRunning,
 					application,
 					appId
 				}
@@ -67,8 +64,6 @@
 
 <script lang="ts">
 	export let application;
-	export let isRunning;
-	export let isExited;
 	export let githubToken;
 	export let gitlabToken;
 	import { page, session } from '$app/stores';
@@ -77,7 +72,7 @@
 	import Loading from '$lib/components/Loading.svelte';
 	import { del, get, post } from '$lib/api';
 	import { goto } from '$app/navigation';
-	import { gitTokens } from '$lib/store';
+	import { gitTokens, status } from '$lib/store';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { disabledButton } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
@@ -135,17 +130,23 @@
 		}
 	}
 	async function getStatus() {
-		statusInterval = setInterval(async () => {
-			const data = await get(`/applications/${id}.json`);
-			isRunning = data.isRunning;
-			isExited = data.isExited;
-		}, 1000);
+		if ($status.application.loading) return;
+		console.log('getStatus');
+		$status.application.loading = true;
+		const data = await get(`/applications/${id}/status.json`);
+		$status.application.isRunning = data.isRunning;
+		$status.application.isExited = data.isExited;
+		$status.application.loading = false;
+		$status.application.initialLoading = false;
 	}
 	onDestroy(() => {
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
 		await getStatus();
+		statusInterval = setInterval(async () => {
+			await getStatus();
+		}, 1000);
 	});
 </script>
 
@@ -153,16 +154,16 @@
 	{#if loading}
 		<Loading fullscreen cover />
 	{:else}
-		{#if isExited}
+		{#if $status.application.isExited}
 			<a
 				href={!$disabledButton ? `/applications/${id}/logs` : null}
-				class=" icons bg-transparent tooltip-bottom text-sm flex items-center text-red-500 tooltip-red-500"
+				class=" icons tooltip-bottom tooltip-red-500 flex items-center bg-transparent text-sm text-red-500"
 				data-tooltip="Application exited with an error!"
 				sveltekit:prefetch
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6"
+					class="h-6 w-6"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentcolor"
@@ -179,20 +180,43 @@
 				</svg>
 			</a>
 		{/if}
-		{#if isRunning}
+		{#if $status.application.initialLoading}
+			<button
+				class="icons tooltip-bottom flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-6 w-6"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<path d="M9 4.55a8 8 0 0 1 6 14.9m0 -4.45v5h5" />
+					<line x1="5.63" y1="7.16" x2="5.63" y2="7.17" />
+					<line x1="4.06" y1="11" x2="4.06" y2="11.01" />
+					<line x1="4.63" y1="15.1" x2="4.63" y2="15.11" />
+					<line x1="7.16" y1="18.37" x2="7.16" y2="18.38" />
+					<line x1="11" y1="19.94" x2="11" y2="19.95" />
+				</svg>
+			</button>
+		{:else if $status.application.isRunning}
 			<button
 				on:click={stopApplication}
 				title="Stop application"
 				type="submit"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
+				class="icons tooltip-bottom flex items-center space-x-2 bg-transparent text-sm text-red-500"
 				data-tooltip={$session.isAdmin
 					? $t('application.stop_application')
 					: $t('application.permission_denied_stop_application')}
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6"
+					class="h-6 w-6"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
@@ -210,14 +234,14 @@
 					title="Rebuild application"
 					type="submit"
 					disabled={$disabledButton}
-					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 hover:text-green-500"
+					class="icons tooltip-bottom flex items-center space-x-2 bg-transparent text-sm hover:text-green-500"
 					data-tooltip={$session.isAdmin
 						? 'Rebuild application'
 						: 'You do not have permission to rebuild application.'}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6"
+						class="h-6 w-6"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -239,14 +263,14 @@
 					title="Build and start application"
 					type="submit"
 					disabled={$disabledButton}
-					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
+					class="icons tooltip-bottom flex items-center space-x-2 bg-transparent text-sm text-green-500"
 					data-tooltip={$session.isAdmin
 						? 'Build and start application'
 						: 'You do not have permission to Build and start application.'}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6"
+						class="h-6 w-6"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -261,18 +285,18 @@
 			</form>
 		{/if}
 
-		<div class="border border-coolgray-500 h-8" />
+		<div class="h-8 border border-coolgray-500" />
 		<a
 			href={!$disabledButton ? `/applications/${id}` : null}
 			sveltekit:prefetch
-			class="hover:text-yellow-500 rounded"
+			class="rounded hover:text-yellow-500"
 			class:text-yellow-500={$page.url.pathname === `/applications/${id}`}
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}`}
 		>
 			<button
 				title="Configurations"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm"
+				class="icons tooltip-bottom bg-transparent text-sm"
 				data-tooltip="Configurations"
 			>
 				<svg
@@ -301,19 +325,19 @@
 		<a
 			href={!$disabledButton ? `/applications/${id}/secrets` : null}
 			sveltekit:prefetch
-			class="hover:text-pink-500 rounded"
+			class="rounded hover:text-pink-500"
 			class:text-pink-500={$page.url.pathname === `/applications/${id}/secrets`}
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/secrets`}
 		>
 			<button
 				title="Secret"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm"
+				class="icons tooltip-bottom bg-transparent text-sm"
 				data-tooltip="Secret"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6"
+					class="h-6 w-6"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
@@ -333,19 +357,19 @@
 		<a
 			href={!$disabledButton ? `/applications/${id}/storage` : null}
 			sveltekit:prefetch
-			class="hover:text-pink-500 rounded"
+			class="rounded hover:text-pink-500"
 			class:text-pink-500={$page.url.pathname === `/applications/${id}/storage`}
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/storage`}
 		>
 			<button
 				title="Persistent Storage"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm"
+				class="icons tooltip-bottom bg-transparent text-sm"
 				data-tooltip="Persistent Storage"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6"
+					class="h-6 w-6"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
@@ -363,19 +387,19 @@
 		<a
 			href={!$disabledButton ? `/applications/${id}/previews` : null}
 			sveltekit:prefetch
-			class="hover:text-orange-500 rounded"
+			class="rounded hover:text-orange-500"
 			class:text-orange-500={$page.url.pathname === `/applications/${id}/previews`}
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/previews`}
 		>
 			<button
 				title="Previews"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm"
+				class="icons tooltip-bottom bg-transparent text-sm"
 				data-tooltip="Previews"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6"
+					class="h-6 w-6"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
@@ -392,18 +416,18 @@
 				</svg></button
 			></a
 		>
-		<div class="border border-coolgray-500 h-8" />
+		<div class="h-8 border border-coolgray-500" />
 		<a
-			href={!$disabledButton && isRunning ? `/applications/${id}/logs` : null}
+			href={!$disabledButton && $status.application.isRunning ? `/applications/${id}/logs` : null}
 			sveltekit:prefetch
-			class="hover:text-sky-500 rounded"
+			class="rounded hover:text-sky-500"
 			class:text-sky-500={$page.url.pathname === `/applications/${id}/logs`}
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs`}
 		>
 			<button
 				title={$t('application.logs')}
-				disabled={$disabledButton || !isRunning}
-				class="icons bg-transparent tooltip-bottom text-sm"
+				disabled={$disabledButton || !$status.application.isRunning}
+				class="icons tooltip-bottom bg-transparent text-sm"
 				data-tooltip={$t('application.logs')}
 			>
 				<svg
@@ -428,14 +452,14 @@
 		<a
 			href={!$disabledButton ? `/applications/${id}/logs/build` : null}
 			sveltekit:prefetch
-			class="hover:text-red-500 rounded"
+			class="rounded hover:text-red-500"
 			class:text-red-500={$page.url.pathname === `/applications/${id}/logs/build`}
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs/build`}
 		>
 			<button
 				title="Build Logs"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm"
+				class="icons tooltip-bottom bg-transparent text-sm"
 				data-tooltip="Build Logs"
 			>
 				<svg
@@ -460,7 +484,7 @@
 				</svg>
 			</button></a
 		>
-		<div class="border border-coolgray-500 h-8" />
+		<div class="h-8 border border-coolgray-500" />
 
 		<button
 			on:click={() => deleteApplication(application.name)}
@@ -468,7 +492,7 @@
 			type="submit"
 			disabled={!$session.isAdmin}
 			class:hover:text-red-500={$session.isAdmin}
-			class="icons bg-transparent  tooltip-bottom text-sm"
+			class="icons tooltip-bottom  bg-transparent text-sm"
 			data-tooltip={$session.isAdmin
 				? $t('application.delete_application')
 				: $t('application.permission_denied_delete_application')}

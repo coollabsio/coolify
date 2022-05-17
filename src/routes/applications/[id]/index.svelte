@@ -4,8 +4,7 @@
 		if (stuff?.application?.id) {
 			return {
 				props: {
-					application: stuff.application,
-					isRunning: stuff.isRunning
+					application: stuff.application
 				}
 			};
 		}
@@ -36,10 +35,9 @@
 		baseImages: Array<{ value: string; label: string }>;
 		baseBuildImages: Array<{ value: string; label: string }>;
 	};
-	export let isRunning;
 	import { page, session } from '$app/stores';
 	import { errorNotification } from '$lib/form';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import Select from 'svelte-select';
 
 	import Explainer from '$lib/components/Explainer.svelte';
@@ -50,13 +48,22 @@
 	import { get, post } from '$lib/api';
 	import cuid from 'cuid';
 	import { browser } from '$app/env';
-	import { disabledButton } from '$lib/store';
+	import { disabledButton, status } from '$lib/store';
 	import { t } from '$lib/translations';
 	const { id } = $page.params;
 
 	let domainEl: HTMLInputElement;
 
 	let loading = false;
+
+	let usageLoading = false;
+	let usage = {
+		MemUsage: 0,
+		CPUPerc: 0,
+		NetIO: 0
+	};
+	let usageInterval;
+
 	let forceSave = false;
 	let debug = application.settings.debug;
 	let previews = application.settings.previews;
@@ -78,15 +85,29 @@
 		}
 	];
 	function containerClass() {
-		if (!$session.isAdmin || isRunning) {
+		if (!$session.isAdmin || $status.application.isRunning) {
 			return 'text-white border border-dashed border-coolgray-300 bg-transparent font-thin px-0';
 		}
 	}
 	if (browser && window.location.hostname === 'demo.coolify.io' && !application.fqdn) {
 		application.fqdn = `http://${cuid()}.demo.coolify.io`;
 	}
-	onMount(() => {
+	async function getUsage() {
+		if (usageLoading) return;
+		usageLoading = true;
+		const data = await get(`/applications/${id}/usage.json`);
+		usage = data.usage;
+		usageLoading = false;
+	}
+	onDestroy(() => {
+		clearInterval(usageInterval);
+	});
+	onMount(async () => {
 		domainEl.focus();
+		await getUsage();
+		usageInterval = setInterval(async () => {
+			await getUsage();
+		}, 1000);
 	});
 
 	async function changeSettings(name) {
@@ -261,6 +282,33 @@
 	</a>
 </div>
 
+<div class="mx-auto max-w-4xl px-6 py-4">
+	<div class="text-2xl font-bold">Application Usage</div>
+	<div class="mx-auto">
+		<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+			<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
+				<dt class=" text-sm font-medium text-white">Used Memory / Memory Limit</dt>
+				<dd class="mt-1 text-xl font-semibold text-white">
+					{usage?.MemUsage}
+				</dd>
+			</div>
+
+			<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
+				<dt class="truncate text-sm font-medium text-white">Used CPU</dt>
+				<dd class="mt-1 text-xl font-semibold text-white ">
+					{usage?.CPUPerc}
+				</dd>
+			</div>
+
+			<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
+				<dt class="truncate text-sm font-medium text-white">Network IO</dt>
+				<dd class="mt-1 text-xl font-semibold text-white ">
+					{usage?.NetIO}
+				</dd>
+			</div>
+		</dl>
+	</div>
+</div>
 <div class="mx-auto max-w-4xl px-6">
 	<!-- svelte-ignore missing-declaration -->
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
@@ -365,10 +413,10 @@
 					>
 					<div class="custom-select-wrapper">
 						<Select
-							isDisabled={!$session.isAdmin || isRunning}
+							isDisabled={!$session.isAdmin || $status.application.isRunning}
 							containerClasses={containerClass()}
 							id="baseImages"
-							showIndicator={!isRunning}
+							showIndicator={!$status.application.isRunning}
 							items={application.baseImages}
 							on:select={selectBaseImage}
 							value={application.baseImage}
@@ -386,10 +434,10 @@
 
 					<div class="custom-select-wrapper">
 						<Select
-							isDisabled={!$session.isAdmin || isRunning}
+							isDisabled={!$session.isAdmin || $status.application.isRunning}
 							containerClasses={containerClass()}
 							id="baseBuildImages"
-							showIndicator={!isRunning}
+							showIndicator={!$status.application.isRunning}
 							items={application.baseBuildImages}
 							on:select={selectBaseBuildImage}
 							value={application.baseBuildImage}
@@ -422,8 +470,8 @@
 				</div>
 				<div>
 					<input
-						readonly={!$session.isAdmin || isRunning}
-						disabled={!$session.isAdmin || isRunning}
+						readonly={!$session.isAdmin || $status.application.isRunning}
+						disabled={!$session.isAdmin || $status.application.isRunning}
 						bind:this={domainEl}
 						name="fqdn"
 						id="fqdn"
@@ -470,12 +518,12 @@
 			<div class="grid grid-cols-2 items-center pb-8">
 				<Setting
 					dataTooltip={$t('forms.must_be_stopped_to_modify')}
-					disabled={isRunning}
+					disabled={$status.application.isRunning}
 					isCenter={false}
 					bind:setting={dualCerts}
 					title={$t('application.ssl_www_and_non_www')}
 					description={$t('application.ssl_explainer')}
-					on:click={() => !isRunning && changeSettings('dualCerts')}
+					on:click={() => !$status.application.isRunning && changeSettings('dualCerts')}
 				/>
 			</div>
 			{#if application.buildPack === 'python'}
@@ -527,8 +575,8 @@
 				<div class="grid grid-cols-2 items-center">
 					<label for="exposePort" class="text-base font-bold text-stone-100">Exposed Port</label>
 					<input
-						readonly={!$session.isAdmin && !isRunning}
-						disabled={!$session.isAdmin || isRunning}
+						readonly={!$session.isAdmin && !$status.application.isRunning}
+						disabled={!$session.isAdmin || $status.application.isRunning}
 						name="exposePort"
 						id="exposePort"
 						bind:value={application.exposePort}

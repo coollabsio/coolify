@@ -14,3 +14,12 @@ export const features: Readable<{ latestVersion: string; beta: boolean }> = read
 });
 
 export const isTraefikUsed: Writable<boolean> = writable(false);
+
+export const status: Writable<any> = writable({
+	application: {
+		isRunning: false,
+		isExited: false,
+		loading: false,
+		initialLoading: true
+	}
+});

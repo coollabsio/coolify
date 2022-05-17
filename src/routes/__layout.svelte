@@ -80,6 +80,9 @@
 				} finally {
 				}
 			}
+			try {
+				const data = await get(`/notifications.json`);
+			} catch (error) {}
 		}
 	});
 

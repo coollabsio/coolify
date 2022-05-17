@@ -27,7 +27,7 @@ export const get: RequestHandler = async (event) => {
 						services: {
 							[id]: {
 								loadbalancer: {
-									servers: []
+									servers: [{ address: `${id}:${privatePort}` }]
 								}
 							}
 						}
@@ -49,7 +49,7 @@ export const get: RequestHandler = async (event) => {
 							services: {
 								[id]: {
 									loadbalancer: {
-										servers: []
+										servers: [{ url: `http://${id}:${privatePort}` }]
 									}
 								}
 							}
@@ -57,11 +57,6 @@ export const get: RequestHandler = async (event) => {
 					};
 				}
 			}
-		}
-		if (type === 'tcp') {
-			traefik[type].services[id].loadbalancer.servers.push({ address: `${id}:${privatePort}` });
-		} else if (type === 'http') {
-			traefik[type].services[id].loadbalancer.servers.push({ url: `http://${id}:${privatePort}` });
 		}
 		return {
 			status: 200,

@@ -20,9 +20,19 @@ model Setting {
   proxyHash             String?
   isAutoUpdateEnabled   Boolean  @default(false)
   isDNSCheckEnabled     Boolean  @default(true)
-  isTraefikUsed         Boolean  @default(false)
+  isTraefikUsed         Boolean  @default(true)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  type          String
+  message       String
+  isRead        Boolean  @default(false)
+  showAtVersion String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model User {
