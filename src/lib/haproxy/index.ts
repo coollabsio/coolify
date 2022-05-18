@@ -122,6 +122,7 @@ export async function stopTcpHttpProxy(
 	}
 	if (forceName) containerName = forceName;
 	const found = await checkContainer(engine, containerName);
+
 	try {
 		if (found) {
 			return await asyncExecShell(
@@ -137,15 +138,15 @@ export async function startTraefikTCPProxy(
 	id: string,
 	publicPort: number,
 	privatePort: number,
-	volume?: string
+	type?: string
 ): Promise<{ stdout: string; stderr: string } | Error> {
 	const { network, engine } = destinationDocker;
 	const host = getEngine(engine);
-
 	const containerName = `${id}-${publicPort}`;
 	const found = await checkContainer(engine, containerName, true);
-	const foundDependentContainer = await checkContainer(engine, id, true);
-
+	let dependentId = id;
+	if (type === 'wordpressftp') dependentId = `${id}-ftp`;
+	const foundDependentContainer = await checkContainer(engine, dependentId, true);
 	try {
 		if (foundDependentContainer && !found) {
 			const { stdout: Config } = await asyncExecShell(
@@ -210,7 +211,6 @@ export async function startTcpProxy(
 	const containerName = `haproxy-for-${publicPort}`;
 	const found = await checkContainer(engine, containerName, true);
 	const foundDependentContainer = await checkContainer(engine, id, true);
-
 	try {
 		if (foundDependentContainer && !found) {
 			const { stdout: Config } = await asyncExecShell(

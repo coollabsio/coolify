@@ -166,7 +166,7 @@
 			await post(`/update.json`, { type: to });
 			const data = await get(`/settings.json`);
 			$isTraefikUsed = data.settings.isTraefikUsed;
-			return toast.push('Proxy migration completed.');
+			return toast.push('Proxy migration started, it takes a few seconds.');
 		} catch ({ error }) {
 			return errorNotification(error);
 		} finally {

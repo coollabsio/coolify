@@ -71,7 +71,7 @@ export default async function (): Promise<void | {
 							ftpPublicPort,
 							`haproxy-for-${ftpPublicPort}`
 						);
-						await startTraefikTCPProxy(destinationDocker, `${id}-ftp`, ftpPublicPort, 22);
+						await startTraefikTCPProxy(destinationDocker, id, ftpPublicPort, 22, 'wordpressftp');
 					} else {
 						await stopTcpHttpProxy(id, destinationDocker, ftpPublicPort, `${id}-${ftpPublicPort}`);
 						await startTcpProxy(destinationDocker, `${id}-ftp`, ftpPublicPort, 22);

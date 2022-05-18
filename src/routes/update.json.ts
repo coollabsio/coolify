@@ -64,12 +64,12 @@ export const post: RequestHandler = async (event) => {
 		}
 	} else if (type === 'traefik') {
 		try {
-			const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy');
-			if (found) {
-				await asyncExecShell(`docker stop -t 0 coolify-haproxy`);
-				await asyncExecShell(`docker rm coolify-haproxy`);
-			}
-			await startTraefikProxy('/var/run/docker.sock');
+			// const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy');
+			// if (found) {
+			// 	await asyncExecShell(`docker stop -t 0 coolify-haproxy`);
+			// 	await asyncExecShell(`docker rm coolify-haproxy`);
+			// }
+			// await startTraefikProxy('/var/run/docker.sock');
 			await db.prisma.setting.update({
 				where: { id: settings.id },
 				data: { isTraefikUsed: true }
@@ -83,12 +83,12 @@ export const post: RequestHandler = async (event) => {
 		}
 	} else if (type === 'haproxy') {
 		try {
-			const found = await checkContainer('/var/run/docker.sock', 'coolify-proxy');
-			if (found) {
-				await asyncExecShell(`docker stop -t 0 coolify-proxy`);
-				await asyncExecShell(`docker rm coolify-proxy`);
-			}
-			await startCoolifyProxy('/var/run/docker.sock');
+			// const found = await checkContainer('/var/run/docker.sock', 'coolify-proxy');
+			// if (found) {
+			// 	await asyncExecShell(`docker stop -t 0 coolify-proxy`);
+			// 	await asyncExecShell(`docker rm coolify-proxy`);
+			// }
+			// await startCoolifyProxy('/var/run/docker.sock');
 			await db.prisma.setting.update({
 				where: { id: settings.id },
 				data: { isTraefikUsed: false }

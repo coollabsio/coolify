@@ -40,14 +40,14 @@ export const get: RequestHandler = async (event) => {
 					traefik = {
 						[type]: {
 							routers: {
-								[`${id}-${publicPort}`]: {
+								[id]: {
 									entrypoints: [type],
 									rule: `Host(\`${domain}\`)`,
-									service: `${id}-${publicPort}`
+									service: id
 								}
 							},
 							services: {
-								[`${id}-${publicPort}`]: {
+								[id]: {
 									loadbalancer: {
 										servers: [{ url: `http://${id}:${privatePort}` }]
 									}
