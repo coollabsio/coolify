@@ -252,7 +252,6 @@ export async function startTraefikHTTPProxy(
 				`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
 			);
 			const ip = JSON.parse(Config)[0].Gateway;
-			console.log({ privatePort, publicPort });
 			const tcpProxy = {
 				version: '3.5',
 				services: {
@@ -263,7 +262,7 @@ export async function startTraefikHTTPProxy(
 							`--entrypoints.http.address=:${publicPort}`,
 							`--providers.http.endpoint=${otherTraefikEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=http`,
 							'--providers.http.pollTimeout=2s',
-							'--log.level=debug'
+							'--log.level=error'
 						],
 						ports: [`${publicPort}:${publicPort}`],
 						extra_hosts: ['host.docker.internal:host-gateway', `host.docker.internal:${ip}`],
@@ -378,7 +377,7 @@ export async function startTraefikProxy(engine: string): Promise<void> {
 			--certificatesresolvers.letsencrypt.acme.httpchallenge=true \
 			--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json \
 			--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web \
-			--log.level=debug`
+			--log.level=error`
 		);
 		await db.prisma.setting.update({ where: { id }, data: { proxyHash: null } });
 		await db.setDestinationSettings({ engine, isCoolifyProxyUsed: true });
