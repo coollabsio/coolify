@@ -108,6 +108,7 @@ export async function checkHAProxy(haproxy?: Got): Promise<void> {
 }
 
 export async function stopTcpHttpProxy(
+	id: string,
 	destinationDocker: DestinationDocker,
 	publicPort: number,
 	forceName: string = null
@@ -115,7 +116,7 @@ export async function stopTcpHttpProxy(
 	const { engine } = destinationDocker;
 	const host = getEngine(engine);
 	const settings = await db.listSettings();
-	let containerName = `proxy-for-${publicPort}`;
+	let containerName = `${id}-${publicPort}`;
 	if (!settings.isTraefikUsed) {
 		containerName = `haproxy-for-${publicPort}`;
 	}
@@ -141,7 +142,7 @@ export async function startTraefikTCPProxy(
 	const { network, engine } = destinationDocker;
 	const host = getEngine(engine);
 
-	const containerName = `proxy-for-${publicPort}`;
+	const containerName = `${id}-${publicPort}`;
 	const found = await checkContainer(engine, containerName, true);
 	const foundDependentContainer = await checkContainer(engine, id, true);
 
@@ -154,8 +155,8 @@ export async function startTraefikTCPProxy(
 			const tcpProxy = {
 				version: '3.5',
 				services: {
-					[id]: {
-						container_name: `proxy-for-${publicPort}`,
+					[`${id}-${publicPort}`]: {
+						container_name: containerName,
 						image: 'traefik:v2.6',
 						command: [
 							`--entrypoints.tcp.address=:${publicPort}`,
@@ -241,7 +242,7 @@ export async function startTraefikHTTPProxy(
 	const { network, engine } = destinationDocker;
 	const host = getEngine(engine);
 
-	const containerName = `proxy-for-${publicPort}`;
+	const containerName = `${id}-${publicPort}`;
 	const found = await checkContainer(engine, containerName, true);
 	const foundDependentContainer = await checkContainer(engine, id, true);
 
@@ -251,21 +252,21 @@ export async function startTraefikHTTPProxy(
 				`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
 			);
 			const ip = JSON.parse(Config)[0].Gateway;
+			console.log({ privatePort, publicPort });
 			const tcpProxy = {
 				version: '3.5',
 				services: {
-					[id]: {
-						container_name: `proxy-for-${publicPort}`,
+					[`${id}-${publicPort}`]: {
+						container_name: containerName,
 						image: 'traefik:v2.6',
 						command: [
 							`--entrypoints.http.address=:${publicPort}`,
 							`--providers.http.endpoint=${otherTraefikEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=http`,
 							'--providers.http.pollTimeout=2s',
-							'--log.level=error'
+							'--log.level=debug'
 						],
 						ports: [`${publicPort}:${publicPort}`],
 						extra_hosts: ['host.docker.internal:host-gateway', `host.docker.internal:${ip}`],
-						volumes: ['/var/run/docker.sock:/var/run/docker.sock'],
 						networks: ['coolify-infra', network]
 					}
 				},
@@ -377,7 +378,7 @@ export async function startTraefikProxy(engine: string): Promise<void> {
 			--certificatesresolvers.letsencrypt.acme.httpchallenge=true \
 			--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json \
 			--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web \
-			--log.level=error`
+			--log.level=debug`
 		);
 		await db.prisma.setting.update({ where: { id }, data: { proxyHash: null } });
 		await db.setDestinationSettings({ engine, isCoolifyProxyUsed: true });

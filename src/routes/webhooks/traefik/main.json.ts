@@ -6,38 +6,10 @@ import { listServicesWithIncludes } from '$lib/database';
 import { checkContainer } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
-const traefik = {
-	http: {
-		routers: {},
-		services: {},
-		middlewares: {
-			'redirect-to-https': {
-				redirectscheme: {
-					scheme: 'https'
-				}
-			},
-			'redirect-to-http': {
-				redirectscheme: {
-					scheme: 'http'
-				}
-			},
-			'redirect-to-non-www': {
-				redirectregex: {
-					regex: '^https?://www\\.(.+)',
-					replacement: 'http://${1}'
-				}
-			},
-			'redirect-to-www': {
-				redirectregex: {
-					regex: '^https?://(?:www\\.)?(.+)',
-					replacement: 'http://www.${1}'
-				}
-			}
-		}
-	}
-};
-
-function configureMiddleware({ id, port, domain, nakedDomain, isHttps, isWWW, isDualCerts }) {
+function configureMiddleware(
+	{ id, port, domain, nakedDomain, isHttps, isWWW, isDualCerts },
+	traefik
+) {
 	if (isHttps) {
 		traefik.http.routers[id] = {
 			entrypoints: ['web'],
@@ -155,6 +127,36 @@ function configureMiddleware({ id, port, domain, nakedDomain, isHttps, isWWW, is
 	}
 }
 export const get: RequestHandler = async (event) => {
+	const traefik = {
+		http: {
+			routers: {},
+			services: {},
+			middlewares: {
+				'redirect-to-https': {
+					redirectscheme: {
+						scheme: 'https'
+					}
+				},
+				'redirect-to-http': {
+					redirectscheme: {
+						scheme: 'http'
+					}
+				},
+				'redirect-to-non-www': {
+					redirectregex: {
+						regex: '^https?://www\\.(.+)',
+						replacement: 'http://${1}'
+					}
+				},
+				'redirect-to-www': {
+					redirectregex: {
+						regex: '^https?://(?:www\\.)?(.+)',
+						replacement: 'http://www.${1}'
+					}
+				}
+			}
+		}
+	};
 	const applications = await db.prisma.application.findMany({
 		include: { destinationDocker: true, settings: true }
 	});
@@ -230,7 +232,6 @@ export const get: RequestHandler = async (event) => {
 			type,
 			destinationDocker,
 			destinationDockerId,
-			updatedAt,
 			dualCerts,
 			plausibleAnalytics
 		} = service;
@@ -288,11 +289,11 @@ export const get: RequestHandler = async (event) => {
 		});
 	}
 	for (const application of data.applications) {
-		configureMiddleware(application);
+		configureMiddleware(application, traefik);
 	}
 	for (const service of data.services) {
 		const { id, scriptName } = service;
-		configureMiddleware(service);
+		configureMiddleware(service, traefik);
 
 		if (scriptName) {
 			traefik.http.middlewares[`${id}-redir`] = {
@@ -309,9 +310,14 @@ export const get: RequestHandler = async (event) => {
 		}
 	}
 	for (const coolify of data.coolify) {
-		configureMiddleware(coolify);
+		configureMiddleware(coolify, traefik);
 	}
-
+	if (Object.keys(traefik.http.routers).length === 0) {
+		traefik.http.routers = null;
+	}
+	if (Object.keys(traefik.http.services).length === 0) {
+		traefik.http.services = null;
+	}
 	return {
 		status: 200,
 		body: {

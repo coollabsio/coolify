@@ -21,7 +21,7 @@ export default async function (): Promise<void | {
 		const engine = '/var/run/docker.sock';
 		const settings = await prisma.setting.findFirst();
 		const localDocker = await prisma.destinationDocker.findFirst({
-			where: { engine }
+			where: { engine, network: 'coolify' }
 		});
 		if (localDocker && localDocker.isCoolifyProxyUsed) {
 			if (settings.isTraefikUsed) {
@@ -46,10 +46,10 @@ export default async function (): Promise<void | {
 				if (destinationDocker.isCoolifyProxyUsed) {
 					const { privatePort } = generateDatabaseConfiguration(database);
 					if (settings.isTraefikUsed) {
-						await stopTcpHttpProxy(destinationDocker, publicPort, `haproxy-for-${publicPort}`);
+						await stopTcpHttpProxy(id, destinationDocker, publicPort, `haproxy-for-${publicPort}`);
 						await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
 					} else {
-						await stopTcpHttpProxy(destinationDocker, publicPort, `proxy-for-${publicPort}`);
+						await stopTcpHttpProxy(id, destinationDocker, publicPort, `${id}-${publicPort}`);
 						await startTcpProxy(destinationDocker, id, publicPort, privatePort);
 					}
 				}
@@ -66,13 +66,14 @@ export default async function (): Promise<void | {
 				if (destinationDocker.isCoolifyProxyUsed) {
 					if (settings.isTraefikUsed) {
 						await stopTcpHttpProxy(
+							id,
 							destinationDocker,
 							ftpPublicPort,
 							`haproxy-for-${ftpPublicPort}`
 						);
 						await startTraefikTCPProxy(destinationDocker, `${id}-ftp`, ftpPublicPort, 22);
 					} else {
-						await stopTcpHttpProxy(destinationDocker, ftpPublicPort, `proxy-for-${ftpPublicPort}`);
+						await stopTcpHttpProxy(id, destinationDocker, ftpPublicPort, `${id}-${ftpPublicPort}`);
 						await startTcpProxy(destinationDocker, `${id}-ftp`, ftpPublicPort, 22);
 					}
 				}
@@ -90,10 +91,10 @@ export default async function (): Promise<void | {
 			if (destinationDockerId) {
 				if (destinationDocker.isCoolifyProxyUsed) {
 					if (settings.isTraefikUsed) {
-						await stopTcpHttpProxy(destinationDocker, publicPort, `haproxy-for-${publicPort}`);
+						await stopTcpHttpProxy(id, destinationDocker, publicPort, `haproxy-for-${publicPort}`);
 						await startTraefikHTTPProxy(destinationDocker, id, publicPort, 9000);
 					} else {
-						await stopTcpHttpProxy(destinationDocker, publicPort, `proxy-for-${publicPort}`);
+						await stopTcpHttpProxy(id, destinationDocker, publicPort, `${id}-${publicPort}`);
 						await startHttpProxy(destinationDocker, id, publicPort, 9000);
 					}
 				}
