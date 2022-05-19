@@ -51,10 +51,12 @@ export async function isSecretExists({
 
 export async function isDomainConfigured({
 	id,
-	fqdn
+	fqdn,
+	checkOwn = false
 }: {
 	id: string;
 	fqdn: string;
+	checkOwn?: boolean;
 }): Promise<boolean> {
 	const domain = getDomain(fqdn);
 	const nakedDomain = domain.replace('www.', '');
@@ -72,12 +74,15 @@ export async function isDomainConfigured({
 		where: {
 			OR: [
 				{ fqdn: { endsWith: `//${nakedDomain}` } },
-				{ fqdn: { endsWith: `//www.${nakedDomain}` } }
+				{ fqdn: { endsWith: `//www.${nakedDomain}` } },
+				{ minio: { apiFqdn: { endsWith: `//${nakedDomain}` } } },
+				{ minio: { apiFqdn: { endsWith: `//www.${nakedDomain}` } } }
 			],
-			id: { not: id }
+			id: { not: checkOwn ? undefined : id }
 		},
 		select: { fqdn: true }
 	});
+
 	const coolifyFqdn = await prisma.setting.findFirst({
 		where: {
 			OR: [

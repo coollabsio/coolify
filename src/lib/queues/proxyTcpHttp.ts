@@ -81,19 +81,16 @@ export default async function (): Promise<void | {
 		}
 
 		// HTTP Proxies
-		const minioInstances = await prisma.minio.findMany({
-			where: { publicPort: { not: null } },
-			include: { service: { include: { destinationDocker: true } } }
-		});
-		for (const minio of minioInstances) {
-			const { service, publicPort } = minio;
-			const { destinationDockerId, destinationDocker, id } = service;
-			if (destinationDockerId) {
-				if (destinationDocker.isCoolifyProxyUsed) {
-					if (settings.isTraefikUsed) {
-						await stopTcpHttpProxy(id, destinationDocker, publicPort, `haproxy-for-${publicPort}`);
-						await startTraefikHTTPProxy(destinationDocker, id, publicPort, 9000);
-					} else {
+		if (!settings.isTraefikUsed) {
+			const minioInstances = await prisma.minio.findMany({
+				where: { publicPort: { not: null } },
+				include: { service: { include: { destinationDocker: true } } }
+			});
+			for (const minio of minioInstances) {
+				const { service, publicPort } = minio;
+				const { destinationDockerId, destinationDocker, id } = service;
+				if (destinationDockerId) {
+					if (destinationDocker.isCoolifyProxyUsed) {
 						await stopTcpHttpProxy(id, destinationDocker, publicPort, `${id}-${publicPort}`);
 						await startHttpProxy(destinationDocker, id, publicPort, 9000);
 					}

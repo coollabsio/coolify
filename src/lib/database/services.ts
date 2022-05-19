@@ -360,7 +360,24 @@ export async function updateService({
 }): Promise<Service> {
 	return await prisma.service.update({ where: { id }, data: { fqdn, name, exposePort } });
 }
-
+export async function updateMinioService({
+	id,
+	fqdn,
+	apiFqdn,
+	exposePort,
+	name
+}: {
+	id: string;
+	fqdn: string;
+	apiFqdn: string;
+	exposePort?: number;
+	name: string;
+}): Promise<Service> {
+	return await prisma.service.update({
+		where: { id },
+		data: { fqdn, name, exposePort, minio: { update: { apiFqdn } } }
+	});
+}
 export async function updateFiderService({
 	id,
 	fqdn,
@@ -459,7 +476,7 @@ export async function updateWordpress({
 	});
 }
 
-export async function updateMinioService({
+export async function updateMinioServicePort({
 	id,
 	publicPort
 }: {

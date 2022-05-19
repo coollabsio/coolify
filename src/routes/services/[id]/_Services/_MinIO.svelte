@@ -30,14 +30,16 @@
 		value={service.minio.rootUserPassword}
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="publicPort">{$t('forms.api_port')}</label>
-	<input
-		name="publicPort"
-		id="publicPort"
-		value={service.minio.publicPort}
-		disabled
-		readonly
-		placeholder={$t('forms.generated_automatically_after_start')}
-	/>
-</div>
+{#if !service.minio.apiFqdn}
+	<div class="grid grid-cols-2 items-center px-10">
+		<label for="publicPort">{$t('forms.api_port')}</label>
+		<input
+			name="publicPort"
+			id="publicPort"
+			value={service.minio.publicPort}
+			disabled
+			readonly
+			placeholder={$t('forms.generated_automatically_after_start')}
+		/>
+	</div>
+{/if}

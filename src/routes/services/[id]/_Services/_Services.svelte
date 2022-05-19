@@ -33,6 +33,7 @@
 		try {
 			await post(`/services/${id}/check.json`, {
 				fqdn: service.fqdn,
+				otherFqdns: [service.minio.apiFqdn],
 				exposePort: service.exposePort
 			});
 			await post(`/services/${id}/${service.type}.json`, { ...service });
@@ -89,6 +90,14 @@
 		</div>
 
 		<div class="grid grid-flow-row gap-2">
+			{#if service.type === 'minio' && !service.minio.apiFqdn && isRunning}
+				<div class="text-center">
+					<span class="font-bold text-red-500">IMPORTANT!</span> There was a small modification with
+					Minio in the latest version of Coolify. Now you can separate the Console URL from the API URL,
+					so you could use both through SSL. But this proccess cannot be done automatically, so you have
+					to stop your Minio instance, configure the new domain and start it back. Sorry for any inconvenience.
+				</div>
+			{/if}
 			<div class="mt-2 grid grid-cols-2 items-center px-10">
 				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 				<div>
@@ -134,25 +143,62 @@
 					{/if}
 				</div>
 			</div>
-			<div class="grid grid-cols-2 px-10">
-				<div class="flex-col ">
-					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100"
-						>{$t('application.url_fqdn')}</label
-					>
-					<Explainer text={$t('application.https_explainer')} />
-				</div>
+			{#if service.type === 'minio'}
+				<div class="grid grid-cols-2 px-10">
+					<div class="flex-col ">
+						<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">Console URL</label>
+					</div>
 
-				<CopyPasswordField
-					placeholder="eg: https://analytics.coollabs.io"
-					readonly={!$session.isAdmin && !isRunning}
-					disabled={!$session.isAdmin || isRunning}
-					name="fqdn"
-					id="fqdn"
-					pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-					bind:value={service.fqdn}
-					required
-				/>
-			</div>
+					<CopyPasswordField
+						placeholder="eg: https://console.min.io"
+						readonly={!$session.isAdmin && !isRunning}
+						disabled={!$session.isAdmin || isRunning}
+						name="fqdn"
+						id="fqdn"
+						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+						bind:value={service.fqdn}
+						required
+					/>
+				</div>
+				<div class="grid grid-cols-2 px-10">
+					<div class="flex-col ">
+						<label for="apiFqdn" class="pt-2 text-base font-bold text-stone-100">API URL</label>
+						<Explainer text={$t('application.https_explainer')} />
+					</div>
+
+					<CopyPasswordField
+						placeholder="eg: https://min.io"
+						readonly={!$session.isAdmin && !isRunning}
+						disabled={!$session.isAdmin || isRunning}
+						name="apiFqdn"
+						id="apiFqdn"
+						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+						bind:value={service.minio.apiFqdn}
+						required
+					/>
+				</div>
+			{:else}
+				<div class="grid grid-cols-2 px-10">
+					<div class="flex-col ">
+						<label for="fqdn" class="pt-2 text-base font-bold text-stone-100"
+							>{$t('application.url_fqdn')}</label
+						>
+						<Explainer text={$t('application.https_explainer')} />
+					</div>
+
+					<CopyPasswordField
+						placeholder="eg: https://analytics.coollabs.io"
+						readonly={!$session.isAdmin && !isRunning}
+						disabled={!$session.isAdmin || isRunning}
+						name="fqdn"
+						id="fqdn"
+						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+						bind:value={service.fqdn}
+						required
+					/>
+				</div>
+			{/if}
+
 			<div class="grid grid-cols-2 items-center px-10">
 				<Setting
 					disabled={isRunning}
@@ -163,7 +209,7 @@
 					on:click={() => !isRunning && changeSettings('dualCerts')}
 				/>
 			</div>
-			<div class="grid grid-cols-2 items-center  px-10">
+			<div class="grid grid-cols-2 items-center px-10">
 				<label for="exposePort" class="text-base font-bold text-stone-100">Exposed Port</label>
 				<input
 					readonly={!$session.isAdmin && !isRunning}

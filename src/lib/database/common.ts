@@ -305,12 +305,12 @@ export async function getFreePort() {
 			select: { mysqlPublicPort: true }
 		})
 	).map((a) => a.mysqlPublicPort);
-	const minioUSed = await (
+	const minioUsed = await (
 		await prisma.minio.findMany({
 			where: { publicPort: { not: null } },
 			select: { publicPort: true }
 		})
 	).map((a) => a.publicPort);
-	const usedPorts = [...dbUsed, ...wpFtpUsed, ...wpUsed, ...minioUSed];
+	const usedPorts = [...dbUsed, ...wpFtpUsed, ...wpUsed, ...minioUsed];
 	return await getPort({ port: portNumbers(minPort, maxPort), exclude: usedPorts });
 }

@@ -7,7 +7,7 @@ import { checkContainer } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 function configureMiddleware(
-	{ id, port, domain, nakedDomain, isHttps, isWWW, isDualCerts },
+	{ id, container, port, domain, nakedDomain, isHttps, isWWW, isDualCerts },
 	traefik
 ) {
 	if (isHttps) {
@@ -22,7 +22,7 @@ function configureMiddleware(
 			loadbalancer: {
 				servers: [
 					{
-						url: `http://${id}:${port}`
+						url: `http://${container}:${port}`
 					}
 				]
 			}
@@ -109,7 +109,7 @@ function configureMiddleware(
 			loadbalancer: {
 				servers: [
 					{
-						url: `http://${id}:${port}`
+						url: `http://${container}:${port}`
 					}
 				]
 			}
@@ -172,8 +172,7 @@ export const get: RequestHandler = async (event) => {
 			port,
 			destinationDocker,
 			destinationDockerId,
-			settings: { previews, dualCerts },
-			updatedAt
+			settings: { previews, dualCerts }
 		} = application;
 		if (destinationDockerId) {
 			const { engine, network } = destinationDocker;
@@ -186,6 +185,7 @@ export const get: RequestHandler = async (event) => {
 				if (isRunning) {
 					data.applications.push({
 						id,
+						container: id,
 						port: port || 3000,
 						domain,
 						nakedDomain,
@@ -208,14 +208,17 @@ export const get: RequestHandler = async (event) => {
 					if (containers.length > 0) {
 						for (const container of containers) {
 							const previewDomain = `${container.split('-')[1]}.${domain}`;
+							const nakedDomain = previewDomain.replace(/^www\./, '');
 							data.applications.push({
 								id: container,
+								container,
 								port: port || 3000,
 								domain: previewDomain,
 								isRunning,
+								nakedDomain,
 								isHttps,
-								redirectTo: isWWW ? previewDomain.replace('www.', '') : 'www.' + previewDomain,
-								updatedAt: updatedAt.getTime()
+								isWWW,
+								isDualCerts: dualCerts
 							});
 						}
 					}
@@ -254,8 +257,26 @@ export const get: RequestHandler = async (event) => {
 							scriptName = plausibleAnalytics.scriptName;
 						}
 
+						let container = id;
+						let otherDomain = null;
+						let otherNakedDomain = null;
+						let otherIsHttps = null;
+						let otherIsWWW = null;
+
+						if (type === 'minio') {
+							otherDomain = getDomain(service.minio.apiFqdn);
+							otherNakedDomain = otherDomain.replace(/^www\./, '');
+							otherIsHttps = service.minio.apiFqdn.startsWith('https://');
+							otherIsWWW = service.minio.apiFqdn.includes('www.');
+						}
 						data.services.push({
 							id,
+							container,
+							type,
+							otherDomain,
+							otherNakedDomain,
+							otherIsHttps,
+							otherIsWWW,
 							port,
 							publicPort,
 							domain,
@@ -280,6 +301,7 @@ export const get: RequestHandler = async (event) => {
 		const isWWW = fqdn.includes('www.');
 		data.coolify.push({
 			id: dev ? 'host.docker.internal' : 'coolify',
+			container: dev ? 'host.docker.internal' : 'coolify',
 			port: 3000,
 			domain,
 			nakedDomain,
@@ -293,7 +315,18 @@ export const get: RequestHandler = async (event) => {
 	}
 	for (const service of data.services) {
 		const { id, scriptName } = service;
+
 		configureMiddleware(service, traefik);
+		if (service.type === 'minio') {
+			service.id = id + '-minio';
+			service.container = id;
+			service.domain = service.otherDomain;
+			service.nakedDomain = service.otherNakedDomain;
+			service.isHttps = service.otherIsHttps;
+			service.isWWW = service.otherIsWWW;
+			service.port = 9000;
+			configureMiddleware(service, traefik);
+		}
 
 		if (scriptName) {
 			traefik.http.middlewares[`${id}-redir`] = {

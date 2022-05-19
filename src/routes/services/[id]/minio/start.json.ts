@@ -34,7 +34,6 @@ export const post: RequestHandler = async (event) => {
 		const publicPort = await getFreePort();
 
 		const consolePort = 9001;
-		const apiPort = 9000;
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 		const image = getServiceImage(type);
@@ -93,7 +92,7 @@ export const post: RequestHandler = async (event) => {
 		try {
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
-			await db.updateMinioService({ id, publicPort });
+			await db.updateMinioServicePort({ id, publicPort });
 			return {
 				status: 200
 			};

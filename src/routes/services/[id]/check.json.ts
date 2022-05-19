@@ -10,18 +10,34 @@ export const post: RequestHandler = async (event) => {
 	if (status === 401) return { status, body };
 
 	const { id } = event.params;
-	let { fqdn, exposePort } = await event.request.json();
+	let { fqdn, exposePort, otherFqdns } = await event.request.json();
 
 	if (fqdn) fqdn = fqdn.toLowerCase();
+	if (otherFqdns) otherFqdns = otherFqdns.map((fqdn) => fqdn.toLowerCase());
+	if (exposePort) exposePort = Number(exposePort);
 
 	try {
-		const found = await db.isDomainConfigured({ id, fqdn });
+		let found = await db.isDomainConfigured({ id, fqdn });
 		if (found) {
 			throw {
 				message: t.get('application.domain_already_in_use', {
 					domain: getDomain(fqdn).replace('www.', '')
 				})
 			};
+		}
+		if (otherFqdns) {
+			for (const ofqdn of otherFqdns) {
+				const domain = getDomain(ofqdn);
+				const nakedDomain = domain.replace('www.', '');
+				found = await db.isDomainConfigured({ id, fqdn: ofqdn, checkOwn: true });
+				if (found) {
+					throw {
+						message: t.get('application.domain_already_in_use', {
+							domain: nakedDomain
+						})
+					};
+				}
+			}
 		}
 		if (exposePort) {
 			exposePort = Number(exposePort);

@@ -345,6 +345,7 @@ model Minio {
   rootUser         String
   rootUserPassword String
   publicPort       Int?
+  apiFqdn          String?
   serviceId        String   @unique
   service          Service  @relation(fields: [serviceId], references: [id])
   createdAt        DateTime @default(now())
