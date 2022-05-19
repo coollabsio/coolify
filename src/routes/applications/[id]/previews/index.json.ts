@@ -17,7 +17,7 @@ export const get: RequestHandler = async (event) => {
 		const destinationDocker = await db.getDestinationByApplicationId({ id, teamId });
 		const docker = dockerInstance({ destinationDocker });
 		const listContainers = await docker.engine.listContainers({
-			filters: { network: [destinationDocker.network] }
+			filters: { network: [destinationDocker.network], name: [id] }
 		});
 		const containers = listContainers.filter((container) => {
 			return (
@@ -30,11 +30,7 @@ export const get: RequestHandler = async (event) => {
 				JSON.parse(Buffer.from(container.Labels['coolify.configuration'], 'base64').toString())
 			)
 			.filter((container) => {
-				return (
-					container.type !== 'manual' &&
-					container.type !== 'webhook_commit' &&
-					container.applicationId === id
-				);
+				return container.pullmergeRequestId && container.applicationId === id;
 			});
 		return {
 			body: {
