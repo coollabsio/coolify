@@ -102,7 +102,7 @@
 	onMount(async () => {
 		if (browser && window.location.hostname === 'demo.coolify.io' && !application.fqdn) {
 			application.fqdn = `http://${cuid()}.demo.coolify.io`;
-			await handleSubmit();
+			await post(`/applications/${id}.json`, { ...application });
 		}
 		domainEl.focus();
 		await getUsage();

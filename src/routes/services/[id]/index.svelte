@@ -32,11 +32,41 @@
 <script lang="ts">
 	import ServiceLinks from '$lib/components/ServiceLinks.svelte';
 	import Services from './_Services/_Services.svelte';
+	import { get } from '$lib/api';
+	import { page } from '$app/stores';
+	import { onDestroy, onMount } from 'svelte';
 
 	export let service;
 	export let isRunning;
 	export let readOnly;
 	export let settings;
+
+	const { id } = $page.params;
+	let usageLoading = false;
+	let usage = {
+		MemUsage: 0,
+		CPUPerc: 0,
+		NetIO: 0
+	};
+	let usageInterval;
+
+	async function getUsage() {
+		if (usageLoading) return;
+		usageLoading = true;
+		const data = await get(`/services/${id}/usage.json`);
+		usage = data.usage;
+		usageLoading = false;
+	}
+
+	onDestroy(() => {
+		clearInterval(usageInterval);
+	});
+	onMount(async () => {
+		await getUsage();
+		usageInterval = setInterval(async () => {
+			await getUsage();
+		}, 1000);
+	});
 </script>
 
 <div class="flex h-20 items-center space-x-2 p-5 px-6 font-bold">
@@ -46,6 +76,7 @@
 		</div>
 		<span class="text-xs">{service.name}</span>
 	</div>
+
 	{#if service.fqdn}
 		<a
 			href={service.fqdn}
@@ -71,5 +102,31 @@
 
 	<ServiceLinks {service} />
 </div>
+<div class="mx-auto max-w-4xl px-6 py-4">
+	<div class="text-2xl font-bold">Service Usage</div>
+	<div class="mx-auto">
+		<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+			<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
+				<dt class=" text-sm font-medium text-white">Used Memory / Memory Limit</dt>
+				<dd class="mt-1 text-xl font-semibold text-white">
+					{usage?.MemUsage}
+				</dd>
+			</div>
 
+			<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
+				<dt class="truncate text-sm font-medium text-white">Used CPU</dt>
+				<dd class="mt-1 text-xl font-semibold text-white ">
+					{usage?.CPUPerc}
+				</dd>
+			</div>
+
+			<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
+				<dt class="truncate text-sm font-medium text-white">Network IO</dt>
+				<dd class="mt-1 text-xl font-semibold text-white ">
+					{usage?.NetIO}
+				</dd>
+			</div>
+		</dl>
+	</div>
+</div>
 <Services bind:service {isRunning} {readOnly} {settings} />

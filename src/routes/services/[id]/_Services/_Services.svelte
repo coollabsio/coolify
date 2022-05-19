@@ -74,7 +74,7 @@
 	onMount(async () => {
 		if (browser && window.location.hostname === 'demo.coolify.io' && !service.fqdn) {
 			service.fqdn = `http://${cuid()}.demo.coolify.io`;
-			await handleSubmit();
+			await post(`/services/${id}/${service.type}.json`, { ...service });
 		}
 	});
 </script>
