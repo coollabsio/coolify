@@ -83,9 +83,6 @@
 				} finally {
 				}
 			}
-			try {
-				const data = await get(`/notifications.json`);
-			} catch (error) {}
 		}
 	});
 
@@ -530,15 +527,6 @@
 		<span class="fixed bottom-0 left-[50px] z-50 m-2 px-4 text-xs text-stone-700"
 			>Powered by <a href="https://coolify.io" target="_blank">Coolify</a></span
 		>
-	{/if}
-	{#if !$isTraefikUsed}
-		<span class="fixed bottom-[20px] right-[10px] z-50 m-2 px-4 text-xs ">
-			<a href="/settings"
-				><button class="bg-coollabs hover:bg-coollabs-100"
-					>New proxy is available! <br />Click here to get more details</button
-				></a
-			>
-		</span>
 	{/if}
 {/if}
 <main>
