@@ -88,9 +88,7 @@
 	function containerClass() {
 		return 'text-white border border-dashed border-coolgray-300 bg-transparent font-thin px-0';
 	}
-	if (browser && window.location.hostname === 'demo.coolify.io' && !application.fqdn) {
-		application.fqdn = `http://${cuid()}.demo.coolify.io`;
-	}
+
 	async function getUsage() {
 		if (usageLoading) return;
 		usageLoading = true;
@@ -102,6 +100,10 @@
 		clearInterval(usageInterval);
 	});
 	onMount(async () => {
+		if (browser && window.location.hostname === 'demo.coolify.io' && !application.fqdn) {
+			application.fqdn = `http://${cuid()}.demo.coolify.io`;
+			await handleSubmit();
+		}
 		domainEl.focus();
 		await getUsage();
 		usageInterval = setInterval(async () => {
@@ -149,6 +151,7 @@
 		}
 	}
 	async function handleSubmit() {
+		if (loading) return;
 		loading = true;
 		try {
 			nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
