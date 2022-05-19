@@ -30,8 +30,6 @@
 </script>
 
 <script lang="ts">
-	import cuid from 'cuid';
-	import { browser } from '$app/env';
 	import ServiceLinks from '$lib/components/ServiceLinks.svelte';
 	import Services from './_Services/_Services.svelte';
 
@@ -39,10 +37,6 @@
 	export let isRunning;
 	export let readOnly;
 	export let settings;
-
-	if (browser && window.location.hostname === 'demo.coolify.io' && !service.fqdn) {
-		service.fqdn = `http://${cuid()}.demo.coolify.io`;
-	}
 </script>
 
 <div class="flex h-20 items-center space-x-2 p-5 px-6 font-bold">

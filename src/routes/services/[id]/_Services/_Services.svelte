@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { browser } from '$app/env';
+
 	export let service;
 	export let isRunning;
 	export let readOnly;
@@ -12,6 +14,8 @@
 	import { errorNotification } from '$lib/form';
 	import { t } from '$lib/translations';
 	import { toast } from '@zerodevx/svelte-toast';
+	import cuid from 'cuid';
+	import { onMount } from 'svelte';
 	import Fider from './_Fider.svelte';
 	import Ghost from './_Ghost.svelte';
 	import Hasura from './_Hasura.svelte';
@@ -29,6 +33,7 @@
 	let dualCerts = service.dualCerts;
 
 	async function handleSubmit() {
+		if (loading) return;
 		loading = true;
 		try {
 			await post(`/services/${id}/check.json`, {
@@ -66,6 +71,12 @@
 			return errorNotification(error);
 		}
 	}
+	onMount(async () => {
+		if (browser && window.location.hostname === 'demo.coolify.io' && !service.fqdn) {
+			service.fqdn = `http://${cuid()}.demo.coolify.io`;
+			await handleSubmit();
+		}
+	});
 </script>
 
 <div class="mx-auto max-w-4xl px-6 pb-12">
