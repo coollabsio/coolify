@@ -37,6 +37,7 @@ export const get: RequestHandler = async (event) => {
 				const service = await db.prisma.service.findFirst({ where: { id } });
 				if (service?.fqdn) {
 					const domain = getDomain(service.fqdn);
+					const isHttps = service.fqdn.startsWith('https://');
 					traefik = {
 						[type]: {
 							routers: {
@@ -55,6 +56,19 @@ export const get: RequestHandler = async (event) => {
 							}
 						}
 					};
+					if (isHttps) {
+						if (dev) {
+							traefik[type].routers[id].tls = {
+								domains: {
+									main: `${domain}`
+								}
+							};
+						} else {
+							traefik[type].routers[id].tls = {
+								certresolver: 'letsencrypt'
+							};
+						}
+					}
 				}
 			}
 		}

@@ -85,6 +85,7 @@ export default async function (): Promise<void | {
 			where: { publicPort: { not: null } },
 			include: { service: { include: { destinationDocker: true } } }
 		});
+		console.log(minioInstances);
 		for (const minio of minioInstances) {
 			const { service, publicPort } = minio;
 			const { destinationDockerId, destinationDocker, id } = service;
@@ -101,6 +102,7 @@ export default async function (): Promise<void | {
 			}
 		}
 	} catch (error) {
+		console.log(error);
 		return ErrorHandler(error.response?.body || error);
 	}
 }

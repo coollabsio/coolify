@@ -202,8 +202,7 @@ export async function startTcpProxy(
 	destinationDocker: DestinationDocker,
 	id: string,
 	publicPort: number,
-	privatePort: number,
-	volume?: string
+	privatePort: number
 ): Promise<{ stdout: string; stderr: string } | Error> {
 	const { network, engine } = destinationDocker;
 	const host = getEngine(engine);
@@ -218,9 +217,7 @@ export async function startTcpProxy(
 			);
 			const ip = JSON.parse(Config)[0].Gateway;
 			return await asyncExecShell(
-				`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} ${
-					volume ? `-v ${volume}` : ''
-				} -d coollabsio/${defaultProxyImageTcp}`
+				`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} -d coollabsio/${defaultProxyImageTcp}`
 			);
 		}
 		if (!foundDependentContainer && found) {
@@ -262,11 +259,15 @@ export async function startTraefikHTTPProxy(
 							`--entrypoints.http.address=:${publicPort}`,
 							`--providers.http.endpoint=${otherTraefikEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=http`,
 							'--providers.http.pollTimeout=2s',
+							'--certificatesresolvers.letsencrypt.acme.httpchallenge=true',
+							'--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json',
+							'--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http',
 							'--log.level=error'
 						],
 						ports: [`${publicPort}:${publicPort}`],
 						extra_hosts: ['host.docker.internal:host-gateway', `host.docker.internal:${ip}`],
-						networks: ['coolify-infra', network]
+						networks: ['coolify-infra', network],
+						volumes: ['coolify-traefik-letsencrypt:/etc/traefik/acme']
 					}
 				},
 				networks: {
@@ -278,6 +279,9 @@ export async function startTraefikHTTPProxy(
 						external: false,
 						name: 'coolify-infra'
 					}
+				},
+				volumes: {
+					'coolify-traefik-letsencrypt': {}
 				}
 			};
 			await fs.writeFile(`/tmp/docker-compose-${id}.yaml`, yaml.dump(tcpProxy));
