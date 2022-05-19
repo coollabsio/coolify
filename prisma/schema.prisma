@@ -25,16 +25,6 @@ model Setting {
   updatedAt             DateTime @updatedAt
 }
 
-model Notification {
-  id            String   @id @default(cuid())
-  type          String
-  message       String
-  isRead        Boolean  @default(false)
-  showAtVersion String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
-
 model User {
   id         String       @id @unique @default(cuid())
   email      String       @unique
