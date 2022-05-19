@@ -219,17 +219,18 @@ export const supportedServiceTypesAndVersions = [
 		ports: {
 			main: 3000
 		}
-	},
-	{
-		name: 'appwrite',
-		fancyName: 'AppWrite',
-		baseImage: 'appwrite/appwrite',
-		images: ['appwrite/influxdb', 'appwrite/telegraf', 'mariadb:10.7', 'redis:6.0-alpine3.12'],
-		versions: ['latest', '0.13.0'],
-		recommendedVersion: '0.13.0',
-		ports: {
-			main: 3000
-		}
+		// },
+		// {
+		// 	name: 'appwrite',
+		// 	fancyName: 'AppWrite',
+		// 	baseImage: 'appwrite/appwrite',
+		// 	images: ['appwrite/influxdb', 'appwrite/telegraf', 'mariadb:10.7', 'redis:6.0-alpine3.12'],
+		// 	versions: ['latest', '0.13.0'],
+		// 	recommendedVersion: '0.13.0',
+		// 	ports: {
+		// 		main: 3000
+		// 	}
+		// }
 	}
 ];
 

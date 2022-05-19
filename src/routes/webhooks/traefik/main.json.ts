@@ -263,7 +263,7 @@ export const get: RequestHandler = async (event) => {
 						let otherIsHttps = null;
 						let otherIsWWW = null;
 
-						if (type === 'minio') {
+						if (type === 'minio' && service.minio.apiFqdn) {
 							otherDomain = getDomain(service.minio.apiFqdn);
 							otherNakedDomain = otherDomain.replace(/^www\./, '');
 							otherIsHttps = service.minio.apiFqdn.startsWith('https://');
