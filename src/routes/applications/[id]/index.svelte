@@ -472,7 +472,7 @@
 			</div>
 			{#if application.buildPack === 'python'}
 				<div class="grid grid-cols-2 items-center">
-					<label for="pythonModule" class="text-base font-bold text-stone-100">WSGI</label>
+					<label for="pythonModule" class="text-base font-bold text-stone-100">WSGI / ASGI</label>
 					<div class="custom-select-wrapper">
 						<Select id="wsgi" items={wsgis} on:select={selectWSGI} value={application.pythonWSGI} />
 					</div>
