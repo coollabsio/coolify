@@ -15,6 +15,12 @@ This is a little list of what you can do to help the project:
 
 ## 👋 Introduction
 
+### Setup with github codespaces
+
+If you have github codespaces enabled then you can just create a codespace and run `pnpm dev` to run your the dev environment. All the required dependencies and packages has been configured for you already.
+
+### Setup locally in your machine
+
 > 🔴 At the moment, Coolify **doesn't support Windows**. You must use Linux or MacOS. 💡 Although windows users can use github codespaces for development
 
 #### Recommended Pull Request Guideline
@@ -35,20 +41,16 @@ Due to the lock file, this repository is best with [pnpm](https://pnpm.io). I re
 
 You need to have [Docker Engine](https://docs.docker.com/engine/install/) installed locally.
 
-#### Setup a local development environment
+#### Steps for local setup
 
-- Copy `.env.template` to `.env` and set the `COOLIFY_APP_ID` environment variable to something cool.
-- Install dependencies with `pnpm install`.
-- Need to create a local SQlite database with `pnpm db:push`.
-  - This will apply all migrations at `db/dev.db`.
-- Seed the database with base entities with `pnpm db:seed`
-- You can start coding after starting `pnpm dev`.
+1. Copy `.env.template` to `.env` and set the `COOLIFY_APP_ID` environment variable to something cool.
+2. Install dependencies with `pnpm install`.
+3. Need to create a local SQlite database with `pnpm db:push`.
 
-#### How to start after you set up your local fork?
+   This will apply all migrations at `db/dev.db`.
 
-This repository works better with [pnpm](https://pnpm.io) due to the lock file. I recommend you to give it a try and use `pnpm` as well because it is cool and efficient!
-
-You need to have [Docker Engine](https://docs.docker.com/engine/install/) installed locally.
+4. Seed the database with base entities with `pnpm db:seed`
+5. You can start coding after starting `pnpm dev`.
 
 ## 🧑‍💻 Developer contribution
 
