@@ -15,7 +15,7 @@ This is a little list of what you can do to help the project:
 
 ## 👋 Introduction
 
-🔴 At the moment, Coolify **doesn't support Windows**. You must use Linux or MacOS.
+> 🔴 At the moment, Coolify **doesn't support Windows**. You must use Linux or MacOS. 💡 Although windows users can use github codespaces for development
 
 #### Recommended Pull Request Guideline
 
@@ -46,9 +46,7 @@ You need to have [Docker Engine](https://docs.docker.com/engine/install/) instal
 
 #### How to start after you set up your local fork?
 
-This repository works better with [pnpm](https://pnpm.io) due to the lock file. I recommend you to give it a try and use `pnpm` as well because it is cool and efficient!
-
-You need to have [Docker Engine](https://docs.docker.com/engine/install/) installed locally.
+This repository works better with [pnpm](https://pnpm.io) due to the lock file.
 
 ## 🧑‍💻 Developer contribution
 
