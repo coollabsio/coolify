@@ -23,7 +23,6 @@
 	import { t } from '$lib/translations';
 	import { get } from '$lib/api';
 	import { onDestroy, onMount } from 'svelte';
-	import Loading from './applications/[id]/logs/_Loading.svelte';
 	import Trend from './_Trend.svelte';
 	import { session } from '$app/stores';
 

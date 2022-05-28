@@ -3,7 +3,6 @@ import * as db from '$lib/database';
 import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
-import { startHttpProxy } from '$lib/haproxy';
 import { ErrorHandler, getFreePort, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 import type { ComposeFile } from '$lib/types/composeFile';
@@ -35,7 +34,6 @@ export const post: RequestHandler = async (event) => {
 		const publicPort = await getFreePort();
 
 		const consolePort = 9001;
-		const apiPort = 9000;
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 		const image = getServiceImage(type);
@@ -94,8 +92,7 @@ export const post: RequestHandler = async (event) => {
 		try {
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
-			await db.updateMinioService({ id, publicPort });
-			await startHttpProxy(destinationDocker, id, publicPort, apiPort);
+			await db.updateMinioServicePort({ id, publicPort });
 			return {
 				status: 200
 			};

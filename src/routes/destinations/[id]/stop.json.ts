@@ -1,6 +1,7 @@
 import { getUserDetails } from '$lib/common';
 import { ErrorHandler } from '$lib/database';
-import { stopCoolifyProxy } from '$lib/haproxy';
+import * as db from '$lib/database';
+import { stopCoolifyProxy, stopTraefikProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler = async (event) => {
@@ -9,7 +10,13 @@ export const post: RequestHandler = async (event) => {
 
 	const { engine } = await event.request.json();
 	try {
-		await stopCoolifyProxy(engine);
+		const settings = await db.prisma.setting.findFirst({});
+		if (settings?.isTraefikUsed) {
+			await stopTraefikProxy(engine);
+		} else {
+			await stopCoolifyProxy(engine);
+		}
+
 		return {
 			status: 200
 		};
