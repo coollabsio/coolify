@@ -15,7 +15,7 @@ This is a little list of what you can do to help the project:
 
 ## 👋 Introduction
 
-🔴 At the moment, Coolify **doesn't support Windows**. You must use Linux or MacOS.
+> 🔴 At the moment, Coolify **doesn't support Windows**. You must use Linux or MacOS. 💡 Although windows users can use github codespaces for development
 
 #### Recommended Pull Request Guideline
 
