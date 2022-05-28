@@ -3,10 +3,10 @@ import * as db from '$lib/database';
 import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
 import type { RequestHandler } from '@sveltejs/kit';
-import { startHttpProxy } from '$lib/haproxy';
 import { ErrorHandler, getFreePort, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 import type { ComposeFile } from '$lib/types/composeFile';
+import { getServiceMainPort } from '$lib/components/common';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -22,17 +22,18 @@ export const post: RequestHandler = async (event) => {
 			fqdn,
 			destinationDockerId,
 			destinationDocker,
+			exposePort,
 			minio: { rootUser, rootUserPassword },
 			serviceSecret
 		} = service;
 
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
+		const port = getServiceMainPort('minio');
 
 		const publicPort = await getFreePort();
 
 		const consolePort = 9001;
-		const apiPort = 9000;
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 		const image = getServiceImage(type);
@@ -62,6 +63,7 @@ export const post: RequestHandler = async (event) => {
 					networks: [network],
 					volumes: [config.volume],
 					restart: 'always',
+					...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
 					labels: makeLabelForServices('minio'),
 					deploy: {
 						restart_policy: {
@@ -90,8 +92,7 @@ export const post: RequestHandler = async (event) => {
 		try {
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
 			await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
-			await db.updateMinioService({ id, publicPort });
-			await startHttpProxy(destinationDocker, id, publicPort, apiPort);
+			await db.updateMinioServicePort({ id, publicPort });
 			return {
 				status: 200
 			};

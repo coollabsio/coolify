@@ -6,6 +6,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { ErrorHandler, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 import type { ComposeFile } from '$lib/types/composeFile';
+import { getServiceMainPort } from '$lib/components/common';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -22,19 +23,24 @@ export const post: RequestHandler = async (event) => {
 			destinationDockerId,
 			serviceSecret,
 			destinationDocker,
+			exposePort,
 			wordpress: {
 				mysqlDatabase,
+				mysqlHost,
+				mysqlPort,
 				mysqlUser,
 				mysqlPassword,
 				extraConfig,
 				mysqlRootUser,
-				mysqlRootUserPassword
+				mysqlRootUserPassword,
+				ownMysql
 			}
 		} = service;
 
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
 		const image = getServiceImage(type);
+		const port = getServiceMainPort('wordpress');
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 		const config = {
@@ -42,7 +48,7 @@ export const post: RequestHandler = async (event) => {
 				image: `${image}:${version}`,
 				volume: `${id}-wordpress-data:/var/www/html`,
 				environmentVariables: {
-					WORDPRESS_DB_HOST: `${id}-mysql`,
+					WORDPRESS_DB_HOST: ownMysql ? `${mysqlHost}:${mysqlPort}` : `${id}-mysql`,
 					WORDPRESS_DB_USER: mysqlUser,
 					WORDPRESS_DB_PASSWORD: mysqlPassword,
 					WORDPRESS_DB_NAME: mysqlDatabase,
@@ -66,7 +72,7 @@ export const post: RequestHandler = async (event) => {
 				config.wordpress.environmentVariables[secret.name] = secret.value;
 			});
 		}
-		const composeFile: ComposeFile = {
+		let composeFile: ComposeFile = {
 			version: '3.8',
 			services: {
 				[id]: {
@@ -76,24 +82,8 @@ export const post: RequestHandler = async (event) => {
 					volumes: [config.wordpress.volume],
 					networks: [network],
 					restart: 'always',
-					depends_on: [`${id}-mysql`],
+					...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
 					labels: makeLabelForServices('wordpress'),
-					deploy: {
-						restart_policy: {
-							condition: 'on-failure',
-							delay: '5s',
-							max_attempts: 3,
-							window: '120s'
-						}
-					}
-				},
-				[`${id}-mysql`]: {
-					container_name: `${id}-mysql`,
-					image: config.mysql.image,
-					volumes: [config.mysql.volume],
-					environment: config.mysql.environmentVariables,
-					networks: [network],
-					restart: 'always',
 					deploy: {
 						restart_policy: {
 							condition: 'on-failure',
@@ -112,12 +102,32 @@ export const post: RequestHandler = async (event) => {
 			volumes: {
 				[config.wordpress.volume.split(':')[0]]: {
 					name: config.wordpress.volume.split(':')[0]
-				},
-				[config.mysql.volume.split(':')[0]]: {
-					name: config.mysql.volume.split(':')[0]
 				}
 			}
 		};
+		if (!ownMysql) {
+			composeFile.services[id].depends_on = [`${id}-mysql`];
+			composeFile.services[`${id}-mysql`] = {
+				container_name: `${id}-mysql`,
+				image: config.mysql.image,
+				volumes: [config.mysql.volume],
+				environment: config.mysql.environmentVariables,
+				networks: [network],
+				restart: 'always',
+				deploy: {
+					restart_policy: {
+						condition: 'on-failure',
+						delay: '5s',
+						max_attempts: 3,
+						window: '120s'
+					}
+				}
+			};
+
+			composeFile.volumes[config.mysql.volume.split(':')[0]] = {
+				name: config.mysql.volume.split(':')[0]
+			};
+		}
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 		try {

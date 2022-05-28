@@ -1,9 +1,14 @@
-import { asyncExecShell } from '$lib/common';
-import { reloadHaproxy } from '$lib/haproxy';
+import { renewSSLCerts } from '$lib/letsencrypt';
+import { prisma } from '$lib/database';
 
 export default async function (): Promise<void> {
-	await asyncExecShell(
-		`docker run --rm --name certbot-renewal -v "coolify-letsencrypt:/etc/letsencrypt" certbot/certbot --logs-dir /etc/letsencrypt/logs renew`
-	);
-	await reloadHaproxy('unix:///var/run/docker.sock');
+	try {
+		const settings = await prisma.setting.findFirst();
+		if (!settings.isTraefikUsed) {
+			return await renewSSLCerts();
+		}
+	} catch (error) {
+		console.log(error);
+		throw error;
+	}
 }

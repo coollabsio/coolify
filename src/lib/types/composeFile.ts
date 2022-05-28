@@ -18,6 +18,7 @@ export type ComposeFileService = {
 	restart: ComposeFileRestartOption;
 	depends_on?: string[];
 	command?: string;
+	ports?: string[];
 	build?: {
 		context: string;
 		dockerfile: string;

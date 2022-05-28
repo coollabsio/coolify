@@ -58,7 +58,7 @@
 		</a>
 	{/if}
 </div>
-<div class="flex justify-center">
+<div class="flex-col justify-center">
 	{#if !destinations || ownDestinations.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">{$t('destination.no_destination_found')}</div>

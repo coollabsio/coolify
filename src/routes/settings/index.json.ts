@@ -1,3 +1,4 @@
+import { dev } from '$app/env';
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { listSettings, ErrorHandler } from '$lib/database';

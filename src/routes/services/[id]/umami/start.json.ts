@@ -8,6 +8,7 @@ import { makeLabelForServices } from '$lib/buildPacks/common';
 import type { ComposeFile } from '$lib/types/composeFile';
 import type { Service, DestinationDocker, Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { getServiceMainPort } from '$lib/components/common';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -24,6 +25,7 @@ export const post: RequestHandler = async (event) => {
 			destinationDockerId,
 			destinationDocker,
 			serviceSecret,
+			exposePort,
 			umami: {
 				umamiAdminPassword,
 				postgresqlUser,
@@ -34,6 +36,7 @@ export const post: RequestHandler = async (event) => {
 		} = service;
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
+		const port = getServiceMainPort('umami');
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 		const image = getServiceImage(type);
@@ -156,6 +159,7 @@ export const post: RequestHandler = async (event) => {
 					networks: [network],
 					volumes: [],
 					restart: 'always',
+					...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
 					labels: makeLabelForServices('umami'),
 					deploy: {
 						restart_policy: {

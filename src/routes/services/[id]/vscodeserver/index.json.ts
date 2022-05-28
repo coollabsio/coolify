@@ -9,11 +9,12 @@ export const post: RequestHandler = async (event) => {
 
 	const { id } = event.params;
 
-	let { name, fqdn } = await event.request.json();
+	let { name, fqdn, exposePort } = await event.request.json();
 	if (fqdn) fqdn = fqdn.toLowerCase();
+	if (exposePort) exposePort = Number(exposePort);
 
 	try {
-		await db.updateService({ id, fqdn, name });
+		await db.updateService({ id, fqdn, name, exposePort });
 		return { status: 201 };
 	} catch (error) {
 		return ErrorHandler(error);

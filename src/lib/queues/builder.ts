@@ -48,6 +48,7 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 		pythonModule,
 		pythonVariable,
 		denoOptions,
+		exposePort,
 		baseImage,
 		baseBuildImage
 	} = job.data;
@@ -152,6 +153,7 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 					JSON.stringify({
 						buildPack,
 						port,
+						exposePort,
 						installCommand,
 						buildCommand,
 						startCommand,
@@ -207,7 +209,7 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 					tag,
 					workdir,
 					docker,
-					port,
+					port: exposePort ? `${exposePort}:${port}` : port,
 					installCommand,
 					buildCommand,
 					startCommand,
@@ -263,7 +265,7 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 			repository,
 			branch,
 			projectId,
-			port,
+			port: exposePort ? `${exposePort}:${port}` : port,
 			commit,
 			installCommand,
 			buildCommand,
@@ -298,6 +300,7 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 						labels,
 						depends_on: [],
 						restart: 'always',
+						...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
 						// logging: {
 						// 	driver: 'fluentd',
 						// },
@@ -325,7 +328,7 @@ export default async function (job: Job<BuilderJob, void, string>): Promise<void
 			await saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
 		} catch (error) {
 			await saveBuildLog({ line: error, buildId, applicationId });
-			sentry.captureException(error);
+			// sentry.captureException(error);
 			throw new Error(error);
 		}
 		await saveBuildLog({ line: 'Proxy will be updated shortly.', buildId, applicationId });

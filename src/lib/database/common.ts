@@ -28,7 +28,7 @@ if (!dev) {
 }
 
 export const prisma = new PrismaClient({
-	errorFormat: 'pretty',
+	errorFormat: 'minimal',
 	rejectOnNotFound: false
 });
 
@@ -58,7 +58,7 @@ export function ErrorHandler(e: {
 		truncatedError.message = 'git clone failed';
 	}
 	if (!e.message?.includes('Coolify Proxy is not running')) {
-		sentry.captureException(truncatedError);
+		// sentry.captureException(truncatedError);
 	}
 	const payload = {
 		status: truncatedError.status || 500,
@@ -155,6 +155,19 @@ export function generateDatabaseConfiguration(database: Database & { settings: D
 			ulimits: Record<string, unknown>;
 			privatePort: number;
 			environmentVariables: {
+				MARIADB_ROOT_USER: string;
+				MARIADB_ROOT_PASSWORD: string;
+				MARIADB_USER: string;
+				MARIADB_PASSWORD: string;
+				MARIADB_DATABASE: string;
+			};
+	  }
+	| {
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
 				POSTGRESQL_POSTGRES_PASSWORD: string;
 				POSTGRESQL_USERNAME: string;
 				POSTGRESQL_PASSWORD: string;
@@ -205,6 +218,20 @@ export function generateDatabaseConfiguration(database: Database & { settings: D
 			},
 			image: `${baseImage}:${version}`,
 			volume: `${id}-${type}-data:/bitnami/mysql/data`,
+			ulimits: {}
+		};
+	} else if (type === 'mariadb') {
+		return {
+			privatePort: 3306,
+			environmentVariables: {
+				MARIADB_ROOT_USER: rootUser,
+				MARIADB_ROOT_PASSWORD: rootUserPassword,
+				MARIADB_USER: dbUser,
+				MARIADB_PASSWORD: dbUserPassword,
+				MARIADB_DATABASE: defaultDatabase
+			},
+			image: `${baseImage}:${version}`,
+			volume: `${id}-${type}-data:/bitnami/mariadb`,
 			ulimits: {}
 		};
 	} else if (type === 'mongodb') {
@@ -278,6 +305,12 @@ export async function getFreePort() {
 			select: { mysqlPublicPort: true }
 		})
 	).map((a) => a.mysqlPublicPort);
-	const usedPorts = [...dbUsed, ...wpFtpUsed, ...wpUsed];
+	const minioUsed = await (
+		await prisma.minio.findMany({
+			where: { publicPort: { not: null } },
+			select: { publicPort: true }
+		})
+	).map((a) => a.publicPort);
+	const usedPorts = [...dbUsed, ...wpFtpUsed, ...wpUsed, ...minioUsed];
 	return await getPort({ port: portNumbers(minPort, maxPort), exclude: usedPorts });
 }

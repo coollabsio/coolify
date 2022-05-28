@@ -19,9 +19,12 @@
 
 <script lang="ts">
 	import { t } from '$lib/translations';
+	import { gitTokens } from '$lib/store';
 
 	export let application;
 	export let appId;
+
+	$gitTokens.githubToken = null;
 
 	import GithubRepositories from './_GithubRepositories.svelte';
 	import GitlabRepositories from './_GitlabRepositories.svelte';

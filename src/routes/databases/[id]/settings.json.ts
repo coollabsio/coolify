@@ -1,7 +1,7 @@
 import { getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { generateDatabaseConfiguration, ErrorHandler, getFreePort } from '$lib/database';
-import { startTcpProxy, stopTcpHttpProxy } from '$lib/haproxy';
+import { startTcpProxy, startTraefikTCPProxy, stopTcpHttpProxy } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const post: RequestHandler = async (event) => {
@@ -13,6 +13,7 @@ export const post: RequestHandler = async (event) => {
 	const publicPort = await getFreePort();
 
 	try {
+		const settings = await db.listSettings();
 		await db.setDatabase({ id, isPublic, appendOnly });
 		const database = await db.getDatabase({ id, teamId });
 		const { destinationDockerId, destinationDocker, publicPort: oldPublicPort } = database;
@@ -21,7 +22,11 @@ export const post: RequestHandler = async (event) => {
 		if (destinationDockerId) {
 			if (isPublic) {
 				await db.prisma.database.update({ where: { id }, data: { publicPort } });
-				await startTcpProxy(destinationDocker, id, publicPort, privatePort);
+				if (settings.isTraefikUsed) {
+					await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
+				} else {
+					await startTcpProxy(destinationDocker, id, publicPort, privatePort);
+				}
 			} else {
 				await db.prisma.database.update({ where: { id }, data: { publicPort: null } });
 				await stopTcpHttpProxy(destinationDocker, oldPublicPort);

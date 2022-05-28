@@ -129,23 +129,28 @@
 				{#if currentStatus === 'running'}
 					<button
 						on:click={cancelBuild}
+						class:animation-spin={cancelInprogress}
 						class="bg-transparent hover:text-red-500 hover:bg-coolgray-500"
 						data-tooltip="Cancel build"
 					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="w-6 h-6"
-							viewBox="0 0 24 24"
-							stroke-width="1.5"
-							stroke="currentColor"
-							fill="none"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						>
-							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-							<circle cx="12" cy="12" r="9" />
-							<path d="M10 10l4 4m0 -4l-4 4" />
-						</svg>
+						{#if cancelInprogress}
+							Cancelling...
+						{:else}
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="w-6 h-6"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<circle cx="12" cy="12" r="9" />
+								<path d="M10 10l4 4m0 -4l-4 4" />
+							</svg>
+						{/if}
 					</button>
 				{/if}
 			</div>

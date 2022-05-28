@@ -7,6 +7,7 @@ import { ErrorHandler, getServiceImage } from '$lib/database';
 import { makeLabelForServices } from '$lib/buildPacks/common';
 import type { ComposeFile } from '$lib/types/composeFile';
 import type { Service, DestinationDocker, Prisma } from '@prisma/client';
+import { getServiceMainPort } from '$lib/components/common';
 
 export const post: RequestHandler = async (event) => {
 	const { teamId, status, body } = await getUserDetails(event);
@@ -23,10 +24,12 @@ export const post: RequestHandler = async (event) => {
 			destinationDockerId,
 			destinationDocker,
 			serviceSecret,
+			exposePort,
 			hasura: { postgresqlUser, postgresqlPassword, postgresqlDatabase }
 		} = service;
 		const network = destinationDockerId && destinationDocker.network;
 		const host = getEngine(destinationDocker.engine);
+		const port = getServiceMainPort('hasura');
 
 		const { workdir } = await createDirectories({ repository: type, buildId: id });
 		const image = getServiceImage(type);
@@ -65,6 +68,7 @@ export const post: RequestHandler = async (event) => {
 					volumes: [],
 					restart: 'always',
 					labels: makeLabelForServices('hasura'),
+					...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
 					deploy: {
 						restart_policy: {
 							condition: 'on-failure',

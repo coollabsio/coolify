@@ -20,6 +20,7 @@ model Setting {
   proxyHash             String?
   isAutoUpdateEnabled   Boolean  @default(false)
   isDNSCheckEnabled     Boolean  @default(true)
+  isTraefikUsed         Boolean  @default(true)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
@@ -84,6 +85,7 @@ model Application {
   buildPack           String?
   projectId           Int?
   port                Int?
+  exposePort          Int?
   installCommand      String?
   buildCommand        String?
   startCommand        String?
@@ -289,6 +291,7 @@ model Service {
   id                  String                     @id @default(cuid())
   name                String
   fqdn                String?
+  exposePort          Int?
   dualCerts           Boolean                    @default(false)
   type                String?
   version             String?
@@ -320,6 +323,7 @@ model PlausibleAnalytics {
   postgresqlDatabase   String
   postgresqlPublicPort Int?
   secretKeyBase        String?
+  scriptName           String   @default("plausible.js")
   serviceId            String   @unique
   service              Service  @relation(fields: [serviceId], references: [id])
   createdAt            DateTime @default(now())
@@ -331,6 +335,7 @@ model Minio {
   rootUser         String
   rootUserPassword String
   publicPort       Int?
+  apiFqdn          String?
   serviceId        String   @unique
   service          Service  @relation(fields: [serviceId], references: [id])
   createdAt        DateTime @default(now())
@@ -350,6 +355,9 @@ model Wordpress {
   id                    String   @id @default(cuid())
   extraConfig           String?
   tablePrefix           String?
+  ownMysql              Boolean  @default(false)
+  mysqlHost             String?
+  mysqlPort             Int?
   mysqlUser             String
   mysqlPassword         String
   mysqlRootUser         String

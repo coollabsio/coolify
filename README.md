@@ -8,6 +8,10 @@ https://demo.coolify.io/
 
 (If it is unresponsive, that means someone overloaded the server. 🙃)
 
+## Feedback
+
+If you have a new service / build pack you would like to add, raise an idea [here](https://feedback.coolify.io/) to get feedback from the community!
+
 ## How to install
 
 Installation is automated with the following command:
@@ -52,18 +56,21 @@ These are the predefined build packs, but with the Docker build pack, you can ho
 - NuxtJS
 - NextJS
 - React/Preact
-- NextJS
 - Gatsby
 - Svelte
 - PHP
+- Laravel
 - Rust
 - Docker
+- Python
+- Deno
 
 ### Databases
 
 One-click database is ready to be used internally or shared over the internet:
 
 - MongoDB
+- MariaDB
 - MySQL
 - PostgreSQL
 - CouchDB
@@ -73,9 +80,9 @@ One-click database is ready to be used internally or shared over the internet:
 
 You can host cool open-source services as well:
 
-- [WordPress](https://wordpress.org)
+- [WordPress](https://docs.coollabs.io/coolify/services/wordpress)
 - [Ghost](https://ghost.org)
-- [Plausible Analytics](https://plausible.io)
+- [Plausible Analytics](https://docs.coollabs.io/coolify/services/plausible-analytics)
 - [NocoDB](https://nocodb.com)
 - [VSCode Server](https://github.com/cdr/code-server)
 - [MinIO](https://min.io)
@@ -85,6 +92,8 @@ You can host cool open-source services as well:
 - [Uptime Kuma](https://github.com/louislam/uptime-kuma)
 - [MeiliSearch](https://github.com/meilisearch/meilisearch)
 - [Umami](https://github.com/mikecao/umami)
+- [Fider](https://fider.io)
+- [Hasura](https://hasura.io)
 
 ## Migration from v1
 

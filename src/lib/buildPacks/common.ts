@@ -8,14 +8,16 @@ import { staticDeployments } from '$lib/components/common';
 const staticApps = ['static', 'react', 'vuejs', 'svelte', 'gatsby', 'astro', 'eleventy'];
 const nodeBased = [
 	'react',
+	'preact',
 	'vuejs',
 	'svelte',
 	'gatsby',
-	'php',
 	'astro',
 	'eleventy',
 	'node',
-	'nestjs'
+	'nestjs',
+	'nuxtjs',
+	'nextjs'
 ];
 
 export function makeLabelForStandaloneApplication({
@@ -403,7 +405,72 @@ export function setDefaultBaseImage(buildPack) {
 			label: 'webdevops/php-nginx:7.1-alpine'
 		}
 	];
-
+	const pythonVersions = [
+		{
+			value: 'python:3.10-alpine',
+			label: 'python:3.10-alpine'
+		},
+		{
+			value: 'python:3.10-buster',
+			label: 'python:3.10-buster'
+		},
+		{
+			value: 'python:3.10-bullseye',
+			label: 'python:3.10-bullseye'
+		},
+		{
+			value: 'python:3.10-slim-bullseye',
+			label: 'python:3.10-slim-bullseye'
+		},
+		{
+			value: 'python:3.9-alpine',
+			label: 'python:3.9-alpine'
+		},
+		{
+			value: 'python:3.9-buster',
+			label: 'python:3.9-buster'
+		},
+		{
+			value: 'python:3.9-bullseye',
+			label: 'python:3.9-bullseye'
+		},
+		{
+			value: 'python:3.9-slim-bullseye',
+			label: 'python:3.9-slim-bullseye'
+		},
+		{
+			value: 'python:3.8-alpine',
+			label: 'python:3.8-alpine'
+		},
+		{
+			value: 'python:3.8-buster',
+			label: 'python:3.8-buster'
+		},
+		{
+			value: 'python:3.8-bullseye',
+			label: 'python:3.8-bullseye'
+		},
+		{
+			value: 'python:3.8-slim-bullseye',
+			label: 'python:3.8-slim-bullseye'
+		},
+		{
+			value: 'python:3.7-alpine',
+			label: 'python:3.7-alpine'
+		},
+		{
+			value: 'python:3.7-buster',
+			label: 'python:3.7-buster'
+		},
+		{
+			value: 'python:3.7-bullseye',
+			label: 'python:3.7-bullseye'
+		},
+		{
+			value: 'python:3.7-slim-bullseye',
+			label: 'python:3.7-slim-bullseye'
+		}
+	];
 	let payload = {
 		baseImage: null,
 		baseBuildImage: null,
@@ -423,7 +490,8 @@ export function setDefaultBaseImage(buildPack) {
 		payload.baseBuildImages = nodeVersions;
 	}
 	if (buildPack === 'python') {
-		payload.baseImage = 'python:3-alpine';
+		payload.baseImage = 'python:3.10-alpine';
+		payload.baseImages = pythonVersions;
 	}
 	if (buildPack === 'rust') {
 		payload.baseImage = 'rust:latest';

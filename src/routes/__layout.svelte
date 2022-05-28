@@ -34,23 +34,30 @@
 </script>
 
 <script>
+	export let settings;
 	import '../tailwind.css';
 	import { SvelteToast, toast } from '@zerodevx/svelte-toast';
 	import { page, session } from '$app/stores';
+	import { fade } from 'svelte/transition';
 	import { onMount } from 'svelte';
 	import { errorNotification } from '$lib/form';
 	import { asyncSleep } from '$lib/components/common';
 	import { del, get, post } from '$lib/api';
 	import { dev } from '$app/env';
-	import { features } from '$lib/store';
-	let isUpdateAvailable = false;
+	import { features, isTraefikUsed } from '$lib/store';
+	import { navigating } from '$app/stores';
+	import PageLoader from '$lib/components/PageLoader.svelte';
 
+	$isTraefikUsed = settings?.isTraefikUsed || false;
+
+	let isUpdateAvailable = false;
 	let updateStatus = {
 		found: false,
 		loading: false,
 		success: null
 	};
 	let latestVersion = 'latest';
+
 	onMount(async () => {
 		if ($session.userId) {
 			const overrideVersion = $features.latestVersion;
@@ -78,6 +85,7 @@
 			}
 		}
 	});
+
 	async function logout() {
 		try {
 			await del(`/logout.json`, {});
@@ -128,16 +136,23 @@
 	<title>Coolify</title>
 	{#if !$session.whiteLabeled}
 		<link rel="icon" href="/favicon.png" />
+	{:else if $session.whiteLabelDetails.icon}
+		<link rel="icon" href={$session.whiteLabelDetails.icon} />
 	{/if}
 </svelte:head>
 <SvelteToast options={{ intro: { y: -64 }, duration: 3000, pausable: true }} />
+{#if $navigating}
+	<div out:fade={{ delay: 100 }}>
+		<PageLoader />
+	</div>
+{/if}
 {#if $session.userId}
 	<nav class="nav-main">
 		<div class="flex h-screen w-full flex-col items-center transition-all duration-100">
 			{#if !$session.whiteLabeled}
 				<div class="my-4 h-10 w-10"><img src="/favicon.png" alt="coolLabs logo" /></div>
 			{/if}
-			<div class="flex flex-col space-y-4 py-2" class:mt-2={$session.whiteLabeled}>
+			<div class="flex flex-col space-y-2 py-2" class:mt-2={$session.whiteLabeled}>
 				<a
 					sveltekit:prefetch
 					href="/"
@@ -222,7 +237,6 @@
 						<polyline points="10 15 13 18 10 21" />
 					</svg>
 				</a>
-				<div class="border-t border-stone-700" />
 				<a
 					sveltekit:prefetch
 					href="/destinations"
@@ -284,7 +298,6 @@
 						<path d="M4 12v6a8 3 0 0 0 16 0v-6" />
 					</svg>
 				</a>
-				<div class="border-t border-stone-700" />
 				<a
 					sveltekit:prefetch
 					href="/services"
@@ -423,7 +436,7 @@
 					{/if}
 				{/if}
 			</div>
-			<div class="flex flex-col space-y-4 py-2">
+			<div class="flex flex-col space-y-2 py-2">
 				<a
 					sveltekit:prefetch
 					href="/iam"

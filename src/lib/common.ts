@@ -4,6 +4,8 @@ import { dev } from '$app/env';
 import * as Sentry from '@sentry/node';
 import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-generator';
 import type { Config } from 'unique-names-generator';
+import { promises as dns } from 'dns';
+import { isIP } from 'is-ip';
 
 import * as db from '$lib/database';
 import { buildLogQueue } from './queues';
@@ -14,24 +16,25 @@ import Cookie from 'cookie';
 import os from 'os';
 import type { RequestEvent } from '@sveltejs/kit/types/internal';
 import type { Job } from 'bullmq';
+import { t } from './translations';
 
 try {
 	if (!dev) {
-		Sentry.init({
-			dsn: process.env['COOLIFY_SENTRY_DSN'],
-			tracesSampleRate: 0,
-			environment: 'production',
-			debug: true,
-			release: currentVersion,
-			initialScope: {
-				tags: {
-					appId: process.env['COOLIFY_APP_ID'],
-					'os.arch': getOsArch(),
-					'os.platform': os.platform(),
-					'os.release': os.release()
-				}
-			}
-		});
+		// Sentry.init({
+		// 	dsn: process.env['COOLIFY_SENTRY_DSN'],
+		// 	tracesSampleRate: 0,
+		// 	environment: 'production',
+		// 	debug: true,
+		// 	release: currentVersion,
+		// 	initialScope: {
+		// 		tags: {
+		// 			appId: process.env['COOLIFY_APP_ID'],
+		// 			'os.arch': getOsArch(),
+		// 			'os.platform': os.platform(),
+		// 			'os.release': os.release()
+		// 		}
+		// 	}
+		// });
 	}
 } catch (err) {
 	console.log('Could not initialize Sentry, no worries.');
@@ -93,12 +96,16 @@ export const getUserDetails = async (
 	const userId = event?.locals?.session?.data?.userId || null;
 	let permission = 'read';
 	if (teamId && userId) {
-		const data = await db.prisma.permission.findFirst({
-			where: { teamId, userId },
-			select: { permission: true },
-			rejectOnNotFound: true
-		});
-		if (data.permission) permission = data.permission;
+		try {
+			const data = await db.prisma.permission.findFirst({
+				where: { teamId, userId },
+				select: { permission: true },
+				rejectOnNotFound: true
+			});
+			if (data.permission) permission = data.permission;
+		} catch (error) {
+			console.log(error);
+		}
 	}
 
 	const payload = {
@@ -178,4 +185,98 @@ export function getDomain(domain: string): string {
 
 export function getOsArch() {
 	return os.arch();
+}
+
+export async function isDNSValid(event: any, domain: string): Promise<any> {
+	let resolves = [];
+	try {
+		if (isIP(event.url.hostname)) {
+			resolves = [event.url.hostname];
+		} else {
+			resolves = await dns.resolve4(event.url.hostname);
+		}
+	} catch (error) {
+		throw {
+			message: t.get('application.dns_not_set_error', { domain })
+		};
+	}
+
+	try {
+		let ipDomainFound = false;
+		dns.setServers(['1.1.1.1', '8.8.8.8']);
+		const dnsResolve = await dns.resolve4(domain);
+		if (dnsResolve.length > 0) {
+			for (const ip of dnsResolve) {
+				if (resolves.includes(ip)) {
+					ipDomainFound = true;
+				}
+			}
+		}
+		if (!ipDomainFound) throw false;
+	} catch (error) {
+		throw {
+			message: t.get('application.domain_not_valid')
+		};
+	}
+}
+
+export async function checkDomainsIsValidInDNS({ event, fqdn, dualCerts }): Promise<any> {
+	const domain = getDomain(fqdn);
+	const domainDualCert = domain.includes('www.') ? domain.replace('www.', '') : `www.${domain}`;
+	dns.setServers(['1.1.1.1', '8.8.8.8']);
+	let resolves = [];
+	try {
+		if (isIP(event.url.hostname)) {
+			resolves = [event.url.hostname];
+		} else {
+			resolves = await dns.resolve4(event.url.hostname);
+		}
+	} catch (error) {
+		throw {
+			message: t.get('application.dns_not_set_error', { domain })
+		};
+	}
+
+	if (dualCerts) {
+		try {
+			const ipDomain = await dns.resolve4(domain);
+			const ipDomainDualCert = await dns.resolve4(domainDualCert);
+
+			let ipDomainFound = false;
+			let ipDomainDualCertFound = false;
+
+			for (const ip of ipDomain) {
+				if (resolves.includes(ip)) {
+					ipDomainFound = true;
+				}
+			}
+			for (const ip of ipDomainDualCert) {
+				if (resolves.includes(ip)) {
+					ipDomainDualCertFound = true;
+				}
+			}
+			if (ipDomainFound && ipDomainDualCertFound) return { status: 200 };
+			throw false;
+		} catch (error) {
+			throw {
+				message: t.get('application.dns_not_set_error', { domain })
+			};
+		}
+	} else {
+		try {
+			const ipDomain = await dns.resolve4(domain);
+			let ipDomainFound = false;
+			for (const ip of ipDomain) {
+				if (resolves.includes(ip)) {
+					ipDomainFound = true;
+				}
+			}
+			if (ipDomainFound) return { status: 200 };
+			throw false;
+		} catch (error) {
+			throw {
+				message: t.get('application.dns_not_set_error', { domain })
+			};
+		}
+	}
 }

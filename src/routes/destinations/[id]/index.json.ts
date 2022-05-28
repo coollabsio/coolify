@@ -26,8 +26,12 @@ export const get: RequestHandler = async (event) => {
 			// // await saveSshKey(destination);
 			// payload.state = await checkContainer(engine, 'coolify-haproxy');
 		} else {
+			let containerName = 'coolify-proxy';
+			if (!settings.isTraefikUsed) {
+				containerName = 'coolify-haproxy';
+			}
 			payload.state =
-				destination?.engine && (await checkContainer(destination.engine, 'coolify-haproxy'));
+				destination?.engine && (await checkContainer(destination.engine, containerName));
 		}
 		return {
 			status: 200,

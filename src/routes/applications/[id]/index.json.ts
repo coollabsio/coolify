@@ -1,10 +1,8 @@
-import { getUserDetails } from '$lib/common';
+import { asyncExecShell, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
-import { checkContainer, isContainerExited } from '$lib/haproxy';
+import { checkContainer, getContainerUsage, isContainerExited } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
-import jsonwebtoken from 'jsonwebtoken';
-import { get as getRequest } from '$lib/api';
 import { setDefaultConfiguration } from '$lib/buildPacks/common';
 
 export const get: RequestHandler = async (event) => {
@@ -14,21 +12,14 @@ export const get: RequestHandler = async (event) => {
 	const { id } = event.params;
 
 	const appId = process.env['COOLIFY_APP_ID'];
-	let isRunning = false;
-	let isExited = false;
 	let githubToken = event.locals.cookies?.githubToken || null;
 	let gitlabToken = event.locals.cookies?.gitlabToken || null;
 	try {
 		const application = await db.getApplication({ id, teamId });
-		if (application.destinationDockerId) {
-			isRunning = await checkContainer(application.destinationDocker.engine, id);
-			isExited = await isContainerExited(application.destinationDocker.engine, id);
-		}
+
 		return {
 			status: 200,
 			body: {
-				isRunning,
-				isExited,
 				application,
 				appId,
 				githubToken,
@@ -52,6 +43,7 @@ export const post: RequestHandler = async (event) => {
 		buildPack,
 		fqdn,
 		port,
+		exposePort,
 		installCommand,
 		buildCommand,
 		startCommand,
@@ -67,6 +59,9 @@ export const post: RequestHandler = async (event) => {
 		baseBuildImage
 	} = await event.request.json();
 	if (port) port = Number(port);
+	if (exposePort) {
+		exposePort = Number(exposePort);
+	}
 	if (denoOptions) denoOptions = denoOptions.trim();
 
 	try {
@@ -87,6 +82,7 @@ export const post: RequestHandler = async (event) => {
 			name,
 			fqdn,
 			port,
+			exposePort,
 			installCommand,
 			buildCommand,
 			startCommand,

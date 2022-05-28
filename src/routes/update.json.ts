@@ -6,6 +6,7 @@ import * as db from '$lib/database';
 import type { RequestHandler } from '@sveltejs/kit';
 import compare from 'compare-versions';
 import got from 'got';
+import { checkContainer, startCoolifyProxy, startTraefikProxy } from '$lib/haproxy';
 
 export const get: RequestHandler = async (request) => {
 	try {
@@ -34,14 +35,14 @@ export const get: RequestHandler = async (request) => {
 
 export const post: RequestHandler = async (event) => {
 	const { type, latestVersion } = await event.request.json();
+	const settings = await db.prisma.setting.findFirst();
 	if (type === 'update') {
 		try {
 			if (!dev) {
-				const { isAutoUpdateEnabled } = await db.prisma.setting.findFirst();
 				await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
 				await asyncExecShell(`env | grep COOLIFY > .env`);
 				await asyncExecShell(
-					`sed -i '/COOLIFY_AUTO_UPDATE=/c\COOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env`
+					`sed -i '/COOLIFY_AUTO_UPDATE=/c\COOLIFY_AUTO_UPDATE=${settings.isAutoUpdateEnabled}' .env`
 				);
 				await asyncExecShell(
 					`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify coolify-redis && docker rm coolify coolify-redis && docker compose up -d --force-recreate"`
@@ -58,6 +59,44 @@ export const post: RequestHandler = async (event) => {
 					body: {}
 				};
 			}
+		} catch (error) {
+			return ErrorHandler(error);
+		}
+	} else if (type === 'traefik') {
+		try {
+			// const found = await checkContainer('/var/run/docker.sock', 'coolify-haproxy');
+			// if (found) {
+			// 	await asyncExecShell(`docker stop -t 0 coolify-haproxy`);
+			// 	await asyncExecShell(`docker rm coolify-haproxy`);
+			// }
+			// await startTraefikProxy('/var/run/docker.sock');
+			await db.prisma.setting.update({
+				where: { id: settings.id },
+				data: { isTraefikUsed: true }
+			});
+			return {
+				status: 200,
+				body: {}
+			};
+		} catch (error) {
+			return ErrorHandler(error);
+		}
+	} else if (type === 'haproxy') {
+		try {
+			// const found = await checkContainer('/var/run/docker.sock', 'coolify-proxy');
+			// if (found) {
+			// 	await asyncExecShell(`docker stop -t 0 coolify-proxy`);
+			// 	await asyncExecShell(`docker rm coolify-proxy`);
+			// }
+			// await startCoolifyProxy('/var/run/docker.sock');
+			await db.prisma.setting.update({
+				where: { id: settings.id },
+				data: { isTraefikUsed: false }
+			});
+			return {
+				status: 200,
+				body: {}
+			};
 		} catch (error) {
 			return ErrorHandler(error);
 		}

@@ -41,7 +41,6 @@ export default async function (): Promise<void> {
 		} catch (error) {
 			console.log(error);
 		}
-		console.log(`Is LowDiskSpace detected? ${lowDiskSpace}`);
 		if (lowDiskSpace) {
 			// Cleanup old coolify images
 			try {

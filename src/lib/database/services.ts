@@ -327,35 +327,62 @@ export async function updatePlausibleAnalyticsService({
 	id,
 	fqdn,
 	email,
+	exposePort,
 	username,
-	name
+	name,
+	scriptName
 }: {
 	id: string;
 	fqdn: string;
+	exposePort?: number;
 	name: string;
 	email: string;
 	username: string;
+	scriptName: string;
 }): Promise<void> {
-	await prisma.plausibleAnalytics.update({ where: { serviceId: id }, data: { email, username } });
-	await prisma.service.update({ where: { id }, data: { name, fqdn } });
+	await prisma.plausibleAnalytics.update({
+		where: { serviceId: id },
+		data: { email, username, scriptName }
+	});
+	await prisma.service.update({ where: { id }, data: { name, fqdn, exposePort } });
 }
 
 export async function updateService({
 	id,
 	fqdn,
+	exposePort,
 	name
 }: {
 	id: string;
 	fqdn: string;
+	exposePort?: number;
 	name: string;
 }): Promise<Service> {
-	return await prisma.service.update({ where: { id }, data: { fqdn, name } });
+	return await prisma.service.update({ where: { id }, data: { fqdn, name, exposePort } });
 }
-
+export async function updateMinioService({
+	id,
+	fqdn,
+	apiFqdn,
+	exposePort,
+	name
+}: {
+	id: string;
+	fqdn: string;
+	apiFqdn: string;
+	exposePort?: number;
+	name: string;
+}): Promise<Service> {
+	return await prisma.service.update({
+		where: { id },
+		data: { fqdn, name, exposePort, minio: { update: { apiFqdn } } }
+	});
+}
 export async function updateFiderService({
 	id,
 	fqdn,
 	name,
+	exposePort,
 	emailNoreply,
 	emailMailgunApiKey,
 	emailMailgunDomain,
@@ -368,6 +395,7 @@ export async function updateFiderService({
 }: {
 	id: string;
 	fqdn: string;
+	exposePort?: number;
 	name: string;
 	emailNoreply: string;
 	emailMailgunApiKey: string;
@@ -384,6 +412,7 @@ export async function updateFiderService({
 		data: {
 			fqdn,
 			name,
+			exposePort,
 			fider: {
 				update: {
 					emailNoreply,
@@ -405,22 +434,49 @@ export async function updateWordpress({
 	id,
 	fqdn,
 	name,
+	exposePort,
+	ownMysql,
 	mysqlDatabase,
-	extraConfig
+	extraConfig,
+	mysqlHost,
+	mysqlPort,
+	mysqlUser,
+	mysqlPassword
 }: {
 	id: string;
 	fqdn: string;
 	name: string;
+	exposePort?: number;
+	ownMysql: boolean;
 	mysqlDatabase: string;
 	extraConfig: string;
+	mysqlHost?: string;
+	mysqlPort?: number;
+	mysqlUser?: string;
+	mysqlPassword?: string;
 }): Promise<Service> {
+	mysqlPassword = encrypt(mysqlPassword);
 	return await prisma.service.update({
 		where: { id },
-		data: { fqdn, name, wordpress: { update: { mysqlDatabase, extraConfig } } }
+		data: {
+			fqdn,
+			name,
+			exposePort,
+			wordpress: {
+				update: {
+					mysqlDatabase,
+					extraConfig,
+					mysqlHost,
+					mysqlUser,
+					mysqlPassword,
+					mysqlPort
+				}
+			}
+		}
 	});
 }
 
-export async function updateMinioService({
+export async function updateMinioServicePort({
 	id,
 	publicPort
 }: {
@@ -434,16 +490,18 @@ export async function updateGhostService({
 	id,
 	fqdn,
 	name,
+	exposePort,
 	mariadbDatabase
 }: {
 	id: string;
 	fqdn: string;
 	name: string;
+	exposePort?: number;
 	mariadbDatabase: string;
 }): Promise<Service> {
 	return await prisma.service.update({
 		where: { id },
-		data: { fqdn, name, ghost: { update: { mariadbDatabase } } }
+		data: { fqdn, name, exposePort, ghost: { update: { mariadbDatabase } } }
 	});
 }
 

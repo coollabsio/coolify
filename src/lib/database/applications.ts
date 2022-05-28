@@ -138,7 +138,18 @@ export async function getApplicationWebhook({
 				return s;
 			});
 		}
-		return { ...application };
+		const { baseImage, baseBuildImage, baseBuildImages, baseImages } = setDefaultBaseImage(
+			application.buildPack
+		);
+
+		// Set default build images
+		if (!application.baseImage) {
+			application.baseImage = baseImage;
+		}
+		if (!application.baseBuildImage) {
+			application.baseBuildImage = baseBuildImage;
+		}
+		return { ...application, baseBuildImages, baseImages };
 	} catch (e) {
 		throw { status: 404, body: { message: e.message } };
 	}
@@ -267,6 +278,7 @@ export async function configureApplication({
 	name,
 	fqdn,
 	port,
+	exposePort,
 	installCommand,
 	buildCommand,
 	startCommand,
@@ -286,6 +298,7 @@ export async function configureApplication({
 	name: string;
 	fqdn: string;
 	port: number;
+	exposePort: number;
 	installCommand: string;
 	buildCommand: string;
 	startCommand: string;
@@ -307,6 +320,7 @@ export async function configureApplication({
 			buildPack,
 			fqdn,
 			port,
+			exposePort,
 			installCommand,
 			buildCommand,
 			startCommand,

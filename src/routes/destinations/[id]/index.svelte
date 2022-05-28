@@ -39,10 +39,13 @@
 	import { t } from '$lib/translations';
 </script>
 
-<div class="flex space-x-1 p-6 text-2xl font-bold">
-	<div class="tracking-tight">{$t('application.destination')}</div>
-	<span class="arrow-right-applications px-1">></span>
-	<span class="pr-2">{destination.name}</span>
+<div class="flex h-20 items-center space-x-2 p-5 px-6 font-bold">
+	<div class="-mb-5 flex-col">
+		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
+			Configuration
+		</div>
+		<span class="text-xs">{destination.name}</span>
+	</div>
 </div>
 
 <div class="mx-auto max-w-4xl px-6">

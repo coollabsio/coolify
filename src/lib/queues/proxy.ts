@@ -1,4 +1,4 @@
-import { ErrorHandler } from '$lib/database';
+import { ErrorHandler, prisma } from '$lib/database';
 import { configureHAProxy } from '$lib/haproxy/configuration';
 
 export default async function (): Promise<void | {
@@ -6,7 +6,10 @@ export default async function (): Promise<void | {
 	body: { message: string; error: string };
 }> {
 	try {
-		return await configureHAProxy();
+		const settings = await prisma.setting.findFirst();
+		if (!settings.isTraefikUsed) {
+			return await configureHAProxy();
+		}
 	} catch (error) {
 		return ErrorHandler(error.response?.body || error);
 	}
