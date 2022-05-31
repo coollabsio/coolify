@@ -72,9 +72,25 @@
 		}
 	}
 	onMount(async () => {
-		if (browser && window.location.hostname === 'demo.coolify.io' && !service.fqdn) {
+		if (browser && window.location.hostname === 'localhost' && !service.fqdn) {
 			service.fqdn = `http://${cuid()}.demo.coolify.io`;
-			await post(`/services/${id}/${service.type}.json`, { ...service });
+			if (service.type === 'wordpress') {
+				service.wordpress.mysqlDatabase = 'db';
+			}
+			if (service.type === 'plausibleanalytics') {
+				service.plausibleAnalytics.email = 'noreply@demo.com';
+				service.plausibleAnalytics.username = 'admin';
+			}
+			if (service.type === 'minio') {
+				service.minio.apiFqdn = `http://${cuid()}.demo.coolify.io`;
+			}
+			if (service.type === 'ghost') {
+				service.ghost.mariadbDatabase = 'db';
+			}
+			if (service.type === 'fider') {
+				service.fider.emailNoreply = 'noreply@demo.com';
+			}
+			await handleSubmit();
 		}
 	});
 </script>
