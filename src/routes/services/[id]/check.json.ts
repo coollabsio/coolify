@@ -13,7 +13,7 @@ export const post: RequestHandler = async (event) => {
 	let { fqdn, exposePort, otherFqdns } = await event.request.json();
 
 	if (fqdn) fqdn = fqdn.toLowerCase();
-	if (otherFqdns) otherFqdns = otherFqdns.map((fqdn) => fqdn.toLowerCase());
+	if (otherFqdns && otherFqdns.length > 0) otherFqdns = otherFqdns.map((f) => f.toLowerCase());
 	if (exposePort) exposePort = Number(exposePort);
 
 	try {
@@ -25,7 +25,7 @@ export const post: RequestHandler = async (event) => {
 				})
 			};
 		}
-		if (otherFqdns) {
+		if (otherFqdns && otherFqdns.length > 0) {
 			for (const ofqdn of otherFqdns) {
 				const domain = getDomain(ofqdn);
 				const nakedDomain = domain.replace('www.', '');

@@ -38,7 +38,7 @@
 		try {
 			await post(`/services/${id}/check.json`, {
 				fqdn: service.fqdn,
-				otherFqdns: [service.minio.apiFqdn],
+				otherFqdns: service.minio?.apiFqdn ? [service.minio?.apiFqdn] : [],
 				exposePort: service.exposePort
 			});
 			await post(`/services/${id}/${service.type}.json`, { ...service });
