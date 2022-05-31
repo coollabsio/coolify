@@ -3,7 +3,12 @@ import { asyncExecShell, getEngine, getUserDetails } from '$lib/common';
 import { decrypt, encrypt } from '$lib/crypto';
 import * as db from '$lib/database';
 import { ErrorHandler, generatePassword, getFreePort } from '$lib/database';
-import { checkContainer, startTcpProxy, stopTcpHttpProxy } from '$lib/haproxy';
+import {
+	checkContainer,
+	startTcpProxy,
+	startTraefikTCPProxy,
+	stopTcpHttpProxy
+} from '$lib/haproxy';
 import type { ComposeFile } from '$lib/types/composeFile';
 import type { RequestHandler } from '@sveltejs/kit';
 import cuid from 'cuid';
@@ -31,49 +36,51 @@ export const post: RequestHandler = async (event) => {
 		});
 		const {
 			service: { destinationDockerId, destinationDocker },
-			ftpPublicPort: oldPublicPort,
+			ftpPublicPort,
 			ftpUser: user,
 			ftpPassword: savedPassword,
 			ftpHostKey,
 			ftpHostKeyPrivate
 		} = data;
-		if (user) ftpUser = user;
-		if (savedPassword) ftpPassword = decrypt(savedPassword);
+		const { network, engine } = destinationDocker;
+		const settings = await db.prisma.setting.findFirst();
+		const host = getEngine(engine);
+		if (ftpEnabled) {
+			if (user) ftpUser = user;
+			if (savedPassword) ftpPassword = decrypt(savedPassword);
 
-		const { stdout: password } = await asyncExecShell(
-			`echo ${ftpPassword} | openssl passwd -1 -stdin`
-		);
-		if (destinationDockerId) {
-			try {
-				await fs.stat(hostkeyDir);
-			} catch (error) {
-				await asyncExecShell(`mkdir -p ${hostkeyDir}`);
-			}
-			if (!ftpHostKey) {
-				await asyncExecShell(
-					`ssh-keygen -t ed25519 -f ssh_host_ed25519_key -N "" -q -f ${hostkeyDir}/${id}.ed25519`
-				);
-				const { stdout: ftpHostKey } = await asyncExecShell(`cat ${hostkeyDir}/${id}.ed25519`);
-				await db.prisma.wordpress.update({
-					where: { serviceId: id },
-					data: { ftpHostKey: encrypt(ftpHostKey) }
-				});
-			} else {
-				await asyncExecShell(`echo "${decrypt(ftpHostKey)}" > ${hostkeyDir}/${id}.ed25519`);
-			}
-			if (!ftpHostKeyPrivate) {
-				await asyncExecShell(`ssh-keygen -t rsa -b 4096 -N "" -f ${hostkeyDir}/${id}.rsa`);
-				const { stdout: ftpHostKeyPrivate } = await asyncExecShell(`cat ${hostkeyDir}/${id}.rsa`);
-				await db.prisma.wordpress.update({
-					where: { serviceId: id },
-					data: { ftpHostKeyPrivate: encrypt(ftpHostKeyPrivate) }
-				});
-			} else {
-				await asyncExecShell(`echo "${decrypt(ftpHostKeyPrivate)}" > ${hostkeyDir}/${id}.rsa`);
-			}
-			const { network, engine } = destinationDocker;
-			const host = getEngine(engine);
-			if (ftpEnabled) {
+			const { stdout: password } = await asyncExecShell(
+				`echo ${ftpPassword} | openssl passwd -1 -stdin`
+			);
+			if (destinationDockerId) {
+				try {
+					await fs.stat(hostkeyDir);
+				} catch (error) {
+					await asyncExecShell(`mkdir -p ${hostkeyDir}`);
+				}
+				if (!ftpHostKey) {
+					await asyncExecShell(
+						`ssh-keygen -t ed25519 -f ssh_host_ed25519_key -N "" -q -f ${hostkeyDir}/${id}.ed25519`
+					);
+					const { stdout: ftpHostKey } = await asyncExecShell(`cat ${hostkeyDir}/${id}.ed25519`);
+					await db.prisma.wordpress.update({
+						where: { serviceId: id },
+						data: { ftpHostKey: encrypt(ftpHostKey) }
+					});
+				} else {
+					await asyncExecShell(`echo "${decrypt(ftpHostKey)}" > ${hostkeyDir}/${id}.ed25519`);
+				}
+				if (!ftpHostKeyPrivate) {
+					await asyncExecShell(`ssh-keygen -t rsa -b 4096 -N "" -f ${hostkeyDir}/${id}.rsa`);
+					const { stdout: ftpHostKeyPrivate } = await asyncExecShell(`cat ${hostkeyDir}/${id}.rsa`);
+					await db.prisma.wordpress.update({
+						where: { serviceId: id },
+						data: { ftpHostKeyPrivate: encrypt(ftpHostKeyPrivate) }
+					});
+				} else {
+					await asyncExecShell(`echo "${decrypt(ftpHostKeyPrivate)}" > ${hostkeyDir}/${id}.rsa`);
+				}
+
 				await db.prisma.wordpress.update({
 					where: { serviceId: id },
 					data: {
@@ -142,24 +149,7 @@ export const post: RequestHandler = async (event) => {
 				await asyncExecShell(
 					`DOCKER_HOST=${host} docker compose -f ${hostkeyDir}/${id}-docker-compose.yml up -d`
 				);
-
-				await startTcpProxy(destinationDocker, `${id}-ftp`, publicPort, 22);
-			} else {
-				await db.prisma.wordpress.update({
-					where: { serviceId: id },
-					data: { ftpPublicPort: null }
-				});
-				try {
-					await asyncExecShell(
-						`DOCKER_HOST=${host} docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`
-					);
-				} catch (error) {
-					//
-				}
-				await stopTcpHttpProxy(destinationDocker, oldPublicPort);
 			}
-		}
-		if (ftpEnabled) {
 			return {
 				status: 201,
 				body: {
@@ -169,6 +159,18 @@ export const post: RequestHandler = async (event) => {
 				}
 			};
 		} else {
+			await db.prisma.wordpress.update({
+				where: { serviceId: id },
+				data: { ftpPublicPort: null }
+			});
+			try {
+				await asyncExecShell(
+					`DOCKER_HOST=${host} docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`
+				);
+			} catch (error) {
+				//
+			}
+			await stopTcpHttpProxy(id, destinationDocker, ftpPublicPort);
 			return {
 				status: 200,
 				body: {}

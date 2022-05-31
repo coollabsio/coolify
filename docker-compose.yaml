@@ -39,3 +39,5 @@ volumes:
     name: coolify-ssl-certs
   coolify-letsencrypt:
     name: coolify-letsencrypt
+  coolify-traefik-letsencrypt:
+    name: coolify-traefik-letsencrypt
