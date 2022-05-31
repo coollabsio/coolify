@@ -5,6 +5,12 @@ const prisma = new PrismaClient();
 const crypto = require('crypto');
 const generator = require('generate-password');
 const cuid = require('cuid');
+const compare = require('compare-versions');
+const { version } = require('../package.json');
+const child = require('child_process');
+const util = require('util');
+
+const algorithm = 'aes-256-ctr';
 
 function generatePassword(length = 24) {
 	return generator.generate({
@@ -13,7 +19,7 @@ function generatePassword(length = 24) {
 		strict: true
 	});
 }
-const algorithm = 'aes-256-ctr';
+const asyncExecShell = util.promisify(child.exec);
 
 async function main() {
 	// Enable registration for the first user
@@ -63,6 +69,14 @@ async function main() {
 				isAutoUpdateEnabled
 			}
 		});
+	}
+	if (compare('2.9.2', version) >= 0) {
+		// Force stop Coolify Proxy, as it had a bug in < 2.9.2. TrustProxy + api.insecure
+		try {
+			await asyncExecShell(`docker stop -t 0 coolify-proxy && docker rm coolify-proxy`);
+		} catch (error) {
+			console.log(error);
+		}
 	}
 }
 main()
