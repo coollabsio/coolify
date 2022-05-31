@@ -70,7 +70,8 @@ async function main() {
 			}
 		});
 	}
-	if (compare('2.9.2', version) >= 0) {
+	const versions = ['2.9.2', '2.9.3'];
+	if (versions.includes(version)) {
 		// Force stop Coolify Proxy, as it had a bug in < 2.9.2. TrustProxy + api.insecure
 		try {
 			await asyncExecShell(`docker stop -t 0 coolify-proxy && docker rm coolify-proxy`);
