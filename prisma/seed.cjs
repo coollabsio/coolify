@@ -70,17 +70,29 @@ async function main() {
 			}
 		});
 	}
-	const versions = ['2.9.2', '2.9.3'];
-	if (versions.includes(version)) {
+	if (settings.isTraefikUsed) {
 		// Force stop Coolify Proxy, as it had a bug in < 2.9.2. TrustProxy + api.insecure
 		try {
-			await asyncExecShell(`docker stop -t 0 coolify-proxy && docker rm coolify-proxy`);
-			const { stdout: Config } = await asyncExecShell(
-				`docker network inspect bridge --format '{{json .IPAM.Config }}'`
+			const { stdout } = await asyncExecShell(
+				`docker inspect coolify-proxy --format '{{json .Config.Cmd}}'`
 			);
-			const ip = JSON.parse(Config)[0].Gateway;
-			await asyncExecShell(
-				`docker run --restart always \
+			if (
+				!stdout
+					.replaceAll('[', '')
+					.replaceAll(']', '')
+					.replaceAll('"', '')
+					.replace('\n', '')
+					.split(',')
+					.includes('--entrypoints.web.forwardedHeaders.insecure=true')
+			) {
+				console.log('Reconfiguring Coolify Proxy (Traefik)...');
+				await asyncExecShell(`docker stop -t 0 coolify-proxy && docker rm coolify-proxy`);
+				const { stdout: Config } = await asyncExecShell(
+					`docker network inspect bridge --format '{{json .IPAM.Config }}'`
+				);
+				const ip = JSON.parse(Config)[0].Gateway;
+				await asyncExecShell(
+					`docker run --restart always \
 				--add-host 'host.docker.internal:host-gateway' \
 				--add-host 'host.docker.internal:${ip}' \
 				-v coolify-traefik-letsencrypt:/etc/traefik/acme \
@@ -102,7 +114,8 @@ async function main() {
 				--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json \
 				--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web \
 				--log.level=error`
-			);
+				);
+			}
 		} catch (error) {
 			console.log(error);
 		}
