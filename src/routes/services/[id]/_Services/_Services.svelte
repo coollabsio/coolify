@@ -72,7 +72,7 @@
 		}
 	}
 	onMount(async () => {
-		if (browser && window.location.hostname === 'localhost' && !service.fqdn) {
+		if (browser && window.location.hostname === 'demo.coolify.io' && !service.fqdn) {
 			service.fqdn = `http://${cuid()}.demo.coolify.io`;
 			if (service.type === 'wordpress') {
 				service.wordpress.mysqlDatabase = 'db';
