@@ -31,7 +31,7 @@ export default async function ({
 	});
 
 	await asyncExecShell(
-		`GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no' git clone -q -b ${branch} git@${url}:${repository}.git --config core.sshCommand="ssh -q -i ${repodir}id.rsa -o StrictHostKeyChecking=no" ${workdir}/ && cd ${workdir}/ && GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no' git submodule update --init --recursive && GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no' git lfs pull && cd .. `
+		`GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no' git clone --recursive --jobs 3 -q -b ${branch} git@${url}:${repository}.git --config core.sshCommand="ssh -q -i ${repodir}id.rsa -o StrictHostKeyChecking=no" ${workdir}/ && cd ${workdir}/ && GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no' git lfs pull && cd .. `
 	);
 	const { stdout: commit } = await asyncExecShell(`cd ${workdir}/ && git rev-parse HEAD`);
 	return commit.replace('\n', '');
