@@ -67,15 +67,9 @@ export async function getSource({
 	return body;
 }
 export async function addGitHubSource({ id, teamId, type, name, htmlUrl, apiUrl, organization }) {
-	await prisma.gitSource.update({
+	return await prisma.gitSource.update({
 		where: { id },
 		data: { type, name, htmlUrl, apiUrl, organization }
-	});
-	return await prisma.githubApp.create({
-		data: {
-			teams: { connect: { id: teamId } },
-			gitSource: { connect: { id } }
-		}
 	});
 }
 export async function addGitLabSource({

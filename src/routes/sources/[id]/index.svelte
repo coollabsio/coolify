@@ -113,7 +113,7 @@
 </div>
 
 <div class="flex flex-col justify-center">
-	{#if !source.gitlabAppId && (!source.githubAppId || !source.githubApp?.installationId)}
+	{#if !source.gitlabAppId && !source.githubAppId}
 		<div class="flex-col space-y-2 pb-10 text-center">
 			<div class="text-xl font-bold text-white">Select a provider</div>
 			<div class="flex justify-center space-x-2">
