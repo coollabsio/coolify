@@ -80,7 +80,7 @@
 </script>
 
 <div class="mx-auto max-w-4xl px-6">
-	{#if !source.githubApp?.installationId}
+	{#if !source.githubAppId}
 		<form on:submit|preventDefault={newGithubApp} class="py-4">
 			<div class="flex space-x-1 pb-5 font-bold">
 				<div class="title">General</div>
@@ -171,7 +171,7 @@
 		</form>
 	{:else}
 		<div class="text-center">
-			<button class=" bg-orange-600 mt-8" on:click={() => installRepositories(source)}
+			<button class=" mt-8 bg-orange-600" on:click={() => installRepositories(source)}
 				>Install Repositories</button
 			>
 		</div>
