@@ -44,6 +44,12 @@ export const post: RequestHandler = async (event) => {
 				await asyncExecShell(
 					`sed -i '/COOLIFY_AUTO_UPDATE=/c\COOLIFY_AUTO_UPDATE=${settings.isAutoUpdateEnabled}' .env`
 				);
+				// TODO: Remove this after release
+				try {
+					await asyncExecShell(
+						`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "docker stop -t 0 coolify-proxy && docker rm coolify-proxy"`
+					);
+				} catch (error) {}
 				await asyncExecShell(
 					`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify coolify-redis && docker rm coolify coolify-redis && docker compose up -d --force-recreate"`
 				);
