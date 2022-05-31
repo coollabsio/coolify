@@ -18,7 +18,7 @@ const include: Prisma.ServiceInclude = {
 	hasura: true,
 	fider: true
 };
-export async function listServicesWithIncludes() {
+export async function listServicesWithIncludes(): Promise<Service[]> {
 	return await prisma.service.findMany({
 		include,
 		orderBy: { createdAt: 'desc' }
@@ -435,7 +435,6 @@ export async function updateWordpress({
 	fqdn,
 	name,
 	exposePort,
-	ownMysql,
 	mysqlDatabase,
 	extraConfig,
 	mysqlHost,
