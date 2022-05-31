@@ -161,7 +161,7 @@ export async function startTraefikTCPProxy(
 						image: 'traefik:v2.6',
 						command: [
 							`--entrypoints.tcp.address=:${publicPort}`,
-							`--providers.http.endpoint=${otherTraefikEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp`,
+							`--providers.http.endpoint=${otherTraefikEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp&address=${dependentId}`,
 							'--providers.http.pollTimeout=2s',
 							'--log.level=error'
 						],
