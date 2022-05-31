@@ -5,6 +5,12 @@ const prisma = new PrismaClient();
 const crypto = require('crypto');
 const generator = require('generate-password');
 const cuid = require('cuid');
+const compare = require('compare-versions');
+const { version } = require('../package.json');
+const child = require('child_process');
+const util = require('util');
+
+const algorithm = 'aes-256-ctr';
 
 function generatePassword(length = 24) {
 	return generator.generate({
@@ -13,7 +19,7 @@ function generatePassword(length = 24) {
 		strict: true
 	});
 }
-const algorithm = 'aes-256-ctr';
+const asyncExecShell = util.promisify(child.exec);
 
 async function main() {
 	// Enable registration for the first user
@@ -63,6 +69,42 @@ async function main() {
 				isAutoUpdateEnabled
 			}
 		});
+	}
+	if (compare('2.9.2', version) >= 0) {
+		// Force stop Coolify Proxy, as it had a bug in < 2.9.2. TrustProxy + api.insecure
+		try {
+			await asyncExecShell(`docker stop -t 0 coolify-proxy && docker rm coolify-proxy`);
+			const { stdout: Config } = await asyncExecShell(
+				`docker network inspect bridge --format '{{json .IPAM.Config }}'`
+			);
+			const ip = JSON.parse(Config)[0].Gateway;
+			await asyncExecShell(
+				`docker run --restart always \
+				--add-host 'host.docker.internal:host-gateway' \
+				--add-host 'host.docker.internal:${ip}' \
+				-v coolify-traefik-letsencrypt:/etc/traefik/acme \
+				-v /var/run/docker.sock:/var/run/docker.sock \
+				--network coolify-infra \
+				-p "80:80" \
+				-p "443:443" \
+				--name coolify-proxy \
+				-d traefik:v2.6 \
+				--entrypoints.web.address=:80 \
+				--entrypoints.web.forwardedHeaders.insecure=true \
+				--entrypoints.websecure.address=:443 \
+				--entrypoints.websecure.forwardedHeaders.insecure=true \
+				--providers.docker=true \
+				--providers.docker.exposedbydefault=false \
+				--providers.http.endpoint=http://coolify:3000/webhooks/traefik/main.json \
+				--providers.http.pollTimeout=5s \
+				--certificatesresolvers.letsencrypt.acme.httpchallenge=true \
+				--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json \
+				--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web \
+				--log.level=error`
+			);
+		} catch (error) {
+			console.log(error);
+		}
 	}
 }
 main()

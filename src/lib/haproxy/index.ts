@@ -161,6 +161,7 @@ export async function startTraefikTCPProxy(
 						image: 'traefik:v2.6',
 						command: [
 							`--entrypoints.tcp.address=:${publicPort}`,
+							`--entryPoints.tcp.forwardedHeaders.insecure=true`,
 							`--providers.http.endpoint=${otherTraefikEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp&address=${dependentId}`,
 							'--providers.http.pollTimeout=2s',
 							'--log.level=error'
@@ -257,6 +258,7 @@ export async function startTraefikHTTPProxy(
 						image: 'traefik:v2.6',
 						command: [
 							`--entrypoints.http.address=:${publicPort}`,
+							`--entryPoints.http.forwardedHeaders.insecure=true`,
 							`--providers.http.endpoint=${otherTraefikEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=http`,
 							'--providers.http.pollTimeout=2s',
 							'--certificatesresolvers.letsencrypt.acme.httpchallenge=true',
@@ -368,12 +370,12 @@ export async function startTraefikProxy(engine: string): Promise<void> {
 			--network coolify-infra \
 			-p "80:80" \
 			-p "443:443" \
-			-p "8080:8080" \
 			--name coolify-proxy \
 			-d ${defaultTraefikImage} \
-			--api.insecure=true \
 			--entrypoints.web.address=:80 \
+			--entrypoints.web.forwardedHeaders.insecure=true \
 			--entrypoints.websecure.address=:443 \
+			--entrypoints.websecure.forwardedHeaders.insecure=true \
 			--providers.docker=true \
 			--providers.docker.exposedbydefault=false \
 			--providers.http.endpoint=${mainTraefikEndpoint} \
