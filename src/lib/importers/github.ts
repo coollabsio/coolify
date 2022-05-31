@@ -49,7 +49,7 @@ export default async function ({
 		applicationId
 	});
 	await asyncExecShell(
-		`git clone -q -b ${branch} https://x-access-token:${token}@${url}/${repository}.git ${workdir}/ && cd ${workdir} && git submodule update --init --recursive && git lfs pull && cd .. `
+		`GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no' git clone -q -b ${branch} https://x-access-token:${token}@${url}/${repository}.git ${workdir}/ && cd ${workdir} && git submodule update --init --recursive && git lfs pull && cd .. `
 	);
 	const { stdout: commit } = await asyncExecShell(`cd ${workdir}/ && git rev-parse HEAD`);
 	return commit.replace('\n', '');

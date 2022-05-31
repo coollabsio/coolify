@@ -9,6 +9,7 @@ export const get: RequestHandler = async (event) => {
 		const privatePort = event.url.searchParams.get('privatePort');
 		const publicPort = event.url.searchParams.get('publicPort');
 		const type = event.url.searchParams.get('type');
+		const address = event.url.searchParams.get('address') || id;
 		let traefik = {};
 		if (publicPort && type && privatePort) {
 			if (type === 'tcp') {
@@ -24,7 +25,7 @@ export const get: RequestHandler = async (event) => {
 						services: {
 							[id]: {
 								loadbalancer: {
-									servers: [{ address: `${id}:${privatePort}` }]
+									servers: [{ address: `${address}:${privatePort}` }]
 								}
 							}
 						}
