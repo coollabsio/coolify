@@ -74,6 +74,34 @@ async function main() {
 		// Force stop Coolify Proxy, as it had a bug in < 2.9.2. TrustProxy + api.insecure
 		try {
 			await asyncExecShell(`docker stop -t 0 coolify-proxy && docker rm coolify-proxy`);
+			const { stdout: Config } = await asyncExecShell(
+				`docker network inspect bridge --format '{{json .IPAM.Config }}'`
+			);
+			const ip = JSON.parse(Config)[0].Gateway;
+			await asyncExecShell(
+				`docker run --restart always \
+				--add-host 'host.docker.internal:host-gateway' \
+				--add-host 'host.docker.internal:${ip}' \
+				-v coolify-traefik-letsencrypt:/etc/traefik/acme \
+				-v /var/run/docker.sock:/var/run/docker.sock \
+				--network coolify-infra \
+				-p "80:80" \
+				-p "443:443" \
+				--name coolify-proxy \
+				-d traefik:v2.6 \
+				--entrypoints.web.address=:80 \
+				--entrypoints.web.forwardedHeaders.insecure=true \
+				--entrypoints.websecure.address=:443 \
+				--entrypoints.websecure.forwardedHeaders.insecure=true \
+				--providers.docker=true \
+				--providers.docker.exposedbydefault=false \
+				--providers.http.endpoint=http://coolify:3000/webhooks/traefik/main.json \
+				--providers.http.pollTimeout=5s \
+				--certificatesresolvers.letsencrypt.acme.httpchallenge=true \
+				--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json \
+				--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web \
+				--log.level=error`
+			);
 		} catch (error) {
 			console.log(error);
 		}
