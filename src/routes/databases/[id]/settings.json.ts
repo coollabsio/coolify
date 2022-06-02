@@ -29,7 +29,7 @@ export const post: RequestHandler = async (event) => {
 				}
 			} else {
 				await db.prisma.database.update({ where: { id }, data: { publicPort: null } });
-				await stopTcpHttpProxy(destinationDocker, oldPublicPort);
+				await stopTcpHttpProxy(id, destinationDocker, oldPublicPort);
 			}
 		}
 		return {
