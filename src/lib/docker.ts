@@ -66,8 +66,7 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 		});
 	}
 	if (isPnpm) {
-		Dockerfile.push('RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm');
-		Dockerfile.push('RUN pnpm add -g pnpm');
+		Dockerfile.push('RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7');
 	}
 	if (installCommand) {
 		Dockerfile.push(`COPY .${baseDirectory || ''}/package.json ./`);
