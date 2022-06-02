@@ -36,8 +36,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 		});
 	}
 	if (isPnpm) {
-		Dockerfile.push('RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm');
-		Dockerfile.push('RUN pnpm add -g pnpm');
+		Dockerfile.push('RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7');
 	}
 	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	Dockerfile.push(`RUN ${installCommand}`);
