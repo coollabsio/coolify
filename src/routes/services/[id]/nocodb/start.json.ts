@@ -61,6 +61,11 @@ export const post: RequestHandler = async (event) => {
 				[network]: {
 					external: true
 				}
+			},
+			volumes: {
+				[config.volume.split(':')[0]]: {
+					name: config.volume.split(':')[0]
+				}
 			}
 		};
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
