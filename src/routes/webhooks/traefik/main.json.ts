@@ -128,7 +128,6 @@ function configureMiddleware(
 
 	if (type === 'plausibleanalytics' && scriptName !== 'plausible.js') {
 		if (!traefik.http.routers[`${id}`].middlewares.includes(`${id}-redir`)) {
-			console.log(traefik.http.routers[`${id}`].middlewares);
 			traefik.http.routers[`${id}`].middlewares.push(`${id}-redir`);
 		}
 		if (!traefik.http.routers[`${id}-secure`].middlewares.includes(`${id}-redir`)) {
