@@ -7,7 +7,7 @@ import { checkContainer } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 function configureMiddleware(
-	{ id, container, port, domain, nakedDomain, isHttps, isWWW, isDualCerts, scriptName },
+	{ id, container, port, domain, nakedDomain, isHttps, isWWW, isDualCerts, scriptName, type },
 	traefik
 ) {
 	if (isHttps) {
@@ -125,7 +125,8 @@ function configureMiddleware(
 			}
 		}
 	}
-	if (scriptName !== 'plausible.js') {
+
+	if (type === 'plausibleanalytics' && scriptName !== 'plausible.js') {
 		if (!traefik.http.routers[`${id}`].middlewares.includes(`${id}-redir`)) {
 			traefik.http.routers[`${id}`].middlewares.push(`${id}-redir`);
 		}
@@ -343,11 +344,6 @@ export const get: RequestHandler = async (event) => {
 					replacement: '/js/plausible.js'
 				}
 			};
-			if (traefik.http.routers[id].middlewares.length > 0) {
-				traefik.http.routers[id].middlewares.push(`${id}-redir`);
-			} else {
-				traefik.http.routers[id].middlewares = [`${id}-redir`];
-			}
 		}
 	}
 	for (const coolify of data.coolify) {
