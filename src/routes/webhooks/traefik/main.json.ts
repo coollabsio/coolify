@@ -344,11 +344,6 @@ export const get: RequestHandler = async (event) => {
 					replacement: '/js/plausible.js'
 				}
 			};
-			// if (traefik.http.routers[id].middlewares.length > 0) {
-			// 	traefik.http.routers[id].middlewares.push(`${id}-redir`);
-			// } else {
-			// 	traefik.http.routers[id].middlewares = [`${id}-redir`];
-			// }
 		}
 	}
 	for (const coolify of data.coolify) {
