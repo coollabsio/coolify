@@ -7,7 +7,7 @@ import { checkContainer } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 
 function configureMiddleware(
-	{ id, container, port, domain, nakedDomain, isHttps, isWWW, isDualCerts },
+	{ id, container, port, domain, nakedDomain, isHttps, isWWW, isDualCerts, scriptName },
 	traefik
 ) {
 	if (isHttps) {
@@ -125,6 +125,14 @@ function configureMiddleware(
 			}
 		}
 	}
+	if (scriptName !== 'plausible.js') {
+		if (!traefik.http.routers[`${id}`].middlewares.includes(`${id}-redir`)) {
+			traefik.http.routers[`${id}`].middlewares.push(`${id}-redir`);
+		}
+		if (!traefik.http.routers[`${id}-secure`].middlewares.includes(`${id}-redir`)) {
+			traefik.http.routers[`${id}-secure`].middlewares.push(`${id}-redir`);
+		}
+	}
 }
 export const get: RequestHandler = async (event) => {
 	const traefik = {
@@ -176,7 +184,7 @@ export const get: RequestHandler = async (event) => {
 		} = application;
 		if (destinationDockerId) {
 			const { engine, network } = destinationDocker;
-			const isRunning = await checkContainer(engine, id);
+			const isRunning = true;
 			if (fqdn) {
 				const domain = getDomain(fqdn);
 				const nakedDomain = domain.replace(/^www\./, '');
@@ -244,7 +252,7 @@ export const get: RequestHandler = async (event) => {
 			if (found) {
 				const port = found.ports.main;
 				const publicPort = service[type]?.publicPort;
-				const isRunning = await checkContainer(engine, id);
+				const isRunning = true;
 				if (fqdn) {
 					const domain = getDomain(fqdn);
 					const nakedDomain = domain.replace(/^www\./, '');
