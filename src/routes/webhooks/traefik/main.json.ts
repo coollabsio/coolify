@@ -126,7 +126,7 @@ function configureMiddleware(
 		}
 	}
 
-	if (type === 'plausibleanalytics' && scriptName !== 'plausible.js') {
+	if (type === 'plausibleanalytics' && scriptName && scriptName !== 'plausible.js') {
 		if (!traefik.http.routers[`${id}`].middlewares.includes(`${id}-redir`)) {
 			traefik.http.routers[`${id}`].middlewares.push(`${id}-redir`);
 		}
