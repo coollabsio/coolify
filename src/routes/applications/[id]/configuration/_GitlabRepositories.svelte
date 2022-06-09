@@ -1,6 +1,7 @@
 <script lang="ts">
 	export let application;
 	export let appId;
+	import Select from 'svelte-select';
 	import { page, session } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { errorNotification } from '$lib/form';
@@ -33,6 +34,10 @@
 	let showSave = false;
 	let autodeploy = application.settings.autodeploy || true;
 
+	let search = {
+		project: '',
+		branch: ''
+	};
 	let selected = {
 		group: undefined,
 		project: undefined,
@@ -84,16 +89,49 @@
 		}, 100);
 	}
 
+	function selectGroup(event) {
+		selected.group = event.detail;
+		selected.project = null;
+		selected.branch = null;
+		showSave = false;
+		loadProjects();
+	}
+
+	async function searchProjects(searchText) {
+		if (!selected.group) {
+			return;
+		}
+
+		search.project = searchText;
+		await loadProjects();
+		return projects;
+	}
+
+	function selectProject(event) {
+		selected.project = event.detail;
+		selected.branch = null;
+		showSave = false;
+		loadBranches();
+	}
+
 	async function loadProjects() {
+		const params = new URLSearchParams({
+			page: 1,
+			per_page: 25,
+			archived: false
+		});
+
+		if (search.project) {
+			params.append('search', search.project);
+		}
+
 		loading.projects = true;
 		if (username === selected.group.name) {
 			try {
-				projects = await get(
-					`${apiUrl}/v4/users/${selected.group.name}/projects?min_access_level=40&page=1&per_page=25&archived=false`,
-					{
-						Authorization: `Bearer ${$gitTokens.gitlabToken}`
-					}
-				);
+				params.append('min_access_level', 40);
+				projects = await get(`${apiUrl}/v4/users/${selected.group.name}/projects?${params}`, {
+					Authorization: `Bearer ${$gitTokens.gitlabToken}`
+				});
 			} catch (error) {
 				errorNotification(error);
 				throw new Error(error);
@@ -102,12 +140,9 @@
 			}
 		} else {
 			try {
-				projects = await get(
-					`${apiUrl}/v4/groups/${selected.group.id}/projects?page=1&per_page=25&archived=false`,
-					{
-						Authorization: `Bearer ${$gitTokens.gitlabToken}`
-					}
-				);
+				projects = await get(`${apiUrl}/v4/groups/${selected.group.id}/projects?${params}`, {
+					Authorization: `Bearer ${$gitTokens.gitlabToken}`
+				});
 			} catch (error) {
 				errorNotification(error);
 				throw new Error(error);
@@ -117,11 +152,35 @@
 		}
 	}
 
+	async function searchBranches(searchText) {
+		if (!selected.project) {
+			return;
+		}
+
+		search.branch = searchText;
+		await loadBranches();
+		return branches;
+	}
+
+	function selectBranch(event) {
+		selected.branch = event.detail;
+		isBranchAlreadyUsed();
+	}
+
 	async function loadBranches() {
+		const params = new URLSearchParams({
+			page: 1,
+			per_page: 100
+		});
+
+		if (search.branch) {
+			params.append('search', search.branch);
+		}
+
 		loading.branches = true;
 		try {
 			branches = await get(
-				`${apiUrl}/v4/projects/${selected.project.id}/repository/branches?per_page=100&page=1`,
+				`${apiUrl}/v4/projects/${selected.project.id}/repository/branches?${params}`,
 				{
 					Authorization: `Bearer ${$gitTokens.gitlabToken}`
 				}
@@ -267,70 +326,79 @@
 
 <form on:submit={handleSubmit}>
 	<div class="flex flex-col space-y-2 px-4 xl:flex-row xl:space-y-0 xl:space-x-2 ">
-		{#if loading.base}
-			<select name="group" disabled class="w-96">
-				<option selected value="">{$t('application.configuration.loading_groups')}</option>
-			</select>
-		{:else}
-			<select name="group" class="w-96" bind:value={selected.group} on:change={loadProjects}>
-				<option value="" disabled selected>{$t('application.configuration.select_a_group')}</option>
-				{#each groups as group}
-					<option value={group}>{group.full_name}</option>
-				{/each}
-			</select>
-		{/if}
-		{#if loading.projects}
-			<select name="project" disabled class="w-96">
-				<option selected value="">{$t('application.configuration.loading_projects')}</option>
-			</select>
-		{:else if !loading.projects && projects.length > 0}
-			<select
-				name="project"
-				class="w-96"
-				bind:value={selected.project}
-				on:change={loadBranches}
-				disabled={!selected.group}
-			>
-				<option value="" disabled selected
-					>{$t('application.configuration.select_a_project')}</option
-				>
-				{#each projects as project}
-					<option value={project}>{project.name}</option>
-				{/each}
-			</select>
-		{:else}
-			<select name="project" disabled class="w-96">
-				<option disabled selected value=""
-					>{$t('application.configuration.no_projects_found')}</option
-				>
-			</select>
-		{/if}
-
-		{#if loading.branches}
-			<select name="branch" disabled class="w-96">
-				<option selected value="">{$t('application.configuration.loading_branches')}</option>
-			</select>
-		{:else if !loading.branches && branches.length > 0}
-			<select
-				name="branch"
-				class="w-96"
-				bind:value={selected.branch}
-				on:change={isBranchAlreadyUsed}
-				disabled={!selected.project}
-			>
-				<option value="" disabled selected>{$t('application.configuration.select_a_branch')}</option
-				>
-				{#each branches as branch}
-					<option value={branch}>{branch.name}</option>
-				{/each}
-			</select>
-		{:else}
-			<select name="project" disabled class="w-96">
-				<option disabled selected value=""
-					>{$t('application.configuration.no_branches_found')}</option
-				>
-			</select>
-		{/if}
+		<div class="custom-select-wrapper">
+			<Select
+				placeholder={loading.base
+					? $t('application.configuration.loading_groups')
+					: $t('application.configuration.select_a_group')}
+				id="group"
+				showIndicator={!loading.base}
+				isWaiting={loading.base}
+				on:select={selectGroup}
+				on:clear={() => {
+					showSave = false;
+					projects = [];
+					branches = [];
+					selected.group = null;
+					selected.project = null;
+					selected.branch = null;
+				}}
+				value={selected.group}
+				isDisabled={loading.base}
+				isClearable={false}
+				items={groups}
+				labelIdentifier="full_name"
+				optionIdentifier="id"
+			/>
+		</div>
+		<div class="custom-select-wrapper">
+			<Select
+				placeholder={loading.projects
+					? $t('application.configuration.loading_projects')
+					: $t('application.configuration.select_a_project')}
+				noOptionsMessage={$t('application.configuration.no_projects_found')}
+				id="project"
+				showIndicator={!loading.projects}
+				isWaiting={loading.projects}
+				isDisabled={loading.projects || !selected.group}
+				on:select={selectProject}
+				on:clear={() => {
+					showSave = false;
+					branches = [];
+					selected.project = null;
+					selected.branch = null;
+				}}
+				value={selected.project}
+				isClearable={false}
+				items={projects}
+				loadOptions={searchProjects}
+				labelIdentifier="name"
+				optionIdentifier="id"
+			/>
+		</div>
+		<div class="custom-select-wrapper">
+			<Select
+				placeholder={loading.branches
+					? $t('application.configuration.loading_branches')
+					: $t('application.configuration.select_a_branch')}
+				noOptionsMessage={$t('application.configuration.no_branches_found')}
+				id="branch"
+				showIndicator={!loading.branches}
+				isWaiting={loading.branches}
+				isDisabled={loading.branches || !selected.project}
+				on:select={selectBranch}
+				on:clear={() => {
+					showSave = false;
+					selected.branch = null;
+				}}
+				value={selected.branch}
+				isClearable={false}
+				items={branches}
+				loadOptions={searchBranches}
+				labelIdentifier="name"
+				optionIdentifier="web_url"
+			/>
+		</div>
 	</div>
 	<div class="flex flex-col items-center justify-center space-y-4 pt-5">
 		<button
