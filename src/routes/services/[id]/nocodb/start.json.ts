@@ -27,6 +27,7 @@ export const post: RequestHandler = async (event) => {
 
 		const config = {
 			image: `${image}:${version}`,
+			volume: `${id}-nc:/usr/app/data`,
 			environmentVariables: {}
 		};
 		if (serviceSecret.length > 0) {
@@ -41,6 +42,7 @@ export const post: RequestHandler = async (event) => {
 					container_name: id,
 					image: config.image,
 					networks: [network],
+					volumes: [config.volume],
 					environment: config.environmentVariables,
 					restart: 'always',
 					...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
