@@ -34,7 +34,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	}
 	if (pythonWSGI?.toLowerCase() === 'gunicorn') {
 		Dockerfile.push(`RUN pip install gunicorn`);
-	} else if (pythonWSGI?.toLowerCase() === "uvicorn") {
+	} else if (pythonWSGI?.toLowerCase() === 'uvicorn') {
 		Dockerfile.push(`RUN pip install uvicorn`);
 	} else if (pythonWSGI?.toLowerCase() === 'uwsgi') {
 		Dockerfile.push(`RUN apk add --no-cache uwsgi-python3`);
@@ -52,9 +52,8 @@ const createDockerfile = async (data, image): Promise<void> => {
 	Dockerfile.push(`EXPOSE ${port}`);
 	if (pythonWSGI?.toLowerCase() === 'gunicorn') {
 		Dockerfile.push(`CMD gunicorn -w=4 -b=0.0.0.0:8000 ${pythonModule}:${pythonVariable}`);
-	} else if (pythonWSGI?.toLowerCase() === "uvicorn") {
-		Dockerfile.push(`CMD uvicorn ${pythonModule}:${pythonVariable} --reload --port ${port}`);
-
+	} else if (pythonWSGI?.toLowerCase() === 'uvicorn') {
+		Dockerfile.push(`CMD uvicorn ${pythonModule}:${pythonVariable} --port ${port} --host 0.0.0.0`);
 	} else if (pythonWSGI?.toLowerCase() === 'uwsgi') {
 		Dockerfile.push(
 			`CMD uwsgi --master -p 4 --http-socket 0.0.0.0:8000 --uid uwsgi --plugins python3 --protocol uwsgi --wsgi ${pythonModule}:${pythonVariable}`
