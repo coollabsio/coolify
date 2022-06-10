@@ -188,7 +188,7 @@
 			{/each}
 		{:else}
 			<div class="flex-col">
-				<div class="text-center font-bold text-xl">
+				<div class="text-center text-xl font-bold">
 					{$t('application.preview.no_previews_available')}
 				</div>
 			</div>

@@ -10,7 +10,6 @@
 		}
 		const endpoint = `/applications/${params.id}.json`;
 		const res = await fetch(endpoint);
-
 		if (res.ok) {
 			return {
 				props: {
@@ -18,7 +17,6 @@
 				}
 			};
 		}
-
 		return {
 			status: res.status,
 			error: new Error(`Could not load ${endpoint}`)
@@ -39,7 +37,6 @@
 	import { errorNotification } from '$lib/form';
 	import { onDestroy, onMount } from 'svelte';
 	import Select from 'svelte-select';
-
 	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 	import type Prisma from '@prisma/client';
@@ -51,9 +48,7 @@
 	import { disabledButton, status } from '$lib/store';
 	import { t } from '$lib/translations';
 	const { id } = $page.params;
-
 	let domainEl: HTMLInputElement;
-
 	let loading = false;
 
 	let usageLoading = false;
@@ -69,12 +64,12 @@
 	let previews = application.settings.previews;
 	let dualCerts = application.settings.dualCerts;
 	let autodeploy = application.settings.autodeploy;
-
 	let nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
 	let isNonWWWDomainOK = false;
 	let isWWWDomainOK = false;
 
 	$: isDisabled = !$session.isAdmin || $status.application.isRunning;
+
 	let wsgis = [
 		{
 			value: 'None',
@@ -83,6 +78,10 @@
 		{
 			value: 'Gunicorn',
 			label: 'Gunicorn'
+		},
+		{
+			value: 'Uvicorn',
+			label: 'Uvicorn'
 		}
 	];
 	function containerClass() {
@@ -110,7 +109,6 @@
 			await getUsage();
 		}, 1000);
 	});
-
 	async function changeSettings(name) {
 		if (name === 'debug') {
 			debug = !debug;
@@ -196,7 +194,6 @@
 		application.baseBuildImage = event.detail.value;
 		await handleSubmit();
 	}
-
 	async function isDNSValid(domain, isWWW) {
 		try {
 			await get(`/applications/${id}/check.json?domain=${domain}`);
@@ -218,7 +215,6 @@
 		</div>
 		<span class="text-xs">{application.name} </span>
 	</div>
-
 	{#if application.fqdn}
 		<a
 			href={application.fqdn}
@@ -433,7 +429,6 @@
 					<label for="baseBuildImage" class="text-base font-bold text-stone-100"
 						>{$t('application.base_build_image')}</label
 					>
-
 					<div class="custom-select-wrapper">
 						<Select
 							{isDisabled}
@@ -530,12 +525,11 @@
 			</div>
 			{#if application.buildPack === 'python'}
 				<div class="grid grid-cols-2 items-center">
-					<label for="pythonModule" class="text-base font-bold text-stone-100">WSGI</label>
+					<label for="pythonModule" class="text-base font-bold text-stone-100">WSGI / ASGI</label>
 					<div class="custom-select-wrapper">
 						<Select id="wsgi" items={wsgis} on:select={selectWSGI} value={application.pythonWSGI} />
 					</div>
 				</div>
-
 				<div class="grid grid-cols-2 items-center">
 					<label for="pythonModule" class="text-base font-bold text-stone-100">Module</label>
 					<input
@@ -544,10 +538,23 @@
 						id="pythonModule"
 						required
 						bind:value={application.pythonModule}
-						placeholder={application.pythonWSGI?.toLowerCase() !== 'gunicorn' ? 'main.py' : 'main'}
+						placeholder={application.pythonWSGI?.toLowerCase() !== 'none' ? 'main' : 'main.py'}
 					/>
 				</div>
 				{#if application.pythonWSGI?.toLowerCase() === 'gunicorn'}
+					<div class="grid grid-cols-2 items-center">
+						<label for="pythonVariable" class="text-base font-bold text-stone-100">Variable</label>
+						<input
+							readonly={!$session.isAdmin}
+							name="pythonVariable"
+							id="pythonVariable"
+							required
+							bind:value={application.pythonVariable}
+							placeholder="default: app"
+						/>
+					</div>
+				{/if}
+				{#if application.pythonWSGI?.toLowerCase() === 'uvicorn'}
 					<div class="grid grid-cols-2 items-center">
 						<label for="pythonVariable" class="text-base font-bold text-stone-100">Variable</label>
 						<input
@@ -694,7 +701,6 @@
 						>
 						<Explainer text={$t('application.publish_directory_explainer')} />
 					</div>
-
 					<input
 						readonly={!$session.isAdmin}
 						name="publishDirectory"
