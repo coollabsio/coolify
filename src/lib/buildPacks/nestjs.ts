@@ -10,8 +10,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	if (isPnpm) {
-		Dockerfile.push('RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm');
-		Dockerfile.push('RUN pnpm add -g pnpm');
+		Dockerfile.push('RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7');
 	}
 	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app/${baseDirectory || ''} ./`);
 

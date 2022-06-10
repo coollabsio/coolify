@@ -12,12 +12,7 @@ export const post: RequestHandler = async (event) => {
 
 	try {
 		const service = await db.getService({ id, teamId });
-		const {
-			destinationDockerId,
-			destinationDocker,
-			fqdn,
-			minio: { publicPort }
-		} = service;
+		const { destinationDockerId, destinationDocker } = service;
 		await db.updateMinioService({ id, publicPort: null });
 		if (destinationDockerId) {
 			const engine = destinationDocker.engine;
@@ -29,11 +24,6 @@ export const post: RequestHandler = async (event) => {
 				}
 			} catch (error) {
 				console.error(error);
-			}
-			try {
-				await stopTcpHttpProxy(destinationDocker, publicPort);
-			} catch (error) {
-				console.log(error);
 			}
 		}
 

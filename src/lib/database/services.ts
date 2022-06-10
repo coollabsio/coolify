@@ -18,7 +18,7 @@ const include: Prisma.ServiceInclude = {
 	hasura: true,
 	fider: true
 };
-export async function listServicesWithIncludes() {
+export async function listServicesWithIncludes(): Promise<Service[]> {
 	return await prisma.service.findMany({
 		include,
 		orderBy: { createdAt: 'desc' }
@@ -360,7 +360,24 @@ export async function updateService({
 }): Promise<Service> {
 	return await prisma.service.update({ where: { id }, data: { fqdn, name, exposePort } });
 }
-
+export async function updateMinioService({
+	id,
+	fqdn,
+	apiFqdn,
+	exposePort,
+	name
+}: {
+	id: string;
+	fqdn: string;
+	apiFqdn: string;
+	exposePort?: number;
+	name: string;
+}): Promise<Service> {
+	return await prisma.service.update({
+		where: { id },
+		data: { fqdn, name, exposePort, minio: { update: { apiFqdn } } }
+	});
+}
 export async function updateFiderService({
 	id,
 	fqdn,
@@ -418,7 +435,6 @@ export async function updateWordpress({
 	fqdn,
 	name,
 	exposePort,
-	ownMysql,
 	mysqlDatabase,
 	extraConfig,
 	mysqlHost,
@@ -459,7 +475,7 @@ export async function updateWordpress({
 	});
 }
 
-export async function updateMinioService({
+export async function updateMinioServicePort({
 	id,
 	publicPort
 }: {

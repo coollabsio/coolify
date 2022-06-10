@@ -195,7 +195,6 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 			}
 		};
 		const composeFileDestination = `${workdir}/docker-compose.yaml`;
-		console.log(JSON.stringify(composeFile, null, 2));
 		await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 		await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
 		await asyncExecShell(

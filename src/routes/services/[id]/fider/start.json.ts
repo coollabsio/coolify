@@ -59,7 +59,7 @@ export const post: RequestHandler = async (event) => {
 			fider: {
 				image: `${image}:${version}`,
 				environmentVariables: {
-					HOST_DOMAIN: domain,
+					BASE_URL: domain,
 					DATABASE_URL: `postgresql://${postgresqlUser}:${postgresqlPassword}@${id}-postgresql:5432/${postgresqlDatabase}?sslmode=disable`,
 					JWT_SECRET: `${jwtSecret.replace(/\$/g, '$$$')}`,
 					EMAIL_NOREPLY: emailNoreply,

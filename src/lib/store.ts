@@ -12,3 +12,14 @@ export const features: Readable<{ latestVersion: string; beta: boolean }> = read
 	beta: browser && window.localStorage.getItem('beta') === 'true',
 	latestVersion: browser && window.localStorage.getItem('latestVersion')
 });
+
+export const isTraefikUsed: Writable<boolean> = writable(false);
+
+export const status: Writable<any> = writable({
+	application: {
+		isRunning: false,
+		isExited: false,
+		loading: false,
+		initialLoading: true
+	}
+});

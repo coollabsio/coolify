@@ -12,7 +12,7 @@ export const del: RequestHandler = async (event) => {
 		const database = await db.getDatabase({ id, teamId });
 		if (database.destinationDockerId) {
 			const everStarted = await stopDatabase(database);
-			if (everStarted) await stopTcpHttpProxy(database.destinationDocker, database.publicPort);
+			if (everStarted) await stopTcpHttpProxy(id, database.destinationDocker, database.publicPort);
 		}
 		await db.removeDatabase({ id });
 		return { status: 200 };

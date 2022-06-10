@@ -37,12 +37,13 @@
 	import { getDomain } from '$lib/components/common';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
-	import { features } from '$lib/store';
+	import { features, isTraefikUsed } from '$lib/store';
 
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
 	let dualCerts = settings.dualCerts;
 	let isAutoUpdateEnabled = settings.isAutoUpdateEnabled;
 	let isDNSCheckEnabled = settings.isDNSCheckEnabled;
+	$isTraefikUsed = settings.isTraefikUsed;
 
 	let minPort = settings.minPort;
 	let maxPort = settings.maxPort;
@@ -55,7 +56,8 @@
 	let isFqdnSet = !!settings.fqdn;
 	let loading = {
 		save: false,
-		remove: false
+		remove: false,
+		proxyMigration: false
 	};
 
 	async function removeFqdn() {
@@ -86,6 +88,7 @@
 			if (name === 'isDNSCheckEnabled') {
 				isDNSCheckEnabled = !isDNSCheckEnabled;
 			}
+
 			await post(`/settings.json`, {
 				isRegistrationEnabled,
 				dualCerts,
@@ -156,6 +159,20 @@
 	function resetView() {
 		forceSave = false;
 	}
+	async function migrateProxy(to) {
+		if (loading.proxyMigration) return;
+		try {
+			loading.proxyMigration = true;
+			await post(`/update.json`, { type: to });
+			const data = await get(`/settings.json`);
+			$isTraefikUsed = data.settings.isTraefikUsed;
+			return toast.push('Proxy migration started, it takes a few seconds.');
+		} catch ({ error }) {
+			return errorNotification(error);
+		} finally {
+			loading.proxyMigration = false;
+		}
+	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -192,6 +209,26 @@
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
 				<!-- <Language /> -->
+				<div class="grid grid-cols-2 items-center">
+					<div class="flex items-center py-2 pr-8">
+						<div class="flex w-96 flex-col">
+							<div class="text-xs font-bold text-stone-100 md:text-base">New Proxy Available!</div>
+							<Explainer
+								text="We are changing to <span class='text-sky-500 font-bold'>Traefik</span> as <span class='text-red-500 font-bold'>HAProxy</span> had several problems and uses a LOT of unnecessary memory (<span class='text-sky-500 font-bold'>~20MB</span> vs <span class='text-red-500 font-bold'>~200MB</span>).<br><br>You can switch back to HAProxy if something is not working and <span class='text-yellow-500 font-bold'>please let us know</span>!"
+							/>
+						</div>
+					</div>
+					<button
+						disabled={loading.proxyMigration}
+						class="bg-green-600 text-white hover:bg-green-500"
+						on:click={() => migrateProxy($isTraefikUsed ? 'haproxy' : 'traefik')}
+						>{loading.proxyMigration
+							? 'Migrating...'
+							: $isTraefikUsed
+							? 'Switch back to HAProxy'
+							: 'Migrate to Traefik'}</button
+					>
+				</div>
 				<div class="grid grid-cols-2 items-start">
 					<div class="flex-col">
 						<div class="pt-2 text-base font-bold text-stone-100">

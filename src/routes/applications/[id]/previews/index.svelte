@@ -31,6 +31,7 @@
 	import { errorNotification } from '$lib/form';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
+	import { goto } from '$app/navigation';
 
 	const { id } = $page.params;
 	async function refreshSecrets() {
@@ -39,11 +40,18 @@
 	}
 	async function redeploy(container) {
 		try {
-			await post(`/applications/${id}/deploy.json`, {
+			const { buildId } = await post(`/applications/${id}/deploy.json`, {
 				pullmergeRequestId: container.pullmergeRequestId,
 				branch: container.branch
 			});
 			toast.push('Application redeployed queued.');
+			if ($page.url.pathname.startsWith(`/applications/${id}/logs/build`)) {
+				return window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
+			} else {
+				return await goto(`/applications/${id}/logs/build?buildId=${buildId}`, {
+					replaceState: true
+				});
+			}
 		} catch ({ error }) {
 			return errorNotification(error);
 		}

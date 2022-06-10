@@ -62,7 +62,7 @@ export const supportedDatabaseTypesAndVersions = [
 		name: 'postgresql',
 		fancyName: 'PostgreSQL',
 		baseImage: 'bitnami/postgresql',
-		versions: ['14.2.0', '13.6.0', '12.10.0	', '11.15.0', '10.20.0']
+		versions: ['14.2.0', '13.6.0', '12.10.0', '11.15.0', '10.20.0']
 	},
 	{
 		name: 'redis',
@@ -219,6 +219,18 @@ export const supportedServiceTypesAndVersions = [
 		ports: {
 			main: 3000
 		}
+		// },
+		// {
+		// 	name: 'appwrite',
+		// 	fancyName: 'AppWrite',
+		// 	baseImage: 'appwrite/appwrite',
+		// 	images: ['appwrite/influxdb', 'appwrite/telegraf', 'mariadb:10.7', 'redis:6.0-alpine3.12'],
+		// 	versions: ['latest', '0.13.0'],
+		// 	recommendedVersion: '0.13.0',
+		// 	ports: {
+		// 		main: 3000
+		// 	}
+		// }
 	}
 ];
 
