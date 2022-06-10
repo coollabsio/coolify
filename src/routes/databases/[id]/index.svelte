@@ -33,10 +33,40 @@
 
 <script lang="ts">
 	import DatabaseLinks from '$lib/components/DatabaseLinks.svelte';
+	import { page } from '$app/stores';
+	import { get } from '$lib/api';
+	import { onDestroy, onMount } from 'svelte';
 	export let database;
 	export let settings;
 	export let privatePort;
 	export let isRunning;
+
+	const { id } = $page.params;
+	let usageLoading = false;
+	let usage = {
+		MemUsage: 0,
+		CPUPerc: 0,
+		NetIO: 0
+	};
+	let usageInterval;
+
+	async function getUsage() {
+		if (usageLoading) return;
+		usageLoading = true;
+		const data = await get(`/databases/${id}/usage.json`);
+		usage = data.usage;
+		usageLoading = false;
+	}
+
+	onDestroy(() => {
+		clearInterval(usageInterval);
+	});
+	onMount(async () => {
+		await getUsage();
+		usageInterval = setInterval(async () => {
+			await getUsage();
+		}, 1000);
+	});
 </script>
 
 <div class="flex items-center space-x-2 p-6 text-2xl font-bold">
@@ -49,4 +79,31 @@
 	<DatabaseLinks {database} />
 </div>
 
+<div class="mx-auto max-w-4xl px-6 py-4">
+	<div class="text-2xl font-bold">Database Usage</div>
+	<div class="mx-auto">
+		<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+			<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
+				<dt class=" text-sm font-medium text-white">Used Memory / Memory Limit</dt>
+				<dd class="mt-1 text-xl font-semibold text-white">
+					{usage?.MemUsage}
+				</dd>
+			</div>
+
+			<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
+				<dt class="truncate text-sm font-medium text-white">Used CPU</dt>
+				<dd class="mt-1 text-xl font-semibold text-white ">
+					{usage?.CPUPerc}
+				</dd>
+			</div>
+
+			<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
+				<dt class="truncate text-sm font-medium text-white">Network IO</dt>
+				<dd class="mt-1 text-xl font-semibold text-white ">
+					{usage?.NetIO}
+				</dd>
+			</div>
+		</dl>
+	</div>
+</div>
 <Databases bind:database {privatePort} {settings} {isRunning} />

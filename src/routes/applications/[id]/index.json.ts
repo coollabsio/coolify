@@ -1,7 +1,7 @@
-import { getUserDetails } from '$lib/common';
+import { asyncExecShell, getUserDetails } from '$lib/common';
 import * as db from '$lib/database';
 import { ErrorHandler } from '$lib/database';
-import { checkContainer, isContainerExited } from '$lib/haproxy';
+import { checkContainer, getContainerUsage, isContainerExited } from '$lib/haproxy';
 import type { RequestHandler } from '@sveltejs/kit';
 import { setDefaultConfiguration } from '$lib/buildPacks/common';
 
@@ -12,21 +12,14 @@ export const get: RequestHandler = async (event) => {
 	const { id } = event.params;
 
 	const appId = process.env['COOLIFY_APP_ID'];
-	let isRunning = false;
-	let isExited = false;
 	let githubToken = event.locals.cookies?.githubToken || null;
 	let gitlabToken = event.locals.cookies?.gitlabToken || null;
 	try {
 		const application = await db.getApplication({ id, teamId });
-		if (application.destinationDockerId) {
-			isRunning = await checkContainer(application.destinationDocker.engine, id);
-			isExited = await isContainerExited(application.destinationDocker.engine, id);
-		}
+
 		return {
 			status: 200,
 			body: {
-				isRunning,
-				isExited,
 				application,
 				appId,
 				githubToken,

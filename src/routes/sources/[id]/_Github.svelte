@@ -84,6 +84,9 @@
 		<form on:submit|preventDefault={newGithubApp} class="py-4">
 			<div class="flex space-x-1 pb-5 font-bold">
 				<div class="title">General</div>
+				{#if source.apiUrl && source.htmlUrl && source.name}
+					<button class=" bg-orange-600" type="submit">Create new GitHub App</button>
+				{/if}
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
 				<div class="grid grid-flow-row gap-2">
@@ -117,11 +120,6 @@
 					/>
 				</div>
 			</div>
-			{#if source.apiUrl && source.htmlUrl && source.name}
-				<div class="text-center">
-					<button class=" mt-8 bg-orange-600" type="submit">Create new GitHub App</button>
-				</div>
-			{/if}
 		</form>
 	{:else if source.githubApp?.installationId}
 		<form on:submit|preventDefault={handleSubmit} class="py-4">
@@ -173,7 +171,7 @@
 		</form>
 	{:else}
 		<div class="text-center">
-			<button class=" bg-orange-600 mt-8" on:click={() => installRepositories(source)}
+			<button class=" mt-8 bg-orange-600" on:click={() => installRepositories(source)}
 				>Install Repositories</button
 			>
 		</div>

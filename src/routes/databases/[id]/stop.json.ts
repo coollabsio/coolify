@@ -13,7 +13,7 @@ export const post: RequestHandler = async (event) => {
 	try {
 		const database = await db.getDatabase({ id, teamId });
 		const everStarted = await stopDatabase(database);
-		if (everStarted) await stopTcpHttpProxy(database.destinationDocker, database.publicPort);
+		if (everStarted) await stopTcpHttpProxy(id, database.destinationDocker, database.publicPort);
 		await db.setDatabase({ id, isPublic: false });
 		await db.prisma.database.update({ where: { id }, data: { publicPort: null } });
 
@@ -21,6 +21,7 @@ export const post: RequestHandler = async (event) => {
 			status: 200
 		};
 	} catch (error) {
+		console.log(error);
 		return ErrorHandler(error);
 	}
 };

@@ -72,8 +72,7 @@ export const post: RequestHandler = async (event) => {
 		minPort,
 		maxPort,
 		isAutoUpdateEnabled,
-		isDNSCheckEnabled,
-		forceSave
+		isDNSCheckEnabled
 	} = await event.request.json();
 	try {
 		const { id } = await db.listSettings();

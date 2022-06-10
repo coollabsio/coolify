@@ -20,6 +20,7 @@ model Setting {
   proxyHash             String?
   isAutoUpdateEnabled   Boolean  @default(false)
   isDNSCheckEnabled     Boolean  @default(true)
+  isTraefikUsed         Boolean  @default(true)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
@@ -334,6 +335,7 @@ model Minio {
   rootUser         String
   rootUserPassword String
   publicPort       Int?
+  apiFqdn          String?
   serviceId        String   @unique
   service          Service  @relation(fields: [serviceId], references: [id])
   createdAt        DateTime @default(now())
