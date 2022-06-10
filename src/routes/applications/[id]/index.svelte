@@ -69,6 +69,7 @@
 	let isWWWDomainOK = false;
 
 	$: isDisabled = !$session.isAdmin || $status.application.isRunning;
+
 	let wsgis = [
 		{
 			value: 'None',
