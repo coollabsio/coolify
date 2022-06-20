@@ -50,7 +50,14 @@
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">{$t('database.select_database_version')}</div>
 </div>
-
+{#if from}
+	<div class="pb-10 text-center">
+		Warning: you are about to change the version of this database.<br />This could cause problem
+		after you restart the database,
+		<span class="font-bold text-pink-600">like losing your data, incompatibility issues, etc</span
+		>.<br />Only do if you know what you are doing!
+	</div>
+{/if}
 <div class="flex flex-wrap justify-center">
 	{#each versions as version}
 		<div class="p-2">
