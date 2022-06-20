@@ -16,7 +16,8 @@ const include: Prisma.ServiceInclude = {
 	meiliSearch: true,
 	umami: true,
 	hasura: true,
-	fider: true
+	fider: true,
+	reacher: true
 };
 export async function listServicesWithIncludes(): Promise<Service[]> {
 	return await prisma.service.findMany({
@@ -293,6 +294,11 @@ export async function configureServiceType({
 					}
 				}
 			}
+		});
+	} else if (type === 'reacher') {
+		await prisma.service.update({
+			where: { id },
+			data: { type }
 		});
 	}
 }

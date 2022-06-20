@@ -311,6 +311,7 @@ model Service {
   umami               Umami?
   hasura              Hasura?
   fider               Fider?
+  reacher             Reacher?
 }
 
 model PlausibleAnalytics {
@@ -448,4 +449,12 @@ model Fider {
   service                 Service  @relation(fields: [serviceId], references: [id])
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+}
+
+model Reacher {
+  id        String   @id @default(cuid())
+  serviceId String   @unique
+  service   Service  @relation(fields: [serviceId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

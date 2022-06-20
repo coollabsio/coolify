@@ -18,6 +18,7 @@
 	import Umami from '$lib/components/svg/services/Umami.svelte';
 	import Hasura from '$lib/components/svg/services/Hasura.svelte';
 	import Fider from '$lib/components/svg/services/Fider.svelte';
+	import Reacher from '$lib/components/svg/services/Reacher.svelte';
 
 	export let services;
 	async function newService() {
@@ -95,6 +96,8 @@
 								<Hasura isAbsolute />
 							{:else if service.type === 'fider'}
 								<Fider isAbsolute />
+							{:else if service.type === 'reacher'}
+								<Reacher isAbsolute />
 							{/if}
 							<div class="truncate text-center text-xl font-bold">
 								{service.name}
@@ -148,6 +151,8 @@
 									<Hasura isAbsolute />
 								{:else if service.type === 'fider'}
 									<Fider isAbsolute />
+								{:else if service.type === 'reacher'}
+									<Reacher isAbsolute />
 								{/if}
 								<div class="truncate text-center text-xl font-bold">
 									{service.name}
@@ -163,7 +168,7 @@
 										Configuration missing
 									</div>
 								{:else}
-									<div class="text-center truncate">{service.type}</div>
+									<div class="truncate text-center">{service.type}</div>
 								{/if}
 							</div>
 						</a>

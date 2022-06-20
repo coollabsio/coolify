@@ -94,6 +94,7 @@ You can host cool open-source services as well:
 - [Umami](https://github.com/mikecao/umami)
 - [Fider](https://fider.io)
 - [Hasura](https://hasura.io)
+- [Reacher](https://reacher.email/)
 
 ## Migration from v1
 

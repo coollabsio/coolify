@@ -13,6 +13,7 @@
 	import VsCodeServer from './svg/services/VSCodeServer.svelte';
 	import Wordpress from './svg/services/Wordpress.svelte';
 	import Fider from './svg/services/Fider.svelte';
+	import Reacher from './svg/services/Reacher.svelte';
 </script>
 
 {#if service.type === 'plausibleanalytics'}
@@ -66,5 +67,9 @@
 {:else if service.type === 'fider'}
 	<a href="https://fider.io" target="_blank">
 		<Fider />
+	</a>
+{:else if service.type === 'reacher'}
+	<a href="https://reacher.email/" target="_blank">
+		<Reacher />
 	</a>
 {/if}
