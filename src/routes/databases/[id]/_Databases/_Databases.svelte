@@ -152,9 +152,19 @@
 			</div>
 
 			<div class="grid grid-cols-2 items-center">
-				<label for="version" class="text-base font-bold text-stone-100">{$t('forms.version')}</label
+				<label for="version" class="text-base font-bold text-stone-100">Version / Tag</label>
+				<a
+					href={$session.isAdmin && !isRunning
+						? `/databases/${id}/configuration/version?from=/databases/${id}`
+						: ''}
+					class="no-underline"
 				>
-				<input value={database.version} readonly disabled class="bg-transparent " />
+					<input
+						value={database.version}
+						disabled={isRunning}
+						class:cursor-pointer={!isRunning}
+					/></a
+				>
 			</div>
 		</div>
 
