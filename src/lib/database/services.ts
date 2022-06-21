@@ -17,7 +17,7 @@ const include: Prisma.ServiceInclude = {
 	umami: true,
 	hasura: true,
 	fider: true,
-	reacher: true
+	calcom: true
 };
 export async function listServicesWithIncludes(): Promise<Service[]> {
 	return await prisma.service.findMany({
@@ -110,6 +110,20 @@ export async function getService({ id, teamId }: { id: string; teamId: string })
 	if (body.fider?.jwtSecret) body.fider.jwtSecret = decrypt(body.fider.jwtSecret);
 	if (body.fider?.emailSmtpPassword)
 		body.fider.emailSmtpPassword = decrypt(body.fider.emailSmtpPassword);
+
+	if (body.calcom?.postgresqlPassword)
+		body.calcom.postgresqlPassword = decrypt(body.calcom.postgresqlPassword);
+	if (body.calcom?.emailSmtpPassword)
+		body.calcom.emailSmtpPassword = decrypt(body.calcom.emailSmtpPassword);
+	if (body.calcom?.authSecret) body.calcom.authSecret = decrypt(body.calcom.authSecret);
+	if (body.calcom?.encryptionKey) body.calcom.encryptionKey = decrypt(body.calcom.encryptionKey);
+	if (body.calcom?.msGraphClientSecret)
+		body.calcom.msGraphClientSecret = decrypt(body.calcom.msGraphClientSecret);
+	if (body.calcom?.zoomClientSecret)
+		body.calcom.zoomClientSecret = decrypt(body.calcom.zoomClientSecret);
+	if (body.calcom?.googleApiCredentials)
+		body.calcom.googleApiCredentials = decrypt(body.calcom.googleApiCredentials);
+	if (body.calcom?.licenseKey) body.calcom.licenseKey = decrypt(body.calcom.licenseKey);
 
 	const settings = await prisma.setting.findFirst();
 
@@ -299,6 +313,27 @@ export async function configureServiceType({
 		await prisma.service.update({
 			where: { id },
 			data: { type }
+		});
+	} else if (type === 'calcom') {
+		const postgresqlUser = cuid();
+		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlDatabase = 'calcom';
+		const authSecret = encrypt(generatePassword(64, true));
+		const encryptionKey = encrypt(generatePassword(64, true));
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				calcom: {
+					create: {
+						postgresqlDatabase,
+						postgresqlPassword,
+						postgresqlUser,
+						authSecret,
+						encryptionKey
+					}
+				}
+			}
 		});
 	}
 }
@@ -510,8 +545,67 @@ export async function updateGhostService({
 	});
 }
 
+export async function updateCalcomService({
+	id,
+	fqdn,
+	name,
+	exposePort,
+	msGraphClientId,
+	msGraphClientSecret,
+	zoomClientId,
+	zoomClientSecret,
+	googleApiCredentials,
+	emailFrom,
+	emailSmtpHost,
+	emailSmtpPort,
+	emailSmtpUser,
+	emailSmtpPassword,
+	licenseKey
+}: {
+	id: string;
+	fqdn: string;
+	name: string;
+	exposePort?: number;
+	msGraphClientId: string;
+	msGraphClientSecret: string;
+	zoomClientId: string;
+	zoomClientSecret: string;
+	googleApiCredentials: string;
+	emailFrom: string;
+	emailSmtpHost: string;
+	emailSmtpPort: number;
+	emailSmtpUser: string;
+	emailSmtpPassword: string;
+	licenseKey: string;
+}): Promise<Service> {
+	return await prisma.service.update({
+		where: { id },
+		data: {
+			fqdn,
+			name,
+			exposePort,
+			calcom: {
+				update: {
+					emailFrom,
+					emailSmtpHost,
+					emailSmtpPort,
+					emailSmtpUser,
+					emailSmtpPassword,
+					msGraphClientId,
+					msGraphClientSecret,
+					zoomClientId,
+					zoomClientSecret,
+					googleApiCredentials,
+					licenseKey
+				}
+			}
+		}
+	});
+}
+
 export async function removeService({ id }: { id: string }): Promise<void> {
 	await prisma.servicePersistentStorage.deleteMany({ where: { serviceId: id } });
+	await prisma.calcom.deleteMany({ where: { serviceId: id } });
 	await prisma.meiliSearch.deleteMany({ where: { serviceId: id } });
 	await prisma.fider.deleteMany({ where: { serviceId: id } });
 	await prisma.ghost.deleteMany({ where: { serviceId: id } });

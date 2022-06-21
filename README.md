@@ -95,6 +95,7 @@ You can host cool open-source services as well:
 - [Fider](https://fider.io)
 - [Hasura](https://hasura.io)
 - [Reacher](https://reacher.email/)
+- [Cal.com](https://cal.com/)
 
 ## Migration from v1
 

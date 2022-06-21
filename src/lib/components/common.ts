@@ -225,14 +225,25 @@ export const supportedServiceTypesAndVersions = [
 		fancyName: 'Reacher',
 		baseImage: 'reacherhq/backend',
 		versions: ['latest'],
-		recommendedVersion: 'stable',
+		recommendedVersion: 'latest',
 		ports: {
 			main: 8080
+		}
+	},
+	{
+		name: 'calcom',
+		fancyName: 'Cal.com',
+		baseImage: 'calendso/calendso',
+		images: ['postgres:12-alpine'],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 3000
 		}
 	}
 ];
 
-export const getServiceMainPort = (service: string) => {
+export const getServiceMainPort = (service: string): number | null => {
 	const serviceType = supportedServiceTypesAndVersions.find((s) => s.name === service);
 	if (serviceType) {
 		return serviceType.ports.main;

@@ -19,6 +19,7 @@
 	import Hasura from '$lib/components/svg/services/Hasura.svelte';
 	import Fider from '$lib/components/svg/services/Fider.svelte';
 	import Reacher from '$lib/components/svg/services/Reacher.svelte';
+	import Calcom from '$lib/components/svg/services/Calcom.svelte';
 
 	export let services;
 	async function newService() {
@@ -98,6 +99,8 @@
 								<Fider isAbsolute />
 							{:else if service.type === 'reacher'}
 								<Reacher isAbsolute />
+							{:else if service.type === 'calcom'}
+								<Calcom isAbsolute />
 							{/if}
 							<div class="truncate text-center text-xl font-bold">
 								{service.name}
@@ -153,6 +156,8 @@
 									<Fider isAbsolute />
 								{:else if service.type === 'reacher'}
 									<Reacher isAbsolute />
+								{:else if service.type === 'calcom'}
+									<Calcom isAbsolute />
 								{/if}
 								<div class="truncate text-center text-xl font-bold">
 									{service.name}

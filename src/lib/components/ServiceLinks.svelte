@@ -14,6 +14,7 @@
 	import Wordpress from './svg/services/Wordpress.svelte';
 	import Fider from './svg/services/Fider.svelte';
 	import Reacher from './svg/services/Reacher.svelte';
+	import Calcom from './svg/services/Calcom.svelte';
 </script>
 
 {#if service.type === 'plausibleanalytics'}
@@ -71,5 +72,9 @@
 {:else if service.type === 'reacher'}
 	<a href="https://reacher.email/" target="_blank">
 		<Reacher />
+	</a>
+{:else if service.type === 'calcom'}
+	<a href="https://cal.com/" target="_blank">
+		<Calcom />
 	</a>
 {/if}

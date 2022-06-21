@@ -311,7 +311,7 @@ model Service {
   umami               Umami?
   hasura              Hasura?
   fider               Fider?
-  reacher             Reacher?
+  calcom              Calcom?
 }
 
 model PlausibleAnalytics {
@@ -451,10 +451,27 @@ model Fider {
   updatedAt               DateTime @updatedAt
 }
 
-model Reacher {
-  id        String   @id @default(cuid())
-  serviceId String   @unique
-  service   Service  @relation(fields: [serviceId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Calcom {
+  id                   String   @id @default(cuid())
+  serviceId            String   @unique
+  postgresqlUser       String
+  postgresqlPassword   String
+  postgresqlDatabase   String
+  postgresqlPublicPort Int?
+  emailFrom            String?
+  emailSmtpHost        String?
+  emailSmtpPort        Int?
+  emailSmtpUser        String?
+  emailSmtpPassword    String?
+  msGraphClientId      String?
+  msGraphClientSecret  String?
+  zoomClientId         String?
+  zoomClientSecret     String?
+  googleApiCredentials String?
+  licenseKey           String?
+  authSecret           String
+  encryptionKey        String
+  service              Service  @relation(fields: [serviceId], references: [id])
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }

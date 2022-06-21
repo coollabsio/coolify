@@ -25,6 +25,7 @@
 	import Umami from './_Umami.svelte';
 	import VsCodeServer from './_VSCodeServer.svelte';
 	import Wordpress from './_Wordpress.svelte';
+	import Calcom from './_Calcom.svelte';
 
 	const { id } = $page.params;
 
@@ -164,7 +165,7 @@
 								value={service.destinationDocker.name}
 								id="destination"
 								disabled
-								class="bg-transparent "
+								class="bg-transparent"
 							/>
 						</div>
 					{/if}
@@ -269,6 +270,8 @@
 				<Hasura bind:service />
 			{:else if service.type === 'fider'}
 				<Fider bind:service {readOnly} />
+			{:else if service.type === 'calcom'}
+				<Calcom bind:service {readOnly} />
 			{/if}
 		</div>
 	</form>

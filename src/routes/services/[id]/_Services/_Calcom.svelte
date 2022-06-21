@@ -1,95 +1,99 @@
 <script lang="ts">
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-	import Explainer from '$lib/components/Explainer.svelte';
 	import { t } from '$lib/translations';
-	import Select from 'svelte-select';
 	export let service;
 	export let readOnly;
-
-	let mailgunRegions = [
-		{
-			value: 'EU',
-			label: 'EU'
-		},
-		{
-			value: 'US',
-			label: 'US'
-		}
-	];
 </script>
 
 <div class="flex space-x-1 py-5 font-bold">
-	<div class="title">Fider</div>
+	<div class="title">Cal.com</div>
 </div>
 
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="jwtSecret">JWT Secret</label>
+	<label for="licenseKey">License Key</label>
 	<CopyPasswordField
-		name="jwtSecret"
-		id="jwtSecret"
+		name="licenseKey"
+		id="licenseKey"
 		isPasswordField
-		value={service.fider.jwtSecret}
-		readonly
-		disabled
-	/>
-</div>
-
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="emailNoreply">Noreply Email</label>
-	<input
-		name="emailNoreply"
-		id="emailNoreply"
-		type="email"
-		required
+		bind:value={service.calcom.licenseKey}
 		readonly={readOnly}
 		disabled={readOnly}
-		bind:value={service.fider.emailNoreply}
-		placeholder="{$t('forms.eg')}: noreply@yourdomain.com"
+		placeholder="{$t('forms.eg')}: XXXXXXXXXXXXXXXXXX"
 	/>
 </div>
+<div class="grid grid-cols-2 items-center px-10">
+	<label for="msGraphClientId">Microsoft Graph Client ID</label>
+	<input
+		name="msGraphClientId"
+		id="msGraphClientId"
+		bind:value={service.calcom.msGraphClientId}
+		readonly={readOnly}
+		disabled={readOnly}
+		placeholder="{$t('forms.eg')}: XXXXXXXXXXXXXXXXXX"
+	/>
+</div>
+<div class="grid grid-cols-2 items-center px-10">
+	<label for="msGraphClientSecret">Microsoft Graph Client Secret</label>
+	<CopyPasswordField
+		name="msGraphClientSecret"
+		id="msGraphClientSecret"
+		isPasswordField
+		bind:value={service.calcom.msGraphClientSecret}
+		readonly={readOnly}
+		disabled={readOnly}
+		placeholder="{$t('forms.eg')}: XXXXXXXXXXXXXXXXXX"
+	/>
+</div>
+<div class="grid grid-cols-2 items-center px-10">
+	<label for="zoomClientId">Zoom Client ID</label>
+	<input
+		name="zoomClientId"
+		id="zoomClientId"
+		bind:value={service.calcom.zoomClientId}
+		readonly={readOnly}
+		disabled={readOnly}
+		placeholder="{$t('forms.eg')}: XXXXXXXXXXXXXXXXXX"
+	/>
+</div>
+<div class="grid grid-cols-2 items-center px-10">
+	<label for="zoomClientSecret">Zoom Client Secret</label>
+	<CopyPasswordField
+		name="zoomClientSecret"
+		id="zoomClientSecret"
+		isPasswordField
+		bind:value={service.calcom.zoomClientSecret}
+		readonly={readOnly}
+		disabled={readOnly}
+		placeholder="{$t('forms.eg')}: XXXXXXXXXXXXXXXXXX"
+	/>
+</div>
+<div class="grid grid-cols-2 items-center px-10">
+	<label for="googleApiCredentials">Google API Credential</label>
+	<CopyPasswordField
+		name="googleApiCredentials"
+		id="googleApiCredentials"
+		isPasswordField
+		bind:value={service.calcom.googleApiCredentials}
+		readonly={readOnly}
+		disabled={readOnly}
+		placeholder="{$t('forms.eg')}: {'{'}{'}'}"
+	/>
+</div>
+
 <div class="flex space-x-1 py-5 font-bold">
 	<div class="title">Email</div>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="emailMailgunApiKey">Mailgun API Key</label>
-	<CopyPasswordField
-		name="emailMailgunApiKey"
-		id="emailMailgunApiKey"
-		isPasswordField
-		bind:value={service.fider.emailMailgunApiKey}
-		readonly={readOnly}
-		disabled={readOnly}
-		placeholder="{$t('forms.eg')}: key-yourkeygoeshere"
-	/>
-</div>
-
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="emailMailgunDomain">Mailgun Domain</label>
+	<label for="emailFrom">Email From</label>
 	<input
-		name="emailMailgunDomain"
-		id="emailMailgunDomain"
+		name="emailFrom"
+		id="emailFrom"
+		type="email"
 		readonly={readOnly}
 		disabled={readOnly}
-		bind:value={service.fider.emailMailgunDomain}
-		placeholder="{$t('forms.eg')}: yourdomain.com"
+		bind:value={service.calcom.emailFrom}
+		placeholder="{$t('forms.eg')}: noreply@yourdomain.com"
 	/>
-</div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="emailMailgunRegion">Mailgun Region</label>
-	<div class="custom-select-wrapper">
-		<Select
-			id="baseBuildImages"
-			items={mailgunRegions}
-			showIndicator
-			on:select={(event) => (service.fider.emailMailgunRegion = event.detail.value)}
-			value={service.fider.emailMailgunRegion || 'EU'}
-			isClearable={false}
-		/>
-	</div>
-</div>
-
-<div class="flex space-x-1 py-5 px-10 font-bold">
-	<div class="text-lg">Or</div>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
 	<label for="emailSmtpHost">SMTP Host</label>
@@ -98,7 +102,7 @@
 		id="emailSmtpHost"
 		readonly={readOnly}
 		disabled={readOnly}
-		bind:value={service.fider.emailSmtpHost}
+		bind:value={service.calcom.emailSmtpHost}
 		placeholder="{$t('forms.eg')}: smtp.yourdomain.com"
 	/>
 </div>
@@ -109,7 +113,7 @@
 		id="emailSmtpPort"
 		readonly={readOnly}
 		disabled={readOnly}
-		bind:value={service.fider.emailSmtpPort}
+		bind:value={service.calcom.emailSmtpPort}
 		placeholder="{$t('forms.eg')}: 587"
 	/>
 </div>
@@ -120,7 +124,7 @@
 		id="emailSmtpUser"
 		readonly={readOnly}
 		disabled={readOnly}
-		bind:value={service.fider.emailSmtpUser}
+		bind:value={service.calcom.emailSmtpUser}
 		placeholder="{$t('forms.eg')}: user@yourdomain.com"
 	/>
 </div>
@@ -130,33 +134,22 @@
 		name="emailSmtpPassword"
 		id="emailSmtpPassword"
 		isPasswordField
-		bind:value={service.fider.emailSmtpPassword}
+		bind:value={service.calcom.emailSmtpPassword}
 		readonly={readOnly}
 		disabled={readOnly}
 		placeholder="{$t('forms.eg')}: s0m3p4ssw0rd"
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="emailSmtpEnableStartTls">SMTP Start TLS</label>
-	<input
-		name="emailSmtpEnableStartTls"
-		id="emailSmtpEnableStartTls"
-		readonly={readOnly}
-		disabled={readOnly}
-		bind:value={service.fider.emailSmtpEnableStartTls}
-		placeholder="{$t('forms.eg')}: true"
-	/>
-</div>
+
 <div class="flex space-x-1 py-5 font-bold">
 	<div class="title">PostgreSQL</div>
 </div>
-
 <div class="grid grid-cols-2 items-center px-10">
 	<label for="postgresqlUser">{$t('forms.username')}</label>
 	<CopyPasswordField
 		name="postgresqlUser"
 		id="postgresqlUser"
-		value={service.fider.postgresqlUser}
+		value={service.calcom.postgresqlUser}
 		readonly
 		disabled
 	/>
@@ -169,7 +162,7 @@
 		readonly
 		disabled
 		name="postgresqlPassword"
-		value={service.fider.postgresqlPassword}
+		value={service.calcom.postgresqlPassword}
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
@@ -177,7 +170,7 @@
 	<CopyPasswordField
 		name="postgresqlDatabase"
 		id="postgresqlDatabase"
-		value={service.fider.postgresqlDatabase}
+		value={service.calcom.postgresqlDatabase}
 		readonly
 		disabled
 	/>

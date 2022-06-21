@@ -47,6 +47,7 @@
 	import Hasura from '$lib/components/svg/services/Hasura.svelte';
 	import Fider from '$lib/components/svg/services/Fider.svelte';
 	import Reacher from '$lib/components/svg/services/Reacher.svelte';
+	import Calcom from '$lib/components/svg/services/Calcom.svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -102,6 +103,8 @@
 						<Fider isAbsolute />
 					{:else if type.name === 'reacher'}
 						<Reacher isAbsolute />
+					{:else if type.name === 'calcom'}
+						<Calcom isAbsolute />
 					{/if}{type.fancyName}
 				</button>
 			</form>
