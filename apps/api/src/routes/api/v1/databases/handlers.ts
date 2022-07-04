@@ -60,7 +60,7 @@ export async function getDatabase(request: FastifyRequest) {
         const { id } = request.params;
         const teamId = request.user.teamId;
         const database = await prisma.database.findFirst({
-            where: { id, teams: { some: { id: teamId === '0' ? teamId : undefined } } },
+            where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: { destinationDocker: true, settings: true }
         });
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
@@ -122,7 +122,7 @@ export async function getVersions(request: FastifyRequest) {
         const teamId = request.user.teamId;
         const { id } = request.params;
         const { type } = await prisma.database.findFirst({
-            where: { id, teams: { some: { id: teamId === '0' ? teamId : undefined } } },
+            where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: { destinationDocker: true, settings: true }
         });
         return {
@@ -185,7 +185,7 @@ export async function getDatabaseUsage(request: FastifyRequest) {
         let usage = {};
 
         const database = await prisma.database.findFirst({
-            where: { id, teams: { some: { id: teamId === '0' ? teamId : undefined } } },
+            where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: { destinationDocker: true, settings: true }
         });
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
@@ -206,7 +206,7 @@ export async function startDatabase(request: FastifyRequest) {
         const { id } = request.params;
 
         const database = await prisma.database.findFirst({
-            where: { id, teams: { some: { id: teamId === '0' ? teamId : undefined } } },
+            where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: { destinationDocker: true, settings: true }
         });
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
@@ -287,7 +287,7 @@ export async function stopDatabase(request: FastifyRequest) {
         const teamId = request.user.teamId;
         const { id } = request.params;
         const database = await prisma.database.findFirst({
-            where: { id, teams: { some: { id: teamId === '0' ? teamId : undefined } } },
+            where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: { destinationDocker: true, settings: true }
         });
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
@@ -363,7 +363,7 @@ export async function deleteDatabase(request: FastifyRequest) {
         const teamId = request.user.teamId;
         const { id } = request.params;
         const database = await prisma.database.findFirst({
-            where: { id, teams: { some: { id: teamId === '0' ? teamId : undefined } } },
+            where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: { destinationDocker: true, settings: true }
         });
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
@@ -394,7 +394,7 @@ export async function saveDatabase(request: FastifyRequest, reply: FastifyReply)
             isRunning
         } = request.body;
         const database = await prisma.database.findFirst({
-            where: { id, teams: { some: { id: teamId === '0' ? teamId : undefined } } },
+            where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: { destinationDocker: true, settings: true }
         });
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
@@ -439,7 +439,7 @@ export async function saveDatabaseSettings(request: FastifyRequest) {
             }
         });
         const database = await prisma.database.findFirst({
-            where: { id, teams: { some: { id: teamId === '0' ? teamId : undefined } } },
+            where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: { destinationDocker: true, settings: true }
         });
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);

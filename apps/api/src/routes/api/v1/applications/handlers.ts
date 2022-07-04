@@ -99,7 +99,7 @@ function decryptApplication(application: any) {
 export async function getApplicationFromDB(id: string, teamId: string) {
     try {
         let application = await prisma.application.findFirst({
-            where: { id, teams: { some: { id: teamId === '0' ? teamId : undefined } } },
+            where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: {
                 destinationDocker: true,
                 settings: true,
@@ -109,7 +109,8 @@ export async function getApplicationFromDB(id: string, teamId: string) {
             }
         });
         application = decryptApplication(application);
-        const buildPack = application.buildPack || null;
+        const buildPack = application?.buildPack || null;
+        console.log(buildPack)
         const { baseImage, baseBuildImage, baseBuildImages, baseImages } = setDefaultBaseImage(
             buildPack
         );

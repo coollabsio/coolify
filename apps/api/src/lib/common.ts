@@ -1119,7 +1119,7 @@ export async function startTraefikTCPProxy(
 export async function getServiceFromDB({ id, teamId }: { id: string; teamId: string }): Promise<any> {
 	const settings = await prisma.setting.findFirst();
 	const body = await prisma.service.findFirst({
-		where: { id, teams: { some: { id: teamId === '0' ? teamId : undefined } } },
+		where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
 		include
 	});
 	let { type } = body
