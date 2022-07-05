@@ -65,20 +65,30 @@
 	import { goto } from '$app/navigation';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
-	import { appSession } from '$lib/store';
+	import { appSession, disabledButton } from '$lib/store';
+	import { onDestroy, onMount } from 'svelte';
 	const { id } = $page.params;
 
 	export let service: any;
 	export let isRunning: any;
 
+	$disabledButton =
+		!$appSession.isAdmin ||
+		!service.fqdn ||
+		!service.destinationDocker ||
+		!service.version ||
+		!service.type;
+
 	let loading = false;
+	let statusInterval: any;
 
 	async function deleteService() {
 		const sure = confirm($t('application.confirm_to_delete', { name: service.name }));
 		if (sure) {
 			loading = true;
 			try {
-				if (service.type && isRunning) await post(`/services/${service.id}/${service.type}/stop`, {});
+				if (service.type && isRunning)
+					await post(`/services/${service.id}/${service.type}/stop`, {});
 				await del(`/services/${service.id}`, { id: service.id });
 				return await goto(`/services`);
 			} catch (error) {
@@ -94,7 +104,6 @@
 			loading = true;
 			try {
 				await post(`/services/${service.id}/${service.type}/stop`, {});
-				return window.location.reload();
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
@@ -106,27 +115,37 @@
 		loading = true;
 		try {
 			await post(`/services/${service.id}/${service.type}/start`, {});
-			return window.location.reload();
 		} catch (error) {
-			console.log(error)
 			return errorNotification(error);
 		} finally {
 			loading = false;
 		}
 	}
+	async function getStatus() {
+		statusInterval = setInterval(async () => {
+			const data = await get(`/services/${id}`);
+			isRunning = data.isRunning;
+		}, 1500);
+	}
+	onDestroy(() => {
+		clearInterval(statusInterval);
+	});
+	onMount(async () => {
+		await getStatus();
+	});
 </script>
 
 <nav class="nav-side">
 	{#if loading}
 		<Loading fullscreen cover />
 	{:else}
-		{#if service.type && service.destinationDockerId && service.version && service.fqdn}
+		{#if service.type && service.destinationDockerId && service.version}
 			{#if isRunning}
 				<button
 					on:click={stopService}
 					title={$t('service.stop_service')}
 					type="submit"
-					disabled={!$appSession.isAdmin}
+					disabled={$disabledButton}
 					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
 					data-tooltip={$appSession.isAdmin
 						? $t('service.stop_service')
@@ -152,7 +171,7 @@
 					on:click={startService}
 					title={$t('service.start_service')}
 					type="submit"
-					disabled={!$appSession.isAdmin}
+					disabled={$disabledButton}
 					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
 					data-tooltip={$appSession.isAdmin
 						? $t('service.start_service')

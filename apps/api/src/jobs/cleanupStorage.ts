@@ -85,5 +85,6 @@ import { getEngine } from '../lib/docker';
                 console.log(`[DEV MODE] Low disk space: ${lowDiskSpace}`);
             }
         }
+        if (parentPort) parentPort.postMessage('done');
     } else process.exit(0);
 })();

@@ -98,6 +98,7 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 		console.error(err);
 		process.exit(1);
 	}
+	console.log(`Coolify's API is listening on ${host}:${port}`);
 	await initServer()
 	await scheduler.start('deployApplication');
 	await scheduler.start('cleanupStorage');

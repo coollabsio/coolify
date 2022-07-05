@@ -1,5 +1,5 @@
 import { parentPort } from 'node:worker_threads';
-import { prisma, startTraefikTCPProxy,  generateDatabaseConfiguration, startTraefikProxy, asyncExecShell } from '../lib/common';
+import { prisma, startTraefikTCPProxy, generateDatabaseConfiguration, startTraefikProxy, asyncExecShell } from '../lib/common';
 import { checkContainer, getEngine } from '../lib/docker';
 
 (async () => {
@@ -83,5 +83,6 @@ import { checkContainer, getEngine } from '../lib/docker';
                 await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
             }
         }
+        if (parentPort) parentPort.postMessage('done');
     } else process.exit(0);
 })();

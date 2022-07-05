@@ -422,8 +422,8 @@ export const supportedServiceTypesAndVersions = [
 		fancyName: 'Hasura',
 		baseImage: 'hasura/graphql-engine',
 		images: ['postgres:12-alpine'],
-		versions: ['latest', 'v2.5.1'],
-		recommendedVersion: 'v2.5.1',
+		versions: ['latest', 'v2.8.3'],
+		recommendedVersion: 'v2.8.3',
 		ports: {
 			main: 8080
 		}

@@ -13,7 +13,7 @@ const options: any = {
 		if (name === 'deployApplication') {
 			if (message.pending === 0) {
 				if (!scheduler.workers.has('autoUpdater')) {
-					scheduler.stop('deployApplication');
+					await scheduler.stop('deployApplication');
 					await scheduler.run('autoUpdater')
 				}
 			}

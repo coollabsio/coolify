@@ -38,7 +38,9 @@ import { asyncExecShell, asyncSleep, isDev, prisma, version } from '../lib/commo
             }
         } catch (error) {
             console.log(error);
-        } 
+        } finally {
+            if (parentPort) parentPort.postMessage('done');
+        }
 
     } else process.exit(0);
 })();

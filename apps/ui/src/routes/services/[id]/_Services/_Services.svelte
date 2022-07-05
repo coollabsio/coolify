@@ -14,7 +14,7 @@
 	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import { t } from '$lib/translations';
-	import { appSession } from '$lib/store';
+	import { appSession, disabledButton } from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte'
@@ -45,7 +45,8 @@
 				exposePort: service.exposePort
 			});
 			await post(`/services/${id}`, { ...service });
-			return window.location.reload();
+			$disabledButton = false;
+			toast.push('Settings saved.');
 		} catch (error) {
 			return errorNotification(error);
 		} finally {

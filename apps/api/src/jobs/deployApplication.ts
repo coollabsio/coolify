@@ -341,9 +341,11 @@ import * as buildpacks from '../lib/buildPacks';
 							data: { status: 'failed' }
 						});
 						await saveBuildLog({ line: error, buildId, applicationId });
+					} finally {
+						if (parentPort) parentPort.postMessage('done');
 					}
-
 				});
+				if (parentPort) parentPort.postMessage('done');
 			}
 		});
 	} else process.exit(0);
