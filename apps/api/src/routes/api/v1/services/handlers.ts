@@ -72,8 +72,8 @@ export async function getService(request: FastifyRequest) {
             service,
             settings
         }
-    } catch (error) {
-        throw { status: 500, message: error }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 export async function getServiceType(request: FastifyRequest) {
@@ -81,8 +81,8 @@ export async function getServiceType(request: FastifyRequest) {
         return {
             types: supportedServiceTypesAndVersions
         }
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 export async function saveServiceType(request: FastifyRequest, reply: FastifyReply) {
@@ -92,8 +92,8 @@ export async function saveServiceType(request: FastifyRequest, reply: FastifyRep
         const { type } = request.body;
         await configureServiceType({ id, type });
         return reply.code(201).send()
-    } catch (error) {
-        throw { status: 500, message: error }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 export async function getServiceVersions(request: FastifyRequest) {
@@ -105,8 +105,8 @@ export async function getServiceVersions(request: FastifyRequest) {
             type,
             versions: supportedServiceTypesAndVersions.find((name) => name.name === type).versions
         }
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 export async function saveServiceVersion(request: FastifyRequest, reply: FastifyReply) {
@@ -119,8 +119,8 @@ export async function saveServiceVersion(request: FastifyRequest, reply: Fastify
             data: { version }
         });
         return reply.code(201).send({})
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 export async function saveServiceDestination(request: FastifyRequest, reply: FastifyReply) {
@@ -133,8 +133,8 @@ export async function saveServiceDestination(request: FastifyRequest, reply: Fas
             data: { destinationDocker: { connect: { id: destinationId } } }
         });
         return reply.code(201).send({})
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 export async function getServiceUsage(request: FastifyRequest) {
@@ -150,8 +150,8 @@ export async function getServiceUsage(request: FastifyRequest) {
         return {
             usage
         }
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 
 }
@@ -202,8 +202,8 @@ export async function getServiceLogs(request: FastifyRequest) {
         return {
             message: 'No logs found.'
         }
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 export async function deleteService(request: FastifyRequest) {
@@ -211,8 +211,8 @@ export async function deleteService(request: FastifyRequest) {
         const { id } = request.params;
         await removeService({ id });
         return {}
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 export async function saveServiceSettings(request: FastifyRequest, reply: FastifyReply) {
@@ -224,8 +224,8 @@ export async function saveServiceSettings(request: FastifyRequest, reply: Fastif
             data: { dualCerts }
         });
         return reply.code(201).send()
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 export async function checkService(request: FastifyRequest) {
@@ -237,13 +237,13 @@ export async function checkService(request: FastifyRequest) {
         if (exposePort) exposePort = Number(exposePort);
         let found = await isDomainConfigured({ id, fqdn });
         if (found) {
-            throw `Application domain already configured.`
+            throw `Domain already configured.`
         }
         if (otherFqdns && otherFqdns.length > 0) {
             for (const ofqdn of otherFqdns) {
                 found = await isDomainConfigured({ id, fqdn: ofqdn, checkOwn: true });
                 if (found) {
-                    throw "Application domain already configured."
+                    throw "Domain already configured."
                 }
             }
         }
@@ -261,8 +261,8 @@ export async function checkService(request: FastifyRequest) {
             }
         }
         return {}
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 export async function saveService(request: FastifyRequest, reply: FastifyReply) {
@@ -288,8 +288,8 @@ export async function saveService(request: FastifyRequest, reply: FastifyReply) 
             where: { id }, data
         });
         return reply.code(201).send()
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 
@@ -308,8 +308,8 @@ export async function getServiceSecrets(request: FastifyRequest) {
         return {
             secrets
         }
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 
@@ -344,8 +344,8 @@ export async function saveServiceSecret(request: FastifyRequest, reply: FastifyR
             }
         }
         return reply.code(201).send()
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 export async function deleteServiceSecret(request: FastifyRequest) {
@@ -354,8 +354,8 @@ export async function deleteServiceSecret(request: FastifyRequest) {
         const { name } = request.body
         await prisma.serviceSecret.deleteMany({ where: { serviceId: id, name } });
         return {}
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 
@@ -368,8 +368,8 @@ export async function getServiceStorages(request: FastifyRequest) {
         return {
             persistentStorages
         }
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 
@@ -389,8 +389,8 @@ export async function saveServiceStorage(request: FastifyRequest, reply: Fastify
             });
         }
         return reply.code(201).send()
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 
@@ -400,8 +400,8 @@ export async function deleteServiceStorage(request: FastifyRequest) {
         const { path } = request.body
         await prisma.servicePersistentStorage.deleteMany({ where: { serviceId: id, path } });
         return {}
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 
@@ -512,8 +512,8 @@ export async function setSettingsService(request: FastifyRequest, reply: Fastify
             return await setWordpressSettings(request, reply)
         }
         throw `Service type ${type} not supported.`
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 async function setWordpressSettings(request: FastifyRequest, reply: FastifyReply) {
@@ -525,8 +525,8 @@ async function setWordpressSettings(request: FastifyRequest, reply: FastifyReply
             data: { ownMysql }
         });
         return reply.code(201).send()
-    } catch (error) {
-        throw { status: 500, message: error }
+     } catch ({ status, message }) {
+        return errorHandler({ status, message })
     }
 }
 
@@ -2380,6 +2380,32 @@ async function stopFiderService(request: FastifyRequest) {
             }
         }
         return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
+export async function activatePlausibleUsers(request: FastifyRequest, reply: FastifyReply) {
+    try {
+        const { id } = request.params
+        const teamId = request.user.teamId;
+        const {
+            destinationDockerId,
+            destinationDocker,
+            plausibleAnalytics: { postgresqlUser, postgresqlPassword, postgresqlDatabase }
+        } = await getServiceFromDB({ id, teamId });
+        if (destinationDockerId) {
+            const docker = dockerInstance({ destinationDocker });
+            const container = await docker.engine.getContainer(id);
+            const command = await container.exec({
+                Cmd: [
+                    `psql -H postgresql://${postgresqlUser}:${postgresqlPassword}@localhost:5432/${postgresqlDatabase} -c "UPDATE users SET email_verified = true;"`
+                ]
+            });
+            await command.start();
+            return await reply.code(201).send()
+        }
+        throw { status: 500, message: 'Could not activate users.' }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }

@@ -289,7 +289,7 @@
 		}
 	},
 	"services": {
-		"all_email_verified": "All email verified. You can login now.",
+		"all_email_verified": "All emails are verified. You can login now.",
 		"generate_www_non_www_ssl": "It will generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-pink-600'>both DNS entries</span> set in advance.<br><br>Service needs to be restarted."
 	},
 	"service": {

@@ -1,5 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import {
+    activatePlausibleUsers,
     checkService,
     deleteService,
     deleteServiceSecret,
@@ -62,6 +63,8 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
     fastify.post('/:id/:type/start', async (request) => await startService(request));
     fastify.post('/:id/:type/stop', async (request) => await stopService(request));
     fastify.post('/:id/:type/settings', async (request, reply) => await setSettingsService(request, reply));
+
+    fastify.post('/:id/plausibleanalytics/activate', async (request, reply) => await activatePlausibleUsers(request, reply));
 };
 
 export default root;
