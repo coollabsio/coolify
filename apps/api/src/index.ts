@@ -99,9 +99,9 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 		process.exit(1);
 	}
 	await initServer()
-	scheduler.start('deployApplication');
-	scheduler.start('cleanupStorage');
-	scheduler.start('checkProxies')
+	await scheduler.start('deployApplication');
+	await scheduler.start('cleanupStorage');
+	await scheduler.start('checkProxies')
 
 	// Check if no build is running, try to autoupdate.
 	setInterval(() => {
@@ -110,9 +110,9 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 		}
 	}, 60000 * 10)
 
-	scheduler.on('worker deleted', (name) => {
+	scheduler.on('worker deleted', async (name) => {
 		if (name === 'autoUpdater') {
-			scheduler.start('deployApplication');
+			await scheduler.start('deployApplication');
 		}
 
 	});

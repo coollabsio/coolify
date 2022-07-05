@@ -9,12 +9,12 @@ Bree.extend(TSBree);
 const options: any = {
 	defaultExtension: 'js',
 	logger: false,
-	workerMessageHandler: ({ name, message }) => {
+	workerMessageHandler: async ({ name, message }) => {
 		if (name === 'deployApplication') {
 			if (message.pending === 0) {
 				if (!scheduler.workers.has('autoUpdater')) {
 					scheduler.stop('deployApplication');
-					scheduler.run('autoUpdater')
+					await scheduler.run('autoUpdater')
 				}
 			}
 		}

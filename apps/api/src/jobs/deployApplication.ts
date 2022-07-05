@@ -73,6 +73,7 @@ import * as buildpacks from '../lib/buildPacks';
 									status: { in: ['queued', 'running'] },
 									id: { not: buildId },
 									applicationId,
+									createdAt: { lt: new Date(new Date().getTime() - 10 * 1000) }
 								},
 								data: { status: 'failed' }
 							});

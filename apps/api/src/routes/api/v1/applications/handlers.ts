@@ -110,7 +110,6 @@ export async function getApplicationFromDB(id: string, teamId: string) {
         });
         application = decryptApplication(application);
         const buildPack = application?.buildPack || null;
-        console.log(buildPack)
         const { baseImage, baseBuildImage, baseBuildImages, baseImages } = setDefaultBaseImage(
             buildPack
         );
@@ -143,7 +142,6 @@ export async function getApplicationFromDBWebhook(projectId: number, branch: str
         if (!application) {
             throw { status: 500, message: 'Application not configured.' }
         }
-        console.log(application)
         application = decryptApplication(application);
         const { baseImage, baseBuildImage, baseBuildImages, baseImages } = setDefaultBaseImage(
             application.buildPack
@@ -473,16 +471,22 @@ export async function checkRepository(request: FastifyRequest) {
 export async function saveRepository(request, reply) {
     try {
         const { id } = request.params
-        let { repository, branch, projectId, autodeploy } = request.body
+        let { repository, branch, projectId, autodeploy, webhookToken } = request.body
 
         repository = repository.toLowerCase();
         branch = branch.toLowerCase();
         projectId = Number(projectId);
-
-        await prisma.application.update({
-            where: { id },
-            data: { repository, branch, projectId, settings: { update: { autodeploy } } }
-        });
+        if (webhookToken) {
+            await prisma.application.update({
+                where: { id },
+                data: { repository, branch, projectId, gitSource: { update: { gitlabApp: { update: { webhookToken: webhookToken ? webhookToken : undefined } } } }, settings: { update: { autodeploy } } }
+            });
+        } else {
+            await prisma.application.update({
+                where: { id },
+                data: { repository, branch, projectId, settings: { update: { autodeploy } } }
+            });
+        }
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })

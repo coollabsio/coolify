@@ -48,8 +48,8 @@
   "devDependencies": {
     "@types/node": "18.0.1",
     "@types/node-os-utils": "1.3.0",
-    "@typescript-eslint/eslint-plugin": "5.30.4",
-    "@typescript-eslint/parser": "5.30.4",
+    "@typescript-eslint/eslint-plugin": "5.30.5",
+    "@typescript-eslint/parser": "5.30.5",
     "esbuild": "0.14.48",
     "eslint": "8.19.0",
     "eslint-config-prettier": "8.5.0",

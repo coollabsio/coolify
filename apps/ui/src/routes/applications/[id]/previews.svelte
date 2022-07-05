@@ -43,7 +43,7 @@
 				pullmergeRequestId: container.pullmergeRequestId,
 				branch: container.branch
 			});
-			toast.push('Application redeployed queued.');
+			toast.push('Deployment queued');
 			if ($page.url.pathname.startsWith(`/applications/${id}/logs/build`)) {
 				return window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
 			} else {
