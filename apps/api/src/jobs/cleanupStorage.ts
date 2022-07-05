@@ -85,7 +85,6 @@ import { getEngine } from '../lib/docker';
                 console.log(`[DEV MODE] Low disk space: ${lowDiskSpace}`);
             }
         }
-        await prisma.$disconnect();
-        if (parentPort) parentPort.postMessage('done');
+        await prisma.$disconnect();      
     } else process.exit(0);
 })();

@@ -40,7 +40,6 @@ import { asyncExecShell, asyncSleep, isDev, prisma, version } from '../lib/commo
             console.log(error);
         } finally {
             await prisma.$disconnect();
-            if (parentPort) parentPort.postMessage('done');
         }
 
     } else process.exit(0);

@@ -84,6 +84,5 @@ import { checkContainer, getEngine } from '../lib/docker';
             }
         }
         await prisma.$disconnect();
-        if (parentPort) parentPort.postMessage('done');
     } else process.exit(0);
 })();
