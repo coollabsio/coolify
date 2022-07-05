@@ -1,6 +1,6 @@
 <script lang="ts">
 	export let database: any;
-	export let isRunning: any;
+	import { status } from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { t } from '$lib/translations';
@@ -40,8 +40,8 @@
 			>{$t('forms.password')}</label
 		>
 		<CopyPasswordField
-			disabled={!isRunning}
-			readonly={!isRunning}
+			disabled={!$status.database.isRunning}
+			readonly={!$status.database.isRunning}
 			placeholder={$t('forms.generated_automatically_after_start')}
 			isPasswordField
 			id="dbUserPassword"
@@ -66,8 +66,8 @@
 			>{$t('forms.roots_password')}</label
 		>
 		<CopyPasswordField
-			disabled={!isRunning}
-			readonly={!isRunning}
+			disabled={!$status.database.isRunning}
+			readonly={!$status.database.isRunning}
 			placeholder={$t('forms.generated_automatically_after_start')}
 			isPasswordField
 			id="rootUserPassword"

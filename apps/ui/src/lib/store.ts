@@ -40,7 +40,18 @@ export const status: Writable<any> = writable({
         isExited: false,
         loading: false,
         initialLoading: true
+    },
+    service: {
+        initialLoading: true,
+        loading: false,
+        isRunning: false
+    }, 
+    database: {
+        initialLoading: true,
+        loading: false,
+        isRunning: false
     }
+
 });
 
 export const features = readable({

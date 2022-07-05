@@ -16,7 +16,7 @@
 	export const load: Load = async ({ fetch, url, params }) => {
 		try {
 			const response = await get(`/applications/${params.id}`);
-			let { application, isRunning, isExited, appId, settings, isQueueActive } = response;
+			let { application, appId, settings, isQueueActive } = response;
 			if (!application || Object.entries(application).length === 0) {
 				return {
 					status: 302,
@@ -37,12 +37,9 @@
 			return {
 				props: {
 					isQueueActive,
-					application,
-					isRunning,
-					isExited
+					application
 				},
 				stuff: {
-					isRunning,
 					application,
 					appId,
 					settings
@@ -59,8 +56,6 @@
 
 <script lang="ts">
 	export let application: any;
-	export let isRunning: any;
-	export let isExited: any;
 	export let isQueueActive: any;
 
 	import { page } from '$app/stores';
@@ -70,12 +65,9 @@
 	import { toast } from '@zerodevx/svelte-toast';
 	import { onDestroy, onMount } from 'svelte';
 	import { t } from '$lib/translations';
-	import { appSession, disabledButton } from '$lib/store';
+	import { appSession, disabledButton, status } from '$lib/store';
 	import { errorNotification } from '$lib/common';
 	import Loading from '$lib/components/Loading.svelte';
-
-	// if (githubToken) $appSession.tokens.github = githubToken;
-	// if (gitlabToken) $appSession.tokens.gitlab = gitlabToken;
 
 	let loading = false;
 	let statusInterval: any;
@@ -126,18 +118,31 @@
 		}
 	}
 	async function getStatus() {
-		statusInterval = setInterval(async () => {
-			const data = await get(`/applications/${id}`);
-			isRunning = data.isRunning;
-			isExited = data.isExited;
-			isQueueActive = data.isQueueActive;
-		}, 1500);
+		if ($status.application.loading) return;
+		$status.application.loading = true;
+		const data = await get(`/applications/${id}`);
+		$status.application.isRunning = data.isRunning;
+		$status.application.isExited = data.isExited;
+		$status.application.loading = false;
+		$status.application.initialLoading = false;
 	}
 	onDestroy(() => {
+		$status.application.initialLoading = true;
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
-		await getStatus();
+		if (!application.gitSourceId || !application.destinationDockerId || !application.fqdn) {
+			$status.application.initialLoading = false;
+			$status.application.isRunning = false;
+			$status.application.isExited = false;
+			$status.application.loading = false;
+			return;
+		} else {
+			await getStatus();
+			statusInterval = setInterval(async () => {
+				await getStatus();
+			}, 2000);
+		}
 	});
 </script>
 
@@ -145,7 +150,7 @@
 	{#if loading}
 		<Loading fullscreen cover />
 	{:else}
-		{#if isExited}
+		{#if $status.application.isExited}
 			<a
 				href={!$disabledButton ? `/applications/${id}/logs` : null}
 				class=" icons bg-transparent tooltip-bottom text-sm flex items-center text-red-500 tooltip-red-500"
@@ -171,7 +176,30 @@
 				</svg>
 			</a>
 		{/if}
-		{#if isRunning}
+		{#if $status.application.initialLoading}
+			<button
+				class="icons tooltip-bottom flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-6 w-6"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<path d="M9 4.55a8 8 0 0 1 6 14.9m0 -4.45v5h5" />
+					<line x1="5.63" y1="7.16" x2="5.63" y2="7.17" />
+					<line x1="4.06" y1="11" x2="4.06" y2="11.01" />
+					<line x1="4.63" y1="15.1" x2="4.63" y2="15.11" />
+					<line x1="7.16" y1="18.37" x2="7.16" y2="18.38" />
+					<line x1="11" y1="19.94" x2="11" y2="19.95" />
+				</svg>
+			</button>
+		{:else if $status.application.isRunning}
 			<button
 				on:click={stopApplication}
 				title="Stop application"
@@ -389,7 +417,7 @@
 		>
 		<div class="border border-coolgray-500 h-8" />
 		<a
-			href={!$disabledButton && isRunning ? `/applications/${id}/logs` : null}
+			href={!$disabledButton && $status.application.isRunning ? `/applications/${id}/logs` : null}
 			sveltekit:prefetch
 			class="hover:text-sky-500 rounded"
 			class:text-sky-500={$page.url.pathname === `/applications/${id}/logs`}
@@ -397,7 +425,7 @@
 		>
 			<button
 				title={$t('application.logs')}
-				disabled={$disabledButton || !isRunning}
+				disabled={$disabledButton || !$status.application.isRunning}
 				class="icons bg-transparent tooltip-bottom text-sm"
 				data-tooltip={$t('application.logs')}
 			>

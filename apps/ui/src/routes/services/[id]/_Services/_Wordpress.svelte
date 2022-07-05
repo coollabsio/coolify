@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { post } from '$lib/api';
 	import { page } from '$app/stores';
+	import { status } from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 	import { browser } from '$app/env';
 	import { t } from '$lib/translations';
-import { errorNotification, getDomain } from '$lib/common';
+	import { errorNotification, getDomain } from '$lib/common';
 
 	export let service: any;
-	export let isRunning: any;
 	export let readOnly: any;
 	export let settings: any;
 	const { id } = $page.params;
@@ -28,7 +28,7 @@ import { errorNotification, getDomain } from '$lib/common';
 	}
 	async function changeSettings(name: any) {
 		if (ftpLoading) return;
-		if (isRunning) {
+		if ($status.service.isRunning) {
 			ftpLoading = true;
 			let ftpEnabled = service.wordpress.ftpEnabled;
 
@@ -76,13 +76,13 @@ import { errorNotification, getDomain } from '$lib/common';
 	<label for="extraConfig">{$t('forms.extra_config')}</label>
 	<textarea
 		bind:value={service.wordpress.extraConfig}
-		disabled={isRunning}
-		readonly={isRunning}
-		class:resize-none={isRunning}
+		disabled={$status.service.isRunning}
+		readonly={$status.service.isRunning}
+		class:resize-none={$status.service.isRunning}
 		rows="5"
 		name="extraConfig"
 		id="extraConfig"
-		placeholder={!isRunning
+		placeholder={!$status.service.isRunning
 			? `${$t('forms.eg')}:
 
 define('WP_ALLOW_MULTISITE', true);
@@ -95,7 +95,7 @@ define('SUBDOMAIN_INSTALL', false);`
 	<Setting
 		bind:setting={service.wordpress.ftpEnabled}
 		loading={ftpLoading}
-		disabled={!isRunning}
+		disabled={!$status.service.isRunning}
 		on:click={() => changeSettings('ftpEnabled')}
 		title="Enable sFTP connection to WordPress data"
 		description="Enables an on-demand sFTP connection to the WordPress data directory. This is useful if you want to use sFTP to upload files."
@@ -122,8 +122,8 @@ define('SUBDOMAIN_INSTALL', false);`
 	<Setting
 		dataTooltip={$t('forms.must_be_stopped_to_modify')}
 		bind:setting={service.wordpress.ownMysql}
-		disabled={isRunning}
-		on:click={() => !isRunning && changeSettings('ownMysql')}
+		disabled={$status.service.isRunning}
+		on:click={() => !$status.service.isRunning && changeSettings('ownMysql')}
 		title="Use your own MySQL server"
 		description="Enables the use of your own MySQL server. If you don't have one, you can use the one provided by Coolify."
 	/>
@@ -135,8 +135,8 @@ define('SUBDOMAIN_INSTALL', false);`
 			name="mysqlHost"
 			id="mysqlHost"
 			required
-			readonly={isRunning}
-			disabled={isRunning}
+			readonly={$status.service.isRunning}
+			disabled={$status.service.isRunning}
 			bind:value={service.wordpress.mysqlHost}
 			placeholder="{$t('forms.eg')}: db.coolify.io"
 		/>
@@ -147,8 +147,8 @@ define('SUBDOMAIN_INSTALL', false);`
 			name="mysqlPort"
 			id="mysqlPort"
 			required
-			readonly={isRunning}
-			disabled={isRunning}
+			readonly={$status.service.isRunning}
+			disabled={$status.service.isRunning}
 			bind:value={service.wordpress.mysqlPort}
 			placeholder="{$t('forms.eg')}: 3306"
 		/>
@@ -174,8 +174,8 @@ define('SUBDOMAIN_INSTALL', false);`
 			id="mysqlRootUser"
 			placeholder="MySQL {$t('forms.root_user')}"
 			value={service.wordpress.mysqlRootUser}
-			readonly={isRunning || !service.wordpress.ownMysql}
-			disabled={isRunning || !service.wordpress.ownMysql}
+			readonly={$status.service.isRunning || !service.wordpress.ownMysql}
+			disabled={$status.service.isRunning || !service.wordpress.ownMysql}
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center px-10">
@@ -183,8 +183,8 @@ define('SUBDOMAIN_INSTALL', false);`
 		<CopyPasswordField
 			id="mysqlRootUserPassword"
 			isPasswordField
-			readonly={isRunning || !service.wordpress.ownMysql}
-			disabled={isRunning || !service.wordpress.ownMysql}
+			readonly={$status.service.isRunning || !service.wordpress.ownMysql}
+			disabled={$status.service.isRunning || !service.wordpress.ownMysql}
 			name="mysqlRootUserPassword"
 			value={service.wordpress.mysqlRootUserPassword}
 		/>
@@ -196,8 +196,8 @@ define('SUBDOMAIN_INSTALL', false);`
 		name="mysqlUser"
 		id="mysqlUser"
 		bind:value={service.wordpress.mysqlUser}
-		readonly={isRunning || !service.wordpress.ownMysql}
-		disabled={isRunning || !service.wordpress.ownMysql}
+		readonly={$status.service.isRunning || !service.wordpress.ownMysql}
+		disabled={$status.service.isRunning || !service.wordpress.ownMysql}
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
@@ -205,8 +205,8 @@ define('SUBDOMAIN_INSTALL', false);`
 	<CopyPasswordField
 		id="mysqlPassword"
 		isPasswordField
-		readonly={isRunning || !service.wordpress.ownMysql}
-		disabled={isRunning || !service.wordpress.ownMysql}
+		readonly={$status.service.isRunning || !service.wordpress.ownMysql}
+		disabled={$status.service.isRunning || !service.wordpress.ownMysql}
 		name="mysqlPassword"
 		bind:value={service.wordpress.mysqlPassword}
 	/>

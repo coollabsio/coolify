@@ -11,11 +11,11 @@
 	import Services from './_Services/_Services.svelte';
 	import { get } from '$lib/api';
 	import { page } from '$app/stores';
+	import { status } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
 	import ServiceLinks from './_ServiceLinks.svelte';
 
 	export let service: any;
-	export let isRunning: any;
 	export let readOnly: any;
 	export let settings: any;
 
@@ -32,12 +32,11 @@
 
 	async function getUsage() {
 		if (loading.usage) return;
-		if (isRunning) {
-			loading.usage = true;
-			const data = await get(`/services/${id}/usage`);
-			usage = data.usage;
-			loading.usage = false;
-		}
+		if (!$status.service.isRunning) return;
+		loading.usage = true;
+		const data = await get(`/services/${id}/usage`);
+		usage = data.usage;
+		loading.usage = false;
 	}
 
 	onDestroy(() => {
@@ -111,4 +110,4 @@
 		</dl>
 	</div>
 </div>
-<Services bind:service bind:isRunning bind:readOnly bind:settings />
+<Services bind:service bind:readOnly bind:settings />

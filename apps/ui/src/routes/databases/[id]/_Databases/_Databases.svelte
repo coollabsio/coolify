@@ -2,7 +2,6 @@
 	export let database: any;
 	export let privatePort: any;
 	export let settings: any;
-	export let isRunning: any;
 
 	import { page } from '$app/stores';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
@@ -18,7 +17,7 @@
 	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
 	import { errorNotification, getDomain } from '$lib/common';
-	import { appSession } from '$lib/store';
+	import { appSession, status } from '$lib/store';
 
 	const { id } = $page.params;
 
@@ -31,7 +30,6 @@
 	let databaseDefault: any;
 	let databaseDbUser: any;
 	let databaseDbUserPassword: any;
-
 
 	generateDbDetails();
 
@@ -58,7 +56,7 @@
 	}
 
 	async function changeSettings(name: any) {
-		if (publicLoading || !isRunning) return;
+		if (publicLoading || !$status.database.isRunning) return;
 		publicLoading = true;
 		let data = {
 			isPublic,
@@ -70,7 +68,7 @@
 		if (name === 'appendOnly') {
 			data.appendOnly = !appendOnly;
 		}
-		try {	
+		try {
 			const { publicPort } = await post(`/databases/${id}/settings`, {
 				isPublic: data.isPublic,
 				appendOnly: data.appendOnly
@@ -89,7 +87,7 @@
 	async function handleSubmit() {
 		try {
 			loading = true;
-			await post(`/databases/${id}`, { ...database, isRunning });
+			await post(`/databases/${id}`, { ...database, isRunning: $status.database.isRunning });
 			generateDbDetails();
 			toast.push('Settings saved.');
 		} catch (error) {
@@ -145,15 +143,15 @@
 			<div class="grid grid-cols-2 items-center">
 				<label for="version" class="text-base font-bold text-stone-100">Version / Tag</label>
 				<a
-					href={$appSession.isAdmin && !isRunning
+					href={$appSession.isAdmin && !$status.database.isRunning
 						? `/databases/${id}/configuration/version?from=/databases/${id}`
 						: ''}
 					class="no-underline"
 				>
 					<input
 						value={database.version}
-						disabled={isRunning}
-						class:cursor-pointer={!isRunning}
+						disabled={$status.database.isRunning}
+						class:cursor-pointer={!$status.database.isRunning}
 					/></a
 				>
 			</div>
@@ -187,15 +185,15 @@
 		</div>
 		<div class="grid grid-flow-row gap-2">
 			{#if database.type === 'mysql'}
-				<MySql bind:database {isRunning} />
+				<MySql bind:database />
 			{:else if database.type === 'postgresql'}
-				<PostgreSql bind:database {isRunning} />
+				<PostgreSql bind:database />
 			{:else if database.type === 'mongodb'}
-				<MongoDb bind:database {isRunning} />
+				<MongoDb bind:database />
 			{:else if database.type === 'mariadb'}
-				<MariaDb bind:database {isRunning} />
+				<MariaDb bind:database />
 			{:else if database.type === 'redis'}
-				<Redis bind:database {isRunning} />
+				<Redis bind:database />
 			{:else if database.type === 'couchdb'}
 				<CouchDb {database} />
 			{/if}
@@ -227,7 +225,7 @@
 				on:click={() => changeSettings('isPublic')}
 				title={$t('database.set_public')}
 				description={$t('database.warning_database_public')}
-				disabled={!isRunning}
+				disabled={!$status.database.isRunning}
 			/>
 		</div>
 		{#if database.type === 'redis'}

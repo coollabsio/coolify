@@ -9,12 +9,11 @@ import generator from 'generate-password';
 import crypto from 'crypto';
 import { promises as dns } from 'dns';
 import { PrismaClient } from '@prisma/client';
+import cuid from 'cuid';
+
 import { checkContainer, getEngine, removeContainer } from './docker';
 import { day } from './dayjs';
-import cuid from 'cuid';
 import * as serviceFields from './serviceFields'
-import { scheduler } from './scheduler';
-
 
 const algorithm = 'aes-256-ctr';
 const customConfig: Config = {

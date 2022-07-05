@@ -11,11 +11,11 @@
 		}
 		return configurationPhase;
 	}
-	export const load: Load = async ({ fetch, params, url }) => {
+	export const load: Load = async ({ params, url }) => {
 		try {
 			let readOnly = false;
 			const response = await get(`/services/${params.id}`);
-			const { service, isRunning, settings } = await response;
+			const { service, settings } = await response;
 			if (!service || Object.entries(service).length === 0) {
 				return {
 					status: 302,
@@ -38,12 +38,10 @@
 
 			return {
 				props: {
-					service,
-					isRunning
+					service
 				},
 				stuff: {
 					service,
-					isRunning,
 					readOnly,
 					settings
 				}
@@ -65,12 +63,11 @@
 	import { goto } from '$app/navigation';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
-	import { appSession, disabledButton } from '$lib/store';
+	import { appSession, disabledButton, status } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
 	const { id } = $page.params;
 
 	export let service: any;
-	export let isRunning: any;
 
 	$disabledButton =
 		!$appSession.isAdmin ||
@@ -87,7 +84,7 @@
 		if (sure) {
 			loading = true;
 			try {
-				if (service.type && isRunning)
+				if (service.type && $status.service.isRunning)
 					await post(`/services/${service.id}/${service.type}/stop`, {});
 				await del(`/services/${service.id}`, { id: service.id });
 				return await goto(`/services`);
@@ -122,16 +119,29 @@
 		}
 	}
 	async function getStatus() {
-		statusInterval = setInterval(async () => {
-			const data = await get(`/services/${id}`);
-			isRunning = data.isRunning;
-		}, 1500);
+		if ($status.service.loading) return;
+		$status.service.loading = true;
+		const data = await get(`/services/${id}`);
+		$status.service.isRunning = data.isRunning;
+		$status.service.initialLoading = false;
+		$status.service.loading = false;
 	}
 	onDestroy(() => {
+		$status.service.initialLoading = true;
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
-		await getStatus();
+		if (!service.type || !service.destinationDockerId || !service.version || !service.fqdn) {
+			$status.service.initialLoading = false;
+			$status.service.isRunning = false;
+			$status.service.loading = false;
+			return;
+		} else {
+			await getStatus();
+			statusInterval = setInterval(async () => {
+				await getStatus();
+			}, 2000);
+		}
 	});
 </script>
 
@@ -140,7 +150,30 @@
 		<Loading fullscreen cover />
 	{:else}
 		{#if service.type && service.destinationDockerId && service.version}
-			{#if isRunning}
+			{#if $status.service.initialLoading}
+				<button
+					class="icons tooltip-bottom flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-6 w-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path d="M9 4.55a8 8 0 0 1 6 14.9m0 -4.45v5h5" />
+						<line x1="5.63" y1="7.16" x2="5.63" y2="7.17" />
+						<line x1="4.06" y1="11" x2="4.06" y2="11.01" />
+						<line x1="4.63" y1="15.1" x2="4.63" y2="15.11" />
+						<line x1="7.16" y1="18.37" x2="7.16" y2="18.38" />
+						<line x1="11" y1="19.94" x2="11" y2="19.95" />
+					</svg>
+				</button>
+			{:else if $status.service.isRunning}
 				<button
 					on:click={stopService}
 					title={$t('service.stop_service')}
@@ -291,7 +324,7 @@
 			>
 			<div class="border border-stone-700 h-8" />
 			<a
-				href={isRunning ? `/services/${id}/logs` : null}
+				href={$status.service.isRunning ? `/services/${id}/logs` : null}
 				sveltekit:prefetch
 				class="hover:text-pink-500 rounded"
 				class:text-pink-500={$page.url.pathname === `/services/${id}/logs`}
@@ -299,7 +332,7 @@
 			>
 				<button
 					title={$t('service.logs')}
-					disabled={!isRunning}
+					disabled={!$status.service.isRunning}
 					class="icons bg-transparent tooltip-bottom text-sm"
 					data-tooltip={$t('service.logs')}
 				>

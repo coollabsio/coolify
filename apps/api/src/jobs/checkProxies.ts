@@ -83,6 +83,7 @@ import { checkContainer, getEngine } from '../lib/docker';
                 await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
             }
         }
+        await prisma.$disconnect();
         if (parentPort) parentPort.postMessage('done');
     } else process.exit(0);
 })();

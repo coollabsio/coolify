@@ -342,9 +342,11 @@ import * as buildpacks from '../lib/buildPacks';
 						});
 						await saveBuildLog({ line: error, buildId, applicationId });
 					} finally {
+						await prisma.$disconnect();
 						if (parentPort) parentPort.postMessage('done');
 					}
 				});
+				await prisma.$disconnect();
 				if (parentPort) parentPort.postMessage('done');
 			}
 		});

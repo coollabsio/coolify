@@ -15,7 +15,7 @@
 		try {
 			const { id } = params;
 			const response = await get(`/databases/${id}`);
-			const { database, isRunning, versions, privatePort, settings } = response;
+			const { database, versions, privatePort, settings } = response;
 			if (id !== 'new' && (!database || Object.entries(database).length === 0)) {
 				return {
 					status: 302,
@@ -35,13 +35,11 @@
 			return {
 				props: {
 					database,
-					isRunning,
 					versions,
 					privatePort
 				},
 				stuff: {
 					database,
-					isRunning,
 					versions,
 					privatePort,
 					settings
@@ -58,17 +56,19 @@
 
 <script lang="ts">
 	export let database: any;
-	export let isRunning: any;
 	import { del, get, post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { errorNotification } from '$lib/common';
-	import { appSession } from '$lib/store';
+	import { appSession, status } from '$lib/store';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import Loading from '$lib/components/Loading.svelte';
+	import { onDestroy, onMount } from 'svelte';
 	const { id } = $page.params;
+
 	let loading = false;
+	let statusInterval: any = false;
 	async function deleteDatabase() {
 		const sure = confirm(`Are you sure you would like to delete '${database.name}'?`);
 		if (sure) {
@@ -104,6 +104,36 @@
 			return errorNotification(error);
 		}
 	}
+	async function getStatus() {
+		if ($status.database.loading) return;
+		$status.database.loading = true;
+		const data = await get(`/databases/${id}`);
+		$status.database.isRunning = data.isRunning;
+		$status.database.initialLoading = false;
+		$status.database.loading = false;
+	}
+	onDestroy(() => {
+		$status.database.initialLoading = true;
+		clearInterval(statusInterval);
+	});
+	onMount(async () => {
+		if (
+			!database.type ||
+			!database.destinationDockerId ||
+			!database.version ||
+			!database.defaultDatabase
+		) {
+			$status.database.initialLoading = false;
+			$status.database.isRunning = false;
+			$status.database.loading = false;
+			return;
+		} else {
+			await getStatus();
+			statusInterval = setInterval(async () => {
+				await getStatus();
+			}, 2000);
+		}
+	});
 </script>
 
 {#if id !== 'new'}
@@ -112,7 +142,30 @@
 			<Loading fullscreen cover />
 		{:else}
 			{#if database.type && database.destinationDockerId && database.version && database.defaultDatabase}
-				{#if isRunning}
+				{#if $status.database.initialLoading}
+					<button
+						class="icons tooltip-bottom flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-6 w-6"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<path d="M9 4.55a8 8 0 0 1 6 14.9m0 -4.45v5h5" />
+							<line x1="5.63" y1="7.16" x2="5.63" y2="7.17" />
+							<line x1="4.06" y1="11" x2="4.06" y2="11.01" />
+							<line x1="4.63" y1="15.1" x2="4.63" y2="15.11" />
+							<line x1="7.16" y1="18.37" x2="7.16" y2="18.38" />
+							<line x1="11" y1="19.94" x2="11" y2="19.95" />
+						</svg>
+					</button>
+				{:else if $status.database.isRunning}
 					<button
 						on:click={stopDatabase}
 						title={$t('database.stop_database')}
@@ -202,7 +255,7 @@
 			>
 			<div class="border border-stone-700 h-8" />
 			<a
-				href={isRunning ? `/databases/${id}/logs` : null}
+				href={$status.database.isRunning ? `/databases/${id}/logs` : null}
 				sveltekit:prefetch
 				class="hover:text-pink-500 rounded"
 				class:text-pink-500={$page.url.pathname === `/databases/${id}/logs`}
@@ -210,7 +263,7 @@
 			>
 				<button
 					title={$t('database.logs')}
-					disabled={!isRunning}
+					disabled={!$status.database.isRunning}
 					class="icons bg-transparent tooltip-bottom text-sm"
 					data-tooltip={$t('database.logs')}
 				>

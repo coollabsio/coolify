@@ -13,11 +13,10 @@
 	import { onDestroy, onMount } from 'svelte';
 	import DatabaseLinks from './_DatabaseLinks.svelte';
 	import Databases from './_Databases/_Databases.svelte';
-
+	import { status } from '$lib/store';
 	export let database: any;
 	export let settings: any;
 	export let privatePort: any;
-	export let isRunning: any;
 
 	const { id } = $page.params;
 	let loading = {
@@ -32,12 +31,11 @@
 
 	async function getUsage() {
 		if (loading.usage) return;
-		if (isRunning) {
-			loading.usage = true;
-			const data = await get(`/databases/${id}/usage`);
-			usage = data.usage;
-			loading.usage = false;
-		}
+		if (!$status.database.isRunning) return;
+		loading.usage = true;
+		const data = await get(`/databases/${id}/usage`);
+		usage = data.usage;
+		loading.usage = false;
 	}
 
 	onDestroy(() => {
@@ -47,7 +45,7 @@
 		await getUsage();
 		usageInterval = setInterval(async () => {
 			await getUsage();
-		}, 1000);
+		}, 1500);
 	});
 </script>
 
@@ -88,4 +86,4 @@
 		</dl>
 	</div>
 </div>
-<Databases bind:database {privatePort} {settings} {isRunning} />
+<Databases bind:database {privatePort} {settings} />

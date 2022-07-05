@@ -5,8 +5,7 @@
 			if (stuff?.application?.id) {
 				return {
 					props: {
-						application: stuff.application,
-						isRunning: stuff.isRunning
+						application: stuff.application
 					}
 				};
 			}
@@ -27,7 +26,6 @@
 
 <script lang="ts">
 	export let application: any;
-	export let isRunning: any;
 	import { page } from '$app/stores';
 	import { onDestroy, onMount } from 'svelte';
 	import Select from 'svelte-select';
@@ -86,6 +84,7 @@
 
 	async function getUsage() {
 		if (usageLoading) return;
+		if (!$status.application.isRunning) return;
 		usageLoading = true;
 		const data = await get(`/applications/${id}/usage`);
 		usage = data.usage;
@@ -100,12 +99,10 @@
 			await handleSubmit();
 		}
 		domainEl.focus();
-		if (isRunning) {
+		await getUsage();
+		usageInterval = setInterval(async () => {
 			await getUsage();
-			usageInterval = setInterval(async () => {
-				await getUsage();
-			}, 1000);
-		}
+		}, 1000);
 	});
 
 	async function changeSettings(name: any) {
@@ -335,7 +332,7 @@
 			<div class="mt-2 grid grid-cols-2 items-center">
 				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 				<input
-					readonly={!$appSession.isAdmin}
+					readonly={!isDisabled}
 					name="name"
 					id="name"
 					bind:value={application.name}
@@ -347,7 +344,7 @@
 					>{$t('application.git_source')}</label
 				>
 				<a
-					href={$appSession.isAdmin
+					href={!isDisabled
 						? `/applications/${id}/configuration/source?from=/applications/${id}`
 						: ''}
 					class="no-underline"
@@ -364,7 +361,7 @@
 					>{$t('application.git_repository')}</label
 				>
 				<a
-					href={$appSession.isAdmin
+					href={!isDisabled
 						? `/applications/${id}/configuration/repository?from=/applications/${id}&to=/applications/${id}/configuration/buildpack`
 						: ''}
 					class="no-underline"
@@ -381,7 +378,7 @@
 					>{$t('application.build_pack')}</label
 				>
 				<a
-					href={$appSession.isAdmin
+					href={!isDisabled
 						? `/applications/${id}/configuration/buildpack?from=/applications/${id}`
 						: ''}
 					class="no-underline "

@@ -1,11 +1,10 @@
 <script lang="ts">
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
-	import { appSession } from '$lib/store';
+	import { appSession, status } from '$lib/store';
 	import { t } from '$lib/translations';
 	export let service: any;
 	export let readOnly: any;
-	export let isRunning: any;
 </script>
 
 <div class="flex space-x-1 py-5 font-bold">
@@ -16,8 +15,8 @@
 	<input
 		name="scriptName"
 		id="scriptName"
-		readonly={!$appSession.isAdmin && !isRunning}
-		disabled={!$appSession.isAdmin || isRunning}
+		readonly={!$appSession.isAdmin && !$status.service.isRunning}
+		disabled={!$appSession.isAdmin || $status.service.isRunning}
 		placeholder="plausible.js"
 		bind:value={service.plausibleAnalytics.scriptName}
 		required
