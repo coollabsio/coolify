@@ -1,3 +1,4 @@
+import { FastifyRequest } from "fastify";
 import { asyncExecShell, errorHandler, getDomain, isDev, listServicesWithIncludes, prisma, supportedServiceTypesAndVersions } from "../../../lib/common";
 import { getEngine } from "../../../lib/docker";
 
@@ -357,6 +358,132 @@ export async function traefikConfiguration(request, reply) {
 			...traefik
 		}
 	} catch ({ status, message }) {
+		return errorHandler({ status, message })
+	}
+}
+
+export async function traefikOtherConfiguration(request: FastifyRequest, reply) {
+	try {
+		const { id } = request.query
+		if (id) {
+			const { privatePort, publicPort, type, address = id } = request.query
+			let traefik = {};
+			if (publicPort && type && privatePort) {
+				if (type === 'tcp') {
+					traefik = {
+						[type]: {
+							routers: {
+								[id]: {
+									entrypoints: [type],
+									rule: `HostSNI(\`*\`)`,
+									service: id
+								}
+							},
+							services: {
+								[id]: {
+									loadbalancer: {
+										servers: [{ address: `${address}:${privatePort}` }]
+									}
+								}
+							}
+						}
+					};
+				} else if (type === 'http') {
+					const service = await prisma.service.findFirst({
+						where: { id },
+						include: { minio: true }
+					});
+					if (service) {
+						if (service.type === 'minio') {
+							if (service?.minio?.apiFqdn) {
+								const {
+									minio: { apiFqdn }
+								} = service;
+								const domain = getDomain(apiFqdn);
+								const isHttps = apiFqdn.startsWith('https://');
+								traefik = {
+									[type]: {
+										routers: {
+											[id]: {
+												entrypoints: [type],
+												rule: `Host(\`${domain}\`)`,
+												service: id
+											}
+										},
+										services: {
+											[id]: {
+												loadbalancer: {
+													servers: [{ url: `http://${id}:${privatePort}` }]
+												}
+											}
+										}
+									}
+								};
+								if (isHttps) {
+									if (isDev) {
+										traefik[type].routers[id].tls = {
+											domains: {
+												main: `${domain}`
+											}
+										};
+									} else {
+										traefik[type].routers[id].tls = {
+											certresolver: 'letsencrypt'
+										};
+									}
+								}
+							}
+						} else {
+							if (service?.fqdn) {
+								const domain = getDomain(service.fqdn);
+								const isHttps = service.fqdn.startsWith('https://');
+								traefik = {
+									[type]: {
+										routers: {
+											[id]: {
+												entrypoints: [type],
+												rule: `Host(\`${domain}:${privatePort}\`)`,
+												service: id
+											}
+										},
+										services: {
+											[id]: {
+												loadbalancer: {
+													servers: [{ url: `http://${id}:${privatePort}` }]
+												}
+											}
+										}
+									}
+								};
+								if (isHttps) {
+									if (isDev) {
+										traefik[type].routers[id].tls = {
+											domains: {
+												main: `${domain}`
+											}
+										};
+									} else {
+										traefik[type].routers[id].tls = {
+											certresolver: 'letsencrypt'
+										};
+									}
+								}
+							}
+						}
+					} else {
+						throw { status: 500 }
+					}
+				}
+			} else {
+				throw { status: 500 }
+			}
+			return {
+				...traefik
+			};
+		}
+		throw { status: 500 }
+	} catch ({ status, message }) {
+		console.log(status, message);
 		return errorHandler({ status, message })
 	}
 }

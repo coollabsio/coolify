@@ -461,7 +461,7 @@ export async function saveDatabaseSettings(request: FastifyRequest) {
                 await stopTcpHttpProxy(id, destinationDocker, oldPublicPort);
             }
         }
-        return {}
+        return { publicPort }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }

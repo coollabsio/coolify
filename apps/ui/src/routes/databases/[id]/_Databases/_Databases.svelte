@@ -14,7 +14,6 @@
 	import PostgreSql from './_PostgreSQL.svelte';
 	import Redis from './_Redis.svelte';
 	import CouchDb from './_CouchDb.svelte';
-	import { browser } from '$app/env';
 	import { post } from '$lib/api';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
@@ -33,6 +32,7 @@
 	let databaseDbUser: any;
 	let databaseDbUserPassword: any;
 
+
 	generateDbDetails();
 
 	function generateDbDetails() {
@@ -48,20 +48,13 @@
 			databaseDbUser = '';
 		}
 	}
-	$: databaseUrl = generateUrl();
 
-	function generateUrl(): any {
-		return (databaseUrl = browser
-			? `${database.type}://${
-					databaseDbUser ? databaseDbUser + ':' : ''
-			  }${databaseDbUserPassword}@${
-					isPublic
-						? settings.fqdn
-							? getDomain(settings.fqdn)
-							: window.location.hostname
-						: database.id
-			  }:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`
-			: $t('forms.loading'));
+	function generateUrl(): string {
+		return `${database.type}://${
+			databaseDbUser ? databaseDbUser + ':' : ''
+		}${databaseDbUserPassword}@${
+			isPublic ? (settings.fqdn ? getDomain(settings.fqdn) : window.location.hostname) : database.id
+		}:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`;
 	}
 
 	async function changeSettings(name: any) {
@@ -77,14 +70,13 @@
 		if (name === 'appendOnly') {
 			data.appendOnly = !appendOnly;
 		}
-		try {
+		try {	
 			const { publicPort } = await post(`/databases/${id}/settings`, {
 				isPublic: data.isPublic,
 				appendOnly: data.appendOnly
 			});
 			isPublic = data.isPublic;
 			appendOnly = data.appendOnly;
-			databaseUrl = generateUrl();
 			if (isPublic) {
 				database.publicPort = publicPort;
 			}
@@ -99,7 +91,6 @@
 			loading = true;
 			await post(`/databases/${id}`, { ...database, isRunning });
 			generateDbDetails();
-			databaseUrl = generateUrl();
 			toast.push('Settings saved.');
 		} catch (error) {
 			return errorNotification(error);
