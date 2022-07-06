@@ -46,10 +46,7 @@
 				}
 			};
 		} catch (error) {
-			return {
-				status: 302,
-				redirect: '/databases'
-			};
+			return handlerNotFoundLoad(error, url);
 		}
 	};
 </script>
@@ -60,7 +57,7 @@
 	import { t } from '$lib/translations';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { errorNotification } from '$lib/common';
+	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
 	import { appSession, status } from '$lib/store';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import Loading from '$lib/components/Loading.svelte';

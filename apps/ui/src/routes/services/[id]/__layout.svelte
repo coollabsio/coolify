@@ -47,10 +47,7 @@
 				}
 			};
 		} catch (error) {
-			return {
-				status: 302,
-				redirect: '/services'
-			};
+			return handlerNotFoundLoad(error, url);
 		}
 	};
 </script>
@@ -62,7 +59,7 @@
 	import { del, get, post } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { t } from '$lib/translations';
-	import { errorNotification } from '$lib/common';
+	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
 	import { appSession, disabledButton, status } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
 	const { id } = $page.params;

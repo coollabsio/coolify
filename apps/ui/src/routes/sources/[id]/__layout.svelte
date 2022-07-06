@@ -22,10 +22,7 @@
 				}
 			};
 		} catch (error) {
-			return {
-				status: 302,
-				redirect: '/sources'
-			};
+			return handlerNotFoundLoad(error, url);
 		}
 	};
 </script>
@@ -35,7 +32,7 @@
 	import { del, get } from '$lib/api';
 
 	import { page } from '$app/stores';
-	import { errorNotification } from '$lib/common';
+	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
 	import { t } from '$lib/translations';
 	import { appSession } from '$lib/store';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';

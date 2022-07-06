@@ -46,10 +46,7 @@
 				}
 			};
 		} catch (error) {
-			return {
-				status: 500,
-				error: new Error(`Could not load ${url}`)
-			};
+			return handlerNotFoundLoad(error, url);
 		}
 	};
 </script>
@@ -66,7 +63,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { t } from '$lib/translations';
 	import { appSession, disabledButton, status } from '$lib/store';
-	import { errorNotification } from '$lib/common';
+	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
 	import Loading from '$lib/components/Loading.svelte';
 
 	let loading = false;

@@ -55,6 +55,10 @@ export async function getSource(request: FastifyRequest) {
             where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: { githubApp: true, gitlabApp: true }
         });
+        if (!source) {
+            throw { status: 404, message: 'Source not found.' }
+        }
+        
         if (source?.githubApp?.clientSecret)
             source.githubApp.clientSecret = decrypt(source.githubApp.clientSecret);
         if (source?.githubApp?.webhookSecret)

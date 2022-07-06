@@ -1131,53 +1131,6 @@ export async function getServiceFromDB({ id, teamId }: { id: string; teamId: str
 		});
 	}
 	body[type] = { ...body[type], ...getUpdateableFields(type, body[type]) }
-	// if (body.plausibleAnalytics?.postgresqlPassword)
-	// 	body.plausibleAnalytics.postgresqlPassword = decrypt(
-	// 		body.plausibleAnalytics.postgresqlPassword
-	// 	);
-	// if (body.plausibleAnalytics?.password)
-	// 	body.plausibleAnalytics.password = decrypt(body.plausibleAnalytics.password);
-	// if (body.plausibleAnalytics?.secretKeyBase)
-	// 	body.plausibleAnalytics.secretKeyBase = decrypt(body.plausibleAnalytics.secretKeyBase);
-
-	// if (body.minio?.rootUserPassword)
-	// 	body.minio.rootUserPassword = decrypt(body.minio.rootUserPassword);
-
-	// if (body.vscodeserver?.password) body.vscodeserver.password = decrypt(body.vscodeserver.password);
-
-	// if (body.wordpress?.mysqlPassword)
-	// 	body.wordpress.mysqlPassword = decrypt(body.wordpress.mysqlPassword);
-	// if (body.wordpress?.mysqlRootUserPassword)
-	// 	body.wordpress.mysqlRootUserPassword = decrypt(body.wordpress.mysqlRootUserPassword);
-
-	// if (body.ghost?.mariadbPassword) body.ghost.mariadbPassword = decrypt(body.ghost.mariadbPassword);
-	// if (body.ghost?.mariadbRootUserPassword)
-	// 	body.ghost.mariadbRootUserPassword = decrypt(body.ghost.mariadbRootUserPassword);
-	// if (body.ghost?.defaultPassword) body.ghost.defaultPassword = decrypt(body.ghost.defaultPassword);
-
-	// if (body.meiliSearch?.masterKey) body.meiliSearch.masterKey = decrypt(body.meiliSearch.masterKey);
-
-	// if (body.wordpress?.ftpPassword) body.wordpress.ftpPassword = decrypt(body.wordpress.ftpPassword);
-
-	// if (body.umami?.postgresqlPassword)
-	// 	body.umami.postgresqlPassword = decrypt(body.umami.postgresqlPassword);
-	// if (body.umami?.umamiAdminPassword)
-	// 	body.umami.umamiAdminPassword = decrypt(body.umami.umamiAdminPassword);
-	// if (body.umami?.hashSalt) body.umami.hashSalt = decrypt(body.umami.hashSalt);
-
-	// if (body.hasura?.postgresqlPassword)
-	// 	body.hasura.postgresqlPassword = decrypt(body.hasura.postgresqlPassword);
-	// if (body.hasura?.graphQLAdminPassword)
-	// 	body.hasura.graphQLAdminPassword = decrypt(body.hasura.graphQLAdminPassword);
-
-	// if (body.fider?.postgresqlPassword)
-	// 	body.fider.postgresqlPassword = decrypt(body.fider.postgresqlPassword);
-	// if (body.fider?.jwtSecret) body.fider.jwtSecret = decrypt(body.fider.jwtSecret);
-	// if (body.fider?.emailSmtpPassword)
-	// 	body.fider.emailSmtpPassword = decrypt(body.fider.emailSmtpPassword);
-
-
-
 	return { ...body, settings };
 }
 

@@ -108,6 +108,9 @@ export async function getApplicationFromDB(id: string, teamId: string) {
                 persistentStorage: true
             }
         });
+        if (!application) {
+            throw { status: 404, message: 'Application not found.' };
+        }
         application = decryptApplication(application);
         const buildPack = application?.buildPack || null;
         const { baseImage, baseBuildImage, baseBuildImages, baseImages } = setDefaultBaseImage(

@@ -63,6 +63,9 @@ export async function getDatabase(request: FastifyRequest) {
             where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: { destinationDocker: true, settings: true }
         });
+        if (!database) {
+            throw { status: 404, message: 'Database not found.' }
+        }
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
         if (database.rootUserPassword) database.rootUserPassword = decrypt(database.rootUserPassword);
         const { destinationDockerId, destinationDocker } = database;

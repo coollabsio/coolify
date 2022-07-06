@@ -43,6 +43,9 @@ export async function getDestination(request: FastifyRequest) {
         const destination = await prisma.destinationDocker.findFirst({
             where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } }
         });
+        if (!destination) {
+            throw { status: 404, message: `Destination not found.` };
+        }
         const settings = await listSettings();
         let payload = {
             destination,

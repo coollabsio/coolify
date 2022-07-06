@@ -1,7 +1,7 @@
 <script context="module" lang="ts">
 	import { del, get } from '$lib/api';
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ params }) => {
+	export const load: Load = async ({ params, url }) => {
 		try {
 			const response = await get(`/iam/team/${params.id}`);
 			if (!response.permissions || Object.entries(response.permissions).length === 0) {
@@ -18,18 +18,15 @@
 					...response
 				}
 			};
-		} catch (error: any) {
-			return {
-				status: 500,
-				error: new Error(error)
-			};
+		} catch (error) {
+			return handlerNotFoundLoad(error, url);
 		}
 	};
 </script>
 
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { errorNotification } from '$lib/common';
+	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
 	import { appSession } from '$lib/store';
 	import { t } from '$lib/translations';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';

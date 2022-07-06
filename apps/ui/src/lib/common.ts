@@ -405,3 +405,16 @@ export const supportedServiceTypesAndVersions = [
 		}
 	}
 ];
+
+export function handlerNotFoundLoad(error: any, url: URL) {
+	if (error?.status === 404) {
+		return {
+			status: 302,
+			redirect: '/'
+		};
+	}
+	return {
+		status: 500,
+		error: new Error(`Could not load ${url}`)
+	};
+}

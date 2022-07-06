@@ -42,6 +42,11 @@ export async function getService(request: FastifyRequest) {
         const teamId = request.user.teamId;
         const { id } = request.params;
         const service = await getServiceFromDB({ id, teamId });
+        
+        if (!service) {
+            throw { status: 404, message: 'Service not found.' }
+        }
+
         const { destinationDockerId, destinationDocker, type, version, settings } = service;
         let isRunning = false;
         if (destinationDockerId) {
@@ -81,7 +86,7 @@ export async function getServiceType(request: FastifyRequest) {
         return {
             types: supportedServiceTypesAndVersions
         }
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -105,7 +110,7 @@ export async function getServiceVersions(request: FastifyRequest) {
             type,
             versions: supportedServiceTypesAndVersions.find((name) => name.name === type).versions
         }
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -119,7 +124,7 @@ export async function saveServiceVersion(request: FastifyRequest, reply: Fastify
             data: { version }
         });
         return reply.code(201).send({})
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -133,7 +138,7 @@ export async function saveServiceDestination(request: FastifyRequest, reply: Fas
             data: { destinationDocker: { connect: { id: destinationId } } }
         });
         return reply.code(201).send({})
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -150,7 +155,7 @@ export async function getServiceUsage(request: FastifyRequest) {
         return {
             usage
         }
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 
@@ -202,7 +207,7 @@ export async function getServiceLogs(request: FastifyRequest) {
         return {
             message: 'No logs found.'
         }
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -211,7 +216,7 @@ export async function deleteService(request: FastifyRequest) {
         const { id } = request.params;
         await removeService({ id });
         return {}
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -224,7 +229,7 @@ export async function saveServiceSettings(request: FastifyRequest, reply: Fastif
             data: { dualCerts }
         });
         return reply.code(201).send()
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -261,7 +266,7 @@ export async function checkService(request: FastifyRequest) {
             }
         }
         return {}
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -288,7 +293,7 @@ export async function saveService(request: FastifyRequest, reply: FastifyReply) 
             where: { id }, data
         });
         return reply.code(201).send()
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -308,7 +313,7 @@ export async function getServiceSecrets(request: FastifyRequest) {
         return {
             secrets
         }
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -344,7 +349,7 @@ export async function saveServiceSecret(request: FastifyRequest, reply: FastifyR
             }
         }
         return reply.code(201).send()
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -354,7 +359,7 @@ export async function deleteServiceSecret(request: FastifyRequest) {
         const { name } = request.body
         await prisma.serviceSecret.deleteMany({ where: { serviceId: id, name } });
         return {}
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -368,7 +373,7 @@ export async function getServiceStorages(request: FastifyRequest) {
         return {
             persistentStorages
         }
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -389,7 +394,7 @@ export async function saveServiceStorage(request: FastifyRequest, reply: Fastify
             });
         }
         return reply.code(201).send()
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -400,7 +405,7 @@ export async function deleteServiceStorage(request: FastifyRequest) {
         const { path } = request.body
         await prisma.servicePersistentStorage.deleteMany({ where: { serviceId: id, path } });
         return {}
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -512,7 +517,7 @@ export async function setSettingsService(request: FastifyRequest, reply: Fastify
             return await setWordpressSettings(request, reply)
         }
         throw `Service type ${type} not supported.`
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
@@ -525,7 +530,7 @@ async function setWordpressSettings(request: FastifyRequest, reply: FastifyReply
             data: { ownMysql }
         });
         return reply.code(201).send()
-     } catch ({ status, message }) {
+    } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
