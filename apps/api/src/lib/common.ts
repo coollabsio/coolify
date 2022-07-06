@@ -23,7 +23,7 @@ const customConfig: Config = {
 	length: 3
 };
 export const isDev = process.env.NODE_ENV === 'development';
-export const version = '3.0.1';
+export const version = '3.0.2';
 
 export const defaultProxyImage = `coolify-haproxy-alpine:latest`;
 export const defaultProxyImageTcp = `coolify-haproxy-tcp-alpine:latest`;

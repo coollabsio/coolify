@@ -135,6 +135,8 @@
 			statusInterval = setInterval(async () => {
 				await getStatus();
 			}, 2000);
+		} else {
+			$status.service.initialLoading = false;
 		}
 	});
 </script>

@@ -126,6 +126,8 @@
 			statusInterval = setInterval(async () => {
 				await getStatus();
 			}, 2000);
+		} else {
+			$status.database.initialLoading = false;
 		}
 	});
 </script>
