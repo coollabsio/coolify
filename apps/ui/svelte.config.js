@@ -5,13 +5,6 @@ import preprocess from 'svelte-preprocess';
 const config = {
 	preprocess: preprocess(),
 	kit: {
-		vite: {
-			server: {
-				fs: {
-					allow: ['./src/lib/locales/']
-				}
-			},
-		},
 		adapter: adapter({
 			pages: 'build',
 			assets: 'build',

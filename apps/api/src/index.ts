@@ -5,7 +5,7 @@ import env from '@fastify/env';
 import cookie from '@fastify/cookie';
 import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
-import { asyncExecShell, isDev } from './lib/common';
+import { asyncExecShell, isDev, prisma } from './lib/common';
 import { scheduler } from './lib/scheduler';
 
 declare module 'fastify' {
@@ -105,11 +105,14 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 	await scheduler.start('checkProxies')
 
 	// Check if no build is running, try to autoupdate.
-	setInterval(() => {
-		if (scheduler.workers.has('deployApplication')) {
-			scheduler.workers.get('deployApplication').postMessage("status");
+	setInterval(async () => {
+		const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
+		if (isAutoUpdateEnabled) {
+			if (scheduler.workers.has('deployApplication')) {
+				scheduler.workers.get('deployApplication').postMessage("status");
+			}
 		}
-	}, 60000 * 10)
+	}, 30000 * 10)
 
 	scheduler.on('worker deleted', async (name) => {
 		if (name === 'autoUpdater') {
