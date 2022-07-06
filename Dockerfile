@@ -1,17 +1,18 @@
-FROM node:16.14.2-alpine as install
+FROM node:18-alpine as build
 WORKDIR /app
 
 RUN apk add --no-cache curl
-RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@6
-RUN pnpm add -g pnpm
+RUN curl -sL https://unpkg.com/@pnpm/self-installer | node
 
-COPY package*.json .
+COPY . .
 RUN pnpm install
+RUN pnpm build
 
-FROM node:16.14.2-alpine
-ARG TARGETPLATFORM
-
+# Production build
+FROM node:18-alpine
 WORKDIR /app
+ENV NODE_ENV production
+ARG TARGETPLATFORM
 
 ENV PRISMA_QUERY_ENGINE_BINARY=/app/prisma-engines/query-engine \
   PRISMA_MIGRATION_ENGINE_BINARY=/app/prisma-engines/migration-engine \
@@ -19,24 +20,24 @@ ENV PRISMA_QUERY_ENGINE_BINARY=/app/prisma-engines/query-engine \
   PRISMA_FMT_BINARY=/app/prisma-engines/prisma-fmt \
   PRISMA_CLI_QUERY_ENGINE_TYPE=binary \
   PRISMA_CLIENT_ENGINE_TYPE=binary
-  
-COPY --from=coollabsio/prisma-engine:latest /prisma-engines/query-engine /prisma-engines/migration-engine /prisma-engines/introspection-engine /prisma-engines/prisma-fmt /app/prisma-engines/
 
-COPY --from=install /app/node_modules ./node_modules
-COPY . .
+COPY --from=coollabsio/prisma-engine:3.15 /prisma-engines/query-engine /prisma-engines/migration-engine /prisma-engines/introspection-engine /prisma-engines/prisma-fmt /app/prisma-engines/
 
 RUN apk add --no-cache git git-lfs openssh-client curl jq cmake sqlite openssl
-RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@6
-RUN pnpm add -g pnpm
+RUN curl -sL https://unpkg.com/@pnpm/self-installer | node
+
 RUN mkdir -p ~/.docker/cli-plugins/
 RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-20.10.9 -o /usr/bin/docker
 RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-compose-linux-2.3.4 -o ~/.docker/cli-plugins/docker-compose
 RUN chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker
 
-RUN pnpm prisma generate
-RUN pnpm build
+COPY --from=build /app/apps/api/build/ .
+COPY --from=build /app/apps/ui/build/ ./public
+COPY --from=build /app/apps/api/prisma/ ./prisma
+COPY --from=build /app/apps/api/package.json .
+COPY --from=build /app/docker-compose.yaml .
 
-
+RUN pnpm install -p
 
 EXPOSE 3000
-CMD ["pnpm", "start"]
+CMD pnpm start

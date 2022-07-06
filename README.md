@@ -6,7 +6,7 @@ An open-source & self-hostable Heroku / Netlify alternative.
 
 https://demo.coolify.io/
 
-(If it is unresponsive, that means someone overloaded the server. 🙃)
+(If it is unresponsive, that means someone overloaded the server. 😄)
 
 ## Feedback
 
@@ -29,6 +29,8 @@ wget -q https://get.coollabs.io/coolify/install.sh -O install.sh; sudo bash ./in
 For more details goto the [docs](https://docs.coollabs.io/coolify/installation).
 
 ## Features
+
+ARM support is in beta!
 
 ### Git Sources
 
@@ -97,7 +99,7 @@ You can host cool open-source services as well:
 
 ## Migration from v1
 
-A fresh installation is necessary. v2 is not compatible with v1.
+A fresh installation is necessary. v2 and v3 are not compatible with v1.
 
 ## Support
 

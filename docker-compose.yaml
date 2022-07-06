@@ -19,13 +19,6 @@ services:
       - '.env'
     networks:
       - coolify-infra
-    depends_on: ['redis']
-  redis:
-    image: redis:6.2-alpine
-    restart: always
-    container_name: coolify-redis
-    networks:
-      - coolify-infra
 
 networks:
   coolify-infra:

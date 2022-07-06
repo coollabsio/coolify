@@ -2,6 +2,8 @@
 
 First of all, thank you for considering contributing to my project! It means a lot 💜.
 
+Contribution guide is for v2, not applicable for v3
+
 ## 🙋 Want to help?
 
 If you begin in GitHub contribution, you can find the [first contribution](https://github.com/firstcontributions/first-contributions) and follow this guide.
