@@ -26,7 +26,8 @@ declare module 'fastify' {
 const port = isDev ? 3001 : 3000;
 const host = '0.0.0.0';
 const fastify = Fastify({
-	logger: false
+	logger: false,
+	trustProxy: true
 });
 const schema = {
 	type: 'object',

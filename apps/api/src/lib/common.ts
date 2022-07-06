@@ -202,6 +202,7 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 	const domainDualCert = domain.includes('www.') ? domain.replace('www.', '') : `www.${domain}`;
 	dns.setServers(['1.1.1.1', '8.8.8.8']);
 	let resolves = [];
+	console.log(hostname)
 	try {
 		if (isIP(hostname)) {
 			resolves = [hostname];
@@ -209,7 +210,7 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 			resolves = await dns.resolve4(hostname);
 		}
 	} catch (error) {
-		throw { status: 500, message: `DNS not set correctly or propogated.<br>Please check your DNS settings.` }
+		throw { status: 500, message: `Could not determine IP address for ${hostname}.` }
 	}
 
 	if (dualCerts) {
