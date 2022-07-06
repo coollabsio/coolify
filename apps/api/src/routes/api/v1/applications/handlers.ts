@@ -324,7 +324,7 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
             }
         }
         if (isDNSCheckEnabled && !isDev && !forceSave) {
-            return await checkDomainsIsValidInDNS({ hostname: request.hostname, fqdn, dualCerts });
+            return await checkDomainsIsValidInDNS({ hostname: request.hostname.split(':')[0], fqdn, dualCerts });
         }
         return {}
     } catch ({ status, message }) {

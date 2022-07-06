@@ -202,7 +202,6 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 	const domainDualCert = domain.includes('www.') ? domain.replace('www.', '') : `www.${domain}`;
 	dns.setServers(['1.1.1.1', '8.8.8.8']);
 	let resolves = [];
-	console.log(hostname)
 	try {
 		if (isIP(hostname)) {
 			resolves = [hostname];
