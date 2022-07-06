@@ -23,7 +23,7 @@ const customConfig: Config = {
 	length: 3
 };
 export const isDev = process.env.NODE_ENV === 'development';
-export const version = '3.0.2';
+export const version = '3.0.3';
 
 export const defaultProxyImage = `coolify-haproxy-alpine:latest`;
 export const defaultProxyImageTcp = `coolify-haproxy-tcp-alpine:latest`;
@@ -209,7 +209,7 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 			resolves = await dns.resolve4(hostname);
 		}
 	} catch (error) {
-		throw `DNS not set correctly or propogated.<br>Please check your DNS settings.`
+		throw { status: 500, message: `DNS not set correctly or propogated.<br>Please check your DNS settings.` }
 	}
 
 	if (dualCerts) {
@@ -231,9 +231,9 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 				}
 			}
 			if (ipDomainFound && ipDomainDualCertFound) return { status: 200 };
-			throw false;
+			throw { status: 500, message: `DNS not set correctly or propogated.<br>Please check your DNS settings.` }
 		} catch (error) {
-			throw `DNS not set correctly or propogated.<br>Please check your DNS settings.`
+			throw { status: 500, message: `DNS not set correctly or propogated.<br>Please check your DNS settings.` }
 		}
 	} else {
 		try {
@@ -245,9 +245,9 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 				}
 			}
 			if (ipDomainFound) return { status: 200 };
-			throw false;
+			throw { status: 500, message: `DNS not set correctly or propogated.<br>Please check your DNS settings.` }
 		} catch (error) {
-			throw `DNS not set correctly or propogated.<br>Please check your DNS settings.`
+			throw { status: 500, message: `DNS not set correctly or propogated.<br>Please check your DNS settings.` }
 		}
 	}
 }
