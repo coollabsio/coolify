@@ -22,7 +22,7 @@
 
 	import { t } from '$lib/translations';
 	import { appSession } from '$lib/store';
-	import { get } from '$lib/api';
+	import { get, post } from '$lib/api';
 
 	const ownDestinations = destinations.filter((destination) => {
 		if (destination.teams[0].id === $appSession.teamId) {
