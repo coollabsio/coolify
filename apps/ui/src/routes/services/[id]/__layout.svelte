@@ -131,12 +131,10 @@
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
-		if (!service.type || !service.destinationDockerId || !service.version || !service.fqdn) {
-			$status.service.initialLoading = false;
-			$status.service.isRunning = false;
-			$status.service.loading = false;
-			return;
-		} else {
+		$status.service.initialLoading = false;
+		$status.service.isRunning = false;
+		$status.service.loading = false;
+		if (service.type && service.destinationDockerId && service.version && service.fqdn) {
 			await getStatus();
 			statusInterval = setInterval(async () => {
 				await getStatus();

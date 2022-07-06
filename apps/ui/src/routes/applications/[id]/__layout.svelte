@@ -131,13 +131,11 @@
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
-		if (!application.gitSourceId || !application.destinationDockerId || !application.fqdn) {
-			$status.application.initialLoading = false;
-			$status.application.isRunning = false;
-			$status.application.isExited = false;
-			$status.application.loading = false;
-			return;
-		} else {
+		$status.application.initialLoading = false;
+		$status.application.isRunning = false;
+		$status.application.isExited = false;
+		$status.application.loading = false;
+		if (application.gitSourceId && application.destinationDockerId && application.fqdn) {
 			await getStatus();
 			statusInterval = setInterval(async () => {
 				await getStatus();

@@ -117,17 +117,15 @@
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
+		$status.database.initialLoading = false;
+		$status.database.isRunning = false;
+		$status.database.loading = false;
 		if (
-			!database.type ||
-			!database.destinationDockerId ||
-			!database.version ||
-			!database.defaultDatabase
+			database.type &&
+			database.destinationDockerId &&
+			database.version &&
+			database.defaultDatabase
 		) {
-			$status.database.initialLoading = false;
-			$status.database.isRunning = false;
-			$status.database.loading = false;
-			return;
-		} else {
 			await getStatus();
 			statusInterval = setInterval(async () => {
 				await getStatus();
