@@ -43,7 +43,7 @@ export async function getDestination(request: FastifyRequest) {
         const destination = await prisma.destinationDocker.findFirst({
             where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } }
         });
-        if (!destination) {
+        if (!destination && id !== 'new') {
             throw { status: 404, message: `Destination not found.` };
         }
         const settings = await listSettings();
@@ -62,10 +62,7 @@ export async function getDestination(request: FastifyRequest) {
             // // await saveSshKey(destination);
             // payload.state = await checkContainer(engine, 'coolify-haproxy');
         } else {
-            let containerName = 'coolify-proxy';
-            if (!settings.isTraefikUsed) {
-                containerName = 'coolify-haproxy';
-            }
+            const containerName = 'coolify-proxy';
             payload.state =
                 destination?.engine && (await checkContainer(destination.engine, containerName));
         }

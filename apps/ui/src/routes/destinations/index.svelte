@@ -34,18 +34,12 @@
 			return destination;
 		}
 	});
-	async function newDestination() {
-		const { id } = await post('/destinations/new', {});
-		return await goto(`/destinations/${id}`, { replaceState: true });
-	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">{$t('index.destinations')}</div>
 	{#if $appSession.isAdmin}
-		<button
-			on:click={newDestination} 
-			class="add-icon bg-sky-600 hover:bg-sky-500">
+	    <a href="/destinations/new" class="add-icon bg-sky-600 hover:bg-sky-500">
 			<svg
 				class="w-6"
 				xmlns="http://www.w3.org/2000/svg"
@@ -59,7 +53,7 @@
 					d="M12 6v6m0 0v6m0-6h6m-6 0H6"
 				/></svg
 			>
-		</button>
+		</a>
 	{/if}
 </div>
 <div class="flex-col justify-center">
