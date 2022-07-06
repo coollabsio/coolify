@@ -131,7 +131,6 @@
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
-		$status.application.initialLoading = false;
 		$status.application.isRunning = false;
 		$status.application.isExited = false;
 		$status.application.loading = false;

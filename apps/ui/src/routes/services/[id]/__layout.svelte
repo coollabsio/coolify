@@ -131,7 +131,6 @@
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
-		$status.service.initialLoading = false;
 		$status.service.isRunning = false;
 		$status.service.loading = false;
 		if (service.type && service.destinationDockerId && service.version && service.fqdn) {

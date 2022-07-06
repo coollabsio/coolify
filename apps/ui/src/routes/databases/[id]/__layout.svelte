@@ -117,7 +117,6 @@
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
-		$status.database.initialLoading = false;
 		$status.database.isRunning = false;
 		$status.database.loading = false;
 		if (
