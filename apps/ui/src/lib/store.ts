@@ -18,7 +18,7 @@ interface AppSession {
 }
 export const loginEmail: Writable<string | undefined> = writable()
 export const appSession: Writable<AppSession> = writable({
-    version: '3.0.0',
+    version: '3.0.1',
     userId: null,
     teamId: null,
     permission: 'read',
