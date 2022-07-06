@@ -23,8 +23,7 @@ async function main() {
 		await prisma.setting.create({
 			data: {
 				isRegistrationEnabled: true,
-				proxyPassword: encrypt(generatePassword()),
-				proxyUser: cuid()
+				isTraefikUsed: true,
 			}
 		});
 	} else {
@@ -74,31 +73,3 @@ main()
 	.finally(async () => {
 		await prisma.$disconnect();
 	});
-
-const encrypt = (text) => {
-	if (text) {
-		const iv = crypto.randomBytes(16);
-		const cipher = crypto.createCipheriv(algorithm, process.env['COOLIFY_SECRET_KEY'], iv);
-		const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
-		return JSON.stringify({
-			iv: iv.toString('hex'),
-			content: encrypted.toString('hex')
-		});
-	}
-};
-
-const decrypt = (hashString) => {
-	if (hashString) {
-		const hash = JSON.parse(hashString);
-		const decipher = crypto.createDecipheriv(
-			algorithm,
-			process.env['COOLIFY_SECRET_KEY'],
-			Buffer.from(hash.iv, 'hex')
-		);
-		const decrpyted = Buffer.concat([
-			decipher.update(Buffer.from(hash.content, 'hex')),
-			decipher.final()
-		]);
-		return decrpyted.toString();
-	}
-};

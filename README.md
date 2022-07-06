@@ -30,6 +30,8 @@ For more details goto the [docs](https://docs.coollabs.io/coolify/installation).
 
 ## Features
 
+ARM support is in beta!
+
 ### Git Sources
 
 You can use the following Git Sources to be auto-deployed to your Coolifyt instance! (Self-hosted versions are also supported.)
