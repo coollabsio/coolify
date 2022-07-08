@@ -173,6 +173,14 @@ export const wordpress = [{
 	isNumber: false,
 	isBoolean: false,
 	isEncrypted: false
+},
+{
+	name: 'ftpPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
 }]
 export const ghost = [{
 	name: 'defaultEmail',

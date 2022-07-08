@@ -112,7 +112,7 @@ define('SUBDOMAIN_INSTALL', false);`
 	</div>
 	<div class="grid grid-cols-2 items-center px-10">
 		<label for="ftpPassword">Password</label>
-		<CopyPasswordField id="ftpPassword" readonly disabled name="ftpPassword" value={ftpPassword} />
+		<CopyPasswordField id="ftpPassword" isPasswordField readonly disabled name="ftpPassword" value={ftpPassword} />
 	</div>
 {/if}
 <div class="flex space-x-1 py-5 font-bold">
