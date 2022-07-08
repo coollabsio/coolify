@@ -199,7 +199,7 @@
 			toast.push('DNS configuration is valid.');
 			isWWW ? (isWWWDomainOK = true) : (isNonWWWDomainOK = true);
 			return true;
-		} catch ({ error }) {
+		} catch (error) {
 			errorNotification(error);
 			isWWW ? (isWWWDomainOK = false) : (isNonWWWDomainOK = false);
 			return false;

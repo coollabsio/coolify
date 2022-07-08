@@ -51,7 +51,7 @@
 		try {
 			await post(`/applications/${id}/configuration/destination`, { destinationId });
 			return await goto(from || `/applications/${id}/configuration/buildpack`);
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}

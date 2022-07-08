@@ -31,7 +31,7 @@
 			}
 			if (newStorage) toast.push('Storage saved.');
 			else toast.push('Storage updated.');
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}
@@ -40,7 +40,7 @@
 			await del(`/services/${id}/storages`, { path: storage.path });
 			dispatch('refresh');
 			toast.push('Storage deleted.');
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}

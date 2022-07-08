@@ -4,6 +4,10 @@ export const asyncSleep = (delay: number) =>
 
 export function errorNotification(error: any): void {
 	if (error.message) {
+		if (error.message === 'Cannot read properties of undefined (reading \'postMessage\')') {
+			toast.push('Currently there is background process in progress. Please try again later.');
+			return;
+		}
 		toast.push(error.message);
 	} else {
 		toast.push('Ooops, something is not okay, are you okay?');

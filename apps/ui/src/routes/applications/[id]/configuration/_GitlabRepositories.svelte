@@ -203,7 +203,7 @@
 				return true;
 			}
 			showSave = true;
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}

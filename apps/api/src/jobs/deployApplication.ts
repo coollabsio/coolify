@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import yaml from 'js-yaml';
 
 import { copyBaseConfigurationFiles, makeLabelForStandaloneApplication, saveBuildLog, setDefaultConfiguration } from '../lib/buildPacks/common';
-import { asyncExecShell, createDirectories, decrypt, getDomain, prisma } from '../lib/common';
+import { asyncExecShell,  createDirectories, decrypt, getDomain, prisma } from '../lib/common';
 import { dockerInstance, getEngine } from '../lib/docker';
 import * as importers from '../lib/importers';
 import * as buildpacks from '../lib/buildPacks';
@@ -21,8 +21,12 @@ import * as buildpacks from '../lib/buildPacks';
 					parentPort.postMessage('cancelled');
 					return;
 				}
-				if (message === 'status') {
-					parentPort.postMessage({ size: queue.size, pending: queue.pending });
+				if (message === 'status:autoUpdater') {
+					parentPort.postMessage({ size: queue.size, pending: queue.pending, caller: 'autoUpdater' });
+					return;
+				}
+				if (message === 'status:cleanupStorage') {
+					parentPort.postMessage({ size: queue.size, pending: queue.pending, caller: 'cleanupStorage' });
 					return;
 				}
 

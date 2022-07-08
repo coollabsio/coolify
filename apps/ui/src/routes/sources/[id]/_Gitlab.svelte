@@ -106,7 +106,7 @@
 				await post(`/sources/${id}/check`, {
 					oauthId: source.gitlabApp?.oauthId
 				});
-			} catch ({ error }) {
+			} catch (error) {
 				source.gitlabApp.oauthId = null;
 				oauthIdEl.focus();
 				return errorNotification(error);

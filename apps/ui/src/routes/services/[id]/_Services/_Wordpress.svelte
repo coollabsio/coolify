@@ -61,7 +61,7 @@
 					ownMysql
 				});
 				service.wordpress.ownMysql = ownMysql;
-			} catch ({ error }) {
+			} catch (error) {
 				return errorNotification(error);
 			}
 		}

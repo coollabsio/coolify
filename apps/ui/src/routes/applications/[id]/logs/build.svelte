@@ -68,7 +68,7 @@
 				const data = await get(`/applications/${id}/logs/build?skip=${skip}`);
 				builds = builds.concat(data.builds);
 				return;
-			} catch ({ error }) {
+			} catch (error) {
 				return errorNotification(error);
 			}
 		} else {

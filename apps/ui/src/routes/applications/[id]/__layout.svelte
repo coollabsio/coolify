@@ -110,7 +110,7 @@
 			loading = true;
 			await post(`/applications/${id}/stop`, {});
 			return window.location.reload();
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}
@@ -118,6 +118,7 @@
 		if ($status.application.loading) return;
 		$status.application.loading = true;
 		const data = await get(`/applications/${id}`);
+		isQueueActive = data.isQueueActive;
 		$status.application.isRunning = data.isRunning;
 		$status.application.isExited = data.isExited;
 		$status.application.loading = false;

@@ -73,7 +73,7 @@
 			try {
 				await del(`/databases/${database.id}`, { id: database.id });
 				return await goto('/databases');
-			} catch ({ error }) {
+			} catch (error) {
 				return errorNotification(error);
 			} finally {
 				loading = false;
@@ -87,7 +87,7 @@
 			try {
 				await post(`/databases/${database.id}/stop`, {});
 				return window.location.reload();
-			} catch ({ error }) {
+			} catch (error) {
 				return errorNotification(error);
 			}
 		}
@@ -97,7 +97,7 @@
 		try {
 			await post(`/databases/${database.id}/start`, {});
 			return window.location.reload();
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}

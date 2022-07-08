@@ -11,11 +11,20 @@ const options: any = {
 	logger: false,
 	workerMessageHandler: async ({ name, message }) => {
 		if (name === 'deployApplication') {
-			if (message.pending === 0) {
-				if (!scheduler.workers.has('autoUpdater')) {
-					await scheduler.stop('deployApplication');
-					await scheduler.run('autoUpdater')
+			if (message.pending === 0 && message.size === 0) {
+				if (message.caller === 'autoUpdater') {
+					if (!scheduler.workers.has('autoUpdater')) {
+						await scheduler.stop('deployApplication');
+						await scheduler.run('autoUpdater')
+					}
 				}
+				if (message.caller === 'cleanupStorage') {
+					if (!scheduler.workers.has('cleanupStorage')) {
+						await scheduler.stop('deployApplication');
+						await scheduler.run('cleanupStorage')
+					}
+				}
+
 			}
 		}
 	},
@@ -25,7 +34,6 @@ const options: any = {
 		},
 		{
 			name: 'cleanupStorage',
-			interval: '10m'
 		},
 		{
 			name: 'checkProxies',

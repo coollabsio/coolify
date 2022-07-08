@@ -32,7 +32,7 @@
 			}
 			if (newStorage) toast.push($t('application.storage.storage_saved'));
 			else toast.push($t('application.storage.storage_updated'));
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}
@@ -41,7 +41,7 @@
 			await del(`/applications/${id}/storages`, { path: storage.path });
 			dispatch('refresh');
 			toast.push($t('application.storage.storage_deleted'));
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}
