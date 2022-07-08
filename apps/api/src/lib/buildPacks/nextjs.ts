@@ -69,7 +69,6 @@ export default async function (data) {
 			await createDockerfile(data, baseImage);
 			await buildImage(data);
 		}
-
 	} catch (error) {
 		throw error;
 	}

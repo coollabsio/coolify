@@ -17,7 +17,7 @@ const nodeBased = [
 	'nextjs'
 ];
 
-export function setDefaultBaseImage(buildPack: string | null, deploymentType: string | null) {
+export function setDefaultBaseImage(buildPack: string | null, deploymentType: string | null = null) {
 	const nodeVersions = [
 		{
 			value: 'node:lts',

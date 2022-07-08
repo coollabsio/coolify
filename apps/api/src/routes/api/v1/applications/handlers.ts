@@ -48,6 +48,15 @@ export async function getImages(request: FastifyRequest) {
                 port = '3000'
             }
         }
+        if (buildPack === 'nuxtjs') {
+            if (deploymentType === 'static') {
+                publishDirectory = 'dist'
+                port = '80'
+            } else {
+                publishDirectory = ''
+                port = '3000'
+            }
+        }
 
 
         return { baseImage, baseBuildImage, baseBuildImages, baseImages, publishDirectory, port }

@@ -466,7 +466,7 @@
 					<Explainer text={$t('application.base_image_explainer')} />
 				</div>
 			{/if}
-			{#if application.buildPack !== 'docker' && application.buildPack === 'nextjs'}
+			{#if application.buildPack !== 'docker' && (application.buildPack === 'nextjs' || application.buildPack === 'nuxtjs')}
 				<div class="grid grid-cols-2 items-center pb-8">
 					<label for="deploymentType" class="text-base font-bold text-stone-100"
 						>Deployment Type</label
@@ -484,7 +484,7 @@
 						/>
 					</div>
 					<Explainer
-						text="How to build your application. Static is for static websites, node is for server-side applications."
+						text="Defines how to deploy your application. <br><br><span class='text-green-500 font-bold'>Static</span> is for static websites, <span class='text-green-500 font-bold'>node</span> is for server-side applications."
 					/>
 				</div>
 			{/if}
