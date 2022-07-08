@@ -42,7 +42,7 @@ export async function getService(request: FastifyRequest) {
         const teamId = request.user.teamId;
         const { id } = request.params;
         const service = await getServiceFromDB({ id, teamId });
-        
+
         if (!service) {
             throw { status: 404, message: 'Service not found.' }
         }
@@ -237,18 +237,20 @@ export async function checkService(request: FastifyRequest) {
     try {
         const { id } = request.params;
         let { fqdn, exposePort, otherFqdns } = request.body;
+
         if (fqdn) fqdn = fqdn.toLowerCase();
         if (otherFqdns && otherFqdns.length > 0) otherFqdns = otherFqdns.map((f) => f.toLowerCase());
         if (exposePort) exposePort = Number(exposePort);
+
         let found = await isDomainConfigured({ id, fqdn });
         if (found) {
-            throw `Domain already configured.`
+            throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
         if (otherFqdns && otherFqdns.length > 0) {
             for (const ofqdn of otherFqdns) {
                 found = await isDomainConfigured({ id, fqdn: ofqdn, checkOwn: true });
                 if (found) {
-                    throw "Domain already configured."
+                    throw { status: 500, message: `Domain ${getDomain(ofqdn).replace('www.', '')} is already in use!` }
                 }
             }
         }
@@ -257,12 +259,12 @@ export async function checkService(request: FastifyRequest) {
             exposePort = Number(exposePort);
 
             if (exposePort < 1024 || exposePort > 65535) {
-                throw `Exposed Port needs to be between 1024 and 65535.`
+                  throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
             }
 
             const publicPort = await getPort({ port: exposePort });
             if (publicPort !== exposePort) {
-                throw `Port ${exposePort} is already in use.`
+                throw { status: 500, message: `Port ${exposePort} is already in use.` }
             }
         }
         return {}
