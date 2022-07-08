@@ -2502,7 +2502,7 @@ export async function activateWordpressFtp(request: FastifyRequest, reply: Fasti
                     //
                 }
                 const volumes = [
-                    `${id}-wordpress-data:/home/${ftpUser}`,
+                    `${id}-wordpress-data:/home/${ftpUser}/wordpress`,
                     `${isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
                     }/${id}.ed25519:/etc/ssh/ssh_host_ed25519_key`,
                     `${isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
@@ -2571,9 +2571,14 @@ export async function activateWordpressFtp(request: FastifyRequest, reply: Fasti
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     } finally {
-        await asyncExecShell(
-            `rm -f ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub ${hostkeyDir}/${id}.sh`
-        );
+        try {
+            await asyncExecShell(
+                `rm -fr ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub ${hostkeyDir}/${id}.sh`
+            );
+        } catch (error) {
+            console.log(error)
+        }
+
     }
 
 }
