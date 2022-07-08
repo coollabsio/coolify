@@ -258,11 +258,12 @@ export async function getCurrentUser(request: FastifyRequest, fastify) {
 				include: { teams: true, permission: true }
 			})
 			if (user) {
+				const permission = user.permission.find(p => p.teamId === request.query.teamId).permission
 				const payload = {
 					...request.user,
 					teamId: request.query.teamId,
-					permission: user.permission.find(p => p.teamId === request.query.teamId).permission || null,
-					isAdmin: user.permission.find(p => p.teamId === request.query.teamId).permission === 'owner'
+					permission: permission || null,
+					isAdmin: permission === 'owner' || permission === 'admin'
 
 				}
 				token = fastify.jwt.sign(payload)

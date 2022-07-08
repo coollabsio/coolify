@@ -1,12 +1,14 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ url }) => {
+		const baseSettings = await get('/base');
 		try {
 			if (Cookies.get('token')) {
 				const response = await get(`/user`);
 				return {
 					props: {
-						...response
+						...response,
+						baseSettings
 					},
 					stuff: {
 						...response
@@ -16,10 +18,17 @@
 				if (url.pathname !== '/login' && url.pathname !== '/register') {
 					return {
 						status: 302,
-						redirect: '/login'
+						redirect: '/login',
+						props: {
+							baseSettings
+						}
 					};
 				}
-				return {};
+				return {
+					props: {
+						baseSettings
+					}
+				};
 			}
 		} catch (error: any) {
 			if (error?.code?.startsWith('FAST_JWT') || error.status === 401) {
@@ -27,25 +36,39 @@
 				if (url.pathname !== '/login') {
 					return {
 						status: 302,
-						redirect: '/login'
+						redirect: '/login',
+						props: {
+							baseSettings
+						}
 					};
 				}
 			}
 			if (url.pathname !== '/login') {
 				return {
 					status: 302,
-					redirect: '/login'
+					redirect: '/login',
+					props: {
+						baseSettings
+					}
 				};
 			}
 			return {
 				status: 500,
-				error: new Error(error)
+				error: new Error(error),
+				props: {
+					baseSettings
+				}
 			};
 		}
 	};
 </script>
 
 <script lang="ts">
+	export let baseSettings: any;
+	$appSession.version = baseSettings.version;
+	$appSession.whiteLabeled = baseSettings.whiteLabeled;
+	$appSession.whiteLabeledDetails.icon = baseSettings.whiteLabeledIcon;
+
 	export let settings: any;
 	export let userId: string;
 	export let teamId: string;
@@ -54,7 +77,6 @@
 	import '../tailwind.css';
 	import Cookies from 'js-cookie';
 	import { fade } from 'svelte/transition';
-
 	import { SvelteToast } from '@zerodevx/svelte-toast';
 	import { navigating, page } from '$app/stores';
 
