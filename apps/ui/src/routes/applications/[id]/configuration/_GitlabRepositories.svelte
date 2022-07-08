@@ -61,16 +61,7 @@
 		} catch (error) {
 			return await getGitlabToken();
 		}
-		try {
-			groups = await get(`${apiUrl}/v4/groups?per_page=5000`, {
-				Authorization: `Bearer ${$appSession.tokens.gitlab}`
-			});
-		} catch (error: any) {
-			errorNotification(error);
-			throw new Error(error);
-		} finally {
-			loading.base = false;
-		}
+		await loadGroups();
 	});
 	function selectGroup(event: any) {
 		selected.group = event.detail;
@@ -116,12 +107,34 @@
 			}, 100);
 		});
 	}
-
-	async function loadProjects() {
+	async function loadGroups(page: number = 1) {
+		let perPage = 100;
 		//@ts-ignore
 		const params: any = new URLSearchParams({
-			page: 1,
-			per_page: 25,
+			page,
+			per_page: perPage,
+		});
+		loading.base = true;
+		try {
+			const newGroups = await get(`${apiUrl}/v4/groups?${params}`, {
+				Authorization: `Bearer ${$appSession.tokens.gitlab}`
+			});
+			groups = groups.concat(newGroups);
+			if (newGroups.length === perPage) {
+				await loadGroups(page + 1);
+			}
+		} catch (error) {
+			return errorNotification(error);
+		} finally {
+			loading.base = false;
+		}
+	}
+	async function loadProjects(page: number = 1) {
+		let perPage = 100;
+		//@ts-ignore
+		const params: any = new URLSearchParams({
+			page,
+			per_page: perPage,
 			archived: false
 		});
 		if (search.project) {
@@ -131,9 +144,16 @@
 		if (username === selected.group.name) {
 			try {
 				params.append('min_access_level', 40);
-				projects = await get(`${apiUrl}/v4/users/${selected.group.name}/projects?${params}`, {
-					Authorization: `Bearer ${$appSession.tokens.gitlab}`
-				});
+				const newProjects = await get(
+					`${apiUrl}/v4/users/${selected.group.name}/projects?${params}`,
+					{
+						Authorization: `Bearer ${$appSession.tokens.gitlab}`
+					}
+				);
+				projects = projects.concat(newProjects);
+				if (newProjects.length === perPage) {
+					await loadProjects(page + 1);
+				}
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
@@ -141,9 +161,16 @@
 			}
 		} else {
 			try {
-				projects = await get(`${apiUrl}/v4/groups/${selected.group.id}/projects?${params}`, {
-					Authorization: `Bearer ${$appSession.tokens.gitlab}`
-				});
+				const newProjects = await get(
+					`${apiUrl}/v4/groups/${selected.group.id}/projects?${params}`,
+					{
+						Authorization: `Bearer ${$appSession.tokens.gitlab}`
+					}
+				);
+				projects = projects.concat(newProjects);
+				if (newProjects.length === perPage) {
+					await loadProjects(page + 1);
+				}
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
@@ -163,23 +190,28 @@
 		selected.branch = event.detail;
 		isBranchAlreadyUsed();
 	}
-	async function loadBranches() {
+	async function loadBranches(page: number = 1) {
+		let perPage = 100;
 		//@ts-ignore
 		const params = new URLSearchParams({
-			page: 1,
-			per_page: 100
+			page,
+			per_page: perPage
 		});
 		if (search.branch) {
 			params.append('search', search.branch);
 		}
 		loading.branches = true;
 		try {
-			branches = await get(
+			const newBranches = await get(
 				`${apiUrl}/v4/projects/${selected.project.id}/repository/branches?${params}`,
 				{
 					Authorization: `Bearer ${$appSession.tokens.gitlab}`
 				}
 			);
+			branches = branches.concat(newBranches);
+			if (newBranches.length === perPage) {
+				await loadBranches(page + 1);
+			}
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
