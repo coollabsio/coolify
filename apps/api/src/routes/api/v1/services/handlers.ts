@@ -2539,7 +2539,7 @@ export async function activateWordpressFtp(request: FastifyRequest, reply: Fasti
                 };
                 await fs.writeFile(
                     `${hostkeyDir}/${id}.sh`,
-                    `#!/bin/bash\nchmod 600 /etc/ssh/ssh_host_ed25519_key /etc/ssh/ssh_host_rsa_key`
+                    `#!/bin/bash\nchmod 600 /etc/ssh/ssh_host_ed25519_key /etc/ssh/ssh_host_rsa_key\nuserdel -f xfs`
                 );
                 await asyncExecShell(`chmod +x ${hostkeyDir}/${id}.sh`);
                 await fs.writeFile(`${hostkeyDir}/${id}-docker-compose.yml`, yaml.dump(compose));
