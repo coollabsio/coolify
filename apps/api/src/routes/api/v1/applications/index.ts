@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { cancelDeployment, checkDNS, checkRepository, deleteApplication, deleteSecret, deleteStorage, deployApplication, getApplication, getApplicationLogs, getBuildIdLogs, getBuildLogs, getBuildPack, getGitHubToken, getGitLabSSHKey, getPreviews, getSecrets, getStorages, getUsage, listApplications, newApplication, saveApplication, saveApplicationSettings, saveApplicationSource, saveBuildPack, saveDeployKey, saveDestination, saveGitLabSSHKey, saveRepository, saveSecret, saveStorage, stopApplication } from './handlers';
+import { cancelDeployment, checkDNS, checkRepository, deleteApplication, deleteSecret, deleteStorage, deployApplication, getApplication, getApplicationLogs, getBuildIdLogs, getBuildLogs, getBuildPack, getGitHubToken, getGitLabSSHKey, getImages, getPreviews, getSecrets, getStorages, getUsage, listApplications, newApplication, saveApplication, saveApplicationSettings, saveApplicationSource, saveBuildPack, saveDeployKey, saveDestination, saveGitLabSSHKey, saveRepository, saveSecret, saveStorage, stopApplication } from './handlers';
 
 export interface GetApplication {
     Params: { id: string; }
@@ -37,6 +37,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
         return await request.jwtVerify()
     })
     fastify.get('/', async (request) => await listApplications(request));
+    fastify.post('/images', async (request) => await getImages(request));
 
     fastify.post('/new', async (request, reply) => await newApplication(request, reply));
 
@@ -67,7 +68,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
 
     fastify.post<DeployApplication>('/:id/deploy', async (request) => await deployApplication(request))
     fastify.post('/:id/cancel', async (request, reply) => await cancelDeployment(request, reply));
-    
+
     fastify.post('/:id/configuration/source', async (request, reply) => await saveApplicationSource(request, reply));
 
     fastify.get('/:id/configuration/repository', async (request) => await checkRepository(request));

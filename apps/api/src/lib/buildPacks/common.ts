@@ -17,7 +17,7 @@ const nodeBased = [
 	'nextjs'
 ];
 
-export function setDefaultBaseImage(buildPack: string | null) {
+export function setDefaultBaseImage(buildPack: string | null, deploymentType: string | null) {
 	const nodeVersions = [
 		{
 			value: 'node:lts',
@@ -259,10 +259,17 @@ export function setDefaultBaseImage(buildPack: string | null) {
 		baseBuildImages: []
 	};
 	if (nodeBased.includes(buildPack)) {
-		payload.baseImage = 'node:lts';
-		payload.baseImages = nodeVersions;
-		payload.baseBuildImage = 'node:lts';
-		payload.baseBuildImages = nodeVersions;
+		if (deploymentType === 'static') {
+			payload.baseImage = 'webdevops/nginx:alpine';
+			payload.baseImages = staticVersions;
+			payload.baseBuildImage = 'node:lts';
+			payload.baseBuildImages = nodeVersions;
+		} else {
+			payload.baseImage = 'node:lts';
+			payload.baseImages = nodeVersions;
+			payload.baseBuildImage = 'node:lts';
+			payload.baseBuildImages = nodeVersions;
+		}
 	}
 	if (staticApps.includes(buildPack)) {
 		payload.baseImage = 'webdevops/nginx:alpine';
@@ -431,7 +438,7 @@ export async function copyBaseConfigurationFiles(
 				buildId,
 				applicationId
 			});
-		} else if (staticApps.includes(buildPack) && baseImage.includes('nginx')) {
+		} else if (baseImage.includes('nginx')) {
 			await fs.writeFile(
 				`${workdir}/nginx.conf`,
 				`user  nginx;

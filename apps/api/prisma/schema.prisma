@@ -91,6 +91,7 @@ model Application {
   startCommand        String?
   baseDirectory       String?
   publishDirectory    String?
+  deploymentType      String?
   phpModules          String?
   pythonWSGI          String?
   pythonModule        String?

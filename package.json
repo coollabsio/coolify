@@ -7,6 +7,7 @@
     "db:studio": "pnpm run --filter coolify-api db:studio",
     "db:push": "pnpm run --filter coolify-api db:push",
     "db:seed": "pnpm run --filter coolify-api db:seed",
+    "db:migrate": "pnpm run --filter coolify-api db:migrate",
     "format": "run-p -l -n format:*",
     "format:api": "NODE_ENV=development pnpm run --filter coolify-api format",
     "lint": "run-p -l -n lint:*",

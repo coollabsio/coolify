@@ -70,7 +70,8 @@ export function findBuildPack(pack: string, packageManager = 'npm') {
 			...metaData,
 			...defaultBuildAndDeploy(packageManager),
 			publishDirectory: null,
-			port: 3000
+			port: 3000,
+			deploymentType: 'node'
 		};
 	}
 	if (pack === 'gatsby') {

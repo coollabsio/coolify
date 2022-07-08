@@ -55,7 +55,8 @@ import * as buildpacks from '../lib/buildPacks';
 						denoOptions,
 						exposePort,
 						baseImage,
-						baseBuildImage
+						baseBuildImage,
+						deploymentType
 					} = message
 					let {
 						branch,
@@ -225,7 +226,8 @@ import * as buildpacks from '../lib/buildPacks';
 										denoMainFile,
 										denoOptions,
 										baseImage,
-										baseBuildImage
+										baseBuildImage,
+										deploymentType
 									});
 								else {
 									await saveBuildLog({ line: `Build pack ${buildPack} not found`, buildId, applicationId });
