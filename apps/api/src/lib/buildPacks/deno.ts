@@ -42,9 +42,8 @@ const createDockerfile = async (data, image): Promise<void> => {
 		Dockerfile.push(`COPY .${baseDirectory || ''}/deps.ts /app`);
 		Dockerfile.push(`RUN deno cache deps.ts`);
 	}
-	Dockerfile.push(`COPY ${denoMainFile} /app`);
-	Dockerfile.push(`RUN deno cache ${denoMainFile}`);
 	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
+	Dockerfile.push(`RUN deno cache ${denoMainFile}`);
 	Dockerfile.push(`ENV NO_COLOR true`);
 	Dockerfile.push(`EXPOSE ${port}`);
 	Dockerfile.push(`CMD deno run ${denoOptions ? denoOptions.split(' ') : ''} ${denoMainFile}`);
