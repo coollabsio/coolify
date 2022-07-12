@@ -5,11 +5,6 @@ image: node:18
 tasks:
   - before: curl -sL https://unpkg.com/@pnpm/self-installer | node
   - init: pnpm install && pnpm db:push && pnpm db:seed
-    env: 
-      COOLIFY_DATABASE_URL:
-        file:../db/dev.db
-      COOLIFY_SECRET_KEY:
-        12341234123412341234123412341234
     command: pnpm dev
 
 ports:
