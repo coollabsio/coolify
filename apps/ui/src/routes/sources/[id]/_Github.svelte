@@ -165,13 +165,10 @@
 						class:hover:bg-orange-500={!loading}
 						disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
 					>
-
-					<button
-						><a
-							class="no-underline"
-							href={`${source.htmlUrl}/apps/${source.githubApp.name}/installations/new`}
-							>{$t('source.change_app_settings', { name: 'GitHub' })}</a
-						></button
+					<a
+						class="no-underline button justify-center flex items-center"
+						href={`${source.htmlUrl}/apps/${source.githubApp.name}/installations/new`}
+						>{$t('source.change_app_settings', { name: 'GitHub' })}</a
 					>
 				{/if}
 			</div>
