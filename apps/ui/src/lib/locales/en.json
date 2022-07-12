@@ -180,7 +180,7 @@
 		"domain_already_in_use": "Domain {{domain}} is already used.",
 		"dns_not_set_error": "DNS not set correctly or propogated for {{domain}}.<br><br>Please check your DNS settings.",
 		"domain_required": "Domain is required.",
-		"settings_saved": "Settings saved.",
+		"settings_saved": "Configuration saved.",
 		"dns_not_set_partial_error": "DNS not set",
 		"domain_not_valid": "Could not resolve domain or it's not pointing to the server IP address.<br><br>Please check your DNS configuration and try again.",
 		"git_source": "Git Source",

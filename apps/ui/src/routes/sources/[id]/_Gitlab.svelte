@@ -69,7 +69,7 @@
 					htmlUrl: source.htmlUrl.replace(/\/$/, ''),
 					apiUrl: source.apiUrl.replace(/\/$/, '')
 				});
-				toast.push('Settings saved.');
+				toast.push('Configuration saved.');
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
