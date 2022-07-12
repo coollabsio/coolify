@@ -2,9 +2,10 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceImages, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePort, getDomain, errorHandler, supportedServiceTypesAndVersions } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceImages, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePort, getDomain, errorHandler, supportedServiceTypesAndVersions, generatePassword, isDev, stopTcpHttpProxy } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, dockerInstance, getEngine, removeContainer } from '../../../../lib/docker';
+import cuid from 'cuid';
 
 export async function listServices(request: FastifyRequest) {
     try {
@@ -42,7 +43,7 @@ export async function getService(request: FastifyRequest) {
         const teamId = request.user.teamId;
         const { id } = request.params;
         const service = await getServiceFromDB({ id, teamId });
-        
+
         if (!service) {
             throw { status: 404, message: 'Service not found.' }
         }
@@ -237,18 +238,20 @@ export async function checkService(request: FastifyRequest) {
     try {
         const { id } = request.params;
         let { fqdn, exposePort, otherFqdns } = request.body;
+
         if (fqdn) fqdn = fqdn.toLowerCase();
         if (otherFqdns && otherFqdns.length > 0) otherFqdns = otherFqdns.map((f) => f.toLowerCase());
         if (exposePort) exposePort = Number(exposePort);
+
         let found = await isDomainConfigured({ id, fqdn });
         if (found) {
-            throw `Domain already configured.`
+            throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
         if (otherFqdns && otherFqdns.length > 0) {
             for (const ofqdn of otherFqdns) {
                 found = await isDomainConfigured({ id, fqdn: ofqdn, checkOwn: true });
                 if (found) {
-                    throw "Domain already configured."
+                    throw { status: 500, message: `Domain ${getDomain(ofqdn).replace('www.', '')} is already in use!` }
                 }
             }
         }
@@ -257,12 +260,12 @@ export async function checkService(request: FastifyRequest) {
             exposePort = Number(exposePort);
 
             if (exposePort < 1024 || exposePort > 65535) {
-                throw `Exposed Port needs to be between 1024 and 65535.`
+                throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
             }
 
             const publicPort = await getPort({ port: exposePort });
             if (publicPort !== exposePort) {
-                throw `Port ${exposePort} is already in use.`
+                throw { status: 500, message: `Port ${exposePort} is already in use.` }
             }
         }
         return {}
@@ -2414,4 +2417,168 @@ export async function activatePlausibleUsers(request: FastifyRequest, reply: Fas
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
+}
+export async function activateWordpressFtp(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = request.params
+    const teamId = request.user.teamId;
+
+    const { ftpEnabled } = request.body;
+
+    const publicPort = await getFreePort();
+    let ftpUser = cuid();
+    let ftpPassword = generatePassword();
+
+    const hostkeyDir = isDev ? '/tmp/hostkeys' : '/app/ssl/hostkeys';
+    try {
+        const data = await prisma.wordpress.update({
+            where: { serviceId: id },
+            data: { ftpEnabled },
+            include: { service: { include: { destinationDocker: true } } }
+        });
+        const {
+            service: { destinationDockerId, destinationDocker },
+            ftpPublicPort,
+            ftpUser: user,
+            ftpPassword: savedPassword,
+            ftpHostKey,
+            ftpHostKeyPrivate
+        } = data;
+        const { network, engine } = destinationDocker;
+        const host = getEngine(engine);
+        if (ftpEnabled) {
+            if (user) ftpUser = user;
+            if (savedPassword) ftpPassword = decrypt(savedPassword);
+
+            const { stdout: password } = await asyncExecShell(
+                `echo ${ftpPassword} | openssl passwd -1 -stdin`
+            );
+            if (destinationDockerId) {
+                try {
+                    await fs.stat(hostkeyDir);
+                } catch (error) {
+                    await asyncExecShell(`mkdir -p ${hostkeyDir}`);
+                }
+                if (!ftpHostKey) {
+                    await asyncExecShell(
+                        `ssh-keygen -t ed25519 -f ssh_host_ed25519_key -N "" -q -f ${hostkeyDir}/${id}.ed25519`
+                    );
+                    const { stdout: ftpHostKey } = await asyncExecShell(`cat ${hostkeyDir}/${id}.ed25519`);
+                    await prisma.wordpress.update({
+                        where: { serviceId: id },
+                        data: { ftpHostKey: encrypt(ftpHostKey) }
+                    });
+                } else {
+                    await asyncExecShell(`echo "${decrypt(ftpHostKey)}" > ${hostkeyDir}/${id}.ed25519`);
+                }
+                if (!ftpHostKeyPrivate) {
+                    await asyncExecShell(`ssh-keygen -t rsa -b 4096 -N "" -f ${hostkeyDir}/${id}.rsa`);
+                    const { stdout: ftpHostKeyPrivate } = await asyncExecShell(`cat ${hostkeyDir}/${id}.rsa`);
+                    await prisma.wordpress.update({
+                        where: { serviceId: id },
+                        data: { ftpHostKeyPrivate: encrypt(ftpHostKeyPrivate) }
+                    });
+                } else {
+                    await asyncExecShell(`echo "${decrypt(ftpHostKeyPrivate)}" > ${hostkeyDir}/${id}.rsa`);
+                }
+
+                await prisma.wordpress.update({
+                    where: { serviceId: id },
+                    data: {
+                        ftpPublicPort: publicPort,
+                        ftpUser: user ? undefined : ftpUser,
+                        ftpPassword: savedPassword ? undefined : encrypt(ftpPassword)
+                    }
+                });
+
+                try {
+                    const isRunning = await checkContainer(engine, `${id}-ftp`);
+                    if (isRunning) {
+                        await asyncExecShell(
+                            `DOCKER_HOST=${host} docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`
+                        );
+                    }
+                } catch (error) {
+                    console.log(error);
+                    //
+                }
+                const volumes = [
+                    `${id}-wordpress-data:/home/${ftpUser}/wordpress`,
+                    `${isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
+                    }/${id}.ed25519:/etc/ssh/ssh_host_ed25519_key`,
+                    `${isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
+                    }/${id}.rsa:/etc/ssh/ssh_host_rsa_key`,
+                    `${isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
+                    }/${id}.sh:/etc/sftp.d/chmod.sh`
+                ];
+
+                const compose: ComposeFile = {
+                    version: '3.8',
+                    services: {
+                        [`${id}-ftp`]: {
+                            image: `atmoz/sftp:alpine`,
+                            command: `'${ftpUser}:${password.replace('\n', '').replace(/\$/g, '$$$')}:e:33'`,
+                            extra_hosts: ['host.docker.internal:host-gateway'],
+                            container_name: `${id}-ftp`,
+                            volumes,
+                            networks: [network],
+                            depends_on: [],
+                            restart: 'always'
+                        }
+                    },
+                    networks: {
+                        [network]: {
+                            external: true
+                        }
+                    },
+                    volumes: {
+                        [`${id}-wordpress-data`]: {
+                            external: true,
+                            name: `${id}-wordpress-data`
+                        }
+                    }
+                };
+                await fs.writeFile(
+                    `${hostkeyDir}/${id}.sh`,
+                    `#!/bin/bash\nchmod 600 /etc/ssh/ssh_host_ed25519_key /etc/ssh/ssh_host_rsa_key\nuserdel -f xfs\nchown -R 33:33 /home/${ftpUser}/wordpress/`
+                );
+                await asyncExecShell(`chmod +x ${hostkeyDir}/${id}.sh`);
+                await fs.writeFile(`${hostkeyDir}/${id}-docker-compose.yml`, yaml.dump(compose));
+                await asyncExecShell(
+                    `DOCKER_HOST=${host} docker compose -f ${hostkeyDir}/${id}-docker-compose.yml up -d`
+                );
+            }
+            return reply.code(201).send({
+                publicPort,
+                ftpUser,
+                ftpPassword
+            })
+        } else {
+            await prisma.wordpress.update({
+                where: { serviceId: id },
+                data: { ftpPublicPort: null }
+            });
+            try {
+                await asyncExecShell(
+                    `DOCKER_HOST=${host} docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`
+                );
+            } catch (error) {
+                //
+            }
+            await stopTcpHttpProxy(id, destinationDocker, ftpPublicPort);
+            return {
+            };
+        }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    } finally {
+        try {
+            await asyncExecShell(
+                `rm -fr ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub ${hostkeyDir}/${id}.sh`
+            );
+        } catch (error) {
+            console.log(error)
+        }
+
+    }
+
 }

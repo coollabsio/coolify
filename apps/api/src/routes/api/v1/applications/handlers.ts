@@ -31,6 +31,40 @@ export async function listApplications(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
+export async function getImages(request: FastifyRequest) {
+    try {
+        const { buildPack, deploymentType } = request.body
+        let publishDirectory = undefined;
+        let port = undefined
+        const { baseImage, baseBuildImage, baseBuildImages, baseImages, } = setDefaultBaseImage(
+            buildPack, deploymentType
+        );
+        if (buildPack === 'nextjs') {
+            if (deploymentType === 'static') {
+                publishDirectory = 'out'
+                port = '80'
+            } else {
+                publishDirectory = ''
+                port = '3000'
+            }
+        }
+        if (buildPack === 'nuxtjs') {
+            if (deploymentType === 'static') {
+                publishDirectory = 'dist'
+                port = '80'
+            } else {
+                publishDirectory = ''
+                port = '3000'
+            }
+        }
+
+
+        return { baseImage, baseBuildImage, baseBuildImages, baseImages, publishDirectory, port }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
 export async function getApplication(request: FastifyRequest<GetApplication>) {
     try {
         const { id } = request.params
@@ -184,7 +218,8 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             denoMainFile,
             denoOptions,
             baseImage,
-            baseBuildImage
+            baseBuildImage,
+            deploymentType
         } = request.body
 
         if (port) port = Number(port);
@@ -215,6 +250,7 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
                 denoOptions,
                 baseImage,
                 baseBuildImage,
+                deploymentType,
                 ...defaultConfiguration
             }
         });

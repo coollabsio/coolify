@@ -103,8 +103,18 @@
 		usageInterval = setInterval(async () => {
 			await getUsage();
 		}, 1000);
+		await getBaseBuildImages();
 	});
-
+	async function getBaseBuildImages() {
+		const data = await post(`/applications/images`, {
+			buildPack: application.buildPack,
+			deploymentType: application.deploymentType
+		});
+		application = {
+			...application,
+			...data
+		};
+	}
 	async function changeSettings(name: any) {
 		if (name === 'debug') {
 			debug = !debug;
@@ -145,10 +155,12 @@
 		}
 	}
 	async function handleSubmit() {
-		if (loading) return;
+		if (loading || !application.fqdn) return;
 		loading = true;
 		try {
 			nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
+			if (application.deploymentType)
+				application.deploymentType = application.deploymentType.toLowerCase();
 			await post(`/applications/${id}/check`, {
 				fqdn: application.fqdn,
 				forceSave,
@@ -192,6 +204,11 @@
 		application.baseBuildImage = event.detail.value;
 		await handleSubmit();
 	}
+	async function selectDeploymentType(event: any) {
+		application.deploymentType = event.detail.value;
+		await getBaseBuildImages();
+		await handleSubmit();
+	}
 
 	async function isDNSValid(domain: any, isWWW: any) {
 		try {
@@ -199,7 +216,7 @@
 			toast.push('DNS configuration is valid.');
 			isWWW ? (isWWWDomainOK = true) : (isNonWWWDomainOK = true);
 			return true;
-		} catch ({ error }) {
+		} catch (error) {
 			errorNotification(error);
 			isWWW ? (isWWWDomainOK = false) : (isNonWWWDomainOK = false);
 			return false;
@@ -404,26 +421,6 @@
 					/>
 				</div>
 			</div>
-			{#if application.buildPack !== 'docker'}
-				<div class="grid grid-cols-2 items-center">
-					<label for="baseImage" class="text-base font-bold text-stone-100"
-						>{$t('application.base_image')}</label
-					>
-					<div class="custom-select-wrapper">
-						<Select
-							{isDisabled}
-							containerClasses={isDisabled && containerClass()}
-							id="baseImages"
-							showIndicator={!$status.application.isRunning}
-							items={application.baseImages}
-							on:select={selectBaseImage}
-							value={application.baseImage}
-							isClearable={false}
-						/>
-					</div>
-					<Explainer text={$t('application.base_image_explainer')} />
-				</div>
-			{/if}
 			{#if application.buildCommand || application.buildPack === 'rust' || application.buildPack === 'laravel'}
 				<div class="grid grid-cols-2 items-center pb-8">
 					<label for="baseBuildImage" class="text-base font-bold text-stone-100"
@@ -447,6 +444,48 @@
 					{:else}
 						<Explainer text={$t('application.base_build_image_explainer')} />
 					{/if}
+				</div>
+			{/if}
+			{#if application.buildPack !== 'docker'}
+				<div class="grid grid-cols-2 items-center">
+					<label for="baseImage" class="text-base font-bold text-stone-100"
+						>{$t('application.base_image')}</label
+					>
+					<div class="custom-select-wrapper">
+						<Select
+							{isDisabled}
+							containerClasses={isDisabled && containerClass()}
+							id="baseImages"
+							showIndicator={!$status.application.isRunning}
+							items={application.baseImages}
+							on:select={selectBaseImage}
+							value={application.baseImage}
+							isClearable={false}
+						/>
+					</div>
+					<Explainer text={$t('application.base_image_explainer')} />
+				</div>
+			{/if}
+			{#if application.buildPack !== 'docker' && (application.buildPack === 'nextjs' || application.buildPack === 'nuxtjs')}
+				<div class="grid grid-cols-2 items-center pb-8">
+					<label for="deploymentType" class="text-base font-bold text-stone-100"
+						>Deployment Type</label
+					>
+					<div class="custom-select-wrapper">
+						<Select
+							{isDisabled}
+							containerClasses={isDisabled && containerClass()}
+							id="deploymentTypes"
+							showIndicator={!$status.application.isRunning}
+							items={['static', 'node']}
+							on:select={selectDeploymentType}
+							value={application.deploymentType}
+							isClearable={false}
+						/>
+					</div>
+					<Explainer
+						text="Defines how to deploy your application. <br><br><span class='text-green-500 font-bold'>Static</span> is for static websites, <span class='text-green-500 font-bold'>node</span> is for server-side applications."
+					/>
 				</div>
 			{/if}
 		</div>
@@ -473,6 +512,7 @@
 						bind:this={domainEl}
 						name="fqdn"
 						id="fqdn"
+						required
 						bind:value={application.fqdn}
 						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 						placeholder="eg: https://coollabs.io"
@@ -516,7 +556,7 @@
 			<div class="grid grid-cols-2 items-center pb-8">
 				<Setting
 					dataTooltip={$t('forms.must_be_stopped_to_modify')}
-					disabled={$status.application.isRunning}
+					disabled={isDisabled}
 					isCenter={false}
 					bind:setting={dualCerts}
 					title={$t('application.ssl_www_and_non_www')}
@@ -535,6 +575,7 @@
 				<div class="grid grid-cols-2 items-center">
 					<label for="pythonModule" class="text-base font-bold text-stone-100">Module</label>
 					<input
+						disabled={isDisabled}
 						readonly={!$appSession.isAdmin}
 						name="pythonModule"
 						id="pythonModule"
@@ -547,6 +588,7 @@
 					<div class="grid grid-cols-2 items-center">
 						<label for="pythonVariable" class="text-base font-bold text-stone-100">Variable</label>
 						<input
+							disabled={isDisabled}
 							readonly={!$appSession.isAdmin}
 							name="pythonVariable"
 							id="pythonVariable"
@@ -560,6 +602,7 @@
 					<div class="grid grid-cols-2 items-center">
 						<label for="pythonVariable" class="text-base font-bold text-stone-100">Variable</label>
 						<input
+							disabled={isDisabled}
 							readonly={!$appSession.isAdmin}
 							name="pythonVariable"
 							id="pythonVariable"
@@ -574,6 +617,7 @@
 				<div class="grid grid-cols-2 items-center">
 					<label for="port" class="text-base font-bold text-stone-100">{$t('forms.port')}</label>
 					<input
+						disabled={isDisabled}
 						readonly={!$appSession.isAdmin}
 						name="port"
 						id="port"
@@ -582,28 +626,27 @@
 					/>
 				</div>
 			{/if}
-			{#if application.buildPack !== 'docker'}
-				<div class="grid grid-cols-2 items-center">
-					<label for="exposePort" class="text-base font-bold text-stone-100">Exposed Port</label>
-					<input
-						readonly={!$appSession.isAdmin && !$status.application.isRunning}
-						disabled={isDisabled}
-						name="exposePort"
-						id="exposePort"
-						bind:value={application.exposePort}
-						placeholder="12345"
-					/>
-					<Explainer
-						text={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
-					/>
-				</div>
-			{/if}
+			<div class="grid grid-cols-2 items-center">
+				<label for="exposePort" class="text-base font-bold text-stone-100">Exposed Port</label>
+				<input
+					readonly={!$appSession.isAdmin && !$status.application.isRunning}
+					disabled={isDisabled}
+					name="exposePort"
+					id="exposePort"
+					bind:value={application.exposePort}
+					placeholder="12345"
+				/>
+				<Explainer
+					text={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
+				/>
+			</div>
 			{#if !notNodeDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-2 items-center pt-4">
 					<label for="installCommand" class="text-base font-bold text-stone-100"
 						>{$t('application.install_command')}</label
 					>
 					<input
+						disabled={isDisabled}
 						readonly={!$appSession.isAdmin}
 						name="installCommand"
 						id="installCommand"
@@ -616,6 +659,7 @@
 						>{$t('application.build_command')}</label
 					>
 					<input
+						disabled={isDisabled}
 						readonly={!$appSession.isAdmin}
 						name="buildCommand"
 						id="buildCommand"
@@ -628,6 +672,7 @@
 						>{$t('application.start_command')}</label
 					>
 					<input
+						disabled={isDisabled}
 						readonly={!$appSession.isAdmin}
 						name="startCommand"
 						id="startCommand"
@@ -642,6 +687,7 @@
 						>Dockerfile Location</label
 					>
 					<input
+						disabled={isDisabled}
 						readonly={!$appSession.isAdmin}
 						name="dockerFileLocation"
 						id="dockerFileLocation"
@@ -649,7 +695,7 @@
 						placeholder="default: /Dockerfile"
 					/>
 					<Explainer
-						text="Does not rely on Base Directory. <br>Should be absolute path, like <span class='text-green-500 font-bold'>/data/Dockerfile</span> or <span class='text-green-500 font-bold'>/Dockerfile.</span>"
+						text="Should be absolute path, like <span class='text-green-500 font-bold'>/data/Dockerfile</span> or <span class='text-green-500 font-bold'>/Dockerfile.</span>"
 					/>
 				</div>
 			{/if}
@@ -657,6 +703,7 @@
 				<div class="grid grid-cols-2 items-center">
 					<label for="denoMainFile" class="text-base font-bold text-stone-100">Main File</label>
 					<input
+						disabled={isDisabled}
 						readonly={!$appSession.isAdmin}
 						name="denoMainFile"
 						id="denoMainFile"
@@ -667,6 +714,7 @@
 				<div class="grid grid-cols-2 items-center">
 					<label for="denoOptions" class="text-base font-bold text-stone-100">Arguments</label>
 					<input
+						disabled={isDisabled}
 						readonly={!$appSession.isAdmin}
 						name="denoOptions"
 						id="denoOptions"
@@ -687,6 +735,7 @@
 						<Explainer text={$t('application.directory_to_use_explainer')} />
 					</div>
 					<input
+						disabled={isDisabled}
 						readonly={!$appSession.isAdmin}
 						name="baseDirectory"
 						id="baseDirectory"
@@ -705,9 +754,11 @@
 					</div>
 
 					<input
+						disabled={isDisabled}
 						readonly={!$appSession.isAdmin}
 						name="publishDirectory"
 						id="publishDirectory"
+						required={application.deploymentType === 'static'}
 						bind:value={application.publishDirectory}
 						placeholder=" {$t('forms.default')}: /"
 					/>

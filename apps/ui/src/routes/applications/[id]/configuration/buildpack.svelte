@@ -60,7 +60,7 @@
 			}
 		}
 	}
-	async function scanRepository() {
+	async function scanRepository(): Promise<void> {
 		try {
 			if (type === 'gitlab') {
 				const files = await get(`${apiUrl}/v4/projects/${projectId}/repository/tree`, {

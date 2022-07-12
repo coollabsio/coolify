@@ -45,7 +45,7 @@
 			});
 			await post(`/services/${id}`, { ...service });
 			$disabledButton = false;
-			toast.push('Settings saved.');
+			toast.push('Configuration saved.');
 		} catch (error) {
 			return errorNotification(error);
 		} finally {

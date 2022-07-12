@@ -87,7 +87,7 @@
 				isDNSCheckEnabled
 			});
 			return toast.push(t.get('application.settings_saved'));
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}
@@ -134,7 +134,7 @@
 			toast.push('DNS configuration is valid.');
 			isWWW ? (isWWWDomainOK = true) : (isNonWWWDomainOK = true);
 			return true;
-		} catch ({ error }) {
+		} catch (error) {
 			errorNotification(error);
 			isWWW ? (isWWWDomainOK = false) : (isNonWWWDomainOK = false);
 			return false;
@@ -151,7 +151,7 @@
 			const data = await get(`/settings`);
 			$isTraefikUsed = data.settings.isTraefikUsed;
 			return toast.push('Proxy migration started, it takes a few seconds.');
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		} finally {
 			loading.proxyMigration = false;

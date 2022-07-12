@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import yaml from 'js-yaml';
 
 import { copyBaseConfigurationFiles, makeLabelForStandaloneApplication, saveBuildLog, setDefaultConfiguration } from '../lib/buildPacks/common';
-import { asyncExecShell, createDirectories, decrypt, getDomain, prisma } from '../lib/common';
+import { asyncExecShell,  createDirectories, decrypt, getDomain, prisma } from '../lib/common';
 import { dockerInstance, getEngine } from '../lib/docker';
 import * as importers from '../lib/importers';
 import * as buildpacks from '../lib/buildPacks';
@@ -21,8 +21,12 @@ import * as buildpacks from '../lib/buildPacks';
 					parentPort.postMessage('cancelled');
 					return;
 				}
-				if (message === 'status') {
-					parentPort.postMessage({ size: queue.size, pending: queue.pending });
+				if (message === 'status:autoUpdater') {
+					parentPort.postMessage({ size: queue.size, pending: queue.pending, caller: 'autoUpdater' });
+					return;
+				}
+				if (message === 'status:cleanupStorage') {
+					parentPort.postMessage({ size: queue.size, pending: queue.pending, caller: 'cleanupStorage' });
 					return;
 				}
 
@@ -51,7 +55,8 @@ import * as buildpacks from '../lib/buildPacks';
 						denoOptions,
 						exposePort,
 						baseImage,
-						baseBuildImage
+						baseBuildImage,
+						deploymentType,
 					} = message
 					let {
 						branch,
@@ -122,6 +127,7 @@ import * as buildpacks from '../lib/buildPacks';
 								repodir,
 								githubAppId: gitSource.githubApp?.id,
 								gitlabAppId: gitSource.gitlabApp?.id,
+								customPort: gitSource.customPort,
 								repository,
 								branch,
 								buildId,
@@ -221,7 +227,8 @@ import * as buildpacks from '../lib/buildPacks';
 										denoMainFile,
 										denoOptions,
 										baseImage,
-										baseBuildImage
+										baseBuildImage,
+										deploymentType
 									});
 								else {
 									await saveBuildLog({ line: `Build pack ${buildPack} not found`, buildId, applicationId });

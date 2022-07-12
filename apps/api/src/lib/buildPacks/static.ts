@@ -40,7 +40,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	} else {
 		Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	}
-	if (baseImage.includes('nginx')) {
+	if (baseImage?.includes('nginx')) {
 		Dockerfile.push(`COPY /nginx.conf /etc/nginx/nginx.conf`);
 	}
 	Dockerfile.push(`EXPOSE ${port}`);

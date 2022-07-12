@@ -15,6 +15,9 @@ import { checkContainer, getEngine, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
+export const version = '3.1.0';
+export const isDev = process.env.NODE_ENV === 'development';
+
 const algorithm = 'aes-256-ctr';
 const customConfig: Config = {
 	dictionaries: [adjectives, colors, animals],
@@ -22,8 +25,6 @@ const customConfig: Config = {
 	separator: ' ',
 	length: 3
 };
-export const isDev = process.env.NODE_ENV === 'development';
-export const version = '3.0.3';
 
 export const defaultProxyImage = `coolify-haproxy-alpine:latest`;
 export const defaultProxyImageTcp = `coolify-haproxy-tcp-alpine:latest`;

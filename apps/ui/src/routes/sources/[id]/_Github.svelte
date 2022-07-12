@@ -11,7 +11,11 @@
 	import { dev } from '$app/env';
 
 	const { id } = $page.params;
+
+	$: selfHosted = source.htmlUrl !== 'https://github.com';
+
 	let loading = false;
+
 	async function handleSubmit() {
 		loading = true;
 		try {
@@ -20,7 +24,7 @@
 				htmlUrl: source.htmlUrl.replace(/\/$/, ''),
 				apiUrl: source.apiUrl.replace(/\/$/, '')
 			});
-			toast.push('Settings saved.');
+			toast.push('Configuration saved.');
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
@@ -57,7 +61,8 @@
 				name: source.name,
 				htmlUrl: source.htmlUrl.replace(/\/$/, ''),
 				apiUrl: source.apiUrl.replace(/\/$/, ''),
-				organization: source.organization
+				organization: source.organization,
+				customPort: source.customPort
 			});
 			const { organization, htmlUrl } = source;
 			const { fqdn } = settings;
@@ -113,8 +118,11 @@
 <div class="mx-auto max-w-4xl px-6">
 	{#if !source.githubAppId}
 		<form on:submit|preventDefault={newGithubApp} class="py-4">
-			<div class="flex space-x-1 pb-5 font-bold">
+			<div class="flex space-x-1 pb-7 font-bold">
 				<div class="title">General</div>
+				{#if !source.githubAppId}
+					<button class="bg-orange-600" type="submit">Save</button>
+				{/if}
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
 				<div class="grid grid-flow-row gap-2">
@@ -130,6 +138,20 @@
 				<div class="grid grid-cols-2 items-center">
 					<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
 					<input name="apiUrl" id="apiUrl" required bind:value={source.apiUrl} />
+				</div>
+				<div class="grid grid-cols-2 items-center">
+					<label for="customPort" class="text-base font-bold text-stone-100">Custom SSH Port</label>
+					<input
+						name="customPort"
+						id="customPort"
+						disabled={!selfHosted || source.githubAppId}
+						readonly={!selfHosted || source.githubAppId}
+						required
+						value={source.customPort}
+					/>
+					<Explainer
+						text="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
+					/>
 				</div>
 				<div class="grid grid-cols-2">
 					<div class="flex flex-col">
@@ -148,11 +170,6 @@
 					/>
 				</div>
 			</div>
-			{#if source.apiUrl && source.htmlUrl && source.name}
-				<div class="text-center">
-					<button class=" mt-8 bg-orange-600" type="submit">Create new GitHub App</button>
-				</div>
-			{/if}
 		</form>
 	{:else if source.githubApp?.installationId}
 		<form on:submit|preventDefault={handleSubmit} class="py-4">
@@ -165,13 +182,10 @@
 						class:hover:bg-orange-500={!loading}
 						disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
 					>
-
-					<button
-						><a
-							class="no-underline"
-							href={`${source.htmlUrl}/apps/${source.githubApp.name}/installations/new`}
-							>{$t('source.change_app_settings', { name: 'GitHub' })}</a
-						></button
+					<a
+						class="no-underline button justify-center flex items-center"
+						href={`${source.htmlUrl}/apps/${source.githubApp.name}/installations/new`}
+						>{$t('source.change_app_settings', { name: 'GitHub' })}</a
 					>
 				{/if}
 			</div>
@@ -184,11 +198,39 @@
 				</div>
 				<div class="grid grid-cols-2 items-center">
 					<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
-					<input name="htmlUrl" id="htmlUrl" required bind:value={source.htmlUrl} />
+					<input
+						name="htmlUrl"
+						id="htmlUrl"
+						disabled={source.githubAppId}
+						readonly={source.githubAppId}
+						required
+						bind:value={source.htmlUrl}
+					/>
 				</div>
 				<div class="grid grid-cols-2 items-center">
 					<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
-					<input name="apiUrl" id="apiUrl" required bind:value={source.apiUrl} />
+					<input
+						name="apiUrl"
+						id="apiUrl"
+						required
+						disabled={source.githubAppId}
+						readonly={source.githubAppId}
+						bind:value={source.apiUrl}
+					/>
+				</div>
+				<div class="grid grid-cols-2 items-center">
+					<label for="customPort" class="text-base font-bold text-stone-100">Custom SSH Port</label>
+					<input
+						name="customPort"
+						id="customPort"
+						disabled={!selfHosted}
+						readonly={!selfHosted}
+						required
+						value={source.customPort}
+					/>
+					<Explainer
+						text="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
+					/>
 				</div>
 				<div class="grid grid-cols-2">
 					<div class="flex flex-col">
@@ -210,7 +252,9 @@
 	{:else}
 		<div class="text-center">
 			<a href={`${source.htmlUrl}/apps/${source.githubApp.name}/installations/new`}>
-				<button class=" bg-orange-600 hover:bg-orange-500 mt-8">Install Repositories</button></a
+				<button class="box-selection bg-orange-600 hover:bg-orange-500 text-xl"
+					>Install Repositories</button
+				></a
 			>
 		</div>
 	{/if}

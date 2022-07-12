@@ -28,6 +28,7 @@
 		branches: false,
 		save: false
 	};
+	let tryAgain = false;
 
 	let htmlUrl = application.gitSource.htmlUrl;
 	let apiUrl = application.gitSource.apiUrl;
@@ -44,10 +45,7 @@
 		project: undefined,
 		branch: undefined
 	};
-	let search = {
-		project: '',
-		branch: ''
-	};
+
 	onMount(async () => {
 		if (!$appSession.tokens.gitlab) {
 			await getGitlabToken();
@@ -58,18 +56,10 @@
 				Authorization: `Bearer ${$appSession.tokens.gitlab}`
 			});
 			username = user.username;
+			await loadGroups();
 		} catch (error) {
-			return await getGitlabToken();
-		}
-		try {
-			groups = await get(`${apiUrl}/v4/groups?per_page=5000`, {
-				Authorization: `Bearer ${$appSession.tokens.gitlab}`
-			});
-		} catch (error: any) {
-			errorNotification(error);
-			throw new Error(error);
-		} finally {
 			loading.base = false;
+			tryAgain = true;
 		}
 	});
 	function selectGroup(event: any) {
@@ -77,15 +67,10 @@
 		selected.project = null;
 		selected.branch = null;
 		showSave = false;
+
+		// Clear out projects
+		projects = [];
 		loadProjects();
-	}
-	async function searchProjects(searchText: any) {
-		if (!selected.group) {
-			return;
-		}
-		search.project = searchText;
-		await loadProjects();
-		return projects;
 	}
 	function selectProject(event: any) {
 		selected.project = event.detail;
@@ -116,24 +101,50 @@
 			}, 100);
 		});
 	}
-
-	async function loadProjects() {
+	async function loadGroups(page: number = 1) {
+		let perPage = 100;
 		//@ts-ignore
 		const params: any = new URLSearchParams({
-			page: 1,
-			per_page: 25,
+			page,
+			per_page: perPage
+		});
+		loading.base = true;
+		try {
+			const newGroups = await get(`${apiUrl}/v4/groups?${params}`, {
+				Authorization: `Bearer ${$appSession.tokens.gitlab}`
+			});
+			groups = groups.concat(newGroups);
+			if (newGroups.length === perPage) {
+				await loadGroups(page + 1);
+			}
+		} catch (error) {
+			return errorNotification(error);
+		} finally {
+			loading.base = false;
+		}
+	}
+	async function loadProjects(page: number = 1) {
+		let perPage = 100;
+		//@ts-ignore
+		const params: any = new URLSearchParams({
+			page,
+			per_page: perPage,
 			archived: false
 		});
-		if (search.project) {
-			params.append('search', search.project);
-		}
 		loading.projects = true;
 		if (username === selected.group.name) {
 			try {
 				params.append('min_access_level', 40);
-				projects = await get(`${apiUrl}/v4/users/${selected.group.name}/projects?${params}`, {
-					Authorization: `Bearer ${$appSession.tokens.gitlab}`
-				});
+				const newProjects = await get(
+					`${apiUrl}/v4/users/${selected.group.name}/projects?${params}`,
+					{
+						Authorization: `Bearer ${$appSession.tokens.gitlab}`
+					}
+				);
+				projects = projects.concat(newProjects);
+				if (newProjects.length === perPage) {
+					await loadProjects(page + 1);
+				}
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
@@ -141,9 +152,16 @@
 			}
 		} else {
 			try {
-				projects = await get(`${apiUrl}/v4/groups/${selected.group.id}/projects?${params}`, {
-					Authorization: `Bearer ${$appSession.tokens.gitlab}`
-				});
+				const newProjects = await get(
+					`${apiUrl}/v4/groups/${selected.group.id}/projects?${params}`,
+					{
+						Authorization: `Bearer ${$appSession.tokens.gitlab}`
+					}
+				);
+				projects = projects.concat(newProjects);
+				if (newProjects.length === perPage) {
+					await loadProjects(page + 1);
+				}
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
@@ -151,35 +169,29 @@
 			}
 		}
 	}
-	async function searchBranches(searchText: any) {
-		if (!selected.project) {
-			return;
-		}
-		search.branch = searchText;
-		await loadBranches();
-		return branches;
-	}
 	function selectBranch(event: any) {
 		selected.branch = event.detail;
 		isBranchAlreadyUsed();
 	}
-	async function loadBranches() {
+	async function loadBranches(page: number = 1) {
+		let perPage = 100;
 		//@ts-ignore
 		const params = new URLSearchParams({
-			page: 1,
-			per_page: 100
+			page,
+			per_page: perPage
 		});
-		if (search.branch) {
-			params.append('search', search.branch);
-		}
 		loading.branches = true;
 		try {
-			branches = await get(
+			const newBranches = await get(
 				`${apiUrl}/v4/projects/${selected.project.id}/repository/branches?${params}`,
 				{
 					Authorization: `Bearer ${$appSession.tokens.gitlab}`
 				}
 			);
+			branches = branches.concat(newBranches);
+			if (newBranches.length === perPage) {
+				await loadBranches(page + 1);
+			}
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
@@ -203,7 +215,7 @@
 				return true;
 			}
 			showSave = true;
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}
@@ -369,9 +381,9 @@
 				value={selected.project}
 				isClearable={false}
 				items={projects}
-				loadOptions={searchProjects}
 				labelIdentifier="name"
 				optionIdentifier="id"
+				isSearchable={true}
 			/>
 		</div>
 		<div class="custom-select-wrapper">
@@ -392,7 +404,7 @@
 				value={selected.branch}
 				isClearable={false}
 				items={branches}
-				loadOptions={searchBranches}
+				isSearchable={true}
 				labelIdentifier="name"
 				optionIdentifier="web_url"
 			/>
@@ -408,5 +420,17 @@
 			class:hover:bg-orange-500={showSave && !loading.save}
 			>{loading.save ? $t('forms.saving') : $t('forms.save')}</button
 		>
+		{#if tryAgain}
+			<div>
+				An error occured during authenticating with GitLab. Please check your GitLab Source
+				configuration <a href={`/sources/${application.gitSource.id}`}>here.</a>
+			</div>
+			<button
+				class="w-40 bg-green-600"
+				on:click|stopPropagation|preventDefault={() => window.location.reload()}
+			>
+				Try again
+			</button>
+		{/if}
 	</div>
 </form>

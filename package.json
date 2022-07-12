@@ -1,12 +1,13 @@
 {
   "name": "coolify",
-  "version": "3.0.3",
   "description": "An open-source & self-hostable Heroku / Netlify alternative.",
+  "version": "3.1.0",
   "license": "AGPL-3.0",
   "scripts": {
     "db:studio": "pnpm run --filter coolify-api db:studio",
     "db:push": "pnpm run --filter coolify-api db:push",
     "db:seed": "pnpm run --filter coolify-api db:seed",
+    "db:migrate": "pnpm run --filter coolify-api db:migrate",
     "format": "run-p -l -n format:*",
     "format:api": "NODE_ENV=development pnpm run --filter coolify-api format",
     "lint": "run-p -l -n lint:*",
@@ -17,7 +18,8 @@
     "build": "NODE_ENV=production run-p -n build:*",
     "build:api": "NODE_ENV=production pnpm run --filter coolify-api build",
     "build:ui": "NODE_ENV=production pnpm run --filter coolify-ui build",
-    "release:staging:amd": "cross-var docker buildx build --platform linux/amd64 -t coollabsio/coolify:$npm_package_version --push ."
+    "release:staging:amd": "cross-var docker buildx build --platform linux/amd64 -t coollabsio/coolify:$npm_package_version --push .",
+    "release:local":"rm -fr ./local-serve && mkdir ./local-serve && pnpm build && cp -Rp apps/api/build/* ./local-serve && cp -Rp apps/ui/build/ ./local-serve/public && cp -Rp apps/api/prisma/ ./local-serve/prisma && cp -Rp apps/api/package.json ./local-serve && cp .env ./local-serve && cd ./local-serve && pnpm install . && pnpm start"
   },
   "devDependencies": {
     "cross-var": "1.1.0",

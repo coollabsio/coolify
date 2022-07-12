@@ -9,3 +9,5 @@ package
 dist
 client
 apps/api/db/*.db
+local-serve
+apps/api/db/migration.db-journal

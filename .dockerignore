@@ -9,3 +9,4 @@ package
 dist
 client
 apps/api/db/*.db
+local-serve

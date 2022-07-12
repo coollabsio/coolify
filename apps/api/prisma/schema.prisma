@@ -91,6 +91,7 @@ model Application {
   startCommand        String?
   baseDirectory       String?
   publishDirectory    String?
+  deploymentType      String?
   phpModules          String?
   pythonWSGI          String?
   pythonModule        String?
@@ -217,6 +218,7 @@ model GitSource {
   type         String?
   apiUrl       String?
   htmlUrl      String?
+  customPort   Int           @default(22)
   organization String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt

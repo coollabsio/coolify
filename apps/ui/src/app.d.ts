@@ -19,3 +19,6 @@ declare namespace App {
 		privatePort: string;
 	}
 }
+
+declare const GITPOD_WORKSPACE_URL: string
+  

@@ -89,7 +89,7 @@
 			loading = true;
 			await post(`/databases/${id}`, { ...database, isRunning: $status.database.isRunning });
 			generateDbDetails();
-			toast.push('Settings saved.');
+			toast.push('Configuration saved.');
 		} catch (error) {
 			return errorNotification(error);
 		} finally {

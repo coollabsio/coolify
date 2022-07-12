@@ -68,7 +68,8 @@ const schema = {
 };
 
 const options = {
-	schema
+	schema,
+	dotenv: true
 };
 fastify.register(env, options);
 if (!isDev) {
@@ -76,7 +77,7 @@ if (!isDev) {
 		root: path.join(__dirname, './public'),
 		preCompressed: true
 	});
-	fastify.setNotFoundHandler(function (request, reply) {
+	fastify.setNotFoundHandler({}, function (request, reply) {
 		if (request.raw.url && request.raw.url.startsWith('/api')) {
 			return reply.status(404).send({
 				success: false
@@ -105,23 +106,30 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 	await scheduler.start('cleanupStorage');
 	await scheduler.start('checkProxies')
 
-	// Check if no build is running, try to autoupdate.
+	// Check if no build is running
+
+	// Check for update
 	setInterval(async () => {
 		const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
 		if (isAutoUpdateEnabled) {
 			if (scheduler.workers.has('deployApplication')) {
-				scheduler.workers.get('deployApplication').postMessage("status");
+				scheduler.workers.get('deployApplication').postMessage("status:autoUpdater");
 			}
 		}
-	}, 30000 * 10)
+	}, 60000 * 15)
+
+	// Cleanup storage
+	setInterval(async () => {
+		if (scheduler.workers.has('deployApplication')) {
+			scheduler.workers.get('deployApplication').postMessage("status:cleanupStorage");
+		}
+	}, 60000 * 10)
 
 	scheduler.on('worker deleted', async (name) => {
-		if (name === 'autoUpdater') {
-			await scheduler.start('deployApplication');
+		if (name === 'autoUpdater' || name === 'cleanupStorage') {
+			if (!scheduler.workers.has('deployApplication')) await scheduler.start('deployApplication');
 		}
-
 	});
-
 });
 
 async function initServer() {

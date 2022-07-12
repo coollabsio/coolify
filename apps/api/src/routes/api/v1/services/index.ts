@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import {
     activatePlausibleUsers,
+    activateWordpressFtp,
     checkService,
     deleteService,
     deleteServiceSecret,
@@ -65,6 +66,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
     fastify.post('/:id/:type/settings', async (request, reply) => await setSettingsService(request, reply));
 
     fastify.post('/:id/plausibleanalytics/activate', async (request, reply) => await activatePlausibleUsers(request, reply));
+    fastify.post('/:id/wordpress/ftp', async (request, reply) => await activateWordpressFtp(request, reply));
 };
 
 export default root;

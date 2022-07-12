@@ -82,7 +82,7 @@ import { appSession } from '$lib/store';
 				} else {
 					await startProxy();
 				}
-			} catch ({ error }) {
+			} catch (error) {
 				return errorNotification(error);
 			}
 		}
@@ -92,7 +92,7 @@ import { appSession } from '$lib/store';
 			const engine = generateRemoteEngine(destination);
 			await post(`/destinations/${id}/stop.json`, { engine });
 			return toast.push($t('destination.coolify_proxy_stopped'));
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}
@@ -101,7 +101,7 @@ import { appSession } from '$lib/store';
 			const engine = generateRemoteEngine(destination);
 			await post(`/destinations/${id}/start.json`, { engine });
 			return toast.push($t('destination.coolify_proxy_started'));
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}
@@ -115,7 +115,7 @@ import { appSession } from '$lib/store';
 					engine: destination.engine,
 					fqdn: settings.fqdn
 				});
-			} catch ({ error }) {
+			} catch (error) {
 				setTimeout(() => {
 					window.location.reload();
 				}, 5000);

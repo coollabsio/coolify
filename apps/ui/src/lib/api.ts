@@ -1,8 +1,12 @@
 import { browser, dev } from '$app/env';
 import Cookies from 'js-cookie';
-import { toast } from '@zerodevx/svelte-toast';
 
 export function getAPIUrl() {
+	if (GITPOD_WORKSPACE_URL) {
+		const {href} = new URL(GITPOD_WORKSPACE_URL)
+		const newURL = href.replace('https://','https://3001-').replace(/\/$/,'')
+		return newURL
+	}
 	return dev ? 'http://localhost:3001' : 'http://localhost:3000';
 }
 async function send({
@@ -52,7 +56,7 @@ async function send({
 	}
 
 	if (dev && !path.startsWith('https://')) {
-		path = `http://localhost:3001${path}`;
+		path = `${getAPIUrl()}${path}`;
 	}
 
 	const response = await fetch(`${path}`, opts);
@@ -74,7 +78,7 @@ async function send({
 		return {};
 	}
 	if (!response.ok) {
-		if (response.status === 401 && !path.startsWith('https://api.github')) {
+		if (response.status === 401 && !path.startsWith('https://api.github') && !path.includes('/v4/user')) {
 			Cookies.remove('token');
 		}
 

@@ -109,6 +109,7 @@
 		loading = true;
 		try {
 			await post(`/services/${service.id}/${service.type}/start`, {});
+			return window.location.reload()
 		} catch (error) {
 			return errorNotification(error);
 		} finally {

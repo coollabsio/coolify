@@ -77,7 +77,7 @@
 				} else {
 					await startProxy();
 				}
-			} catch ({ error }) {
+			} catch (error) {
 				return errorNotification(error);
 			} finally {
 				loadingProxy = false;
@@ -88,7 +88,7 @@
 		try {
 			await post(`/destinations/${id}/stop`, { engine: destination.engine });
 			return toast.push($t('destination.coolify_proxy_stopped'));
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}
@@ -96,7 +96,7 @@
 		try {
 			await post(`/destinations/${id}/start`, { engine: destination.engine });
 			return toast.push($t('destination.coolify_proxy_started'));
-		} catch ({ error }) {
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}
@@ -110,7 +110,7 @@
 					engine: destination.engine,
 					fqdn: settings.fqdn
 				});
-			} catch ({ error }) {
+			} catch (error) {
 				setTimeout(() => {
 					window.location.reload();
 				}, 5000);

@@ -1,8 +1,7 @@
-import { browser } from '$app/env';
 import { writable, readable, type Writable, type Readable } from 'svelte/store';
-// import { version as currentVersion } from '../../package.json';
+
 interface AppSession {
-    version: string
+    version: string | null,
     userId: string | null,
     teamId: string | null,
     permission: string,
@@ -18,7 +17,7 @@ interface AppSession {
 }
 export const loginEmail: Writable<string | undefined> = writable()
 export const appSession: Writable<AppSession> = writable({
-    version: '3.0.3',
+    version: null,
     userId: null,
     teamId: null,
     permission: 'read',
