@@ -5,8 +5,10 @@ image: node:18
 tasks:
   - init: pnpm install && pnpm db:push && pnpm db:seed
     env: 
-      COOLIFY_DATABASE_URL=file:../db/dev.db
-      COOLIFY_SECRET_KEY=12341234123412341234123412341234
+      COOLIFY_DATABASE_URL:
+        file:../db/dev.db
+      COOLIFY_SECRET_KEY:
+        12341234123412341234123412341234
     command: pnpm dev
 
 ports:
