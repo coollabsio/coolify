@@ -44,10 +44,7 @@
 		project: undefined,
 		branch: undefined
 	};
-	let search = {
-		project: '',
-		branch: ''
-	};
+
 	onMount(async () => {
 		if (!$appSession.tokens.gitlab) {
 			await getGitlabToken();
@@ -68,15 +65,10 @@
 		selected.project = null;
 		selected.branch = null;
 		showSave = false;
+
+		// Clear out projects
+		projects = [];
 		loadProjects();
-	}
-	async function searchProjects(searchText: any) {
-		if (!selected.group) {
-			return;
-		}
-		search.project = searchText;
-		await loadProjects();
-		return projects;
 	}
 	function selectProject(event: any) {
 		selected.project = event.detail;
@@ -137,9 +129,6 @@
 			per_page: perPage,
 			archived: false
 		});
-		if (search.project) {
-			params.append('search', search.project);
-		}
 		loading.projects = true;
 		if (username === selected.group.name) {
 			try {
@@ -178,14 +167,6 @@
 			}
 		}
 	}
-	async function searchBranches(searchText: any) {
-		if (!selected.project) {
-			return;
-		}
-		search.branch = searchText;
-		await loadBranches();
-		return branches;
-	}
 	function selectBranch(event: any) {
 		selected.branch = event.detail;
 		isBranchAlreadyUsed();
@@ -197,9 +178,6 @@
 			page,
 			per_page: perPage
 		});
-		if (search.branch) {
-			params.append('search', search.branch);
-		}
 		loading.branches = true;
 		try {
 			const newBranches = await get(
@@ -401,9 +379,9 @@
 				value={selected.project}
 				isClearable={false}
 				items={projects}
-				loadOptions={searchProjects}
 				labelIdentifier="name"
 				optionIdentifier="id"
+				isSearchable={true}
 			/>
 		</div>
 		<div class="custom-select-wrapper">
@@ -424,7 +402,7 @@
 				value={selected.branch}
 				isClearable={false}
 				items={branches}
-				loadOptions={searchBranches}
+				isSearchable={true}
 				labelIdentifier="name"
 				optionIdentifier="web_url"
 			/>
