@@ -626,22 +626,20 @@
 					/>
 				</div>
 			{/if}
-			{#if application.buildPack !== 'docker'}
-				<div class="grid grid-cols-2 items-center">
-					<label for="exposePort" class="text-base font-bold text-stone-100">Exposed Port</label>
-					<input
-						readonly={!$appSession.isAdmin && !$status.application.isRunning}
-						disabled={isDisabled}
-						name="exposePort"
-						id="exposePort"
-						bind:value={application.exposePort}
-						placeholder="12345"
-					/>
-					<Explainer
-						text={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
-					/>
-				</div>
-			{/if}
+			<div class="grid grid-cols-2 items-center">
+				<label for="exposePort" class="text-base font-bold text-stone-100">Exposed Port</label>
+				<input
+					readonly={!$appSession.isAdmin && !$status.application.isRunning}
+					disabled={isDisabled}
+					name="exposePort"
+					id="exposePort"
+					bind:value={application.exposePort}
+					placeholder="12345"
+				/>
+				<Explainer
+					text={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
+				/>
+			</div>
 			{#if !notNodeDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-2 items-center pt-4">
 					<label for="installCommand" class="text-base font-bold text-stone-100"
@@ -697,7 +695,7 @@
 						placeholder="default: /Dockerfile"
 					/>
 					<Explainer
-						text="Does not rely on Base Directory. <br>Should be absolute path, like <span class='text-green-500 font-bold'>/data/Dockerfile</span> or <span class='text-green-500 font-bold'>/Dockerfile.</span>"
+						text="Should be absolute path, like <span class='text-green-500 font-bold'>/data/Dockerfile</span> or <span class='text-green-500 font-bold'>/Dockerfile.</span>"
 					/>
 				</div>
 			{/if}

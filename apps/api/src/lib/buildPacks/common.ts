@@ -438,7 +438,7 @@ export async function copyBaseConfigurationFiles(
 				buildId,
 				applicationId
 			});
-		} else if (baseImage.includes('nginx')) {
+		} else if (baseImage?.includes('nginx')) {
 			await fs.writeFile(
 				`${workdir}/nginx.conf`,
 				`user  nginx;
