@@ -11,7 +11,8 @@ export default async function ({
 	apiUrl,
 	htmlUrl,
 	branch,
-	buildId
+	buildId,
+	customPort
 }: {
 	applicationId: string;
 	workdir: string;
@@ -21,6 +22,7 @@ export default async function ({
 	htmlUrl: string;
 	branch: string;
 	buildId: string;
+	customPort: number;
 }): Promise<string> {
 	const { default: got } = await import('got')
 	const url = htmlUrl.replace('https://', '').replace('http://', '');
@@ -54,7 +56,7 @@ export default async function ({
 		applicationId
 	});
 	await asyncExecShell(
-		`git clone -q -b ${branch} https://x-access-token:${token}@${url}/${repository}.git ${workdir}/ && cd ${workdir} && git submodule update --init --recursive && git lfs pull && cd .. `
+		`git clone -q -b ${branch} https://x-access-token:${token}@${url}/${repository}.git --config core.sshCommand="ssh -p ${customPort}" ${workdir}/ && cd ${workdir} && git submodule update --init --recursive && git lfs pull && cd .. `
 	);
 	const { stdout: commit } = await asyncExecShell(`cd ${workdir}/ && git rev-parse HEAD`);
 	return commit.replace('\n', '');

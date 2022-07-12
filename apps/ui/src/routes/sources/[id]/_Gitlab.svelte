@@ -12,8 +12,8 @@
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import { appSession } from '$lib/store';
-	import { goto } from '$app/navigation';
 	const { id } = $page.params;
+
 	let url = settings.fqdn ? settings.fqdn : window.location.origin;
 
 	if (dev) {
@@ -31,6 +31,8 @@
 			appSecret: null
 		};
 	}
+	$: selfHosted = source.htmlUrl !== 'https://gitlab.com' ;
+
 	onMount(() => {
 		oauthIdEl && oauthIdEl.focus();
 	});
@@ -49,7 +51,8 @@
 					oauthId: source.gitlabApp.oauthId,
 					appId: source.gitlabApp.appId,
 					appSecret: source.gitlabApp.appSecret,
-					groupName: source.gitlabApp.groupName
+					groupName: source.gitlabApp.groupName,
+					customPort: source.customPort
 				});
 				const from = $page.url.searchParams.get('from');
 				if (from) {
@@ -67,7 +70,8 @@
 				await post(`/sources/${id}`, {
 					name: source.name,
 					htmlUrl: source.htmlUrl.replace(/\/$/, ''),
-					apiUrl: source.apiUrl.replace(/\/$/, '')
+					apiUrl: source.apiUrl.replace(/\/$/, ''),
+					customPort: source.customPort
 				});
 				toast.push('Configuration saved.');
 			} catch (error) {
@@ -119,6 +123,10 @@
 				window.open(`${source.htmlUrl}/-/profile/applications`);
 				break;
 			case 'group':
+				if (!source.gitlabApp.groupName) {
+					toast.push('Please enter a group name first.');
+					return;
+				}
 				window.open(
 					`${source.htmlUrl}/groups/${source.gitlabApp.groupName}/-/settings/applications`
 				);
@@ -146,6 +154,8 @@
 					<button on:click|preventDefault={changeSettings}
 						>{$t('source.change_app_settings', { name: 'GitLab' })}</button
 					>
+				{:else}
+					<button on:click|preventDefault|stopPropagation={newApp}>Create new GitLab App</button>
 				{/if}
 			{/if}
 		</div>
@@ -204,7 +214,7 @@
 					required
 					disabled={source.gitlabAppId}
 					readonly={source.gitlabAppId}
-					value={source.htmlUrl}
+					bind:value={source.htmlUrl}
 				/>
 			</div>
 			<div class="grid grid-cols-2 items-center">
@@ -216,6 +226,20 @@
 					readonly={source.gitlabAppId}
 					required
 					value={source.apiUrl}
+				/>
+			</div>
+			<div class="grid grid-cols-2 items-center">
+				<label for="customPort" class="text-base font-bold text-stone-100">Custom SSH Port</label>
+				<input
+					name="customPort"
+					id="customPort"
+					disabled={!selfHosted}
+					readonly={!selfHosted}
+					required
+					bind:value={source.customPort}
+				/>
+				<Explainer
+					text="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
 				/>
 			</div>
 			<div class="grid grid-cols-2 items-start">

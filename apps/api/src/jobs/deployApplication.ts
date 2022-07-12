@@ -56,7 +56,7 @@ import * as buildpacks from '../lib/buildPacks';
 						exposePort,
 						baseImage,
 						baseBuildImage,
-						deploymentType
+						deploymentType,
 					} = message
 					let {
 						branch,
@@ -127,6 +127,7 @@ import * as buildpacks from '../lib/buildPacks';
 								repodir,
 								githubAppId: gitSource.githubApp?.id,
 								gitlabAppId: gitSource.gitlabApp?.id,
+								customPort: gitSource.customPort,
 								repository,
 								branch,
 								buildId,
