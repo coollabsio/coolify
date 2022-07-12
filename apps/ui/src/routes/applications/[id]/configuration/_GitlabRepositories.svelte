@@ -28,6 +28,7 @@
 		branches: false,
 		save: false
 	};
+	let tryAgain = false;
 
 	let htmlUrl = application.gitSource.htmlUrl;
 	let apiUrl = application.gitSource.apiUrl;
@@ -55,10 +56,11 @@
 				Authorization: `Bearer ${$appSession.tokens.gitlab}`
 			});
 			username = user.username;
+			await loadGroups();
 		} catch (error) {
-			return await getGitlabToken();
+			loading.base = false;
+			tryAgain = true;
 		}
-		await loadGroups();
 	});
 	function selectGroup(event: any) {
 		selected.group = event.detail;
@@ -104,7 +106,7 @@
 		//@ts-ignore
 		const params: any = new URLSearchParams({
 			page,
-			per_page: perPage,
+			per_page: perPage
 		});
 		loading.base = true;
 		try {
@@ -418,5 +420,17 @@
 			class:hover:bg-orange-500={showSave && !loading.save}
 			>{loading.save ? $t('forms.saving') : $t('forms.save')}</button
 		>
+		{#if tryAgain}
+			<div>
+				An error occured during authenticating with GitLab. Please check your GitLab Source
+				configuration <a href={`/sources/${application.gitSource.id}`}>here.</a>
+			</div>
+			<button
+				class="w-40 bg-green-600"
+				on:click|stopPropagation|preventDefault={() => window.location.reload()}
+			>
+				Try again
+			</button>
+		{/if}
 	</div>
 </form>

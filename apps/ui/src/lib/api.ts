@@ -78,7 +78,7 @@ async function send({
 		return {};
 	}
 	if (!response.ok) {
-		if (response.status === 401 && !path.startsWith('https://api.github')) {
+		if (response.status === 401 && !path.startsWith('https://api.github') && !path.includes('/v4/user')) {
 			Cookies.remove('token');
 		}
 
