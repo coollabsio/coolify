@@ -15,7 +15,7 @@ import { checkContainer, getEngine, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
-export const version = '3.1.0';
+export const version = '3.2.0';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -30,13 +30,29 @@ export const defaultProxyImage = `coolify-haproxy-alpine:latest`;
 export const defaultProxyImageTcp = `coolify-haproxy-tcp-alpine:latest`;
 export const defaultProxyImageHttp = `coolify-haproxy-http-alpine:latest`;
 export const defaultTraefikImage = `traefik:v2.6`;
+export function getAPIUrl() {
+	if (process.env.GITPOD_WORKSPACE_URL) {
+		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL)
+		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '')
+		return newURL
+	}
+	return isDev ? 'http://localhost:3001' : 'http://localhost:3000';
+}
+export function getUIUrl() {
+	if (process.env.GITPOD_WORKSPACE_URL) {
+		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL)
+		const newURL = href.replace('https://', 'https://3000-').replace(/\/$/, '')
+		return newURL
+	}
+	return 'http://localhost:3000';
+}
 
 const mainTraefikEndpoint = isDev
-	? 'http://host.docker.internal:3001/webhooks/traefik/main.json'
+	? `${getAPIUrl()}/webhooks/traefik/main.json`
 	: 'http://coolify:3000/webhooks/traefik/main.json';
 
 const otherTraefikEndpoint = isDev
-	? 'http://host.docker.internal:3001/webhooks/traefik/other.json'
+	? `${getAPIUrl()}/webhooks/traefik/other.json`
 	: 'http://coolify:3000/webhooks/traefik/other.json';
 
 

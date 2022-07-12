@@ -8,7 +8,7 @@
 	import { onMount } from 'svelte';
 	import { dev } from '$app/env';
 	import { goto } from '$app/navigation';
-	import { del, get, post } from '$lib/api';
+	import { del, get, getAPIUrl, getWebhookUrl, post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import { appSession } from '$lib/store';
@@ -18,7 +18,7 @@
 	const from = $page.url.searchParams.get('from');
 
 	let url = settings?.fqdn ? settings.fqdn : window.location.origin;
-	if (dev) url = `http://localhost:3001`;
+	if (dev) url = getAPIUrl();
 
 	const updateDeployKeyIdUrl = `/applications/${id}/configuration/deploykey`;
 
@@ -228,7 +228,7 @@
 	}
 	async function setWebhook(url: any, webhookToken: any) {
 		const host = dev
-			? 'https://webhook.site/0e5beb2c-4e9b-40e2-a89e-32295e570c21'
+			? getWebhookUrl('gitlab')
 			: `${window.location.origin}/webhooks/gitlab/events`;
 		try {
 			await post(

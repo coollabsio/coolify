@@ -2,7 +2,7 @@
 	export let source: any;
 	export let settings: any;
 	import { page } from '$app/stores';
-	import { post } from '$lib/api';
+	import { getAPIUrl, getWebhookUrl, post } from '$lib/api';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
@@ -67,7 +67,7 @@
 			const { organization, htmlUrl } = source;
 			const { fqdn } = settings;
 			const host = dev
-				? 'http://localhost:3001'
+				? getAPIUrl()
 				: fqdn
 				? fqdn
 				: `http://${window.location.host}` || '';
@@ -81,7 +81,7 @@
 				url: host,
 				hook_attributes: {
 					url: dev
-						? 'https://webhook.site/0e5beb2c-4e9b-40e2-a89e-32295e570c21/events'
+						? getWebhookUrl('github')
 						: `${host}/webhooks/github/events`
 				},
 				redirect_url: `${host}/webhooks/github`,
