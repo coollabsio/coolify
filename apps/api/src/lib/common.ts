@@ -14,6 +14,7 @@ import cuid from 'cuid';
 import { checkContainer, getEngine, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
+import axios from 'axios';
 
 export const version = '3.1.1';
 export const isDev = process.env.NODE_ENV === 'development';
@@ -1493,5 +1494,50 @@ async function cleanupDB(buildId: string) {
 	const data = await prisma.build.findUnique({ where: { id: buildId } });
 	if (data?.status === 'queued' || data?.status === 'running') {
 		await prisma.build.update({ where: { id: buildId }, data: { status: 'failed' } });
+	}
+}
+
+export function convertTolOldVolumeNames(type) {
+	if (type === 'nocodb') {
+		return 'nc'
+	}
+}
+export async function getAvailableServices(): Promise<any> {
+	const { data } = await axios.get(`https://gist.githubusercontent.com/andrasbacsai/4aac36d8d6214dbfc34fa78110554a50/raw/291a957ee6ac01d480465623e183a30230ad921f/availableServices.json`)
+	return data
+}
+export async function cleanupDockerStorage(host, lowDiskSpace, force) {
+	// Cleanup old coolify images
+	try {
+		let { stdout: images } = await asyncExecShell(
+			`DOCKER_HOST=${host} docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs `
+		);
+		images = images.trim();
+		if (images) {
+			await asyncExecShell(`DOCKER_HOST=${host} docker rmi -f ${images}`);
+		}
+	} catch (error) {
+		//console.log(error);
+	}
+	if (lowDiskSpace || force) {
+		if (isDev) {
+			if (!force) console.log(`[DEV MODE] Low disk space: ${lowDiskSpace}`);
+			return
+		}
+		try {
+			await asyncExecShell(`DOCKER_HOST=${host} docker container prune -f`);
+		} catch (error) {
+			//console.log(error);
+		}
+		try {
+			await asyncExecShell(`DOCKER_HOST=${host} docker image prune -f`);
+		} catch (error) {
+			//console.log(error);
+		}
+		try {
+			await asyncExecShell(`DOCKER_HOST=${host} docker image prune -a -f`);
+		} catch (error) {
+			//console.log(error);
+		}
 	}
 }

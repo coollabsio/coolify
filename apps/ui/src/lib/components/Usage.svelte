@@ -23,7 +23,7 @@
 	};
 	import { appSession } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
-	import { get } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import Trend from './Trend.svelte';
 	async function getStatus() {
@@ -59,6 +59,9 @@
 		cpu: 'stable',
 		disk: 'stable'
 	};
+	async function manuallyCleanupStorage() {
+		return await post('/internal/cleanup', {});
+	}
 </script>
 
 {#if $appSession.teamId === '0'}
@@ -129,6 +132,9 @@
 			<dd class="mt-1 text-3xl font-semibold text-white">
 				{usage?.disk.usedGb}<span class="text-sm">GB</span>
 			</dd>
+			<button on:click={manuallyCleanupStorage} class="bg-coollabs hover:bg-coollabs-100"
+				>Cleanup Storage</button
+			>
 		</div>
 		<div
 			class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left"
@@ -143,5 +149,6 @@
 			</dd>
 		</div>
 	</dl>
+
 	<div class="px-6 pt-20 text-2xl font-bold">Resources</div>
 {/if}

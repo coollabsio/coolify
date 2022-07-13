@@ -4,7 +4,7 @@ import axios from 'axios';
 import compare from 'compare-versions';
 import cuid from 'cuid';
 import bcrypt from 'bcryptjs';
-import { asyncExecShell, asyncSleep, errorHandler, isDev, prisma, uniqueName, version } from '../../../lib/common';
+import { asyncExecShell, asyncSleep, cleanupDockerStorage, errorHandler, isDev, prisma, uniqueName, version } from '../../../lib/common';
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Login, Update } from '.';
@@ -15,7 +15,14 @@ export async function hashPassword(password: string): Promise<string> {
 	return bcrypt.hash(password, saltRounds);
 }
 
-
+export async function cleanupManually() {
+	try {
+		await cleanupDockerStorage('unix:///var/run/docker.sock', true, true)
+		return {}
+	} catch ({ status, message }) {
+		return errorHandler({ status, message })
+	}
+}
 export async function checkUpdate(request: FastifyRequest) {
 	try {
 		const currentVersion = version;

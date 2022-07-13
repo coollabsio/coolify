@@ -2,10 +2,74 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceImages, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePort, getDomain, errorHandler, supportedServiceTypesAndVersions, generatePassword, isDev, stopTcpHttpProxy } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceImages, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePort, getDomain, errorHandler, supportedServiceTypesAndVersions, generatePassword, isDev, stopTcpHttpProxy, getAvailableServices } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, dockerInstance, getEngine, removeContainer } from '../../../../lib/docker';
 import cuid from 'cuid';
+
+async function startServiceNew(request: FastifyRequest) {
+    try {
+        const { id } = request.params;
+        const teamId = request.user.teamId;
+        const service = await getServiceFromDB({ id, teamId });
+        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort } =
+            service;
+        const network = destinationDockerId && destinationDocker.network;
+        const host = getEngine(destinationDocker.engine);
+        const port = getServiceMainPort(type);
+
+        const { workdir } = await createDirectories({ repository: type, buildId: id });
+        const image = getServiceImage(type);
+        const config = (await getAvailableServices()).find((name) => name.name === type).compose
+        const environmentVariables = {}
+        if (serviceSecret.length > 0) {
+            serviceSecret.forEach((secret) => {
+                environmentVariables[secret.name] = secret.value;
+            });
+        }
+        config.services[id] = JSON.parse(JSON.stringify(config.services[type]))
+        config.services[id].container_name = id
+        config.services[id].image = `${image}:${version}`
+        config.services[id].ports = (exposePort ? [`${exposePort}:${port}`] : []),
+            config.services[id].restart = "always"
+        config.services[id].networks = [network]
+        config.services[id].labels = makeLabelForServices(type)
+        config.services[id].deploy = {
+            restart_policy: {
+                condition: 'on-failure',
+                delay: '5s',
+                max_attempts: 3,
+                window: '120s'
+            }
+        }
+        config.networks = {
+            [network]: {
+                external: true
+            }
+        }
+        config.volumes = {}
+        config.services[id].volumes.forEach((volume, index) => {
+            let oldVolumeName = volume.split(':')[0]
+            const path = volume.split(':')[1]
+            oldVolumeName = convertTolOldVolumeNames(type)
+            const volumeName = `${id}-${oldVolumeName}`
+            config.volumes[volumeName] = {
+                name: volumeName
+            }
+            config.services[id].volumes[index] = `${volumeName}:${path}`
+        })
+        delete config.services[type]
+        config.services[id].environment = environmentVariables
+        const composeFileDestination = `${workdir}/docker-compose.yaml`;
+        await fs.writeFile(composeFileDestination, yaml.dump(config));
+        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
+        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+        return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
 
 export async function listServices(request: FastifyRequest) {
     try {
