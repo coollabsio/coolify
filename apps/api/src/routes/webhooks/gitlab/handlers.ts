@@ -2,7 +2,7 @@ import axios from "axios";
 import cuid from "cuid";
 import crypto from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { encrypt, errorHandler, isDev, listSettings, prisma } from "../../../lib/common";
+import { encrypt, errorHandler, getAPIUrl, isDev, listSettings, prisma } from "../../../lib/common";
 import { checkContainer, removeContainer } from "../../../lib/docker";
 import { scheduler } from "../../../lib/scheduler";
 import { getApplicationFromDB, getApplicationFromDBWebhook } from "../../api/v1/applications/handlers";
@@ -16,7 +16,7 @@ export async function configureGitLabApp(request: FastifyRequest, reply: Fastify
         let domain = `http://${request.hostname}`;
         if (fqdn) domain = fqdn;
         if (isDev) {
-            domain = `http://localhost:3001`;
+            domain = getAPIUrl();
         }
         const params = new URLSearchParams({
             client_id: appId,
@@ -28,7 +28,7 @@ export async function configureGitLabApp(request: FastifyRequest, reply: Fastify
         });
         const { data } = await axios.post(`${htmlUrl}/oauth/token`, params)
         if (isDev) {
-            return reply.redirect(`http://localhost:3000/webhooks/success?token=${data.access_token}`)
+            return reply.redirect(`${getAPIUrl()}/webhooks/success?token=${data.access_token}`)
         }
         return reply.redirect(`/webhooks/success?token=${data.access_token}`)
     } catch ({ status, message, ...other }) {

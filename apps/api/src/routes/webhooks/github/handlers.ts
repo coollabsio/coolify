@@ -2,7 +2,7 @@ import axios from "axios";
 import cuid from "cuid";
 import crypto from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { encrypt, errorHandler, isDev, prisma } from "../../../lib/common";
+import { encrypt, errorHandler, getAPIUrl, getUIUrl, isDev, prisma } from "../../../lib/common";
 import { checkContainer, removeContainer } from "../../../lib/docker";
 import { scheduler } from "../../../lib/scheduler";
 import { getApplicationFromDB, getApplicationFromDBWebhook } from "../../api/v1/applications/handlers";
@@ -19,7 +19,7 @@ export async function installGithub(request: FastifyRequest, reply: FastifyReply
             data: { installationId: Number(installation_id) }
         });
         if (isDev) {
-            return reply.redirect(`http://localhost:3000/sources/${gitSourceId}`)
+            return reply.redirect(`${getUIUrl()}/sources/${gitSourceId}`)
         } else {
             return reply.redirect(`/sources/${gitSourceId}`)
         }
@@ -55,7 +55,7 @@ export async function configureGitHubApp(request, reply) {
             }
         });
         if (isDev) {
-            return reply.redirect(`http://localhost:3000/sources/${state}`)
+            return reply.redirect(`${getUIUrl()}/sources/${state}`)
         } else {
             return reply.redirect(`/sources/${state}`)
         }

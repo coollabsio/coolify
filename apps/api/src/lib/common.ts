@@ -14,8 +14,9 @@ import cuid from 'cuid';
 import { checkContainer, getEngine, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
+import axios from 'axios';
 
-export const version = '3.1.0';
+export const version = '3.1.1';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -30,13 +31,29 @@ export const defaultProxyImage = `coolify-haproxy-alpine:latest`;
 export const defaultProxyImageTcp = `coolify-haproxy-tcp-alpine:latest`;
 export const defaultProxyImageHttp = `coolify-haproxy-http-alpine:latest`;
 export const defaultTraefikImage = `traefik:v2.6`;
+export function getAPIUrl() {
+	if (process.env.GITPOD_WORKSPACE_URL) {
+		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL)
+		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '')
+		return newURL
+	}
+	return isDev ? 'http://localhost:3001' : 'http://localhost:3000';
+}
+export function getUIUrl() {
+	if (process.env.GITPOD_WORKSPACE_URL) {
+		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL)
+		const newURL = href.replace('https://', 'https://3000-').replace(/\/$/, '')
+		return newURL
+	}
+	return 'http://localhost:3000';
+}
 
 const mainTraefikEndpoint = isDev
-	? 'http://host.docker.internal:3001/webhooks/traefik/main.json'
+	? `${getAPIUrl()}/webhooks/traefik/main.json`
 	: 'http://coolify:3000/webhooks/traefik/main.json';
 
 const otherTraefikEndpoint = isDev
-	? 'http://host.docker.internal:3001/webhooks/traefik/other.json'
+	? `${getAPIUrl()}/webhooks/traefik/other.json`
 	: 'http://coolify:3000/webhooks/traefik/other.json';
 
 
@@ -1477,5 +1494,50 @@ async function cleanupDB(buildId: string) {
 	const data = await prisma.build.findUnique({ where: { id: buildId } });
 	if (data?.status === 'queued' || data?.status === 'running') {
 		await prisma.build.update({ where: { id: buildId }, data: { status: 'failed' } });
+	}
+}
+
+export function convertTolOldVolumeNames(type) {
+	if (type === 'nocodb') {
+		return 'nc'
+	}
+}
+export async function getAvailableServices(): Promise<any> {
+	const { data } = await axios.get(`https://gist.githubusercontent.com/andrasbacsai/4aac36d8d6214dbfc34fa78110554a50/raw/291a957ee6ac01d480465623e183a30230ad921f/availableServices.json`)
+	return data
+}
+export async function cleanupDockerStorage(host, lowDiskSpace, force) {
+	// Cleanup old coolify images
+	try {
+		let { stdout: images } = await asyncExecShell(
+			`DOCKER_HOST=${host} docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs `
+		);
+		images = images.trim();
+		if (images) {
+			await asyncExecShell(`DOCKER_HOST=${host} docker rmi -f ${images}`);
+		}
+	} catch (error) {
+		//console.log(error);
+	}
+	if (lowDiskSpace || force) {
+		if (isDev) {
+			if (!force) console.log(`[DEV MODE] Low disk space: ${lowDiskSpace}`);
+			return
+		}
+		try {
+			await asyncExecShell(`DOCKER_HOST=${host} docker container prune -f`);
+		} catch (error) {
+			//console.log(error);
+		}
+		try {
+			await asyncExecShell(`DOCKER_HOST=${host} docker image prune -f`);
+		} catch (error) {
+			//console.log(error);
+		}
+		try {
+			await asyncExecShell(`DOCKER_HOST=${host} docker image prune -a -f`);
+		} catch (error) {
+			//console.log(error);
+		}
 	}
 }

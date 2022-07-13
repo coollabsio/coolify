@@ -445,7 +445,7 @@ export async function setPermission(request: FastifyRequest, reply: FastifyReply
 export async function changePassword(request: FastifyRequest, reply: FastifyReply) {
     try {
         const { id } = request.body;
-        await prisma.user.update({ where: { id: undefined }, data: { password: 'RESETME' } });
+        await prisma.user.update({ where: { id }, data: { password: 'RESETME' } });
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })

@@ -1,13 +1,27 @@
-import { browser, dev } from '$app/env';
+import { dev } from '$app/env';
 import Cookies from 'js-cookie';
 
 export function getAPIUrl() {
 	if (GITPOD_WORKSPACE_URL) {
-		const {href} = new URL(GITPOD_WORKSPACE_URL)
-		const newURL = href.replace('https://','https://3001-').replace(/\/$/,'')
+		const { href } = new URL(GITPOD_WORKSPACE_URL)
+		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '')
 		return newURL
 	}
 	return dev ? 'http://localhost:3001' : 'http://localhost:3000';
+}
+export function getWebhookUrl(type: string) {
+	console.log(GITPOD_WORKSPACE_URL)
+	if (GITPOD_WORKSPACE_URL) {
+		const { href } = new URL(GITPOD_WORKSPACE_URL)
+		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '')
+		if (type === 'github') {
+			return `${newURL}/webhooks/github/events`
+		}
+		if (type === 'gitlab') {
+			return `${newURL}/webhooks/gitlab/events`
+		}
+	}
+	return `https://webhook.site/0e5beb2c-4e9b-40e2-a89e-32295e570c21/events`;
 }
 async function send({
 	method,

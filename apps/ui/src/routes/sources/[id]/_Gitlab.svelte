@@ -4,7 +4,7 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
-	import { post } from '$lib/api';
+	import { getAPIUrl, post } from '$lib/api';
 	import { dev } from '$app/env';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { toast } from '@zerodevx/svelte-toast';
@@ -17,7 +17,7 @@
 	let url = settings.fqdn ? settings.fqdn : window.location.origin;
 
 	if (dev) {
-		url = `http://localhost:3001`;
+		url = getAPIUrl();
 	}
 	let loading = false;
 

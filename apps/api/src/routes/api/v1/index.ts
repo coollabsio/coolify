@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { scheduler } from '../../../lib/scheduler';
-import { checkUpdate, login, showDashboard, update, showUsage, getCurrentUser } from './handlers';
+import { checkUpdate, login, showDashboard, update, showUsage, getCurrentUser, cleanupManually } from './handlers';
 
 export interface Update {
 	Body: { latestVersion: string }
@@ -46,6 +46,10 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
 	fastify.get('/usage', {
 		onRequest: [fastify.authenticate]
 	}, async () => await showUsage());
+
+	fastify.post('/internal/cleanup', {
+		onRequest: [fastify.authenticate]
+	}, async () => await cleanupManually());
 };
 
 export default root;
