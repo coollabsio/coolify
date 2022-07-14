@@ -1,7 +1,7 @@
 {
   "name": "coolify",
   "description": "An open-source & self-hostable Heroku / Netlify alternative.",
-  "version": "3.1.1",
+  "version": "3.1.2",
   "license": "AGPL-3.0",
   "scripts": {
     "db:studio": "pnpm run --filter coolify-api db:studio",

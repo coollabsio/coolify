@@ -16,7 +16,7 @@ import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 import axios from 'axios';
 
-export const version = '3.1.1';
+export const version = '3.1.2';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';

@@ -157,10 +157,18 @@ export async function login(request: FastifyRequest<Login>, reply: FastifyReply)
 				if (userFound.password === 'RESETME') {
 					const hashedPassword = await hashPassword(password);
 					if (userFound.updatedAt < new Date(Date.now() - 1000 * 60 * 10)) {
-						await prisma.user.update({
-							where: { email: userFound.email },
-							data: { password: 'RESETTIMEOUT' }
-						});
+						if (userFound.id === '0') {
+							await prisma.user.update({
+								where: { email: userFound.email },
+								data: { password: 'RESETME' }
+							});
+						} else {
+							await prisma.user.update({
+								where: { email: userFound.email },
+								data: { password: 'RESETTIMEOUT' }
+							});
+						}
+
 						throw {
 							status: 500,
 							message: 'Password reset link has expired. Please request a new one.'
