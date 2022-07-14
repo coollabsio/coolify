@@ -10,8 +10,8 @@ import { checkContainer, dockerInstance, getEngine, isContainerExited, removeCon
 import { scheduler } from '../../../../lib/scheduler';
 
 import type { FastifyRequest } from 'fastify';
-import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, OnlyId, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication } from './types';
-import { Application, DestinationDocker } from '@prisma/client';
+import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication } from './types';
+import { OnlyId } from '../../../../types';
 
 export async function listApplications(request: FastifyRequest) {
     try {
