@@ -267,7 +267,7 @@ export async function saveApplicationSettings(request: FastifyRequest<SaveApplic
         const { debug, previews, dualCerts, autodeploy, branch, projectId } = request.body
         const isDouble = await checkDoubleBranch(branch, projectId);
         if (isDouble && autodeploy) {
-            throw { status: 500, message: 'Application not configured.' }
+            throw { status: 500, message: 'Cannot activate automatic deployments until only one application is defined for this repository / branch.' }
         }
         await prisma.application.update({
             where: { id },
