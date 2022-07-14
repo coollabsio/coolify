@@ -1,24 +1,24 @@
 import { FastifyPluginAsync } from 'fastify';
 import { checkDestination, deleteDestination, getDestination, listDestinations, newDestination, restartProxy, saveDestinationSettings, startProxy, stopProxy } from './handlers';
 
-const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
-    fastify.addHook('onRequest', async (request, reply) => {
+import type { OnlyId } from '../../../../types';
+import type { CheckDestination, NewDestination, Proxy, SaveDestinationSettings } from './types';
+
+const root: FastifyPluginAsync = async (fastify): Promise<void> => {
+    fastify.addHook('onRequest', async (request) => {
         return await request.jwtVerify()
     })
     fastify.get('/', async (request) => await listDestinations(request));
-    fastify.post('/check', async (request) => await checkDestination(request));
+    fastify.post<CheckDestination>('/check', async (request) => await checkDestination(request));
 
-    fastify.get('/:id', async (request) => await getDestination(request));
-    fastify.post('/:id', async (request, reply) => await newDestination(request, reply));
-    fastify.delete('/:id', async (request) => await deleteDestination(request));
+    fastify.get<OnlyId>('/:id', async (request) => await getDestination(request));
+    fastify.post<NewDestination>('/:id', async (request, reply) => await newDestination(request, reply));
+    fastify.delete<OnlyId>('/:id', async (request) => await deleteDestination(request));
 
-    fastify.post('/:id/settings', async (request, reply) => await saveDestinationSettings(request, reply));
-    fastify.post('/:id/start', async (request, reply) => await startProxy(request, reply));
-    fastify.post('/:id/stop', async (request, reply) => await stopProxy(request, reply));
-    fastify.post('/:id/restart', async (request, reply) => await restartProxy(request, reply));
-
-
-
+    fastify.post<SaveDestinationSettings>('/:id/settings', async (request, reply) => await saveDestinationSettings(request));
+    fastify.post<Proxy>('/:id/start', async (request, reply) => await startProxy(request));
+    fastify.post<Proxy>('/:id/stop', async (request, reply) => await stopProxy(request));
+    fastify.post<Proxy>('/:id/restart', async (request, reply) => await restartProxy(request));
 };
 
 export default root;

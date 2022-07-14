@@ -2,6 +2,7 @@ import { promises as dns } from 'dns';
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { checkDomainsIsValidInDNS, errorHandler, getDomain, isDNSValid, isDomainConfigured, listSettings, prisma } from '../../../../lib/common';
+import { CheckDNS, CheckDomain, DeleteDomain, SaveSettings } from './types';
 
 
 export async function listAllSettings(request: FastifyRequest) {
@@ -14,7 +15,7 @@ export async function listAllSettings(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function saveSettings(request: FastifyRequest, reply: FastifyReply) {
+export async function saveSettings(request: FastifyRequest<SaveSettings>, reply: FastifyReply) {
     try {
         const {
             fqdn,
@@ -41,7 +42,7 @@ export async function saveSettings(request: FastifyRequest, reply: FastifyReply)
         return errorHandler({ status, message })
     }
 }
-export async function deleteDomain(request: FastifyRequest, reply: FastifyReply) {
+export async function deleteDomain(request: FastifyRequest<DeleteDomain>, reply: FastifyReply) {
     try {
         const { fqdn } = request.body
         let ip;
@@ -57,7 +58,7 @@ export async function deleteDomain(request: FastifyRequest, reply: FastifyReply)
     }
 }
 
-export async function checkDomain(request: FastifyRequest, reply: FastifyReply) {
+export async function checkDomain(request: FastifyRequest<CheckDomain>) {
     try {
         const { id } = request.params;
         let { fqdn, forceSave, dualCerts, isDNSCheckEnabled } = request.body
@@ -74,9 +75,9 @@ export async function checkDomain(request: FastifyRequest, reply: FastifyReply) 
         return errorHandler({ status, message })
     }
 }
-export async function checkDNS(request: FastifyRequest, reply: FastifyReply) {
+export async function checkDNS(request: FastifyRequest<CheckDNS>) {
     try {
-        const { id, domain } = request.params;
+        const { domain } = request.params;
         await isDNSValid(request.hostname, domain);
         return {}
     } catch ({ status, message }) {

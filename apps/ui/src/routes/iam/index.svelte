@@ -53,7 +53,7 @@
 			return;
 		}
 		try {
-			await del(`/iam/user/remove`, { uid: id });
+			await del(`/iam/user/remove`, { id });
 			toast.push('Account deleted.');
 			const data = await get('/iam');
 			accounts = data.accounts;

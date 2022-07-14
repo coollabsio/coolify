@@ -1,6 +1,7 @@
 import { FastifyRequest } from "fastify";
 import { asyncExecShell, errorHandler, getDomain, isDev, listServicesWithIncludes, prisma, supportedServiceTypesAndVersions } from "../../../lib/common";
 import { getEngine } from "../../../lib/docker";
+import { TraefikOtherConfiguration } from "./types";
 
 function configureMiddleware(
 	{ id, container, port, domain, nakedDomain, isHttps, isWWW, isDualCerts, scriptName, type },
@@ -362,7 +363,7 @@ export async function traefikConfiguration(request, reply) {
 	}
 }
 
-export async function traefikOtherConfiguration(request: FastifyRequest, reply) {
+export async function traefikOtherConfiguration(request: FastifyRequest<TraefikOtherConfiguration>) {
 	try {
 		const { id } = request.query
 		if (id) {

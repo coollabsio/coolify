@@ -2,12 +2,15 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceImages, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePort, getDomain, errorHandler, supportedServiceTypesAndVersions, generatePassword, isDev, stopTcpHttpProxy, getAvailableServices } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceImages, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePort, getDomain, errorHandler, supportedServiceTypesAndVersions, generatePassword, isDev, stopTcpHttpProxy, getAvailableServices, convertTolOldVolumeNames } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, dockerInstance, getEngine, removeContainer } from '../../../../lib/docker';
 import cuid from 'cuid';
 
-async function startServiceNew(request: FastifyRequest) {
+import type { OnlyId } from '../../../../types';
+import type { ActivateWordpressFtp, CheckService, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetWordpressSettings } from './types';
+
+async function startServiceNew(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -73,7 +76,6 @@ async function startServiceNew(request: FastifyRequest) {
 
 export async function listServices(request: FastifyRequest) {
     try {
-        const userId = request.user.userId;
         const teamId = request.user.teamId;
         let services = []
         if (teamId === '0') {
@@ -102,7 +104,7 @@ export async function newService(request: FastifyRequest, reply: FastifyReply) {
         return errorHandler({ status, message })
     }
 }
-export async function getService(request: FastifyRequest) {
+export async function getService(request: FastifyRequest<OnlyId>) {
     try {
         const teamId = request.user.teamId;
         const { id } = request.params;
@@ -155,7 +157,7 @@ export async function getServiceType(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function saveServiceType(request: FastifyRequest, reply: FastifyReply) {
+export async function saveServiceType(request: FastifyRequest<SaveServiceType>, reply: FastifyReply) {
     try {
         const teamId = request.user.teamId;
         const { id } = request.params;
@@ -166,7 +168,7 @@ export async function saveServiceType(request: FastifyRequest, reply: FastifyRep
         return errorHandler({ status, message })
     }
 }
-export async function getServiceVersions(request: FastifyRequest) {
+export async function getServiceVersions(request: FastifyRequest<OnlyId>) {
     try {
         const teamId = request.user.teamId;
         const { id } = request.params;
@@ -179,9 +181,8 @@ export async function getServiceVersions(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function saveServiceVersion(request: FastifyRequest, reply: FastifyReply) {
+export async function saveServiceVersion(request: FastifyRequest<SaveServiceVersion>, reply: FastifyReply) {
     try {
-        const teamId = request.user.teamId;
         const { id } = request.params;
         const { version } = request.body;
         await prisma.service.update({
@@ -193,9 +194,8 @@ export async function saveServiceVersion(request: FastifyRequest, reply: Fastify
         return errorHandler({ status, message })
     }
 }
-export async function saveServiceDestination(request: FastifyRequest, reply: FastifyReply) {
+export async function saveServiceDestination(request: FastifyRequest<SaveServiceDestination>, reply: FastifyReply) {
     try {
-        const teamId = request.user.teamId;
         const { id } = request.params;
         const { destinationId } = request.body;
         await prisma.service.update({
@@ -207,7 +207,7 @@ export async function saveServiceDestination(request: FastifyRequest, reply: Fas
         return errorHandler({ status, message })
     }
 }
-export async function getServiceUsage(request: FastifyRequest) {
+export async function getServiceUsage(request: FastifyRequest<OnlyId>) {
     try {
         const teamId = request.user.teamId;
         const { id } = request.params;
@@ -225,9 +225,8 @@ export async function getServiceUsage(request: FastifyRequest) {
     }
 
 }
-export async function getServiceLogs(request: FastifyRequest) {
+export async function getServiceLogs(request: FastifyRequest<GetServiceLogs>) {
     try {
-        const teamId = request.user.teamId;
         const { id } = request.params;
         let { since = 0 } = request.query
         if (since !== 0) {
@@ -276,7 +275,7 @@ export async function getServiceLogs(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function deleteService(request: FastifyRequest) {
+export async function deleteService(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params;
         await removeService({ id });
@@ -285,7 +284,7 @@ export async function deleteService(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function saveServiceSettings(request: FastifyRequest, reply: FastifyReply) {
+export async function saveServiceSettings(request: FastifyRequest<SaveServiceSettings>, reply: FastifyReply) {
     try {
         const { id } = request.params;
         const { dualCerts } = request.body;
@@ -298,7 +297,7 @@ export async function saveServiceSettings(request: FastifyRequest, reply: Fastif
         return errorHandler({ status, message })
     }
 }
-export async function checkService(request: FastifyRequest) {
+export async function checkService(request: FastifyRequest<CheckService>) {
     try {
         const { id } = request.params;
         let { fqdn, exposePort, otherFqdns } = request.body;
@@ -337,7 +336,7 @@ export async function checkService(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function saveService(request: FastifyRequest, reply: FastifyReply) {
+export async function saveService(request: FastifyRequest<SaveService>, reply: FastifyReply) {
     try {
         const { id } = request.params;
         let { name, fqdn, exposePort, type } = request.body;
@@ -365,7 +364,7 @@ export async function saveService(request: FastifyRequest, reply: FastifyReply) 
     }
 }
 
-export async function getServiceSecrets(request: FastifyRequest) {
+export async function getServiceSecrets(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         let secrets = await prisma.serviceSecret.findMany({
@@ -385,10 +384,10 @@ export async function getServiceSecrets(request: FastifyRequest) {
     }
 }
 
-export async function saveServiceSecret(request: FastifyRequest, reply: FastifyReply) {
+export async function saveServiceSecret(request: FastifyRequest<SaveServiceSecret>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        let { name, value, isBuildSecret, isPRMRSecret, isNew } = request.body
+        let { name, value, isNew } = request.body
 
         if (isNew) {
             const found = await prisma.serviceSecret.findFirst({ where: { name, serviceId: id } });
@@ -420,7 +419,7 @@ export async function saveServiceSecret(request: FastifyRequest, reply: FastifyR
         return errorHandler({ status, message })
     }
 }
-export async function deleteServiceSecret(request: FastifyRequest) {
+export async function deleteServiceSecret(request: FastifyRequest<DeleteServiceSecret>) {
     try {
         const { id } = request.params
         const { name } = request.body
@@ -431,7 +430,7 @@ export async function deleteServiceSecret(request: FastifyRequest) {
     }
 }
 
-export async function getServiceStorages(request: FastifyRequest) {
+export async function getServiceStorages(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         const persistentStorages = await prisma.servicePersistentStorage.findMany({
@@ -445,7 +444,7 @@ export async function getServiceStorages(request: FastifyRequest) {
     }
 }
 
-export async function saveServiceStorage(request: FastifyRequest, reply: FastifyReply) {
+export async function saveServiceStorage(request: FastifyRequest<SaveServiceStorage>, reply: FastifyReply) {
     try {
         const { id } = request.params
         const { path, newStorage, storageId } = request.body
@@ -466,7 +465,7 @@ export async function saveServiceStorage(request: FastifyRequest, reply: Fastify
     }
 }
 
-export async function deleteServiceStorage(request: FastifyRequest) {
+export async function deleteServiceStorage(request: FastifyRequest<DeleteServiceStorage>) {
     try {
         const { id } = request.params
         const { path } = request.body
@@ -477,7 +476,7 @@ export async function deleteServiceStorage(request: FastifyRequest) {
     }
 }
 
-export async function startService(request: FastifyRequest,) {
+export async function startService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { type } = request.params
         if (type === 'plausibleanalytics') {
@@ -527,7 +526,7 @@ export async function startService(request: FastifyRequest,) {
         throw { status: 500, message: error?.message || error }
     }
 }
-export async function stopService(request: FastifyRequest) {
+export async function stopService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { type } = request.params
         if (type === 'plausibleanalytics') {
@@ -577,7 +576,7 @@ export async function stopService(request: FastifyRequest) {
         throw { status: 500, message: error?.message || error }
     }
 }
-export async function setSettingsService(request: FastifyRequest, reply: FastifyReply) {
+export async function setSettingsService(request: FastifyRequest<ServiceStartStop & SetWordpressSettings>, reply: FastifyReply) {
     try {
         const { type } = request.params
         if (type === 'wordpress') {
@@ -588,7 +587,7 @@ export async function setSettingsService(request: FastifyRequest, reply: Fastify
         return errorHandler({ status, message })
     }
 }
-async function setWordpressSettings(request: FastifyRequest, reply: FastifyReply) {
+async function setWordpressSettings(request: FastifyRequest<ServiceStartStop & SetWordpressSettings>, reply: FastifyReply) {
     try {
         const { id } = request.params
         const { ownMysql } = request.body
@@ -602,7 +601,7 @@ async function setWordpressSettings(request: FastifyRequest, reply: FastifyReply
     }
 }
 
-async function startPlausibleAnalyticsService(request: FastifyRequest) {
+async function startPlausibleAnalyticsService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params
         const teamId = request.user.teamId;
@@ -796,7 +795,7 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
         return errorHandler({ status, message })
     }
 }
-async function stopPlausibleAnalyticsService(request: FastifyRequest) {
+async function stopPlausibleAnalyticsService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -825,7 +824,7 @@ async function stopPlausibleAnalyticsService(request: FastifyRequest) {
     }
 }
 
-async function startNocodbService(request: FastifyRequest) {
+async function startNocodbService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -891,7 +890,7 @@ async function startNocodbService(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-async function stopNocodbService(request: FastifyRequest) {
+async function stopNocodbService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -910,7 +909,7 @@ async function stopNocodbService(request: FastifyRequest) {
     }
 }
 
-async function startMinioService(request: FastifyRequest) {
+async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -994,7 +993,7 @@ async function startMinioService(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-async function stopMinioService(request: FastifyRequest) {
+async function stopMinioService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1014,7 +1013,7 @@ async function stopMinioService(request: FastifyRequest) {
     }
 }
 
-async function startVscodeService(request: FastifyRequest) {
+async function startVscodeService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1119,7 +1118,7 @@ async function startVscodeService(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-async function stopVscodeService(request: FastifyRequest) {
+async function stopVscodeService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1138,7 +1137,7 @@ async function stopVscodeService(request: FastifyRequest) {
     }
 }
 
-async function startWordpressService(request: FastifyRequest) {
+async function startWordpressService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1146,7 +1145,6 @@ async function startWordpressService(request: FastifyRequest) {
         const {
             type,
             version,
-            fqdn,
             destinationDockerId,
             serviceSecret,
             destinationDocker,
@@ -1264,7 +1262,7 @@ async function startWordpressService(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-async function stopWordpressService(request: FastifyRequest) {
+async function stopWordpressService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1313,7 +1311,7 @@ async function stopWordpressService(request: FastifyRequest) {
     }
 }
 
-async function startVaultwardenService(request: FastifyRequest) {
+async function startVaultwardenService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1380,7 +1378,7 @@ async function startVaultwardenService(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-async function stopVaultwardenService(request: FastifyRequest) {
+async function stopVaultwardenService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1404,7 +1402,7 @@ async function stopVaultwardenService(request: FastifyRequest) {
     }
 }
 
-async function startLanguageToolService(request: FastifyRequest) {
+async function startLanguageToolService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1472,7 +1470,7 @@ async function startLanguageToolService(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-async function stopLanguageToolService(request: FastifyRequest) {
+async function stopLanguageToolService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1496,7 +1494,7 @@ async function stopLanguageToolService(request: FastifyRequest) {
     }
 }
 
-async function startN8nService(request: FastifyRequest) {
+async function startN8nService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1564,7 +1562,7 @@ async function startN8nService(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-async function stopN8nService(request: FastifyRequest) {
+async function stopN8nService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1588,7 +1586,7 @@ async function stopN8nService(request: FastifyRequest) {
     }
 }
 
-async function startUptimekumaService(request: FastifyRequest) {
+async function startUptimekumaService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1655,7 +1653,7 @@ async function startUptimekumaService(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-async function stopUptimekumaService(request: FastifyRequest) {
+async function stopUptimekumaService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1679,7 +1677,7 @@ async function stopUptimekumaService(request: FastifyRequest) {
     }
 }
 
-async function startGhostService(request: FastifyRequest) {
+async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1708,6 +1706,7 @@ async function startGhostService(request: FastifyRequest) {
         const { workdir } = await createDirectories({ repository: type, buildId: id });
         const image = getServiceImage(type);
         const domain = getDomain(fqdn);
+        const port = getServiceMainPort('ghost');
         const isHttps = fqdn.startsWith('https://');
         const config = {
             ghost: {
@@ -1806,7 +1805,7 @@ async function startGhostService(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-async function stopGhostService(request: FastifyRequest) {
+async function stopGhostService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1834,7 +1833,7 @@ async function stopGhostService(request: FastifyRequest) {
     }
 }
 
-async function startMeilisearchService(request: FastifyRequest) {
+async function startMeilisearchService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1907,7 +1906,7 @@ async function startMeilisearchService(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-async function stopMeilisearchService(request: FastifyRequest) {
+async function stopMeilisearchService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -1931,7 +1930,7 @@ async function stopMeilisearchService(request: FastifyRequest) {
     }
 }
 
-async function startUmamiService(request: FastifyRequest) {
+async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -2126,7 +2125,7 @@ async function startUmamiService(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-async function stopUmamiService(request: FastifyRequest) {
+async function stopUmamiService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -2158,7 +2157,7 @@ async function stopUmamiService(request: FastifyRequest) {
     }
 }
 
-async function startHasuraService(request: FastifyRequest) {
+async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -2262,7 +2261,7 @@ async function startHasuraService(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-async function stopHasuraService(request: FastifyRequest) {
+async function stopHasuraService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -2294,7 +2293,7 @@ async function stopHasuraService(request: FastifyRequest) {
     }
 }
 
-async function startFiderService(request: FastifyRequest) {
+async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -2425,7 +2424,7 @@ async function startFiderService(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-async function stopFiderService(request: FastifyRequest) {
+async function stopFiderService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -2457,7 +2456,7 @@ async function stopFiderService(request: FastifyRequest) {
     }
 }
 
-export async function activatePlausibleUsers(request: FastifyRequest, reply: FastifyReply) {
+export async function activatePlausibleUsers(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
     try {
         const { id } = request.params
         const teamId = request.user.teamId;
@@ -2482,10 +2481,8 @@ export async function activatePlausibleUsers(request: FastifyRequest, reply: Fas
         return errorHandler({ status, message })
     }
 }
-export async function activateWordpressFtp(request: FastifyRequest, reply: FastifyReply) {
+export async function activateWordpressFtp(request: FastifyRequest<ActivateWordpressFtp>, reply: FastifyReply) {
     const { id } = request.params
-    const teamId = request.user.teamId;
-
     const { ftpEnabled } = request.body;
 
     const publicPort = await getFreePort();

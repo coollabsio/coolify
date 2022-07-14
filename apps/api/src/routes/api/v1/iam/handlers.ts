@@ -3,6 +3,10 @@ import type { FastifyRequest } from 'fastify';
 import { FastifyReply } from 'fastify';
 import { decrypt, errorHandler, prisma, uniqueName } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
+
+import type { OnlyId } from '../../../../types';
+import type { BodyId, InviteToTeam, SaveTeam, SetPermission } from './types';
+
 export async function listTeams(request: FastifyRequest) {
     try {
         const userId = request.user.userId;
@@ -36,7 +40,7 @@ export async function listTeams(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function deleteTeam(request: FastifyRequest, reply: FastifyReply) {
+export async function deleteTeam(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
     try {
         const userId = request.user.userId;
         const { id } = request.params;
@@ -136,7 +140,7 @@ export async function newTeam(request: FastifyRequest, reply: FastifyReply) {
         return errorHandler({ status, message })
     }
 }
-export async function getTeam(request: FastifyRequest, reply: FastifyReply) {
+export async function getTeam(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
     try {
         const userId = request.user.userId;
         const teamId = request.user.teamId;
@@ -163,7 +167,7 @@ export async function getTeam(request: FastifyRequest, reply: FastifyReply) {
         return errorHandler({ status, message })
     }
 }
-export async function saveTeam(request: FastifyRequest, reply: FastifyReply) {
+export async function saveTeam(request: FastifyRequest<SaveTeam>, reply: FastifyReply) {
     try {
         const { id } = request.params;
         const { name } = request.body;
@@ -263,7 +267,7 @@ export async function saveTeam(request: FastifyRequest, reply: FastifyReply) {
 //     }
 // }
 
-export async function inviteToTeam(request: FastifyRequest, reply: FastifyReply) {
+export async function inviteToTeam(request: FastifyRequest<InviteToTeam>, reply: FastifyReply) {
     try {
         const userId = request.user.userId;
         const { email, permission, teamId, teamName } = request.body;
@@ -306,7 +310,7 @@ export async function inviteToTeam(request: FastifyRequest, reply: FastifyReply)
     }
 }
 
-export async function acceptInvitation(request: FastifyRequest) {
+export async function acceptInvitation(request: FastifyRequest<BodyId>) {
     try {
         const userId = request.user.userId;
         const { id } = request.body;
@@ -331,7 +335,7 @@ export async function acceptInvitation(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function revokeInvitation(request: FastifyRequest) {
+export async function revokeInvitation(request: FastifyRequest<BodyId>) {
     try {
         const { id } = request.body
         await prisma.teamInvitation.delete({ where: { id } });
@@ -341,15 +345,15 @@ export async function revokeInvitation(request: FastifyRequest) {
     }
 }
 
-export async function removeUser(request: FastifyRequest, reply: FastifyReply) {
+export async function removeUser(request: FastifyRequest<BodyId>, reply: FastifyReply) {
     try {
-        const { uid } = request.body;
-        const user = await prisma.user.findUnique({ where: { id: uid }, include: { teams: true, permission: true } });
+        const { id } = request.body;
+        const user = await prisma.user.findUnique({ where: { id }, include: { teams: true, permission: true } });
         if (user) {
             const permissions = user.permission;
             if (permissions.length > 0) {
                 for (const permission of permissions) {
-                    await prisma.permission.deleteMany({ where: { id: permission.id, userId: uid } });
+                    await prisma.permission.deleteMany({ where: { id: permission.id, userId: id } });
                 }
             }
             const teams = user.teams;
@@ -357,7 +361,7 @@ export async function removeUser(request: FastifyRequest, reply: FastifyReply) {
                 for (const team of teams) {
                     const newTeam = await prisma.team.update({
                         where: { id: team.id },
-                        data: { users: { disconnect: { id: uid } } },
+                        data: { users: { disconnect: { id } } },
                         include: { applications: true, database: true, gitHubApps: true, gitLabApps: true, gitSources: true, destinationDocker: true, service: true, users: true }
                     });
                     if (newTeam.users.length === 0) {
@@ -422,14 +426,14 @@ export async function removeUser(request: FastifyRequest, reply: FastifyReply) {
                 }
             }
         }
-        await prisma.user.delete({ where: { id: uid } });
+        await prisma.user.delete({ where: { id } });
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
 
-export async function setPermission(request: FastifyRequest, reply: FastifyReply) {
+export async function setPermission(request: FastifyRequest<SetPermission>, reply: FastifyReply) {
     try {
         const { userId, newPermission, permissionId } = request.body;
         await prisma.permission.updateMany({
@@ -442,7 +446,7 @@ export async function setPermission(request: FastifyRequest, reply: FastifyReply
     }
 }
 
-export async function changePassword(request: FastifyRequest, reply: FastifyReply) {
+export async function changePassword(request: FastifyRequest<BodyId>, reply: FastifyReply) {
     try {
         const { id } = request.body;
         await prisma.user.update({ where: { id }, data: { password: 'RESETME' } });

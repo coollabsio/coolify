@@ -16,7 +16,7 @@ import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 import axios from 'axios';
 
-export const version = '3.1.2';
+export const version = '3.1.3';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -825,7 +825,7 @@ export type ComposeFileService = {
 		context: string;
 		dockerfile: string;
 		args?: Record<string, unknown>;
-	};
+	} | string;
 	deploy?: {
 		restart_policy?: {
 			condition?: string;

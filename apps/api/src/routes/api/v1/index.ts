@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
-import { scheduler } from '../../../lib/scheduler';
 import { checkUpdate, login, showDashboard, update, showUsage, getCurrentUser, cleanupManually } from './handlers';
+import { GetCurrentUser } from './types';
 
 export interface Update {
 	Body: { latestVersion: string }
@@ -9,7 +9,7 @@ export interface Login {
 	Body: { email: string, password: string, isLogin: boolean }
 }
 
-const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
+const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 	fastify.get('/', async function (_request, reply) {
 		return reply.redirect(302, '/');
 	});
@@ -19,7 +19,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
 		return { token, payload }
 	});
 
-	fastify.get('/user', {
+	fastify.get<GetCurrentUser>('/user', {
 		onRequest: [fastify.authenticate]
 	}, async (request) => await getCurrentUser(request, fastify));
 

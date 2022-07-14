@@ -1,13 +1,15 @@
 import axios from "axios";
 import cuid from "cuid";
 import crypto from "crypto";
-import type { FastifyReply, FastifyRequest } from "fastify";
-import { encrypt, errorHandler, getAPIUrl, getUIUrl, isDev, prisma } from "../../../lib/common";
+import { encrypt, errorHandler, getUIUrl, isDev, prisma } from "../../../lib/common";
 import { checkContainer, removeContainer } from "../../../lib/docker";
 import { scheduler } from "../../../lib/scheduler";
-import { getApplicationFromDB, getApplicationFromDBWebhook } from "../../api/v1/applications/handlers";
+import { getApplicationFromDBWebhook } from "../../api/v1/applications/handlers";
 
-export async function installGithub(request: FastifyRequest, reply: FastifyReply): Promise<any> {
+import type { FastifyReply, FastifyRequest } from "fastify";
+import type { GitHubEvents, InstallGithub } from "./types";
+
+export async function installGithub(request: FastifyRequest<InstallGithub>, reply: FastifyReply): Promise<any> {
     try {
         const { gitSourceId, installation_id } = request.query;
         const source = await prisma.gitSource.findUnique({
@@ -63,7 +65,7 @@ export async function configureGitHubApp(request, reply) {
         return errorHandler({ status, message })
     }
 }
-export async function gitHubEvents(request: FastifyRequest, reply: FastifyReply): Promise<any> {
+export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promise<any> {
     try {
         const buildId = cuid();
         const allowedGithubEvents = ['push', 'pull_request'];

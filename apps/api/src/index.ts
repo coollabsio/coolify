@@ -77,7 +77,7 @@ if (!isDev) {
 		root: path.join(__dirname, './public'),
 		preCompressed: true
 	});
-	fastify.setNotFoundHandler({}, function (request, reply) {
+	fastify.setNotFoundHandler(async function (request, reply) {
 		if (request.raw.url && request.raw.url.startsWith('/api')) {
 			return reply.status(404).send({
 				success: false

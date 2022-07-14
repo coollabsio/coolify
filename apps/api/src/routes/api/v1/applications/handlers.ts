@@ -2,18 +2,16 @@ import cuid from 'cuid';
 import crypto from 'node:crypto'
 import jsonwebtoken from 'jsonwebtoken';
 import axios from 'axios';
-import { day } from '../../../../lib/dayjs';
-
-
-import type { FastifyRequest } from 'fastify';
 import { FastifyReply } from 'fastify';
-
-import { CheckDNS, DeleteApplication, DeployApplication, GetApplication, SaveApplication, SaveApplicationSettings } from '.';
+import { day } from '../../../../lib/dayjs';
 import { setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
 import { asyncExecShell, checkDomainsIsValidInDNS, checkDoubleBranch, decrypt, encrypt, errorHandler, generateSshKeyPair, getContainerUsage, getDomain, isDev, isDomainConfigured, prisma, stopBuild, uniqueName } from '../../../../lib/common';
 import { checkContainer, dockerInstance, getEngine, isContainerExited, removeContainer } from '../../../../lib/docker';
 import { scheduler } from '../../../../lib/scheduler';
 
+import type { FastifyRequest } from 'fastify';
+import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, OnlyId, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication } from './types';
+import { Application, DestinationDocker } from '@prisma/client';
 
 export async function listApplications(request: FastifyRequest) {
     try {
@@ -31,7 +29,7 @@ export async function listApplications(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function getImages(request: FastifyRequest) {
+export async function getImages(request: FastifyRequest<GetImages>) {
     try {
         const { buildPack, deploymentType } = request.body
         let publishDirectory = undefined;
@@ -65,14 +63,14 @@ export async function getImages(request: FastifyRequest) {
     }
 }
 
-export async function getApplication(request: FastifyRequest<GetApplication>) {
+export async function getApplication(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         const { teamId } = request.user
         const appId = process.env['COOLIFY_APP_ID'];
         let isRunning = false;
         let isExited = false;
-        const application = await getApplicationFromDB(id, teamId);
+        const application: any = await getApplicationFromDB(id, teamId);
         if (application?.destinationDockerId && application.destinationDocker?.engine) {
             isRunning = await checkContainer(application.destinationDocker.engine, id);
             isExited = await isContainerExited(application.destinationDocker.engine, id);
@@ -281,11 +279,11 @@ export async function saveApplicationSettings(request: FastifyRequest<SaveApplic
     }
 }
 
-export async function stopApplication(request: FastifyRequest, reply: FastifyReply) {
+export async function stopApplication(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
     try {
         const { id } = request.params
         const { teamId } = request.user
-        const application = await getApplicationFromDB(id, teamId);
+        const application: any = await getApplicationFromDB(id, teamId);
         if (application?.destinationDockerId && application.destinationDocker?.engine) {
             const { engine } = application.destinationDocker;
             const found = await checkContainer(engine, id);
@@ -373,8 +371,9 @@ export async function getUsage(request) {
     try {
         const { id } = request.params
         const teamId = request.user?.teamId;
-        const application = await getApplicationFromDB(id, teamId);
         let usage = {};
+
+        const application: any = await getApplicationFromDB(id, teamId);
         if (application.destinationDockerId) {
             [usage] = await Promise.all([getContainerUsage(application.destinationDocker.engine, id)]);
         }
@@ -389,7 +388,6 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
     try {
         const { id } = request.params
         const teamId = request.user?.teamId;
-
         const { pullmergeRequestId = null, branch } = request.body
         const buildId = cuid();
         const application = await getApplicationFromDB(id, teamId);
@@ -450,7 +448,7 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
 }
 
 
-export async function saveApplicationSource(request: FastifyRequest, reply: FastifyReply) {
+export async function saveApplicationSource(request: FastifyRequest<SaveApplicationSource>, reply: FastifyReply) {
     try {
         const { id } = request.params
         const { gitSourceId } = request.body
@@ -464,11 +462,11 @@ export async function saveApplicationSource(request: FastifyRequest, reply: Fast
     }
 }
 
-export async function getGitHubToken(request: FastifyRequest, reply: FastifyReply) {
+export async function getGitHubToken(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
     try {
         const { id } = request.params
         const { teamId } = request.user
-        const application = await getApplicationFromDB(id, teamId);
+        const application: any = await getApplicationFromDB(id, teamId);
         const payload = {
             iat: Math.round(new Date().getTime() / 1000),
             exp: Math.round(new Date().getTime() / 1000 + 60),
@@ -490,7 +488,7 @@ export async function getGitHubToken(request: FastifyRequest, reply: FastifyRepl
     }
 }
 
-export async function checkRepository(request: FastifyRequest) {
+export async function checkRepository(request: FastifyRequest<CheckRepository>) {
     try {
         const { id } = request.params
         const { repository, branch } = request.query
@@ -537,7 +535,7 @@ export async function saveRepository(request, reply) {
     }
 }
 
-export async function saveDestination(request: FastifyRequest, reply: FastifyReply) {
+export async function saveDestination(request: FastifyRequest<SaveDestination>, reply: FastifyReply) {
     try {
         const { id } = request.params
         const { destinationId } = request.body
@@ -555,7 +553,7 @@ export async function getBuildPack(request) {
     try {
         const { id } = request.params
         const teamId = request.user?.teamId;
-        const application = await getApplicationFromDB(id, teamId);
+        const application: any = await getApplicationFromDB(id, teamId);
         return {
             type: application.gitSource.type,
             projectId: application.projectId,
@@ -579,7 +577,7 @@ export async function saveBuildPack(request, reply) {
     }
 }
 
-export async function getSecrets(request: FastifyRequest) {
+export async function getSecrets(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         let secrets = await prisma.secret.findMany({
@@ -601,7 +599,7 @@ export async function getSecrets(request: FastifyRequest) {
     }
 }
 
-export async function saveSecret(request: FastifyRequest, reply: FastifyReply) {
+export async function saveSecret(request: FastifyRequest<SaveSecret>, reply: FastifyReply) {
     try {
         const { id } = request.params
         let { name, value, isBuildSecret, isPRMRSecret, isNew } = request.body
@@ -636,7 +634,7 @@ export async function saveSecret(request: FastifyRequest, reply: FastifyReply) {
         return errorHandler({ status, message })
     }
 }
-export async function deleteSecret(request: FastifyRequest) {
+export async function deleteSecret(request: FastifyRequest<DeleteSecret>) {
     try {
         const { id } = request.params
         const { name } = request.body
@@ -647,7 +645,7 @@ export async function deleteSecret(request: FastifyRequest) {
     }
 }
 
-export async function getStorages(request: FastifyRequest) {
+export async function getStorages(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         const persistentStorages = await prisma.applicationPersistentStorage.findMany({ where: { applicationId: id } });
@@ -659,7 +657,7 @@ export async function getStorages(request: FastifyRequest) {
     }
 }
 
-export async function saveStorage(request: FastifyRequest, reply: FastifyReply) {
+export async function saveStorage(request: FastifyRequest<SaveStorage>, reply: FastifyReply) {
     try {
         const { id } = request.params
         const { path, newStorage, storageId } = request.body
@@ -680,7 +678,7 @@ export async function saveStorage(request: FastifyRequest, reply: FastifyReply) 
     }
 }
 
-export async function deleteStorage(request: FastifyRequest) {
+export async function deleteStorage(request: FastifyRequest<DeleteStorage>) {
     try {
         const { id } = request.params
         const { path } = request.body
@@ -691,7 +689,7 @@ export async function deleteStorage(request: FastifyRequest) {
     }
 }
 
-export async function getPreviews(request: FastifyRequest) {
+export async function getPreviews(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         const { teamId } = request.user
@@ -739,7 +737,7 @@ export async function getPreviews(request: FastifyRequest) {
     }
 }
 
-export async function getApplicationLogs(request: FastifyRequest) {
+export async function getApplicationLogs(request: FastifyRequest<GetApplicationLogs>) {
     try {
         const { id } = request.params
         let { since = 0 } = request.query
@@ -783,7 +781,7 @@ export async function getApplicationLogs(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function getBuildLogs(request: FastifyRequest) {
+export async function getBuildLogs(request: FastifyRequest<GetBuildLogs>) {
     try {
         const { id } = request.params
         let { buildId, skip = 0 } = request.query
@@ -820,9 +818,9 @@ export async function getBuildLogs(request: FastifyRequest) {
     }
 }
 
-export async function getBuildIdLogs(request: FastifyRequest) {
+export async function getBuildIdLogs(request: FastifyRequest<GetBuildIdLogs>) {
     try {
-        const { id, buildId } = request.params
+        const { buildId } = request.params
         let { sequence = 0 } = request.query
         if (typeof sequence !== 'number') {
             sequence = Number(sequence)
@@ -841,7 +839,7 @@ export async function getBuildIdLogs(request: FastifyRequest) {
     }
 }
 
-export async function getGitLabSSHKey(request: FastifyRequest) {
+export async function getGitLabSSHKey(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         const application = await prisma.application.findUnique({
@@ -854,7 +852,7 @@ export async function getGitLabSSHKey(request: FastifyRequest) {
     }
 }
 
-export async function saveGitLabSSHKey(request: FastifyRequest, reply: FastifyReply) {
+export async function saveGitLabSSHKey(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
     try {
         const { id } = request.params
         const application = await prisma.application.findUnique({
@@ -876,7 +874,7 @@ export async function saveGitLabSSHKey(request: FastifyRequest, reply: FastifyRe
     }
 }
 
-export async function saveDeployKey(request: FastifyRequest, reply: FastifyReply) {
+export async function saveDeployKey(request: FastifyRequest<SaveDeployKey>, reply: FastifyReply) {
     try {
         const { id } = request.params
         let { deployKeyId } = request.body;
@@ -896,9 +894,8 @@ export async function saveDeployKey(request: FastifyRequest, reply: FastifyReply
     }
 }
 
-export async function cancelDeployment(request: FastifyRequest, reply: FastifyReply) {
+export async function cancelDeployment(request: FastifyRequest<CancelDeployment>, reply: FastifyReply) {
     try {
-        const { id } = request.params
         const { buildId, applicationId } = request.body;
         if (!buildId) {
             throw { status: 500, message: 'buildId is required' }

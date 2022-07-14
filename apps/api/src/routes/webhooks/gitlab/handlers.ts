@@ -2,16 +2,18 @@ import axios from "axios";
 import cuid from "cuid";
 import crypto from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { encrypt, errorHandler, getAPIUrl, isDev, listSettings, prisma } from "../../../lib/common";
+import { errorHandler, getAPIUrl, isDev, listSettings, prisma } from "../../../lib/common";
 import { checkContainer, removeContainer } from "../../../lib/docker";
 import { scheduler } from "../../../lib/scheduler";
 import { getApplicationFromDB, getApplicationFromDBWebhook } from "../../api/v1/applications/handlers";
 
-export async function configureGitLabApp(request: FastifyRequest, reply: FastifyReply) {
+import type { ConfigureGitLabApp, GitLabEvents } from "./types";
+
+export async function configureGitLabApp(request: FastifyRequest<ConfigureGitLabApp>, reply: FastifyReply) {
     try {
         const { code, state } = request.query;
         const { fqdn } = await listSettings();
-        const { gitSource: { gitlabApp: { appId, appSecret }, htmlUrl } } = await getApplicationFromDB(state, undefined);
+        const { gitSource: { gitlabApp: { appId, appSecret }, htmlUrl } }: any = await getApplicationFromDB(state, undefined);
 
         let domain = `http://${request.hostname}`;
         if (fqdn) domain = fqdn;
@@ -36,12 +38,13 @@ export async function configureGitLabApp(request: FastifyRequest, reply: Fastify
         return errorHandler({ status, message })
     }
 }
-export async function gitLabEvents(request: FastifyRequest, reply: FastifyReply) {
+export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
+    const { object_kind: objectKind, ref, project_id } = request.body
     try {
         const buildId = cuid();
 
         const allowedActions = ['opened', 'reopen', 'close', 'open', 'update'];
-        const { object_kind: objectKind, ref, project_id } = request.body
+
         const webhookToken = request.headers['x-gitlab-token'];
         if (!webhookToken) {
             throw { status: 500, message: 'Invalid webhookToken.' }

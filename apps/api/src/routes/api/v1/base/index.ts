@@ -1,8 +1,8 @@
 import { FastifyPluginAsync } from 'fastify';
 import { errorHandler, version } from '../../../../lib/common';
 
-const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
-    fastify.get('/', async (request) => {
+const root: FastifyPluginAsync = async (fastify): Promise<void> => {
+    fastify.get('/', async () => {
         try {
             return {
                 version,

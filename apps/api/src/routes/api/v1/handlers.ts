@@ -8,7 +8,7 @@ import { asyncExecShell, asyncSleep, cleanupDockerStorage, errorHandler, isDev, 
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Login, Update } from '.';
-
+import type { GetCurrentUser } from './types';
 
 export async function hashPassword(password: string): Promise<string> {
 	const saltRounds = 15;
@@ -253,9 +253,9 @@ export async function login(request: FastifyRequest<Login>, reply: FastifyReply)
 	}
 }
 
-export async function getCurrentUser(request: FastifyRequest, fastify) {
+export async function getCurrentUser(request: FastifyRequest<GetCurrentUser>, fastify) {
 	let token = null
-
+	const { teamId } = request.query
 	try {
 		const user = await prisma.user.findUnique({
 			where: { id: request.user.userId }
@@ -266,17 +266,17 @@ export async function getCurrentUser(request: FastifyRequest, fastify) {
 	} catch (error) {
 		throw { status: 401, message: error };
 	}
-	if (request.query.teamId) {
+	if (teamId) {
 		try {
 			const user = await prisma.user.findFirst({
-				where: { id: request.user.userId, teams: { some: { id: request.query.teamId } } },
+				where: { id: request.user.userId, teams: { some: { id: teamId } } },
 				include: { teams: true, permission: true }
 			})
 			if (user) {
-				const permission = user.permission.find(p => p.teamId === request.query.teamId).permission
+				const permission = user.permission.find(p => p.teamId === teamId).permission
 				const payload = {
 					...request.user,
-					teamId: request.query.teamId,
+					teamId,
 					permission: permission || null,
 					isAdmin: permission === 'owner' || permission === 'admin'
 

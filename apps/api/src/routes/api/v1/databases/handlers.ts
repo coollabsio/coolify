@@ -6,10 +6,11 @@ import fs from 'fs/promises';
 import { asyncExecShell, ComposeFile, createDirectories, decrypt, encrypt, errorHandler, generateDatabaseConfiguration, generatePassword, getContainerUsage, getDatabaseImage, getDatabaseVersions, getFreePort, listSettings, makeLabelForStandaloneDatabase, prisma, startTcpProxy, startTraefikTCPProxy, stopDatabaseContainer, stopTcpHttpProxy, supportedDatabaseTypesAndVersions, uniqueName, updatePasswordInDb } from '../../../../lib/common';
 import { dockerInstance, getEngine } from '../../../../lib/docker';
 import { day } from '../../../../lib/dayjs';
+import { GetDatabaseLogs, OnlyId, SaveDatabase, SaveDatabaseDestination, SaveDatabaseSettings, SaveVersion } from '../../../../types';
+import { SaveDatabaseType } from './types';
 
 export async function listDatabases(request: FastifyRequest) {
     try {
-        const userId = request.user.userId;
         const teamId = request.user.teamId;
         let databases = []
         if (teamId === '0') {
@@ -55,7 +56,7 @@ export async function newDatabase(request: FastifyRequest, reply: FastifyReply) 
         return errorHandler({ status, message })
     }
 }
-export async function getDatabase(request: FastifyRequest) {
+export async function getDatabase(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -107,7 +108,7 @@ export async function getDatabaseTypes(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function saveDatabaseType(request: FastifyRequest, reply: FastifyReply) {
+export async function saveDatabaseType(request: FastifyRequest<SaveDatabaseType>, reply: FastifyReply) {
     try {
         const { id } = request.params;
         const { type } = request.body;
@@ -120,7 +121,7 @@ export async function saveDatabaseType(request: FastifyRequest, reply: FastifyRe
         return errorHandler({ status, message })
     }
 }
-export async function getVersions(request: FastifyRequest) {
+export async function getVersions(request: FastifyRequest<OnlyId>) {
     try {
         const teamId = request.user.teamId;
         const { id } = request.params;
@@ -135,7 +136,7 @@ export async function getVersions(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function saveVersion(request: FastifyRequest, reply: FastifyReply) {
+export async function saveVersion(request: FastifyRequest<SaveVersion>, reply: FastifyReply) {
     try {
         const { id } = request.params;
         const { version } = request.body;
@@ -144,7 +145,6 @@ export async function saveVersion(request: FastifyRequest, reply: FastifyReply) 
             where: { id },
             data: {
                 version,
-
             }
         });
         return reply.code(201).send({})
@@ -152,7 +152,7 @@ export async function saveVersion(request: FastifyRequest, reply: FastifyReply) 
         return errorHandler({ status, message })
     }
 }
-export async function saveDatabaseDestination(request: FastifyRequest, reply: FastifyReply) {
+export async function saveDatabaseDestination(request: FastifyRequest<SaveDatabaseDestination>, reply: FastifyReply) {
     try {
         const { id } = request.params;
         const { destinationId } = request.body;
@@ -181,7 +181,7 @@ export async function saveDatabaseDestination(request: FastifyRequest, reply: Fa
         return errorHandler({ status, message })
     }
 }
-export async function getDatabaseUsage(request: FastifyRequest) {
+export async function getDatabaseUsage(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -203,7 +203,7 @@ export async function getDatabaseUsage(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function startDatabase(request: FastifyRequest) {
+export async function startDatabase(request: FastifyRequest<OnlyId>) {
     try {
         const teamId = request.user.teamId;
         const { id } = request.params;
@@ -226,7 +226,6 @@ export async function startDatabase(request: FastifyRequest) {
 
         const network = destinationDockerId && destinationDocker.network;
         const host = getEngine(destinationDocker.engine);
-        const engine = destinationDocker.engine;
         const volumeName = volume.split(':')[0];
         const labels = await makeLabelForStandaloneDatabase({ id, image, volume });
 
@@ -285,7 +284,7 @@ export async function startDatabase(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function stopDatabase(request: FastifyRequest) {
+export async function stopDatabase(request: FastifyRequest<OnlyId>) {
     try {
         const teamId = request.user.teamId;
         const { id } = request.params;
@@ -310,7 +309,7 @@ export async function stopDatabase(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function getDatabaseLogs(request: FastifyRequest) {
+export async function getDatabaseLogs(request: FastifyRequest<GetDatabaseLogs>) {
     try {
         const teamId = request.user.teamId;
         const { id } = request.params;
@@ -361,7 +360,7 @@ export async function getDatabaseLogs(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function deleteDatabase(request: FastifyRequest) {
+export async function deleteDatabase(request: FastifyRequest<OnlyId>) {
     try {
         const teamId = request.user.teamId;
         const { id } = request.params;
@@ -382,7 +381,7 @@ export async function deleteDatabase(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function saveDatabase(request: FastifyRequest, reply: FastifyReply) {
+export async function saveDatabase(request: FastifyRequest<SaveDatabase>, reply: FastifyReply) {
     try {
         const teamId = request.user.teamId;
         const { id } = request.params;
@@ -428,7 +427,7 @@ export async function saveDatabase(request: FastifyRequest, reply: FastifyReply)
         return errorHandler({ status, message })
     }
 }
-export async function saveDatabaseSettings(request: FastifyRequest) {
+export async function saveDatabaseSettings(request: FastifyRequest<SaveDatabaseSettings>) {
     try {
         const teamId = request.user.teamId;
         const { id } = request.params;
