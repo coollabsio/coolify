@@ -313,6 +313,7 @@ model Service {
   umami               Umami?
   hasura              Hasura?
   fider               Fider?
+  moodle              Moodle?
 }
 
 model PlausibleAnalytics {
@@ -447,6 +448,23 @@ model Fider {
   emailSmtpUser           String?
   emailSmtpPassword       String?
   emailSmtpEnableStartTls Boolean  @default(false)
+  service                 Service  @relation(fields: [serviceId], references: [id])
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model Moodle {
+  id                      String   @id @default(cuid())
+  serviceId               String   @unique
+  defaultUsername         String
+  defaultPassword         String
+  defaultEmail            String
+  mariadbUser             String
+  mariadbPassword         String
+  mariadbRootUser         String
+  mariadbRootUserPassword String
+  mariadbDatabase         String
+  mariadbPublicPort       Int?
   service                 Service  @relation(fields: [serviceId], references: [id])
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt

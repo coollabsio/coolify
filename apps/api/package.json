@@ -14,6 +14,7 @@
     "start": "NODE_ENV=production npx -y prisma migrate deploy && npx prisma generate && npx prisma db seed && node index.js"
   },
   "dependencies": {
+    "shared": "workspace:*",
     "@breejs/ts-worker": "2.0.0",
     "@fastify/autoload": "5.0.0",
     "@fastify/cookie": "7.0.0",
@@ -51,7 +52,7 @@
     "@types/node-os-utils": "1.3.0",
     "@typescript-eslint/eslint-plugin": "5.30.5",
     "@typescript-eslint/parser": "5.30.5",
-    "esbuild": "0.14.48",
+    "esbuild": "0.14.49",
     "eslint": "8.19.0",
     "eslint-config-prettier": "8.5.0",
     "eslint-plugin-prettier": "4.2.1",

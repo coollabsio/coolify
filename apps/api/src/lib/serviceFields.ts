@@ -15,7 +15,7 @@ export const plausibleAnalytics = [{
 	isNumber: false,
 	isBoolean: false,
 	isEncrypted: false
-},{
+}, {
 	name: 'username',
 	isEditable: true,
 	isLowerCase: false,
@@ -86,7 +86,7 @@ export const minio = [{
 	isNumber: false,
 	isBoolean: false,
 	isEncrypted: false
-},{
+}, {
 	name: 'rootUser',
 	isEditable: false,
 	isLowerCase: false,
@@ -325,7 +325,7 @@ export const fider = [{
 	isNumber: false,
 	isBoolean: false,
 	isEncrypted: true
-},{
+}, {
 	name: 'postgreslUser',
 	isEditable: false,
 	isLowerCase: false,
@@ -407,6 +407,70 @@ export const fider = [{
 },
 {
 	name: 'emailMailgunRegion',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+}]
+export const moodle = [{
+	name: 'defaultEmail',
+	isEditable: true,
+	isLowerCase: true,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'defaultUsername',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'defaultPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'mariadbUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'mariadbPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'mariadbRootUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'mariadbRootUserPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'mariadbDatabase',
 	isEditable: true,
 	isLowerCase: false,
 	isNumber: false,

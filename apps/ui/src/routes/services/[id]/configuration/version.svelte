@@ -31,7 +31,8 @@
 	import { goto } from '$app/navigation';
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
-	import { errorNotification, supportedServiceTypesAndVersions } from '$lib/common';
+	import { errorNotification } from '$lib/common';
+	import { supportedServiceTypesAndVersions } from 'shared/index';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');

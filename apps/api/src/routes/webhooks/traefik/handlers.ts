@@ -1,5 +1,6 @@
 import { FastifyRequest } from "fastify";
-import { asyncExecShell, errorHandler, getDomain, isDev, listServicesWithIncludes, prisma, supportedServiceTypesAndVersions } from "../../../lib/common";
+import { supportedServiceTypesAndVersions } from "shared";
+import { asyncExecShell, errorHandler, getDomain, isDev, listServicesWithIncludes, prisma } from "../../../lib/common";
 import { getEngine } from "../../../lib/docker";
 import { TraefikOtherConfiguration } from "./types";
 

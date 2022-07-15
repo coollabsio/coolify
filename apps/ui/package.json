@@ -39,6 +39,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"shared": "workspace:*",
 		"@sveltejs/adapter-static": "1.0.0-next.34",
 		"@zerodevx/svelte-toast": "0.7.2",
 		"cuid": "2.1.8",

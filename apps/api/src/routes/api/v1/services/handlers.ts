@@ -2,13 +2,14 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceImages, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePort, getDomain, errorHandler, supportedServiceTypesAndVersions, generatePassword, isDev, stopTcpHttpProxy } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceImages, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, dockerInstance, getEngine, removeContainer } from '../../../../lib/docker';
 import cuid from 'cuid';
 
 import type { OnlyId } from '../../../../types';
 import type { ActivateWordpressFtp, CheckService, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetWordpressSettings } from './types';
+import { supportedServiceTypesAndVersions } from 'shared';
 
 // async function startServiceNew(request: FastifyRequest<OnlyId>) {
 //     try {
@@ -227,7 +228,6 @@ export async function getServiceType(request: FastifyRequest) {
 }
 export async function saveServiceType(request: FastifyRequest<SaveServiceType>, reply: FastifyReply) {
     try {
-        const teamId = request.user.teamId;
         const { id } = request.params;
         const { type } = request.body;
         await configureServiceType({ id, type });
@@ -589,6 +589,9 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         if (type === 'fider') {
             return await startFiderService(request)
         }
+        if (type === 'moodle') {
+            return await startMoodleService(request)
+        }
         throw `Service type ${type} not supported.`
     } catch (error) {
         throw { status: 500, message: error?.message || error }
@@ -638,6 +641,9 @@ export async function stopService(request: FastifyRequest<ServiceStartStop>) {
         }
         if (type === 'fider') {
             return await stopFiderService(request)
+        }
+        if (type === 'moodle') {
+            return await stopMoodleService(request)
         }
         throw `Service type ${type} not supported.`
     } catch (error) {
@@ -2523,6 +2529,170 @@ async function stopFiderService(request: FastifyRequest<ServiceStartStop>) {
         return errorHandler({ status, message })
     }
 }
+
+async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
+    try {
+        const { id } = request.params;
+        const teamId = request.user.teamId;
+        const service = await getServiceFromDB({ id, teamId });
+        const {
+            type,
+            version,
+            fqdn,
+            destinationDockerId,
+            destinationDocker,
+            serviceSecret,
+            exposePort,
+            moodle: {
+                defaultUsername,
+                defaultPassword,
+                defaultEmail,
+                mariadbRootUser,
+                mariadbRootUserPassword,
+                mariadbDatabase,
+                mariadbPassword,
+                mariadbUser
+            }
+        } = service;
+        const network = destinationDockerId && destinationDocker.network;
+        const host = getEngine(destinationDocker.engine);
+        const port = getServiceMainPort('moodle');
+
+        const { workdir } = await createDirectories({ repository: type, buildId: id });
+        const image = getServiceImage(type);
+        const domain = getDomain(fqdn);
+        const config = {
+            moodle: {
+                image: `${image}:${version}`,
+                volume: `${id}-data:/bitnami/moodle`,
+                environmentVariables: {
+                    MOODLE_USERNAME: defaultUsername,
+                    MOODLE_PASSWORD: defaultPassword,
+                    MOODLE_EMAIL: defaultEmail,
+                    MOODLE_DATABASE_HOST: `${id}-mariadb`,
+                    MOODLE_DATABASE_USER: mariadbUser,
+                    MOODLE_DATABASE_PASSWORD: mariadbPassword,
+                    MOODLE_DATABASE_NAME: mariadbDatabase,
+                    MOODLE_REVERSEPROXY: 'yes'
+                }
+            },
+            mariadb: {
+                image: 'bitnami/mariadb:latest',
+                volume: `${id}-mariadb-data:/bitnami/mariadb`,
+                environmentVariables: {
+                    MARIADB_USER: mariadbUser,
+                    MARIADB_PASSWORD: mariadbPassword,
+                    MARIADB_DATABASE: mariadbDatabase,
+                    MARIADB_ROOT_USER: mariadbRootUser,
+                    MARIADB_ROOT_PASSWORD: mariadbRootUserPassword
+                }
+            }
+        };
+        if (serviceSecret.length > 0) {
+            serviceSecret.forEach((secret) => {
+                config.moodle.environmentVariables[secret.name] = secret.value;
+            });
+        }
+
+        const composeFile: ComposeFile = {
+            version: '3.8',
+            services: {
+                [id]: {
+                    container_name: id,
+                    image: config.moodle.image,
+                    environment: config.moodle.environmentVariables,
+                    networks: [network],
+                    volumes: [],
+                    restart: 'always',
+                    labels: makeLabelForServices('moodle'),
+                    ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                    deploy: {
+                        restart_policy: {
+                            condition: 'on-failure',
+                            delay: '5s',
+                            max_attempts: 3,
+                            window: '120s'
+                        }
+                    },
+                    depends_on: [`${id}-mariadb`]
+                },
+                [`${id}-mariadb`]: {
+                    container_name: `${id}-mariadb`,
+                    image: config.mariadb.image,
+                    environment: config.mariadb.environmentVariables,
+                    networks: [network],
+                    volumes: [],
+                    restart: 'always',
+                    deploy: {
+                        restart_policy: {
+                            condition: 'on-failure',
+                            delay: '5s',
+                            max_attempts: 3,
+                            window: '120s'
+                        }
+                    },
+                    depends_on: []
+                }
+
+            },
+            networks: {
+                [network]: {
+                    external: true
+                }
+            },
+            volumes: {
+                [config.moodle.volume.split(':')[0]]: {
+                    name: config.moodle.volume.split(':')[0]
+                },
+                [config.mariadb.volume.split(':')[0]]: {
+                    name: config.mariadb.volume.split(':')[0]
+                }
+            }
+
+        };
+        const composeFileDestination = `${workdir}/docker-compose.yaml`;
+        await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
+
+        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
+        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+
+        return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+async function stopMoodleService(request: FastifyRequest<ServiceStartStop>) {
+    try {
+        const { id } = request.params;
+        const teamId = request.user.teamId;
+        const service = await getServiceFromDB({ id, teamId });
+        const { destinationDockerId, destinationDocker, fqdn } = service;
+        if (destinationDockerId) {
+            const engine = destinationDocker.engine;
+
+            try {
+                const found = await checkContainer(engine, id);
+                if (found) {
+                    await removeContainer({ id, engine });
+                }
+            } catch (error) {
+                console.error(error);
+            }
+            try {
+                const found = await checkContainer(engine, `${id}-mariadb`);
+                if (found) {
+                    await removeContainer({ id: `${id}-mariadb`, engine });
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+        return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
 
 export async function activatePlausibleUsers(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
     try {

@@ -24,22 +24,9 @@
 	import { t } from '$lib/translations';
 	import { appSession } from '$lib/store';
 
-	import PlausibleAnalytics from '$lib/components/svg/services/PlausibleAnalytics.svelte';
-	import NocoDb from '$lib/components/svg/services/NocoDB.svelte';
-	import MinIo from '$lib/components/svg/services/MinIO.svelte';
-	import VsCodeServer from '$lib/components/svg/services/VSCodeServer.svelte';
-	import Wordpress from '$lib/components/svg/services/Wordpress.svelte';
-	import VaultWarden from '$lib/components/svg/services/VaultWarden.svelte';
-	import LanguageTool from '$lib/components/svg/services/LanguageTool.svelte';
-
-	import N8n from '$lib/components/svg/services/N8n.svelte';
-	import UptimeKuma from '$lib/components/svg/services/UptimeKuma.svelte';
-	import Ghost from '$lib/components/svg/services/Ghost.svelte';
-	import MeiliSearch from '$lib/components/svg/services/MeiliSearch.svelte';
-	import Umami from '$lib/components/svg/services/Umami.svelte';
-	import Hasura from '$lib/components/svg/services/Hasura.svelte';
-	import Fider from '$lib/components/svg/services/Fider.svelte';
+	import * as Icons from '$lib/components/svg/services';
 	import { getDomain } from '$lib/common';
+	import Services from './[id]/_Services.svelte';
 
 	async function newService() {
 		const { id } = await post('/services/new', {});
@@ -88,35 +75,7 @@
 				{#each ownServices as service}
 					<a href="/services/{service.id}" class="w-96 p-2 no-underline">
 						<div class="box-selection group relative hover:bg-pink-600">
-							{#if service.type === 'plausibleanalytics'}
-								<PlausibleAnalytics isAbsolute />
-							{:else if service.type === 'nocodb'}
-								<NocoDb isAbsolute />
-							{:else if service.type === 'minio'}
-								<MinIo isAbsolute />
-							{:else if service.type === 'vscodeserver'}
-								<VsCodeServer isAbsolute />
-							{:else if service.type === 'wordpress'}
-								<Wordpress isAbsolute />
-							{:else if service.type === 'vaultwarden'}
-								<VaultWarden isAbsolute />
-							{:else if service.type === 'languagetool'}
-								<LanguageTool isAbsolute />
-							{:else if service.type === 'n8n'}
-								<N8n isAbsolute />
-							{:else if service.type === 'uptimekuma'}
-								<UptimeKuma isAbsolute />
-							{:else if service.type === 'ghost'}
-								<Ghost isAbsolute />
-							{:else if service.type === 'meilisearch'}
-								<MeiliSearch isAbsolute />
-							{:else if service.type === 'umami'}
-								<Umami isAbsolute />
-							{:else if service.type === 'hasura'}
-								<Hasura isAbsolute />
-							{:else if service.type === 'fider'}
-								<Fider isAbsolute />
-							{/if}
+							<Services type={service.type} />
 							<div class="truncate text-center text-xl font-bold">
 								{service.name}
 							</div>
@@ -141,35 +100,7 @@
 					{#each otherServices as service}
 						<a href="/services/{service.id}" class="w-96 p-2 no-underline">
 							<div class="box-selection group relative hover:bg-pink-600">
-								{#if service.type === 'plausibleanalytics'}
-									<PlausibleAnalytics isAbsolute />
-								{:else if service.type === 'nocodb'}
-									<NocoDb isAbsolute />
-								{:else if service.type === 'minio'}
-									<MinIo isAbsolute />
-								{:else if service.type === 'vscodeserver'}
-									<VsCodeServer isAbsolute />
-								{:else if service.type === 'wordpress'}
-									<Wordpress isAbsolute />
-								{:else if service.type === 'vaultwarden'}
-									<VaultWarden isAbsolute />
-								{:else if service.type === 'languagetool'}
-									<LanguageTool isAbsolute />
-								{:else if service.type === 'n8n'}
-									<N8n isAbsolute />
-								{:else if service.type === 'uptimekuma'}
-									<UptimeKuma isAbsolute />
-								{:else if service.type === 'ghost'}
-									<Ghost isAbsolute />
-								{:else if service.type === 'meilisearch'}
-									<MeiliSearch isAbsolute />
-								{:else if service.type === 'umami'}
-									<Umami isAbsolute />
-								{:else if service.type === 'hasura'}
-									<Hasura isAbsolute />
-								{:else if service.type === 'fider'}
-									<Fider isAbsolute />
-								{/if}
+								<Services type={service.type} />
 								<div class="truncate text-center text-xl font-bold">
 									{service.name}
 								</div>
