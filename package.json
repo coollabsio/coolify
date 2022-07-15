@@ -15,11 +15,9 @@
     "dev": "run-p -l -n dev:*",
     "dev:api": "NODE_ENV=development pnpm run --filter coolify-api dev",
     "dev:ui": "NODE_ENV=development pnpm run --filter coolify-ui dev",
-    "dev:shared": "NODE_ENV=development pnpm run --filter shared dev",
-    "build": "NODE_ENV=production pnpm build:shared && run-p -n build:api build:ui",
+    "build": "NODE_ENV=production run-p -n build:*",
     "build:api": "NODE_ENV=production pnpm run --filter coolify-api build",
     "build:ui": "NODE_ENV=production pnpm run --filter coolify-ui build",
-    "build:shared": "NODE_ENV=production pnpm run --filter shared build",
     "dockerlogin":"echo $DOCKER_PASS | docker login --username=$DOCKER_USER --password-stdin",
     "release:staging:amd": "cross-var docker buildx build --platform linux/amd64 -t coollabsio/coolify:$npm_package_version --push .",
     "release:local":"rm -fr ./local-serve && mkdir ./local-serve && pnpm build && cp -Rp apps/api/build/* ./local-serve && cp -Rp apps/ui/build/ ./local-serve/public && cp -Rp apps/api/prisma/ ./local-serve/prisma && cp -Rp apps/api/package.json ./local-serve && env | grep '^COOLIFY_' > ./local-serve/.env && cd ./local-serve && pnpm install . && pnpm start"

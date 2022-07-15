@@ -25,17 +25,18 @@ export async function cleanupManually() {
 }
 export async function checkUpdate(request: FastifyRequest) {
 	try {
+		const isStaging = request.hostname === 'staging.coolify.io'
 		const currentVersion = version;
 		const { data: versions } = await axios.get(
 			`https://get.coollabs.io/versions.json?appId=${process.env['COOLIFY_APP_ID']}&version=${currentVersion}`
 		);
 		const latestVersion =
-			request.hostname === 'staging.coolify.io'
+			isStaging
 				? versions['coolify'].next.version
 				: versions['coolify'].main.version;
 		const isUpdateAvailable = compare(latestVersion, currentVersion);
 		return {
-			isUpdateAvailable: isUpdateAvailable === 1,
+			isUpdateAvailable: isStaging ? true : isUpdateAvailable === 1,
 			latestVersion
 		};
 	} catch ({ status, message }) {

@@ -1,7 +1,0 @@
-{
-    "watch": ["src"],
-    "ignore": ["src/**/*.test.ts"],
-    "ext": "ts,mjs,json,graphql",
-    "exec": "rimraf build && esbuild  index.ts --watch=true --minify=true --platform=node --outdir=build --format=cjs",
-    "legacyWatch": true
-  }
