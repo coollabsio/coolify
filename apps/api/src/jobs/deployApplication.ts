@@ -189,7 +189,7 @@ import * as buildpacks from '../lib/buildPacks';
 							let imageFound = false;
 							try {
 								await image.inspect();
-								imageFound = false;
+								imageFound = true;
 							} catch (error) {
 								//
 							}
@@ -235,7 +235,7 @@ import * as buildpacks from '../lib/buildPacks';
 									throw new Error(`Build pack ${buildPack} not found.`);
 								}
 							} else {
-								await saveBuildLog({ line: 'Nothing changed.', buildId, applicationId });
+								await saveBuildLog({ line: 'Build image already available - no rebuild required.', buildId, applicationId });
 							}
 							try {
 								await asyncExecShell(`DOCKER_HOST=${host} docker stop -t 0 ${imageId}`);
