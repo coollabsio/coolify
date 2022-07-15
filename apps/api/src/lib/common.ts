@@ -1502,10 +1502,10 @@ export function convertTolOldVolumeNames(type) {
 		return 'nc'
 	}
 }
-export async function getAvailableServices(): Promise<any> {
-	const { data } = await axios.get(`https://gist.githubusercontent.com/andrasbacsai/4aac36d8d6214dbfc34fa78110554a50/raw/291a957ee6ac01d480465623e183a30230ad921f/availableServices.json`)
-	return data
-}
+// export async function getAvailableServices(): Promise<any> {
+// 	const { data } = await axios.get(`https://gist.githubusercontent.com/andrasbacsai/4aac36d8d6214dbfc34fa78110554a50/raw/5b27e6c37d78aaeedc1148d797112c827a2f43cf/availableServices.json`)
+// 	return data
+// }
 export async function cleanupDockerStorage(host, lowDiskSpace, force) {
 	// Cleanup old coolify images
 	try {

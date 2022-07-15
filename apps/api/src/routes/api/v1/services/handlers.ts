@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceImages, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePort, getDomain, errorHandler, supportedServiceTypesAndVersions, generatePassword, isDev, stopTcpHttpProxy, getAvailableServices, convertTolOldVolumeNames } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceImages, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePort, getDomain, errorHandler, supportedServiceTypesAndVersions, generatePassword, isDev, stopTcpHttpProxy } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, dockerInstance, getEngine, removeContainer } from '../../../../lib/docker';
 import cuid from 'cuid';
@@ -10,69 +10,137 @@ import cuid from 'cuid';
 import type { OnlyId } from '../../../../types';
 import type { ActivateWordpressFtp, CheckService, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetWordpressSettings } from './types';
 
-async function startServiceNew(request: FastifyRequest<OnlyId>) {
-    try {
-        const { id } = request.params;
-        const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort } =
-            service;
-        const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
-        const port = getServiceMainPort(type);
+// async function startServiceNew(request: FastifyRequest<OnlyId>) {
+//     try {
+//         const { id } = request.params;
+//         const teamId = request.user.teamId;
+//         const service = await getServiceFromDB({ id, teamId });
+//         const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort } =
+//             service;
+//         const network = destinationDockerId && destinationDocker.network;
+//         const host = getEngine(destinationDocker.engine);
+//         const port = getServiceMainPort(type);
 
-        const { workdir } = await createDirectories({ repository: type, buildId: id });
-        const image = getServiceImage(type);
-        const config = (await getAvailableServices()).find((name) => name.name === type).compose
-        const environmentVariables = {}
-        if (serviceSecret.length > 0) {
-            serviceSecret.forEach((secret) => {
-                environmentVariables[secret.name] = secret.value;
-            });
-        }
-        config.services[id] = JSON.parse(JSON.stringify(config.services[type]))
-        config.services[id].container_name = id
-        config.services[id].image = `${image}:${version}`
-        config.services[id].ports = (exposePort ? [`${exposePort}:${port}`] : []),
-            config.services[id].restart = "always"
-        config.services[id].networks = [network]
-        config.services[id].labels = makeLabelForServices(type)
-        config.services[id].deploy = {
-            restart_policy: {
-                condition: 'on-failure',
-                delay: '5s',
-                max_attempts: 3,
-                window: '120s'
-            }
-        }
-        config.networks = {
-            [network]: {
-                external: true
-            }
-        }
-        config.volumes = {}
-        config.services[id].volumes.forEach((volume, index) => {
-            let oldVolumeName = volume.split(':')[0]
-            const path = volume.split(':')[1]
-            oldVolumeName = convertTolOldVolumeNames(type)
-            const volumeName = `${id}-${oldVolumeName}`
-            config.volumes[volumeName] = {
-                name: volumeName
-            }
-            config.services[id].volumes[index] = `${volumeName}:${path}`
-        })
-        delete config.services[type]
-        config.services[id].environment = environmentVariables
-        const composeFileDestination = `${workdir}/docker-compose.yaml`;
-        await fs.writeFile(composeFileDestination, yaml.dump(config));
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
-        return {}
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
+//         const { workdir } = await createDirectories({ repository: type, buildId: id });
+//         const image = getServiceImage(type);
+//         const config = (await getAvailableServices()).find((name) => name.name === type).compose
+//         const environmentVariables = {}
+//         if (serviceSecret.length > 0) {
+//             serviceSecret.forEach((secret) => {
+//                 environmentVariables[secret.name] = secret.value;
+//             });
+//         } 
+//         config.newVolumes = {}
+//         for (const service of Object.entries(config.services)) {
+//             const name = service[0]
+//             const details: any = service[1]
+//             config.services[`${id}-${name}`] = JSON.parse(JSON.stringify(details))
+//             config.services[`${id}-${name}`].container_name = `${id}-${name}`
+//             config.services[`${id}-${name}`].restart = "always"
+//             config.services[`${id}-${name}`].networks = [network]
+//             config.services[`${id}-${name}`].labels = makeLabelForServices(type)
+//             if (name === config.name) {
+//                 config.services[`${id}-${name}`].image = `${details.image.split(':')[0]}:${version}`
+//                 config.services[`${id}-${name}`].ports = (exposePort ? [`${exposePort}:${port}`] : [])
+//                 config.services[`${id}-${name}`].environment = environmentVariables
+//             }
+//             config.services[`${id}-${name}`].deploy = {
+//                 restart_policy: {
+//                     condition: 'on-failure',
+//                     delay: '5s',
+//                     max_attempts: 3,
+//                     window: '120s'
+//                 }
+//             }
+//             if (config.services[`${id}-${name}`]?.volumes?.length > 0) {
+//                 config.services[`${id}-${name}`].volumes.forEach((volume, index) => {
+//                     let oldVolumeName = volume.split(':')[0]
+//                     const path = volume.split(':')[1]
+//                     // if (config?.volumes[oldVolumeName]) delete config?.volumes[oldVolumeName]
+//                     const newName = convertTolOldVolumeNames(type)
+//                     if (newName) oldVolumeName = newName
 
+//                     const volumeName = `${id}-${oldVolumeName}`
+//                     config.newVolumes[volumeName] = {
+//                         name: volumeName
+//                     }
+//                     config.services[`${id}-${name}`].volumes[index] = `${volumeName}:${path}`
+//                 })
+//                 config.services[`${id}-${config.name}`] = {
+//                     ...config.services[`${id}-${config.name}`],
+//                     environment: environmentVariables
+//                 }
+//             }
+//             config.networks = {
+//                 [network]: {
+//                     external: true
+//                 }
+//             }
+
+//             config.volumes = config.newVolumes
+
+//             // config.services[`${id}-${name}`]?.volumes?.length > 0 && config.services[`${id}-${name}`].volumes.forEach((volume, index) => {
+//             //     let oldVolumeName = volume.split(':')[0]
+//             //     const path = volume.split(':')[1]
+//             //     oldVolumeName = convertTolOldVolumeNames(type)
+//             //     const volumeName = `${id}-${oldVolumeName}`
+//             //     config.volumes[volumeName] = {
+//             //         name: volumeName
+//             //     }
+//             //     config.services[`${id}-${name}`].volumes[index] = `${volumeName}:${path}`
+//             // })
+//             // config.services[`${id}-${config.name}`] = {
+//             //     ...config.services[`${id}-${config.name}`],
+//             //     environment: environmentVariables
+//             // }
+//             delete config.services[name]
+
+//         }
+//         console.log(config.services)
+//         console.log(config.volumes) 
+
+//         // config.services[id] = JSON.parse(JSON.stringify(config.services[type]))
+//         // config.services[id].container_name = id
+//         // config.services[id].image = `${image}:${version}`
+//         // config.services[id].ports = (exposePort ? [`${exposePort}:${port}`] : []),
+//         //     config.services[id].restart = "always"
+//         // config.services[id].networks = [network]
+//         // config.services[id].labels = makeLabelForServices(type)
+//         // config.services[id].deploy = {
+//         //     restart_policy: {
+//         //         condition: 'on-failure',
+//         //         delay: '5s',
+//         //         max_attempts: 3,
+//         //         window: '120s'
+//         //     }
+//         // }
+//         // config.networks = {
+//         //     [network]: {
+//         //         external: true
+//         //     }
+//         // }
+//         // config.volumes = {}
+//         // config.services[id].volumes.forEach((volume, index) => {
+//         //     let oldVolumeName = volume.split(':')[0]
+//         //     const path = volume.split(':')[1]
+//         //     oldVolumeName = convertTolOldVolumeNames(type)
+//         //     const volumeName = `${id}-${oldVolumeName}`
+//         //     config.volumes[volumeName] = {
+//         //         name: volumeName
+//         //     }
+//         //     config.services[id].volumes[index] = `${volumeName}:${path}`
+//         // })
+//         // delete config.services[type]
+//         // config.services[id].environment = environmentVariables
+//         const composeFileDestination = `${workdir}/docker-compose.yaml`;
+//         // await fs.writeFile(composeFileDestination, yaml.dump(config));
+//         // await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
+//         // await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+//         return {}
+//     } catch ({ status, message }) {
+//         return errorHandler({ status, message })
+//     }
+// }
 
 export async function listServices(request: FastifyRequest) {
     try {
