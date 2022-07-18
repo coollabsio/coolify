@@ -15,7 +15,7 @@ import { checkContainer, getEngine, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
-export const version = '3.1.3';
+export const version = '3.2.0';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
