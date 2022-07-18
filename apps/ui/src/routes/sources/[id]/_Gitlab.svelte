@@ -225,7 +225,7 @@
 					disabled={source.gitlabAppId}
 					readonly={source.gitlabAppId}
 					required
-					value={source.apiUrl}
+					bind:value={source.apiUrl}
 				/>
 			</div>
 			<div class="grid grid-cols-2 items-center">
