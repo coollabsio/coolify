@@ -11,13 +11,19 @@
 	let loading = false;
 
 	async function handleSubmit() {
+		if (loading) return;
 		try {
-			const { id } = await post('/new/destination/docker', {
+			loading = true;
+			await post(`/destinations/check`, { network: payload.network });
+			const { id } = await post(`/destinations/new`, {
 				...payload
 			});
-			return await goto(`/destinations/${id}`);
+			await goto(`/destinations/${id}`);
+			window.location.reload();
 		} catch (error) {
 			return errorNotification(error);
+		} finally {
+			loading = false;
 		}
 	}
 </script>
@@ -64,20 +70,6 @@
 			<label for="port" class="text-base font-bold text-stone-100">{$t('forms.port')}</label>
 			<input required name="port" placeholder="{$t('forms.eg')}: 22" bind:value={payload.port} />
 		</div>
-		<div class="grid grid-cols-2 items-center px-10">
-			<label for="sshPrivateKey" class="text-base font-bold text-stone-100"
-				>{$t('forms.ssh_private_key')}</label
-			>
-			<textarea
-				rows="10"
-				class="resize-none"
-				required
-				name="sshPrivateKey"
-				placeholder="{$t('forms.eg')}: -----BEGIN...."
-				bind:value={payload.sshPrivateKey}
-			/>
-		</div>
-
 		<div class="grid grid-cols-2 items-center px-10">
 			<label for="network" class="text-base font-bold text-stone-100">{$t('forms.network')}</label>
 			<input

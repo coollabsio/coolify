@@ -73,6 +73,9 @@
 								<div class="truncate text-center">{destination.teams[0].name}</div>
 							{/if}
 							<div class="truncate text-center">{destination.network}</div>
+							{#if $appSession.teamId === '0' && destination.remoteVerified === false && destination.remoteEngine}
+								<div class="truncate text-center text-sm text-red-500">Not verified yet</div>
+							{/if}
 						</div>
 					</a>
 				{/each}

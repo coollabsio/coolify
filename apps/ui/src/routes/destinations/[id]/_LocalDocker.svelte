@@ -142,9 +142,6 @@
 					: $t('destination.force_restart_proxy')}</button
 			>
 		{/if}
-		<!-- <button type="button" class="bg-coollabs hover:bg-coollabs-100" on:click={scanApps}
-				>Scan for applications</button
-			> -->
 	</div>
 	<div class="grid grid-cols-2 items-center px-10 ">
 		<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
@@ -168,10 +165,6 @@
 			value={destination.engine}
 		/>
 	</div>
-	<!-- <div class="flex items-center">
-			<label for="remoteEngine">Remote Engine?</label>
-			<input name="remoteEngine" type="checkbox" bind:checked={payload.remoteEngine} />
-		</div> -->
 	<div class="grid grid-cols-2 items-center px-10">
 		<label for="network" class="text-base font-bold text-stone-100">{$t('forms.network')}</label>
 		<CopyPasswordField

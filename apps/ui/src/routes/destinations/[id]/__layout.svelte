@@ -1,6 +1,14 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, url, params }) => {
+	function checkConfiguration(destination: any): string | null {
+		let configurationPhase = null;
+		if (!destination?.remoteEngine) return configurationPhase;
+		if (!destination?.sshKey) {
+			configurationPhase = 'sshkey';
+		}
+		return configurationPhase;
+	}
+	export const load: Load = async ({ url, params }) => {
 		try {
 			const { id } = params;
 			const response = await get(`/destinations/${id}`);
@@ -11,6 +19,17 @@
 					redirect: '/destinations'
 				};
 			}
+			const configurationPhase = checkConfiguration(destination);
+			if (
+				configurationPhase &&
+				url.pathname !== `/destinations/${params.id}/configuration/${configurationPhase}`
+			) {
+				return {
+					status: 302,
+					redirect: `/destinations/${params.id}/configuration/${configurationPhase}`
+				};
+			}
+
 			return {
 				props: {
 					destination
@@ -22,6 +41,7 @@
 				}
 			};
 		} catch (error) {
+			console.log(error)
 			return handlerNotFoundLoad(error, url);
 		}
 	};

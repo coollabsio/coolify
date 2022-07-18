@@ -44,7 +44,7 @@
 		<button class="w-32" on:click={() => setPredefined('localDocker')}
 			>{$t('sources.local_docker')}</button
 		>
-		<!-- <button class="w-32" on:click={() => setPredefined('remoteDocker')}>Remote Docker</button> -->
+		<button class="w-32" on:click={() => setPredefined('remoteDocker')}>Remote Docker</button>
 		<!-- <button class="w-32" on:click={() => setPredefined('kubernetes')}>Kubernetes</button> -->
 	</div>
 </div>

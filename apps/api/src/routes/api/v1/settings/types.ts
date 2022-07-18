@@ -29,3 +29,14 @@ export interface CheckDNS {
         domain: string, 
     }
 }
+export interface SaveSSHKey {
+    Body: {
+        privateKey: string, 
+        name: string
+    }
+}
+export interface DeleteSSHKey {
+    Body: {
+       id: string
+    }
+}

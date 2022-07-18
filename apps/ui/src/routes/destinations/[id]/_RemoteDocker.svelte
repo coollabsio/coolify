@@ -1,7 +1,7 @@
 <script lang="ts">
 	export let destination: any;
-	export let settings: any
-	export let state: any
+	export let settings: any;
+	export let state: any;
 
 	import { toast } from '@zerodevx/svelte-toast';
 	import { page, session } from '$app/stores';
@@ -10,50 +10,45 @@
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { onMount } from 'svelte';
 	import { t } from '$lib/translations';
-import { errorNotification, generateRemoteEngine } from '$lib/common';
-import { appSession } from '$lib/store';
+	import { errorNotification, generateRemoteEngine } from '$lib/common';
+	import { appSession } from '$lib/store';
 	const { id } = $page.params;
 	let cannotDisable = settings.fqdn && destination.engine === '/var/run/docker.sock';
-	// let scannedApps = [];
 	let loading = false;
 	let restarting = false;
+	$: isDisabled = !$appSession.isAdmin;
+
 	async function handleSubmit() {
 		loading = true;
 		try {
-			return await post(`/destinations/${id}.json`, { ...destination });
-		} catch (error ) {
+			return await post(`/destinations/${id}`, { ...destination });
+		} catch (error) {
 			return errorNotification(error);
 		} finally {
 			loading = false;
 		}
 	}
-	// async function scanApps() {
-	// 	scannedApps = [];
-	// 	const data = await fetch(`/destinations/${id}/scan.json`);
-	// 	const { containers } = await data.json();
-	// 	scannedApps = containers;
-	// }
 	onMount(async () => {
 		if (state === false && destination.isCoolifyProxyUsed === true) {
 			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
 			try {
-				await post(`/destinations/${id}/settings.json`, {
+				await post(`/destinations/${id}/settings`, {
 					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
 					engine: destination.engine
 				});
 				await stopProxy();
-			} catch (error ) {
+			} catch (error) {
 				return errorNotification(error);
 			}
 		} else if (state === true && destination.isCoolifyProxyUsed === false) {
 			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
 			try {
-				await post(`/destinations/${id}/settings.json`, {
+				await post(`/destinations/${id}/settings`, {
 					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
 					engine: destination.engine
 				});
 				await startProxy();
-			} catch ( error ) {
+			} catch (error) {
 				return errorNotification(error);
 			}
 		}
@@ -73,7 +68,7 @@ import { appSession } from '$lib/store';
 			}
 			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
 			try {
-				await post(`/destinations/${id}/settings.json`, {
+				await post(`/destinations/${id}/settings`, {
 					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
 					engine: destination.engine
 				});
@@ -89,8 +84,7 @@ import { appSession } from '$lib/store';
 	}
 	async function stopProxy() {
 		try {
-			const engine = generateRemoteEngine(destination);
-			await post(`/destinations/${id}/stop.json`, { engine });
+			await post(`/destinations/${id}/stop`, { engine: destination.engine });
 			return toast.push($t('destination.coolify_proxy_stopped'));
 		} catch (error) {
 			return errorNotification(error);
@@ -98,8 +92,7 @@ import { appSession } from '$lib/store';
 	}
 	async function startProxy() {
 		try {
-			const engine = generateRemoteEngine(destination);
-			await post(`/destinations/${id}/start.json`, { engine });
+			await post(`/destinations/${id}/start`, { engine: destination.engine });
 			return toast.push($t('destination.coolify_proxy_started'));
 		} catch (error) {
 			return errorNotification(error);
@@ -111,7 +104,7 @@ import { appSession } from '$lib/store';
 			try {
 				restarting = true;
 				toast.push($t('destination.coolify_proxy_restarting'));
-				await post(`/destinations/${id}/restart.json`, {
+				await post(`/destinations/${id}/restart`, {
 					engine: destination.engine,
 					fqdn: settings.fqdn
 				});
@@ -119,7 +112,19 @@ import { appSession } from '$lib/store';
 				setTimeout(() => {
 					window.location.reload();
 				}, 5000);
+			} finally {
+				restarting = false;
 			}
+		}
+	}
+	async function verifyRemoteDocker() {
+		try {
+			loading = true;
+			return await post(`/destinations/${id}/verify`, {});
+		} catch (error) {
+			return errorNotification(error);
+		} finally {
+			loading = false;
 		}
 	}
 </script>
@@ -136,6 +141,11 @@ import { appSession } from '$lib/store';
 				disabled={loading}
 				>{loading ? $t('forms.saving') : $t('forms.save')}
 			</button>
+			{#if !destination.remoteVerified}
+				<button on:click|preventDefault|stopPropagation={verifyRemoteDocker}
+					>Verify Remote Docker Engine</button
+				>
+			{/if}
 			<button
 				class={restarting ? '' : 'bg-red-600 hover:bg-red-500'}
 				disabled={restarting}
@@ -145,9 +155,6 @@ import { appSession } from '$lib/store';
 					: $t('destination.force_restart_proxy')}</button
 			>
 		{/if}
-		<!-- <button type="button" class="bg-coollabs hover:bg-coollabs-100" on:click={scanApps}
-				>Scan for applications</button
-			> -->
 	</div>
 	<div class="grid grid-cols-2 items-center px-10 ">
 		<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
@@ -159,22 +166,6 @@ import { appSession } from '$lib/store';
 			bind:value={destination.name}
 		/>
 	</div>
-
-	<div class="grid grid-cols-2 items-center px-10">
-		<label for="engine" class="text-base font-bold text-stone-100">{$t('forms.engine')}</label>
-		<CopyPasswordField
-			id="engine"
-			readonly
-			disabled
-			name="engine"
-			placeholder="{$t('forms.eg')}: /var/run/docker.sock"
-			value={destination.engine}
-		/>
-	</div>
-	<!-- <div class="flex items-center">
-			<label for="remoteEngine">Remote Engine?</label>
-			<input name="remoteEngine" type="checkbox" bind:checked={payload.remoteEngine} />
-		</div> -->
 	<div class="grid grid-cols-2 items-center px-10">
 		<label for="network" class="text-base font-bold text-stone-100">{$t('forms.network')}</label>
 		<CopyPasswordField
@@ -185,6 +176,49 @@ import { appSession } from '$lib/store';
 			placeholder="{$t('forms.default')}: coolify"
 			value={destination.network}
 		/>
+	</div>
+	<div class="grid grid-cols-2 items-center px-10">
+		<label for="remoteIpAddress" class="text-base font-bold text-stone-100">IP Address</label>
+		<CopyPasswordField
+			id="remoteIpAddress"
+			readonly
+			disabled
+			name="remoteIpAddress"
+			value={destination.remoteIpAddress}
+		/>
+	</div>
+	<div class="grid grid-cols-2 items-center px-10">
+		<label for="remoteUser" class="text-base font-bold text-stone-100">User</label>
+		<CopyPasswordField
+			id="remoteUser"
+			readonly
+			disabled
+			name="remoteUser"
+			value={destination.remoteUser}
+		/>
+	</div>
+	<div class="grid grid-cols-2 items-center px-10">
+		<label for="remotePort" class="text-base font-bold text-stone-100">Port</label>
+		<CopyPasswordField
+			id="remotePort"
+			readonly
+			disabled
+			name="remotePort"
+			value={destination.remotePort}
+		/>
+	</div>
+	<div class="grid grid-cols-2 items-center px-10">
+		<label for="sshKey" class="text-base font-bold text-stone-100">SSH Key</label>
+		<a
+			href={!isDisabled ? `/destinations/${id}/configuration/sshkey?from=/destinations/${id}` : ''}
+			class="no-underline"
+			><input
+				value={destination.sshKey.name}
+				id="sshKey"
+				disabled
+				class="cursor-pointer hover:bg-coolgray-500"
+			/></a
+		>
 	</div>
 	<div class="grid grid-cols-2 items-center">
 		<Setting
@@ -200,27 +234,3 @@ import { appSession } from '$lib/store';
 		/>
 	</div>
 </form>
-<!-- <div class="flex justify-center">
-	{#if payload.isCoolifyProxyUsed}
-		{#if state}
-			<button on:click={stopProxy}>Stop proxy</button>
-		{:else}
-			<button on:click={startProxy}>Start proxy</button>
-		{/if}
-	{/if}
-</div> -->
-
-<!-- {#if scannedApps.length > 0}
-	<div class="flex justify-center px-6 pb-10">
-		<div class="flex space-x-2 h-8 items-center">
-			<div class="font-bold text-xl text-white">Found applications</div>
-		</div>
-	</div>
-	<div class="max-w-4xl mx-auto px-6">
-		<div class="flex space-x-2 justify-center">
-			{#each scannedApps as app}
-				<FoundApp {app} />
-			{/each}
-		</div>
-	</div>
-{/if} -->
