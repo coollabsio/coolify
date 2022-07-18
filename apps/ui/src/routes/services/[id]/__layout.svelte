@@ -47,6 +47,7 @@
 				}
 			};
 		} catch (error) {
+			console.log(error);
 			return handlerNotFoundLoad(error, url);
 		}
 	};
@@ -60,7 +61,7 @@
 	import { goto } from '$app/navigation';
 	import { t } from '$lib/translations';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
-	import { appSession, disabledButton, status } from '$lib/store';
+	import { appSession, disabledButton, status, location, setLocation } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
 	const { id } = $page.params;
 
@@ -109,7 +110,7 @@
 		loading = true;
 		try {
 			await post(`/services/${service.id}/${service.type}/start`, {});
-			return window.location.reload()
+			return window.location.reload();
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
@@ -126,9 +127,11 @@
 	}
 	onDestroy(() => {
 		$status.service.initialLoading = true;
+		$location = null;
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
+		setLocation(service);
 		$status.service.isRunning = false;
 		$status.service.loading = false;
 		if (service.type && service.destinationDockerId && service.version && service.fqdn) {
@@ -147,6 +150,29 @@
 		<Loading fullscreen cover />
 	{:else}
 		{#if service.type && service.destinationDockerId && service.version}
+			{#if $location}
+				<a
+					href={$location}
+					target="_blank"
+					class="icons tooltip-bottom flex items-center bg-transparent text-sm"
+					><svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-6 w-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
+						<line x1="10" y1="14" x2="20" y2="4" />
+						<polyline points="15 4 20 4 20 9" />
+					</svg></a
+				>
+				<div class="border border-stone-700 h-8" />
+			{/if}
 			{#if $status.service.initialLoading}
 				<button
 					class="icons tooltip-bottom flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"

@@ -2,6 +2,8 @@ import cuid from 'cuid';
 import type { FastifyRequest } from 'fastify';
 import { FastifyReply } from 'fastify';
 import { decrypt, encrypt, errorHandler, prisma } from '../../../../lib/common';
+import { OnlyId } from '../../../../types';
+import { CheckGitLabOAuthId, SaveGitHubSource, SaveGitLabSource } from './types';
 
 export async function listSources(request: FastifyRequest) {
     try {
@@ -31,7 +33,7 @@ export async function saveSource(request, reply) {
         return errorHandler({ status, message })
     }
 }
-export async function getSource(request: FastifyRequest) {
+export async function getSource(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         const { teamId } = request.user
@@ -97,12 +99,12 @@ export async function deleteSource(request) {
     }
 
 }
-export async function saveGitHubSource(request: FastifyRequest, reply: FastifyReply) {
+export async function saveGitHubSource(request: FastifyRequest<SaveGitHubSource>) {
     try {
         const { teamId } = request.user
 
         const { id } = request.params
-        let { name, type, htmlUrl, apiUrl, organization, customPort } = request.body
+        let { name, htmlUrl, apiUrl, organization, customPort } = request.body
 
         if (customPort) customPort = Number(customPort)
         if (id === 'new') {
@@ -128,7 +130,7 @@ export async function saveGitHubSource(request: FastifyRequest, reply: FastifyRe
         return errorHandler({ status, message })
     }
 }
-export async function saveGitLabSource(request: FastifyRequest, reply: FastifyReply) {
+export async function saveGitLabSource(request: FastifyRequest<SaveGitLabSource>) {
     try {
         const { id } = request.params
         const { teamId } = request.user
@@ -175,7 +177,7 @@ export async function saveGitLabSource(request: FastifyRequest, reply: FastifyRe
     }
 }
 
-export async function checkGitLabOAuthID(request: FastifyRequest) {
+export async function checkGitLabOAuthID(request: FastifyRequest<CheckGitLabOAuthId>) {
     try {
         const { oauthId } = request.body
         const found = await prisma.gitlabApp.findFirst({ where: { oauthId: Number(oauthId) } });

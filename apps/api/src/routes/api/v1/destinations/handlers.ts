@@ -3,6 +3,9 @@ import { FastifyReply } from 'fastify';
 import { asyncExecShell, errorHandler, listSettings, prisma, startCoolifyProxy, startTraefikProxy, stopTraefikProxy } from '../../../../lib/common';
 import { checkContainer, dockerInstance, getEngine } from '../../../../lib/docker';
 
+import type { OnlyId } from '../../../../types';
+import type { CheckDestination, NewDestination, Proxy, SaveDestinationSettings } from './types';
+
 export async function listDestinations(request: FastifyRequest) {
     try {
         const teamId = request.user.teamId;
@@ -22,7 +25,7 @@ export async function listDestinations(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function checkDestination(request: FastifyRequest) {
+export async function checkDestination(request: FastifyRequest<CheckDestination>) {
     try {
         const { network } = request.body;
         const found = await prisma.destinationDocker.findFirst({ where: { network } });
@@ -36,7 +39,7 @@ export async function checkDestination(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function getDestination(request: FastifyRequest) {
+export async function getDestination(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         const teamId = request.user?.teamId;
@@ -74,7 +77,7 @@ export async function getDestination(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function newDestination(request: FastifyRequest, reply: FastifyReply) {
+export async function newDestination(request: FastifyRequest<NewDestination>, reply: FastifyReply) {
     try {
         const { id } = request.params
         let { name, network, engine, isCoolifyProxyUsed } = request.body
@@ -119,7 +122,7 @@ export async function newDestination(request: FastifyRequest, reply: FastifyRepl
         return errorHandler({ status, message })
     }
 }
-export async function deleteDestination(request: FastifyRequest) {
+export async function deleteDestination(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         const destination = await prisma.destinationDocker.delete({ where: { id } });
@@ -143,7 +146,7 @@ export async function deleteDestination(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function saveDestinationSettings(request: FastifyRequest, reply: FastifyReply) {
+export async function saveDestinationSettings(request: FastifyRequest<SaveDestinationSettings>) {
     try {
         const { engine, isCoolifyProxyUsed } = request.body;
         await prisma.destinationDocker.updateMany({
@@ -159,7 +162,7 @@ export async function saveDestinationSettings(request: FastifyRequest, reply: Fa
         return errorHandler({ status, message })
     }
 }
-export async function startProxy(request: FastifyRequest, reply: FastifyReply) {
+export async function startProxy(request: FastifyRequest<Proxy>) {
     const { engine } = request.body;
     try {
         await startTraefikProxy(engine);
@@ -169,19 +172,16 @@ export async function startProxy(request: FastifyRequest, reply: FastifyReply) {
         return errorHandler({ status, message })
     }
 }
-export async function stopProxy(request: FastifyRequest, reply: FastifyReply) {
-    const settings = await prisma.setting.findFirst({});
+export async function stopProxy(request: FastifyRequest<Proxy>) {
     const { engine } = request.body;
     try {
         await stopTraefikProxy(engine);
-
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
-export async function restartProxy(request: FastifyRequest, reply: FastifyReply) {
-    const settings = await prisma.setting.findFirst({});
+export async function restartProxy(request: FastifyRequest<Proxy>) {
     const { engine } = request.body;
     try {
         await stopTraefikProxy(engine);

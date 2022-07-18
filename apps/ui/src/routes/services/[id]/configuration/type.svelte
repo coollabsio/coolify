@@ -32,21 +32,7 @@
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
-
-	import PlausibleAnalytics from '$lib/components/svg/services/PlausibleAnalytics.svelte';
-	import NocoDb from '$lib/components/svg/services/NocoDB.svelte';
-	import MinIo from '$lib/components/svg/services/MinIO.svelte';
-	import VsCodeServer from '$lib/components/svg/services/VSCodeServer.svelte';
-	import Wordpress from '$lib/components/svg/services/Wordpress.svelte';
-	import VaultWarden from '$lib/components/svg/services/VaultWarden.svelte';
-	import LanguageTool from '$lib/components/svg/services/LanguageTool.svelte';
-	import N8n from '$lib/components/svg/services/N8n.svelte';
-	import UptimeKuma from '$lib/components/svg/services/UptimeKuma.svelte';
-	import Ghost from '$lib/components/svg/services/Ghost.svelte';
-	import MeiliSearch from '$lib/components/svg/services/MeiliSearch.svelte';
-	import Umami from '$lib/components/svg/services/Umami.svelte';
-	import Hasura from '$lib/components/svg/services/Hasura.svelte';
-	import Fider from '$lib/components/svg/services/Fider.svelte';
+	import Services from '../_Services.svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -70,35 +56,8 @@
 		<div class="p-2">
 			<form on:submit|preventDefault={() => handleSubmit(type.name)}>
 				<button type="submit" class="box-selection relative text-xl font-bold hover:bg-pink-600">
-					{#if type.name === 'plausibleanalytics'}
-						<PlausibleAnalytics isAbsolute />
-					{:else if type.name === 'nocodb'}
-						<NocoDb isAbsolute />
-					{:else if type.name === 'minio'}
-						<MinIo isAbsolute />
-					{:else if type.name === 'vscodeserver'}
-						<VsCodeServer isAbsolute />
-					{:else if type.name === 'wordpress'}
-						<Wordpress isAbsolute />
-					{:else if type.name === 'vaultwarden'}
-						<VaultWarden isAbsolute />
-					{:else if type.name === 'languagetool'}
-						<LanguageTool isAbsolute />
-					{:else if type.name === 'n8n'}
-						<N8n isAbsolute />
-					{:else if type.name === 'uptimekuma'}
-						<UptimeKuma isAbsolute />
-					{:else if type.name === 'ghost'}
-						<Ghost isAbsolute />
-					{:else if type.name === 'meilisearch'}
-						<MeiliSearch isAbsolute />
-					{:else if type.name === 'umami'}
-						<Umami isAbsolute />
-					{:else if type.name === 'hasura'}
-						<Hasura isAbsolute />
-					{:else if type.name === 'fider'}
-						<Fider isAbsolute />
-					{/if}{type.fancyName}
+					<Services type={type.name} />
+					{type.fancyName}
 				</button>
 			</form>
 		</div>

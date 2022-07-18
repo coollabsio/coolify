@@ -14,9 +14,8 @@ import cuid from 'cuid';
 import { checkContainer, getEngine, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
-import axios from 'axios';
 
-export const version = '3.1.2';
+export const version = '3.1.3';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -69,7 +68,7 @@ export const include: any = {
 	meiliSearch: true,
 	umami: true,
 	hasura: true,
-	fider: true
+	fider: true,
 };
 
 export const uniqueName = (): string => uniqueNamesGenerator(customConfig);
@@ -112,6 +111,168 @@ export const encrypt = (text: string) => {
 		});
 	}
 };
+
+export const supportedServiceTypesAndVersions = [
+    {
+        name: 'plausibleanalytics',
+        fancyName: 'Plausible Analytics',
+        baseImage: 'plausible/analytics',
+        images: ['bitnami/postgresql:13.2.0', 'yandex/clickhouse-server:21.3.2.5'],
+        versions: ['latest', 'stable'],
+        recommendedVersion: 'stable',
+        ports: {
+            main: 8000
+        }
+    },
+    {
+        name: 'nocodb',
+        fancyName: 'NocoDB',
+        baseImage: 'nocodb/nocodb',
+        versions: ['latest'],
+        recommendedVersion: 'latest',
+        ports: {
+            main: 8080
+        }
+    },
+    {
+        name: 'minio',
+        fancyName: 'MinIO',
+        baseImage: 'minio/minio',
+        versions: ['latest'],
+        recommendedVersion: 'latest',
+        ports: {
+            main: 9001
+        }
+    },
+    {
+        name: 'vscodeserver',
+        fancyName: 'VSCode Server',
+        baseImage: 'codercom/code-server',
+        versions: ['latest'],
+        recommendedVersion: 'latest',
+        ports: {
+            main: 8080
+        }
+    },
+    {
+        name: 'wordpress',
+        fancyName: 'Wordpress',
+        baseImage: 'wordpress',
+        images: ['bitnami/mysql:5.7'],
+        versions: ['latest', 'php8.1', 'php8.0', 'php7.4', 'php7.3'],
+        recommendedVersion: 'latest',
+        ports: {
+            main: 80
+        }
+    },
+    {
+        name: 'vaultwarden',
+        fancyName: 'Vaultwarden',
+        baseImage: 'vaultwarden/server',
+        versions: ['latest'],
+        recommendedVersion: 'latest',
+        ports: {
+            main: 80
+        }
+    },
+    {
+        name: 'languagetool',
+        fancyName: 'LanguageTool',
+        baseImage: 'silviof/docker-languagetool',
+        versions: ['latest'],
+        recommendedVersion: 'latest',
+        ports: {
+            main: 8010
+        }
+    },
+    {
+        name: 'n8n',
+        fancyName: 'n8n',
+        baseImage: 'n8nio/n8n',
+        versions: ['latest'],
+        recommendedVersion: 'latest',
+        ports: {
+            main: 5678
+        }
+    },
+    {
+        name: 'uptimekuma',
+        fancyName: 'Uptime Kuma',
+        baseImage: 'louislam/uptime-kuma',
+        versions: ['latest'],
+        recommendedVersion: 'latest',
+        ports: {
+            main: 3001
+        }
+    },
+    {
+        name: 'ghost',
+        fancyName: 'Ghost',
+        baseImage: 'bitnami/ghost',
+        images: ['bitnami/mariadb'],
+        versions: ['latest'],
+        recommendedVersion: 'latest',
+        ports: {
+            main: 2368
+        }
+    },
+    {
+        name: 'meilisearch',
+        fancyName: 'Meilisearch',
+        baseImage: 'getmeili/meilisearch',
+        images: [],
+        versions: ['latest'],
+        recommendedVersion: 'latest',
+        ports: {
+            main: 7700
+        }
+    },
+    {
+        name: 'umami',
+        fancyName: 'Umami',
+        baseImage: 'ghcr.io/mikecao/umami',
+        images: ['postgres:12-alpine'],
+        versions: ['postgresql-latest'],
+        recommendedVersion: 'postgresql-latest',
+        ports: {
+            main: 3000
+        }
+    },
+    {
+        name: 'hasura',
+        fancyName: 'Hasura',
+        baseImage: 'hasura/graphql-engine',
+        images: ['postgres:12-alpine'],
+        versions: ['latest', 'v2.5.1'],
+        recommendedVersion: 'v2.5.1',
+        ports: {
+            main: 8080
+        }
+    },
+    {
+        name: 'fider',
+        fancyName: 'Fider',
+        baseImage: 'getfider/fider',
+        images: ['postgres:12-alpine'],
+        versions: ['stable'],
+        recommendedVersion: 'stable',
+        ports: {
+            main: 3000
+        }
+    },
+    // {
+    //     name: 'moodle',
+    //     fancyName: 'Moodle',
+    //     baseImage: 'bitnami/moodle',
+    //     images: [],
+    //     versions: ['latest', 'v4.0.2'],
+    //     recommendedVersion: 'latest',
+    //     ports: {
+    //         main: 8080
+    //     }
+    // }
+];
+
 export async function checkDoubleBranch(branch: string, projectId: number): Promise<boolean> {
 	const applications = await prisma.application.findMany({ where: { branch, projectId } });
 	return applications.length > 1;
@@ -307,167 +468,6 @@ export const supportedDatabaseTypesAndVersions = [
 		versions: ['6.2', '6.0', '5.0']
 	},
 	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] }
-];
-export const supportedServiceTypesAndVersions = [
-	{
-		name: 'plausibleanalytics',
-		fancyName: 'Plausible Analytics',
-		baseImage: 'plausible/analytics',
-		images: ['bitnami/postgresql:13.2.0', 'yandex/clickhouse-server:21.3.2.5'],
-		versions: ['latest', 'stable'],
-		recommendedVersion: 'stable',
-		ports: {
-			main: 8000
-		}
-	},
-	{
-		name: 'nocodb',
-		fancyName: 'NocoDB',
-		baseImage: 'nocodb/nocodb',
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 8080
-		}
-	},
-	{
-		name: 'minio',
-		fancyName: 'MinIO',
-		baseImage: 'minio/minio',
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 9001
-		}
-	},
-	{
-		name: 'vscodeserver',
-		fancyName: 'VSCode Server',
-		baseImage: 'codercom/code-server',
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 8080
-		}
-	},
-	{
-		name: 'wordpress',
-		fancyName: 'Wordpress',
-		baseImage: 'wordpress',
-		images: ['bitnami/mysql:5.7'],
-		versions: ['latest', 'php8.1', 'php8.0', 'php7.4', 'php7.3'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 80
-		}
-	},
-	{
-		name: 'vaultwarden',
-		fancyName: 'Vaultwarden',
-		baseImage: 'vaultwarden/server',
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 80
-		}
-	},
-	{
-		name: 'languagetool',
-		fancyName: 'LanguageTool',
-		baseImage: 'silviof/docker-languagetool',
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 8010
-		}
-	},
-	{
-		name: 'n8n',
-		fancyName: 'n8n',
-		baseImage: 'n8nio/n8n',
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 5678
-		}
-	},
-	{
-		name: 'uptimekuma',
-		fancyName: 'Uptime Kuma',
-		baseImage: 'louislam/uptime-kuma',
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 3001
-		}
-	},
-	{
-		name: 'ghost',
-		fancyName: 'Ghost',
-		baseImage: 'bitnami/ghost',
-		images: ['bitnami/mariadb'],
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 2368
-		}
-	},
-	{
-		name: 'meilisearch',
-		fancyName: 'Meilisearch',
-		baseImage: 'getmeili/meilisearch',
-		images: [],
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 7700
-		}
-	},
-	{
-		name: 'umami',
-		fancyName: 'Umami',
-		baseImage: 'ghcr.io/mikecao/umami',
-		images: ['postgres:12-alpine'],
-		versions: ['postgresql-latest'],
-		recommendedVersion: 'postgresql-latest',
-		ports: {
-			main: 3000
-		}
-	},
-	{
-		name: 'hasura',
-		fancyName: 'Hasura',
-		baseImage: 'hasura/graphql-engine',
-		images: ['postgres:12-alpine'],
-		versions: ['latest', 'v2.8.3'],
-		recommendedVersion: 'v2.8.3',
-		ports: {
-			main: 8080
-		}
-	},
-	{
-		name: 'fider',
-		fancyName: 'Fider',
-		baseImage: 'getfider/fider',
-		images: ['postgres:12-alpine'],
-		versions: ['stable'],
-		recommendedVersion: 'stable',
-		ports: {
-			main: 3000
-		}
-		// },
-		// {
-		// 	name: 'appwrite',
-		// 	fancyName: 'AppWrite',
-		// 	baseImage: 'appwrite/appwrite',
-		// 	images: ['appwrite/influxdb', 'appwrite/telegraf', 'mariadb:10.7', 'redis:6.0-alpine3.12'],
-		// 	versions: ['latest', '0.13.0'],
-		// 	recommendedVersion: '0.13.0',
-		// 	ports: {
-		// 		main: 3000
-		// 	}
-		// }
-	}
 ];
 
 export async function startTraefikProxy(engine: string): Promise<void> {
@@ -825,7 +825,7 @@ export type ComposeFileService = {
 		context: string;
 		dockerfile: string;
 		args?: Record<string, unknown>;
-	};
+	} | string;
 	deploy?: {
 		restart_policy?: {
 			condition?: string;
@@ -1347,6 +1347,40 @@ export async function configureServiceType({
 				}
 			}
 		});
+	} else if (type === 'moodle') {
+		const defaultUsername = cuid();
+		const defaultPassword = encrypt(generatePassword());
+		const defaultEmail = `${cuid()}@example.com`;
+		const mariadbUser = cuid();
+		const mariadbPassword = encrypt(generatePassword());
+		const mariadbDatabase = 'moodle_db';
+		const mariadbRootUser = cuid();
+		const mariadbRootUserPassword = encrypt(generatePassword());
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				moodle: {
+					create: {
+						defaultUsername,
+						defaultPassword,
+						defaultEmail,
+						mariadbUser,
+						mariadbPassword,
+						mariadbDatabase,
+						mariadbRootUser,
+						mariadbRootUserPassword
+					}
+				}
+			}
+		});
+	} else {
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type
+			}
+		});
 	}
 }
 
@@ -1502,10 +1536,10 @@ export function convertTolOldVolumeNames(type) {
 		return 'nc'
 	}
 }
-export async function getAvailableServices(): Promise<any> {
-	const { data } = await axios.get(`https://gist.githubusercontent.com/andrasbacsai/4aac36d8d6214dbfc34fa78110554a50/raw/291a957ee6ac01d480465623e183a30230ad921f/availableServices.json`)
-	return data
-}
+// export async function getAvailableServices(): Promise<any> {
+// 	const { data } = await axios.get(`https://gist.githubusercontent.com/andrasbacsai/4aac36d8d6214dbfc34fa78110554a50/raw/5b27e6c37d78aaeedc1148d797112c827a2f43cf/availableServices.json`)
+// 	return data
+// }
 export async function cleanupDockerStorage(host, lowDiskSpace, force) {
 	// Cleanup old coolify images
 	try {

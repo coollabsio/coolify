@@ -140,7 +140,7 @@
 							{#if application.fqdn}
 								<div class="truncate text-center">{getDomain(application.fqdn) || ''}</div>
 							{/if}
-							{#if !application.gitSourceId}
+							{#if !application.gitSourceId || !application.repository || !application.branch}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									Git Source Missing
 								</div>

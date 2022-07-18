@@ -62,12 +62,13 @@
 	import { toast } from '@zerodevx/svelte-toast';
 	import { onDestroy, onMount } from 'svelte';
 	import { t } from '$lib/translations';
-	import { appSession, disabledButton, status } from '$lib/store';
+	import { appSession, disabledButton, status, location, setLocation } from '$lib/store';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
 	import Loading from '$lib/components/Loading.svelte';
 
 	let loading = false;
 	let statusInterval: any;
+
 	$disabledButton =
 		!$appSession.isAdmin ||
 		!application.fqdn ||
@@ -75,6 +76,7 @@
 		!application.repository ||
 		!application.destinationDocker ||
 		!application.buildPack;
+
 	const { id } = $page.params;
 
 	async function handleDeploySubmit() {
@@ -126,9 +128,12 @@
 	}
 	onDestroy(() => {
 		$status.application.initialLoading = true;
+		$location = null;
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
+		setLocation(application);
+
 		$status.application.isRunning = false;
 		$status.application.isExited = false;
 		$status.application.loading = false;
@@ -147,6 +152,30 @@
 	{#if loading}
 		<Loading fullscreen cover />
 	{:else}
+		{#if $location}
+			<a
+				href={$location}
+				target="_blank"
+				class="icons tooltip-bottom flex items-center bg-transparent text-sm"
+				><svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-6 w-6"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
+					<line x1="10" y1="14" x2="20" y2="4" />
+					<polyline points="15 4 20 4 20 9" />
+				</svg></a
+			>
+		{/if}
+
+		<div class="border border-coolgray-500 h-8" />
 		{#if $status.application.isExited}
 			<a
 				href={!$disabledButton ? `/applications/${id}/logs` : null}

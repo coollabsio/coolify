@@ -1,17 +1,18 @@
 import { FastifyPluginAsync } from 'fastify';
 import { checkDNS, checkDomain, deleteDomain, listAllSettings, saveSettings } from './handlers';
+import { CheckDNS, CheckDomain, DeleteDomain, SaveSettings } from './types';
 
 
-const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
-    fastify.addHook('onRequest', async (request, reply) => {
+const root: FastifyPluginAsync = async (fastify): Promise<void> => {
+    fastify.addHook('onRequest', async (request) => {
         return await request.jwtVerify()
     })
     fastify.get('/', async (request) => await listAllSettings(request));
-    fastify.post('/', async (request, reply) => await saveSettings(request, reply));
-    fastify.delete('/', async (request, reply) => await deleteDomain(request, reply));
+    fastify.post<SaveSettings>('/', async (request, reply) => await saveSettings(request, reply));
+    fastify.delete<DeleteDomain>('/', async (request, reply) => await deleteDomain(request, reply));
 
-    fastify.get('/check', async (request, reply) => await checkDNS(request, reply));
-    fastify.post('/check', async (request, reply) => await checkDomain(request, reply));
+    fastify.get<CheckDNS>('/check', async (request) => await checkDNS(request));
+    fastify.post<CheckDomain>('/check', async (request) => await checkDomain(request));
 };
 
 export default root;

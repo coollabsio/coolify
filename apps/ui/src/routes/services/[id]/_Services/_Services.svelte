@@ -13,10 +13,10 @@
 	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import { t } from '$lib/translations';
-	import { appSession, disabledButton, status } from '$lib/store';
+	import { appSession, disabledButton, status, location, setLocation } from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
-	import Setting from '$lib/components/Setting.svelte'
+	import Setting from '$lib/components/Setting.svelte';
 
 	import Fider from './_Fider.svelte';
 	import Ghost from './_Ghost.svelte';
@@ -27,6 +27,7 @@
 	import Umami from './_Umami.svelte';
 	import VsCodeServer from './_VSCodeServer.svelte';
 	import Wordpress from './_Wordpress.svelte';
+	import Moodle from './_Moodle.svelte';
 
 	const { id } = $page.params;
 
@@ -44,6 +45,7 @@
 				exposePort: service.exposePort
 			});
 			await post(`/services/${id}`, { ...service });
+			setLocation(service)
 			$disabledButton = false;
 			toast.push('Configuration saved.');
 		} catch (error) {
@@ -97,6 +99,7 @@
 		}
 	});
 </script>
+
 <div class="mx-auto max-w-4xl px-6 pb-12">
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
 		<div class="flex space-x-1 pb-5 font-bold">
@@ -271,6 +274,8 @@
 				<Hasura bind:service />
 			{:else if service.type === 'fider'}
 				<Fider bind:service {readOnly} />
+			{:else if service.type === 'moodle'}
+				<Moodle bind:service {readOnly} />
 			{/if}
 		</div>
 	</form>
