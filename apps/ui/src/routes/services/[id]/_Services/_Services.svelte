@@ -13,7 +13,7 @@
 	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import { t } from '$lib/translations';
-	import { appSession, disabledButton, status } from '$lib/store';
+	import { appSession, disabledButton, status, location, setLocation } from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
@@ -45,6 +45,7 @@
 				exposePort: service.exposePort
 			});
 			await post(`/services/${id}`, { ...service });
+			setLocation(service)
 			$disabledButton = false;
 			toast.push('Configuration saved.');
 		} catch (error) {

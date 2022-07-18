@@ -44,7 +44,7 @@ export const status: Writable<any> = writable({
         initialLoading: true,
         loading: false,
         isRunning: false
-    }, 
+    },
     database: {
         initialLoading: true,
         loading: false,
@@ -57,3 +57,17 @@ export const features = readable({
     beta: window.localStorage.getItem('beta') === 'true',
     latestVersion: window.localStorage.getItem('latestVersion')
 });
+
+export const location: Writable<null | string> = writable(null)
+export const setLocation = (resource: any) => {
+    console.log(GITPOD_WORKSPACE_URL)
+    if (GITPOD_WORKSPACE_URL && resource.exposePort) {
+        const { href } = new URL(GITPOD_WORKSPACE_URL);
+        const newURL = href
+            .replace('https://', `https://${resource.exposePort}-`)
+            .replace(/\/$/, '');
+        location.set(newURL)
+    } else {
+        location.set(resource.fqdn)
+    }
+}

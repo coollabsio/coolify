@@ -62,12 +62,13 @@
 	import { toast } from '@zerodevx/svelte-toast';
 	import { onDestroy, onMount } from 'svelte';
 	import { t } from '$lib/translations';
-	import { appSession, disabledButton, status } from '$lib/store';
+	import { appSession, disabledButton, status, location, setLocation } from '$lib/store';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
 	import Loading from '$lib/components/Loading.svelte';
 
 	let loading = false;
 	let statusInterval: any;
+
 	$disabledButton =
 		!$appSession.isAdmin ||
 		!application.fqdn ||
@@ -75,14 +76,7 @@
 		!application.repository ||
 		!application.destinationDocker ||
 		!application.buildPack;
-	let location = application.fqdn || null;
-	if (GITPOD_WORKSPACE_URL && application.exposePort) {
-		const { href } = new URL(GITPOD_WORKSPACE_URL);
-		const newURL = href
-			.replace('https://', `https://${application.exposePort}-`)
-			.replace(/\/$/, '');
-		location = newURL;
-	}
+
 	const { id } = $page.params;
 
 	async function handleDeploySubmit() {
@@ -134,9 +128,12 @@
 	}
 	onDestroy(() => {
 		$status.application.initialLoading = true;
+		$location = null;
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
+		setLocation(application);
+
 		$status.application.isRunning = false;
 		$status.application.isExited = false;
 		$status.application.loading = false;
@@ -155,9 +152,9 @@
 	{#if loading}
 		<Loading fullscreen cover />
 	{:else}
-		{#if location}
+		{#if $location}
 			<a
-				href={location}
+				href={$location}
 				target="_blank"
 				class="icons tooltip-bottom flex items-center bg-transparent text-sm"
 				><svg
@@ -177,7 +174,7 @@
 				</svg></a
 			>
 		{/if}
-	
+
 		<div class="border border-coolgray-500 h-8" />
 		{#if $status.application.isExited}
 			<a

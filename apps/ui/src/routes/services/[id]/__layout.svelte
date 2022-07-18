@@ -61,9 +61,8 @@
 	import { goto } from '$app/navigation';
 	import { t } from '$lib/translations';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
-	import { appSession, disabledButton, status } from '$lib/store';
+	import { appSession, disabledButton, status, location, setLocation } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
-	import ServiceLinks from './_ServiceLinks.svelte';
 	const { id } = $page.params;
 
 	export let service: any;
@@ -77,13 +76,6 @@
 
 	let loading = false;
 	let statusInterval: any;
-
-	let location = service.fqdn || null;
-	if (GITPOD_WORKSPACE_URL && service.exposePort) {
-		const { href } = new URL(GITPOD_WORKSPACE_URL);
-		const newURL = href.replace('https://', `https://${service.exposePort}-`).replace(/\/$/, '');
-		location = newURL;
-	}
 
 	async function deleteService() {
 		const sure = confirm($t('application.confirm_to_delete', { name: service.name }));
@@ -135,9 +127,11 @@
 	}
 	onDestroy(() => {
 		$status.service.initialLoading = true;
+		$location = null;
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
+		setLocation(service);
 		$status.service.isRunning = false;
 		$status.service.loading = false;
 		if (service.type && service.destinationDockerId && service.version && service.fqdn) {
@@ -156,9 +150,9 @@
 		<Loading fullscreen cover />
 	{:else}
 		{#if service.type && service.destinationDockerId && service.version}
-			{#if location}
+			{#if $location}
 				<a
-					href={location}
+					href={$location}
 					target="_blank"
 					class="icons tooltip-bottom flex items-center bg-transparent text-sm"
 					><svg
@@ -177,8 +171,8 @@
 						<polyline points="15 4 20 4 20 9" />
 					</svg></a
 				>
+				<div class="border border-stone-700 h-8" />
 			{/if}
-			<div class="border border-stone-700 h-8" />
 			{#if $status.service.initialLoading}
 				<button
 					class="icons tooltip-bottom flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"

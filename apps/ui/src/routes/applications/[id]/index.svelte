@@ -35,7 +35,7 @@
 	import { get, post } from '$lib/api';
 	import cuid from 'cuid';
 	import { browser } from '$app/env';
-	import { appSession, disabledButton, status } from '$lib/store';
+	import { appSession, disabledButton, setLocation, status } from '$lib/store';
 	import { t } from '$lib/translations';
 	import { errorNotification, getDomain, notNodeDeployments, staticDeployments } from '$lib/common';
 	import Setting from './_Setting.svelte';
@@ -169,6 +169,7 @@
 				exposePort: application.exposePort
 			});
 			await post(`/applications/${id}`, { ...application });
+			setLocation(application)
 			$disabledButton = false;
 			forceSave = false;
 			return toast.push('Configurations saved.');
@@ -329,7 +330,6 @@
 			<div class="mt-2 grid grid-cols-2 items-center">
 				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 				<input
-					readonly={!isDisabled}
 					name="name"
 					id="name"
 					bind:value={application.name}
