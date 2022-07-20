@@ -20,7 +20,5 @@ export interface SaveDestinationSettings extends OnlyId {
     }
 }
 export interface Proxy extends OnlyId {
-    Body: {
-        engine: string
-    }
+
 }

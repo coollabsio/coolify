@@ -2,7 +2,7 @@ import type { FastifyRequest } from 'fastify';
 import { FastifyReply } from 'fastify';
 import sshConfig from 'ssh-config'
 import fs from 'fs/promises'
-import { asyncExecShell, decrypt, errorHandler, listSettings, prisma, startCoolifyProxy, startTraefikProxy, stopTraefikProxy } from '../../../../lib/common';
+import { asyncExecShell, decrypt, errorHandler, listSettings, prisma, startTraefikProxy, stopTraefikProxy } from '../../../../lib/common';
 import { checkContainer, dockerInstance, getEngine } from '../../../../lib/docker';
 
 import type { OnlyId } from '../../../../types';
@@ -55,23 +55,8 @@ export async function getDestination(request: FastifyRequest<OnlyId>) {
         const settings = await listSettings();
         let payload = {
             destination,
-            settings,
-            state: false
+            settings
         };
-
-        if (destination?.remoteEngine) {
-            // const { stdout } = await asyncExecShell(
-            // 	`ssh -p ${destination.port} ${destination.user}@${destination.ipAddress} "docker ps -a"`
-            // );
-            // console.log(stdout)
-            // const engine = await generateRemoteEngine(destination);
-            // // await saveSshKey(destination);
-            // payload.state = await checkContainer(engine, 'coolify-haproxy');
-        } else {
-            const containerName = 'coolify-proxy';
-            payload.state =
-                destination?.engine && (await checkContainer(destination.engine, containerName));
-        }
         return {
             ...payload
         };
@@ -83,7 +68,7 @@ export async function getDestination(request: FastifyRequest<OnlyId>) {
 export async function newDestination(request: FastifyRequest<NewDestination>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        let { name, network, engine, isCoolifyProxyUsed, ipAddress, user, port, sshPrivateKey } = request.body
+        let { name, network, engine, isCoolifyProxyUsed, remoteIpAddress, remoteUser, remotePort } = request.body
         const teamId = request.user.teamId;
         if (id === 'new') {
             if (engine) {
@@ -111,16 +96,14 @@ export async function newDestination(request: FastifyRequest<NewDestination>, re
                 if (isCoolifyProxyUsed) {
                     const settings = await prisma.setting.findFirst();
                     if (settings?.isTraefikUsed) {
-                        await startTraefikProxy(engine);
-                    } else {
-                        await startCoolifyProxy(engine);
+                        await startTraefikProxy(id);
                     }
                 }
                 return reply.code(201).send({ id: destination.id });
             }
-            if (ipAddress) {
+            if (remoteIpAddress) {
                 await prisma.destinationDocker.create({
-                    data: { name, teams: { connect: { id: teamId } }, engine, network, isCoolifyProxyUsed, remoteEngine: true, remoteIpAddress: ipAddress, remoteUser: user, remotePort: port }
+                    data: { name, teams: { connect: { id: teamId } }, engine, network, isCoolifyProxyUsed, remoteEngine: true, remoteIpAddress, remoteUser, remotePort }
                 });
                 return reply.code(201).send()
 
@@ -180,35 +163,39 @@ export async function saveDestinationSettings(request: FastifyRequest<SaveDestin
     }
 }
 export async function startProxy(request: FastifyRequest<Proxy>) {
-    const { engine } = request.body;
+    const { id } = request.params
     try {
-        await startTraefikProxy(engine);
+        await startTraefikProxy(id);
         return {}
     } catch ({ status, message }) {
-        await stopTraefikProxy(engine);
+        await stopTraefikProxy(id);
         return errorHandler({ status, message })
     }
 }
 export async function stopProxy(request: FastifyRequest<Proxy>) {
-    const { engine } = request.body;
+    const { id } = request.params
     try {
-        await stopTraefikProxy(engine);
+        await stopTraefikProxy(id);
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
 export async function restartProxy(request: FastifyRequest<Proxy>) {
-    const { engine } = request.body;
+    const { id } = request.params
     try {
-        await stopTraefikProxy(engine);
-        await startTraefikProxy(engine);
-        await prisma.destinationDocker.updateMany({
-            where: { engine },
+        await stopTraefikProxy(id);
+        await startTraefikProxy(id);
+        await prisma.destinationDocker.update({
+            where: { id },
             data: { isCoolifyProxyUsed: true }
         });
         return {}
     } catch ({ status, message }) {
+        await prisma.destinationDocker.update({
+            where: { id },
+            data: { isCoolifyProxyUsed: false }
+        });
         return errorHandler({ status, message })
     }
 }
@@ -217,7 +204,6 @@ export async function assignSSHKey(request: FastifyRequest) {
     try {
         const { id: sshKeyId } = request.body;
         const { id } = request.params;
-        console.log({ id, sshKeyId })
         await prisma.destinationDocker.update({ where: { id }, data: { sshKey: { connect: { id: sshKeyId } } } })
         return {}
     } catch ({ status, message }) {
@@ -250,6 +236,19 @@ export async function verifyRemoteDockerEngine(request: FastifyRequest, reply: F
         await prisma.destinationDocker.update({ where: { id }, data: { remoteVerified: true } })
         return reply.code(201).send()
 
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
+export async function getDestinationStatus(request: FastifyRequest<OnlyId>) {
+    try {
+        const { id } = request.params
+        const destination = await prisma.destinationDocker.findUnique({ where: { id } })
+        const containerName = 'coolify-proxy';
+        return {
+            isRunning: await checkContainer({ dockerId: destination.id, container: containerName })
+        }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }

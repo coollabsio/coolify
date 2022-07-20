@@ -72,7 +72,7 @@ export async function getApplication(request: FastifyRequest<OnlyId>) {
         let isExited = false;
         const application: any = await getApplicationFromDB(id, teamId);
         if (application?.destinationDockerId && application.destinationDocker?.engine) {
-            isRunning = await checkContainer(application.destinationDocker.engine, id);
+            isRunning = await checkContainer({ dockerId: application.destinationDocker.id, container: id });
             isExited = await isContainerExited(application.destinationDocker.engine, id);
         }
         return {
@@ -285,10 +285,10 @@ export async function stopApplication(request: FastifyRequest<OnlyId>, reply: Fa
         const { teamId } = request.user
         const application: any = await getApplicationFromDB(id, teamId);
         if (application?.destinationDockerId && application.destinationDocker?.engine) {
-            const { engine } = application.destinationDocker;
-            const found = await checkContainer(engine, id);
+            const { engine, id: dockerId } = application.destinationDocker;
+            const found = await checkContainer({ dockerId, container: id });
             if (found) {
-                await removeContainer({ id, engine });
+                await removeContainer({ id, dockerId: application.destinationDocker.id });
             }
         }
         return reply.code(201).send();
@@ -314,7 +314,7 @@ export async function deleteApplication(request: FastifyRequest<DeleteApplicatio
                 for (const container of containersArray) {
                     const containerObj = JSON.parse(container);
                     const id = containerObj.ID;
-                    await removeContainer({ id, engine: application.destinationDocker.engine });
+                    await removeContainer({ id, dockerId: application.destinationDocker.id });
                 }
             }
         }
@@ -375,7 +375,7 @@ export async function getUsage(request) {
 
         const application: any = await getApplicationFromDB(id, teamId);
         if (application.destinationDockerId) {
-            [usage] = await Promise.all([getContainerUsage(application.destinationDocker.engine, id)]);
+            [usage] = await Promise.all([getContainerUsage(application.destinationDocker.id, id)]);
         }
         return {
             usage

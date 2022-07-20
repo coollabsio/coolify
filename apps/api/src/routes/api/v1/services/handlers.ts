@@ -282,7 +282,7 @@ export async function getServiceUsage(request: FastifyRequest<OnlyId>) {
 
         const service = await getServiceFromDB({ id, teamId });
         if (service.destinationDockerId) {
-            [usage] = await Promise.all([getContainerUsage(service.destinationDocker.engine, id)]);
+            [usage] = await Promise.all([getContainerUsage(service.destinationDocker.id, id)]);
         }
         return {
             usage
@@ -877,17 +877,17 @@ async function stopPlausibleAnalyticsService(request: FastifyRequest<ServiceStar
         if (destinationDockerId) {
             const engine = destinationDocker.engine;
 
-            let found = await checkContainer(engine, id);
+            let found = await checkContainer({ dockerId: destinationDocker.id, container: id });
             if (found) {
-                await removeContainer({ id, engine });
+                await removeContainer({ id, dockerId: destinationDocker.id });
             }
-            found = await checkContainer(engine, `${id}-postgresql`);
+            found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-postgresql` });
             if (found) {
-                await removeContainer({ id: `${id}-postgresql`, engine });
+                await removeContainer({ id: `${id}-postgresql`, dockerId: destinationDocker.id });
             }
-            found = await checkContainer(engine, `${id}-clickhouse`);
+            found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-clickhouse` });
             if (found) {
-                await removeContainer({ id: `${id}-clickhouse`, engine });
+                await removeContainer({ id: `${id}-clickhouse`, dockerId: destinationDocker.id });
             }
         }
 
@@ -971,9 +971,9 @@ async function stopNocodbService(request: FastifyRequest<ServiceStartStop>) {
         const { destinationDockerId, destinationDocker, fqdn } = service;
         if (destinationDockerId) {
             const engine = destinationDocker.engine;
-            const found = await checkContainer(engine, id);
+            const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
             if (found) {
-                await removeContainer({ id, engine });
+                await removeContainer({ id, dockerId: destinationDocker.id });
             }
         }
         return {}
@@ -1075,9 +1075,9 @@ async function stopMinioService(request: FastifyRequest<ServiceStartStop>) {
         await prisma.minio.update({ where: { serviceId: id }, data: { publicPort: null } })
         if (destinationDockerId) {
             const engine = destinationDocker.engine;
-            const found = await checkContainer(engine, id);
+            const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
             if (found) {
-                await removeContainer({ id, engine });
+                await removeContainer({ id, dockerId: destinationDocker.id });
             }
         }
         return {}
@@ -1199,9 +1199,9 @@ async function stopVscodeService(request: FastifyRequest<ServiceStartStop>) {
         const { destinationDockerId, destinationDocker, fqdn } = service;
         if (destinationDockerId) {
             const engine = destinationDocker.engine;
-            const found = await checkContainer(engine, id);
+            const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
             if (found) {
-                await removeContainer({ id, engine });
+                await removeContainer({ id, dockerId: destinationDocker.id });
             }
         }
         return {}
@@ -1348,26 +1348,26 @@ async function stopWordpressService(request: FastifyRequest<ServiceStartStop>) {
         if (destinationDockerId) {
             const engine = destinationDocker.engine;
             try {
-                const found = await checkContainer(engine, id);
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
-                    await removeContainer({ id, engine });
+                    await removeContainer({ id, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
             }
             try {
-                const found = await checkContainer(engine, `${id}-mysql`);
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-mysql` });
                 if (found) {
-                    await removeContainer({ id: `${id}-mysql`, engine });
+                    await removeContainer({ id: `${id}-mysql`, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
             }
             try {
                 if (ftpEnabled) {
-                    const found = await checkContainer(engine, `${id}-ftp`);
+                    const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-ftp` });
                     if (found) {
-                        await removeContainer({ id: `${id}-ftp`, engine });
+                        await removeContainer({ id: `${id}-ftp`, dockerId: destinationDocker.id });
                     }
                     await prisma.wordpress.update({
                         where: { serviceId: id },
@@ -1461,9 +1461,9 @@ async function stopVaultwardenService(request: FastifyRequest<ServiceStartStop>)
             const engine = destinationDocker.engine;
 
             try {
-                const found = await checkContainer(engine, id);
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
-                    await removeContainer({ id, engine });
+                    await removeContainer({ id, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
@@ -1553,9 +1553,9 @@ async function stopLanguageToolService(request: FastifyRequest<ServiceStartStop>
             const engine = destinationDocker.engine;
 
             try {
-                const found = await checkContainer(engine, id);
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
-                    await removeContainer({ id, engine });
+                    await removeContainer({ id, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
@@ -1645,9 +1645,9 @@ async function stopN8nService(request: FastifyRequest<ServiceStartStop>) {
             const engine = destinationDocker.engine;
 
             try {
-                const found = await checkContainer(engine, id);
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
-                    await removeContainer({ id, engine });
+                    await removeContainer({ id, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
@@ -1736,9 +1736,9 @@ async function stopUptimekumaService(request: FastifyRequest<ServiceStartStop>) 
             const engine = destinationDocker.engine;
 
             try {
-                const found = await checkContainer(engine, id);
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
-                    await removeContainer({ id, engine });
+                    await removeContainer({ id, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
@@ -1888,13 +1888,13 @@ async function stopGhostService(request: FastifyRequest<ServiceStartStop>) {
             const engine = destinationDocker.engine;
 
             try {
-                let found = await checkContainer(engine, id);
+                let found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
-                    await removeContainer({ id, engine });
+                    await removeContainer({ id, dockerId: destinationDocker.id });
                 }
-                found = await checkContainer(engine, `${id}-mariadb`);
+                found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-mariadb` });
                 if (found) {
-                    await removeContainer({ id: `${id}-mariadb`, engine });
+                    await removeContainer({ id: `${id}-mariadb`, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
@@ -1989,9 +1989,9 @@ async function stopMeilisearchService(request: FastifyRequest<ServiceStartStop>)
             const engine = destinationDocker.engine;
 
             try {
-                const found = await checkContainer(engine, id);
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
-                    await removeContainer({ id, engine });
+                    await removeContainer({ id, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
@@ -2208,17 +2208,17 @@ async function stopUmamiService(request: FastifyRequest<ServiceStartStop>) {
             const engine = destinationDocker.engine;
 
             try {
-                const found = await checkContainer(engine, id);
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
-                    await removeContainer({ id, engine });
+                    await removeContainer({ id, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
             }
             try {
-                const found = await checkContainer(engine, `${id}-postgresql`);
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-postgresql` });
                 if (found) {
-                    await removeContainer({ id: `${id}-postgresql`, engine });
+                    await removeContainer({ id: `${id}-postgresql`, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
@@ -2344,17 +2344,17 @@ async function stopHasuraService(request: FastifyRequest<ServiceStartStop>) {
             const engine = destinationDocker.engine;
 
             try {
-                const found = await checkContainer(engine, id);
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
-                    await removeContainer({ id, engine });
+                    await removeContainer({ id, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
             }
             try {
-                const found = await checkContainer(engine, `${id}-postgresql`);
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-postgresql` });
                 if (found) {
-                    await removeContainer({ id: `${id}-postgresql`, engine });
+                    await removeContainer({ id: `${id}-postgresql`, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
@@ -2507,17 +2507,17 @@ async function stopFiderService(request: FastifyRequest<ServiceStartStop>) {
             const engine = destinationDocker.engine;
 
             try {
-                const found = await checkContainer(engine, id);
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
-                    await removeContainer({ id, engine });
+                    await removeContainer({ id, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
             }
             try {
-                const found = await checkContainer(engine, `${id}-postgresql`);
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-postgresql` });
                 if (found) {
-                    await removeContainer({ id: `${id}-postgresql`, engine });
+                    await removeContainer({ id: `${id}-postgresql`, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
@@ -2670,17 +2670,17 @@ async function stopMoodleService(request: FastifyRequest<ServiceStartStop>) {
             const engine = destinationDocker.engine;
 
             try {
-                const found = await checkContainer(engine, id);
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
-                    await removeContainer({ id, engine });
+                    await removeContainer({ id, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
             }
             try {
-                const found = await checkContainer(engine, `${id}-mariadb`);
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-mariadb` });
                 if (found) {
-                    await removeContainer({ id: `${id}-mariadb`, engine });
+                    await removeContainer({ id: `${id}-mariadb`, dockerId: destinationDocker.id });
                 }
             } catch (error) {
                 console.error(error);
@@ -2789,7 +2789,7 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
                 });
 
                 try {
-                    const isRunning = await checkContainer(engine, `${id}-ftp`);
+                    const isRunning = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-ftp` });
                     if (isRunning) {
                         await asyncExecShell(
                             `DOCKER_HOST=${host} docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`

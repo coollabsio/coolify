@@ -1,4 +1,4 @@
-import { asyncExecShell } from './common';
+import { asyncExecShell, executeDockerCmd } from './common';
 import Dockerode from 'dockerode';
 export function getEngine(engine: string): string {
 	return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : engine;
@@ -12,22 +12,31 @@ export function dockerInstance({ destinationDocker }): { engine: Dockerode; netw
 	};
 }
 
-export async function checkContainer(engine: string, container: string, remove = false): Promise<boolean> {
-	const host = getEngine(engine);
+export async function checkContainer({ dockerId, container, remove = false }: { dockerId: string, container: string, remove?: boolean }): Promise<boolean> {
 	let containerFound = false;
-
 	try {
-		const { stdout } = await asyncExecShell(
-			`DOCKER_HOST="${host}" docker inspect --format '{{json .State}}' ${container}`
-		);
+		const { stdout } = await executeDockerCmd({
+			dockerId,
+			command:
+				`docker inspect --format '{{json .State}}' ${container}`
+		});
+
 		const parsedStdout = JSON.parse(stdout);
 		const status = parsedStdout.Status;
 		const isRunning = status === 'running';
 		if (status === 'created') {
-			await asyncExecShell(`DOCKER_HOST="${host}" docker rm ${container}`);
+			await executeDockerCmd({
+				dockerId,
+				command:
+					`docker rm ${container}`
+			});
 		}
 		if (remove && status === 'exited') {
-			await asyncExecShell(`DOCKER_HOST="${host}" docker rm ${container}`);
+			await executeDockerCmd({
+				dockerId,
+				command:
+					`docker rm ${container}`
+			});
 		}
 		if (isRunning) {
 			containerFound = true;
@@ -57,19 +66,17 @@ export async function isContainerExited(engine: string, containerName: string): 
 
 export async function removeContainer({
 	id,
-	engine
+	dockerId
 }: {
 	id: string;
-	engine: string;
+	dockerId: string;
 }): Promise<void> {
-	const host = getEngine(engine);
 	try {
-		const { stdout } = await asyncExecShell(
-			`DOCKER_HOST=${host} docker inspect --format '{{json .State}}' ${id}`
-		);
+		const { stdout } =await executeDockerCmd({ dockerId, command: `docker inspect --format '{{json .State}}' ${id}`})
+	
 		if (JSON.parse(stdout).Running) {
-			await asyncExecShell(`DOCKER_HOST=${host} docker stop -t 0 ${id}`);
-			await asyncExecShell(`DOCKER_HOST=${host} docker rm ${id}`);
+			await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}`})
+			await executeDockerCmd({ dockerId, command: `docker rm ${id}`})
 		}
 	} catch (error) {
 		console.log(error);

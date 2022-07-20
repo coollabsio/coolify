@@ -3,7 +3,7 @@ import type { FastifyRequest } from 'fastify';
 import { FastifyReply } from 'fastify';
 import yaml from 'js-yaml';
 import fs from 'fs/promises';
-import { asyncExecShell, ComposeFile, createDirectories, decrypt, encrypt, errorHandler, generateDatabaseConfiguration, generatePassword, getContainerUsage, getDatabaseImage, getDatabaseVersions, getFreePort, listSettings, makeLabelForStandaloneDatabase, prisma, startTcpProxy, startTraefikTCPProxy, stopDatabaseContainer, stopTcpHttpProxy, supportedDatabaseTypesAndVersions, uniqueName, updatePasswordInDb } from '../../../../lib/common';
+import { asyncExecShell, ComposeFile, createDirectories, decrypt, encrypt, errorHandler, executeDockerCmd, generateDatabaseConfiguration, generatePassword, getContainerUsage, getDatabaseImage, getDatabaseVersions, getFreePort, listSettings, makeLabelForStandaloneDatabase, prisma, startTraefikTCPProxy, stopDatabaseContainer, stopTcpHttpProxy, supportedDatabaseTypesAndVersions, uniqueName, updatePasswordInDb } from '../../../../lib/common';
 import { dockerInstance, getEngine } from '../../../../lib/docker';
 import { day } from '../../../../lib/dayjs';
 import { GetDatabaseLogs, OnlyId, SaveDatabase, SaveDatabaseDestination, SaveDatabaseSettings, SaveVersion } from '../../../../types';
@@ -56,6 +56,36 @@ export async function newDatabase(request: FastifyRequest, reply: FastifyReply) 
         return errorHandler({ status, message })
     }
 }
+export async function getDatabaseStatus(request: FastifyRequest<OnlyId>) {
+    try {
+        const { id } = request.params;
+        const teamId = request.user.teamId;
+        let isRunning = false;
+
+        const database = await prisma.database.findFirst({
+            where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+            include: { destinationDocker: true, settings: true }
+        });
+        const { destinationDockerId, destinationDocker } = database;
+        if (destinationDockerId) {
+            try {
+                const { stdout } = await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker inspect --format '{{json .State}}' ${id}` })
+
+                if (JSON.parse(stdout).Running) {
+                    isRunning = true;
+                }
+            } catch (error) {
+                //
+            }
+        }
+        return {
+            isRunning
+        }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
 export async function getDatabase(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params;
@@ -68,30 +98,12 @@ export async function getDatabase(request: FastifyRequest<OnlyId>) {
             throw { status: 404, message: 'Database not found.' }
         }
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
-        if (database.rootUserPassword) database.rootUserPassword = decrypt(database.rootUserPassword);
-        const { destinationDockerId, destinationDocker } = database;
-        let isRunning = false;
-        if (destinationDockerId) {
-            const host = getEngine(destinationDocker.engine);
-
-            try {
-                const { stdout } = await asyncExecShell(
-                    `DOCKER_HOST=${host} docker inspect --format '{{json .State}}' ${id}`
-                );
-
-                if (JSON.parse(stdout).Running) {
-                    isRunning = true;
-                }
-            } catch (error) {
-                //
-            }
-        }
+        if (database.rootUserPassword) database.rootUserPassword = decrypt(database.rootUserPassword);    
         const configuration = generateDatabaseConfiguration(database);
         const settings = await listSettings();
         return {
             privatePort: configuration?.privatePort,
             database,
-            isRunning,
             versions: await getDatabaseVersions(database.type),
             settings
         };
@@ -164,16 +176,15 @@ export async function saveDatabaseDestination(request: FastifyRequest<SaveDataba
 
         const {
             destinationDockerId,
-            destinationDocker: { engine },
+            destinationDocker: { engine, id: dockerId },
             version,
             type
         } = await prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } });
 
         if (destinationDockerId) {
-            const host = getEngine(engine);
             if (type && version) {
                 const baseImage = getDatabaseImage(type);
-                asyncExecShell(`DOCKER_HOST=${host} docker pull ${baseImage}:${version}`);
+                executeDockerCmd({ dockerId, command: `docker pull ${baseImage}:${version}` })
             }
         }
         return reply.code(201).send({})
@@ -194,7 +205,7 @@ export async function getDatabaseUsage(request: FastifyRequest<OnlyId>) {
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
         if (database.rootUserPassword) database.rootUserPassword = decrypt(database.rootUserPassword);
         if (database.destinationDockerId) {
-            [usage] = await Promise.all([getContainerUsage(database.destinationDocker.engine, id)]);
+            [usage] = await Promise.all([getContainerUsage(database.destinationDocker.id, id)]);
         }
         return {
             usage
@@ -267,13 +278,13 @@ export async function startDatabase(request: FastifyRequest<OnlyId>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         try {
-            await asyncExecShell(`DOCKER_HOST=${host} docker volume create ${volumeName}`);
+            await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker volume create ${volumeName}` })
         } catch (error) {
             console.log(error);
         }
         try {
-            await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
-            if (isPublic) await startTcpProxy(destinationDocker, id, publicPort, privatePort);
+            await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up -d` })
+            if (isPublic) await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
             return {};
         } catch (error) {
             throw {
@@ -453,11 +464,7 @@ export async function saveDatabaseSettings(request: FastifyRequest<SaveDatabaseS
         if (destinationDockerId) {
             if (isPublic) {
                 await prisma.database.update({ where: { id }, data: { publicPort } });
-                if (settings.isTraefikUsed) {
-                    await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
-                } else {
-                    await startTcpProxy(destinationDocker, id, publicPort, privatePort);
-                }
+                await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
             } else {
                 await prisma.database.update({ where: { id }, data: { publicPort: null } });
                 await stopTcpHttpProxy(id, destinationDocker, oldPublicPort);

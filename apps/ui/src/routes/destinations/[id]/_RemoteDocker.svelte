@@ -1,12 +1,11 @@
 <script lang="ts">
 	export let destination: any;
 	export let settings: any;
-	export let state: any;
 
 	import { toast } from '@zerodevx/svelte-toast';
 	import { page, session } from '$app/stores';
 	import Setting from '$lib/components/Setting.svelte';
-	import { post } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { onMount } from 'svelte';
 	import { t } from '$lib/translations';
@@ -15,7 +14,9 @@
 	const { id } = $page.params;
 	let cannotDisable = settings.fqdn && destination.engine === '/var/run/docker.sock';
 	let loading = false;
+	let loadingProxy = true;
 	let restarting = false;
+
 	$: isDisabled = !$appSession.isAdmin;
 
 	async function handleSubmit() {
@@ -29,7 +30,9 @@
 		}
 	}
 	onMount(async () => {
-		if (state === false && destination.isCoolifyProxyUsed === true) {
+		loadingProxy = true;
+		const { isRunning } = await get(`/destinations/${id}/status`);
+		if (isRunning === false && destination.isCoolifyProxyUsed === true) {
 			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
 			try {
 				await post(`/destinations/${id}/settings`, {
@@ -40,7 +43,7 @@
 			} catch (error) {
 				return errorNotification(error);
 			}
-		} else if (state === true && destination.isCoolifyProxyUsed === false) {
+		} else if (isRunning === true && destination.isCoolifyProxyUsed === false) {
 			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
 			try {
 				await post(`/destinations/${id}/settings`, {
@@ -52,24 +55,27 @@
 				return errorNotification(error);
 			}
 		}
+		loadingProxy = false;
 	});
 	async function changeProxySetting() {
+		loadingProxy = true;
 		if (!cannotDisable) {
 			const isProxyActivated = destination.isCoolifyProxyUsed;
 			if (isProxyActivated) {
 				const sure = confirm(
 					`Are you sure you want to ${
 						destination.isCoolifyProxyUsed ? 'disable' : 'enable'
-					} Coolify proxy? It will remove the proxy for all configured networks and all deployments on '${
-						destination.engine
-					}'! Nothing will be reachable if you do it!`
+					} Coolify proxy? It will remove the proxy for all configured networks and all deployments! Nothing will be reachable if you do it!`
 				);
-				if (!sure) return;
+				if (!sure) {
+					loadingProxy = false;
+					return;
+				}
 			}
-			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
+			let proxyUsed = !destination.isCoolifyProxyUsed;
 			try {
 				await post(`/destinations/${id}/settings`, {
-					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
+					isCoolifyProxyUsed: proxyUsed,
 					engine: destination.engine
 				});
 				if (isProxyActivated) {
@@ -77,8 +83,11 @@
 				} else {
 					await startProxy();
 				}
+				destination.isCoolifyProxyUsed = proxyUsed;
 			} catch (error) {
 				return errorNotification(error);
+			} finally {
+				loadingProxy = false;
 			}
 		}
 	}
@@ -223,6 +232,7 @@
 	<div class="grid grid-cols-2 items-center">
 		<Setting
 			disabled={cannotDisable}
+			loading={loadingProxy}
 			bind:setting={destination.isCoolifyProxyUsed}
 			on:click={changeProxySetting}
 			title={$t('destination.use_coolify_proxy')}

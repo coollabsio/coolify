@@ -12,7 +12,7 @@
 		try {
 			const { id } = params;
 			const response = await get(`/destinations/${id}`);
-			const { destination, settings, state } = response;
+			const { destination, settings } = response;
 			if (id !== 'new' && (!destination || Object.entries(destination).length === 0)) {
 				return {
 					status: 302,
@@ -36,8 +36,7 @@
 				},
 				stuff: {
 					destination,
-					settings,
-					state
+					settings
 				}
 			};
 		} catch (error) {

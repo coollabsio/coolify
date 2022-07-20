@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import yaml from 'js-yaml';
 
 import { copyBaseConfigurationFiles, makeLabelForStandaloneApplication, saveBuildLog, setDefaultConfiguration } from '../lib/buildPacks/common';
-import { asyncExecShell,  createDirectories, decrypt, getDomain, prisma } from '../lib/common';
+import { createDirectories, decrypt, executeDockerCmd, getDomain, prisma } from '../lib/common';
 import { dockerInstance, getEngine } from '../lib/docker';
 import * as importers from '../lib/importers';
 import * as buildpacks from '../lib/buildPacks';
@@ -238,8 +238,8 @@ import * as buildpacks from '../lib/buildPacks';
 								await saveBuildLog({ line: 'Build image already available - no rebuild required.', buildId, applicationId });
 							}
 							try {
-								await asyncExecShell(`DOCKER_HOST=${host} docker stop -t 0 ${imageId}`);
-								await asyncExecShell(`DOCKER_HOST=${host} docker rm ${imageId}`);
+								await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker stop -t 0 ${imageId}` })
+								await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker rm ${imageId}` })
 							} catch (error) {
 								//
 							}
@@ -325,9 +325,7 @@ import * as buildpacks from '../lib/buildPacks';
 									volumes: Object.assign({}, ...composeVolumes)
 								};
 								await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
-								await asyncExecShell(
-									`DOCKER_HOST=${host} docker compose --project-directory ${workdir} up -d`
-								);
+								await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose --project-directory ${workdir} up -d` })
 								await saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
 							} catch (error) {
 								await saveBuildLog({ line: error, buildId, applicationId });

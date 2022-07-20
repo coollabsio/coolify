@@ -1,22 +1,24 @@
 <script lang="ts">
 	export let destination: any;
 	export let settings: any;
-	export let state: any;
 
 	import { toast } from '@zerodevx/svelte-toast';
 	import { page } from '$app/stores';
-	import { post } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { onMount } from 'svelte';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import { appSession } from '$lib/store';
 	import Setting from '$lib/components/Setting.svelte';
+
 	const { id } = $page.params;
 	let cannotDisable = settings.fqdn && destination.engine === '/var/run/docker.sock';
+
 	let loading = false;
 	let loadingProxy = false;
 	let restarting = false;
+
 	async function handleSubmit() {
 		loading = true;
 		try {
@@ -28,27 +30,31 @@
 		}
 	}
 	onMount(async () => {
-		if (state === false && destination.isCoolifyProxyUsed === true) {
-			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
+		loadingProxy = true;
+		const { isRunning } = await get(`/destinations/${id}/status`);
+		let proxyUsed = !destination.isCoolifyProxyUsed;
+		if (isRunning === false && destination.isCoolifyProxyUsed === true) {
 			try {
 				await post(`/destinations/${id}/settings`, {
-					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
+					isCoolifyProxyUsed: proxyUsed,
 					engine: destination.engine
 				});
 				await stopProxy();
 			} catch (error) {
 				return errorNotification(error);
 			}
-		} else if (state === true && destination.isCoolifyProxyUsed === false) {
-			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
+		} else if (isRunning === true && destination.isCoolifyProxyUsed === false) {
 			try {
 				await post(`/destinations/${id}/settings`, {
-					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
+					isCoolifyProxyUsed: proxyUsed,
 					engine: destination.engine
 				});
 				await startProxy();
+				destination.isCoolifyProxyUsed = proxyUsed;
 			} catch (error) {
 				return errorNotification(error);
+			} finally {
+				loadingProxy = false;
 			}
 		}
 	});

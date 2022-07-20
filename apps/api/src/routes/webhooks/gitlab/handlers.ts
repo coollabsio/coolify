@@ -117,8 +117,10 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                 if (applicationFound.settings.previews) {
                     if (applicationFound.destinationDockerId) {
                         const isRunning = await checkContainer(
-                            applicationFound.destinationDocker.engine,
-                            applicationFound.id
+                            {
+                                dockerId: applicationFound.destinationDocker.engine,
+                                container: applicationFound.id
+                            }
                         );
                         if (!isRunning) {
                             throw { status: 500, message: 'Application not running.' }
@@ -164,7 +166,7 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                         if (applicationFound.destinationDockerId) {
                             const id = `${applicationFound.id}-${pullmergeRequestId}`;
                             const engine = applicationFound.destinationDocker.engine;
-                            await removeContainer({ id, engine });
+                            await removeContainer({ id, dockerId: applicationFound.destinationDocker.id });
                         }
                         return {
                             message: 'Removed preview. Thank you!'

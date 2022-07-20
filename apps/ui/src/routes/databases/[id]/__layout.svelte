@@ -104,7 +104,7 @@
 	async function getStatus() {
 		if ($status.database.loading) return;
 		$status.database.loading = true;
-		const data = await get(`/databases/${id}`);
+		const data = await get(`/databases/${id}/status`);
 		$status.database.isRunning = data.isRunning;
 		$status.database.initialLoading = false;
 		$status.database.loading = false;

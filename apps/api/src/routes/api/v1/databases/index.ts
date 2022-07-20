@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { deleteDatabase, getDatabase, getDatabaseLogs, getDatabaseTypes, getDatabaseUsage, getVersions, listDatabases, newDatabase, saveDatabase, saveDatabaseDestination, saveDatabaseSettings, saveDatabaseType, saveVersion, startDatabase, stopDatabase } from './handlers';
+import { deleteDatabase, getDatabase, getDatabaseLogs, getDatabaseStatus, getDatabaseTypes, getDatabaseUsage, getVersions, listDatabases, newDatabase, saveDatabase, saveDatabaseDestination, saveDatabaseSettings, saveDatabaseType, saveVersion, startDatabase, stopDatabase } from './handlers';
 
 import type { GetDatabaseLogs, OnlyId, SaveDatabase, SaveDatabaseDestination, SaveDatabaseSettings, SaveVersion } from '../../../../types';
 import type { SaveDatabaseType } from './types';
@@ -12,6 +12,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.post('/new', async (request, reply) => await newDatabase(request, reply));
 
     fastify.get<OnlyId>('/:id', async (request) => await getDatabase(request));
+    fastify.get<OnlyId>('/:id/status', async (request) => await getDatabaseStatus(request));
     fastify.post<SaveDatabase>('/:id', async (request, reply) => await saveDatabase(request, reply));
     fastify.delete<OnlyId>('/:id', async (request) => await deleteDatabase(request));
 
