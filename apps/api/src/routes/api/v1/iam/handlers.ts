@@ -273,11 +273,15 @@ export async function inviteToTeam(request: FastifyRequest<InviteToTeam>, reply:
         const { email, permission, teamId, teamName } = request.body;
         const userFound = await prisma.user.findUnique({ where: { email } });
         if (!userFound) {
-            throw `No user found with '${email}' email address.`
+            throw {
+                message: `No user found with '${email}' email address.`
+            };         
         }
         const uid = userFound.id;
-        if (uid === userId) {
-            throw `Invitation to yourself? Whaaaaat?`
+        if (uid === userId) {          
+            throw {
+                message: `Invitation to yourself? Whaaaaat?`
+            };
         }
         const alreadyInTeam = await prisma.team.findFirst({
             where: { id: teamId, users: { some: { id: uid } } }
