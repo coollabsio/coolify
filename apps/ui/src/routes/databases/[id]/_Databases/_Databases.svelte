@@ -46,7 +46,7 @@
 			databaseDbUser = '';
 		}
 	}
-
+	// TODO: Must integrate remote docker engine
 	function generateUrl(): string {
 		return `${database.type}://${
 			databaseDbUser ? databaseDbUser + ':' : ''
