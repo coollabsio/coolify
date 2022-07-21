@@ -47,13 +47,10 @@ export async function checkContainer({ dockerId, container, remove = false }: { 
 	return containerFound;
 }
 
-export async function isContainerExited(engine: string, containerName: string): Promise<boolean> {
+export async function isContainerExited(dockerId: string, containerName: string): Promise<boolean> {
 	let isExited = false;
-	const host = getEngine(engine);
 	try {
-		const { stdout } = await asyncExecShell(
-			`DOCKER_HOST="${host}" docker inspect -f '{{.State.Status}}' ${containerName}`
-		);
+		const { stdout } = await executeDockerCmd({ dockerId, command: `docker inspect -f '{{.State.Status}}' ${containerName}` })
 		if (stdout.trim() === 'exited') {
 			isExited = true;
 		}
@@ -72,11 +69,11 @@ export async function removeContainer({
 	dockerId: string;
 }): Promise<void> {
 	try {
-		const { stdout } =await executeDockerCmd({ dockerId, command: `docker inspect --format '{{json .State}}' ${id}`})
-	
+		const { stdout } = await executeDockerCmd({ dockerId, command: `docker inspect --format '{{json .State}}' ${id}` })
+
 		if (JSON.parse(stdout).Running) {
-			await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}`})
-			await executeDockerCmd({ dockerId, command: `docker rm ${id}`})
+			await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}` })
+			await executeDockerCmd({ dockerId, command: `docker rm ${id}` })
 		}
 	} catch (error) {
 		console.log(error);

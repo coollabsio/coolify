@@ -18,8 +18,7 @@
 			const { id } = await post(`/destinations/new`, {
 				...payload
 			});
-			await goto(`/destinations/${id}`);
-			window.location.reload();
+			return await goto(`/destinations/${id}`);
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
@@ -50,25 +49,25 @@
 		</div>
 
 		<div class="grid grid-cols-2 items-center px-10">
-			<label for="ipAddress" class="text-base font-bold text-stone-100"
+			<label for="remoteIpAddress" class="text-base font-bold text-stone-100"
 				>{$t('forms.ip_address')}</label
 			>
 			<input
 				required
-				name="ipAddress"
+				name="remoteIpAddress"
 				placeholder="{$t('forms.eg')}: 192.168..."
-				bind:value={payload.ipAddress}
+				bind:value={payload.remoteIpAddress}
 			/>
 		</div>
 
 		<div class="grid grid-cols-2 items-center px-10">
-			<label for="user" class="text-base font-bold text-stone-100">{$t('forms.user')}</label>
-			<input required name="user" placeholder="{$t('forms.eg')}: root" bind:value={payload.user} />
+			<label for="remoteUser" class="text-base font-bold text-stone-100">{$t('forms.user')}</label>
+			<input required name="remoteUser" placeholder="{$t('forms.eg')}: root" bind:value={payload.remoteUser} />
 		</div>
 
 		<div class="grid grid-cols-2 items-center px-10">
-			<label for="port" class="text-base font-bold text-stone-100">{$t('forms.port')}</label>
-			<input required name="port" placeholder="{$t('forms.eg')}: 22" bind:value={payload.port} />
+			<label for="remotePort" class="text-base font-bold text-stone-100">{$t('forms.port')}</label>
+			<input required name="remotePort" placeholder="{$t('forms.eg')}: 22" bind:value={payload.remotePort} />
 		</div>
 		<div class="grid grid-cols-2 items-center px-10">
 			<label for="network" class="text-base font-bold text-stone-100">{$t('forms.network')}</label>

@@ -1,7 +1,8 @@
-import { asyncExecShell, base64Encode, generateTimestamp, getDomain, isDev, prisma, version } from "../common";
+import { asyncExecShell, base64Encode, executeDockerCmd, generateTimestamp, getDomain, isDev, prisma, version } from "../common";
 import { scheduler } from "../scheduler";
 import { promises as fs } from 'fs';
 import { day } from "../dayjs";
+import { spawn } from 'node:child_process'
 const staticApps = ['static', 'react', 'vuejs', 'svelte', 'gatsby', 'astro', 'eleventy'];
 const nodeBased = [
 	'react',
@@ -511,8 +512,8 @@ export async function buildImage({
 	applicationId,
 	tag,
 	workdir,
-	docker,
 	buildId,
+	dockerId,
 	isCache = false,
 	debug = false,
 	dockerFileLocation = '/Dockerfile'
@@ -522,6 +523,9 @@ export async function buildImage({
 	} else {
 		await saveBuildLog({ line: `Building image started.`, buildId, applicationId });
 	}
+	if (debug) {
+		await saveBuildLog({ line: `\n###############\nIMPORTANT: Due to some issues during implementing Remote Docker Engine, the builds logs are not streamed at the moment. You will see the full build log when the build is finished!\n###############`, buildId, applicationId });
+	}
 	if (!debug && isCache) {
 		await saveBuildLog({
 			line: `Debug turned off. To see more details, allow it in the configuration.`,
@@ -529,15 +533,56 @@ export async function buildImage({
 			applicationId
 		});
 	}
-
-	const stream = await docker.engine.buildImage(
-		{ src: ['.'], context: workdir },
-		{
-			dockerfile: isCache ? `${dockerFileLocation}-cache` : dockerFileLocation,
-			t: `${applicationId}:${tag}${isCache ? '-cache' : ''}`
+	const dockerFile = isCache ? `${dockerFileLocation}-cache` : `${dockerFileLocation}`
+	const cache = `${applicationId}:${tag}${isCache ? '-cache' : ''}`
+	const { stderr } = await executeDockerCmd({ dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} ${workdir}` })
+	if (debug) {
+		const array = stderr.split('\n')
+		for (const line of array) {
+			if (line !== '\n') {
+				await saveBuildLog({
+					line: `${line.replace('\n', '')}`,
+					buildId,
+					applicationId
+				});
+			}
 		}
-	);
-	await streamEvents({ stream, docker, buildId, applicationId, debug });
+	}
+
+
+	// await new Promise((resolve, reject) => {
+	// 	const command = spawn(`docker`, ['build', '-f', `${workdir}${dockerFile}`, '-t', `${cache}`,`${workdir}`], {
+	// 		env: {
+	// 			DOCKER_HOST: 'ssh://root@95.217.178.202',
+	// 			DOCKER_BUILDKIT: '1'
+	// 		}
+	// 	});
+	// 	command.stdout.on('data', function (data) {
+	// 		console.log('stdout: ' + data);
+	// 	});
+	// 	command.stderr.on('data', function (data) {
+	// 		console.log('stderr: ' + data);
+	// 	});
+	// 	command.on('error', function (error) {
+	// 		console.log(error)
+	// 		reject(error)
+	// 	})
+	// 	command.on('exit', function (code) {
+	// 		console.log('exit code: ' + code);
+	// 		resolve(code)
+	// 	});
+	// })
+
+
+	// console.log({ stdout, stderr })
+	// const stream = await docker.engine.buildImage(
+	// 	{ src: ['.'], context: workdir },
+	// 	{
+	// 		dockerfile: isCache ? `${dockerFileLocation}-cache` : dockerFileLocation,
+	// 		t: `${applicationId}:${tag}${isCache ? '-cache' : ''}`
+	// 	}
+	// );
+	// await streamEvents({ stream, docker, buildId, applicationId, debug });
 	await saveBuildLog({ line: `Building image successful!`, buildId, applicationId });
 }
 
@@ -617,18 +662,17 @@ export function makeLabelForStandaloneApplication({
 
 export async function buildCacheImageWithNode(data, imageForBuild) {
 	const {
-		applicationId,
-		tag,
 		workdir,
-		docker,
 		buildId,
 		baseDirectory,
 		installCommand,
 		buildCommand,
-		debug,
 		secrets,
 		pullmergeRequestId
 	} = data;
+
+	data.isCache = true
+
 	const isPnpm = checkPnpm(installCommand, buildCommand);
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild}`);
@@ -659,11 +703,13 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	Dockerfile.push(`RUN ${buildCommand}`);
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
-	await buildImage({ applicationId, tag, workdir, docker, buildId, isCache: true, debug });
+	await buildImage(data);
 }
 
 export async function buildCacheImageForLaravel(data, imageForBuild) {
-	const { applicationId, tag, workdir, docker, buildId, debug, secrets, pullmergeRequestId } = data;
+	const { workdir, buildId, secrets, pullmergeRequestId } = data;
+	data.isCache = true
+
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild}`);
 	Dockerfile.push('WORKDIR /app');
@@ -687,22 +733,17 @@ export async function buildCacheImageForLaravel(data, imageForBuild) {
 	Dockerfile.push(`COPY resources /app/resources`);
 	Dockerfile.push(`RUN yarn install && yarn production`);
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
-	await buildImage({ applicationId, tag, workdir, docker, buildId, isCache: true, debug });
+	await buildImage(data);
 }
 
 export async function buildCacheImageWithCargo(data, imageForBuild) {
 	const {
 		applicationId,
-		tag,
 		workdir,
-		docker,
 		buildId,
-		baseDirectory,
-		installCommand,
-		buildCommand,
-		debug,
-		secrets
 	} = data;
+	data.isCache = true
+
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild} as planner-${applicationId}`);
 	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
@@ -717,5 +758,5 @@ export async function buildCacheImageWithCargo(data, imageForBuild) {
 	Dockerfile.push(`COPY --from=planner-${applicationId} /app/recipe.json recipe.json`);
 	Dockerfile.push('RUN cargo chef cook --release --recipe-path recipe.json');
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
-	await buildImage({ applicationId, tag, workdir, docker, buildId, isCache: true, debug });
+	await buildImage(data);
 }

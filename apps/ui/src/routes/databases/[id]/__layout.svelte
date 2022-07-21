@@ -58,7 +58,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
-	import { appSession, status } from '$lib/store';
+	import { appSession, status, disabledButton } from '$lib/store';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import Loading from '$lib/components/Loading.svelte';
 	import { onDestroy, onMount } from 'svelte';
@@ -66,6 +66,9 @@
 
 	let loading = false;
 	let statusInterval: any = false;
+
+	$disabledButton = !$appSession.isAdmin;
+
 	async function deleteDatabase() {
 		const sure = confirm(`Are you sure you would like to delete '${database.name}'?`);
 		if (sure) {
@@ -138,6 +141,32 @@
 			<Loading fullscreen cover />
 		{:else}
 			{#if database.type && database.destinationDockerId && database.version && database.defaultDatabase}
+				{#if $status.database.isExited}
+					<a
+						href={!$disabledButton ? `/databases/${id}/logs` : null}
+						class=" icons bg-transparent tooltip-bottom text-sm flex items-center text-red-500 tooltip-red-500"
+						data-tooltip="Service exited with an error!"
+						sveltekit:prefetch
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="w-6 h-6"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentcolor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<path
+								d="M8.7 3h6.6c.3 0 .5 .1 .7 .3l4.7 4.7c.2 .2 .3 .4 .3 .7v6.6c0 .3 -.1 .5 -.3 .7l-4.7 4.7c-.2 .2 -.4 .3 -.7 .3h-6.6c-.3 0 -.5 -.1 -.7 -.3l-4.7 -4.7c-.2 -.2 -.3 -.4 -.3 -.7v-6.6c0 -.3 .1 -.5 .3 -.7l4.7 -4.7c.2 -.2 .4 -.3 .7 -.3z"
+							/>
+							<line x1="12" y1="8" x2="12" y2="12" />
+							<line x1="12" y1="16" x2="12.01" y2="16" />
+						</svg>
+					</a>
+				{/if}
 				{#if $status.database.initialLoading}
 					<button
 						class="icons tooltip-bottom flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"

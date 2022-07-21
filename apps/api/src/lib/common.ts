@@ -473,6 +473,8 @@ export async function createRemoteEngineConfiguration(id: string) {
 	const sshKeyFile = `/tmp/id_rsa-${id}`
 	const { sshKey: { privateKey }, remoteIpAddress, remotePort, remoteUser } = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } })
 	await fs.writeFile(sshKeyFile, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 })
+	// Needed for remote docker compose
+	await asyncExecShell(`eval $(ssh-agent -s) && ssh-add -q ${sshKeyFile}`)
 	const config = sshConfig.parse('')
 	const found = config.find({ Host: remoteIpAddress })
 	if (!found) {
@@ -542,14 +544,13 @@ export async function startTraefikProxy(id: string): Promise<void> {
 			data: { isCoolifyProxyUsed: true }
 		});
 	}
-	if (!remoteEngine) await configureNetworkTraefikProxy(engine);
+	if (!remoteEngine) await configureNetworkTraefikProxy(engine, id);
 }
 
-export async function configureNetworkTraefikProxy(engine: string): Promise<void> {
+export async function configureNetworkTraefikProxy(engine: string, id: string): Promise<void> {
 	const destinations = await prisma.destinationDocker.findMany({ where: { engine } });
-
 	const { stdout: networks } = await executeDockerCmd({
-		dockerId: '',
+		dockerId: id,
 		command:
 			`docker ps -a --filter name=coolify-proxy --format '{{json .Networks}}'`
 	});

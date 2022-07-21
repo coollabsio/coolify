@@ -21,10 +21,9 @@
 				payload = {
 					name: $t('sources.remote_docker'),
 					remoteEngine: true,
-					ipAddress: null,
-					user: 'root',
-					port: 22,
-					sshPrivateKey: null,
+					remoteIpAddress: null,
+					remoteUser: 'root',
+					remotePort: 22,
 					network: cuid(),
 					isCoolifyProxyUsed: true
 				};

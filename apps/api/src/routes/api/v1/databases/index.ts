@@ -12,9 +12,10 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.post('/new', async (request, reply) => await newDatabase(request, reply));
 
     fastify.get<OnlyId>('/:id', async (request) => await getDatabase(request));
-    fastify.get<OnlyId>('/:id/status', async (request) => await getDatabaseStatus(request));
     fastify.post<SaveDatabase>('/:id', async (request, reply) => await saveDatabase(request, reply));
     fastify.delete<OnlyId>('/:id', async (request) => await deleteDatabase(request));
+
+    fastify.get<OnlyId>('/:id/status', async (request) => await getDatabaseStatus(request));
 
     fastify.post<SaveDatabaseSettings>('/:id/settings', async (request) => await saveDatabaseSettings(request));
 

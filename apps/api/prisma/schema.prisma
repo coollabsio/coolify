@@ -213,17 +213,17 @@ model DestinationDocker {
   updatedAt          DateTime      @updatedAt
   database           Database[]
   service            Service[]
-  sshKey             SshKey?
+  sshKey             SshKey?       @relation(fields: [sshKeyId], references: [id])
+  sshKeyId           String?
 }
 
 model SshKey {
-  id                  String             @id @default(cuid())
-  name                String
-  privateKey          String
-  destinationDocker   DestinationDocker? @relation(fields: [destinationDockerId], references: [id])
-  destinationDockerId String?            @unique
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  id                String              @id @default(cuid())
+  name              String
+  privateKey        String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  destinationDocker DestinationDocker[]
 }
 
 model GitSource {

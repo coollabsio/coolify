@@ -9,6 +9,7 @@ import {
     getService,
     getServiceLogs,
     getServiceSecrets,
+    getServiceStatus,
     getServiceStorages,
     getServiceType,
     getServiceUsage,
@@ -40,6 +41,8 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.get<OnlyId>('/:id', async (request) => await getService(request));
     fastify.post<SaveService>('/:id', async (request, reply) => await saveService(request, reply));
     fastify.delete<OnlyId>('/:id', async (request) => await deleteService(request));
+
+    fastify.get<OnlyId>('/:id/status', async (request) => await getServiceStatus(request));
 
     fastify.post<CheckService>('/:id/check', async (request) => await checkService(request));
 

@@ -5,7 +5,7 @@ import yaml from 'js-yaml';
 
 import { copyBaseConfigurationFiles, makeLabelForStandaloneApplication, saveBuildLog, setDefaultConfiguration } from '../lib/buildPacks/common';
 import { createDirectories, decrypt, executeDockerCmd, getDomain, prisma } from '../lib/common';
-import { dockerInstance, getEngine } from '../lib/docker';
+import Dockerode from 'dockerode';
 import * as importers from '../lib/importers';
 import * as buildpacks from '../lib/buildPacks';
 
@@ -104,9 +104,6 @@ import * as buildpacks from '../lib/buildPacks';
 							destinationType = 'docker';
 						}
 						if (destinationType === 'docker') {
-							const docker = dockerInstance({ destinationDocker });
-							const host = getEngine(destinationDocker.engine);
-
 							await prisma.build.update({ where: { id: buildId }, data: { status: 'running' } });
 							const { workdir, repodir } = await createDirectories({ repository, buildId });
 							const configuration = await setDefaultConfiguration(message);
@@ -185,18 +182,23 @@ import * as buildpacks from '../lib/buildPacks';
 							} else {
 								deployNeeded = true;
 							}
-							const image = await docker.engine.getImage(`${applicationId}:${tag}`);
+
 							let imageFound = false;
 							try {
-								await image.inspect();
+								await executeDockerCmd({
+									dockerId: destinationDocker.id,
+									command: `docker image inspect ${applicationId}:${tag}`
+								})
 								imageFound = true;
 							} catch (error) {
 								//
 							}
-							if (!imageFound || deployNeeded) {
+							// if (!imageFound || deployNeeded) {
+							if (true) {
 								await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId, baseImage);
 								if (buildpacks[buildPack])
 									await buildpacks[buildPack]({
+										dockerId: destinationDocker.id,
 										buildId,
 										applicationId,
 										domain,
@@ -212,7 +214,6 @@ import * as buildpacks from '../lib/buildPacks';
 										commit,
 										tag,
 										workdir,
-										docker,
 										port: exposePort ? `${exposePort}:${port}` : port,
 										installCommand,
 										buildCommand,
@@ -299,7 +300,7 @@ import * as buildpacks from '../lib/buildPacks';
 											container_name: imageId,
 											volumes,
 											env_file: envFound ? [`${workdir}/.env`] : [],
-											networks: [docker.network],
+											networks: [destinationDocker.network],
 											labels,
 											depends_on: [],
 											restart: 'always',
@@ -318,7 +319,7 @@ import * as buildpacks from '../lib/buildPacks';
 										}
 									},
 									networks: {
-										[docker.network]: {
+										[destinationDocker.network]: {
 											external: true
 										}
 									},

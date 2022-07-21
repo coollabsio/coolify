@@ -36,7 +36,6 @@
 
 			return {
 				props: {
-					isQueueActive,
 					application
 				},
 				stuff: {
@@ -53,7 +52,6 @@
 
 <script lang="ts">
 	export let application: any;
-	export let isQueueActive: any;
 
 	import { page } from '$app/stores';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
@@ -68,7 +66,7 @@
 
 	let loading = false;
 	let statusInterval: any;
-
+	let isQueueActive= false;
 	$disabledButton =
 		!$appSession.isAdmin ||
 		!application.fqdn ||
@@ -114,12 +112,12 @@
 			return window.location.reload();
 		} catch (error) {
 			return errorNotification(error);
-		}
+		} 
 	}
 	async function getStatus() {
 		if ($status.application.loading) return;
 		$status.application.loading = true;
-		const data = await get(`/applications/${id}`);
+		const data = await get(`/applications/${id}/status`);
 		isQueueActive = data.isQueueActive;
 		$status.application.isRunning = data.isRunning;
 		$status.application.isExited = data.isExited;

@@ -2,7 +2,7 @@ import type { FastifyRequest } from 'fastify';
 import { FastifyReply } from 'fastify';
 import sshConfig from 'ssh-config'
 import fs from 'fs/promises'
-import { asyncExecShell, decrypt, errorHandler, listSettings, prisma, startTraefikProxy, stopTraefikProxy } from '../../../../lib/common';
+import { asyncExecShell, decrypt, errorHandler, executeDockerCmd, listSettings, prisma, startTraefikProxy, stopTraefikProxy } from '../../../../lib/common';
 import { checkContainer, dockerInstance, getEngine } from '../../../../lib/docker';
 
 import type { OnlyId } from '../../../../types';
@@ -67,9 +67,11 @@ export async function getDestination(request: FastifyRequest<OnlyId>) {
 }
 export async function newDestination(request: FastifyRequest<NewDestination>, reply: FastifyReply) {
     try {
-        const { id } = request.params
-        let { name, network, engine, isCoolifyProxyUsed, remoteIpAddress, remoteUser, remotePort } = request.body
         const teamId = request.user.teamId;
+        const { id } = request.params
+
+        let { name, network, engine, isCoolifyProxyUsed, remoteIpAddress, remoteUser, remotePort } = request.body
+        console.log({ name, network, engine, isCoolifyProxyUsed, remoteIpAddress, remoteUser, remotePort })
         if (id === 'new') {
             if (engine) {
                 const host = getEngine(engine);
@@ -100,17 +102,12 @@ export async function newDestination(request: FastifyRequest<NewDestination>, re
                     }
                 }
                 return reply.code(201).send({ id: destination.id });
-            }
-            if (remoteIpAddress) {
-                await prisma.destinationDocker.create({
+            } else {
+                const destination = await prisma.destinationDocker.create({
                     data: { name, teams: { connect: { id: teamId } }, engine, network, isCoolifyProxyUsed, remoteEngine: true, remoteIpAddress, remoteUser, remotePort }
                 });
-                return reply.code(201).send()
-
+                return reply.code(201).send({ id: destination.id })
             }
-            throw {
-                message: `Cannot save Docker Engine.`
-            };
         } else {
             await prisma.destinationDocker.update({ where: { id }, data: { name, engine, network } });
             return reply.code(201).send();
@@ -125,22 +122,20 @@ export async function newDestination(request: FastifyRequest<NewDestination>, re
 export async function deleteDestination(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
-        const destination = await prisma.destinationDocker.delete({ where: { id } });
-        if (destination.isCoolifyProxyUsed) {
-            const host = getEngine(destination.engine);
-            const { network } = destination;
-            const settings = await prisma.setting.findFirst();
-            const containerName = settings.isTraefikUsed ? 'coolify-proxy' : 'coolify-haproxy';
-            const { stdout: found } = await asyncExecShell(
-                `DOCKER_HOST=${host} docker ps -a --filter network=${network} --filter name=${containerName} --format '{{.}}'`
-            );
-            if (found) {
-                await asyncExecShell(
-                    `DOCKER_HOST="${host}" docker network disconnect ${network} ${containerName}`
-                );
-                await asyncExecShell(`DOCKER_HOST="${host}" docker network rm ${network}`);
+        const { network, remoteVerified, engine, isCoolifyProxyUsed } = await prisma.destinationDocker.findUnique({ where: { id } });
+        if (isCoolifyProxyUsed) {
+            if (engine || remoteVerified) {
+                const { stdout: found } = await executeDockerCmd({
+                    dockerId: id,
+                    command: `docker ps -a --filter network=${network} --filter name=coolify-proxy --format '{{.}}'`
+                })
+                if (found) {
+                    await executeDockerCmd({ dockerId: id, command: `docker network disconnect ${network} coolify-proxy` })
+                    await executeDockerCmd({ dockerId: id, command: `docker network rm ${network}` })
+                }
             }
         }
+        await prisma.destinationDocker.delete({ where: { id } });
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -168,6 +163,7 @@ export async function startProxy(request: FastifyRequest<Proxy>) {
         await startTraefikProxy(id);
         return {}
     } catch ({ status, message }) {
+        console.log({status, message})
         await stopTraefikProxy(id);
         return errorHandler({ status, message })
     }
@@ -245,9 +241,9 @@ export async function getDestinationStatus(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         const destination = await prisma.destinationDocker.findUnique({ where: { id } })
-        const containerName = 'coolify-proxy';
+        const isRunning = await checkContainer({ dockerId: destination.id, container: 'coolify-proxy' })
         return {
-            isRunning: await checkContainer({ dockerId: destination.id, container: containerName })
+            isRunning
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })

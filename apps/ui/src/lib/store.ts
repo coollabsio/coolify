@@ -41,14 +41,16 @@ export const status: Writable<any> = writable({
         initialLoading: true
     },
     service: {
-        initialLoading: true,
+        isRunning: false,
+        isExited: false,
         loading: false,
-        isRunning: false
+        initialLoading: true
     },
     database: {
-        initialLoading: true,
+        isRunning: false,
+        isExited: false,
         loading: false,
-        isRunning: false
+        initialLoading: true
     }
 
 });
@@ -60,7 +62,6 @@ export const features = readable({
 
 export const location: Writable<null | string> = writable(null)
 export const setLocation = (resource: any) => {
-    console.log(GITPOD_WORKSPACE_URL)
     if (GITPOD_WORKSPACE_URL && resource.exposePort) {
         const { href } = new URL(GITPOD_WORKSPACE_URL);
         const newURL = href

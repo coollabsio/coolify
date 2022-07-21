@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { OnlyId } from '../../../../types';
-import { cancelDeployment, checkDNS, checkRepository, deleteApplication, deleteSecret, deleteStorage, deployApplication, getApplication, getApplicationLogs, getBuildIdLogs, getBuildLogs, getBuildPack, getGitHubToken, getGitLabSSHKey, getImages, getPreviews, getSecrets, getStorages, getUsage, listApplications, newApplication, saveApplication, saveApplicationSettings, saveApplicationSource, saveBuildPack, saveDeployKey, saveDestination, saveGitLabSSHKey, saveRepository, saveSecret, saveStorage, stopApplication } from './handlers';
+import { cancelDeployment, checkDNS, checkRepository, deleteApplication, deleteSecret, deleteStorage, deployApplication, getApplication, getApplicationLogs, getApplicationStatus, getBuildIdLogs, getBuildLogs, getBuildPack, getGitHubToken, getGitLabSSHKey, getImages, getPreviews, getSecrets, getStorages, getUsage, listApplications, newApplication, saveApplication, saveApplicationSettings, saveApplicationSource, saveBuildPack, saveDeployKey, saveDestination, saveGitLabSSHKey, saveRepository, saveSecret, saveStorage, stopApplication } from './handlers';
 
 import type { CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, DeployApplication, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, GetImages, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage } from './types';
 
@@ -16,6 +16,8 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.get<OnlyId>('/:id', async (request) => await getApplication(request));
     fastify.post<SaveApplication>('/:id', async (request, reply) => await saveApplication(request, reply));
     fastify.delete<DeleteApplication>('/:id', async (request, reply) => await deleteApplication(request, reply));
+
+    fastify.get<OnlyId>('/:id/status', async (request) => await getApplicationStatus(request));
 
     fastify.post<OnlyId>('/:id/stop', async (request, reply) => await stopApplication(request, reply));
 

@@ -3,9 +3,10 @@ import type { FastifyRequest } from 'fastify';
 import { FastifyReply } from 'fastify';
 import yaml from 'js-yaml';
 import fs from 'fs/promises';
-import { asyncExecShell, ComposeFile, createDirectories, decrypt, encrypt, errorHandler, executeDockerCmd, generateDatabaseConfiguration, generatePassword, getContainerUsage, getDatabaseImage, getDatabaseVersions, getFreePort, listSettings, makeLabelForStandaloneDatabase, prisma, startTraefikTCPProxy, stopDatabaseContainer, stopTcpHttpProxy, supportedDatabaseTypesAndVersions, uniqueName, updatePasswordInDb } from '../../../../lib/common';
-import { dockerInstance, getEngine } from '../../../../lib/docker';
+import { ComposeFile, createDirectories, decrypt, encrypt, errorHandler, executeDockerCmd, generateDatabaseConfiguration, generatePassword, getContainerUsage, getDatabaseImage, getDatabaseVersions, getFreePort, listSettings, makeLabelForStandaloneDatabase, prisma, startTraefikTCPProxy, stopDatabaseContainer, stopTcpHttpProxy, supportedDatabaseTypesAndVersions, uniqueName, updatePasswordInDb } from '../../../../lib/common';
+import { checkContainer } from '../../../../lib/docker';
 import { day } from '../../../../lib/dayjs';
+
 import { GetDatabaseLogs, OnlyId, SaveDatabase, SaveDatabaseDestination, SaveDatabaseSettings, SaveVersion } from '../../../../types';
 import { SaveDatabaseType } from './types';
 
@@ -98,7 +99,7 @@ export async function getDatabase(request: FastifyRequest<OnlyId>) {
             throw { status: 404, message: 'Database not found.' }
         }
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
-        if (database.rootUserPassword) database.rootUserPassword = decrypt(database.rootUserPassword);    
+        if (database.rootUserPassword) database.rootUserPassword = decrypt(database.rootUserPassword);
         const configuration = generateDatabaseConfiguration(database);
         const settings = await listSettings();
         return {
@@ -236,7 +237,6 @@ export async function startDatabase(request: FastifyRequest<OnlyId>) {
             generateDatabaseConfiguration(database);
 
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const volumeName = volume.split(':')[0];
         const labels = await makeLabelForStandaloneDatabase({ id, image, volume });
 
@@ -322,39 +322,27 @@ export async function stopDatabase(request: FastifyRequest<OnlyId>) {
 }
 export async function getDatabaseLogs(request: FastifyRequest<GetDatabaseLogs>) {
     try {
-        const teamId = request.user.teamId;
         const { id } = request.params;
         let { since = 0 } = request.query
         if (since !== 0) {
             since = day(since).unix();
         }
-        const { destinationDockerId, destinationDocker } = await prisma.database.findUnique({
+        const { destinationDockerId, destinationDocker: { id: dockerId } } = await prisma.database.findUnique({
             where: { id },
             include: { destinationDocker: true }
         });
         if (destinationDockerId) {
-            const docker = dockerInstance({ destinationDocker });
             try {
-                const container = await docker.engine.getContainer(id);
-                if (container) {
+                // const found = await checkContainer({ dockerId, container: id })
+                // if (found) {
                     const { default: ansi } = await import('strip-ansi')
-                    const logs = (
-                        await container.logs({
-                            stdout: true,
-                            stderr: true,
-                            timestamps: true,
-                            since,
-                            tail: 5000
-                        })
-                    )
-                        .toString()
-                        .split('\n')
-                        .map((l) => ansi(l.slice(8)))
-                        .filter((a) => a);
-                    return {
-                        logs
-                    };
-                }
+                    const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
+                    const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
+                    const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
+                    const logs = stripLogsStderr.concat(stripLogsStdout)
+                    const sortedLogs = logs.sort((a, b) => (day(a.split(' ')[0]).isAfter(day(b.split(' ')[0])) ? 1 : -1))
+                    return { logs: sortedLogs }
+                // }
             } catch (error) {
                 const { statusCode } = error;
                 if (statusCode === 404) {

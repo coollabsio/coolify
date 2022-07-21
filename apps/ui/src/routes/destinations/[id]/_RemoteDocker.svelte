@@ -9,56 +9,65 @@
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { onMount } from 'svelte';
 	import { t } from '$lib/translations';
-	import { errorNotification, generateRemoteEngine } from '$lib/common';
+	import { errorNotification } from '$lib/common';
 	import { appSession } from '$lib/store';
+
 	const { id } = $page.params;
+
 	let cannotDisable = settings.fqdn && destination.engine === '/var/run/docker.sock';
-	let loading = false;
-	let loadingProxy = true;
-	let restarting = false;
+	let loading = {
+		restart: false,
+		proxy: true,
+		save: false,
+		verify: false
+	};
 
 	$: isDisabled = !$appSession.isAdmin;
 
 	async function handleSubmit() {
-		loading = true;
+		loading.save = true;
 		try {
-			return await post(`/destinations/${id}`, { ...destination });
+			await post(`/destinations/${id}`, { ...destination });
+			toast.push('Configuration saved.');
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
-			loading = false;
+			loading.save = false;
 		}
 	}
 	onMount(async () => {
-		loadingProxy = true;
-		const { isRunning } = await get(`/destinations/${id}/status`);
-		if (isRunning === false && destination.isCoolifyProxyUsed === true) {
-			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
-			try {
-				await post(`/destinations/${id}/settings`, {
-					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
-					engine: destination.engine
-				});
-				await stopProxy();
-			} catch (error) {
-				return errorNotification(error);
-			}
-		} else if (isRunning === true && destination.isCoolifyProxyUsed === false) {
-			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
-			try {
-				await post(`/destinations/${id}/settings`, {
-					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
-					engine: destination.engine
-				});
-				await startProxy();
-			} catch (error) {
-				return errorNotification(error);
+		loading.proxy = true;
+		if (destination.remoteEngine && destination.remoteVerified) {
+			const { isRunning } = await get(`/destinations/${id}/status`);
+			if (isRunning === false && destination.isCoolifyProxyUsed === true) {
+				destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
+				try {
+					await post(`/destinations/${id}/settings`, {
+						isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
+						engine: destination.engine
+					});
+					await stopProxy();
+				} catch (error) {
+					return errorNotification(error);
+				}
+			} else if (isRunning === true && destination.isCoolifyProxyUsed === false) {
+				destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
+				try {
+					await post(`/destinations/${id}/settings`, {
+						isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
+						engine: destination.engine
+					});
+					await startProxy();
+				} catch (error) {
+					return errorNotification(error);
+				}
 			}
 		}
-		loadingProxy = false;
+
+		loading.proxy = false;
 	});
 	async function changeProxySetting() {
-		loadingProxy = true;
+		loading.proxy = true;
 		if (!cannotDisable) {
 			const isProxyActivated = destination.isCoolifyProxyUsed;
 			if (isProxyActivated) {
@@ -68,7 +77,7 @@
 					} Coolify proxy? It will remove the proxy for all configured networks and all deployments! Nothing will be reachable if you do it!`
 				);
 				if (!sure) {
-					loadingProxy = false;
+					loading.proxy = false;
 					return;
 				}
 			}
@@ -87,7 +96,7 @@
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
-				loadingProxy = false;
+				loading.proxy = false;
 			}
 		}
 	}
@@ -111,7 +120,7 @@
 		const sure = confirm($t('destination.confirm_restart_proxy'));
 		if (sure) {
 			try {
-				restarting = true;
+				loading.restart = true;
 				toast.push($t('destination.coolify_proxy_restarting'));
 				await post(`/destinations/${id}/restart`, {
 					engine: destination.engine,
@@ -122,18 +131,21 @@
 					window.location.reload();
 				}, 5000);
 			} finally {
-				restarting = false;
+				loading.restart = false;
 			}
 		}
 	}
 	async function verifyRemoteDocker() {
 		try {
-			loading = true;
-			return await post(`/destinations/${id}/verify`, {});
+			loading.verify = true;
+			await post(`/destinations/${id}/verify`, {});
+			destination.remoteVerified = true;
+			toast.push('Remote Docker Engine verified!');
+			return;
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
-			loading = false;
+			loading.verify = false;
 		}
 	}
 </script>
@@ -145,24 +157,27 @@
 			<button
 				type="submit"
 				class="bg-sky-600 hover:bg-sky-500"
-				class:bg-sky-600={!loading}
-				class:hover:bg-sky-500={!loading}
-				disabled={loading}
-				>{loading ? $t('forms.saving') : $t('forms.save')}
+				class:bg-sky-600={!loading.save}
+				class:hover:bg-sky-500={!loading.save}
+				disabled={loading.save}
+				>{loading.save ? $t('forms.saving') : $t('forms.save')}
 			</button>
 			{#if !destination.remoteVerified}
-				<button on:click|preventDefault|stopPropagation={verifyRemoteDocker}
-					>Verify Remote Docker Engine</button
+				<button
+					disabled={loading.verify}
+					on:click|preventDefault|stopPropagation={verifyRemoteDocker}
+					>{loading.verify ? 'Verifying...' : 'Verify Remote Docker Engine'}</button
+				>
+			{:else}
+				<button
+					class={loading.restart ? '' : 'bg-red-600 hover:bg-red-500'}
+					disabled={loading.restart}
+					on:click|preventDefault={forceRestartProxy}
+					>{loading.restart
+						? $t('destination.restarting_please_wait')
+						: $t('destination.force_restart_proxy')}</button
 				>
 			{/if}
-			<button
-				class={restarting ? '' : 'bg-red-600 hover:bg-red-500'}
-				disabled={restarting}
-				on:click|preventDefault={forceRestartProxy}
-				>{restarting
-					? $t('destination.restarting_please_wait')
-					: $t('destination.force_restart_proxy')}</button
-			>
 		{/if}
 	</div>
 	<div class="grid grid-cols-2 items-center px-10 ">
@@ -232,7 +247,7 @@
 	<div class="grid grid-cols-2 items-center">
 		<Setting
 			disabled={cannotDisable}
-			loading={loadingProxy}
+			loading={loading.proxy}
 			bind:setting={destination.isCoolifyProxyUsed}
 			on:click={changeProxySetting}
 			title={$t('destination.use_coolify_proxy')}

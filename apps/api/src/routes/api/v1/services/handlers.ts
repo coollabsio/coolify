@@ -2,9 +2,9 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceImages, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceImages, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
-import { checkContainer, dockerInstance, getEngine, removeContainer } from '../../../../lib/docker';
+import { checkContainer, dockerInstance, isContainerExited, removeContainer } from '../../../../lib/docker';
 import cuid from 'cuid';
 
 import type { OnlyId } from '../../../../types';
@@ -172,6 +172,31 @@ export async function newService(request: FastifyRequest, reply: FastifyReply) {
         return errorHandler({ status, message })
     }
 }
+export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
+    try {
+        const teamId = request.user.teamId;
+        const { id } = request.params;
+
+        let isRunning = false;
+        let isExited = false
+
+        const service = await getServiceFromDB({ id, teamId });
+        const { destinationDockerId, settings } = service;
+
+        if (destinationDockerId) {
+            isRunning = await checkContainer({ dockerId: service.destinationDocker.id, container: id });
+            isExited = await isContainerExited(service.destinationDocker.id, id);
+        }
+        return {
+            isRunning,
+            isExited,
+            settings
+        }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
 export async function getService(request: FastifyRequest<OnlyId>) {
     try {
         const teamId = request.user.teamId;
@@ -181,36 +206,8 @@ export async function getService(request: FastifyRequest<OnlyId>) {
         if (!service) {
             throw { status: 404, message: 'Service not found.' }
         }
-
-        const { destinationDockerId, destinationDocker, type, version, settings } = service;
-        let isRunning = false;
-        if (destinationDockerId) {
-            const host = getEngine(destinationDocker.engine);
-            const docker = dockerInstance({ destinationDocker });
-            const baseImage = getServiceImage(type);
-            const images = getServiceImages(type);
-            docker.engine.pull(`${baseImage}:${version}`);
-            if (images?.length > 0) {
-                for (const image of images) {
-                    docker.engine.pull(`${image}:latest`);
-                }
-            }
-            try {
-                const { stdout } = await asyncExecShell(
-                    `DOCKER_HOST=${host} docker inspect --format '{{json .State}}' ${id}`
-                );
-
-                if (JSON.parse(stdout).Running) {
-                    isRunning = true;
-                }
-            } catch (error) {
-                //
-            }
-        }
         return {
-            isRunning,
             service,
-            settings
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -299,33 +296,22 @@ export async function getServiceLogs(request: FastifyRequest<GetServiceLogs>) {
         if (since !== 0) {
             since = day(since).unix();
         }
-        const { destinationDockerId, destinationDocker } = await prisma.service.findUnique({
+        const { destinationDockerId, destinationDocker: { id: dockerId } } = await prisma.service.findUnique({
             where: { id },
             include: { destinationDocker: true }
         });
         if (destinationDockerId) {
-            const docker = dockerInstance({ destinationDocker });
             try {
-                const container = await docker.engine.getContainer(id);
-                if (container) {
+                // const found = await checkContainer({ dockerId, container: id })
+                // if (found) {
                     const { default: ansi } = await import('strip-ansi')
-                    const logs = (
-                        await container.logs({
-                            stdout: true,
-                            stderr: true,
-                            timestamps: true,
-                            since,
-                            tail: 5000
-                        })
-                    )
-                        .toString()
-                        .split('\n')
-                        .map((l) => ansi(l.slice(8)))
-                        .filter((a) => a);
-                    return {
-                        logs
-                    };
-                }
+                    const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
+                    const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
+                    const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
+                    const logs = stripLogsStderr.concat(stripLogsStdout)
+                    const sortedLogs = logs.sort((a, b) => (day(a.split(' ')[0]).isAfter(day(b.split(' ')[0])) ? 1 : -1))
+                    return { logs: sortedLogs }
+                // }
             } catch (error) {
                 const { statusCode } = error;
                 if (statusCode === 404) {
@@ -742,7 +728,6 @@ async function startPlausibleAnalyticsService(request: FastifyRequest<ServiceSta
             });
         }
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const port = getServiceMainPort('plausibleanalytics');
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -859,10 +844,8 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(
-            `DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up --build -d`
-        );
+        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -905,7 +888,6 @@ async function startNocodbService(request: FastifyRequest<ServiceStartStop>) {
         const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort } =
             service;
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const port = getServiceMainPort('nocodb');
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -956,8 +938,8 @@ async function startNocodbService(request: FastifyRequest<ServiceStartStop>) {
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -970,7 +952,6 @@ async function stopNocodbService(request: FastifyRequest<ServiceStartStop>) {
         const service = await getServiceFromDB({ id, teamId });
         const { destinationDockerId, destinationDocker, fqdn } = service;
         if (destinationDockerId) {
-            const engine = destinationDocker.engine;
             const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
             if (found) {
                 await removeContainer({ id, dockerId: destinationDocker.id });
@@ -999,7 +980,6 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
         } = service;
 
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const port = getServiceMainPort('minio');
 
         const publicPort = await getFreePort();
@@ -1058,8 +1038,8 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
         await prisma.minio.update({ where: { serviceId: id }, data: { publicPort } });
         return {}
     } catch ({ status, message }) {
@@ -1071,10 +1051,9 @@ async function stopMinioService(request: FastifyRequest<ServiceStartStop>) {
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker, fqdn } = service;
+        const { destinationDockerId, destinationDocker } = service;
         await prisma.minio.update({ where: { serviceId: id }, data: { publicPort: null } })
         if (destinationDockerId) {
-            const engine = destinationDocker.engine;
             const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
             if (found) {
                 await removeContainer({ id, dockerId: destinationDocker.id });
@@ -1103,7 +1082,6 @@ async function startVscodeService(request: FastifyRequest<ServiceStartStop>) {
         } = service;
 
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const port = getServiceMainPort('vscodeserver');
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -1175,16 +1153,16 @@ async function startVscodeService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
 
         const changePermissionOn = persistentStorage.map((p) => p.path);
         if (changePermissionOn.length > 0) {
-            await asyncExecShell(
-                `DOCKER_HOST=${host} docker exec -u root ${id} chown -R 1000:1000 ${changePermissionOn.join(
+            await executeDockerCmd({
+                dockerId: destinationDocker.id, command: `docker exec -u root ${id} chown -R 1000:1000 ${changePermissionOn.join(
                     ' '
                 )}`
-            );
+            })
         }
         return {}
     } catch ({ status, message }) {
@@ -1196,9 +1174,8 @@ async function stopVscodeService(request: FastifyRequest<ServiceStartStop>) {
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker, fqdn } = service;
+        const { destinationDockerId, destinationDocker } = service;
         if (destinationDockerId) {
-            const engine = destinationDocker.engine;
             const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
             if (found) {
                 await removeContainer({ id, dockerId: destinationDocker.id });
@@ -1236,7 +1213,6 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
         } = service;
 
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const image = getServiceImage(type);
         const port = getServiceMainPort('wordpress');
 
@@ -1328,8 +1304,10 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
         }
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+
+        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1346,7 +1324,6 @@ async function stopWordpressService(request: FastifyRequest<ServiceStartStop>) {
             wordpress: { ftpEnabled }
         } = service;
         if (destinationDockerId) {
-            const engine = destinationDocker.engine;
             try {
                 const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
@@ -1393,7 +1370,6 @@ async function startVaultwardenService(request: FastifyRequest<ServiceStartStop>
             service;
 
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const port = getServiceMainPort('vaultwarden');
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -1444,8 +1420,10 @@ async function startVaultwardenService(request: FastifyRequest<ServiceStartStop>
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+
+        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1456,10 +1434,8 @@ async function stopVaultwardenService(request: FastifyRequest<ServiceStartStop>)
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker, fqdn } = service;
+        const { destinationDockerId, destinationDocker } = service;
         if (destinationDockerId) {
-            const engine = destinationDocker.engine;
-
             try {
                 const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
@@ -1483,7 +1459,6 @@ async function startLanguageToolService(request: FastifyRequest<ServiceStartStop
         const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort } =
             service;
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const port = getServiceMainPort('languagetool');
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -1536,8 +1511,9 @@ async function startLanguageToolService(request: FastifyRequest<ServiceStartStop
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1548,10 +1524,8 @@ async function stopLanguageToolService(request: FastifyRequest<ServiceStartStop>
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker, fqdn } = service;
+        const { destinationDockerId, destinationDocker } = service;
         if (destinationDockerId) {
-            const engine = destinationDocker.engine;
-
             try {
                 const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
@@ -1575,7 +1549,6 @@ async function startN8nService(request: FastifyRequest<ServiceStartStop>) {
         const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort } =
             service;
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const port = getServiceMainPort('n8n');
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -1628,8 +1601,10 @@ async function startN8nService(request: FastifyRequest<ServiceStartStop>) {
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+
+        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1640,10 +1615,8 @@ async function stopN8nService(request: FastifyRequest<ServiceStartStop>) {
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker, fqdn } = service;
+        const { destinationDockerId, destinationDocker } = service;
         if (destinationDockerId) {
-            const engine = destinationDocker.engine;
-
             try {
                 const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
@@ -1667,7 +1640,6 @@ async function startUptimekumaService(request: FastifyRequest<ServiceStartStop>)
         const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort } =
             service;
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const port = getServiceMainPort('uptimekuma');
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -1719,8 +1691,9 @@ async function startUptimekumaService(request: FastifyRequest<ServiceStartStop>)
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1731,10 +1704,8 @@ async function stopUptimekumaService(request: FastifyRequest<ServiceStartStop>) 
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker, fqdn } = service;
+        const { destinationDockerId, destinationDocker } = service;
         if (destinationDockerId) {
-            const engine = destinationDocker.engine;
-
             try {
                 const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
@@ -1774,7 +1745,6 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
             }
         } = service;
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
         const image = getServiceImage(type);
@@ -1871,8 +1841,9 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1883,10 +1854,8 @@ async function stopGhostService(request: FastifyRequest<ServiceStartStop>) {
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker, fqdn } = service;
+        const { destinationDockerId, destinationDocker } = service;
         if (destinationDockerId) {
-            const engine = destinationDocker.engine;
-
             try {
                 let found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
@@ -1917,7 +1886,6 @@ async function startMeilisearchService(request: FastifyRequest<ServiceStartStop>
         const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort } =
             service;
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const port = getServiceMainPort('meilisearch');
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -1972,8 +1940,10 @@ async function startMeilisearchService(request: FastifyRequest<ServiceStartStop>
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+
+        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1984,10 +1954,8 @@ async function stopMeilisearchService(request: FastifyRequest<ServiceStartStop>)
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker, fqdn } = service;
+        const { destinationDockerId, destinationDocker } = service;
         if (destinationDockerId) {
-            const engine = destinationDocker.engine;
-
             try {
                 const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
@@ -2024,7 +1992,6 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
             }
         } = service;
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const port = getServiceMainPort('umami');
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -2191,8 +2158,10 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+
+        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -2203,10 +2172,8 @@ async function stopUmamiService(request: FastifyRequest<ServiceStartStop>) {
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker, fqdn } = service;
+        const { destinationDockerId, destinationDocker } = service;
         if (destinationDockerId) {
-            const engine = destinationDocker.engine;
-
             try {
                 const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
@@ -2245,7 +2212,6 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
             hasura: { postgresqlUser, postgresqlPassword, postgresqlDatabase }
         } = service;
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const port = getServiceMainPort('hasura');
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -2327,8 +2293,9 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -2339,10 +2306,8 @@ async function stopHasuraService(request: FastifyRequest<ServiceStartStop>) {
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker, fqdn } = service;
+        const { destinationDockerId, destinationDocker } = service;
         if (destinationDockerId) {
-            const engine = destinationDocker.engine;
-
             try {
                 const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
@@ -2396,7 +2361,6 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
             }
         } = service;
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const port = getServiceMainPort('fider');
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -2489,8 +2453,8 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
 
         return {}
     } catch ({ status, message }) {
@@ -2502,10 +2466,8 @@ async function stopFiderService(request: FastifyRequest<ServiceStartStop>) {
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker, fqdn } = service;
+        const { destinationDockerId, destinationDocker } = service;
         if (destinationDockerId) {
-            const engine = destinationDocker.engine;
-
             try {
                 const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
@@ -2554,12 +2516,10 @@ async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
             }
         } = service;
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const port = getServiceMainPort('moodle');
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
         const image = getServiceImage(type);
-        const domain = getDomain(fqdn);
         const config = {
             moodle: {
                 image: `${image}:${version}`,
@@ -2652,8 +2612,10 @@ async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-        await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+
+        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+
 
         return {}
     } catch ({ status, message }) {
@@ -2665,10 +2627,8 @@ async function stopMoodleService(request: FastifyRequest<ServiceStartStop>) {
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker, fqdn } = service;
+        const { destinationDockerId, destinationDocker } = service;
         if (destinationDockerId) {
-            const engine = destinationDocker.engine;
-
             try {
                 const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
                 if (found) {
@@ -2703,14 +2663,10 @@ export async function activatePlausibleUsers(request: FastifyRequest<OnlyId>, re
             plausibleAnalytics: { postgresqlUser, postgresqlPassword, postgresqlDatabase }
         } = await getServiceFromDB({ id, teamId });
         if (destinationDockerId) {
-            const docker = dockerInstance({ destinationDocker });
-            const container = await docker.engine.getContainer(id);
-            const command = await container.exec({
-                Cmd: [
-                    `psql -H postgresql://${postgresqlUser}:${postgresqlPassword}@localhost:5432/${postgresqlDatabase} -c "UPDATE users SET email_verified = true;"`
-                ]
-            });
-            await command.start();
+            await executeDockerCmd({
+                dockerId: destinationDocker.id,
+                command: `docker exec ${id} 'psql -H postgresql://${postgresqlUser}:${postgresqlPassword}@localhost:5432/${postgresqlDatabase} -c "UPDATE users SET email_verified = true;"'`
+            })
             return await reply.code(201).send()
         }
         throw { status: 500, message: 'Could not activate users.' }
@@ -2742,7 +2698,6 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
             ftpHostKeyPrivate
         } = data;
         const { network, engine } = destinationDocker;
-        const host = getEngine(engine);
         if (ftpEnabled) {
             if (user) ftpUser = user;
             if (savedPassword) ftpPassword = decrypt(savedPassword);
@@ -2841,9 +2796,11 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
                 );
                 await asyncExecShell(`chmod +x ${hostkeyDir}/${id}.sh`);
                 await fs.writeFile(`${hostkeyDir}/${id}-docker-compose.yml`, yaml.dump(compose));
-                await asyncExecShell(
-                    `DOCKER_HOST=${host} docker compose -f ${hostkeyDir}/${id}-docker-compose.yml up -d`
-                );
+                await executeDockerCmd({
+                    dockerId: destinationDocker.id,
+                    command: `docker compose -f ${hostkeyDir}/${id}-docker-compose.yml up -d`
+                })
+
             }
             return reply.code(201).send({
                 publicPort,
@@ -2856,9 +2813,11 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
                 data: { ftpPublicPort: null }
             });
             try {
-                await asyncExecShell(
-                    `DOCKER_HOST=${host} docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`
-                );
+                await executeDockerCmd({
+                    dockerId: destinationDocker.id,
+                    command: `docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`
+                })
+
             } catch (error) {
                 //
             }
