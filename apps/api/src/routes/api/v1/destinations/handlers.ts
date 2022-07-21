@@ -230,7 +230,7 @@ export async function verifyRemoteDockerEngine(request: FastifyRequest, reply: F
                 Host: remoteIpAddress,
                 Port: remotePort.toString(),
                 User: remoteUser,
-                IdentityFile: `${homedir}/id_rsa_verification_${id}`,
+                IdentityFile: `/tmp/id_rsa_verification_${id}`,
                 StrictHostKeyChecking: 'no'
             })
         }
