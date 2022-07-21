@@ -77,7 +77,7 @@
 		<div class="flex flex-col">
 			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 				{#each ownDatabases as database}
-					<a href="/databases/{database.id}" class="w-96 p-2 no-underline">
+					<a href="/databases/{database.id}" class="p-2 no-underline">
 						<div class="box-selection group relative hover:bg-purple-600">
 							{#if database.type === 'clickhouse'}
 								<Clickhouse isAbsolute />

@@ -66,7 +66,7 @@
 		<div class="flex flex-col">
 			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 				{#each ownDestinations as destination}
-					<a href="/destinations/{destination.id}" class="w-96 p-2 no-underline">
+					<a href="/destinations/{destination.id}" class="p-2 no-underline">
 						<div class="box-selection hover:bg-sky-600">
 							<div class="truncate text-center text-xl font-bold">{destination.name}</div>
 							{#if $appSession.teamId === '0' && otherDestinations.length > 0}

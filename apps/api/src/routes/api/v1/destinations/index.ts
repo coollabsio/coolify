@@ -2,13 +2,13 @@ import { FastifyPluginAsync } from 'fastify';
 import { assignSSHKey, checkDestination, deleteDestination, getDestination, getDestinationStatus, listDestinations, newDestination, restartProxy, saveDestinationSettings, startProxy, stopProxy, verifyRemoteDockerEngine } from './handlers';
 
 import type { OnlyId } from '../../../../types';
-import type { CheckDestination, NewDestination, Proxy, SaveDestinationSettings } from './types';
+import type { CheckDestination, ListDestinations, NewDestination, Proxy, SaveDestinationSettings } from './types';
 
 const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.addHook('onRequest', async (request) => {
         return await request.jwtVerify()
     })
-    fastify.get('/', async (request) => await listDestinations(request));
+    fastify.get<ListDestinations>('/', async (request) => await listDestinations(request));
     fastify.post<CheckDestination>('/check', async (request) => await checkDestination(request));
 
     fastify.get<OnlyId>('/:id', async (request) => await getDestination(request));

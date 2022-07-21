@@ -1,5 +1,10 @@
 import { OnlyId } from "../../../../types"
 
+export interface ListDestinations {
+    Querystring: {
+        onlyVerified: string
+    }
+}
 export interface CheckDestination {
     Body: {
         network: string

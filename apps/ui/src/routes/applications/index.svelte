@@ -93,7 +93,7 @@
 		<div class="flex flex-col">
 			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 				{#each ownApplications as application}
-					<a href="/applications/{application.id}" class="w-96 p-2 no-underline">
+					<a href="/applications/{application.id}" class="p-2 no-underline">
 						<div class="box-selection group relative hover:bg-green-600">
 							{#if application.buildPack}
 								{#if application.buildPack.toLowerCase() === 'rust'}

@@ -6,11 +6,12 @@ import { asyncExecShell, decrypt, errorHandler, executeDockerCmd, listSettings, 
 import { checkContainer, dockerInstance, getEngine } from '../../../../lib/docker';
 
 import type { OnlyId } from '../../../../types';
-import type { CheckDestination, NewDestination, Proxy, SaveDestinationSettings } from './types';
+import type { CheckDestination, ListDestinations, NewDestination, Proxy, SaveDestinationSettings } from './types';
 
-export async function listDestinations(request: FastifyRequest) {
+export async function listDestinations(request: FastifyRequest<ListDestinations>) {
     try {
         const teamId = request.user.teamId;
+        const { onlyVerified = false } = request.query
         let destinations = []
         if (teamId === '0') {
             destinations = await prisma.destinationDocker.findMany({ include: { teams: true } });
@@ -19,6 +20,9 @@ export async function listDestinations(request: FastifyRequest) {
                 where: { teams: { some: { id: teamId } } },
                 include: { teams: true }
             });
+        }
+        if (onlyVerified) {
+            destinations = destinations.filter(destination => destination.engine || (destination.remoteEngine && destination.remoteVerified))
         }
         return {
             destinations
@@ -163,7 +167,7 @@ export async function startProxy(request: FastifyRequest<Proxy>) {
         await startTraefikProxy(id);
         return {}
     } catch ({ status, message }) {
-        console.log({status, message})
+        console.log({ status, message })
         await stopTraefikProxy(id);
         return errorHandler({ status, message })
     }
