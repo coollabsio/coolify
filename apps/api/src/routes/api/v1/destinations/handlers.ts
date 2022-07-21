@@ -2,6 +2,8 @@ import type { FastifyRequest } from 'fastify';
 import { FastifyReply } from 'fastify';
 import sshConfig from 'ssh-config'
 import fs from 'fs/promises'
+import os from 'os';
+
 import { asyncExecShell, decrypt, errorHandler, executeDockerCmd, listSettings, prisma, startTraefikProxy, stopTraefikProxy } from '../../../../lib/common';
 import { checkContainer, dockerInstance, getEngine } from '../../../../lib/docker';
 
@@ -213,9 +215,14 @@ export async function assignSSHKey(request: FastifyRequest) {
 export async function verifyRemoteDockerEngine(request: FastifyRequest, reply: FastifyReply) {
     try {
         const { id } = request.params;
+        const homedir = os.homedir();
+
         const { sshKey: { privateKey }, remoteIpAddress, remotePort, remoteUser, network } = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } })
-        await fs.writeFile('./id_rsa', decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 })
+        
+        await fs.writeFile(`/tmp/id_rsa_verification_${id}`, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 })
+
         const host = `ssh://${remoteUser}@${remoteIpAddress}`
+
         const config = sshConfig.parse('')
         const found = config.find({ Host: remoteIpAddress })
         if (!found) {
@@ -223,16 +230,23 @@ export async function verifyRemoteDockerEngine(request: FastifyRequest, reply: F
                 Host: remoteIpAddress,
                 Port: remotePort.toString(),
                 User: remoteUser,
-                IdentityFile: '/workspace/coolify/apps/api/id_rsa',
+                IdentityFile: `${homedir}/id_rsa_verification_${id}`,
                 StrictHostKeyChecking: 'no'
             })
         }
-        await fs.writeFile('/home/gitpod/.ssh/config', sshConfig.stringify(config))
+        try {
+            await fs.stat(`${homedir}/.ssh/`)
+        } catch (error) {
+            await fs.mkdir(`${homedir}/.ssh/`)
+        }
+        await fs.writeFile(`${homedir}.ssh/config`, sshConfig.stringify(config))
+
         const { stdout } = await asyncExecShell(`DOCKER_HOST=${host} docker network ls --filter 'name=${network}' --no-trunc --format "{{json .}}"`);
-        console.log({ stdout })
+
         if (!stdout) {
             await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable ${network}`);
         }
+        
         await prisma.destinationDocker.update({ where: { id }, data: { remoteVerified: true } })
         return reply.code(201).send()
 
