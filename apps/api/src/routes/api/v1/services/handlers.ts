@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceImages, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceImages, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, dockerInstance, isContainerExited, removeContainer } from '../../../../lib/docker';
 import cuid from 'cuid';
@@ -202,12 +202,13 @@ export async function getService(request: FastifyRequest<OnlyId>) {
         const teamId = request.user.teamId;
         const { id } = request.params;
         const service = await getServiceFromDB({ id, teamId });
-
+        const settings = await listSettings()
         if (!service) {
             throw { status: 404, message: 'Service not found.' }
         }
         return {
             service,
+            settings
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
