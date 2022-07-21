@@ -32,7 +32,6 @@
     "dayjs": "1.11.3",
     "dockerode": "3.3.2",
     "dotenv-extended": "2.9.0",
-    "execa": "^6.1.0",
     "fastify": "4.2.1",
     "fastify-plugin": "4.0.0",
     "generate-password": "1.7.0",
