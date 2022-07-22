@@ -76,7 +76,8 @@ export async function checkDomain(request: FastifyRequest<CheckDomain>) {
             throw "Domain already configured";
         }
         if (isDNSCheckEnabled && !forceSave) {
-            return await checkDomainsIsValidInDNS({ hostname: request.hostname.split(':')[0], fqdn, dualCerts });
+            const hostname = request.hostname.split(':')[0]
+            return await checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts });
         }
         return {};
     } catch ({ status, message }) {

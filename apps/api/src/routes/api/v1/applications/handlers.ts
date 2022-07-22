@@ -356,7 +356,9 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
         if (fqdn) fqdn = fqdn.toLowerCase();
         if (exposePort) exposePort = Number(exposePort);
 
+        const { destinationDocker: { id: dockerId, remoteIpAddress, remoteEngine }, exposePort: configuredPort } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
         const { isDNSCheckEnabled } = await prisma.setting.findFirst({});
+
         const found = await isDomainConfigured({ id, fqdn });
         if (found) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
@@ -365,7 +367,7 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
             if (exposePort < 1024 || exposePort > 65535) {
                 throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
             }
-            const { destinationDocker: { id: dockerId, remoteIpAddress }, exposePort: configuredPort } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
+
             if (configuredPort !== exposePort) {
                 const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
                 if (availablePort.toString() !== exposePort.toString()) {
@@ -374,6 +376,8 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
             }
         }
         if (isDNSCheckEnabled && !isDev && !forceSave) {
+            let hostname = request.hostname.split(':')[0];
+            if (remoteEngine) hostname = remoteIpAddress;
             return await checkDomainsIsValidInDNS({ hostname: request.hostname.split(':')[0], fqdn, dualCerts });
         }
         return {}
