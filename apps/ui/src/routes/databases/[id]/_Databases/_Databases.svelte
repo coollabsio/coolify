@@ -50,7 +50,7 @@
 		return `${database.type}://${
 			databaseDbUser ? databaseDbUser + ':' : ''
 		}${databaseDbUserPassword}@${
-			isPublic ? (database.destinationDocker.remoteEngine ? database.destinationDocker.ipAddress : $appSession.ipv4) : database.id
+			isPublic ? (database.destinationDocker.remoteEngine ? database.destinationDocker.remoteipAddress : $appSession.ipv4) : database.id
 		}:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`;
 	}
 
