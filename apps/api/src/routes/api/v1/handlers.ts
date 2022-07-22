@@ -17,7 +17,8 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function cleanupManually() {
 	try {
-		await cleanupDockerStorage('unix:///var/run/docker.sock', true, true)
+		const destination = await prisma.destinationDocker.findFirst({ where: { engine: '/var/run/docker.sock' } })
+		await cleanupDockerStorage(destination.id, true, true)
 		return {}
 	} catch ({ status, message }) {
 		return errorHandler({ status, message })

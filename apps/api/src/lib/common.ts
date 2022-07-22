@@ -1530,15 +1530,14 @@ export function convertTolOldVolumeNames(type) {
 // 	const { data } = await axios.get(`https://gist.githubusercontent.com/andrasbacsai/4aac36d8d6214dbfc34fa78110554a50/raw/5b27e6c37d78aaeedc1148d797112c827a2f43cf/availableServices.json`)
 // 	return data
 // }
-export async function cleanupDockerStorage(host, lowDiskSpace, force) {
+export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 	// Cleanup old coolify images
 	try {
-		let { stdout: images } = await asyncExecShell(
-			`DOCKER_HOST=${host} docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs `
-		);
+		let { stdout: images } = await executeDockerCmd({ dockerId, command: `docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs` })
+
 		images = images.trim();
 		if (images) {
-			await asyncExecShell(`DOCKER_HOST=${host} docker rmi -f ${images}`);
+			await executeDockerCmd({ dockerId, command: `docker rmi -f ${images}" -q | xargs` })
 		}
 	} catch (error) {
 		//console.log(error);
@@ -1549,17 +1548,17 @@ export async function cleanupDockerStorage(host, lowDiskSpace, force) {
 			return
 		}
 		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker container prune -f`);
+			await executeDockerCmd({ dockerId, command: `docker container prune -f` })
 		} catch (error) {
 			//console.log(error);
 		}
 		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker image prune -f`);
+			await executeDockerCmd({ dockerId, command: `docker image prune -f` })
 		} catch (error) {
 			//console.log(error);
 		}
 		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker image prune -a -f`);
+			await executeDockerCmd({ dockerId, command: `docker image prune -a -f` })
 		} catch (error) {
 			//console.log(error);
 		}
