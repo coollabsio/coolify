@@ -15,7 +15,6 @@
 	import Databases from './_Databases/_Databases.svelte';
 	import { status } from '$lib/store';
 	export let database: any;
-	export let settings: any;
 	export let privatePort: any;
 
 	const { id } = $page.params;
@@ -86,4 +85,4 @@
 		</dl>
 	</div>
 </div>
-<Databases bind:database {privatePort} {settings} />
+<Databases bind:database {privatePort}/>

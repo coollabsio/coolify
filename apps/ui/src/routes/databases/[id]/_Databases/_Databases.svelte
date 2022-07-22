@@ -1,7 +1,6 @@
 <script lang="ts">
 	export let database: any;
 	export let privatePort: any;
-	export let settings: any;
 
 	import { page } from '$app/stores';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
@@ -16,7 +15,7 @@
 	import { post } from '$lib/api';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
-	import { errorNotification, getDomain } from '$lib/common';
+	import { errorNotification } from '$lib/common';
 	import { appSession, status } from '$lib/store';
 
 	const { id } = $page.params;
@@ -51,7 +50,7 @@
 		return `${database.type}://${
 			databaseDbUser ? databaseDbUser + ':' : ''
 		}${databaseDbUserPassword}@${
-			isPublic ? ($appSession.ipv4) : database.id
+			isPublic ? (database.destinationDocker.remoteEngine ? database.destinationDocker.ipAddress : $appSession.ipv4) : database.id
 		}:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`;
 	}
 
