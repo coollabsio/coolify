@@ -1104,7 +1104,7 @@ export async function startTraefikTCPProxy(
 				if (isDev) {
 					ip = getAPIUrl()
 				} else {
-					ip = `http://${ipv4 || ipv6}`
+					ip = `http://${ipv4 || ipv6}:3000`
 				}
 				traefikUrl = `${ip}/webhooks/traefik/other.json`
 			}
