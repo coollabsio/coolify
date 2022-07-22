@@ -977,8 +977,7 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
         const network = destinationDockerId && destinationDocker.network;
         const port = getServiceMainPort('minio');
 
-        const { service: { destinationDocker: { id: dockerId } } } = await prisma.minio.findUnique({ where: { id }, include: { service: { include: { destinationDocker: true } } } })
-
+        const { service: { destinationDocker: { id: dockerId } } } = await prisma.minio.findUnique({ where: { serviceId: id }, include: { service: { include: { destinationDocker: true } } } })
         const publicPort = await getFreePublicPort(id, dockerId);
 
         const consolePort = 9001;
@@ -2674,8 +2673,11 @@ export async function activatePlausibleUsers(request: FastifyRequest<OnlyId>, re
 export async function activateWordpressFtp(request: FastifyRequest<ActivateWordpressFtp>, reply: FastifyReply) {
     const { id } = request.params
     const { ftpEnabled } = request.body;
-    const { service: { destinationDocker: { id: dockerId } } } = await prisma.wordpress.findUnique({ where: { id }, include: { service: { include: { destinationDocker: true } } } })
+
+    const { service: { destinationDocker: { id: dockerId } } } = await prisma.wordpress.findUnique({ where: { serviceId: id }, include: { service: { include: { destinationDocker: true } } } })
+
     const publicPort = await getFreePublicPort(id, dockerId);
+    
     let ftpUser = cuid();
     let ftpPassword = generatePassword();
 
