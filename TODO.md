@@ -1,1 +1,1 @@
-- Database connecting string for remote docker engines
+- RDE Application DNS check not working 
