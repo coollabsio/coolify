@@ -5,7 +5,7 @@ import axios from 'axios';
 import { FastifyReply } from 'fastify';
 import { day } from '../../../../lib/dayjs';
 import { setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
-import { asyncExecShell, checkDomainsIsValidInDNS, checkDoubleBranch, decrypt, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, isDev, isDomainConfigured, prisma, stopBuild, uniqueName } from '../../../../lib/common';
+import { checkDomainsIsValidInDNS, checkDoubleBranch, decrypt, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, getExposedFreePort, isDev, isDomainConfigured, prisma, stopBuild, uniqueName } from '../../../../lib/common';
 import { checkContainer, dockerInstance, isContainerExited, removeContainer } from '../../../../lib/docker';
 import { scheduler } from '../../../../lib/scheduler';
 
@@ -57,7 +57,7 @@ export async function getImages(request: FastifyRequest<GetImages>) {
         }
 
 
-        return { baseImage, baseBuildImage, baseBuildImages, baseImages, publishDirectory, port }
+        return { baseBuildImage, baseBuildImages, publishDirectory, port }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
@@ -249,6 +249,7 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             dockerFileLocation,
             denoMainFile
         });
+        console.log({ baseImage })
         await prisma.application.update({
             where: { id },
             data: {
@@ -352,7 +353,9 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
         const { id } = request.params
 
         let { exposePort, fqdn, forceSave, dualCerts } = request.body
-        fqdn = fqdn.toLowerCase();
+        
+        if (fqdn) fqdn = fqdn.toLowerCase();
+        if (exposePort) exposePort = Number(exposePort);
 
         const { isDNSCheckEnabled } = await prisma.setting.findFirst({});
         const found = await isDomainConfigured({ id, fqdn });
@@ -360,14 +363,12 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
         if (exposePort) {
-            exposePort = Number(exposePort);
 
             if (exposePort < 1024 || exposePort > 65535) {
                 throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
             }
-            const { default: getPort } = await import('get-port');
-            const publicPort = await getPort({ port: exposePort });
-            if (publicPort !== exposePort) {
+            const availablePort = await getExposedFreePort(id, exposePort);
+            if (availablePort.toString() !== exposePort.toString()) {
                 throw { status: 500, message: `Port ${exposePort} is already in use.` }
             }
         }
@@ -765,13 +766,13 @@ export async function getApplicationLogs(request: FastifyRequest<GetApplicationL
             try {
                 // const found = await checkContainer({ dockerId, container: id })
                 // if (found) {
-                    const { default: ansi } = await import('strip-ansi')
-                    const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
-                    const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
-                    const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
-                    const logs = stripLogsStderr.concat(stripLogsStdout)
-                    const sortedLogs = logs.sort((a, b) => (day(a.split(' ')[0]).isAfter(day(b.split(' ')[0])) ? 1 : -1))
-                    return { logs: sortedLogs }
+                const { default: ansi } = await import('strip-ansi')
+                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
+                const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
+                const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
+                const logs = stripLogsStderr.concat(stripLogsStdout)
+                const sortedLogs = logs.sort((a, b) => (day(a.split(' ')[0]).isAfter(day(b.split(' ')[0])) ? 1 : -1))
+                return { logs: sortedLogs }
                 // }
             } catch (error) {
                 const { statusCode } = error;

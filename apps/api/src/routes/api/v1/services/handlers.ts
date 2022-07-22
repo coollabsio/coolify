@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceImages, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceImage, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings, getExposedFreePort } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, dockerInstance, isContainerExited, removeContainer } from '../../../../lib/docker';
 import cuid from 'cuid';
@@ -305,13 +305,13 @@ export async function getServiceLogs(request: FastifyRequest<GetServiceLogs>) {
             try {
                 // const found = await checkContainer({ dockerId, container: id })
                 // if (found) {
-                    const { default: ansi } = await import('strip-ansi')
-                    const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
-                    const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
-                    const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
-                    const logs = stripLogsStderr.concat(stripLogsStdout)
-                    const sortedLogs = logs.sort((a, b) => (day(a.split(' ')[0]).isAfter(day(b.split(' ')[0])) ? 1 : -1))
-                    return { logs: sortedLogs }
+                const { default: ansi } = await import('strip-ansi')
+                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
+                const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
+                const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
+                const logs = stripLogsStderr.concat(stripLogsStdout)
+                const sortedLogs = logs.sort((a, b) => (day(a.split(' ')[0]).isAfter(day(b.split(' ')[0])) ? 1 : -1))
+                return { logs: sortedLogs }
                 // }
             } catch (error) {
                 const { statusCode } = error;
@@ -373,15 +373,12 @@ export async function checkService(request: FastifyRequest<CheckService>) {
             }
         }
         if (exposePort) {
-            const { default: getPort } = await import('get-port');
-            exposePort = Number(exposePort);
-
             if (exposePort < 1024 || exposePort > 65535) {
                 throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
             }
 
-            const publicPort = await getPort({ port: exposePort });
-            if (publicPort !== exposePort) {
+            const availablePort = await getExposedFreePort(id, exposePort);
+            if (availablePort.toString() !== exposePort.toString()) {
                 throw { status: 500, message: `Port ${exposePort} is already in use.` }
             }
         }
@@ -983,7 +980,7 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
         const network = destinationDockerId && destinationDocker.network;
         const port = getServiceMainPort('minio');
 
-        const publicPort = await getFreePort();
+        const publicPort = await getFreePublicPort();
 
         const consolePort = 9001;
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -2679,7 +2676,7 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
     const { id } = request.params
     const { ftpEnabled } = request.body;
 
-    const publicPort = await getFreePort();
+    const publicPort = await getFreePublicPort();
     let ftpUser = cuid();
     let ftpPassword = generatePassword();
 

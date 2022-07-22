@@ -994,8 +994,24 @@ export async function updatePasswordInDb(database, user, newPassword, isRoot) {
 		}
 	}
 }
-
-export async function getFreePort() {
+export async function getExposedFreePort(id, exposePort) {
+	const { default: getPort } = await import('get-port');
+	const applicationUsed = await (
+		await prisma.application.findMany({
+			where: { exposePort: { not: null }, id: { not: id } },
+			select: { exposePort: true }
+		})
+	).map((a) => a.exposePort);
+	const serviceUsed = await (
+		await prisma.service.findMany({
+			where: { exposePort: { not: null }, id: { not: id } },
+			select: { exposePort: true }
+		})
+	).map((a) => a.exposePort);
+	const usedPorts = [...applicationUsed, ...serviceUsed];
+	return await getPort({ port: exposePort, exclude: usedPorts });
+}
+export async function getFreePublicPort() {
 	const { default: getPort, portNumbers } = await import('get-port');
 	const data = await prisma.setting.findFirst();
 	const { minPort, maxPort } = data;
