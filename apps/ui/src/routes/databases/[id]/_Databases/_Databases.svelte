@@ -17,6 +17,7 @@
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import { appSession, status } from '$lib/store';
+	import Explainer from '$lib/components/Explainer.svelte';
 
 	const { id } = $page.params;
 
@@ -45,12 +46,15 @@
 			databaseDbUser = '';
 		}
 	}
-	// TODO: Must integrate remote docker engine
 	function generateUrl(): string {
 		return `${database.type}://${
 			databaseDbUser ? databaseDbUser + ':' : ''
 		}${databaseDbUserPassword}@${
-			isPublic ? (database.destinationDocker.remoteEngine ? database.destinationDocker.remoteipAddress : $appSession.ipv4) : database.id
+			isPublic
+				? database.destinationDocker.remoteEngine
+					? database.destinationDocker.remoteipAddress
+					: $appSession.ipv4
+				: database.id
 		}:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`;
 	}
 
@@ -197,9 +201,16 @@
 				<CouchDb {database} />
 			{/if}
 			<div class="grid grid-cols-2 items-center px-10 pb-8">
-				<label for="url" class="text-base font-bold text-stone-100"
-					>{$t('database.connection_string')}</label
-				>
+				<div>
+					<label for="url" class="text-base font-bold text-stone-100"
+						>{$t('database.connection_string')}</label
+					>
+					{#if !isPublic && database.destinationDocker.remoteEngine}
+						<Explainer
+							text="You can only access the database with this URL if your application is deployed to the same Destination."
+						/>
+					{/if}
+				</div>
 				<CopyPasswordField
 					textarea={true}
 					placeholder={$t('forms.generated_automatically_after_start')}
