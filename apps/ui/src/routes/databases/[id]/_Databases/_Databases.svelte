@@ -52,7 +52,7 @@
 		}${databaseDbUserPassword}@${
 			isPublic
 				? database.destinationDocker.remoteEngine
-					? database.destinationDocker.remoteipAddress
+					? database.destinationDocker.remoteIpAddress
 					: $appSession.ipv4
 				: database.id
 		}:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`;
