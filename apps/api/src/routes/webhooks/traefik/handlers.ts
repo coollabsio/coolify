@@ -668,23 +668,7 @@ export async function remoteTraefikConfiguration(request: FastifyRequest) {
 			}
 		}
 
-		const { fqdn, dualCerts } = await prisma.setting.findFirst();
-		if (fqdn) {
-			const domain = getDomain(fqdn);
-			const nakedDomain = domain.replace(/^www\./, '');
-			const isHttps = fqdn.startsWith('https://');
-			const isWWW = fqdn.includes('www.');
-			data.coolify.push({
-				id: isDev ? 'host.docker.internal' : 'coolify',
-				container: isDev ? 'host.docker.internal' : 'coolify',
-				port: 3000,
-				domain,
-				nakedDomain,
-				isHttps,
-				isWWW,
-				isDualCerts: dualCerts
-			});
-		}
+
 		for (const application of data.applications) {
 			configureMiddleware(application, traefik);
 		}
