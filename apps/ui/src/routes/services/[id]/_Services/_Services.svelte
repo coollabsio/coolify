@@ -31,7 +31,8 @@
 
 	const { id } = $page.params;
 
-	$: isDisabled = !$appSession.isAdmin || $status.service.initialLoading;
+	$: isDisabled =
+		!$appSession.isAdmin || $status.service.isRunning || $status.service.initialLoading;
 
 	let loading = false;
 	let loadingVerification = false;
@@ -155,7 +156,7 @@
 					<input
 						value={service.version}
 						id="service"
-						disabled={$status.service.isRunning  || $status.service.initialLoading}
+						disabled={$status.service.isRunning || $status.service.initialLoading}
 						class:cursor-pointer={!$status.service.isRunning}
 					/></a
 				>
@@ -185,10 +186,8 @@
 
 					<CopyPasswordField
 						placeholder="eg: https://console.min.io"
-						readonly={!$appSession.isAdmin && !$status.service.isRunning}
-						disabled={!$appSession.isAdmin ||
-							$status.service.isRunning ||
-							$status.service.initialLoading}
+						readonly={isDisabled}
+						disabled={isDisabled}
 						name="fqdn"
 						id="fqdn"
 						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
