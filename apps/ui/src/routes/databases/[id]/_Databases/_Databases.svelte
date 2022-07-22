@@ -51,7 +51,7 @@
 		return `${database.type}://${
 			databaseDbUser ? databaseDbUser + ':' : ''
 		}${databaseDbUserPassword}@${
-			isPublic ? (settings.fqdn ? getDomain(settings.fqdn) : window.location.hostname) : database.id
+			isPublic ? ($appSession.ipv4) : database.id
 		}:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`;
 	}
 

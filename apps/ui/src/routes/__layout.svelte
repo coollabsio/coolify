@@ -65,6 +65,8 @@
 
 <script lang="ts">
 	export let baseSettings: any;
+	$appSession.ipv4 = baseSettings.ipv4;
+	$appSession.ipv6 = baseSettings.ipv6;
 	$appSession.version = baseSettings.version;
 	$appSession.whiteLabeled = baseSettings.whiteLabeled;
 	$appSession.whiteLabeledDetails.icon = baseSettings.whiteLabeledIcon;

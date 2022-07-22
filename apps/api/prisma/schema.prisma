@@ -11,6 +11,8 @@ datasource db {
 model Setting {
   id                    String   @id @default(cuid())
   fqdn                  String?  @unique
+  ipv4                  String?
+  ipv6                  String?
   isRegistrationEnabled Boolean  @default(false)
   dualCerts             Boolean  @default(false)
   minPort               Int      @default(9000)

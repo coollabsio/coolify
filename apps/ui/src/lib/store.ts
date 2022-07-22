@@ -1,6 +1,8 @@
 import { writable, readable, type Writable, type Readable } from 'svelte/store';
 
 interface AppSession {
+    ipv4: string | null,
+    ipv6: string | null,
     version: string | null,
     userId: string | null,
     teamId: string | null,
@@ -17,6 +19,8 @@ interface AppSession {
 }
 export const loginEmail: Writable<string | undefined> = writable()
 export const appSession: Writable<AppSession> = writable({
+    ipv4: null,
+    ipv6: null,
     version: null,
     userId: null,
     teamId: null,
