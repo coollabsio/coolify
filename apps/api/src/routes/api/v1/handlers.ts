@@ -155,7 +155,6 @@ export async function login(request: FastifyRequest<Login>, reply: FastifyReply)
 		}
 		if (userFound) {
 			if (userFound.type === 'email') {
-				// TODO: Review this one
 				if (userFound.password === 'RESETME') {
 					const hashedPassword = await hashPassword(password);
 					if (userFound.updatedAt < new Date(Date.now() - 1000 * 60 * 10)) {
