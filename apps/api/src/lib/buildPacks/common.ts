@@ -1,8 +1,7 @@
-import { asyncExecShell, base64Encode, executeDockerCmd, generateTimestamp, getDomain, isDev, prisma, version } from "../common";
-import { scheduler } from "../scheduler";
+import {  base64Encode, executeDockerCmd, generateTimestamp, getDomain, isDev, prisma, version } from "../common";
 import { promises as fs } from 'fs';
 import { day } from "../dayjs";
-import { spawn } from 'node:child_process'
+
 const staticApps = ['static', 'react', 'vuejs', 'svelte', 'gatsby', 'astro', 'eleventy'];
 const nodeBased = [
 	'react',

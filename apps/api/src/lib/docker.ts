@@ -1,4 +1,4 @@
-import { asyncExecShell, executeDockerCmd } from './common';
+import { executeDockerCmd } from './common';
 import Dockerode from 'dockerode';
 export function getEngine(engine: string): string {
 	return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : engine;

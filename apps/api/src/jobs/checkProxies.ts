@@ -1,6 +1,6 @@
 import { parentPort } from 'node:worker_threads';
-import { prisma, startTraefikTCPProxy, generateDatabaseConfiguration, startTraefikProxy, asyncExecShell, executeDockerCmd } from '../lib/common';
-import { checkContainer, getEngine } from '../lib/docker';
+import { prisma, startTraefikTCPProxy, generateDatabaseConfiguration, startTraefikProxy, executeDockerCmd } from '../lib/common';
+import { checkContainer } from '../lib/docker';
 
 (async () => {
     if (parentPort) {

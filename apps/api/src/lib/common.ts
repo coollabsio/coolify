@@ -505,7 +505,7 @@ export async function executeDockerCmd({ dockerId, command }: { dockerId: string
 	);
 }
 export async function startTraefikProxy(id: string): Promise<void> {
-	const { engine, network, remoteEngine } = await prisma.destinationDocker.findUnique({ where: { id } })
+	const { engine, network, remoteEngine, remoteIpAddress } = await prisma.destinationDocker.findUnique({ where: { id } })
 
 	const found = await checkContainer({ dockerId: id, container: 'coolify-proxy', remove: true });
 	const { id: settingsId } = await listSettings();
@@ -513,6 +513,17 @@ export async function startTraefikProxy(id: string): Promise<void> {
 	if (!found) {
 		const { stdout: Config } = await executeDockerCmd({ dockerId: id, command: `docker network inspect ${network} --format '{{json .IPAM.Config }}'` })
 		const ip = JSON.parse(Config)[0].Gateway;
+		const { publicIp } = await import('public-ip')
+		let traefikUrl = mainTraefikEndpoint
+		if (remoteEngine) {
+			let ip = null
+			if (isDev) {
+				ip = getAPIUrl()
+			} else {
+				ip = `http://${await publicIp({ timeout: 2000 })}`
+			}
+			traefikUrl = `${ip}/webhooks/traefik/remote/${id}`
+		}
 		await executeDockerCmd({
 			dockerId: id,
 			command: `docker run --restart always \
@@ -531,7 +542,7 @@ export async function startTraefikProxy(id: string): Promise<void> {
 			--entrypoints.websecure.forwardedHeaders.insecure=true \
 			--providers.docker=true \
 			--providers.docker.exposedbydefault=false \
-			--providers.http.endpoint=${mainTraefikEndpoint} \
+			--providers.http.endpoint=${traefikUrl} \
 			--providers.http.pollTimeout=5s \
 			--certificatesresolvers.letsencrypt.acme.httpchallenge=true \
 			--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json \
@@ -544,21 +555,32 @@ export async function startTraefikProxy(id: string): Promise<void> {
 			data: { isCoolifyProxyUsed: true }
 		});
 	}
-	if (!remoteEngine) await configureNetworkTraefikProxy(engine, id);
+	// Configure networks for local docker engine
+	if (engine) {
+		const destinations = await prisma.destinationDocker.findMany({ where: { engine } });
+		for (const destination of destinations) {
+			await configureNetworkTraefikProxy(destination);
+		}
+	}
+	// Configure networks for remote docker engine
+	if (remoteEngine) {
+		const destinations = await prisma.destinationDocker.findMany({ where: { remoteIpAddress } });
+		for (const destination of destinations) {
+			await configureNetworkTraefikProxy(destination);
+		}
+	}
 }
 
-export async function configureNetworkTraefikProxy(engine: string, id: string): Promise<void> {
-	const destinations = await prisma.destinationDocker.findMany({ where: { engine } });
+export async function configureNetworkTraefikProxy(destination: any): Promise<void> {
+	const { id } = destination
 	const { stdout: networks } = await executeDockerCmd({
 		dockerId: id,
 		command:
 			`docker ps -a --filter name=coolify-proxy --format '{{json .Networks}}'`
 	});
 	const configuredNetworks = networks.replace(/"/g, '').replace('\n', '').split(',');
-	for (const destination of destinations) {
-		if (!configuredNetworks.includes(destination.network)) {
-			await executeDockerCmd({ dockerId: destination.id, command: `docker network connect ${destination.network} coolify-proxy` })
-		}
+	if (!configuredNetworks.includes(destination.network)) {
+		await executeDockerCmd({ dockerId: destination.id, command: `docker network connect ${destination.network} coolify-proxy` })
 	}
 }
 
@@ -1529,7 +1551,7 @@ export function convertTolOldVolumeNames(type) {
 // export async function getAvailableServices(): Promise<any> {
 // 	const { data } = await axios.get(`https://gist.githubusercontent.com/andrasbacsai/4aac36d8d6214dbfc34fa78110554a50/raw/5b27e6c37d78aaeedc1148d797112c827a2f43cf/availableServices.json`)
 // 	return data
-// }
+// 
 export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 	// Cleanup old coolify images
 	try {
