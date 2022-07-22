@@ -31,7 +31,7 @@ const customConfig: Config = {
 export const defaultProxyImage = `coolify-haproxy-alpine:latest`;
 export const defaultProxyImageTcp = `coolify-haproxy-tcp-alpine:latest`;
 export const defaultProxyImageHttp = `coolify-haproxy-http-alpine:latest`;
-export const defaultTraefikImage = `traefik:v2.6`;
+export const defaultTraefikImage = `traefik:v2.8`;
 export function getAPIUrl() {
 	if (process.env.GITPOD_WORKSPACE_URL) {
 		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL)
@@ -994,56 +994,64 @@ export async function updatePasswordInDb(database, user, newPassword, isRoot) {
 		}
 	}
 }
-export async function getExposedFreePort(id, exposePort) {
+export async function getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress) {
 	const { default: getPort } = await import('get-port');
 	const applicationUsed = await (
 		await prisma.application.findMany({
-			where: { exposePort: { not: null }, id: { not: id } },
+			where: { exposePort: { not: null }, id: { not: id }, destinationDockerId: dockerId },
 			select: { exposePort: true }
 		})
 	).map((a) => a.exposePort);
 	const serviceUsed = await (
 		await prisma.service.findMany({
-			where: { exposePort: { not: null }, id: { not: id } },
+			where: { exposePort: { not: null }, id: { not: id }, destinationDockerId: dockerId },
 			select: { exposePort: true }
 		})
 	).map((a) => a.exposePort);
 	const usedPorts = [...applicationUsed, ...serviceUsed];
-	return await getPort({ port: exposePort, exclude: usedPorts });
+	if (remoteIpAddress) {
+		const { default: checkPort } = await import('is-port-reachable');
+		const found = await checkPort(exposePort, { host: remoteIpAddress });
+		if (!found) {
+			return exposePort
+		}
+		return false
+	}
+	return await getPort({ port: Number(exposePort), exclude: usedPorts });
+
 }
-export async function getFreePublicPort() {
+export async function getFreePublicPort(id, dockerId) {
 	const { default: getPort, portNumbers } = await import('get-port');
 	const data = await prisma.setting.findFirst();
 	const { minPort, maxPort } = data;
 
 	const dbUsed = await (
 		await prisma.database.findMany({
-			where: { publicPort: { not: null } },
+			where: { publicPort: { not: null }, id: { not: id }, destinationDockerId: dockerId },
 			select: { publicPort: true }
 		})
 	).map((a) => a.publicPort);
 	const wpFtpUsed = await (
 		await prisma.wordpress.findMany({
-			where: { ftpPublicPort: { not: null } },
+			where: { ftpPublicPort: { not: null }, id: { not: id }, service: { destinationDockerId: dockerId } },
 			select: { ftpPublicPort: true }
 		})
 	).map((a) => a.ftpPublicPort);
 	const wpUsed = await (
 		await prisma.wordpress.findMany({
-			where: { mysqlPublicPort: { not: null } },
+			where: { mysqlPublicPort: { not: null }, id: { not: id }, service: { destinationDockerId: dockerId } },
 			select: { mysqlPublicPort: true }
 		})
 	).map((a) => a.mysqlPublicPort);
 	const minioUsed = await (
 		await prisma.minio.findMany({
-			where: { publicPort: { not: null } },
+			where: { publicPort: { not: null }, id: { not: id }, service: { destinationDockerId: dockerId } },
 			select: { publicPort: true }
 		})
 	).map((a) => a.publicPort);
 	const usedPorts = [...dbUsed, ...wpFtpUsed, ...wpUsed, ...minioUsed];
 	return await getPort({ port: portNumbers(minPort, maxPort), exclude: usedPorts });
 }
-
 
 export async function startTraefikTCPProxy(
 	destinationDocker: any,
@@ -1067,19 +1075,19 @@ export async function startTraefikTCPProxy(
 
 			const ip = JSON.parse(Config)[0].Gateway;
 			const tcpProxy = {
-				version: '3.5',
+				version: '3.8',
 				services: {
 					[`${id}-${publicPort}`]: {
 						container_name: container,
-						image: 'traefik:v2.6',
+						image: 'traefik:v2.8',
 						command: [
-							`--entrypoints.tcp.address =: ${publicPort}`,
-							`--entryPoints.tcp.forwardedHeaders.insecure = true`,
-							`--providers.http.endpoint = ${otherTraefikEndpoint} ? id = ${id} & privatePort=${privatePort} & publicPort=${publicPort} & type=tcp & address=${dependentId}`,
+							`--entrypoints.tcp.address=:${publicPort}`,
+							`--entryPoints.tcp.forwardedHeaders.insecure=true`,
+							`--providers.http.endpoint=${otherTraefikEndpoint} ? id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp&address=${dependentId}`,
 							'--providers.http.pollTimeout=2s',
 							'--log.level=error'
 						],
-						ports: [`${publicPort}: ${publicPort}`],
+						ports: [`${publicPort}:${publicPort}`],
 						extra_hosts: ['host.docker.internal:host-gateway', `host.docker.internal: ${ip}`],
 						volumes: ['/var/run/docker.sock:/var/run/docker.sock'],
 						networks: ['coolify-infra', network]

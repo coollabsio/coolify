@@ -13,15 +13,10 @@ import { SaveDatabaseType } from './types';
 export async function listDatabases(request: FastifyRequest) {
     try {
         const teamId = request.user.teamId;
-        let databases = []
-        if (teamId === '0') {
-            databases = await prisma.database.findMany({ include: { teams: true } });
-        } else {
-            databases = await prisma.database.findMany({
-                where: { teams: { some: { id: teamId } } },
-                include: { teams: true }
-            });
-        }
+        const databases = await prisma.database.findMany({
+            where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+            include: { teams: true, destinationDocker: true }
+        });
         return {
             databases
         }
@@ -335,13 +330,13 @@ export async function getDatabaseLogs(request: FastifyRequest<GetDatabaseLogs>) 
             try {
                 // const found = await checkContainer({ dockerId, container: id })
                 // if (found) {
-                    const { default: ansi } = await import('strip-ansi')
-                    const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
-                    const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
-                    const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
-                    const logs = stripLogsStderr.concat(stripLogsStdout)
-                    const sortedLogs = logs.sort((a, b) => (day(a.split(' ')[0]).isAfter(day(b.split(' ')[0])) ? 1 : -1))
-                    return { logs: sortedLogs }
+                const { default: ansi } = await import('strip-ansi')
+                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
+                const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
+                const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
+                const logs = stripLogsStderr.concat(stripLogsStdout)
+                const sortedLogs = logs.sort((a, b) => (day(a.split(' ')[0]).isAfter(day(b.split(' ')[0])) ? 1 : -1))
+                return { logs: sortedLogs }
                 // }
             } catch (error) {
                 const { statusCode } = error;
@@ -431,8 +426,10 @@ export async function saveDatabaseSettings(request: FastifyRequest<SaveDatabaseS
         const teamId = request.user.teamId;
         const { id } = request.params;
         const { isPublic, appendOnly = true } = request.body;
-        const publicPort = await getFreePublicPort();
-        const settings = await listSettings();
+
+        const { destinationDocker: { id: dockerId } } = await prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
+        const publicPort = await getFreePublicPort(id, dockerId);
+
         await prisma.database.update({
             where: { id },
             data: {

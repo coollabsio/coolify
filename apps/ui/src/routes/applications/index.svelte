@@ -140,15 +140,18 @@
 							{#if application.fqdn}
 								<div class="truncate text-center">{getDomain(application.fqdn) || ''}</div>
 							{/if}
+							{#if application.destinationDocker.name}
+								<div class="truncate text-center">{application.destinationDocker.name}</div>
+							{/if}
 							{#if !application.gitSourceId || !application.repository || !application.branch}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									Git Source Missing
 								</div>
-								{:else if !application.destinationDockerId}
+							{:else if !application.destinationDockerId}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									Destination Missing
 								</div>
-								{:else if !application.fqdn}
+							{:else if !application.fqdn}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									URL Missing
 								</div>

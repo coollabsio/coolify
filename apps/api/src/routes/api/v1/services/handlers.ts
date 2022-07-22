@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings, getExposedFreePort } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceImage, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings, getFreeExposedPort } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, dockerInstance, isContainerExited, removeContainer } from '../../../../lib/docker';
 import cuid from 'cuid';
@@ -145,15 +145,10 @@ import type { ActivateWordpressFtp, CheckService, DeleteServiceSecret, DeleteSer
 export async function listServices(request: FastifyRequest) {
     try {
         const teamId = request.user.teamId;
-        let services = []
-        if (teamId === '0') {
-            services = await prisma.service.findMany({ include: { teams: true } });
-        } else {
-            services = await prisma.service.findMany({
-                where: { teams: { some: { id: teamId } } },
-                include: { teams: true }
-            });
-        }
+        const services = await prisma.service.findMany({
+            where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+            include: { teams: true, destinationDocker: true }
+        });
         return {
             services
         }
@@ -376,10 +371,12 @@ export async function checkService(request: FastifyRequest<CheckService>) {
             if (exposePort < 1024 || exposePort > 65535) {
                 throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
             }
-
-            const availablePort = await getExposedFreePort(id, exposePort);
-            if (availablePort.toString() !== exposePort.toString()) {
-                throw { status: 500, message: `Port ${exposePort} is already in use.` }
+            const { destinationDocker: { id: dockerId, remoteIpAddress }, exposePort: configuredPort } = await prisma.service.findUnique({ where: { id }, include: { destinationDocker: true } })
+            if (configuredPort !== exposePort) {
+                const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
+                if (availablePort.toString() !== exposePort.toString()) {
+                    throw { status: 500, message: `Port ${exposePort} is already in use.` }
+                }
             }
         }
         return {}
@@ -980,7 +977,9 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
         const network = destinationDockerId && destinationDocker.network;
         const port = getServiceMainPort('minio');
 
-        const publicPort = await getFreePublicPort();
+        const { service: { destinationDocker: { id: dockerId } } } = await prisma.minio.findUnique({ where: { id }, include: { service: { include: { destinationDocker: true } } } })
+
+        const publicPort = await getFreePublicPort(id, dockerId);
 
         const consolePort = 9001;
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -2675,8 +2674,8 @@ export async function activatePlausibleUsers(request: FastifyRequest<OnlyId>, re
 export async function activateWordpressFtp(request: FastifyRequest<ActivateWordpressFtp>, reply: FastifyReply) {
     const { id } = request.params
     const { ftpEnabled } = request.body;
-
-    const publicPort = await getFreePublicPort();
+    const { service: { destinationDocker: { id: dockerId } } } = await prisma.wordpress.findUnique({ where: { id }, include: { service: { include: { destinationDocker: true } } } })
+    const publicPort = await getFreePublicPort(id, dockerId);
     let ftpUser = cuid();
     let ftpPassword = generatePassword();
 

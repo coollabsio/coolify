@@ -31,6 +31,8 @@
 
 	const { id } = $page.params;
 
+	$: isDisabled = !$appSession.isAdmin || $status.service.initialLoading;
+
 	let loading = false;
 	let loadingVerification = false;
 	let dualCerts = service.dualCerts;
@@ -45,7 +47,7 @@
 				exposePort: service.exposePort
 			});
 			await post(`/services/${id}`, { ...service });
-			setLocation(service)
+			setLocation(service);
 			$disabledButton = false;
 			toast.push('Configuration saved.');
 		} catch (error) {
@@ -145,7 +147,7 @@
 			<div class="grid grid-cols-2 items-center px-10">
 				<label for="version" class="text-base font-bold text-stone-100">Version / Tag</label>
 				<a
-					href={$appSession.isAdmin && !$status.service.isRunning
+					href={$appSession.isAdmin && !$status.service.isRunning && !$status.service.initialLoading
 						? `/services/${id}/configuration/version?from=/services/${id}`
 						: ''}
 					class="no-underline"
@@ -153,7 +155,7 @@
 					<input
 						value={service.version}
 						id="service"
-						disabled={$status.service.isRunning}
+						disabled={$status.service.isRunning  || $status.service.initialLoading}
 						class:cursor-pointer={!$status.service.isRunning}
 					/></a
 				>
@@ -184,7 +186,9 @@
 					<CopyPasswordField
 						placeholder="eg: https://console.min.io"
 						readonly={!$appSession.isAdmin && !$status.service.isRunning}
-						disabled={!$appSession.isAdmin || $status.service.isRunning}
+						disabled={!$appSession.isAdmin ||
+							$status.service.isRunning ||
+							$status.service.initialLoading}
 						name="fqdn"
 						id="fqdn"
 						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
@@ -201,7 +205,7 @@
 					<CopyPasswordField
 						placeholder="eg: https://min.io"
 						readonly={!$appSession.isAdmin && !$status.service.isRunning}
-						disabled={!$appSession.isAdmin || $status.service.isRunning}
+						disabled={isDisabled}
 						name="apiFqdn"
 						id="apiFqdn"
 						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
@@ -221,7 +225,9 @@
 					<CopyPasswordField
 						placeholder="eg: https://analytics.coollabs.io"
 						readonly={!$appSession.isAdmin && !$status.service.isRunning}
-						disabled={!$appSession.isAdmin || $status.service.isRunning}
+						disabled={!$appSession.isAdmin ||
+							$status.service.isRunning ||
+							$status.service.initialLoading}
 						name="fqdn"
 						id="fqdn"
 						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
@@ -245,7 +251,9 @@
 				<label for="exposePort" class="text-base font-bold text-stone-100">Exposed Port</label>
 				<input
 					readonly={!$appSession.isAdmin && !$status.service.isRunning}
-					disabled={!$appSession.isAdmin || $status.service.isRunning}
+					disabled={!$appSession.isAdmin ||
+						$status.service.isRunning ||
+						$status.service.initialLoading}
 					name="exposePort"
 					id="exposePort"
 					bind:value={service.exposePort}

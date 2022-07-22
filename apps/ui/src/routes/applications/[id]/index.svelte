@@ -41,7 +41,7 @@
 	import Setting from './_Setting.svelte';
 	const { id } = $page.params;
 
-	$: isDisabled = !$appSession.isAdmin || $status.application.isRunning;
+	$: isDisabled = !$appSession.isAdmin || $status.application.isRunning || $status.application.initialLoading;
 
 	let domainEl: HTMLInputElement;
 
@@ -536,7 +536,7 @@
 			<div class="grid grid-cols-2 items-center pb-8">
 				<Setting
 					dataTooltip={$t('forms.must_be_stopped_to_modify')}
-					disabled={isDisabled}
+					disabled={$status.application.isRunning}
 					isCenter={false}
 					bind:setting={dualCerts}
 					title={$t('application.ssl_www_and_non_www')}

@@ -100,6 +100,9 @@
 							{#if $appSession.teamId === '0' && otherDatabases.length > 0}
 								<div class="truncate text-center">{database.teams[0].name}</div>
 							{/if}
+							{#if database.destinationDocker.name}
+								<div class="truncate text-center">{database.destinationDocker.name}</div>
+							{/if}
 							{#if !database.type}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									{$t('application.configuration.configuration_missing')}

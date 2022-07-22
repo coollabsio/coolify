@@ -85,6 +85,9 @@
 							{#if service.fqdn}
 								<div class="truncate text-center">{getDomain(service.fqdn) || ''}</div>
 							{/if}
+							{#if service.destinationDocker.name}
+								<div class="truncate text-center">{service.destinationDocker.name}</div>
+							{/if}
 							{#if !service.type || !service.fqdn}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									{$t('application.configuration.configuration_missing')}

@@ -5,7 +5,7 @@ import axios from 'axios';
 import { FastifyReply } from 'fastify';
 import { day } from '../../../../lib/dayjs';
 import { setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
-import { checkDomainsIsValidInDNS, checkDoubleBranch, decrypt, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, getExposedFreePort, isDev, isDomainConfigured, prisma, stopBuild, uniqueName } from '../../../../lib/common';
+import { checkDomainsIsValidInDNS, checkDoubleBranch, decrypt, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, getFreeExposedPort, isDev, isDomainConfigured, prisma, stopBuild, uniqueName } from '../../../../lib/common';
 import { checkContainer, dockerInstance, isContainerExited, removeContainer } from '../../../../lib/docker';
 import { scheduler } from '../../../../lib/scheduler';
 
@@ -18,7 +18,7 @@ export async function listApplications(request: FastifyRequest) {
         const { teamId } = request.user
         const applications = await prisma.application.findMany({
             where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-            include: { teams: true }
+            include: { teams: true, destinationDocker: true }
         });
         const settings = await prisma.setting.findFirst()
         return {
@@ -249,7 +249,6 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             dockerFileLocation,
             denoMainFile
         });
-        console.log({ baseImage })
         await prisma.application.update({
             where: { id },
             data: {
@@ -353,7 +352,7 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
         const { id } = request.params
 
         let { exposePort, fqdn, forceSave, dualCerts } = request.body
-        
+
         if (fqdn) fqdn = fqdn.toLowerCase();
         if (exposePort) exposePort = Number(exposePort);
 
@@ -363,13 +362,15 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
         if (exposePort) {
-
             if (exposePort < 1024 || exposePort > 65535) {
                 throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
             }
-            const availablePort = await getExposedFreePort(id, exposePort);
-            if (availablePort.toString() !== exposePort.toString()) {
-                throw { status: 500, message: `Port ${exposePort} is already in use.` }
+            const { destinationDocker: { id: dockerId, remoteIpAddress }, exposePort: configuredPort } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
+            if (configuredPort !== exposePort) {
+                const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
+                if (availablePort.toString() !== exposePort.toString()) {
+                    throw { status: 500, message: `Port ${exposePort} is already in use.` }
+                }
             }
         }
         if (isDNSCheckEnabled && !isDev && !forceSave) {

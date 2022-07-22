@@ -76,13 +76,13 @@
 	<label for="extraConfig">{$t('forms.extra_config')}</label>
 	<textarea
 		bind:value={service.wordpress.extraConfig}
-		disabled={$status.service.isRunning}
+		disabled={$status.service.isRunning || $status.service.initialLoading}
 		readonly={$status.service.isRunning}
 		class:resize-none={$status.service.isRunning}
 		rows="5"
 		name="extraConfig"
 		id="extraConfig"
-		placeholder={!$status.service.isRunning
+		placeholder={!$status.service.isRunning && !$status.service.initialLoading
 			? `${$t('forms.eg')}:
 
 define('WP_ALLOW_MULTISITE', true);
@@ -112,7 +112,14 @@ define('SUBDOMAIN_INSTALL', false);`
 	</div>
 	<div class="grid grid-cols-2 items-center px-10">
 		<label for="ftpPassword">Password</label>
-		<CopyPasswordField id="ftpPassword" isPasswordField readonly disabled name="ftpPassword" value={ftpPassword} />
+		<CopyPasswordField
+			id="ftpPassword"
+			isPasswordField
+			readonly
+			disabled
+			name="ftpPassword"
+			value={ftpPassword}
+		/>
 	</div>
 {/if}
 <div class="flex space-x-1 py-5 font-bold">
