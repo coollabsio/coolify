@@ -508,7 +508,7 @@ export async function startTraefikProxy(id: string): Promise<void> {
 	const { engine, network, remoteEngine, remoteIpAddress } = await prisma.destinationDocker.findUnique({ where: { id } })
 
 	const found = await checkContainer({ dockerId: id, container: 'coolify-proxy', remove: true });
-	const { id: settingsId } = await listSettings();
+	const { id: settingsId, ipv4, ipv6 } = await listSettings();
 
 	if (!found) {
 		const { stdout: Config } = await executeDockerCmd({ dockerId: id, command: `docker network inspect ${network} --format '{{json .IPAM.Config }}'` })
@@ -520,7 +520,7 @@ export async function startTraefikProxy(id: string): Promise<void> {
 			if (isDev) {
 				ip = getAPIUrl()
 			} else {
-				ip = `http://${await publicIp({ timeout: 2000 })}`
+				ip = `http://${ipv4 || ipv6}`
 			}
 			traefikUrl = `${ip}/webhooks/traefik/remote/${id}`
 		}
@@ -1082,9 +1082,11 @@ export async function startTraefikTCPProxy(
 	privatePort: number,
 	type?: string
 ): Promise<{ stdout: string; stderr: string } | Error> {
-	const { network, id: dockerId } = destinationDocker;
+	const { network, id: dockerId, remoteEngine } = destinationDocker;
 	const container = `${id}-${publicPort}`;
 	const found = await checkContainer({ dockerId, container, remove: true });
+	const {  ipv4, ipv6 } = await listSettings();
+
 	let dependentId = id;
 	if (type === 'wordpressftp') dependentId = `${id}-ftp`;
 	const foundDependentContainer = await checkContainer({ dockerId, container: dependentId, remove: true });
@@ -1096,16 +1098,26 @@ export async function startTraefikTCPProxy(
 			})
 
 			const ip = JSON.parse(Config)[0].Gateway;
+			let traefikUrl = otherTraefikEndpoint
+			if (remoteEngine) {
+				let ip = null
+				if (isDev) {
+					ip = getAPIUrl()
+				} else {
+					ip = `http://${ipv4 || ipv6}`
+				}
+				traefikUrl = `${ip}/webhooks/traefik/other.json`
+			}
 			const tcpProxy = {
 				version: '3.8',
 				services: {
 					[`${id}-${publicPort}`]: {
 						container_name: container,
-						image: 'traefik:v2.8',
+						image: defaultTraefikImage,
 						command: [
 							`--entrypoints.tcp.address=:${publicPort}`,
 							`--entryPoints.tcp.forwardedHeaders.insecure=true`,
-							`--providers.http.endpoint=${otherTraefikEndpoint} ? id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp&address=${dependentId}`,
+							`--providers.http.endpoint=${otherTraefikEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp&address=${dependentId}`,
 							'--providers.http.pollTimeout=2s',
 							'--log.level=error'
 						],
