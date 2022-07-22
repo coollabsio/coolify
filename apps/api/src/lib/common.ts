@@ -520,7 +520,7 @@ export async function startTraefikProxy(id: string): Promise<void> {
 			if (isDev) {
 				ip = getAPIUrl()
 			} else {
-				ip = `http://${ipv4 || ipv6}`
+				ip = `http://${ipv4 || ipv6}:3000`
 			}
 			traefikUrl = `${ip}/webhooks/traefik/remote/${id}`
 		}
@@ -1108,6 +1108,7 @@ export async function startTraefikTCPProxy(
 				}
 				traefikUrl = `${ip}/webhooks/traefik/other.json`
 			}
+			console.log(traefikUrl)
 			const tcpProxy = {
 				version: '3.8',
 				services: {
