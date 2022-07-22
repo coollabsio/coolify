@@ -1117,7 +1117,7 @@ export async function startTraefikTCPProxy(
 						command: [
 							`--entrypoints.tcp.address=:${publicPort}`,
 							`--entryPoints.tcp.forwardedHeaders.insecure=true`,
-							`--providers.http.endpoint=${otherTraefikEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp&address=${dependentId}`,
+							`--providers.http.endpoint=${traefikUrl}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp&address=${dependentId}`,
 							'--providers.http.pollTimeout=2s',
 							'--log.level=error'
 						],
