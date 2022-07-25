@@ -124,7 +124,7 @@
 			{#if loadLogsInterval}
 				<LoadingLogs />
 			{/if}
-			<div class="flex justify-end sticky top-0 p-2 mx-1">
+			<div class="flex justify-end sticky top-0 p-1 mx-1">
 				<button
 					on:click={followBuild}
 					class="bg-transparent"
