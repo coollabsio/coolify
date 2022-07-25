@@ -10,7 +10,7 @@ import { checkContainer, dockerInstance, isContainerExited, removeContainer } fr
 import { scheduler } from '../../../../lib/scheduler';
 
 import type { FastifyRequest } from 'fastify';
-import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication } from './types';
+import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain } from './types';
 import { OnlyId } from '../../../../types';
 
 export async function listApplications(request: FastifyRequest) {
@@ -346,7 +346,16 @@ export async function deleteApplication(request: FastifyRequest<DeleteApplicatio
         return errorHandler({ status, message })
     }
 }
-
+export async function checkDomain(request: FastifyRequest<CheckDomain>) {
+    try {
+        const { id } = request.params
+        const { domain } = request.query
+        const { fqdn, settings: { dualCerts } } = await prisma.application.findUnique({ where: { id }, include: { settings: true } })
+        return await checkDomainsIsValidInDNS({ hostname: domain, fqdn, dualCerts });
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function checkDNS(request: FastifyRequest<CheckDNS>) {
     try {
         const { id } = request.params
@@ -378,7 +387,7 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
         if (isDNSCheckEnabled && !isDev && !forceSave) {
             let hostname = request.hostname.split(':')[0];
             if (remoteEngine) hostname = remoteIpAddress;
-            return await checkDomainsIsValidInDNS({ hostname: request.hostname.split(':')[0], fqdn, dualCerts });
+            return await checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts });
         }
         return {}
     } catch ({ status, message }) {

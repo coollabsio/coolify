@@ -377,6 +377,7 @@ export async function getContainerUsage(dockerId: string, container: string): Pr
 export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): Promise<any> {
 	const { isIP } = await import('is-ip');
 	const domain = getDomain(fqdn);
+	console.log({hostname, fqdn, dualCerts })
 	const domainDualCert = domain.includes('www.') ? domain.replace('www.', '') : `www.${domain}`;
 	dns.setServers(['1.1.1.1', '8.8.8.8']);
 	let resolves = [];
@@ -415,13 +416,16 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 		}
 	} else {
 		try {
+			console.log({domain})
 			const ipDomain = await dns.resolve4(domain);
+			console.log({ipDomain})
 			let ipDomainFound = false;
 			for (const ip of ipDomain) {
 				if (resolves.includes(ip)) {
 					ipDomainFound = true;
 				}
 			}
+			console.log({ipDomainFound})
 			if (ipDomainFound) return { status: 200 };
 			throw { status: 500, message: `DNS not set correctly or propogated.<br>Please check your DNS settings.` }
 		} catch (error) {
