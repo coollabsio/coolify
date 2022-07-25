@@ -108,9 +108,30 @@ A fresh installation is necessary. v2 and v3 are not compatible with v1.
 - Email: [andras@coollabs.io](mailto:andras@coollabs.io)
 - Discord: [Invitation](https://discord.gg/xhBCC7eGKw)
 
-## Contribute
 
-See [our contribution guide](./CONTRIBUTING.md).
+
+## Financial Contributors
+
+Become a financial contributor and help us sustain our community. [[Contribute](https://opencollective.com/coollabsio/contribute)]
+
+### Individuals
+
+<a href="https://opencollective.com/coollabsio"><img src="https://opencollective.com/coollabsio/individuals.svg?width=890"></a>
+
+### Organizations
+
+Support this project with your organization. Your logo will show up here with a link to your website. [[Contribute](https://opencollective.com/coollabsio/contribute)]
+
+<a href="https://opencollective.com/coollabsio/organization/0/website"><img src="https://opencollective.com/coollabsio/organization/0/avatar.svg"></a>
+<a href="https://opencollective.com/coollabsio/organization/1/website"><img src="https://opencollective.com/coollabsio/organization/1/avatar.svg"></a>
+<a href="https://opencollective.com/coollabsio/organization/2/website"><img src="https://opencollective.com/coollabsio/organization/2/avatar.svg"></a>
+<a href="https://opencollective.com/coollabsio/organization/3/website"><img src="https://opencollective.com/coollabsio/organization/3/avatar.svg"></a>
+<a href="https://opencollective.com/coollabsio/organization/4/website"><img src="https://opencollective.com/coollabsio/organization/4/avatar.svg"></a>
+<a href="https://opencollective.com/coollabsio/organization/5/website"><img src="https://opencollective.com/coollabsio/organization/5/avatar.svg"></a>
+<a href="https://opencollective.com/coollabsio/organization/6/website"><img src="https://opencollective.com/coollabsio/organization/6/avatar.svg"></a>
+<a href="https://opencollective.com/coollabsio/organization/7/website"><img src="https://opencollective.com/coollabsio/organization/7/avatar.svg"></a>
+<a href="https://opencollective.com/coollabsio/organization/8/website"><img src="https://opencollective.com/coollabsio/organization/8/avatar.svg"></a>
+<a href="https://opencollective.com/coollabsio/organization/9/website"><img src="https://opencollective.com/coollabsio/organization/9/avatar.svg"></a>
 
 ## License
 
