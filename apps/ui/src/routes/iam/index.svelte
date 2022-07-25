@@ -189,54 +189,52 @@
 
 <div class="mx-auto max-w-4xl px-6">
 	<div class="title font-bold">Teams</div>
-	<div class="flex items-center justify-center pt-10">
-		<div class="flex flex-col">
-			<div class="flex flex-row flex-wrap justify-center px-2 pb-10 md:flex-row">
-				{#each ownTeams as team}
+	<div class="flex-col items-center justify-center pt-10">
+		<div class="flex flex-row flex-wrap justify-center px-2 pb-10 md:flex-row">
+			{#each ownTeams as team}
+				<a href="/iam/team/{team.id}" class="p-2 no-underline">
+					<div class="box-selection relative">
+						<div>
+							<div class="truncate text-center text-xl font-bold">
+								{team.name}
+							</div>
+							<div class="mt-1 text-center text-xs">
+								{team.permissions?.length} member(s)
+							</div>
+						</div>
+						<div class="flex items-center justify-center pt-3">
+							<button
+								on:click|preventDefault={() => switchTeam(team.id)}
+								class:bg-fuchsia-600={$appSession.teamId !== team.id}
+								class:hover:bg-fuchsia-500={$appSession.teamId !== team.id}
+								class:bg-transparent={$appSession.teamId === team.id}
+								disabled={$appSession.teamId === team.id}
+								>{$appSession.teamId === team.id ? 'Current Team' : 'Switch Team'}</button
+							>
+						</div>
+					</div>
+				</a>
+			{/each}
+		</div>
+		{#if $appSession.teamId === '0' && allTeams.length > 0}
+			<div class="pb-5 pt-10 text-xl font-bold">Other Teams</div>
+			<div class="flex flex-row flex-wrap justify-center px-2 md:flex-row">
+				{#each allTeams as team}
 					<a href="/iam/team/{team.id}" class="p-2 no-underline">
-						<div class="box-selection relative">
-							<div>
-								<div class="truncate text-center text-xl font-bold">
-									{team.name}
-								</div>
-								<div class="mt-1 text-center text-xs">
-									{team.permissions?.length} member(s)
-								</div>
+						<div
+							class="box-selection relative"
+							class:hover:bg-fuchsia-600={team.id !== '0'}
+							class:hover:bg-red-500={team.id === '0'}
+						>
+							<div class="truncate text-center text-xl font-bold">
+								{team.name}
 							</div>
-							<div class="flex items-center justify-center pt-3">
-								<button
-									on:click|preventDefault={() => switchTeam(team.id)}
-									class:bg-fuchsia-600={$appSession.teamId !== team.id}
-									class:hover:bg-fuchsia-500={$appSession.teamId !== team.id}
-									class:bg-transparent={$appSession.teamId === team.id}
-									disabled={$appSession.teamId === team.id}
-									>{$appSession.teamId === team.id ? 'Current Team' : 'Switch Team'}</button
-								>
-							</div>
+
+							<div class="mt-1 text-center">{team.permissions?.length} member(s)</div>
 						</div>
 					</a>
 				{/each}
 			</div>
-			{#if $appSession.teamId === '0' && allTeams.length > 0}
-				<div class="pb-5 pt-10 text-xl font-bold">Other Teams</div>
-				<div class="flex flex-row flex-wrap justify-center px-2 md:flex-row">
-					{#each allTeams as team}
-						<a href="/iam/team/{team.id}" class="p-2 no-underline">
-							<div
-								class="box-selection relative"
-								class:hover:bg-fuchsia-600={team.id !== '0'}
-								class:hover:bg-red-500={team.id === '0'}
-							>
-								<div class="truncate text-center text-xl font-bold">
-									{team.name}
-								</div>
-
-								<div class="mt-1 text-center">{team.permissions?.length} member(s)</div>
-							</div>
-						</a>
-					{/each}
-				</div>
-			{/if}
-		</div>
+		{/if}
 	</div>
 </div>

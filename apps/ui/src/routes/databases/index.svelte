@@ -113,7 +113,7 @@
 				{/each}
 			</div>
 			{#if otherDatabases.length > 0 && $appSession.teamId === '0'}
-				<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Databases</div>
+				<div class="px-6 pb-5 pt-10 text-2xl font-bold text-center">Other Databases</div>
 				<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 					{#each otherDatabases as database}
 						<a href="/databases/{database.id}" class="p-2 no-underline">

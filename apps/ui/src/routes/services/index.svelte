@@ -98,7 +98,7 @@
 				{/each}
 			</div>
 			{#if otherServices.length > 0 && $appSession.teamId === '0'}
-				<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Services</div>
+				<div class="px-6 pb-5 pt-10 text-2xl font-bold text-center">Other Services</div>
 				<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 					{#each otherServices as service}
 						<a href="/services/{service.id}" class="p-2 no-underline">
