@@ -308,7 +308,7 @@
 <div class="mx-auto max-w-4xl px-6">
 	<!-- svelte-ignore missing-declaration -->
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
-		<div class="flex space-x-1 pb-5 font-bold">
+		<div class="flex space-x-1 pb-5">
 			<div class="title">{$t('general')}</div>
 			{#if $appSession.isAdmin}
 				<button

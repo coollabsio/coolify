@@ -172,7 +172,7 @@
 			{#if containers.length > 0}
 				{#each containers as container}
 					<a href={container.fqdn} class="p-2 no-underline" target="_blank">
-						<div class="box-selection text-center hover:border-transparent hover:bg-coolgray-200">
+						<div class="box-selection text-center hover:border-transparent hover:bg-green-600">
 							<div class="truncate text-center text-xl font-bold">{getDomain(container.fqdn)}</div>
 						</div>
 					</a>

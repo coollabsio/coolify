@@ -118,10 +118,10 @@
 <div class="mx-auto max-w-4xl px-6">
 	{#if !source.githubAppId}
 		<form on:submit|preventDefault={newGithubApp} class="py-4">
-			<div class="flex space-x-1 pb-7 font-bold">
+			<div class="flex space-x-1 pb-7">
 				<div class="title">General</div>
 				{#if !source.githubAppId}
-					<button class="bg-orange-600" type="submit">Save</button>
+					<button class="bg-orange-600 font-normal" type="submit">Save</button>
 				{/if}
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
@@ -173,7 +173,7 @@
 		</form>
 	{:else if source.githubApp?.installationId}
 		<form on:submit|preventDefault={handleSubmit} class="py-4">
-			<div class="flex space-x-1 pb-5 font-bold">
+			<div class="flex space-x-1 pb-5 ">
 				<div class="title">{$t('general')}</div>
 				{#if $appSession.isAdmin}
 					<button

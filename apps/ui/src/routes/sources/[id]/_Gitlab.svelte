@@ -141,7 +141,7 @@
 
 <div class="mx-auto max-w-4xl px-6">
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
-		<div class="flex space-x-1 pb-7 font-bold">
+		<div class="flex space-x-1 pb-7">
 			<div class="title">General</div>
 			{#if $appSession.isAdmin}
 				<button
