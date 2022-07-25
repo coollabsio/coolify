@@ -130,6 +130,7 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 			if (!scheduler.workers.has('deployApplication')) await scheduler.start('deployApplication');
 		}
 	});
+	await getArch();
 	await getIPAddress();
 });
 async function getIPAddress() {
@@ -151,6 +152,14 @@ async function getIPAddress() {
 async function initServer() {
 	try {
 		await asyncExecShell(`docker network create --attachable coolify`);
+	} catch (error) { }
+}
+async function getArch() {
+	try {
+		const settings = await prisma.setting.findFirst({})
+		if (settings && !settings.arch) {
+			await prisma.setting.update({ where: { id: settings.id }, data: { arch: process.arch } })
+		}
 	} catch (error) { }
 }
 

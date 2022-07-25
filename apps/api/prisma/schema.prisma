@@ -13,6 +13,7 @@ model Setting {
   fqdn                  String?  @unique
   ipv4                  String?
   ipv6                  String?
+  arch                  String?
   isRegistrationEnabled Boolean  @default(false)
   dualCerts             Boolean  @default(false)
   minPort               Int      @default(9000)
