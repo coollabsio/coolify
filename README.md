@@ -24,6 +24,9 @@ Support this project with your organization. Your logo will show up here with a 
 <a href="https://opencollective.com/coollabsio/organization/7/website"><img src="https://opencollective.com/coollabsio/organization/7/avatar.svg"></a>
 <a href="https://opencollective.com/coollabsio/organization/8/website"><img src="https://opencollective.com/coollabsio/organization/8/avatar.svg"></a>
 <a href="https://opencollective.com/coollabsio/organization/9/website"><img src="https://opencollective.com/coollabsio/organization/9/avatar.svg"></a>
+
+--- 
+
 ## Live Demo
 
 https://demo.coolify.io/
@@ -33,6 +36,8 @@ https://demo.coolify.io/
 ## Feedback
 
 If you have a new service / build pack you would like to add, raise an idea [here](https://feedback.coolify.io/) to get feedback from the community!
+
+--- 
 
 ## How to install
 
@@ -49,6 +54,8 @@ wget -q https://get.coollabs.io/coolify/install.sh -O install.sh; sudo bash ./in
 ```
 
 For more details goto the [docs](https://docs.coollabs.io/coolify/installation).
+
+--- 
 
 ## Features
 
@@ -129,8 +136,6 @@ A fresh installation is necessary. v2 and v3 are not compatible with v1.
 - Telegram: [@andrasbacsai](https://t.me/andrasbacsai)
 - Email: [andras@coollabs.io](mailto:andras@coollabs.io)
 - Discord: [Invitation](https://discord.gg/xhBCC7eGKw)
-
-
 
 
 ## License
