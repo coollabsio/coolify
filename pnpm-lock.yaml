@@ -53,7 +53,7 @@ importers:
       p-queue: 7.2.0
       prettier: 2.7.1
       prisma: 3.15.2
-      public-ip: ^6.0.1
+      public-ip: 6.0.1
       rimraf: 3.0.2
       ssh-config: 4.1.6
       strip-ansi: 7.0.1

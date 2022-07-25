@@ -4,6 +4,7 @@
   "version": "3.2.0",
   "license": "AGPL-3.0",
   "scripts": {
+    "postinstall": "pnpm db:push && pnpm db:seed",
     "db:studio": "pnpm run --filter coolify-api db:studio",
     "db:push": "pnpm run --filter coolify-api db:push",
     "db:seed": "pnpm run --filter coolify-api db:seed",
