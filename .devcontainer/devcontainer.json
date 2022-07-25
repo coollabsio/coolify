@@ -15,6 +15,7 @@
 	"settings": {},
 	// Add the IDs of extensions you want installed when the container is created.
 	"extensions": [
+		"ms-azuretools.vscode-docker",
 		"dbaeumer.vscode-eslint",
 		"svelte.svelte-vscode",
 		"ardenivanov.svelte-intellisense",

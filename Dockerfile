@@ -1,4 +1,4 @@
-FROM node:18-alpine as build
+FROM node:18-alpine3.16 as build
 WORKDIR /app
 
 RUN apk add --no-cache curl
@@ -9,7 +9,7 @@ RUN pnpm install
 RUN pnpm build
 
 # Production build
-FROM node:18-alpine
+FROM node:18-alpine3.16
 WORKDIR /app
 ENV NODE_ENV production
 ARG TARGETPLATFORM
