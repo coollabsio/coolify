@@ -94,9 +94,9 @@
 							{#if destination.remoteEngine}
 								<svg
 									xmlns="http://www.w3.org/2000/svg"
-									class="absolute top-0 left-9 -m-4 h-6 w-6 text-sky-600 rotate-45"
+									class="absolute top-0 left-9 -m-4 h-6 w-6 text-sky-500 rotate-45"
 									viewBox="0 0 24 24"
-									stroke-width="1.5"
+									stroke-width="3"
 									stroke="currentColor"
 									fill="none"
 									stroke-linecap="round"
@@ -154,9 +154,9 @@
 								{#if destination.remoteEngine}
 									<svg
 										xmlns="http://www.w3.org/2000/svg"
-										class="absolute top-0 left-10 -m-4 h-6 w-6 text-sky-600"
+										class="absolute top-0 left-9 -m-4 h-6 w-6 text-sky-500 rotate-45"
 										viewBox="0 0 24 24"
-										stroke-width="1.5"
+										stroke-width="3"
 										stroke="currentColor"
 										fill="none"
 										stroke-linecap="round"

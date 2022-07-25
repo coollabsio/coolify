@@ -18,6 +18,12 @@ export interface GitHubEvents {
                 repo: {
                     id: string,
                 }
+            },
+            head: {
+                ref: string,
+                repo: {
+                    id: string,
+                }
             }
         }
     }
