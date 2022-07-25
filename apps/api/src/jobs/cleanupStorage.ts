@@ -15,7 +15,7 @@ import { getEngine } from '../lib/docker';
             try {
                 let stdout = null
                 if (!isDev) {
-                    const output = await executeDockerCmd({ dockerId: destination.id, command: `docker exec coolify sh -c 'df -kPT /'` })
+                    const output = await executeDockerCmd({ dockerId: destination.id, command: `CONTAINER=$(docker ps -lq | head -1) && docker exec $CONTAINER sh -c 'df -kPT /'` })
                     stdout = output.stdout;
                 } else {
                     const output = await asyncExecShell(
