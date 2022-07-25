@@ -1,3 +1,6 @@
 - RDE Application DNS check not working 
 - Check DNS configurations for app/service/coolify with RDE and local engines
-- Refactor PR deployments (/apps/api/src/routes/api/v1/applications/handlers.ts#L744) and create previews model inside coolify db?
+
+
+# Low
+- Create previews model in Coolify DB

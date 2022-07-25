@@ -6,7 +6,7 @@ import { FastifyReply } from 'fastify';
 import { day } from '../../../../lib/dayjs';
 import { setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
 import { checkDomainsIsValidInDNS, checkDoubleBranch, decrypt, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, getFreeExposedPort, isDev, isDomainConfigured, prisma, stopBuild, uniqueName } from '../../../../lib/common';
-import { checkContainer, isContainerExited, removeContainer } from '../../../../lib/docker';
+import { checkContainer, formatLabelsOnDocker, isContainerExited, removeContainer } from '../../../../lib/docker';
 import { scheduler } from '../../../../lib/scheduler';
 
 import type { FastifyRequest } from 'fastify';
@@ -741,22 +741,8 @@ export async function getPreviews(request: FastifyRequest<OnlyId>) {
                 PRMRSecrets: []
             }
         }
-        const out = stdout.trim().split('\n')
-        const jsonStdout = out.map(a => JSON.parse(a))
-        const containers = jsonStdout.filter((container) => {
-            const labels = container.Labels.split(',')
-            let jsonLabels = {}
-            labels.forEach(l => {
-                const name = l.split('=')[0]
-                const value = l.split('=')[1]
-                jsonLabels = { ...jsonLabels, ...{ [name]: value } }
-            })
-            container.Labels = jsonLabels;
-            return (
-                jsonLabels['coolify.configuration'] &&
-                jsonLabels['coolify.type'] === 'standalone-application'
-            );
-        });
+        const containers = formatLabelsOnDocker(stdout).filter(container => container.Labels['coolify.configuration'] && container.Labels['coolify.type'] === 'standalone-application')
+
         const jsonContainers = containers
             .map((container) =>
                 JSON.parse(Buffer.from(container.Labels['coolify.configuration'], 'base64').toString())

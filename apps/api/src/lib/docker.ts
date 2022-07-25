@@ -1,4 +1,18 @@
 import { executeDockerCmd } from './common';
+
+export function formatLabelsOnDocker(data) {
+	return data.trim().split('\n').map(a => JSON.parse(a)).map((container) => {
+		const labels = container.Labels.split(',')
+		let jsonLabels = {}
+		labels.forEach(l => {
+			const name = l.split('=')[0]
+			const value = l.split('=')[1]
+			jsonLabels = { ...jsonLabels, ...{ [name]: value } }
+		})
+		container.Labels = jsonLabels;
+		return container
+	})
+}
 export async function checkContainer({ dockerId, container, remove = false }: { dockerId: string, container: string, remove?: boolean }): Promise<boolean> {
 	let containerFound = false;
 	try {
