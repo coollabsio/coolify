@@ -4,7 +4,7 @@ import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
 import { prisma, uniqueName, asyncExecShell, getServiceImage, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings, getFreeExposedPort, checkDomainsIsValidInDNS } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
-import { checkContainer, dockerInstance, isContainerExited, removeContainer } from '../../../../lib/docker';
+import { checkContainer, isContainerExited, removeContainer } from '../../../../lib/docker';
 import cuid from 'cuid';
 
 import type { OnlyId } from '../../../../types';
@@ -350,7 +350,7 @@ export async function checkServiceDomain(request: FastifyRequest<CheckServiceDom
     try {
         const { id } = request.params
         const { domain } = request.query
-        const { fqdn, dualCerts } = await prisma.service.findUnique({ where: { id }})
+        const { fqdn, dualCerts } = await prisma.service.findUnique({ where: { id } })
         return await checkDomainsIsValidInDNS({ hostname: domain, fqdn, dualCerts });
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -2695,7 +2695,7 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
     const { service: { destinationDocker: { id: dockerId } } } = await prisma.wordpress.findUnique({ where: { serviceId: id }, include: { service: { include: { destinationDocker: true } } } })
 
     const publicPort = await getFreePublicPort(id, dockerId);
-    
+
     let ftpUser = cuid();
     let ftpPassword = generatePassword();
 

@@ -5,7 +5,7 @@ import fs from 'fs/promises'
 import os from 'os';
 
 import { asyncExecShell, decrypt, errorHandler, executeDockerCmd, listSettings, prisma, startTraefikProxy, stopTraefikProxy } from '../../../../lib/common';
-import { checkContainer, dockerInstance, getEngine } from '../../../../lib/docker';
+import { checkContainer } from '../../../../lib/docker';
 
 import type { OnlyId } from '../../../../types';
 import type { CheckDestination, ListDestinations, NewDestination, Proxy, SaveDestinationSettings } from './types';
@@ -79,19 +79,17 @@ export async function newDestination(request: FastifyRequest<NewDestination>, re
         let { name, network, engine, isCoolifyProxyUsed, remoteIpAddress, remoteUser, remotePort } = request.body
         console.log({ name, network, engine, isCoolifyProxyUsed, remoteIpAddress, remoteUser, remotePort })
         if (id === 'new') {
+            console.log(engine)
             if (engine) {
-                const host = getEngine(engine);
-                const docker = dockerInstance({ destinationDocker: { engine, network } });
-                const found = await docker.engine.listNetworks({ filters: { name: [`^${network}$`] } });
-                if (found.length === 0) {
-                    await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable ${network}`);
+                const { stdout } = await asyncExecShell(`DOCKER_HOST=unix:///var/run/docker.sock docker network ls --filter 'name=^${network}$' --format '{{json .}}'`);
+                if (stdout === '') {
+                    await asyncExecShell(`DOCKER_HOST=unix:///var/run/docker.sock docker network create --attachable ${network}`);
                 }
                 await prisma.destinationDocker.create({
                     data: { name, teams: { connect: { id: teamId } }, engine, network, isCoolifyProxyUsed }
                 });
                 const destinations = await prisma.destinationDocker.findMany({ where: { engine } });
                 const destination = destinations.find((destination) => destination.network === network);
-
                 if (destinations.length > 0) {
                     const proxyConfigured = destinations.find(
                         (destination) => destination.network !== network && destination.isCoolifyProxyUsed === true
@@ -102,10 +100,7 @@ export async function newDestination(request: FastifyRequest<NewDestination>, re
                     await prisma.destinationDocker.updateMany({ where: { engine }, data: { isCoolifyProxyUsed } });
                 }
                 if (isCoolifyProxyUsed) {
-                    const settings = await prisma.setting.findFirst();
-                    if (settings?.isTraefikUsed) {
-                        await startTraefikProxy(id);
-                    }
+                    await startTraefikProxy(destination.id);
                 }
                 return reply.code(201).send({ id: destination.id });
             } else {
@@ -120,9 +115,8 @@ export async function newDestination(request: FastifyRequest<NewDestination>, re
         }
 
     } catch ({ status, message }) {
+        console.log({ status, message })
         return errorHandler({ status, message })
-    } finally {
-        await fs.rm('./id_rsa')
     }
 }
 export async function deleteDestination(request: FastifyRequest<OnlyId>) {
@@ -218,7 +212,7 @@ export async function verifyRemoteDockerEngine(request: FastifyRequest, reply: F
         const homedir = os.homedir();
 
         const { sshKey: { privateKey }, remoteIpAddress, remotePort, remoteUser, network } = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } })
-        
+
         await fs.writeFile(`/tmp/id_rsa_verification_${id}`, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 })
 
         const host = `ssh://${remoteUser}@${remoteIpAddress}`

@@ -1,6 +1,5 @@
 import { FastifyRequest } from "fastify";
-import { asyncExecShell, errorHandler, getDomain, isDev, listServicesWithIncludes, prisma, supportedServiceTypesAndVersions, include } from "../../../lib/common";
-import { getEngine } from "../../../lib/docker";
+import { errorHandler, getDomain, isDev, prisma, supportedServiceTypesAndVersions, include, executeDockerCmd } from "../../../lib/common";
 import { TraefikOtherConfiguration } from "./types";
 
 function configureMiddleware(
@@ -185,7 +184,7 @@ export async function traefikConfiguration(request, reply) {
 				settings: { previews, dualCerts }
 			} = application;
 			if (destinationDockerId) {
-				const { engine, network } = destinationDocker;
+				const { network, id: dockerId } = destinationDocker;
 				const isRunning = true;
 				if (fqdn) {
 					const domain = getDomain(fqdn);
@@ -206,10 +205,7 @@ export async function traefikConfiguration(request, reply) {
 						});
 					}
 					if (previews) {
-						const host = getEngine(engine);
-						const { stdout } = await asyncExecShell(
-							`DOCKER_HOST=${host} docker container ls --filter="status=running" --filter="network=${network}" --filter="name=${id}-" --format="{{json .Names}}"`
-						);
+						const { stdout } = await executeDockerCmd({ dockerId, command: `docker container ls --filter="status=running" --filter="network=${network}" --filter="name=${id}-" --format="{{json .Names}}"` })
 						const containers = stdout
 							.trim()
 							.split('\n')
@@ -253,7 +249,6 @@ export async function traefikConfiguration(request, reply) {
 				plausibleAnalytics
 			} = service;
 			if (destinationDockerId) {
-				const { engine } = destinationDocker;
 				const found = supportedServiceTypesAndVersions.find((a) => a.name === type);
 				if (found) {
 					const port = found.ports.main;
@@ -546,7 +541,7 @@ export async function remoteTraefikConfiguration(request: FastifyRequest) {
 				settings: { previews, dualCerts }
 			} = application;
 			if (destinationDockerId) {
-				const { engine, network } = destinationDocker;
+				const { id: dockerId, network } = destinationDocker;
 				const isRunning = true;
 				if (fqdn) {
 					const domain = getDomain(fqdn);
@@ -567,10 +562,7 @@ export async function remoteTraefikConfiguration(request: FastifyRequest) {
 						});
 					}
 					if (previews) {
-						const host = getEngine(engine);
-						const { stdout } = await asyncExecShell(
-							`DOCKER_HOST=${host} docker container ls --filter="status=running" --filter="network=${network}" --filter="name=${id}-" --format="{{json .Names}}"`
-						);
+						const { stdout } = await executeDockerCmd({ dockerId, command: `docker container ls --filter="status=running" --filter="network=${network}" --filter="name=${id}-" --format="{{json .Names}}"` })
 						const containers = stdout
 							.trim()
 							.split('\n')
@@ -614,7 +606,6 @@ export async function remoteTraefikConfiguration(request: FastifyRequest) {
 				plausibleAnalytics
 			} = service;
 			if (destinationDockerId) {
-				const { engine } = destinationDocker;
 				const found = supportedServiceTypesAndVersions.find((a) => a.name === type);
 				if (found) {
 					const port = found.ports.main;

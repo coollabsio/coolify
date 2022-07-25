@@ -1,6 +1,5 @@
 import { parentPort } from 'node:worker_threads';
 import { asyncExecShell, cleanupDockerStorage, executeDockerCmd, isDev, prisma, version } from '../lib/common';
-import { getEngine } from '../lib/docker';
 
 (async () => {
     if (parentPort) {

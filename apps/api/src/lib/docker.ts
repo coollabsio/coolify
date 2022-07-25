@@ -1,17 +1,4 @@
 import { executeDockerCmd } from './common';
-import Dockerode from 'dockerode';
-export function getEngine(engine: string): string {
-	return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : engine;
-}
-export function dockerInstance({ destinationDocker }): { engine: Dockerode; network: string } {
-	return {
-		engine: new Dockerode({
-			socketPath: destinationDocker.engine
-		}),
-		network: destinationDocker.network
-	};
-}
-
 export async function checkContainer({ dockerId, container, remove = false }: { dockerId: string, container: string, remove?: boolean }): Promise<boolean> {
 	let containerFound = false;
 	try {

@@ -13,7 +13,7 @@ import cuid from 'cuid';
 import os from 'os';
 import sshConfig from 'ssh-config'
 
-import { checkContainer, getEngine, removeContainer } from './docker';
+import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
@@ -326,7 +326,7 @@ export async function isDomainConfigured({
 	dockerId: string;
 }): Promise<boolean> {
 
-	console.log({checkOwn, dockerId})
+	console.log({ checkOwn, dockerId })
 	const domain = getDomain(fqdn);
 	const nakedDomain = domain.replace('www.', '');
 	const foundApp = await prisma.application.findFirst({
@@ -387,7 +387,7 @@ export async function getContainerUsage(dockerId: string, container: string): Pr
 export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): Promise<any> {
 	const { isIP } = await import('is-ip');
 	const domain = getDomain(fqdn);
-	console.log({hostname, fqdn, dualCerts })
+	console.log({ hostname, fqdn, dualCerts })
 	const domainDualCert = domain.includes('www.') ? domain.replace('www.', '') : `www.${domain}`;
 	dns.setServers(['1.1.1.1', '8.8.8.8']);
 	let resolves = [];
@@ -506,25 +506,24 @@ export async function createRemoteEngineConfiguration(id: string) {
 }
 export async function executeDockerCmd({ dockerId, command }: { dockerId: string, command: string }) {
 	let { remoteEngine, remoteIpAddress, remoteUser, engine } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
-	if (remoteEngine) engine = `ssh://${remoteUser}@${remoteIpAddress}`
-	const host = getEngine(engine)
-	if (engine.startsWith('ssh://')) {
+	if (remoteEngine) {
+		engine = `ssh://${remoteUser}@${remoteIpAddress}`
 		await createRemoteEngineConfiguration(dockerId)
+	} else {
+		engine = 'unix:///var/run/docker.sock'
 	}
 	return await asyncExecShell(
-		`DOCKER_BUILDKIT=1 DOCKER_HOST="${host}" ${command}`
+		`DOCKER_BUILDKIT=1 DOCKER_HOST="${engine}" ${command}`
 	);
 }
 export async function startTraefikProxy(id: string): Promise<void> {
 	const { engine, network, remoteEngine, remoteIpAddress } = await prisma.destinationDocker.findUnique({ where: { id } })
-
 	const found = await checkContainer({ dockerId: id, container: 'coolify-proxy', remove: true });
 	const { id: settingsId, ipv4, ipv6 } = await listSettings();
 
 	if (!found) {
 		const { stdout: Config } = await executeDockerCmd({ dockerId: id, command: `docker network inspect ${network} --format '{{json .IPAM.Config }}'` })
 		const ip = JSON.parse(Config)[0].Gateway;
-		const { publicIp } = await import('public-ip')
 		let traefikUrl = mainTraefikEndpoint
 		if (remoteEngine) {
 			let ip = null
@@ -619,21 +618,6 @@ export async function stopTraefikProxy(
 	}
 }
 
-export async function configureNetworkCoolifyProxy(engine: string): Promise<void> {
-	const host = getEngine(engine);
-	const destinations = await prisma.destinationDocker.findMany({ where: { engine } });
-	const { stdout: networks } = await asyncExecShell(
-		`DOCKER_HOST="${host}" docker ps -a --filter name=coolify-haproxy --format '{{json .Networks}}'`
-	);
-	const configuredNetworks = networks.replace(/"/g, '').replace('\n', '').split(',');
-	for (const destination of destinations) {
-		if (!configuredNetworks.includes(destination.network)) {
-			await asyncExecShell(
-				`DOCKER_HOST="${host}" docker network connect ${destination.network} coolify-haproxy`
-			);
-		}
-	}
-}
 export async function listSettings(): Promise<any> {
 	const settings = await prisma.setting.findFirst({});
 	if (settings.proxyPassword) settings.proxyPassword = decrypt(settings.proxyPassword);
@@ -1096,7 +1080,7 @@ export async function startTraefikTCPProxy(
 	const { network, id: dockerId, remoteEngine } = destinationDocker;
 	const container = `${id}-${publicPort}`;
 	const found = await checkContainer({ dockerId, container, remove: true });
-	const {  ipv4, ipv6 } = await listSettings();
+	const { ipv4, ipv6 } = await listSettings();
 
 	let dependentId = id;
 	if (type === 'wordpressftp') dependentId = `${id}-ftp`;
@@ -1526,7 +1510,6 @@ export async function stopBuild(buildId, applicationId) {
 	await new Promise<void>(async (resolve, reject) => {
 		const { destinationDockerId, status } = await prisma.build.findFirst({ where: { id: buildId } });
 		const { engine, id: dockerId } = await prisma.destinationDocker.findFirst({ where: { id: destinationDockerId } });
-		const host = getEngine(engine);
 		let interval = setInterval(async () => {
 			try {
 				if (status === 'failed') {
@@ -1537,10 +1520,7 @@ export async function stopBuild(buildId, applicationId) {
 					clearInterval(interval);
 					return reject(new Error('Build canceled'));
 				}
-
-				const { stdout: buildContainers } = await asyncExecShell(
-					`DOCKER_HOST = ${host} docker container ls--filter "label=coolify.buildId=${buildId}" --format '{{json .}}'`
-				);
+				const { stdout: buildContainers } = await executeDockerCmd({ dockerId, command: `docker container ls--filter "label=coolify.buildId=${buildId}" --format '{{json .}}'` })
 				if (buildContainers) {
 					const containersArray = buildContainers.trim().split('\n');
 					for (const container of containersArray) {

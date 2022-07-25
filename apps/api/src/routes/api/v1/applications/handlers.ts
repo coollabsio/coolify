@@ -6,7 +6,7 @@ import { FastifyReply } from 'fastify';
 import { day } from '../../../../lib/dayjs';
 import { setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
 import { checkDomainsIsValidInDNS, checkDoubleBranch, decrypt, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, getFreeExposedPort, isDev, isDomainConfigured, prisma, stopBuild, uniqueName } from '../../../../lib/common';
-import { checkContainer, dockerInstance, isContainerExited, removeContainer } from '../../../../lib/docker';
+import { checkContainer, isContainerExited, removeContainer } from '../../../../lib/docker';
 import { scheduler } from '../../../../lib/scheduler';
 
 import type { FastifyRequest } from 'fastify';
@@ -731,16 +731,19 @@ export async function getPreviews(request: FastifyRequest<OnlyId>) {
             secret.value = decrypt(secret.value);
             return secret;
         });
+
         const applicationSecrets = secrets.filter((secret) => !secret.isPRMRSecret);
         const PRMRSecrets = secrets.filter((secret) => secret.isPRMRSecret);
-        const destinationDocker = await prisma.destinationDocker.findFirst({
-            where: { application: { some: { id } }, teams: { some: { id: teamId } } }
-        });
-        const docker = dockerInstance({ destinationDocker });
-        const listContainers = await docker.engine.listContainers({
-            filters: { network: [destinationDocker.network], name: [id] }
-        });
-        const containers = listContainers.filter((container) => {
+        const application = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
+        const { stdout } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker container ls --filter 'name=${id}-' --format "{{json .}}"` })
+        if (!stdout) {
+            return {
+                containers: [],
+                applicationSecrets: [],
+                PRMRSecrets: []
+            }
+        }
+        const containers = JSON.parse(stdout).filter((container) => {
             return (
                 container.Labels['coolify.configuration'] &&
                 container.Labels['coolify.type'] === 'standalone-application'

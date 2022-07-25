@@ -5,7 +5,6 @@ import yaml from 'js-yaml';
 
 import { copyBaseConfigurationFiles, makeLabelForStandaloneApplication, saveBuildLog, setDefaultConfiguration } from '../lib/buildPacks/common';
 import { createDirectories, decrypt, executeDockerCmd, getDomain, prisma } from '../lib/common';
-import Dockerode from 'dockerode';
 import * as importers from '../lib/importers';
 import * as buildpacks from '../lib/buildPacks';
 
