@@ -741,7 +741,8 @@ export async function getPreviews(request: FastifyRequest<OnlyId>) {
                 PRMRSecrets: []
             }
         }
-        const containers = JSON.parse(stdout).filter((container) => {
+        const jsonStdout = JSON.parse(stdout)
+        const containers = jsonStdout.filter((container) => {
             return (
                 container.Labels['coolify.configuration'] &&
                 container.Labels['coolify.type'] === 'standalone-application'
