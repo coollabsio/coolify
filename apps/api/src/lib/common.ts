@@ -245,8 +245,8 @@ export const supportedServiceTypesAndVersions = [
 		fancyName: 'Hasura',
 		baseImage: 'hasura/graphql-engine',
 		images: ['postgres:12-alpine'],
-		versions: ['latest', 'v2.5.1'],
-		recommendedVersion: 'v2.5.1',
+		versions: ['latest', 'v2.8.4', 'v2.5.1'],
+		recommendedVersion: 'v2.8.4',
 		ports: {
 			main: 8080
 		}
@@ -463,7 +463,7 @@ export const supportedDatabaseTypesAndVersions = [
 		name: 'mariadb',
 		fancyName: 'MariaDB',
 		baseImage: 'bitnami/mariadb',
-		versions: ['10.7', '10.6', '10.5', '10.4', '10.3', '10.2']
+		versions: ['10.8', '10.7', '10.6', '10.5', '10.4', '10.3', '10.2']
 	},
 	{
 		name: 'postgresql',
@@ -475,9 +475,9 @@ export const supportedDatabaseTypesAndVersions = [
 		name: 'redis',
 		fancyName: 'Redis',
 		baseImage: 'bitnami/redis',
-		versions: ['6.2', '6.0', '5.0']
+		versions: ['7.0', '6.2', '6.0', '5.0']
 	},
-	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] }
+	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.2'] }
 ];
 export async function createRemoteEngineConfiguration(id: string) {
 	const homedir = os.homedir();
