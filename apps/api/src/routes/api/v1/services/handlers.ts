@@ -2,13 +2,13 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings, getFreeExposedPort } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceImage, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings, getFreeExposedPort, checkDomainsIsValidInDNS } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, dockerInstance, isContainerExited, removeContainer } from '../../../../lib/docker';
 import cuid from 'cuid';
 
 import type { OnlyId } from '../../../../types';
-import type { ActivateWordpressFtp, CheckService, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetWordpressSettings } from './types';
+import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetWordpressSettings } from './types';
 
 // async function startServiceNew(request: FastifyRequest<OnlyId>) {
 //     try {
@@ -346,22 +346,35 @@ export async function saveServiceSettings(request: FastifyRequest<SaveServiceSet
         return errorHandler({ status, message })
     }
 }
+export async function checkServiceDomain(request: FastifyRequest<CheckServiceDomain>) {
+    try {
+        const { id } = request.params
+        const { domain } = request.query
+        const { fqdn, dualCerts } = await prisma.service.findUnique({ where: { id }})
+        return await checkDomainsIsValidInDNS({ hostname: domain, fqdn, dualCerts });
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function checkService(request: FastifyRequest<CheckService>) {
     try {
         const { id } = request.params;
-        let { fqdn, exposePort, otherFqdns } = request.body;
+        let { fqdn, exposePort, forceSave, otherFqdns, dualCerts } = request.body;
 
         if (fqdn) fqdn = fqdn.toLowerCase();
         if (otherFqdns && otherFqdns.length > 0) otherFqdns = otherFqdns.map((f) => f.toLowerCase());
         if (exposePort) exposePort = Number(exposePort);
 
-        let found = await isDomainConfigured({ id, fqdn });
+        const { destinationDocker: { id: dockerId, remoteIpAddress, remoteEngine }, exposePort: configuredPort } = await prisma.service.findUnique({ where: { id }, include: { destinationDocker: true } })
+        const { isDNSCheckEnabled } = await prisma.setting.findFirst({});
+
+        let found = await isDomainConfigured({ id, fqdn, dockerId });
         if (found) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
         if (otherFqdns && otherFqdns.length > 0) {
             for (const ofqdn of otherFqdns) {
-                found = await isDomainConfigured({ id, fqdn: ofqdn, checkOwn: true });
+                found = await isDomainConfigured({ id, fqdn: ofqdn, dockerId });
                 if (found) {
                     throw { status: 500, message: `Domain ${getDomain(ofqdn).replace('www.', '')} is already in use!` }
                 }
@@ -371,13 +384,18 @@ export async function checkService(request: FastifyRequest<CheckService>) {
             if (exposePort < 1024 || exposePort > 65535) {
                 throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
             }
-            const { destinationDocker: { id: dockerId, remoteIpAddress }, exposePort: configuredPort } = await prisma.service.findUnique({ where: { id }, include: { destinationDocker: true } })
+
             if (configuredPort !== exposePort) {
                 const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
                 if (availablePort.toString() !== exposePort.toString()) {
                     throw { status: 500, message: `Port ${exposePort} is already in use.` }
                 }
             }
+        }
+        if (isDNSCheckEnabled && !isDev && !forceSave) {
+            let hostname = request.hostname.split(':')[0];
+            if (remoteEngine) hostname = remoteIpAddress;
+            return await checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts });
         }
         return {}
     } catch ({ status, message }) {

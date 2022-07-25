@@ -11,7 +11,7 @@
 	import { toast } from '@zerodevx/svelte-toast';
 
 	import { get, post } from '$lib/api';
-	import { errorNotification } from '$lib/common';
+	import { errorNotification, getDomain } from '$lib/common';
 	import { t } from '$lib/translations';
 	import { appSession, disabledButton, status, location, setLocation } from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
@@ -30,13 +30,30 @@
 	import Moodle from './_Moodle.svelte';
 
 	const { id } = $page.params;
-
 	$: isDisabled =
 		!$appSession.isAdmin || $status.service.isRunning || $status.service.initialLoading;
 
+	let forceSave = false;
 	let loading = false;
 	let loadingVerification = false;
 	let dualCerts = service.dualCerts;
+
+	let nonWWWDomain = service.fqdn && getDomain(service.fqdn).replace(/^www\./, '');
+	let isNonWWWDomainOK = false;
+	let isWWWDomainOK = false;
+
+	async function isDNSValid(domain: any, isWWW: any) {
+		try {
+			await get(`/services/${id}/check?domain=${domain}`);
+			toast.push('DNS configuration is valid.');
+			isWWW ? (isWWWDomainOK = true) : (isNonWWWDomainOK = true);
+			return true;
+		} catch (error) {
+			errorNotification(error);
+			isWWW ? (isWWWDomainOK = false) : (isNonWWWDomainOK = false);
+			return false;
+		}
+	}
 
 	async function handleSubmit() {
 		if (loading) return;
@@ -44,14 +61,32 @@
 		try {
 			await post(`/services/${id}/check`, {
 				fqdn: service.fqdn,
+				forceSave,
+				dualCerts,
 				otherFqdns: service.minio?.apiFqdn ? [service.minio?.apiFqdn] : [],
 				exposePort: service.exposePort
 			});
 			await post(`/services/${id}`, { ...service });
 			setLocation(service);
 			$disabledButton = false;
+			forceSave = false;
 			toast.push('Configuration saved.');
 		} catch (error) {
+			//@ts-ignore
+			if (error?.message.startsWith($t('application.dns_not_set_partial_error'))) {
+				forceSave = true;
+				if (dualCerts) {
+					isNonWWWDomainOK = await isDNSValid(getDomain(nonWWWDomain), false);
+					isWWWDomainOK = await isDNSValid(getDomain(`www.${nonWWWDomain}`), true);
+				} else {
+					const isWWW = getDomain(service.fqdn).includes('www.');
+					if (isWWW) {
+						isWWWDomainOK = await isDNSValid(getDomain(`www.${nonWWWDomain}`), true);
+					} else {
+						isNonWWWDomainOK = await isDNSValid(getDomain(nonWWWDomain), false);
+					}
+				}
+			}
 			return errorNotification(error);
 		} finally {
 			loading = false;
@@ -111,8 +146,15 @@
 				<button
 					type="submit"
 					class:bg-pink-600={!loading}
+					class:bg-orange-600={forceSave}
 					class:hover:bg-pink-500={!loading}
-					disabled={loading}>{loading ? $t('forms.saving') : $t('forms.save')}</button
+					class:hover:bg-orange-400={forceSave}
+					disabled={loading}
+					>{loading
+						? $t('forms.saving')
+						: forceSave
+						? $t('forms.confirm_continue')
+						: $t('forms.save')}</button
 				>
 			{/if}
 			{#if service.type === 'plausibleanalytics' && $status.service.isRunning}
@@ -235,7 +277,38 @@
 					/>
 				</div>
 			{/if}
-
+			{#if forceSave}
+				<div class="flex-col space-y-2 pt-4 text-center">
+					{#if isNonWWWDomainOK}
+						<button
+							class="bg-green-600 hover:bg-green-500"
+							on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+							>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
+						>
+					{:else}
+						<button
+							class="bg-red-600 hover:bg-red-500"
+							on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+							>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
+						>
+					{/if}
+					{#if dualCerts}
+						{#if isWWWDomainOK}
+							<button
+								class="bg-green-600 hover:bg-green-500"
+								on:click|preventDefault={() => isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+								>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
+							>
+						{:else}
+							<button
+								class="bg-red-600 hover:bg-red-500"
+								on:click|preventDefault={() => isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+								>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
+							>
+						{/if}
+					{/if}
+				</div>
+			{/if}
 			<div class="grid grid-cols-2 items-center px-10">
 				<Setting
 					disabled={$status.service.isRunning}

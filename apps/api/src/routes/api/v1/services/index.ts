@@ -3,6 +3,7 @@ import {
     activatePlausibleUsers,
     activateWordpressFtp,
     checkService,
+    checkServiceDomain,
     deleteService,
     deleteServiceSecret,
     deleteServiceStorage,
@@ -29,7 +30,7 @@ import {
 } from './handlers';
 
 import type { OnlyId } from '../../../../types';
-import type { ActivateWordpressFtp, CheckService, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetWordpressSettings } from './types';
+import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetWordpressSettings } from './types';
 
 const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.addHook('onRequest', async (request) => {
@@ -44,6 +45,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 
     fastify.get<OnlyId>('/:id/status', async (request) => await getServiceStatus(request));
 
+    fastify.get<CheckServiceDomain>('/:id/check', async (request) => await checkServiceDomain(request));
     fastify.post<CheckService>('/:id/check', async (request) => await checkService(request));
 
     fastify.post<SaveServiceSettings>('/:id/settings', async (request, reply) => await saveServiceSettings(request, reply));

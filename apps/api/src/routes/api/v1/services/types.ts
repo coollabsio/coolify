@@ -25,9 +25,16 @@ export interface SaveServiceSettings extends OnlyId {
         dualCerts: boolean
     }
 }
+export interface CheckServiceDomain extends OnlyId {
+    Querystring: {
+        domain: string
+    }
+}
 export interface CheckService extends OnlyId {
     Body: {
         fqdn: string,
+        forceSave: boolean,
+        dualCerts: boolean,
         exposePort: number,
         otherFqdns: Array<string>
     }

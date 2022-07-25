@@ -317,12 +317,16 @@ export function getDomain(domain: string): string {
 export async function isDomainConfigured({
 	id,
 	fqdn,
-	checkOwn = false
+	checkOwn = false,
+	dockerId = undefined
 }: {
 	id: string;
 	fqdn: string;
 	checkOwn?: boolean;
+	dockerId: string;
 }): Promise<boolean> {
+
+	console.log({checkOwn, dockerId})
 	const domain = getDomain(fqdn);
 	const nakedDomain = domain.replace('www.', '');
 	const foundApp = await prisma.application.findFirst({
@@ -331,7 +335,10 @@ export async function isDomainConfigured({
 				{ fqdn: { endsWith: `//${nakedDomain}` } },
 				{ fqdn: { endsWith: `//www.${nakedDomain}` } }
 			],
-			id: { not: id }
+			id: { not: id },
+			destinationDocker: {
+				id: dockerId
+			}
 		},
 		select: { fqdn: true }
 	});
@@ -343,7 +350,10 @@ export async function isDomainConfigured({
 				{ minio: { apiFqdn: { endsWith: `//${nakedDomain}` } } },
 				{ minio: { apiFqdn: { endsWith: `//www.${nakedDomain}` } } }
 			],
-			id: { not: checkOwn ? undefined : id }
+			id: { not: checkOwn ? undefined : id },
+			destinationDocker: {
+				id: dockerId
+			}
 		},
 		select: { fqdn: true }
 	});
@@ -416,16 +426,13 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 		}
 	} else {
 		try {
-			console.log({domain})
 			const ipDomain = await dns.resolve4(domain);
-			console.log({ipDomain})
 			let ipDomainFound = false;
 			for (const ip of ipDomain) {
 				if (resolves.includes(ip)) {
 					ipDomainFound = true;
 				}
 			}
-			console.log({ipDomainFound})
 			if (ipDomainFound) return { status: 200 };
 			throw { status: 500, message: `DNS not set correctly or propogated.<br>Please check your DNS settings.` }
 		} catch (error) {
