@@ -177,7 +177,6 @@ export async function getApplicationFromDB(id: string, teamId: string) {
 }
 export async function getApplicationFromDBWebhook(projectId: number, branch: string) {
     try {
-        console.log({ projectId, branch })
         let application = await prisma.application.findFirst({
             where: { projectId, branch, settings: { autodeploy: true } },
             include: {
@@ -188,7 +187,6 @@ export async function getApplicationFromDBWebhook(projectId: number, branch: str
                 persistentStorage: true
             }
         });
-        console.log({ application })
         if (!application) {
             throw { status: 500, message: 'Application not configured.' }
         }

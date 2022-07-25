@@ -86,7 +86,6 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
             projectId = repository.id;
             branch =  body.pull_request.head.ref.includes('/') ? body.pull_request.head.ref.split('/')[2] : body.pull_request.head.ref;
         }
-        console.log({repository, projectId, branch})
         if (!projectId || !branch) {
             throw { status: 500, message: 'Cannot parse projectId or branch from the webhook?!' }
         }

@@ -34,7 +34,6 @@ export async function configureGitLabApp(request: FastifyRequest<ConfigureGitLab
         }
         return reply.redirect(`/webhooks/success?token=${data.access_token}`)
     } catch ({ status, message, ...other }) {
-        console.log(other)
         return errorHandler({ status, message })
     }
 }
