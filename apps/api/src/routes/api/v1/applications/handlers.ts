@@ -734,7 +734,7 @@ export async function getPreviews(request: FastifyRequest<OnlyId>) {
         const PRMRSecrets = secrets.filter((secret) => secret.isPRMRSecret);
         const application = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
         const { stdout } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker container ls --filter 'name=${id}-' --format "{{json .}}"` })
-        if (!stdout) {
+        if (stdout === '') {
             return {
                 containers: [],
                 applicationSecrets: [],
