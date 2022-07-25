@@ -86,7 +86,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
             projectId = repository.id;
             branch = body.pull_request.head.ref.split('/')[2];
         }
-
+        console.log({repository, projectId, branch})
         const applicationFound = await getApplicationFromDBWebhook(projectId, branch);
         if (applicationFound) {
             const webhookSecret = applicationFound.gitSource.githubApp.webhookSecret || null;

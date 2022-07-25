@@ -512,7 +512,7 @@ export async function executeDockerCmd({ dockerId, command }: { dockerId: string
 		await createRemoteEngineConfiguration(dockerId)
 	}
 	return await asyncExecShell(
-		`DOCKER_HOST="${host}" ${command}`
+		`DOCKER_BUILDKIT=1 DOCKER_HOST="${host}" ${command}`
 	);
 }
 export async function startTraefikProxy(id: string): Promise<void> {
