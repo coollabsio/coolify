@@ -239,7 +239,6 @@
 			><input
 				value={destination.sshKey.name}
 				id="sshKey"
-				disabled
 				class="cursor-pointer hover:bg-coolgray-500"
 			/></a
 		>

@@ -153,7 +153,8 @@
 				>
 					<input
 						value={database.version}
-						disabled={$status.database.isRunning || $status.service.initialLoading}
+						readonly
+						disabled={$status.database.isRunning || $status.database.initialLoading}
 						class:cursor-pointer={!$status.database.isRunning}
 					/></a
 				>

@@ -31,7 +31,7 @@
 			appSecret: null
 		};
 	}
-	$: selfHosted = source.htmlUrl !== 'https://gitlab.com' ;
+	$: selfHosted = source.htmlUrl !== 'https://gitlab.com';
 
 	onMount(() => {
 		oauthIdEl && oauthIdEl.focus();
@@ -228,20 +228,22 @@
 					bind:value={source.apiUrl}
 				/>
 			</div>
-			<div class="grid grid-cols-2 items-center">
-				<label for="customPort" class="text-base font-bold text-stone-100">Custom SSH Port</label>
-				<input
-					name="customPort"
-					id="customPort"
-					disabled={!selfHosted}
-					readonly={!selfHosted}
-					required
-					bind:value={source.customPort}
-				/>
-				<Explainer
-					text="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
-				/>
-			</div>
+			{#if selfHosted}
+				<div class="grid grid-cols-2 items-center">
+					<label for="customPort" class="text-base font-bold text-stone-100">Custom SSH Port</label>
+					<input
+						name="customPort"
+						id="customPort"
+						disabled={!selfHosted}
+						readonly={!selfHosted}
+						required
+						bind:value={source.customPort}
+					/>
+					<Explainer
+						text="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
+					/>
+				</div>
+			{/if}
 			<div class="grid grid-cols-2 items-start">
 				<div class="flex-col">
 					<label for="oauthId" class="pt-2 text-base font-bold text-stone-100"

@@ -198,6 +198,7 @@
 					<input
 						value={service.version}
 						id="service"
+						readonly
 						disabled={$status.service.isRunning || $status.service.initialLoading}
 						class:cursor-pointer={!$status.service.isRunning}
 					/></a
