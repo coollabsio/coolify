@@ -5,6 +5,7 @@
 
 	import { post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
+	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 	import { t } from '$lib/translations';
 
@@ -27,6 +28,12 @@
 	}
 </script>
 
+<div class="text-center flex justify-center">
+	<Explainer
+		customClass="max-w-[32rem]"
+		text="Remote Docker Engines are using <span class='text-white font-bold'>SSH connection</span> to initiate connection. You need to setup an <span class='text-white font-bold'>SSH key</span> in advance on the server and install Docker. <br>See <a class='text-white' href='https://docs.coollabs.io'>docs</a> for more details."
+	/>
+</div>
 <div class="flex justify-center px-6 pb-8">
 	<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
 		<div class="flex items-center space-x-2 pb-5">
@@ -62,12 +69,22 @@
 
 		<div class="grid grid-cols-2 items-center px-10">
 			<label for="remoteUser" class="text-base font-bold text-stone-100">{$t('forms.user')}</label>
-			<input required name="remoteUser" placeholder="{$t('forms.eg')}: root" bind:value={payload.remoteUser} />
+			<input
+				required
+				name="remoteUser"
+				placeholder="{$t('forms.eg')}: root"
+				bind:value={payload.remoteUser}
+			/>
 		</div>
 
 		<div class="grid grid-cols-2 items-center px-10">
 			<label for="remotePort" class="text-base font-bold text-stone-100">{$t('forms.port')}</label>
-			<input required name="remotePort" placeholder="{$t('forms.eg')}: 22" bind:value={payload.remotePort} />
+			<input
+				required
+				name="remotePort"
+				placeholder="{$t('forms.eg')}: 22"
+				bind:value={payload.remotePort}
+			/>
 		</div>
 		<div class="grid grid-cols-2 items-center px-10">
 			<label for="network" class="text-base font-bold text-stone-100">{$t('forms.network')}</label>
