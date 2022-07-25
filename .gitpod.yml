@@ -3,7 +3,7 @@
 # and commit this file to your remote git repository to share the goodness with others.
 image: gitpod/workspace-node:2022-06-20-19-54-55
 tasks:
-  - init: pnpm install
+  - init: pnpm install && pnpm db:push && pnpm db:seed
     command: pnpm dev
 
 ports:
