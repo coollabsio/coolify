@@ -80,13 +80,15 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
         if (githubEvent === 'push') {
             repository = body.repository;
             projectId = repository.id;
-            branch = body.ref.split('/')[2];
+            branch = body.ref.includes('/') ? body.ref.split('/')[2] : body.ref;
         } else if (githubEvent === 'pull_request') {
             repository = body.pull_request.head.repo;
             projectId = repository.id;
-            branch = body.pull_request.head.ref.split('/')[2];
+            branch =  body.pull_request.head.ref.includes('/') ? body.pull_request.head.ref.split('/')[2] : body.pull_request.head.ref;
         }
-        console.log({repository, projectId, branch})
+        if (!projectId || !branch) {
+            throw { status: 500, message: 'Cannot parse projectId or branch from the webhook?!' }
+        }
         const applicationFound = await getApplicationFromDBWebhook(projectId, branch);
         if (applicationFound) {
             const webhookSecret = applicationFound.gitSource.githubApp.webhookSecret || null;
