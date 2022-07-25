@@ -8,12 +8,16 @@ export interface GitHubEvents {
     Body: {
         number: string,
         action: string,
-        repository: string,
+        repository: {
+            id: string,
+        },
         ref: string,
         pull_request: {
-            head: {
+            base: {
                 ref: string,
-                repo: string
+                repo: {
+                    id: string,
+                }
             }
         }
     }
