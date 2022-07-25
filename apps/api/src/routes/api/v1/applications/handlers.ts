@@ -742,6 +742,7 @@ export async function getPreviews(request: FastifyRequest<OnlyId>) {
             }
         }
         const jsonStdout = JSON.parse(stdout)
+        console.log({jsonStdout, stdout})
         const containers = jsonStdout.filter((container) => {
             return (
                 container.Labels['coolify.configuration'] &&
