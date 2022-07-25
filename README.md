@@ -74,7 +74,7 @@ You can use the following Git Sources to be auto-deployed to your Coolifyt insta
 You can deploy your applications to the following destinations:
 
 - Local Docker Engine
-- Remote Docker Engine (WIP)
+- Remote Docker Engine
 - Kubernetes (WIP)
 
 ### Applications
