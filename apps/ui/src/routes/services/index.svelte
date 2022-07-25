@@ -85,7 +85,7 @@
 							{#if service.fqdn}
 								<div class="truncate text-center">{getDomain(service.fqdn) || ''}</div>
 							{/if}
-							{#if service.destinationDocker.name}
+							{#if service.destinationDocker?.name}
 								<div class="truncate text-center">{service.destinationDocker.name}</div>
 							{/if}
 							{#if !service.type || !service.fqdn}
@@ -101,7 +101,7 @@
 				<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Services</div>
 				<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 					{#each otherServices as service}
-						<a href="/services/{service.id}" class="w-96 p-2 no-underline">
+						<a href="/services/{service.id}" class="p-2 no-underline">
 							<div class="box-selection group relative hover:bg-pink-600">
 								<Services type={service.type} />
 								<div class="truncate text-center text-xl font-bold">

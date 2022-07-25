@@ -193,7 +193,7 @@
 		<div class="flex flex-col">
 			<div class="flex flex-row flex-wrap justify-center px-2 pb-10 md:flex-row">
 				{#each ownTeams as team}
-					<a href="/iam/team/{team.id}" class="w-96 p-2 no-underline">
+					<a href="/iam/team/{team.id}" class="p-2 no-underline">
 						<div class="box-selection relative">
 							<div>
 								<div class="truncate text-center text-xl font-bold">
@@ -221,7 +221,7 @@
 				<div class="pb-5 pt-10 text-xl font-bold">Other Teams</div>
 				<div class="flex flex-row flex-wrap justify-center px-2 md:flex-row">
 					{#each allTeams as team}
-						<a href="/iam/team/{team.id}" class="w-96 p-2 no-underline">
+						<a href="/iam/team/{team.id}" class="p-2 no-underline">
 							<div
 								class="box-selection relative"
 								class:hover:bg-fuchsia-600={team.id !== '0'}

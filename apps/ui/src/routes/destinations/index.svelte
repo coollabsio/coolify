@@ -126,7 +126,7 @@
 				<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Destinations</div>
 				<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 					{#each otherDestinations as destination}
-						<a href="/destinations/{destination.id}" class="w-96 p-2 no-underline relative">
+						<a href="/destinations/{destination.id}" class="p-2 no-underline relative">
 							<div class="box-selection hover:bg-sky-600">
 								<svg
 									xmlns="http://www.w3.org/2000/svg"

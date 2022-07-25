@@ -100,7 +100,7 @@
 							{#if $appSession.teamId === '0' && otherDatabases.length > 0}
 								<div class="truncate text-center">{database.teams[0].name}</div>
 							{/if}
-							{#if database.destinationDocker.name}
+							{#if database.destinationDocker?.name}
 								<div class="truncate text-center">{database.destinationDocker.name}</div>
 							{/if}
 							{#if !database.type}
@@ -116,7 +116,7 @@
 				<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Databases</div>
 				<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 					{#each otherDatabases as database}
-						<a href="/databases/{database.id}" class="w-96 p-2 no-underline">
+						<a href="/databases/{database.id}" class="p-2 no-underline">
 							<div class="box-selection group relative hover:bg-purple-600">
 								{#if database.type === 'clickhouse'}
 									<Clickhouse isAbsolute />
