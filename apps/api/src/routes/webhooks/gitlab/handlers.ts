@@ -118,7 +118,7 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                     if (applicationFound.destinationDockerId) {
                         const isRunning = await checkContainer(
                             {
-                                dockerId: applicationFound.destinationDocker.engine,
+                                dockerId: applicationFound.destinationDocker.id,
                                 container: applicationFound.id
                             }
                         );

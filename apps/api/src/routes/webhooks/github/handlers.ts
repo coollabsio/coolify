@@ -166,7 +166,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                     if (applicationFound.destinationDockerId) {
                         const isRunning = await checkContainer(
                             {
-                                dockerId: applicationFound.destinationDocker.engine,
+                                dockerId: applicationFound.destinationDocker.id,
                                 container: applicationFound.id
                             }
                         );
@@ -209,7 +209,6 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                     } else if (pullmergeRequestAction === 'closed') {
                         if (applicationFound.destinationDockerId) {
                             const id = `${applicationFound.id}-${pullmergeRequestId}`;
-                            const engine = applicationFound.destinationDocker.engine;
                             await removeContainer({ id, dockerId: applicationFound.destinationDocker.id });
                         }
                         return {
