@@ -732,8 +732,8 @@ export async function getPreviews(request: FastifyRequest<OnlyId>) {
 
         const applicationSecrets = secrets.filter((secret) => !secret.isPRMRSecret);
         const PRMRSecrets = secrets.filter((secret) => secret.isPRMRSecret);
-        const application = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
-        const { stdout } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker container ls --filter 'name=${id}-' --format "{{json .}}"` })
+        const application = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } });
+        const { stdout } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker container ls --filter 'name=${id}-'  --format "{{json .}}"` })
         if (stdout === '') {
             return {
                 containers: [],
@@ -741,12 +741,20 @@ export async function getPreviews(request: FastifyRequest<OnlyId>) {
                 PRMRSecrets: []
             }
         }
-        const jsonStdout = JSON.parse(stdout)
-        console.log({jsonStdout, stdout})
+        const out = stdout.trim().split('\n')
+        const jsonStdout = out.map(a => JSON.parse(a))
         const containers = jsonStdout.filter((container) => {
+            const labels = container.Labels.split(',')
+            let jsonLabels = {}
+            labels.forEach(l => {
+                const name = l.split('=')[0]
+                const value = l.split('=')[1]
+                jsonLabels = { ...jsonLabels, ...{ [name]: value } }
+            })
+            container.Labels = jsonLabels;
             return (
-                container.Labels['coolify.configuration'] &&
-                container.Labels['coolify.type'] === 'standalone-application'
+                jsonLabels['coolify.configuration'] &&
+                jsonLabels['coolify.type'] === 'standalone-application'
             );
         });
         const jsonContainers = containers
@@ -766,6 +774,7 @@ export async function getPreviews(request: FastifyRequest<OnlyId>) {
             })
         }
     } catch ({ status, message }) {
+        console.log({ status, message })
         return errorHandler({ status, message })
     }
 }
