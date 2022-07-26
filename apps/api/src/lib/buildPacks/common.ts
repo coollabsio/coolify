@@ -1,4 +1,4 @@
-import {  base64Encode, executeDockerCmd, generateTimestamp, getDomain, isDev, prisma, version } from "../common";
+import { base64Encode, executeDockerCmd, generateTimestamp, getDomain, isDev, prisma, version } from "../common";
 import { promises as fs } from 'fs';
 import { day } from "../dayjs";
 
@@ -582,7 +582,11 @@ export async function buildImage({
 	// 	}
 	// );
 	// await streamEvents({ stream, docker, buildId, applicationId, debug });
-	await saveBuildLog({ line: `Building image successful!`, buildId, applicationId });
+	if (isCache) {
+		await saveBuildLog({ line: `Building cache image successful.`, buildId, applicationId });
+	} else {
+		await saveBuildLog({ line: `Building image successful.`, buildId, applicationId });
+	}
 }
 
 export async function streamEvents({ stream, docker, buildId, applicationId, debug }) {
@@ -670,7 +674,6 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 		pullmergeRequestId
 	} = data;
 
-	data.isCache = true
 
 	const isPnpm = checkPnpm(installCommand, buildCommand);
 	const Dockerfile: Array<string> = [];
@@ -702,12 +705,11 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	Dockerfile.push(`RUN ${buildCommand}`);
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
-	await buildImage(data);
+	await buildImage({ ...data, isCache: true });
 }
 
 export async function buildCacheImageForLaravel(data, imageForBuild) {
 	const { workdir, buildId, secrets, pullmergeRequestId } = data;
-	data.isCache = true
 
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild}`);
@@ -732,7 +734,7 @@ export async function buildCacheImageForLaravel(data, imageForBuild) {
 	Dockerfile.push(`COPY resources /app/resources`);
 	Dockerfile.push(`RUN yarn install && yarn production`);
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
-	await buildImage(data);
+	await buildImage({ ...data, isCache: true });
 }
 
 export async function buildCacheImageWithCargo(data, imageForBuild) {
@@ -741,7 +743,6 @@ export async function buildCacheImageWithCargo(data, imageForBuild) {
 		workdir,
 		buildId,
 	} = data;
-	data.isCache = true
 
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild} as planner-${applicationId}`);
@@ -757,5 +758,5 @@ export async function buildCacheImageWithCargo(data, imageForBuild) {
 	Dockerfile.push(`COPY --from=planner-${applicationId} /app/recipe.json recipe.json`);
 	Dockerfile.push('RUN cargo chef cook --release --recipe-path recipe.json');
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
-	await buildImage(data);
+	await buildImage({ ...data, isCache: true });
 }
