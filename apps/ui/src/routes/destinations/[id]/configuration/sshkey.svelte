@@ -43,17 +43,44 @@
 </div>
 <div class="flex flex-col justify-center">
 	<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row ">
-		{#each sshKeys as sshKey}
-			<div class="p-2 relative">
-				<form on:submit|preventDefault={() => handleSubmit(sshKey.id)}>
-					<button
-						type="submit"
-						class="disabled:opacity-95 bg-coolgray-200 disabled:text-white box-selection hover:bg-orange-700 group"
+		{#if sshKeys.length > 0}
+			{#each sshKeys as sshKey}
+				<div class="p-2 relative">
+					<form on:submit|preventDefault={() => handleSubmit(sshKey.id)}>
+						<button
+							type="submit"
+							class="disabled:opacity-95 bg-coolgray-200 disabled:text-white box-selection hover:bg-orange-700 group"
+						>
+							<div class="font-bold text-xl text-center truncate">{sshKey.name}</div>
+						</button>
+					</form>
+				</div>
+			{/each}
+		{:else}
+			<div class="flex-col">
+				<div class="pb-2 text-center font-bold">No SSH key found</div>
+				<div class="flex justify-center">
+					<a
+						href="/settings/ssh-keys"
+						sveltekit:prefetch
+						class="add-icon bg-sky-600 hover:bg-sky-500"
 					>
-						<div class="font-bold text-xl text-center truncate">{sshKey.name}</div>
-					</button>
-				</form>
+						<svg
+							class="w-6"
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+							/></svg
+						>
+					</a>
+				</div>
 			</div>
-		{/each}
+		{/if}
 	</div>
 </div>
