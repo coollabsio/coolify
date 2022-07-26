@@ -34,17 +34,21 @@
 	let containers: any;
 	let PRMRSecrets: any;
 	let applicationSecrets: any;
-	let loading = true;
+	let loading = {
+		init: true,
+		removing: false
+	};
 	async function refreshSecrets() {
 		const data = await get(`/applications/${id}/secrets`);
 		PRMRSecrets = [...data.secrets];
 	}
 	async function removeApplication(container: any) {
 		try {
+			loading.removing = true;
 			await post(`/applications/${id}/stop/preview`, {
 				pullmergeRequestId: container.pullmergeRequestId
 			});
-			toast.push('Preview stopped.');
+			return window.location.reload();
 		} catch (error) {
 			return errorNotification(error);
 		}
@@ -69,7 +73,7 @@
 	}
 	onMount(async () => {
 		try {
-			loading = true;
+			loading.init = true;
 			const response = await get(`/applications/${id}/previews`);
 			containers = response.containers;
 			PRMRSecrets = response.PRMRSecrets;
@@ -77,7 +81,7 @@
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
-			loading = false;
+			loading.init = false;
 		}
 	});
 </script>
@@ -133,7 +137,7 @@
 		</a>
 	{/if}
 </div>
-{#if loading}
+{#if loading.init}
 	<Loading />
 {:else}
 	<div class="mx-auto max-w-6xl px-6 pt-4">
@@ -193,8 +197,12 @@
 					</div>
 					<div class="flex items-center justify-center">
 						<button
-							class="bg-coollabs hover:bg-coollabs-100"
-							on:click={() => removeApplication(container)}>Remove Application</button
+							class:bg-coollabs={!loading.removing}
+							class:hover:bg-coollabs-100={!loading.removing}
+							disabled={loading.removing}
+							on:click={() => removeApplication(container)}
+							>{loading.removing ? 'Removing...' : 'Remove Application'}
+							></button
 						>
 					</div>
 				{/each}
