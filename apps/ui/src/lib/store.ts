@@ -35,7 +35,6 @@ export const appSession: Writable<AppSession> = writable({
         gitlab: null
     }
 });
-export const isTraefikUsed: Writable<boolean> = writable(false);
 export const disabledButton: Writable<boolean> = writable(false);
 export const status: Writable<any> = writable({
     application: {

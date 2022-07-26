@@ -7,8 +7,9 @@ import { CheckDNS, CheckDomain, DeleteDomain, DeleteSSHKey, SaveSettings, SaveSS
 
 export async function listAllSettings(request: FastifyRequest) {
     try {
+        const teamId = request.user.teamId;
         const settings = await listSettings();
-        const sshKeys = await prisma.sshKey.findMany()
+        const sshKeys = await prisma.sshKey.findMany({ where: { team: { id: teamId } } })
         const unencryptedKeys = []
         if (sshKeys.length > 0) {
             for (const key of sshKeys) {
@@ -96,6 +97,7 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
 
 export async function saveSSHKey(request: FastifyRequest<SaveSSHKey>, reply: FastifyReply) {
     try {
+        const teamId = request.user.teamId;
         const { privateKey, name } = request.body;
         const found = await prisma.sshKey.findMany({ where: { name } })
         if (found.length > 0) {
@@ -104,7 +106,7 @@ export async function saveSSHKey(request: FastifyRequest<SaveSSHKey>, reply: Fas
             }
         }
         const encryptedSSHKey = encrypt(privateKey)
-        await prisma.sshKey.create({ data: { name, privateKey: encryptedSSHKey } })
+        await prisma.sshKey.create({ data: { name, privateKey: encryptedSSHKey, team: { connect: { id: teamId } } } })
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })

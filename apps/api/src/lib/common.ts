@@ -323,7 +323,7 @@ export async function isDomainConfigured({
 	id: string;
 	fqdn: string;
 	checkOwn?: boolean;
-	dockerId: string;
+	dockerId?: string;
 }): Promise<boolean> {
 
 	console.log({ checkOwn, dockerId })

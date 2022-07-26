@@ -9,3 +9,5 @@ tasks:
 ports:
   - port: 3001
     visibility: public
+  - port: 3000
+    visibility: public

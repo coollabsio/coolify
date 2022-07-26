@@ -66,6 +66,7 @@ model Team {
   databaseId        String?
   service           Service[]           @relation(references: [id])
   serviceId         String?
+  SshKey            SshKey[]
 }
 
 model TeamInvitation {
@@ -227,6 +228,8 @@ model SshKey {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   destinationDocker DestinationDocker[]
+  team              Team?               @relation(fields: [teamId], references: [id])
+  teamId            String?
 }
 
 model GitSource {

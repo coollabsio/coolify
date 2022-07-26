@@ -117,6 +117,9 @@
 							{#if $appSession.teamId === '0' && destination.remoteVerified === false && destination.remoteEngine}
 								<div class="truncate text-center text-sm text-red-500">Not verified yet</div>
 							{/if}
+							{#if destination.remoteEngine && !destination.sshKeyId}
+								<div class="truncate text-center text-sm text-red-500">SSH Key missing!</div>
+							{/if}
 						</div>
 					</a>
 				{/each}
