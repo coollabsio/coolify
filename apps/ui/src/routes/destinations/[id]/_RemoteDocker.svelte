@@ -238,6 +238,7 @@
 			class="no-underline"
 			><input
 				value={destination.sshKey.name}
+				readonly
 				id="sshKey"
 				class="cursor-pointer hover:bg-coolgray-500"
 			/></a
