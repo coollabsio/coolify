@@ -325,8 +325,6 @@ export async function isDomainConfigured({
 	checkOwn?: boolean;
 	dockerId?: string;
 }): Promise<boolean> {
-
-	console.log({ checkOwn, dockerId })
 	const domain = getDomain(fqdn);
 	const nakedDomain = domain.replace('www.', '');
 	const foundApp = await prisma.application.findFirst({
@@ -387,7 +385,6 @@ export async function getContainerUsage(dockerId: string, container: string): Pr
 export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): Promise<any> {
 	const { isIP } = await import('is-ip');
 	const domain = getDomain(fqdn);
-	console.log({ hostname, fqdn, dualCerts })
 	const domainDualCert = domain.includes('www.') ? domain.replace('www.', '') : `www.${domain}`;
 	dns.setServers(['1.1.1.1', '8.8.8.8']);
 	let resolves = [];

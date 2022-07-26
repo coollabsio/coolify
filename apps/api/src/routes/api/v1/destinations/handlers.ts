@@ -77,7 +77,6 @@ export async function newDestination(request: FastifyRequest<NewDestination>, re
         const { id } = request.params
 
         let { name, network, engine, isCoolifyProxyUsed, remoteIpAddress, remoteUser, remotePort } = request.body
-        console.log({ name, network, engine, isCoolifyProxyUsed, remoteIpAddress, remoteUser, remotePort })
         if (id === 'new') {
             console.log(engine)
             if (engine) {
