@@ -71,7 +71,6 @@
 	$appSession.whiteLabeled = baseSettings.whiteLabeled;
 	$appSession.whiteLabeledDetails.icon = baseSettings.whiteLabeledIcon;
 
-	export let settings: any;
 	export let userId: string;
 	export let teamId: string;
 	export let permission: string;

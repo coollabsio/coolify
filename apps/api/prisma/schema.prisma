@@ -11,9 +11,6 @@ datasource db {
 model Setting {
   id                    String   @id @default(cuid())
   fqdn                  String?  @unique
-  ipv4                  String?
-  ipv6                  String?
-  arch                  String?
   isRegistrationEnabled Boolean  @default(false)
   dualCerts             Boolean  @default(false)
   minPort               Int      @default(9000)
@@ -26,6 +23,9 @@ model Setting {
   isTraefikUsed         Boolean  @default(true)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+  ipv4                  String?
+  ipv6                  String?
+  arch                  String?
 }
 
 model User {
@@ -33,40 +33,40 @@ model User {
   email      String       @unique
   type       String
   password   String?
-  teams      Team[]
-  permission Permission[]
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
+  permission Permission[]
+  teams      Team[]
 }
 
 model Permission {
   id         String   @id @default(cuid())
-  user       User     @relation(fields: [userId], references: [id])
   userId     String
-  team       Team     @relation(fields: [teamId], references: [id])
   teamId     String
   permission String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  team       Team     @relation(fields: [teamId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
 }
 
 model Team {
   id                String              @id @default(cuid())
-  users             User[]
   name              String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  databaseId        String?
+  serviceId         String?
+  permissions       Permission[]
+  sshKey            SshKey[]
   applications      Application[]
+  database          Database[]
+  destinationDocker DestinationDocker[]
   gitSources        GitSource[]
   gitHubApps        GithubApp[]
   gitLabApps        GitlabApp[]
-  destinationDocker DestinationDocker[]
-  permissions       Permission[]
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  database          Database[]          @relation(references: [id])
-  databaseId        String?
-  service           Service[]           @relation(references: [id])
-  serviceId         String?
-  SshKey            SshKey[]
+  service           Service[]
+  users             User[]
 }
 
 model TeamInvitation {
@@ -105,21 +105,20 @@ model Application {
   denoOptions         String?
   createdAt           DateTime                       @default(now())
   updatedAt           DateTime                       @updatedAt
-  settings            ApplicationSettings?
-  teams               Team[]
   destinationDockerId String?
-  destinationDocker   DestinationDocker?             @relation(fields: [destinationDockerId], references: [id])
   gitSourceId         String?
-  gitSource           GitSource?                     @relation(fields: [gitSourceId], references: [id])
-  secrets             Secret[]
-  persistentStorage   ApplicationPersistentStorage[]
   baseImage           String?
   baseBuildImage      String?
+  gitSource           GitSource?                     @relation(fields: [gitSourceId], references: [id])
+  destinationDocker   DestinationDocker?             @relation(fields: [destinationDockerId], references: [id])
+  persistentStorage   ApplicationPersistentStorage[]
+  settings            ApplicationSettings?
+  secrets             Secret[]
+  teams               Team[]
 }
 
 model ApplicationSettings {
   id            String      @id @default(cuid())
-  application   Application @relation(fields: [applicationId], references: [id])
   applicationId String      @unique
   dualCerts     Boolean     @default(false)
   debug         Boolean     @default(false)
@@ -127,26 +126,27 @@ model ApplicationSettings {
   autodeploy    Boolean     @default(true)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+  application   Application @relation(fields: [applicationId], references: [id])
 }
 
 model ApplicationPersistentStorage {
   id            String      @id @default(cuid())
-  application   Application @relation(fields: [applicationId], references: [id])
   applicationId String
   path          String
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+  application   Application @relation(fields: [applicationId], references: [id])
 
   @@unique([applicationId, path])
 }
 
 model ServicePersistentStorage {
   id        String   @id @default(cuid())
-  service   Service  @relation(fields: [serviceId], references: [id])
   serviceId String
   path      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  service   Service  @relation(fields: [serviceId], references: [id])
 
   @@unique([serviceId, path])
 }
@@ -159,8 +159,8 @@ model Secret {
   isBuildSecret Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
-  application   Application @relation(fields: [applicationId], references: [id])
   applicationId String
+  application   Application @relation(fields: [applicationId], references: [id])
 
   @@unique([name, applicationId, isPRMRSecret])
 }
@@ -171,8 +171,8 @@ model ServiceSecret {
   value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  service   Service  @relation(fields: [serviceId], references: [id])
   serviceId String
+  service   Service  @relation(fields: [serviceId], references: [id])
 
   @@unique([name, serviceId])
 }
@@ -211,14 +211,14 @@ model DestinationDocker {
   remotePort         Int?
   remoteVerified     Boolean       @default(false)
   isCoolifyProxyUsed Boolean?      @default(false)
-  teams              Team[]
-  application        Application[]
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
+  sshKeyId           String?
+  sshKey             SshKey?       @relation(fields: [sshKeyId], references: [id])
+  application        Application[]
   database           Database[]
   service            Service[]
-  sshKey             SshKey?       @relation(fields: [sshKeyId], references: [id])
-  sshKeyId           String?
+  teams              Team[]
 }
 
 model SshKey {
@@ -227,15 +227,14 @@ model SshKey {
   privateKey        String
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
-  destinationDocker DestinationDocker[]
-  team              Team?               @relation(fields: [teamId], references: [id])
   teamId            String?
+  team              Team?               @relation(fields: [teamId], references: [id])
+  destinationDocker DestinationDocker[]
 }
 
 model GitSource {
   id           String        @id @default(cuid())
   name         String
-  teams        Team[]
   type         String?
   apiUrl       String?
   htmlUrl      String?
@@ -244,16 +243,16 @@ model GitSource {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   githubAppId  String?       @unique
-  githubApp    GithubApp?    @relation(fields: [githubAppId], references: [id])
-  application  Application[]
   gitlabAppId  String?       @unique
   gitlabApp    GitlabApp?    @relation(fields: [gitlabAppId], references: [id])
+  githubApp    GithubApp?    @relation(fields: [githubAppId], references: [id])
+  application  Application[]
+  teams        Team[]
 }
 
 model GithubApp {
   id             String     @id @default(cuid())
   name           String?    @unique
-  teams          Team[]
   appId          Int?
   installationId Int?
   clientId       String?
@@ -263,13 +262,13 @@ model GithubApp {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
   gitSource      GitSource?
+  teams          Team[]
 }
 
 model GitlabApp {
   id            String     @id @default(cuid())
   oauthId       Int        @unique
   groupName     String?    @unique
-  teams         Team[]
   deployKeyId   Int?
   privateSshKey String?
   publicSshKey  String?
@@ -279,6 +278,7 @@ model GitlabApp {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
   gitSource     GitSource?
+  teams         Team[]
 }
 
 model Database {
@@ -292,22 +292,22 @@ model Database {
   dbUserPassword      String?
   rootUser            String?
   rootUserPassword    String?
-  settings            DatabaseSettings?
-  destinationDocker   DestinationDocker? @relation(fields: [destinationDockerId], references: [id])
   destinationDockerId String?
-  teams               Team[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
+  destinationDocker   DestinationDocker? @relation(fields: [destinationDockerId], references: [id])
+  settings            DatabaseSettings?
+  teams               Team[]
 }
 
 model DatabaseSettings {
   id         String   @id @default(cuid())
-  database   Database @relation(fields: [databaseId], references: [id])
   databaseId String   @unique
   isPublic   Boolean  @default(false)
   appendOnly Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  database   Database @relation(fields: [databaseId], references: [id])
 }
 
 model Service {
@@ -318,23 +318,23 @@ model Service {
   dualCerts           Boolean                    @default(false)
   type                String?
   version             String?
-  teams               Team[]
   destinationDockerId String?
-  destinationDocker   DestinationDocker?         @relation(fields: [destinationDockerId], references: [id])
   createdAt           DateTime                   @default(now())
   updatedAt           DateTime                   @updatedAt
-  plausibleAnalytics  PlausibleAnalytics?
+  destinationDocker   DestinationDocker?         @relation(fields: [destinationDockerId], references: [id])
+  fider               Fider?
+  ghost               Ghost?
+  hasura              Hasura?
+  meiliSearch         MeiliSearch?
   minio               Minio?
+  moodle              Moodle?
+  plausibleAnalytics  PlausibleAnalytics?
+  persistentStorage   ServicePersistentStorage[]
+  serviceSecret       ServiceSecret[]
+  umami               Umami?
   vscodeserver        Vscodeserver?
   wordpress           Wordpress?
-  ghost               Ghost?
-  serviceSecret       ServiceSecret[]
-  meiliSearch         MeiliSearch?
-  persistentStorage   ServicePersistentStorage[]
-  umami               Umami?
-  hasura              Hasura?
-  fider               Fider?
-  moodle              Moodle?
+  teams               Team[]
 }
 
 model PlausibleAnalytics {
@@ -349,9 +349,9 @@ model PlausibleAnalytics {
   secretKeyBase        String?
   scriptName           String   @default("plausible.js")
   serviceId            String   @unique
-  service              Service  @relation(fields: [serviceId], references: [id])
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+  service              Service  @relation(fields: [serviceId], references: [id])
 }
 
 model Minio {
@@ -361,18 +361,18 @@ model Minio {
   publicPort       Int?
   apiFqdn          String?
   serviceId        String   @unique
-  service          Service  @relation(fields: [serviceId], references: [id])
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  service          Service  @relation(fields: [serviceId], references: [id])
 }
 
 model Vscodeserver {
   id        String   @id @default(cuid())
   password  String
   serviceId String   @unique
-  service   Service  @relation(fields: [serviceId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  service   Service  @relation(fields: [serviceId], references: [id])
 }
 
 model Wordpress {
@@ -395,9 +395,9 @@ model Wordpress {
   ftpHostKey            String?
   ftpHostKeyPrivate     String?
   serviceId             String   @unique
-  service               Service  @relation(fields: [serviceId], references: [id])
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+  service               Service  @relation(fields: [serviceId], references: [id])
 }
 
 model Ghost {
@@ -411,18 +411,18 @@ model Ghost {
   mariadbDatabase         String?
   mariadbPublicPort       Int?
   serviceId               String   @unique
-  service                 Service  @relation(fields: [serviceId], references: [id])
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+  service                 Service  @relation(fields: [serviceId], references: [id])
 }
 
 model MeiliSearch {
   id        String   @id @default(cuid())
   masterKey String
   serviceId String   @unique
-  service   Service  @relation(fields: [serviceId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  service   Service  @relation(fields: [serviceId], references: [id])
 }
 
 model Umami {
@@ -434,9 +434,9 @@ model Umami {
   postgresqlPublicPort Int?
   umamiAdminPassword   String
   hashSalt             String
-  service              Service  @relation(fields: [serviceId], references: [id])
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+  service              Service  @relation(fields: [serviceId], references: [id])
 }
 
 model Hasura {
@@ -447,9 +447,9 @@ model Hasura {
   postgresqlDatabase   String
   postgresqlPublicPort Int?
   graphQLAdminPassword String
-  service              Service  @relation(fields: [serviceId], references: [id])
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+  service              Service  @relation(fields: [serviceId], references: [id])
 }
 
 model Fider {
@@ -469,9 +469,9 @@ model Fider {
   emailSmtpUser           String?
   emailSmtpPassword       String?
   emailSmtpEnableStartTls Boolean  @default(false)
-  service                 Service  @relation(fields: [serviceId], references: [id])
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+  service                 Service  @relation(fields: [serviceId], references: [id])
 }
 
 model Moodle {
@@ -486,7 +486,7 @@ model Moodle {
   mariadbRootUserPassword String
   mariadbDatabase         String
   mariadbPublicPort       Int?
-  service                 Service  @relation(fields: [serviceId], references: [id])
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+  service                 Service  @relation(fields: [serviceId], references: [id])
 }

@@ -21,14 +21,16 @@ ENV PRISMA_QUERY_ENGINE_BINARY=/app/prisma-engines/query-engine \
   PRISMA_CLI_QUERY_ENGINE_TYPE=binary \
   PRISMA_CLIENT_ENGINE_TYPE=binary
 
-COPY --from=coollabsio/prisma-engine:3.15 /prisma-engines/query-engine /prisma-engines/migration-engine /prisma-engines/introspection-engine /prisma-engines/prisma-fmt /app/prisma-engines/
+COPY --from=coollabsio/prisma-engine:4.1.0 /prisma-engines/query-engine /prisma-engines/migration-engine /prisma-engines/introspection-engine /prisma-engines/prisma-fmt /app/prisma-engines/
 
 RUN apk add --no-cache git git-lfs openssh-client curl jq cmake sqlite openssl
 RUN curl -sL https://unpkg.com/@pnpm/self-installer | node
 
 RUN mkdir -p ~/.docker/cli-plugins/
+# https://download.docker.com/linux/static/stable/
 RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-20.10.9 -o /usr/bin/docker
-RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-compose-linux-2.3.4 -o ~/.docker/cli-plugins/docker-compose
+# https://github.com/docker/compose/releases
+RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-compose-linux-2.7.0 -o ~/.docker/cli-plugins/docker-compose
 RUN chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker
 
 COPY --from=build /app/apps/api/build/ .
