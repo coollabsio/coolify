@@ -197,13 +197,12 @@
 					</div>
 					<div class="flex items-center justify-center">
 						<button
-							class:bg-coollabs={!loading.removing}
-							class:hover:bg-coollabs-100={!loading.removing}
+							class:bg-red-600={!loading.removing}
+							class:hover:bg-red-500={!loading.removing}
 							disabled={loading.removing}
 							on:click={() => removeApplication(container)}
 							>{loading.removing ? 'Removing...' : 'Remove Application'}
-							></button
-						>
+						</button>
 					</div>
 				{/each}
 			{:else}
