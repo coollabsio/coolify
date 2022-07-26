@@ -22,7 +22,7 @@
     "@fastify/jwt": "6.3.1",
     "@fastify/static": "6.4.1",
     "@iarna/toml": "2.2.5",
-    "@prisma/client": "4.1.0",
+    "@prisma/client": "3.15.2",
     "axios": "0.27.2",
     "bcryptjs": "2.4.3",
     "bree": "9.1.1",
@@ -60,7 +60,7 @@
     "eslint-plugin-prettier": "4.2.1",
     "nodemon": "2.0.19",
     "prettier": "2.7.1",
-    "prisma": "4.1.0",
+    "prisma": "3.15.2",
     "rimraf": "3.0.2",
     "tsconfig-paths": "4.0.0",
     "typescript": "4.7.4"

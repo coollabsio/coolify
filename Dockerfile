@@ -21,7 +21,7 @@ ENV PRISMA_QUERY_ENGINE_BINARY=/app/prisma-engines/query-engine \
   PRISMA_CLI_QUERY_ENGINE_TYPE=binary \
   PRISMA_CLIENT_ENGINE_TYPE=binary
 
-COPY --from=coollabsio/prisma-engine:4.1.0 /prisma-engines/query-engine /prisma-engines/migration-engine /prisma-engines/introspection-engine /prisma-engines/prisma-fmt /app/prisma-engines/
+COPY --from=coollabsio/prisma-engine:3.15 /prisma-engines/query-engine /prisma-engines/migration-engine /prisma-engines/introspection-engine /prisma-engines/prisma-fmt /app/prisma-engines/
 
 RUN apk add --no-cache git git-lfs openssh-client curl jq cmake sqlite openssl
 RUN curl -sL https://unpkg.com/@pnpm/self-installer | node
