@@ -39,6 +39,16 @@
 		const data = await get(`/applications/${id}/secrets`);
 		PRMRSecrets = [...data.secrets];
 	}
+	async function removeApplication(container: any) {
+		try {
+			await post(`/applications/${id}/stop/preview`, {
+				pullmergeRequestId: container.pullmergeRequestId
+			});
+			toast.push('Preview stopped.');
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
 	async function redeploy(container: any) {
 		try {
 			const { buildId } = await post(`/applications/${id}/deploy`, {
@@ -179,6 +189,12 @@
 					<div class="flex items-center justify-center">
 						<button class="bg-coollabs hover:bg-coollabs-100" on:click={() => redeploy(container)}
 							>{$t('application.preview.redeploy')}</button
+						>
+					</div>
+					<div class="flex items-center justify-center">
+						<button
+							class="bg-coollabs hover:bg-coollabs-100"
+							on:click={() => removeApplication(container)}>Remove Application</button
 						>
 					</div>
 				{/each}

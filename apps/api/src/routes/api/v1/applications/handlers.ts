@@ -10,7 +10,7 @@ import { checkContainer, formatLabelsOnDocker, isContainerExited, removeContaine
 import { scheduler } from '../../../../lib/scheduler';
 
 import type { FastifyRequest } from 'fastify';
-import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain } from './types';
+import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain, StopPreviewApplication } from './types';
 import { OnlyId } from '../../../../types';
 
 export async function listApplications(request: FastifyRequest) {
@@ -292,6 +292,25 @@ export async function saveApplicationSettings(request: FastifyRequest<SaveApplic
     }
 }
 
+export async function stopPreviewApplication(request: FastifyRequest<StopPreviewApplication>, reply: FastifyReply) {
+    try {
+        const { id } = request.params
+        const { pullmergeRequestId } = request.body
+        const { teamId } = request.user
+        const application: any = await getApplicationFromDB(id, teamId);
+        if (application?.destinationDockerId) {
+            const container = `${id}-${pullmergeRequestId}`
+            const { id: dockerId } = application.destinationDocker;
+            const found = await checkContainer({ dockerId, container });
+            if (found) {
+                await removeContainer({ id: container, dockerId: application.destinationDocker.id });
+            }
+        }
+        return reply.code(201).send();
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function stopApplication(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
     try {
         const { id } = request.params

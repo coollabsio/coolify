@@ -118,3 +118,9 @@ export interface DeployApplication extends OnlyId {
         branch: string
     }
 }
+
+export interface StopPreviewApplication extends OnlyId {
+    Body: {
+        pullmergeRequestId: string | null,
+    }
+}
