@@ -116,18 +116,18 @@ If you have a new database you would like to add, raise an idea [here](https://f
 
 You quickly need to host a self-hostable, open-source service? You can do it with a few clicks!
 
-<a href="https://wordpress.org"><img style="width:40px;height:40px" src="https://icon.horse/icon/wordpress.org"></a>
+<a href="https://wordpress.org"><img style="background-color:white;width:40px;height:40px" src="https://icon.horse/icon/wordpress.org"></a>
 <a href="https://ghost.org"><img style="width:40px;height:40px" src="https://icon.horse/icon/ghost.org"></a>
 <a href="https://plausible.io"><img style="width:40px;height:40px" src="https://icon.horse/icon/plausible.io"></a>
 <a href="https://nocodb.com"><img style="width:40px;height:40px" src="https://icon.horse/icon/nocodb.com"></a>
 <a href="https://coder.com"><img style="width:40px;height:40px" src="https://icon.horse/icon/coder.com"></a>
-<a href="https://min.io"><img style="width:40px;height:40px" src="https://icon.horse/icon/min.io"></a>
-<a href="https://bitwarden.com"><img style="width:40px;height:40px" src="https://icon.horse/icon/bitwarden.com"></a>
-<a href="https://languagetool.org"><img style="width:40px;height:40px" src="https://icon.horse/icon/languagetool.org"></a>
+<a href="https://min.io"><img style="background-color:white;width:40px;height:40px" src="https://icon.horse/icon/min.io"></a>
+<a href="https://bitwarden.com"><img style="background-color:white;width:40px;height:40px" src="https://icon.horse/icon/bitwarden.com"></a>
+<a href="https://languagetool.org"><img style="background-color:white;width:40px;height:40px" src="https://icon.horse/icon/languagetool.org"></a>
 <a href="https://n8n.io"><img style="width:40px;height:40px" src="https://icon.horse/icon/n8n.io"></a>
 <a href="https://uptime.kuma.pet"><img style="width:40px;height:40px" src="https://icon.horse/icon/uptime.kuma.pet"></a>
 <a href="https://www.meilisearch.com"><img style="width:40px;height:40px" src="https://icon.horse/icon/www.meilisearch.com"></a>
-<a href="https://umami.is"><img style="width:40px;height:40px" src="https://icon.horse/icon/umami.is"></a>
+<a href="https://umami.is"><img style="background-color:white;width:40px;height:40px" src="https://icon.horse/icon/umami.is"></a>
 <a href="https://fider.io"><img style="width:40px;height:40px" src="https://icon.horse/icon/fider.io"></a>
 <a href="https://hasura.io"><img style="width:40px;height:40px" src="https://icon.horse/icon/hasura.io"></a>
 
