@@ -482,16 +482,32 @@ export async function createRemoteEngineConfiguration(id: string) {
 	const { sshKey: { privateKey }, remoteIpAddress, remotePort, remoteUser } = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } })
 	await fs.writeFile(sshKeyFile, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 })
 	// Needed for remote docker compose
-	const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(`ps ax | grep [s]sh-agent | wc -l`)
+	const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(`ps ax | grep [s]sh-agent | grep ssh-agent.pid | grep -v grep | wc -l`)
 	if (numberOfSSHAgentsRunning !== '' && Number(numberOfSSHAgentsRunning.trim()) == 0) {
-		await asyncExecShell(`eval $(ssh-agent -s) && ssh-add -q ${sshKeyFile}`)
+		await asyncExecShell(`eval $(ssh-agent -sa /tmp/ssh-agent.pid)`)
 	}
+	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh-add -q ${sshKeyFile}`)
+
+	const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(`ps ax | grep 'ssh -fNL 11122:localhost:22' | grep -v grep | wc -l`)
+	console.log(numberOfSSHTunnelsRunning)
+	if (numberOfSSHTunnelsRunning !== '' && Number(numberOfSSHTunnelsRunning.trim()) == 0) {
+		try {
+			await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh -fNL 11122:localhost:22 ${remoteIpAddress}`)
+
+		} catch(error){
+			console.log(error)
+		}
+
+	}
+	
+
 	const config = sshConfig.parse('')
 	const found = config.find({ Host: remoteIpAddress })
 	if (!found) {
 		config.append({
 			Host: remoteIpAddress,
-			Port: remotePort.toString(),
+			Hostname: 'localhost',
+			Port: '11122',
 			User: remoteUser,
 			IdentityFile: sshKeyFile,
 			StrictHostKeyChecking: 'no'
@@ -502,19 +518,24 @@ export async function createRemoteEngineConfiguration(id: string) {
 	} catch (error) {
 		await fs.mkdir(`${homedir}/.ssh/`)
 	}
-	return await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config))
+
+	await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config))
+	
+	return
+
 }
 export async function executeDockerCmd({ dockerId, command }: { dockerId: string, command: string }) {
-	let { remoteEngine, remoteIpAddress, remoteUser, engine } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
+	let { remoteEngine, remoteIpAddress, engine } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
 	if (remoteEngine) {
-		engine = `ssh://${remoteUser}@${remoteIpAddress}`
 		await createRemoteEngineConfiguration(dockerId)
+		engine = `ssh://${remoteIpAddress}`
 	} else {
 		engine = 'unix:///var/run/docker.sock'
 	}
 	return await asyncExecShell(
 		`DOCKER_BUILDKIT=1 DOCKER_HOST="${engine}" ${command}`
 	);
+
 }
 export async function startTraefikProxy(id: string): Promise<void> {
 	const { engine, network, remoteEngine, remoteIpAddress } = await prisma.destinationDocker.findUnique({ where: { id } })
