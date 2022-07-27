@@ -482,7 +482,10 @@ export async function createRemoteEngineConfiguration(id: string) {
 	const { sshKey: { privateKey }, remoteIpAddress, remotePort, remoteUser } = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } })
 	await fs.writeFile(sshKeyFile, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 })
 	// Needed for remote docker compose
-	await asyncExecShell(`eval $(ssh-agent -s) && ssh-add -q ${sshKeyFile}`)
+	const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(`ps ax | grep [s]sh-agent | wc -l`)
+	if (numberOfSSHAgentsRunning !== '' && Number(numberOfSSHAgentsRunning.trim()) == 0) {
+		await asyncExecShell(`eval $(ssh-agent -s) && ssh-add -q ${sshKeyFile}`)
+	}
 	const config = sshConfig.parse('')
 	const found = config.find({ Host: remoteIpAddress })
 	if (!found) {
