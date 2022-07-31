@@ -467,7 +467,13 @@ export const supportedDatabaseTypesAndVersions = [
 		baseImage: 'bitnami/redis',
 		versions: ['6.2', '6.0', '5.0']
 	},
-	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] }
+	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] },
+	{
+		name: 'edgedb',
+		fancyName: 'EdgeDB',
+		baseImage: 'edgedb/edgedb',
+		versions: ['2.0', '1.4'],
+	  }
 ];
 
 export async function startTraefikProxy(engine: string): Promise<void> {
@@ -693,6 +699,17 @@ export function generateDatabaseConfiguration(database: any):
 			COUCHDB_PASSWORD: string;
 			COUCHDB_USER: string;
 		};
+	} 
+	| {
+		volume: string;
+		image: string;
+		ulimits: Record<string, unknown>;
+		privatePort: number;
+		environmentVariables: {
+		  EDGEDB_SERVER_PASSWORD: string;
+		  EDGEDB_SERVER_USER: string;
+		  EDGEDB_SERVER_DATABASE: string;
+		};
 	} {
 	const {
 		id,
@@ -779,6 +796,18 @@ export function generateDatabaseConfiguration(database: any):
 			image: `${baseImage}:${version}`,
 			volume: `${id}-${type}-data:/bitnami/couchdb`,
 			ulimits: {}
+		};
+	} else if (type === 'edgedb') {
+		return {
+		  privatePort: 5656,
+		  environmentVariables: {
+			EDGEDB_SERVER_PASSWORD: rootUserPassword,
+			EDGEDB_SERVER_USER: rootUser,
+			EDGEDB_SERVER_DATABASE: defaultDatabase,
+		  },
+		  image: `${baseImage}:${version}`,
+		  volume: `${id}-${type}-data:/edgedb/edgedb`,
+		  ulimits: {},
 		};
 	}
 }
