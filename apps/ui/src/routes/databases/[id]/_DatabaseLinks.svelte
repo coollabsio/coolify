@@ -3,6 +3,7 @@
 
 	import Clickhouse from '$lib/components/svg/databases/Clickhouse.svelte';
 	import CouchDb from '$lib/components/svg/databases/CouchDB.svelte';
+	import EdgeDb from '$lib/components/svg/databases/EdgeDB.svelte';
 	import MariaDb from '$lib/components/svg/databases/MariaDB.svelte';
 	import MongoDb from '$lib/components/svg/databases/MongoDB.svelte';
 	import MySql from '$lib/components/svg/databases/MySQL.svelte';
@@ -25,5 +26,7 @@
 		<PostgreSql />
 	{:else if database.type === 'redis'}
 		<Redis />
+	{:else if database.type === 'redis'}
+		<EdgeDb />
 	{/if}
 </span>

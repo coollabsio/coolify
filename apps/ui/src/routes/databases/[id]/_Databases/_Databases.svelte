@@ -13,6 +13,7 @@
 	import PostgreSql from './_PostgreSQL.svelte';
 	import Redis from './_Redis.svelte';
 	import CouchDb from './_CouchDb.svelte';
+	import EdgeDB from './_EdgeDB.svelte';
 	import { post } from '$lib/api';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
@@ -37,8 +38,10 @@
 		databaseDefault = database.defaultDatabase;
 		databaseDbUser = database.dbUser;
 		databaseDbUserPassword = database.dbUserPassword;
-		if (database.type === 'mongodb') {
-			databaseDefault = '?readPreference=primary&ssl=false';
+		if (database.type === 'mongodb' || database.type === 'edgedb') {
+			if (database.type === 'mongodb') {
+				databaseDefault = '?readPreference=primary&ssl=false';
+			}
 			databaseDbUser = database.rootUser;
 			databaseDbUserPassword = database.rootUserPassword;
 		} else if (database.type === 'redis') {
@@ -196,6 +199,8 @@
 				<Redis bind:database />
 			{:else if database.type === 'couchdb'}
 				<CouchDb {database} />
+			{:else if database.type === 'edgedb'}
+				<EdgeDB {database} />
 			{/if}
 			<div class="grid grid-cols-2 items-center px-10 pb-8">
 				<label for="url" class="text-base font-bold text-stone-100"

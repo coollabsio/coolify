@@ -26,6 +26,7 @@
 	import MySQL from '$lib/components/svg/databases/MySQL.svelte';
 	import PostgreSQL from '$lib/components/svg/databases/PostgreSQL.svelte';
 	import Redis from '$lib/components/svg/databases/Redis.svelte';
+	import EdgeDb from '$lib/components/svg/databases/EdgeDB.svelte';
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { appSession } from '$lib/store';
@@ -93,6 +94,8 @@
 								<PostgreSQL isAbsolute />
 							{:else if database.type === 'redis'}
 								<Redis isAbsolute />
+							{:else if database.type === 'edgedb'}
+								<EdgeDb isAbsolute />
 							{/if}
 							<div class="truncate text-center text-xl font-bold">
 								{database.name}
@@ -129,6 +132,8 @@
 									<PostgreSQL isAbsolute />
 								{:else if database.type === 'redis'}
 									<Redis isAbsolute />
+								{:else if database.type === 'edgedb'}
+									<EdgeDb isAbsolute />
 								{/if}
 								<div class="truncate text-center text-xl font-bold">
 									{database.name}

@@ -39,6 +39,7 @@
 	import MySQL from '$lib/components/svg/databases/MySQL.svelte';
 	import PostgreSQL from '$lib/components/svg/databases/PostgreSQL.svelte';
 	import Redis from '$lib/components/svg/databases/Redis.svelte';
+	import EdgeDb from '$lib/components/svg/databases/EdgeDB.svelte';
 	import { goto } from '$app/navigation';
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
@@ -76,6 +77,8 @@
 						<PostgreSQL isAbsolute />
 					{:else if type.name === 'redis'}
 						<Redis isAbsolute />
+					{:else if type.name === 'edgedb'}
+						<EdgeDb isAbsolute />
 					{/if}{type.fancyName}
 				</button>
 			</form>
