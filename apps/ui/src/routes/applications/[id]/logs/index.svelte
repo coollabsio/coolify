@@ -1,32 +1,13 @@
-<script context="module" lang="ts">
-	import type { Load } from '@sveltejs/kit';
-	import { onDestroy, onMount } from 'svelte';
-	export const load: Load = async ({ fetch, params, url, stuff }) => {
-		try {
-			const response = await get(`/applications/${params.id}/logs`);
-			return {
-				props: {
-					application: stuff.application,
-					...response
-				}
-			};
-		} catch (error) {
-			return {
-				status: 500,
-				error: new Error(`Could not load ${url}`)
-			};
-		}
-	};
-</script>
-
 <script lang="ts">
-	export let application: any;
 	import { page } from '$app/stores';
 	import { get } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import LoadingLogs from '$lib/components/LoadingLogs.svelte';
+	import { onMount, onDestroy } from 'svelte';
 
+	let application: any = {};
+	let logsLoading = false;
 	let loadLogsInterval: any = null;
 	let logs: any = [];
 	let lastLog: any = null;
@@ -37,6 +18,8 @@
 
 	const { id } = $page.params;
 	onMount(async () => {
+		const response = await get(`/applications/${id}`);
+		application = response.application;
 		loadAllLogs();
 		loadLogsInterval = setInterval(() => {
 			loadLogs();
@@ -48,6 +31,7 @@
 	});
 	async function loadAllLogs() {
 		try {
+			logsLoading = true;
 			const data: any = await get(`/applications/${id}/logs`);
 			if (data?.logs) {
 				lastLog = data.logs[data.logs.length - 1];
@@ -56,9 +40,12 @@
 		} catch (error) {
 			console.log(error);
 			return errorNotification(error);
+		} finally {
+			logsLoading = false;
 		}
 	}
 	async function loadLogs() {
+		if (logsLoading) return;
 		try {
 			const newLogs: any = await get(
 				`/applications/${id}/logs?since=${lastLog?.split(' ')[0] || 0}`
@@ -157,7 +144,7 @@
 			{#if loadLogsInterval}
 				<LoadingLogs />
 			{/if}
-			<div class="flex justify-end sticky top-0 p-2 mx-1">
+			<div class="flex justify-end sticky top-0 p-1 mx-1">
 				<button
 					on:click={followBuild}
 					class="bg-transparent"

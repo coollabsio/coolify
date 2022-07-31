@@ -21,10 +21,9 @@
 				payload = {
 					name: $t('sources.remote_docker'),
 					remoteEngine: true,
-					ipAddress: null,
-					user: 'root',
-					port: 22,
-					sshPrivateKey: null,
+					remoteIpAddress: null,
+					remoteUser: 'root',
+					remotePort: 22,
 					network: cuid(),
 					isCoolifyProxyUsed: true
 				};
@@ -44,7 +43,7 @@
 		<button class="w-32" on:click={() => setPredefined('localDocker')}
 			>{$t('sources.local_docker')}</button
 		>
-		<!-- <button class="w-32" on:click={() => setPredefined('remoteDocker')}>Remote Docker</button> -->
+		<button class="w-32" on:click={() => setPredefined('remoteDocker')}>Remote Docker</button>
 		<!-- <button class="w-32" on:click={() => setPredefined('kubernetes')}>Kubernetes</button> -->
 	</div>
 </div>

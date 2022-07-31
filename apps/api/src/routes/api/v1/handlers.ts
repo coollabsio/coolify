@@ -17,7 +17,8 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function cleanupManually() {
 	try {
-		await cleanupDockerStorage('unix:///var/run/docker.sock', true, true)
+		const destination = await prisma.destinationDocker.findFirst({ where: { engine: '/var/run/docker.sock' } })
+		await cleanupDockerStorage(destination.id, true, true)
 		return {}
 	} catch ({ status, message }) {
 		return errorHandler({ status, message })
@@ -154,7 +155,6 @@ export async function login(request: FastifyRequest<Login>, reply: FastifyReply)
 		}
 		if (userFound) {
 			if (userFound.type === 'email') {
-				// TODO: Review this one
 				if (userFound.password === 'RESETME') {
 					const hashedPassword = await hashPassword(password);
 					if (userFound.updatedAt < new Date(Date.now() - 1000 * 60 * 10)) {

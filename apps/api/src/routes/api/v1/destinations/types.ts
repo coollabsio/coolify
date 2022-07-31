@@ -1,5 +1,10 @@
 import { OnlyId } from "../../../../types"
 
+export interface ListDestinations {
+    Querystring: {
+        onlyVerified: string
+    }
+}
 export interface CheckDestination {
     Body: {
         network: string
@@ -20,7 +25,5 @@ export interface SaveDestinationSettings extends OnlyId {
     }
 }
 export interface Proxy extends OnlyId {
-    Body: {
-        engine: string
-    }
+
 }

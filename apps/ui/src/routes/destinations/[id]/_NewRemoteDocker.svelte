@@ -5,23 +5,35 @@
 
 	import { post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
+	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 	import { t } from '$lib/translations';
 
 	let loading = false;
 
 	async function handleSubmit() {
+		if (loading) return;
 		try {
-			const { id } = await post('/new/destination/docker', {
+			loading = true;
+			await post(`/destinations/check`, { network: payload.network });
+			const { id } = await post(`/destinations/new`, {
 				...payload
 			});
 			return await goto(`/destinations/${id}`);
 		} catch (error) {
 			return errorNotification(error);
+		} finally {
+			loading = false;
 		}
 	}
 </script>
 
+<div class="text-center flex justify-center">
+	<Explainer
+		customClass="max-w-[32rem]"
+		text="Remote Docker Engines are using <span class='text-white font-bold'>SSH connection</span> to initiate connection. You need to setup an <span class='text-white font-bold'>SSH key</span> in advance on the server and install Docker. <br>See <a class='text-white' href='https://docs.coollabs.io'>docs</a> for more details."
+	/>
+</div>
 <div class="flex justify-center px-6 pb-8">
 	<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
 		<div class="flex items-center space-x-2 pb-5">
@@ -44,40 +56,36 @@
 		</div>
 
 		<div class="grid grid-cols-2 items-center px-10">
-			<label for="ipAddress" class="text-base font-bold text-stone-100"
+			<label for="remoteIpAddress" class="text-base font-bold text-stone-100"
 				>{$t('forms.ip_address')}</label
 			>
 			<input
 				required
-				name="ipAddress"
+				name="remoteIpAddress"
 				placeholder="{$t('forms.eg')}: 192.168..."
-				bind:value={payload.ipAddress}
+				bind:value={payload.remoteIpAddress}
 			/>
 		</div>
 
 		<div class="grid grid-cols-2 items-center px-10">
-			<label for="user" class="text-base font-bold text-stone-100">{$t('forms.user')}</label>
-			<input required name="user" placeholder="{$t('forms.eg')}: root" bind:value={payload.user} />
-		</div>
-
-		<div class="grid grid-cols-2 items-center px-10">
-			<label for="port" class="text-base font-bold text-stone-100">{$t('forms.port')}</label>
-			<input required name="port" placeholder="{$t('forms.eg')}: 22" bind:value={payload.port} />
-		</div>
-		<div class="grid grid-cols-2 items-center px-10">
-			<label for="sshPrivateKey" class="text-base font-bold text-stone-100"
-				>{$t('forms.ssh_private_key')}</label
-			>
-			<textarea
-				rows="10"
-				class="resize-none"
+			<label for="remoteUser" class="text-base font-bold text-stone-100">{$t('forms.user')}</label>
+			<input
 				required
-				name="sshPrivateKey"
-				placeholder="{$t('forms.eg')}: -----BEGIN...."
-				bind:value={payload.sshPrivateKey}
+				name="remoteUser"
+				placeholder="{$t('forms.eg')}: root"
+				bind:value={payload.remoteUser}
 			/>
 		</div>
 
+		<div class="grid grid-cols-2 items-center px-10">
+			<label for="remotePort" class="text-base font-bold text-stone-100">{$t('forms.port')}</label>
+			<input
+				required
+				name="remotePort"
+				placeholder="{$t('forms.eg')}: 22"
+				bind:value={payload.remotePort}
+			/>
+		</div>
 		<div class="grid grid-cols-2 items-center px-10">
 			<label for="network" class="text-base font-bold text-stone-100">{$t('forms.network')}</label>
 			<input

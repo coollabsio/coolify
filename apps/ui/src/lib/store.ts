@@ -1,6 +1,8 @@
 import { writable, readable, type Writable, type Readable } from 'svelte/store';
 
 interface AppSession {
+    ipv4: string | null,
+    ipv6: string | null,
     version: string | null,
     userId: string | null,
     teamId: string | null,
@@ -17,6 +19,8 @@ interface AppSession {
 }
 export const loginEmail: Writable<string | undefined> = writable()
 export const appSession: Writable<AppSession> = writable({
+    ipv4: null,
+    ipv6: null,
     version: null,
     userId: null,
     teamId: null,
@@ -31,7 +35,6 @@ export const appSession: Writable<AppSession> = writable({
         gitlab: null
     }
 });
-export const isTraefikUsed: Writable<boolean> = writable(false);
 export const disabledButton: Writable<boolean> = writable(false);
 export const status: Writable<any> = writable({
     application: {
@@ -41,14 +44,16 @@ export const status: Writable<any> = writable({
         initialLoading: true
     },
     service: {
-        initialLoading: true,
+        isRunning: false,
+        isExited: false,
         loading: false,
-        isRunning: false
+        initialLoading: true
     },
     database: {
-        initialLoading: true,
+        isRunning: false,
+        isExited: false,
         loading: false,
-        isRunning: false
+        initialLoading: true
     }
 
 });
@@ -60,7 +65,6 @@ export const features = readable({
 
 export const location: Writable<null | string> = writable(null)
 export const setLocation = (resource: any) => {
-    console.log(GITPOD_WORKSPACE_URL)
     if (GITPOD_WORKSPACE_URL && resource.exposePort) {
         const { href } = new URL(GITPOD_WORKSPACE_URL);
         const newURL = href

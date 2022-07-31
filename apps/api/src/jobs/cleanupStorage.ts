@@ -1,20 +1,20 @@
 import { parentPort } from 'node:worker_threads';
-import { asyncExecShell, cleanupDockerStorage, isDev, prisma, version } from '../lib/common';
-import { getEngine } from '../lib/docker';
+import { asyncExecShell, cleanupDockerStorage, executeDockerCmd, isDev, prisma, version } from '../lib/common';
 
 (async () => {
     if (parentPort) {
         const destinationDockers = await prisma.destinationDocker.findMany();
-        const engines = [...new Set(destinationDockers.map(({ engine }) => engine))];
-        for (const engine of engines) {
+        let enginesDone = new Set()
+        for (const destination of destinationDockers) {
+            if (enginesDone.has(destination.engine) || enginesDone.has(destination.remoteIpAddress)) return
+            if (destination.engine) enginesDone.add(destination.engine)
+            if (destination.remoteIpAddress) enginesDone.add(destination.remoteIpAddress)
+            
             let lowDiskSpace = false;
-            const host = getEngine(engine);
             try {
                 let stdout = null
                 if (!isDev) {
-                    const output = await asyncExecShell(
-                        `DOCKER_HOST=${host} docker exec coolify sh -c 'df -kPT /'`
-                    );
+                    const output = await executeDockerCmd({ dockerId: destination.id, command: `CONTAINER=$(docker ps -lq | head -1) && docker exec $CONTAINER sh -c 'df -kPT /'` })
                     stdout = output.stdout;
                 } else {
                     const output = await asyncExecShell(
@@ -53,7 +53,7 @@ import { getEngine } from '../lib/docker';
             } catch (error) {
                 console.log(error);
             }
-            await cleanupDockerStorage(host, lowDiskSpace, false)
+            await cleanupDockerStorage(destination.id, lowDiskSpace, false)
         }
         await prisma.$disconnect();
     } else process.exit(0);

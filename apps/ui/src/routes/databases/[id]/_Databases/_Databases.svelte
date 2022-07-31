@@ -1,7 +1,6 @@
 <script lang="ts">
 	export let database: any;
 	export let privatePort: any;
-	export let settings: any;
 
 	import { page } from '$app/stores';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
@@ -17,8 +16,9 @@
 	import { post } from '$lib/api';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
-	import { errorNotification, getDomain } from '$lib/common';
+	import { errorNotification } from '$lib/common';
 	import { appSession, status } from '$lib/store';
+	import Explainer from '$lib/components/Explainer.svelte';
 
 	const { id } = $page.params;
 
@@ -49,12 +49,15 @@
 			databaseDbUser = '';
 		}
 	}
-
 	function generateUrl(): string {
 		return `${database.type}://${
 			databaseDbUser ? databaseDbUser + ':' : ''
 		}${databaseDbUserPassword}@${
-			isPublic ? (settings.fqdn ? getDomain(settings.fqdn) : window.location.hostname) : database.id
+			isPublic
+				? database.destinationDocker.remoteEngine
+					? database.destinationDocker.remoteIpAddress
+					: $appSession.ipv4
+				: database.id
 		}:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`;
 	}
 
@@ -103,7 +106,7 @@
 
 <div class="mx-auto max-w-4xl px-6">
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
-		<div class="flex space-x-1 pb-5 font-bold">
+		<div class="flex space-x-1 pb-5">
 			<div class="title">{$t('general')}</div>
 			{#if $appSession.isAdmin}
 				<button
@@ -153,7 +156,8 @@
 				>
 					<input
 						value={database.version}
-						disabled={$status.database.isRunning}
+						readonly
+						disabled={$status.database.isRunning || $status.database.initialLoading}
 						class:cursor-pointer={!$status.database.isRunning}
 					/></a
 				>
@@ -203,9 +207,16 @@
 				<EdgeDB {database} />
 			{/if}
 			<div class="grid grid-cols-2 items-center px-10 pb-8">
-				<label for="url" class="text-base font-bold text-stone-100"
-					>{$t('database.connection_string')}</label
-				>
+				<div>
+					<label for="url" class="text-base font-bold text-stone-100"
+						>{$t('database.connection_string')}</label
+					>
+					{#if !isPublic && database.destinationDocker.remoteEngine}
+						<Explainer
+							text="You can only access the database with this URL if your application is deployed to the same Destination."
+						/>
+					{/if}
+				</div>
 				<CopyPasswordField
 					textarea={true}
 					placeholder={$t('forms.generated_automatically_after_start')}

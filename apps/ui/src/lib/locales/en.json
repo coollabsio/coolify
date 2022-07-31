@@ -250,7 +250,7 @@
 		"no_destination_found": "No destination found",
 		"new_error_network_already_exists": "Network {{network}} already configured for another team!",
 		"new": {
-			"saving_and_configuring_proxy": "Saving and configuring proxy...",
+			"saving_and_configuring_proxy": "Saving...",
 			"install_proxy": "This will install a proxy on the destination to allow you to access your applications and services without any manual configuration (recommended for Docker).<br><br>Databases will have their own proxy.",
 			"add_new_destination": "Add New Destination",
 			"predefined_destinations": "Predefined destinations"

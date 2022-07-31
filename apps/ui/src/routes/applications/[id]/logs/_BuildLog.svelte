@@ -106,7 +106,7 @@
 		{#if currentStatus === 'queued'}
 			<div class="text-center font-bold text-xl">{$t('application.build.queued_waiting_exec')}</div>
 		{:else}
-			<div class="flex justify-end sticky top-0 p-2">
+			<div class="flex justify-end sticky top-0 p-1 mx-1">
 				<button
 					on:click={followBuild}
 					class="bg-transparent hover:text-green-500 hover:bg-coolgray-500"

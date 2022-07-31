@@ -1,18 +1,18 @@
 import { promises as fs } from 'fs';
 import { buildImage } from './common';
 
-export default async function ({
-	applicationId,
-	debug,
-	tag,
-	workdir,
-	docker,
-	buildId,
-	baseDirectory,
-	secrets,
-	pullmergeRequestId,
-	dockerFileLocation
-}) {
+export default async function (data) {
+	let {
+		applicationId,
+		debug,
+		tag,
+		workdir,
+		buildId,
+		baseDirectory,
+		secrets,
+		pullmergeRequestId,
+		dockerFileLocation
+	} = data
 	try {
 		const file = `${workdir}${dockerFileLocation}`;
 		let dockerFileOut = `${workdir}`;
@@ -45,7 +45,7 @@ export default async function ({
 		}
 
 		await fs.writeFile(`${dockerFileOut}${dockerFileLocation}`, Dockerfile.join('\n'));
-		await buildImage({ applicationId, tag, workdir, docker, buildId, debug, dockerFileLocation });
+		await buildImage(data);
 	} catch (error) {
 		throw error;
 	}

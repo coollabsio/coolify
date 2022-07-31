@@ -121,10 +121,10 @@
 				<div class="flex space-x-2 h-8 items-center justify-center pt-8">
 					<button
 						type="submit"
-						class="hover:bg-coollabs-100 text-white"
+						class="text-white"
 						disabled={loading}
+						class:hover:bg-coollabs-100={!loading}
 						class:bg-transparent={loading}
-						class:text-stone-600={loading}
 						class:bg-coollabs={!loading}
 						>{loading ? $t('register.registering') : $t('register.register')}</button
 					>

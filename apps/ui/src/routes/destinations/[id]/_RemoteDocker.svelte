@@ -1,80 +1,90 @@
 <script lang="ts">
 	export let destination: any;
-	export let settings: any
-	export let state: any
+	export let settings: any;
 
 	import { toast } from '@zerodevx/svelte-toast';
 	import { page, session } from '$app/stores';
 	import Setting from '$lib/components/Setting.svelte';
-	import { post } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { onMount } from 'svelte';
 	import { t } from '$lib/translations';
-import { errorNotification, generateRemoteEngine } from '$lib/common';
-import { appSession } from '$lib/store';
+	import { errorNotification } from '$lib/common';
+	import { appSession } from '$lib/store';
+
 	const { id } = $page.params;
+
 	let cannotDisable = settings.fqdn && destination.engine === '/var/run/docker.sock';
-	// let scannedApps = [];
-	let loading = false;
-	let restarting = false;
+	let loading = {
+		restart: false,
+		proxy: true,
+		save: false,
+		verify: false
+	};
+
+	$: isDisabled = !$appSession.isAdmin;
+
 	async function handleSubmit() {
-		loading = true;
+		loading.save = true;
 		try {
-			return await post(`/destinations/${id}.json`, { ...destination });
-		} catch (error ) {
+			await post(`/destinations/${id}`, { ...destination });
+			toast.push('Configuration saved.');
+		} catch (error) {
 			return errorNotification(error);
 		} finally {
-			loading = false;
+			loading.save = false;
 		}
 	}
-	// async function scanApps() {
-	// 	scannedApps = [];
-	// 	const data = await fetch(`/destinations/${id}/scan.json`);
-	// 	const { containers } = await data.json();
-	// 	scannedApps = containers;
-	// }
 	onMount(async () => {
-		if (state === false && destination.isCoolifyProxyUsed === true) {
-			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
-			try {
-				await post(`/destinations/${id}/settings.json`, {
-					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
-					engine: destination.engine
-				});
-				await stopProxy();
-			} catch (error ) {
-				return errorNotification(error);
-			}
-		} else if (state === true && destination.isCoolifyProxyUsed === false) {
-			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
-			try {
-				await post(`/destinations/${id}/settings.json`, {
-					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
-					engine: destination.engine
-				});
-				await startProxy();
-			} catch ( error ) {
-				return errorNotification(error);
+		loading.proxy = true;
+		if (destination.remoteEngine && destination.remoteVerified) {
+			const { isRunning } = await get(`/destinations/${id}/status`);
+			if (isRunning === false && destination.isCoolifyProxyUsed === true) {
+				destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
+				try {
+					await post(`/destinations/${id}/settings`, {
+						isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
+						engine: destination.engine
+					});
+					await stopProxy();
+				} catch (error) {
+					return errorNotification(error);
+				}
+			} else if (isRunning === true && destination.isCoolifyProxyUsed === false) {
+				destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
+				try {
+					await post(`/destinations/${id}/settings`, {
+						isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
+						engine: destination.engine
+					});
+					await startProxy();
+				} catch (error) {
+					return errorNotification(error);
+				}
 			}
 		}
+
+		loading.proxy = false;
 	});
 	async function changeProxySetting() {
+		loading.proxy = true;
 		if (!cannotDisable) {
 			const isProxyActivated = destination.isCoolifyProxyUsed;
 			if (isProxyActivated) {
 				const sure = confirm(
 					`Are you sure you want to ${
 						destination.isCoolifyProxyUsed ? 'disable' : 'enable'
-					} Coolify proxy? It will remove the proxy for all configured networks and all deployments on '${
-						destination.engine
-					}'! Nothing will be reachable if you do it!`
+					} Coolify proxy? It will remove the proxy for all configured networks and all deployments! Nothing will be reachable if you do it!`
 				);
-				if (!sure) return;
+				if (!sure) {
+					loading.proxy = false;
+					return;
+				}
 			}
-			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
+			let proxyUsed = !destination.isCoolifyProxyUsed;
 			try {
-				await post(`/destinations/${id}/settings.json`, {
-					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
+				await post(`/destinations/${id}/settings`, {
+					isCoolifyProxyUsed: proxyUsed,
 					engine: destination.engine
 				});
 				if (isProxyActivated) {
@@ -82,15 +92,17 @@ import { appSession } from '$lib/store';
 				} else {
 					await startProxy();
 				}
+				destination.isCoolifyProxyUsed = proxyUsed;
 			} catch (error) {
 				return errorNotification(error);
+			} finally {
+				loading.proxy = false;
 			}
 		}
 	}
 	async function stopProxy() {
 		try {
-			const engine = generateRemoteEngine(destination);
-			await post(`/destinations/${id}/stop.json`, { engine });
+			await post(`/destinations/${id}/stop`, { engine: destination.engine });
 			return toast.push($t('destination.coolify_proxy_stopped'));
 		} catch (error) {
 			return errorNotification(error);
@@ -98,8 +110,7 @@ import { appSession } from '$lib/store';
 	}
 	async function startProxy() {
 		try {
-			const engine = generateRemoteEngine(destination);
-			await post(`/destinations/${id}/start.json`, { engine });
+			await post(`/destinations/${id}/start`, { engine: destination.engine });
 			return toast.push($t('destination.coolify_proxy_started'));
 		} catch (error) {
 			return errorNotification(error);
@@ -109,9 +120,9 @@ import { appSession } from '$lib/store';
 		const sure = confirm($t('destination.confirm_restart_proxy'));
 		if (sure) {
 			try {
-				restarting = true;
+				loading.restart = true;
 				toast.push($t('destination.coolify_proxy_restarting'));
-				await post(`/destinations/${id}/restart.json`, {
+				await post(`/destinations/${id}/restart`, {
 					engine: destination.engine,
 					fqdn: settings.fqdn
 				});
@@ -119,7 +130,22 @@ import { appSession } from '$lib/store';
 				setTimeout(() => {
 					window.location.reload();
 				}, 5000);
+			} finally {
+				loading.restart = false;
 			}
+		}
+	}
+	async function verifyRemoteDocker() {
+		try {
+			loading.verify = true;
+			await post(`/destinations/${id}/verify`, {});
+			destination.remoteVerified = true;
+			toast.push('Remote Docker Engine verified!');
+			return;
+		} catch (error) {
+			return errorNotification(error);
+		} finally {
+			loading.verify = false;
 		}
 	}
 </script>
@@ -131,23 +157,28 @@ import { appSession } from '$lib/store';
 			<button
 				type="submit"
 				class="bg-sky-600 hover:bg-sky-500"
-				class:bg-sky-600={!loading}
-				class:hover:bg-sky-500={!loading}
-				disabled={loading}
-				>{loading ? $t('forms.saving') : $t('forms.save')}
+				class:bg-sky-600={!loading.save}
+				class:hover:bg-sky-500={!loading.save}
+				disabled={loading.save}
+				>{loading.save ? $t('forms.saving') : $t('forms.save')}
 			</button>
-			<button
-				class={restarting ? '' : 'bg-red-600 hover:bg-red-500'}
-				disabled={restarting}
-				on:click|preventDefault={forceRestartProxy}
-				>{restarting
-					? $t('destination.restarting_please_wait')
-					: $t('destination.force_restart_proxy')}</button
-			>
+			{#if !destination.remoteVerified}
+				<button
+					disabled={loading.verify}
+					on:click|preventDefault|stopPropagation={verifyRemoteDocker}
+					>{loading.verify ? 'Verifying...' : 'Verify Remote Docker Engine'}</button
+				>
+			{:else}
+				<button
+					class={loading.restart ? '' : 'bg-red-600 hover:bg-red-500'}
+					disabled={loading.restart}
+					on:click|preventDefault={forceRestartProxy}
+					>{loading.restart
+						? $t('destination.restarting_please_wait')
+						: $t('destination.force_restart_proxy')}</button
+				>
+			{/if}
 		{/if}
-		<!-- <button type="button" class="bg-coollabs hover:bg-coollabs-100" on:click={scanApps}
-				>Scan for applications</button
-			> -->
 	</div>
 	<div class="grid grid-cols-2 items-center px-10 ">
 		<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
@@ -159,22 +190,6 @@ import { appSession } from '$lib/store';
 			bind:value={destination.name}
 		/>
 	</div>
-
-	<div class="grid grid-cols-2 items-center px-10">
-		<label for="engine" class="text-base font-bold text-stone-100">{$t('forms.engine')}</label>
-		<CopyPasswordField
-			id="engine"
-			readonly
-			disabled
-			name="engine"
-			placeholder="{$t('forms.eg')}: /var/run/docker.sock"
-			value={destination.engine}
-		/>
-	</div>
-	<!-- <div class="flex items-center">
-			<label for="remoteEngine">Remote Engine?</label>
-			<input name="remoteEngine" type="checkbox" bind:checked={payload.remoteEngine} />
-		</div> -->
 	<div class="grid grid-cols-2 items-center px-10">
 		<label for="network" class="text-base font-bold text-stone-100">{$t('forms.network')}</label>
 		<CopyPasswordField
@@ -186,9 +201,53 @@ import { appSession } from '$lib/store';
 			value={destination.network}
 		/>
 	</div>
+	<div class="grid grid-cols-2 items-center px-10">
+		<label for="remoteIpAddress" class="text-base font-bold text-stone-100">IP Address</label>
+		<CopyPasswordField
+			id="remoteIpAddress"
+			readonly
+			disabled
+			name="remoteIpAddress"
+			value={destination.remoteIpAddress}
+		/>
+	</div>
+	<div class="grid grid-cols-2 items-center px-10">
+		<label for="remoteUser" class="text-base font-bold text-stone-100">User</label>
+		<CopyPasswordField
+			id="remoteUser"
+			readonly
+			disabled
+			name="remoteUser"
+			value={destination.remoteUser}
+		/>
+	</div>
+	<div class="grid grid-cols-2 items-center px-10">
+		<label for="remotePort" class="text-base font-bold text-stone-100">Port</label>
+		<CopyPasswordField
+			id="remotePort"
+			readonly
+			disabled
+			name="remotePort"
+			value={destination.remotePort}
+		/>
+	</div>
+	<div class="grid grid-cols-2 items-center px-10">
+		<label for="sshKey" class="text-base font-bold text-stone-100">SSH Key</label>
+		<a
+			href={!isDisabled ? `/destinations/${id}/configuration/sshkey?from=/destinations/${id}` : ''}
+			class="no-underline"
+			><input
+				value={destination.sshKey.name}
+				readonly
+				id="sshKey"
+				class="cursor-pointer hover:bg-coolgray-500"
+			/></a
+		>
+	</div>
 	<div class="grid grid-cols-2 items-center">
 		<Setting
 			disabled={cannotDisable}
+			loading={loading.proxy}
 			bind:setting={destination.isCoolifyProxyUsed}
 			on:click={changeProxySetting}
 			title={$t('destination.use_coolify_proxy')}
@@ -200,27 +259,3 @@ import { appSession } from '$lib/store';
 		/>
 	</div>
 </form>
-<!-- <div class="flex justify-center">
-	{#if payload.isCoolifyProxyUsed}
-		{#if state}
-			<button on:click={stopProxy}>Stop proxy</button>
-		{:else}
-			<button on:click={startProxy}>Start proxy</button>
-		{/if}
-	{/if}
-</div> -->
-
-<!-- {#if scannedApps.length > 0}
-	<div class="flex justify-center px-6 pb-10">
-		<div class="flex space-x-2 h-8 items-center">
-			<div class="font-bold text-xl text-white">Found applications</div>
-		</div>
-	</div>
-	<div class="max-w-4xl mx-auto px-6">
-		<div class="flex space-x-2 justify-center">
-			{#each scannedApps as app}
-				<FoundApp {app} />
-			{/each}
-		</div>
-	</div>
-{/if} -->

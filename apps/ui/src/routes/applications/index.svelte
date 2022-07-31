@@ -93,7 +93,7 @@
 		<div class="flex flex-col">
 			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 				{#each ownApplications as application}
-					<a href="/applications/{application.id}" class="w-96 p-2 no-underline">
+					<a href="/applications/{application.id}" class="p-2 no-underline">
 						<div class="box-selection group relative hover:bg-green-600">
 							{#if application.buildPack}
 								{#if application.buildPack.toLowerCase() === 'rust'}
@@ -140,15 +140,18 @@
 							{#if application.fqdn}
 								<div class="truncate text-center">{getDomain(application.fqdn) || ''}</div>
 							{/if}
+							{#if application.destinationDocker?.name}
+								<div class="truncate text-center">{application.destinationDocker.name}</div>
+							{/if}
 							{#if !application.gitSourceId || !application.repository || !application.branch}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									Git Source Missing
 								</div>
-								{:else if !application.destinationDockerId}
+							{:else if !application.destinationDockerId}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									Destination Missing
 								</div>
-								{:else if !application.fqdn}
+							{:else if !application.fqdn}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									URL Missing
 								</div>
@@ -158,10 +161,10 @@
 				{/each}
 			</div>
 			{#if otherApplications.length > 0 && $appSession.teamId === '0'}
-				<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Applications</div>
+				<div class="px-6 pb-5 pt-10 text-2xl font-bold text-center">Other Applications</div>
 				<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 					{#each otherApplications as application}
-						<a href="/applications/{application.id}" class="w-96 p-2 no-underline">
+						<a href="/applications/{application.id}" class="p-2 no-underline">
 							<div class="box-selection group relative hover:bg-green-600">
 								{#if application.buildPack}
 									{#if application.buildPack.toLowerCase() === 'rust'}

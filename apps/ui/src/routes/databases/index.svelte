@@ -78,7 +78,7 @@
 		<div class="flex flex-col">
 			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 				{#each ownDatabases as database}
-					<a href="/databases/{database.id}" class="w-96 p-2 no-underline">
+					<a href="/databases/{database.id}" class="p-2 no-underline">
 						<div class="box-selection group relative hover:bg-purple-600">
 							{#if database.type === 'clickhouse'}
 								<Clickhouse isAbsolute />
@@ -103,6 +103,9 @@
 							{#if $appSession.teamId === '0' && otherDatabases.length > 0}
 								<div class="truncate text-center">{database.teams[0].name}</div>
 							{/if}
+							{#if database.destinationDocker?.name}
+								<div class="truncate text-center">{database.destinationDocker.name}</div>
+							{/if}
 							{#if !database.type}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									{$t('application.configuration.configuration_missing')}
@@ -113,10 +116,10 @@
 				{/each}
 			</div>
 			{#if otherDatabases.length > 0 && $appSession.teamId === '0'}
-				<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Databases</div>
+				<div class="px-6 pb-5 pt-10 text-2xl font-bold text-center">Other Databases</div>
 				<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 					{#each otherDatabases as database}
-						<a href="/databases/{database.id}" class="w-96 p-2 no-underline">
+						<a href="/databases/{database.id}" class="p-2 no-underline">
 							<div class="box-selection group relative hover:bg-purple-600">
 								{#if database.type === 'clickhouse'}
 									<Clickhouse isAbsolute />

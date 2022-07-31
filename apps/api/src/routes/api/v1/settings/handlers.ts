@@ -1,15 +1,24 @@
 import { promises as dns } from 'dns';
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { checkDomainsIsValidInDNS, errorHandler, getDomain, isDNSValid, isDomainConfigured, listSettings, prisma } from '../../../../lib/common';
-import { CheckDNS, CheckDomain, DeleteDomain, SaveSettings } from './types';
+import { checkDomainsIsValidInDNS, decrypt, encrypt, errorHandler, getDomain, isDNSValid, isDomainConfigured, listSettings, prisma } from '../../../../lib/common';
+import { CheckDNS, CheckDomain, DeleteDomain, DeleteSSHKey, SaveSettings, SaveSSHKey } from './types';
 
 
 export async function listAllSettings(request: FastifyRequest) {
     try {
+        const teamId = request.user.teamId;
         const settings = await listSettings();
+        const sshKeys = await prisma.sshKey.findMany({ where: { team: { id: teamId } } })
+        const unencryptedKeys = []
+        if (sshKeys.length > 0) {
+            for (const key of sshKeys) {
+                unencryptedKeys.push({ id: key.id, name: key.name, privateKey: decrypt(key.privateKey), createdAt: key.createdAt })
+            }
+        }
         return {
-            settings
+            settings,
+            sshKeys: unencryptedKeys
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -68,7 +77,8 @@ export async function checkDomain(request: FastifyRequest<CheckDomain>) {
             throw "Domain already configured";
         }
         if (isDNSCheckEnabled && !forceSave) {
-            return await checkDomainsIsValidInDNS({ hostname: request.hostname.split(':')[0], fqdn, dualCerts });
+            const hostname = request.hostname.split(':')[0]
+            return await checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts });
         }
         return {};
     } catch ({ status, message }) {
@@ -80,6 +90,33 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
         const { domain } = request.params;
         await isDNSValid(request.hostname, domain);
         return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
+export async function saveSSHKey(request: FastifyRequest<SaveSSHKey>, reply: FastifyReply) {
+    try {
+        const teamId = request.user.teamId;
+        const { privateKey, name } = request.body;
+        const found = await prisma.sshKey.findMany({ where: { name } })
+        if (found.length > 0) {
+            throw {
+                message: "Name already used. Choose another one please."
+            }
+        }
+        const encryptedSSHKey = encrypt(privateKey)
+        await prisma.sshKey.create({ data: { name, privateKey: encryptedSSHKey, team: { connect: { id: teamId } } } })
+        return reply.code(201).send()
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+export async function deleteSSHKey(request: FastifyRequest<DeleteSSHKey>, reply: FastifyReply) {
+    try {
+        const { id } = request.body;
+        await prisma.sshKey.delete({ where: { id } })
+        return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }

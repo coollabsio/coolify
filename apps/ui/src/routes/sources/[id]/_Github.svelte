@@ -66,11 +66,7 @@
 			});
 			const { organization, htmlUrl } = source;
 			const { fqdn } = settings;
-			const host = dev
-				? getAPIUrl()
-				: fqdn
-				? fqdn
-				: `http://${window.location.host}` || '';
+			const host = dev ? getAPIUrl() : fqdn ? fqdn : `http://${window.location.host}` || '';
 			const domain = getDomain(fqdn);
 
 			let url = 'settings/apps/new';
@@ -80,9 +76,7 @@
 				name: `coolify-${name}`,
 				url: host,
 				hook_attributes: {
-					url: dev
-						? getWebhookUrl('github')
-						: `${host}/webhooks/github/events`
+					url: dev ? getWebhookUrl('github') : `${host}/webhooks/github/events`
 				},
 				redirect_url: `${host}/webhooks/github`,
 				callback_urls: [`${host}/login/github/app`],
@@ -118,10 +112,10 @@
 <div class="mx-auto max-w-4xl px-6">
 	{#if !source.githubAppId}
 		<form on:submit|preventDefault={newGithubApp} class="py-4">
-			<div class="flex space-x-1 pb-7 font-bold">
+			<div class="flex space-x-1 pb-7">
 				<div class="title">General</div>
 				{#if !source.githubAppId}
-					<button class="bg-orange-600" type="submit">Save</button>
+					<button class="bg-orange-600 font-normal" type="submit">Save</button>
 				{/if}
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
@@ -173,7 +167,7 @@
 		</form>
 	{:else if source.githubApp?.installationId}
 		<form on:submit|preventDefault={handleSubmit} class="py-4">
-			<div class="flex space-x-1 pb-5 font-bold">
+			<div class="flex space-x-1 pb-5 ">
 				<div class="title">{$t('general')}</div>
 				{#if $appSession.isAdmin}
 					<button
@@ -218,20 +212,24 @@
 						bind:value={source.apiUrl}
 					/>
 				</div>
-				<div class="grid grid-cols-2 items-center">
-					<label for="customPort" class="text-base font-bold text-stone-100">Custom SSH Port</label>
-					<input
-						name="customPort"
-						id="customPort"
-						disabled={!selfHosted}
-						readonly={!selfHosted}
-						required
-						value={source.customPort}
-					/>
-					<Explainer
-						text="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
-					/>
-				</div>
+				{#if selfHosted}
+					<div class="grid grid-cols-2 items-center">
+						<label for="customPort" class="text-base font-bold text-stone-100"
+							>Custom SSH Port</label
+						>
+						<input
+							name="customPort"
+							id="customPort"
+							disabled={!selfHosted}
+							readonly={!selfHosted}
+							required
+							value={source.customPort}
+						/>
+						<Explainer
+							text="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
+						/>
+					</div>
+				{/if}
 				<div class="grid grid-cols-2">
 					<div class="flex flex-col">
 						<label for="organization" class="pt-2 text-base font-bold text-stone-100"

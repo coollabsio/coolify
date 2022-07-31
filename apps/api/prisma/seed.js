@@ -24,7 +24,8 @@ async function main() {
 			data: {
 				isRegistrationEnabled: true,
 				proxyPassword: encrypt(generatePassword()),
-				proxyUser: cuid()
+				proxyUser: cuid(),
+				arch: process.arch
 			}
 		});
 	} else {

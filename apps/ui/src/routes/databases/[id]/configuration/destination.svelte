@@ -9,7 +9,7 @@
 					redirect: `/database/${params.id}`
 				};
 			}
-			const response = await get(`/destinations`);
+			const response = await get(`/destinations?onlyVerified=true`);
 			return {
 				props: {
 					...response
@@ -55,7 +55,7 @@
 <div class="flex justify-center">
 	{#if !destinations || destinations.length === 0}
 		<div class="flex-col">
-			<div class="pb-2">{$t('application.configuration.no_configurable_destination')}</div>
+			<div class="pb-2 text-center font-bold">{$t('application.configuration.no_configurable_destination')}</div>
 			<div class="flex justify-center">
 				<a href="/new/destination" sveltekit:prefetch class="add-icon bg-sky-600 hover:bg-sky-500">
 					<svg

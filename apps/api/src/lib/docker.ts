@@ -1,33 +1,43 @@
-import { asyncExecShell } from './common';
-import Dockerode from 'dockerode';
-export function getEngine(engine: string): string {
-	return engine === '/var/run/docker.sock' ? 'unix:///var/run/docker.sock' : engine;
-}
-export function dockerInstance({ destinationDocker }): { engine: Dockerode; network: string } {
-	return {
-		engine: new Dockerode({
-			socketPath: destinationDocker.engine
-		}),
-		network: destinationDocker.network
-	};
-}
+import { executeDockerCmd } from './common';
 
-export async function checkContainer(engine: string, container: string, remove = false): Promise<boolean> {
-	const host = getEngine(engine);
+export function formatLabelsOnDocker(data) {
+	return data.trim().split('\n').map(a => JSON.parse(a)).map((container) => {
+		const labels = container.Labels.split(',')
+		let jsonLabels = {}
+		labels.forEach(l => {
+			const name = l.split('=')[0]
+			const value = l.split('=')[1]
+			jsonLabels = { ...jsonLabels, ...{ [name]: value } }
+		})
+		container.Labels = jsonLabels;
+		return container
+	})
+}
+export async function checkContainer({ dockerId, container, remove = false }: { dockerId: string, container: string, remove?: boolean }): Promise<boolean> {
 	let containerFound = false;
-
 	try {
-		const { stdout } = await asyncExecShell(
-			`DOCKER_HOST="${host}" docker inspect --format '{{json .State}}' ${container}`
-		);
+		const { stdout } = await executeDockerCmd({
+			dockerId,
+			command:
+				`docker inspect --format '{{json .State}}' ${container}`
+		});
+
 		const parsedStdout = JSON.parse(stdout);
 		const status = parsedStdout.Status;
 		const isRunning = status === 'running';
 		if (status === 'created') {
-			await asyncExecShell(`DOCKER_HOST="${host}" docker rm ${container}`);
+			await executeDockerCmd({
+				dockerId,
+				command:
+					`docker rm ${container}`
+			});
 		}
 		if (remove && status === 'exited') {
-			await asyncExecShell(`DOCKER_HOST="${host}" docker rm ${container}`);
+			await executeDockerCmd({
+				dockerId,
+				command:
+					`docker rm ${container}`
+			});
 		}
 		if (isRunning) {
 			containerFound = true;
@@ -38,13 +48,10 @@ export async function checkContainer(engine: string, container: string, remove =
 	return containerFound;
 }
 
-export async function isContainerExited(engine: string, containerName: string): Promise<boolean> {
+export async function isContainerExited(dockerId: string, containerName: string): Promise<boolean> {
 	let isExited = false;
-	const host = getEngine(engine);
 	try {
-		const { stdout } = await asyncExecShell(
-			`DOCKER_HOST="${host}" docker inspect -f '{{.State.Status}}' ${containerName}`
-		);
+		const { stdout } = await executeDockerCmd({ dockerId, command: `docker inspect -f '{{.State.Status}}' ${containerName}` })
 		if (stdout.trim() === 'exited') {
 			isExited = true;
 		}
@@ -57,19 +64,17 @@ export async function isContainerExited(engine: string, containerName: string): 
 
 export async function removeContainer({
 	id,
-	engine
+	dockerId
 }: {
 	id: string;
-	engine: string;
+	dockerId: string;
 }): Promise<void> {
-	const host = getEngine(engine);
 	try {
-		const { stdout } = await asyncExecShell(
-			`DOCKER_HOST=${host} docker inspect --format '{{json .State}}' ${id}`
-		);
+		const { stdout } = await executeDockerCmd({ dockerId, command: `docker inspect --format '{{json .State}}' ${id}` })
+
 		if (JSON.parse(stdout).Running) {
-			await asyncExecShell(`DOCKER_HOST=${host} docker stop -t 0 ${id}`);
-			await asyncExecShell(`DOCKER_HOST=${host} docker rm ${id}`);
+			await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}` })
+			await executeDockerCmd({ dockerId, command: `docker rm ${id}` })
 		}
 	} catch (error) {
 		console.log(error);

@@ -92,7 +92,7 @@ label {
 }
 
 button, .button {
-	@apply rounded bg-coolgray-200 p-1 px-2 py-1 text-xs font-bold outline-none transition-all duration-100 hover:bg-coolgray-500 disabled:cursor-not-allowed disabled:bg-coolblack disabled:text-stone-600;
+	@apply rounded bg-coolgray-200 p-2 px-3 text-sm outline-none transition-all duration-100 hover:bg-coolgray-500 disabled:cursor-not-allowed disabled:bg-coolblack disabled:text-stone-600;
 }
 
 a {
@@ -104,7 +104,7 @@ a {
 }
 
 .title {
-	@apply mr-4 text-base tracking-tight md:text-2xl;
+	@apply mr-4 text-base tracking-tight md:text-2xl font-bold;
 }
 .nav-main {
 	@apply fixed top-0 left-0 min-h-screen w-16 min-w-[4rem] overflow-auto border-r border-stone-800 bg-coolgray-200 scrollbar-w-1  scrollbar-thumb-coollabs scrollbar-track-coolgray-200 xl:overflow-visible;
@@ -394,4 +394,12 @@ a {
 	100% {
 		transform: scale(0.9);
 	}
+}
+
+.sub-menu {
+	@apply text-xl font-bold  hover:bg-coolgray-500  rounded p-2 hover:text-white text-stone-200 cursor-pointer;
+}
+
+.sub-menu-active {
+	@apply  bg-coolgray-500  text-white;
 }
