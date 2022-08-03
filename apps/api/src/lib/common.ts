@@ -488,18 +488,16 @@ export async function createRemoteEngineConfiguration(id: string) {
 	}
 	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh-add -q ${sshKeyFile}`)
 
-	const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(`ps ax | grep 'ssh -fNL 11122:localhost:22' | grep -v grep | wc -l`)
-	console.log(numberOfSSHTunnelsRunning)
+	const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(`ps ax | grep 'ssh -o StrictHostKeyChecking no -fNL 11122:localhost:${remotePort}' | grep -v grep | wc -l`)
 	if (numberOfSSHTunnelsRunning !== '' && Number(numberOfSSHTunnelsRunning.trim()) == 0) {
 		try {
-			await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh -fNL 11122:localhost:22 ${remoteIpAddress}`)
+			await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh -o "StrictHostKeyChecking no" -fNL 11122:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`)
 
 		} catch(error){
 			console.log(error)
 		}
 
 	}
-	
 
 	const config = sshConfig.parse('')
 	const found = config.find({ Host: remoteIpAddress })
