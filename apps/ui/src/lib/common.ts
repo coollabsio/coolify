@@ -5,7 +5,7 @@ export const supportedServiceTypesAndVersions = [
 		name: 'plausibleanalytics',
 		fancyName: 'Plausible Analytics',
 		baseImage: 'plausible/analytics',
-		images: ['bitnami/postgresql:13.2.0', 'yandex/clickhouse-server:21.3.2.5'],
+		images: ['postgres:13.2.0', 'yandex/clickhouse-server:21.3.2.5'],
 		versions: ['latest', 'stable'],
 		recommendedVersion: 'stable',
 		ports: {
@@ -46,7 +46,7 @@ export const supportedServiceTypesAndVersions = [
 		name: 'wordpress',
 		fancyName: 'Wordpress',
 		baseImage: 'wordpress',
-		images: ['bitnami/mysql:5.7'],
+		images: ['mysql:5.7'],
 		versions: ['latest', 'php8.1', 'php8.0', 'php7.4', 'php7.3'],
 		recommendedVersion: 'latest',
 		ports: {
@@ -96,8 +96,8 @@ export const supportedServiceTypesAndVersions = [
 	{
 		name: 'ghost',
 		fancyName: 'Ghost',
-		baseImage: 'bitnami/ghost',
-		images: ['bitnami/mariadb'],
+		baseImage: 'ghost',
+		images: ['mariadb'],
 		versions: ['latest'],
 		recommendedVersion: 'latest',
 		ports: {
@@ -147,7 +147,7 @@ export const supportedServiceTypesAndVersions = [
 		ports: {
 			main: 3000
 		}
-	},
+	}
 	// {
 	//     name: 'moodle',
 	//     fancyName: 'Moodle',
@@ -161,12 +161,11 @@ export const supportedServiceTypesAndVersions = [
 	// }
 ];
 
-export const asyncSleep = (delay: number) =>
-	new Promise((resolve) => setTimeout(resolve, delay));
+export const asyncSleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, delay));
 
 export function errorNotification(error: any): void {
 	if (error.message) {
-		if (error.message === 'Cannot read properties of undefined (reading \'postMessage\')') {
+		if (error.message === "Cannot read properties of undefined (reading 'postMessage')") {
 			toast.push('Currently there is background process in progress. Please try again later.');
 			return;
 		}
@@ -212,7 +211,6 @@ export const staticDeployments = [
 ];
 export const notNodeDeployments = ['php', 'docker', 'rust', 'python', 'deno', 'laravel'];
 
-
 export function generateRemoteEngine(destination: any) {
 	return `ssh://${destination.user}@${destination.ipAddress}:${destination.port}`;
 }
@@ -228,29 +226,29 @@ export const supportedDatabaseTypesAndVersions = [
 	{
 		name: 'mongodb',
 		fancyName: 'MongoDB',
-		baseImage: 'bitnami/mongodb',
+		baseImage: 'mongo',
 		versions: ['5.0', '4.4', '4.2']
 	},
-	{ name: 'mysql', fancyName: 'MySQL', baseImage: 'bitnami/mysql', versions: ['8.0', '5.7'] },
+	{ name: 'mysql', fancyName: 'MySQL', baseImage: 'mysql', versions: ['8.0', '5.7'] },
 	{
 		name: 'mariadb',
 		fancyName: 'MariaDB',
-		baseImage: 'bitnami/mariadb',
+		baseImage: 'mariadb',
 		versions: ['10.7', '10.6', '10.5', '10.4', '10.3', '10.2']
 	},
 	{
 		name: 'postgresql',
 		fancyName: 'PostgreSQL',
-		baseImage: 'bitnami/postgresql',
+		baseImage: 'postgres',
 		versions: ['14.2.0', '13.6.0', '12.10.0	', '11.15.0', '10.20.0']
 	},
 	{
 		name: 'redis',
 		fancyName: 'Redis',
-		baseImage: 'bitnami/redis',
-		versions: ['6.2', '6.0', '5.0']
+		baseImage: 'redis',
+		versions: ['7.0.4', '6.2', '6.0', '5.0']
 	},
-	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] }
+	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'couchdb', versions: ['3.2.1'] }
 ];
 
 export const getServiceMainPort = (service: string) => {
@@ -260,8 +258,6 @@ export const getServiceMainPort = (service: string) => {
 	}
 	return null;
 };
-
-
 
 export function handlerNotFoundLoad(error: any, url: URL) {
 	if (error?.status === 404) {

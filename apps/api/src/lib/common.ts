@@ -13,7 +13,7 @@ import cuid from 'cuid';
 
 import { checkContainer, getEngine, removeContainer } from './docker';
 import { day } from './dayjs';
-import * as serviceFields from './serviceFields'
+import * as serviceFields from './serviceFields';
 
 export const version = '3.1.4';
 export const isDev = process.env.NODE_ENV === 'development';
@@ -32,17 +32,17 @@ export const defaultProxyImageHttp = `coolify-haproxy-http-alpine:latest`;
 export const defaultTraefikImage = `traefik:v2.6`;
 export function getAPIUrl() {
 	if (process.env.GITPOD_WORKSPACE_URL) {
-		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL)
-		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '')
-		return newURL
+		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL);
+		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '');
+		return newURL;
 	}
 	return isDev ? 'http://localhost:3001' : 'http://localhost:3000';
 }
 export function getUIUrl() {
 	if (process.env.GITPOD_WORKSPACE_URL) {
-		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL)
-		const newURL = href.replace('https://', 'https://3000-').replace(/\/$/, '')
-		return newURL
+		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL);
+		const newURL = href.replace('https://', 'https://3000-').replace(/\/$/, '');
+		return newURL;
 	}
 	return 'http://localhost:3000';
 }
@@ -54,7 +54,6 @@ const mainTraefikEndpoint = isDev
 const otherTraefikEndpoint = isDev
 	? `${getAPIUrl()}/webhooks/traefik/other.json`
 	: 'http://coolify:3000/webhooks/traefik/other.json';
-
 
 export const include: any = {
 	destinationDocker: true,
@@ -68,7 +67,7 @@ export const include: any = {
 	meiliSearch: true,
 	umami: true,
 	hasura: true,
-	fider: true,
+	fider: true
 };
 
 export const uniqueName = (): string => uniqueNamesGenerator(customConfig);
@@ -113,164 +112,164 @@ export const encrypt = (text: string) => {
 };
 
 export const supportedServiceTypesAndVersions = [
-    {
-        name: 'plausibleanalytics',
-        fancyName: 'Plausible Analytics',
-        baseImage: 'plausible/analytics',
-        images: ['bitnami/postgresql:13.2.0', 'yandex/clickhouse-server:21.3.2.5'],
-        versions: ['latest', 'stable'],
-        recommendedVersion: 'stable',
-        ports: {
-            main: 8000
-        }
-    },
-    {
-        name: 'nocodb',
-        fancyName: 'NocoDB',
-        baseImage: 'nocodb/nocodb',
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 8080
-        }
-    },
-    {
-        name: 'minio',
-        fancyName: 'MinIO',
-        baseImage: 'minio/minio',
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 9001
-        }
-    },
-    {
-        name: 'vscodeserver',
-        fancyName: 'VSCode Server',
-        baseImage: 'codercom/code-server',
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 8080
-        }
-    },
-    {
-        name: 'wordpress',
-        fancyName: 'Wordpress',
-        baseImage: 'wordpress',
-        images: ['bitnami/mysql:5.7'],
-        versions: ['latest', 'php8.1', 'php8.0', 'php7.4', 'php7.3'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 80
-        }
-    },
-    {
-        name: 'vaultwarden',
-        fancyName: 'Vaultwarden',
-        baseImage: 'vaultwarden/server',
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 80
-        }
-    },
-    {
-        name: 'languagetool',
-        fancyName: 'LanguageTool',
-        baseImage: 'silviof/docker-languagetool',
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 8010
-        }
-    },
-    {
-        name: 'n8n',
-        fancyName: 'n8n',
-        baseImage: 'n8nio/n8n',
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 5678
-        }
-    },
-    {
-        name: 'uptimekuma',
-        fancyName: 'Uptime Kuma',
-        baseImage: 'louislam/uptime-kuma',
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 3001
-        }
-    },
-    {
-        name: 'ghost',
-        fancyName: 'Ghost',
-        baseImage: 'bitnami/ghost',
-        images: ['bitnami/mariadb'],
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 2368
-        }
-    },
-    {
-        name: 'meilisearch',
-        fancyName: 'Meilisearch',
-        baseImage: 'getmeili/meilisearch',
-        images: [],
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 7700
-        }
-    },
-    {
-        name: 'umami',
-        fancyName: 'Umami',
-        baseImage: 'ghcr.io/mikecao/umami',
-        images: ['postgres:12-alpine'],
-        versions: ['postgresql-latest'],
-        recommendedVersion: 'postgresql-latest',
-        ports: {
-            main: 3000
-        }
-    },
-    {
-        name: 'hasura',
-        fancyName: 'Hasura',
-        baseImage: 'hasura/graphql-engine',
-        images: ['postgres:12-alpine'],
-        versions: ['latest', 'v2.5.1'],
-        recommendedVersion: 'v2.5.1',
-        ports: {
-            main: 8080
-        }
-    },
-    {
-        name: 'fider',
-        fancyName: 'Fider',
-        baseImage: 'getfider/fider',
-        images: ['postgres:12-alpine'],
-        versions: ['stable'],
-        recommendedVersion: 'stable',
-        ports: {
-            main: 3000
-        }
-    },
-    // {
-    //     name: 'moodle',
-    //     fancyName: 'Moodle',
-    //     baseImage: 'bitnami/moodle',
-    //     images: [],
-    //     versions: ['latest', 'v4.0.2'],
-    //     recommendedVersion: 'latest',
-    //     ports: {
-    //         main: 8080
-    //     }
-    // }
+	{
+		name: 'plausibleanalytics',
+		fancyName: 'Plausible Analytics',
+		baseImage: 'plausible/analytics',
+		images: ['postgres:13.2.0', 'yandex/clickhouse-server:21.3.2.5'],
+		versions: ['latest', 'stable'],
+		recommendedVersion: 'stable',
+		ports: {
+			main: 8000
+		}
+	},
+	{
+		name: 'nocodb',
+		fancyName: 'NocoDB',
+		baseImage: 'nocodb/nocodb',
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8080
+		}
+	},
+	{
+		name: 'minio',
+		fancyName: 'MinIO',
+		baseImage: 'minio/minio',
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 9001
+		}
+	},
+	{
+		name: 'vscodeserver',
+		fancyName: 'VSCode Server',
+		baseImage: 'codercom/code-server',
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8080
+		}
+	},
+	{
+		name: 'wordpress',
+		fancyName: 'Wordpress',
+		baseImage: 'wordpress',
+		images: ['mysql:5.7'],
+		versions: ['latest', 'php8.1', 'php8.0', 'php7.4', 'php7.3'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 80
+		}
+	},
+	{
+		name: 'vaultwarden',
+		fancyName: 'Vaultwarden',
+		baseImage: 'vaultwarden/server',
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 80
+		}
+	},
+	{
+		name: 'languagetool',
+		fancyName: 'LanguageTool',
+		baseImage: 'silviof/docker-languagetool',
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8010
+		}
+	},
+	{
+		name: 'n8n',
+		fancyName: 'n8n',
+		baseImage: 'n8nio/n8n',
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 5678
+		}
+	},
+	{
+		name: 'uptimekuma',
+		fancyName: 'Uptime Kuma',
+		baseImage: 'louislam/uptime-kuma',
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 3001
+		}
+	},
+	{
+		name: 'ghost',
+		fancyName: 'Ghost',
+		baseImage: 'ghost',
+		images: ['mariadb'],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 2368
+		}
+	},
+	{
+		name: 'meilisearch',
+		fancyName: 'Meilisearch',
+		baseImage: 'getmeili/meilisearch',
+		images: [],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 7700
+		}
+	},
+	{
+		name: 'umami',
+		fancyName: 'Umami',
+		baseImage: 'ghcr.io/mikecao/umami',
+		images: ['postgres:12-alpine'],
+		versions: ['postgresql-latest'],
+		recommendedVersion: 'postgresql-latest',
+		ports: {
+			main: 3000
+		}
+	},
+	{
+		name: 'hasura',
+		fancyName: 'Hasura',
+		baseImage: 'hasura/graphql-engine',
+		images: ['postgres:12-alpine'],
+		versions: ['latest', 'v2.5.1'],
+		recommendedVersion: 'v2.5.1',
+		ports: {
+			main: 8080
+		}
+	},
+	{
+		name: 'fider',
+		fancyName: 'Fider',
+		baseImage: 'getfider/fider',
+		images: ['postgres:12-alpine'],
+		versions: ['stable'],
+		recommendedVersion: 'stable',
+		ports: {
+			main: 3000
+		}
+	}
+	// {
+	//     name: 'moodle',
+	//     fancyName: 'Moodle',
+	//     baseImage: 'bitnami/moodle',
+	//     images: [],
+	//     versions: ['latest', 'v4.0.2'],
+	//     recommendedVersion: 'latest',
+	//     ports: {
+	//         main: 8080
+	//     }
+	// }
 ];
 
 export async function checkDoubleBranch(branch: string, projectId: number): Promise<boolean> {
@@ -287,7 +286,7 @@ export async function isDNSValid(hostname: any, domain: string): Promise<any> {
 			resolves = await dns.resolve4(hostname);
 		}
 	} catch (error) {
-		throw 'Invalid DNS.'
+		throw 'Invalid DNS.';
 	}
 
 	try {
@@ -303,10 +302,9 @@ export async function isDNSValid(hostname: any, domain: string): Promise<any> {
 		}
 		if (!ipDomainFound) throw false;
 	} catch (error) {
-		throw 'DNS not set'
+		throw 'DNS not set';
 	}
 }
-
 
 export function getDomain(domain: string): string {
 	return domain?.replace('https://', '').replace('http://', '');
@@ -388,7 +386,7 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 			resolves = await dns.resolve4(hostname);
 		}
 	} catch (error) {
-		throw { status: 500, message: `Could not determine IP address for ${hostname}.` }
+		throw { status: 500, message: `Could not determine IP address for ${hostname}.` };
 	}
 
 	if (dualCerts) {
@@ -410,9 +408,15 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 				}
 			}
 			if (ipDomainFound && ipDomainDualCertFound) return { status: 200 };
-			throw { status: 500, message: `DNS not set correctly or propogated.<br>Please check your DNS settings.` }
+			throw {
+				status: 500,
+				message: `DNS not set correctly or propogated.<br>Please check your DNS settings.`
+			};
 		} catch (error) {
-			throw { status: 500, message: `DNS not set correctly or propogated.<br>Please check your DNS settings.` }
+			throw {
+				status: 500,
+				message: `DNS not set correctly or propogated.<br>Please check your DNS settings.`
+			};
 		}
 	} else {
 		try {
@@ -424,9 +428,15 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 				}
 			}
 			if (ipDomainFound) return { status: 200 };
-			throw { status: 500, message: `DNS not set correctly or propogated.<br>Please check your DNS settings.` }
+			throw {
+				status: 500,
+				message: `DNS not set correctly or propogated.<br>Please check your DNS settings.`
+			};
 		} catch (error) {
-			throw { status: 500, message: `DNS not set correctly or propogated.<br>Please check your DNS settings.` }
+			throw {
+				status: 500,
+				message: `DNS not set correctly or propogated.<br>Please check your DNS settings.`
+			};
 		}
 	}
 }
@@ -445,29 +455,29 @@ export const supportedDatabaseTypesAndVersions = [
 	{
 		name: 'mongodb',
 		fancyName: 'MongoDB',
-		baseImage: 'bitnami/mongodb',
+		baseImage: 'mongo',
 		versions: ['5.0', '4.4', '4.2']
 	},
-	{ name: 'mysql', fancyName: 'MySQL', baseImage: 'bitnami/mysql', versions: ['8.0', '5.7'] },
+	{ name: 'mysql', fancyName: 'MySQL', baseImage: 'mysql', versions: ['8.0', '5.7'] },
 	{
 		name: 'mariadb',
 		fancyName: 'MariaDB',
-		baseImage: 'bitnami/mariadb',
+		baseImage: 'mariadb',
 		versions: ['10.7', '10.6', '10.5', '10.4', '10.3', '10.2']
 	},
 	{
 		name: 'postgresql',
 		fancyName: 'PostgreSQL',
-		baseImage: 'bitnami/postgresql',
+		baseImage: 'postgres',
 		versions: ['14.4.0', '13.6.0', '12.10.0', '11.15.0', '10.20.0']
 	},
 	{
 		name: 'redis',
 		fancyName: 'Redis',
-		baseImage: 'bitnami/redis',
-		versions: ['6.2', '6.0', '5.0']
+		baseImage: 'redis',
+		versions: ['7.0.4', '6.2', '6.0', '5.0']
 	},
-	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] }
+	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'couchdb', versions: ['3.2.1'] }
 ];
 
 export async function startTraefikProxy(engine: string): Promise<void> {
@@ -592,8 +602,6 @@ export async function listSettings(): Promise<any> {
 	return settings;
 }
 
-
-
 // export async function stopCoolifyProxy(
 // 	engine: string
 // ): Promise<{ stdout: string; stderr: string } | Error> {
@@ -627,73 +635,73 @@ export function generatePassword(length = 24, symbols = false): string {
 
 export function generateDatabaseConfiguration(database: any):
 	| {
-		volume: string;
-		image: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			MYSQL_DATABASE: string;
-			MYSQL_PASSWORD: string;
-			MYSQL_ROOT_USER: string;
-			MYSQL_USER: string;
-			MYSQL_ROOT_PASSWORD: string;
-		};
-	}
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				MYSQL_DATABASE: string;
+				MYSQL_PASSWORD: string;
+				MYSQL_ROOT_USER: string;
+				MYSQL_USER: string;
+				MYSQL_ROOT_PASSWORD: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			MONGODB_ROOT_USER: string;
-			MONGODB_ROOT_PASSWORD: string;
-		};
-	}
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				MONGODB_ROOT_USER: string;
+				MONGODB_ROOT_PASSWORD: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			MARIADB_ROOT_USER: string;
-			MARIADB_ROOT_PASSWORD: string;
-			MARIADB_USER: string;
-			MARIADB_PASSWORD: string;
-			MARIADB_DATABASE: string;
-		};
-	}
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				MARIADB_ROOT_USER: string;
+				MARIADB_ROOT_PASSWORD: string;
+				MARIADB_USER: string;
+				MARIADB_PASSWORD: string;
+				MARIADB_DATABASE: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			POSTGRESQL_POSTGRES_PASSWORD: string;
-			POSTGRESQL_USERNAME: string;
-			POSTGRESQL_PASSWORD: string;
-			POSTGRESQL_DATABASE: string;
-		};
-	}
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				POSTGRESQL_POSTGRES_PASSWORD: string;
+				POSTGRESQL_USERNAME: string;
+				POSTGRESQL_PASSWORD: string;
+				POSTGRESQL_DATABASE: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			REDIS_AOF_ENABLED: string;
-			REDIS_PASSWORD: string;
-		};
-	}
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				REDIS_AOF_ENABLED: string;
+				REDIS_PASSWORD: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			COUCHDB_PASSWORD: string;
-			COUCHDB_USER: string;
-		};
-	} {
+			volume: string;
+			image: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				COUCHDB_PASSWORD: string;
+				COUCHDB_USER: string;
+			};
+	  } {
 	const {
 		id,
 		dbUser,
@@ -717,7 +725,7 @@ export function generateDatabaseConfiguration(database: any):
 				MYSQL_DATABASE: defaultDatabase
 			},
 			image: `${baseImage}:${version}`,
-			volume: `${id}-${type}-data:/bitnami/mysql/data`,
+			volume: `${id}-${type}-data:/var/lib/mysql`,
 			ulimits: {}
 		};
 	} else if (type === 'mariadb') {
@@ -731,7 +739,7 @@ export function generateDatabaseConfiguration(database: any):
 				MARIADB_DATABASE: defaultDatabase
 			},
 			image: `${baseImage}:${version}`,
-			volume: `${id}-${type}-data:/bitnami/mariadb`,
+			volume: `${id}-${type}-data:/var/lib/mysql`,
 			ulimits: {}
 		};
 	} else if (type === 'mongodb') {
@@ -742,7 +750,7 @@ export function generateDatabaseConfiguration(database: any):
 				MONGODB_ROOT_PASSWORD: rootUserPassword
 			},
 			image: `${baseImage}:${version}`,
-			volume: `${id}-${type}-data:/bitnami/mongodb`,
+			volume: `${id}-${type}-data:/data/db`,
 			ulimits: {}
 		};
 	} else if (type === 'postgresql') {
@@ -755,7 +763,7 @@ export function generateDatabaseConfiguration(database: any):
 				POSTGRESQL_DATABASE: defaultDatabase
 			},
 			image: `${baseImage}:${version}`,
-			volume: `${id}-${type}-data:/bitnami/postgresql`,
+			volume: `${id}-${type}-data:/var/lib/postgresql/data`,
 			ulimits: {}
 		};
 	} else if (type === 'redis') {
@@ -766,7 +774,7 @@ export function generateDatabaseConfiguration(database: any):
 				REDIS_AOF_ENABLED: appendOnly ? 'yes' : 'no'
 			},
 			image: `${baseImage}:${version}`,
-			volume: `${id}-${type}-data:/bitnami/redis/data`,
+			volume: `${id}-${type}-data:/data`,
 			ulimits: {}
 		};
 	} else if (type === 'couchdb') {
@@ -777,7 +785,7 @@ export function generateDatabaseConfiguration(database: any):
 				COUCHDB_USER: dbUser
 			},
 			image: `${baseImage}:${version}`,
-			volume: `${id}-${type}-data:/bitnami/couchdb`,
+			volume: `${id}-${type}-data:/opt/couchdb/data`,
 			ulimits: {}
 		};
 	}
@@ -798,7 +806,6 @@ export function getDatabaseVersions(type: string): string[] {
 	}
 	return [];
 }
-
 
 export type ComposeFile = {
 	version: ComposerFileVersion;
@@ -821,11 +828,13 @@ export type ComposeFileService = {
 	depends_on?: string[];
 	command?: string;
 	ports?: string[];
-	build?: {
-		context: string;
-		dockerfile: string;
-		args?: Record<string, unknown>;
-	} | string;
+	build?:
+		| {
+				context: string;
+				dockerfile: string;
+				args?: Record<string, unknown>;
+		  }
+		| string;
 	deploy?: {
 		restart_policy?: {
 			condition?: string;
@@ -932,10 +941,7 @@ export async function startTcpProxy(
 	}
 }
 
-
-export async function stopDatabaseContainer(
-	database: any
-): Promise<boolean> {
+export async function stopDatabaseContainer(database: any): Promise<boolean> {
 	let everStarted = false;
 	const {
 		id,
@@ -958,7 +964,6 @@ export async function stopDatabaseContainer(
 	}
 	return everStarted;
 }
-
 
 export async function stopTcpHttpProxy(
 	id: string,
@@ -986,7 +991,6 @@ export async function stopTcpHttpProxy(
 		return error;
 	}
 }
-
 
 export async function updatePasswordInDb(database, user, newPassword, isRoot) {
 	const {
@@ -1065,7 +1069,6 @@ export async function getFreePort() {
 	return await getPort({ port: portNumbers(minPort, maxPort), exclude: usedPorts });
 }
 
-
 export async function startTraefikTCPProxy(
 	destinationDocker: any,
 	id: string,
@@ -1133,14 +1136,20 @@ export async function startTraefikTCPProxy(
 	}
 }
 
-export async function getServiceFromDB({ id, teamId }: { id: string; teamId: string }): Promise<any> {
+export async function getServiceFromDB({
+	id,
+	teamId
+}: {
+	id: string;
+	teamId: string;
+}): Promise<any> {
 	const settings = await prisma.setting.findFirst();
 	const body = await prisma.service.findFirst({
 		where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
 		include
 	});
-	let { type } = body
-	type = fixType(type)
+	let { type } = body;
+	type = fixType(type);
 
 	if (body?.serviceSecret.length > 0) {
 		body.serviceSecret = body.serviceSecret.map((s) => {
@@ -1148,7 +1157,7 @@ export async function getServiceFromDB({ id, teamId }: { id: string; teamId: str
 			return s;
 		});
 	}
-	body[type] = { ...body[type], ...getUpdateableFields(type, body[type]) }
+	body[type] = { ...body[type], ...getUpdateableFields(type, body[type]) };
 	return { ...body, settings };
 }
 
@@ -1404,49 +1413,49 @@ export function saveUpdateableFields(type: string, data: any) {
 	let update = {};
 	if (type && serviceFields[type]) {
 		serviceFields[type].map((k) => {
-			let temp = data[k.name]
+			let temp = data[k.name];
 			if (temp) {
 				if (k.isEncrypted) {
-					temp = encrypt(temp)
+					temp = encrypt(temp);
 				}
 				if (k.isLowerCase) {
-					temp = temp.toLowerCase()
+					temp = temp.toLowerCase();
 				}
 				if (k.isNumber) {
-					temp = Number(temp)
+					temp = Number(temp);
 				}
 				if (k.isBoolean) {
-					temp = Boolean(temp)
+					temp = Boolean(temp);
 				}
 			}
-			update[k.name] = temp
+			update[k.name] = temp;
 		});
 	}
-	return update
+	return update;
 }
 
 export function getUpdateableFields(type: string, data: any) {
 	let update = {};
 	if (type && serviceFields[type]) {
 		serviceFields[type].map((k) => {
-			let temp = data[k.name]
+			let temp = data[k.name];
 			if (temp) {
 				if (k.isEncrypted) {
-					temp = decrypt(temp)
+					temp = decrypt(temp);
 				}
-				update[k.name] = temp
+				update[k.name] = temp;
 			}
-			update[k.name] = temp
+			update[k.name] = temp;
 		});
 	}
-	return update
+	return update;
 }
 
 export function fixType(type) {
 	// Hack to fix the type case sensitivity...
 	if (type === 'plausibleanalytics') type = 'plausibleAnalytics';
 	if (type === 'meilisearch') type = 'meiliSearch';
-	return type
+	return type;
 }
 
 export const getServiceMainPort = (service: string) => {
@@ -1457,7 +1466,6 @@ export const getServiceMainPort = (service: string) => {
 	return null;
 };
 
-
 export function makeLabelForServices(type) {
 	return [
 		'coolify.managed=true',
@@ -1466,8 +1474,14 @@ export function makeLabelForServices(type) {
 		`coolify.service.type=${type}`
 	];
 }
-export function errorHandler({ status = 500, message = 'Unknown error.' }: { status: number, message: string | any }) {
-	if (message.message) message = message.message
+export function errorHandler({
+	status = 500,
+	message = 'Unknown error.'
+}: {
+	status: number;
+	message: string | any;
+}) {
+	if (message.message) message = message.message;
 	throw { status, message };
 }
 export async function generateSshKeyPair(): Promise<{ publicKey: string; privateKey: string }> {
@@ -1488,8 +1502,12 @@ export async function generateSshKeyPair(): Promise<{ publicKey: string; private
 export async function stopBuild(buildId, applicationId) {
 	let count = 0;
 	await new Promise<void>(async (resolve, reject) => {
-		const { destinationDockerId, status } = await prisma.build.findFirst({ where: { id: buildId } });
-		const { engine } = await prisma.destinationDocker.findFirst({ where: { id: destinationDockerId } });
+		const { destinationDockerId, status } = await prisma.build.findFirst({
+			where: { id: buildId }
+		});
+		const { engine } = await prisma.destinationDocker.findFirst({
+			where: { id: destinationDockerId }
+		});
 		const host = getEngine(engine);
 		let interval = setInterval(async () => {
 			try {
@@ -1519,7 +1537,7 @@ export async function stopBuild(buildId, applicationId) {
 					}
 				}
 				count++;
-			} catch (error) { }
+			} catch (error) {}
 		}, 100);
 	});
 }
@@ -1533,7 +1551,7 @@ async function cleanupDB(buildId: string) {
 
 export function convertTolOldVolumeNames(type) {
 	if (type === 'nocodb') {
-		return 'nc'
+		return 'nc';
 	}
 }
 // export async function getAvailableServices(): Promise<any> {
@@ -1556,7 +1574,7 @@ export async function cleanupDockerStorage(host, lowDiskSpace, force) {
 	if (lowDiskSpace || force) {
 		if (isDev) {
 			if (!force) console.log(`[DEV MODE] Low disk space: ${lowDiskSpace}`);
-			return
+			return;
 		}
 		try {
 			await asyncExecShell(`DOCKER_HOST=${host} docker container prune -f`);
