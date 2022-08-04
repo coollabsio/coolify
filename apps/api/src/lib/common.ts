@@ -739,6 +739,7 @@ export function generateDatabaseConfiguration(database: any):
 		  EDGEDB_SERVER_PASSWORD: string;
 		  EDGEDB_SERVER_USER: string;
 		  EDGEDB_SERVER_DATABASE: string;
+		  EDGEDB_SERVER_SECURITY: string;
 		};
 	} {
 	const {
@@ -834,6 +835,7 @@ export function generateDatabaseConfiguration(database: any):
 			EDGEDB_SERVER_PASSWORD: rootUserPassword,
 			EDGEDB_SERVER_USER: rootUser,
 			EDGEDB_SERVER_DATABASE: defaultDatabase,
+			EDGEDB_SERVER_SECURITY: 'insecure_dev_mode'
 		  },
 		  image: `${baseImage}:${version}`,
 		  volume: `${id}-${type}-data:/edgedb/edgedb`,
