@@ -30,6 +30,7 @@ export async function listDestinations(request: FastifyRequest<ListDestinations>
             destinations
         }
     } catch ({ status, message }) {
+        console.log({status, message})
         return errorHandler({ status, message })
     }
 }
