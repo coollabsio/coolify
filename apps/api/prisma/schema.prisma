@@ -82,7 +82,7 @@ model TeamInvitation {
 model Application {
   id                  String                         @id @default(cuid())
   name                String
-  fqdn                String?                        @unique
+  fqdn                String?
   repository          String?
   configHash          String?
   branch              String?

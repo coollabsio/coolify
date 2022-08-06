@@ -368,13 +368,13 @@ export async function checkService(request: FastifyRequest<CheckService>) {
         const { destinationDocker: { id: dockerId, remoteIpAddress, remoteEngine }, exposePort: configuredPort } = await prisma.service.findUnique({ where: { id }, include: { destinationDocker: true } })
         const { isDNSCheckEnabled } = await prisma.setting.findFirst({});
 
-        let found = await isDomainConfigured({ id, fqdn, dockerId });
+        let found = await isDomainConfigured({ id, fqdn, remoteIpAddress });
         if (found) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
         if (otherFqdns && otherFqdns.length > 0) {
             for (const ofqdn of otherFqdns) {
-                found = await isDomainConfigured({ id, fqdn: ofqdn, dockerId });
+                found = await isDomainConfigured({ id, fqdn: ofqdn,remoteIpAddress });
                 if (found) {
                     throw { status: 500, message: `Domain ${getDomain(ofqdn).replace('www.', '')} is already in use!` }
                 }

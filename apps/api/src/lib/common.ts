@@ -318,12 +318,12 @@ export async function isDomainConfigured({
 	id,
 	fqdn,
 	checkOwn = false,
-	dockerId = undefined
+	remoteIpAddress = undefined
 }: {
 	id: string;
 	fqdn: string;
 	checkOwn?: boolean;
-	dockerId?: string;
+	remoteIpAddress?: string;
 }): Promise<boolean> {
 	const domain = getDomain(fqdn);
 	const nakedDomain = domain.replace('www.', '');
@@ -335,7 +335,7 @@ export async function isDomainConfigured({
 			],
 			id: { not: id },
 			destinationDocker: {
-				id: dockerId
+				remoteIpAddress,
 			}
 		},
 		select: { fqdn: true }
@@ -350,7 +350,7 @@ export async function isDomainConfigured({
 			],
 			id: { not: checkOwn ? undefined : id },
 			destinationDocker: {
-				id: dockerId
+				remoteIpAddress
 			}
 		},
 		select: { fqdn: true }
