@@ -31,11 +31,14 @@ export async function checkUpdate(request: FastifyRequest) {
 		const { data: versions } = await axios.get(
 			`https://get.coollabs.io/versions.json?appId=${process.env['COOLIFY_APP_ID']}&version=${currentVersion}`
 		);
-		const latestVersion =
-			isStaging
-				? versions['coolify'].next.version
-				: versions['coolify'].main.version;
+		const latestVersion = versions['coolify'].main.version			
 		const isUpdateAvailable = compare(latestVersion, currentVersion);
+		if (isStaging) {
+			return {
+				isUpdateAvailable: true,
+				latestVersion: 'next'
+			}
+		}
 		return {
 			isUpdateAvailable: isStaging ? true : isUpdateAvailable === 1,
 			latestVersion
