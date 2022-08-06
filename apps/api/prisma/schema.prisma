@@ -215,6 +215,7 @@ model DestinationDocker {
   updatedAt          DateTime      @updatedAt
   sshKeyId           String?
   sshKey             SshKey?       @relation(fields: [sshKeyId], references: [id])
+  sshLocalPort       Int?
   application        Application[]
   database           Database[]
   service            Service[]
