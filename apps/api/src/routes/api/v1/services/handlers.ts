@@ -2379,12 +2379,11 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
         const image = getServiceImage(type);
-        const domain = getDomain(fqdn);
         const config = {
             fider: {
                 image: `${image}:${version}`,
                 environmentVariables: {
-                    BASE_URL: domain,
+                    BASE_URL: fqdn,
                     DATABASE_URL: `postgresql://${postgresqlUser}:${postgresqlPassword}@${id}-postgresql:5432/${postgresqlDatabase}?sslmode=disable`,
                     JWT_SECRET: `${jwtSecret.replace(/\$/g, '$$$')}`,
                     EMAIL_NOREPLY: emailNoreply,
