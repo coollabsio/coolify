@@ -1,5 +1,6 @@
-- RDE Application DNS check not working 
-- Check DNS configurations for app/service/coolify with RDE and local engines
+- RDE Application DNS check not working  - check
+- Check DNS configurations for app/service/coolify with RDE and local engines - check
+- Random local ssh port for each remote engine
 
 
 # Low
