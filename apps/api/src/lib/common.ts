@@ -476,9 +476,28 @@ export const supportedDatabaseTypesAndVersions = [
 	},
 	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.2'] }
 ];
+
+export async function getFreeSSHLocalPort(id: string): Promise<number> {
+	const { default: getPort, portNumbers } = await import('get-port');
+	const { remoteIpAddress, sshLocalPort } = await prisma.destinationDocker.findUnique({ where: { id } })
+	if (sshLocalPort) {
+		return Number(sshLocalPort)
+	}
+	const ports = await prisma.destinationDocker.findMany({ where: { sshLocalPort: { not: null }, remoteIpAddress: { not: remoteIpAddress } } })
+	const alreadyConfigured = await prisma.destinationDocker.findFirst({ where: { remoteIpAddress, id: { not: id }, sshLocalPort: { not: null } } })
+	if (alreadyConfigured?.sshLocalPort) {
+		await prisma.destinationDocker.update({ where: { id }, data: { sshLocalPort: alreadyConfigured.sshLocalPort } })
+		return Number(alreadyConfigured.sshLocalPort)
+	}
+	const availablePort = await getPort({ port: portNumbers(10000, 10100), exclude: ports.map(p => p.sshLocalPort) })
+	await prisma.destinationDocker.update({ where: { id }, data: { sshLocalPort: Number(availablePort) } })
+	return Number(availablePort)
+}
+
 export async function createRemoteEngineConfiguration(id: string) {
 	const homedir = os.homedir();
 	const sshKeyFile = `/tmp/id_rsa-${id}`
+	const localPort = await getFreeSSHLocalPort(id);
 	const { sshKey: { privateKey }, remoteIpAddress, remotePort, remoteUser } = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } })
 	await fs.writeFile(sshKeyFile, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 })
 	// Needed for remote docker compose
@@ -488,24 +507,23 @@ export async function createRemoteEngineConfiguration(id: string) {
 	}
 	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh-add -q ${sshKeyFile}`)
 
-	const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(`ps ax | grep 'ssh -o StrictHostKeyChecking no -fNL 11122:localhost:${remotePort}' | grep -v grep | wc -l`)
+	const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(`ps ax | grep 'ssh -F /dev/null -o StrictHostKeyChecking no -fNL ${localPort}:localhost:${remotePort}' | grep -v grep | wc -l`)
 	if (numberOfSSHTunnelsRunning !== '' && Number(numberOfSSHTunnelsRunning.trim()) == 0) {
 		try {
-			await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh -o "StrictHostKeyChecking no" -fNL 11122:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`)
+			await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh -F /dev/null -o "StrictHostKeyChecking no" -fNL ${localPort}:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`)
 
-		} catch(error){
+		} catch (error) {
 			console.log(error)
 		}
 
 	}
-
 	const config = sshConfig.parse('')
 	const found = config.find({ Host: remoteIpAddress })
 	if (!found) {
 		config.append({
 			Host: remoteIpAddress,
 			Hostname: 'localhost',
-			Port: '11122',
+			Port: Number(localPort),
 			User: remoteUser,
 			IdentityFile: sshKeyFile,
 			StrictHostKeyChecking: 'no'
@@ -516,11 +534,7 @@ export async function createRemoteEngineConfiguration(id: string) {
 	} catch (error) {
 		await fs.mkdir(`${homedir}/.ssh/`)
 	}
-
-	await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config))
-	
-	return
-
+	return await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config))
 }
 export async function executeDockerCmd({ dockerId, command }: { dockerId: string, command: string }) {
 	let { remoteEngine, remoteIpAddress, engine } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })

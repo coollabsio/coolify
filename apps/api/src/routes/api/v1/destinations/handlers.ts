@@ -4,7 +4,7 @@ import sshConfig from 'ssh-config'
 import fs from 'fs/promises'
 import os from 'os';
 
-import { asyncExecShell, decrypt, errorHandler, executeDockerCmd, listSettings, prisma, startTraefikProxy, stopTraefikProxy } from '../../../../lib/common';
+import { asyncExecShell, createRemoteEngineConfiguration, decrypt, errorHandler, executeDockerCmd, listSettings, prisma, startTraefikProxy, stopTraefikProxy } from '../../../../lib/common';
 import { checkContainer } from '../../../../lib/docker';
 
 import type { OnlyId } from '../../../../types';
@@ -30,7 +30,7 @@ export async function listDestinations(request: FastifyRequest<ListDestinations>
             destinations
         }
     } catch ({ status, message }) {
-        console.log({status, message})
+        console.log({ status, message })
         return errorHandler({ status, message })
     }
 }
@@ -209,32 +209,10 @@ export async function assignSSHKey(request: FastifyRequest) {
 export async function verifyRemoteDockerEngine(request: FastifyRequest, reply: FastifyReply) {
     try {
         const { id } = request.params;
-        const homedir = os.homedir();
+        await createRemoteEngineConfiguration(id);
 
-        const { sshKey: { privateKey }, remoteIpAddress, remotePort, remoteUser, network } = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } })
-
-        await fs.writeFile(`/tmp/id_rsa_verification_${id}`, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 })
-
+        const { remoteIpAddress, remoteUser, network } = await prisma.destinationDocker.findFirst({ where: { id } })
         const host = `ssh://${remoteUser}@${remoteIpAddress}`
-
-        const config = sshConfig.parse('')
-        const found = config.find({ Host: remoteIpAddress })
-        if (!found) {
-            config.append({
-                Host: remoteIpAddress,
-                Port: remotePort.toString(),
-                User: remoteUser,
-                IdentityFile: `/tmp/id_rsa_verification_${id}`,
-                StrictHostKeyChecking: 'no'
-            })
-        }
-        try {
-            await fs.stat(`${homedir}/.ssh/`)
-        } catch (error) {
-            await fs.mkdir(`${homedir}/.ssh/`)
-        }
-        await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config))
-
         const { stdout } = await asyncExecShell(`DOCKER_HOST=${host} docker network ls --filter 'name=${network}' --no-trunc --format "{{json .}}"`);
 
         if (!stdout) {

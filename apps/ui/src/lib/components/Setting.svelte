@@ -23,7 +23,6 @@
 	class="flex justify-center"
 >
 	<div
-		type="button"
 		on:click
 		aria-pressed="false"
 		class="relative mx-20 inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
