@@ -58,8 +58,10 @@
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 
 	const { id } = $page.params;
-
+	const isDestinationDeletable = destination.application.length === 0 && destination.database.length === 0 && destination.service.length === 0
+	
 	async function deleteDestination(destination: any) {
+		if (!isDestinationDeletable) return
 		const sure = confirm($t('application.confirm_to_delete', { name: destination.name }));
 		if (sure) {
 			try {
@@ -70,20 +72,29 @@
 			}
 		}
 	}
+	function deletable() {
+		if (!isDestinationDeletable) {
+			return "Please delete all resources before deleting this."
+		}
+		if ($appSession.isAdmin) {
+			return $t('destination.delete_destination')
+		} else {
+			return $t('destination.permission_denied_delete_destination')
+		}
+	}
 </script>
 
 {#if id !== 'new'}
 	<nav class="nav-side">
 		<button
 			on:click={() => deleteDestination(destination)}
-			title={$t('source.delete_git_source')}
+			title={$t('destination.delete_destination')}
 			type="submit"
-			disabled={!$appSession.isAdmin}
-			class:hover:text-red-500={$appSession.isAdmin}
+			disabled={!$appSession.isAdmin && isDestinationDeletable}
+			class:hover:text-red-500={$appSession.isAdmin && isDestinationDeletable}
 			class="icons tooltip-bottom bg-transparent text-sm"
-			data-tooltip={$appSession.isAdmin
-				? $t('destination.delete_destination')
-				: $t('destination.permission_denied_delete_destination')}><DeleteIcon /></button
+			class:text-stone-600={!isDestinationDeletable}
+			data-tooltip={deletable()}><DeleteIcon /></button
 		>
 	</nav>
 {/if}

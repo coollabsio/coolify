@@ -54,7 +54,7 @@ export async function getDestination(request: FastifyRequest<OnlyId>) {
         const teamId = request.user?.teamId;
         const destination = await prisma.destinationDocker.findFirst({
             where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-            include: { sshKey: true }
+            include: { sshKey: true, application: true, service: true, database: true }
         });
         if (!destination && id !== 'new') {
             throw { status: 404, message: `Destination not found.` };
