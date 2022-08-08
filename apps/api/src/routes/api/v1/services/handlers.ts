@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings, getFreeExposedPort, checkDomainsIsValidInDNS } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceImage, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings, getFreeExposedPort, checkDomainsIsValidInDNS, persistentVolumes } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, isContainerExited, removeContainer } from '../../../../lib/docker';
 import cuid from 'cuid';
@@ -374,7 +374,7 @@ export async function checkService(request: FastifyRequest<CheckService>) {
         }
         if (otherFqdns && otherFqdns.length > 0) {
             for (const ofqdn of otherFqdns) {
-                found = await isDomainConfigured({ id, fqdn: ofqdn,remoteIpAddress });
+                found = await isDomainConfigured({ id, fqdn: ofqdn, remoteIpAddress });
                 if (found) {
                     throw { status: 500, message: `Domain ${getDomain(ofqdn).replace('www.', '')} is already in use!` }
                 }
@@ -685,6 +685,7 @@ async function startPlausibleAnalyticsService(request: FastifyRequest<ServiceSta
             destinationDockerId,
             destinationDocker,
             serviceSecret,
+            persistentStorage,
             exposePort,
             plausibleAnalytics: {
                 id: plausibleDbId,
@@ -785,12 +786,16 @@ COPY ./init.query /docker-entrypoint-initdb.d/init.query
 COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 
         await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile);
+
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.plausibleAnalytics)
+
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
                 [id]: {
                     container_name: id,
                     image: config.plausibleAnalytics.image,
+                    volumes,
                     command:
                         'sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh db init-admin && /entrypoint.sh run"',
                     networks: [network],
@@ -847,6 +852,7 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
                 }
             },
             volumes: {
+                ...volumeMounts,
                 [config.postgresql.volume.split(':')[0]]: {
                     name: config.postgresql.volume.split(':')[0]
                 },
@@ -857,7 +863,7 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
         return {}
     } catch ({ status, message }) {
@@ -898,7 +904,7 @@ async function startNocodbService(request: FastifyRequest<ServiceStartStop>) {
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort } =
+        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort, persistentStorage } =
             service;
         const network = destinationDockerId && destinationDocker.network;
         const port = getServiceMainPort('nocodb');
@@ -916,6 +922,7 @@ async function startNocodbService(request: FastifyRequest<ServiceStartStop>) {
                 config.environmentVariables[secret.name] = secret.value;
             });
         }
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -923,7 +930,7 @@ async function startNocodbService(request: FastifyRequest<ServiceStartStop>) {
                     container_name: id,
                     image: config.image,
                     networks: [network],
-                    volumes: [config.volume],
+                    volumes,
                     environment: config.environmentVariables,
                     restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
@@ -943,15 +950,11 @@ async function startNocodbService(request: FastifyRequest<ServiceStartStop>) {
                     external: true
                 }
             },
-            volumes: {
-                [config.volume.split(':')[0]]: {
-                    name: config.volume.split(':')[0]
-                }
-            }
+            volumes: volumeMounts
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
         return {}
     } catch ({ status, message }) {
@@ -987,6 +990,7 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
             fqdn,
             destinationDockerId,
             destinationDocker,
+            persistentStorage,
             exposePort,
             minio: { rootUser, rootUserPassword },
             serviceSecret
@@ -1016,6 +1020,7 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
                 config.environmentVariables[secret.name] = secret.value;
             });
         }
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1025,7 +1030,7 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
                     command: `server /data --console-address ":${consolePort}"`,
                     environment: config.environmentVariables,
                     networks: [network],
-                    volumes: [config.volume],
+                    volumes,
                     restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('minio'),
@@ -1044,15 +1049,11 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
                     external: true
                 }
             },
-            volumes: {
-                [config.volume.split(':')[0]]: {
-                    name: config.volume.split(':')[0]
-                }
-            }
+            volumes: volumeMounts
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
         await prisma.minio.update({ where: { serviceId: id }, data: { publicPort } });
         return {}
@@ -1113,28 +1114,8 @@ async function startVscodeService(request: FastifyRequest<ServiceStartStop>) {
                 config.environmentVariables[secret.name] = secret.value;
             });
         }
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
 
-        const volumes =
-            persistentStorage?.map((storage) => {
-                return `${id}${storage.path.replace(/\//gi, '-')}:${storage.path}`;
-            }) || [];
-
-        const composeVolumes = volumes.map((volume) => {
-            return {
-                [`${volume.split(':')[0]}`]: {
-                    name: volume.split(':')[0]
-                }
-            };
-        });
-        const volumeMounts = Object.assign(
-            {},
-            {
-                [config.volume.split(':')[0]]: {
-                    name: config.volume.split(':')[0]
-                }
-            },
-            ...composeVolumes
-        );
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1143,7 +1124,7 @@ async function startVscodeService(request: FastifyRequest<ServiceStartStop>) {
                     image: config.image,
                     environment: config.environmentVariables,
                     networks: [network],
-                    volumes: [config.volume, ...volumes],
+                    volumes,
                     restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('vscodeServer'),
@@ -1167,7 +1148,7 @@ async function startVscodeService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
 
         const changePermissionOn = persistentStorage.map((p) => p.path);
@@ -1212,6 +1193,7 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
             destinationDockerId,
             serviceSecret,
             destinationDocker,
+            persistentStorage,
             exposePort,
             wordpress: {
                 mysqlDatabase,
@@ -1260,6 +1242,9 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
                 config.wordpress.environmentVariables[secret.name] = secret.value;
             });
         }
+
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.wordpress)
+
         let composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1267,7 +1252,7 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
                     container_name: id,
                     image: config.wordpress.image,
                     environment: config.wordpress.environmentVariables,
-                    volumes: [config.wordpress.volume],
+                    volumes,
                     networks: [network],
                     restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
@@ -1287,11 +1272,7 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
                     external: true
                 }
             },
-            volumes: {
-                [config.wordpress.volume.split(':')[0]]: {
-                    name: config.wordpress.volume.split(':')[0]
-                }
-            }
+            volumes: volumeMounts
         };
         if (!ownMysql) {
             composeFile.services[id].depends_on = [`${id}-mysql`];
@@ -1319,7 +1300,7 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
 
         return {}
@@ -1380,7 +1361,7 @@ async function startVaultwardenService(request: FastifyRequest<ServiceStartStop>
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort } =
+        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort, persistentStorage } =
             service;
 
         const network = destinationDockerId && destinationDocker.network;
@@ -1399,6 +1380,7 @@ async function startVaultwardenService(request: FastifyRequest<ServiceStartStop>
                 config.environmentVariables[secret.name] = secret.value;
             });
         }
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1407,7 +1389,7 @@ async function startVaultwardenService(request: FastifyRequest<ServiceStartStop>
                     image: config.image,
                     environment: config.environmentVariables,
                     networks: [network],
-                    volumes: [config.volume],
+                    volumes,
                     restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('vaultWarden'),
@@ -1426,16 +1408,12 @@ async function startVaultwardenService(request: FastifyRequest<ServiceStartStop>
                     external: true
                 }
             },
-            volumes: {
-                [config.volume.split(':')[0]]: {
-                    name: config.volume.split(':')[0]
-                }
-            }
+            volumes: volumeMounts
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
 
         return {}
@@ -1470,7 +1448,7 @@ async function startLanguageToolService(request: FastifyRequest<ServiceStartStop
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort } =
+        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort, persistentStorage } =
             service;
         const network = destinationDockerId && destinationDocker.network;
         const port = getServiceMainPort('languagetool');
@@ -1489,6 +1467,7 @@ async function startLanguageToolService(request: FastifyRequest<ServiceStartStop
                 config.environmentVariables[secret.name] = secret.value;
             });
         }
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1499,7 +1478,7 @@ async function startLanguageToolService(request: FastifyRequest<ServiceStartStop
                     environment: config.environmentVariables,
                     restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    volumes: [config.volume],
+                    volumes,
                     labels: makeLabelForServices('languagetool'),
                     deploy: {
                         restart_policy: {
@@ -1516,16 +1495,12 @@ async function startLanguageToolService(request: FastifyRequest<ServiceStartStop
                     external: true
                 }
             },
-            volumes: {
-                [config.volume.split(':')[0]]: {
-                    name: config.volume.split(':')[0]
-                }
-            }
+            volumes: volumeMounts
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
 
         return {}
@@ -1560,7 +1535,7 @@ async function startN8nService(request: FastifyRequest<ServiceStartStop>) {
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort } =
+        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort, persistentStorage } =
             service;
         const network = destinationDockerId && destinationDocker.network;
         const port = getServiceMainPort('n8n');
@@ -1580,6 +1555,7 @@ async function startN8nService(request: FastifyRequest<ServiceStartStop>) {
                 config.environmentVariables[secret.name] = secret.value;
             });
         }
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1587,7 +1563,7 @@ async function startN8nService(request: FastifyRequest<ServiceStartStop>) {
                     container_name: id,
                     image: config.image,
                     networks: [network],
-                    volumes: [config.volume],
+                    volumes,
                     environment: config.environmentVariables,
                     restart: 'always',
                     labels: makeLabelForServices('n8n'),
@@ -1607,16 +1583,12 @@ async function startN8nService(request: FastifyRequest<ServiceStartStop>) {
                     external: true
                 }
             },
-            volumes: {
-                [config.volume.split(':')[0]]: {
-                    name: config.volume.split(':')[0]
-                }
-            }
+            volumes: volumeMounts
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
 
         return {}
@@ -1651,7 +1623,7 @@ async function startUptimekumaService(request: FastifyRequest<ServiceStartStop>)
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort } =
+        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort, persistentStorage } =
             service;
         const network = destinationDockerId && destinationDocker.network;
         const port = getServiceMainPort('uptimekuma');
@@ -1669,6 +1641,7 @@ async function startUptimekumaService(request: FastifyRequest<ServiceStartStop>)
                 config.environmentVariables[secret.name] = secret.value;
             });
         }
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1676,7 +1649,7 @@ async function startUptimekumaService(request: FastifyRequest<ServiceStartStop>)
                     container_name: id,
                     image: config.image,
                     networks: [network],
-                    volumes: [config.volume],
+                    volumes,
                     environment: config.environmentVariables,
                     restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
@@ -1696,16 +1669,12 @@ async function startUptimekumaService(request: FastifyRequest<ServiceStartStop>)
                     external: true
                 }
             },
-            volumes: {
-                [config.volume.split(':')[0]]: {
-                    name: config.volume.split(':')[0]
-                }
-            }
+            volumes: volumeMounts
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
 
         return {}
@@ -1746,6 +1715,7 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
             destinationDockerId,
             destinationDocker,
             serviceSecret,
+            persistentStorage,
             exposePort,
             fqdn,
             ghost: {
@@ -1799,6 +1769,8 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
                 config.ghost.environmentVariables[secret.name] = secret.value;
             });
         }
+
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.ghost)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1806,7 +1778,7 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
                     container_name: id,
                     image: config.ghost.image,
                     networks: [network],
-                    volumes: [config.ghost.volume],
+                    volumes,
                     environment: config.ghost.environmentVariables,
                     restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
@@ -1844,9 +1816,7 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
                 }
             },
             volumes: {
-                [config.ghost.volume.split(':')[0]]: {
-                    name: config.ghost.volume.split(':')[0]
-                },
+                ...volumeMounts,
                 [config.mariadb.volume.split(':')[0]]: {
                     name: config.mariadb.volume.split(':')[0]
                 }
@@ -1855,7 +1825,7 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
 
         return {}
@@ -1897,7 +1867,7 @@ async function startMeilisearchService(request: FastifyRequest<ServiceStartStop>
         const {
             meiliSearch: { masterKey }
         } = service;
-        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort } =
+        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort, persistentStorage } =
             service;
         const network = destinationDockerId && destinationDocker.network;
         const port = getServiceMainPort('meilisearch');
@@ -1918,6 +1888,7 @@ async function startMeilisearchService(request: FastifyRequest<ServiceStartStop>
                 config.environmentVariables[secret.name] = secret.value;
             });
         }
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1928,7 +1899,7 @@ async function startMeilisearchService(request: FastifyRequest<ServiceStartStop>
                     environment: config.environmentVariables,
                     restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    volumes: [config.volume],
+                    volumes,
                     labels: makeLabelForServices('meilisearch'),
                     deploy: {
                         restart_policy: {
@@ -1945,19 +1916,12 @@ async function startMeilisearchService(request: FastifyRequest<ServiceStartStop>
                     external: true
                 }
             },
-            volumes: {
-                [config.volume.split(':')[0]]: {
-                    name: config.volume.split(':')[0]
-                }
-            }
+            volumes: volumeMounts
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-
-
-        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
-
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1996,6 +1960,7 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
             destinationDockerId,
             destinationDocker,
             serviceSecret,
+            persistentStorage,
             exposePort,
             umami: {
                 umamiAdminPassword,
@@ -2119,6 +2084,7 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
 	  FROM ${config.postgresql.image}
 	  COPY ./schema.postgresql.sql /docker-entrypoint-initdb.d/schema.postgresql.sql`;
         await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile);
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.umami)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -2127,7 +2093,7 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
                     image: config.umami.image,
                     environment: config.umami.environmentVariables,
                     networks: [network],
-                    volumes: [],
+                    volumes,
                     restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('umami'),
@@ -2164,6 +2130,7 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
                 }
             },
             volumes: {
+                ...volumeMounts,
                 [config.postgresql.volume.split(':')[0]]: {
                     name: config.postgresql.volume.split(':')[0]
                 }
@@ -2171,11 +2138,8 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-
-
-        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
-
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -2221,6 +2185,7 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
             version,
             destinationDockerId,
             destinationDocker,
+            persistentStorage,
             serviceSecret,
             exposePort,
             hasura: { postgresqlUser, postgresqlPassword, postgresqlDatabase }
@@ -2254,6 +2219,7 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
             });
         }
 
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.hasura)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -2262,7 +2228,7 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
                     image: config.hasura.image,
                     environment: config.hasura.environmentVariables,
                     networks: [network],
-                    volumes: [],
+                    volumes,
                     restart: 'always',
                     labels: makeLabelForServices('hasura'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
@@ -2299,6 +2265,7 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
                 }
             },
             volumes: {
+                ...volumeMounts,
                 [config.postgresql.volume.split(':')[0]]: {
                     name: config.postgresql.volume.split(':')[0]
                 }
@@ -2307,7 +2274,7 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
 
         return {}
@@ -2357,6 +2324,7 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
             destinationDockerId,
             destinationDocker,
             serviceSecret,
+            persistentStorage,
             exposePort,
             fider: {
                 postgresqlUser,
@@ -2412,7 +2380,7 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
                 config.fider.environmentVariables[secret.name] = secret.value;
             });
         }
-
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.fider)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -2421,7 +2389,7 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
                     image: config.fider.image,
                     environment: config.fider.environmentVariables,
                     networks: [network],
-                    volumes: [],
+                    volumes,
                     restart: 'always',
                     labels: makeLabelForServices('fider'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
@@ -2458,6 +2426,7 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
                 }
             },
             volumes: {
+                ...volumeMounts,
                 [config.postgresql.volume.split(':')[0]]: {
                     name: config.postgresql.volume.split(':')[0]
                 }
@@ -2466,7 +2435,7 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
 
         return {}
@@ -2516,6 +2485,7 @@ async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
             destinationDockerId,
             destinationDocker,
             serviceSecret,
+            persistentStorage,
             exposePort,
             moodle: {
                 defaultUsername,
@@ -2565,7 +2535,7 @@ async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
                 config.moodle.environmentVariables[secret.name] = secret.value;
             });
         }
-
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.moodle)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -2574,7 +2544,7 @@ async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
                     image: config.moodle.image,
                     environment: config.moodle.environmentVariables,
                     networks: [network],
-                    volumes: [],
+                    volumes,
                     restart: 'always',
                     labels: makeLabelForServices('moodle'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
@@ -2613,9 +2583,7 @@ async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
                 }
             },
             volumes: {
-                [config.moodle.volume.split(':')[0]]: {
-                    name: config.moodle.volume.split(':')[0]
-                },
+                ...volumeMounts,
                 [config.mariadb.volume.split(':')[0]]: {
                     name: config.mariadb.volume.split(':')[0]
                 }
@@ -2625,10 +2593,8 @@ async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-
-        //await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
-
 
         return {}
     } catch ({ status, message }) {
@@ -2762,9 +2728,10 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
                 try {
                     const isRunning = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-ftp` });
                     if (isRunning) {
-                        await asyncExecShell(
-                            `DOCKER_HOST=${host} docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`
-                        );
+                        await executeDockerCmd({
+                            dockerId: destinationDocker.id,
+                            command: `docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`
+                        })
                     }
                 } catch (error) {
                     console.log(error);

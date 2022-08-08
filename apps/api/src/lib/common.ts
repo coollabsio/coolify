@@ -1623,3 +1623,29 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 		}
 	}
 }
+
+export function persistentVolumes(id, persistentStorage, config) {
+	const persistentVolume =
+		persistentStorage?.map((storage) => {
+			return `${id}${storage.path.replace(/\//gi, '-')}:${storage.path}`;
+		}) || [];
+
+	const volumes = [config.volume, ...persistentVolume]
+	const composeVolumes = volumes.map((volume) => {
+		return {
+			[`${volume.split(':')[0]}`]: {
+				name: volume.split(':')[0]
+			}
+		};
+	});
+	const volumeMounts = Object.assign(
+		{},
+		{
+			[config.volume.split(':')[0]]: {
+				name: config.volume.split(':')[0]
+			}
+		},
+		...composeVolumes
+	);
+	return { volumes, volumeMounts }
+}
