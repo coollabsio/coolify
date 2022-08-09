@@ -4,3 +4,7 @@
 - Services new empty storage errors
 - New SSH key modal redesign
 - Change license every package.json
+- Login page redesign
+- Registration redesign
+- Global Settings -> Remove domain redesign
+- Color hover on buttons
