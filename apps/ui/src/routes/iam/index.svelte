@@ -28,7 +28,7 @@
 	import { del, get, post } from '$lib/api';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { errorNotification } from '$lib/common';
-	import { appSession } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	import { goto } from '$app/navigation';
 	import Cookies from 'js-cookie';
 	if (accounts.length === 0) {
@@ -42,7 +42,10 @@
 		}
 		try {
 			await post(`/iam/user/password`, { id });
-			toast.push('Password reset successfully. Please relogin to reset it.');
+			return addToast({
+				message: 'Password reset successfully. Please relogin to reset it.',
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		}
@@ -54,7 +57,10 @@
 		}
 		try {
 			await del(`/iam/user/remove`, { id });
-			toast.push('Account deleted.');
+			addToast({
+				message: 'Account deleted.',
+				type: 'success'
+			});
 			const data = await get('/iam');
 			accounts = data.accounts;
 		} catch (error) {
@@ -104,21 +110,24 @@
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">Identity and Access Management</div>
-	<div on:click={newTeam} class="add-icon cursor-pointer bg-fuchsia-600 hover:bg-fuchsia-500">
-		<svg
-			class="w-6"
-			xmlns="http://www.w3.org/2000/svg"
-			fill="none"
-			viewBox="0 0 24 24"
-			stroke="currentColor"
-			><path
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				stroke-width="2"
-				d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-			/></svg
+	<button
+			on:click={newTeam}
+			class="btn btn-square btn-sm bg-iam"
 		>
-	</div>
+			<svg
+				class="h-6 w-6"
+				xmlns="http://www.w3.org/2000/svg"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				><path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+				/></svg
+			>
+		</button>
 </div>
 
 {#if invitations.length > 0}
@@ -132,11 +141,11 @@
 						<span class="font-bold text-rose-600">{invitation.permission}</span> permission.
 					</div>
 					<button
-						class="hover:bg-green-500"
+						class="btn btn-sm btn-success"
 						on:click={() => acceptInvitation(invitation.id, invitation.teamId)}>Accept</button
 					>
 					<button
-						class="hover:bg-red-600"
+						class="btn btn-sm btn-error"
 						on:click={() => revokeInvitation(invitation.id, invitation.teamId)}>Delete</button
 					>
 				</div>
@@ -168,14 +177,14 @@
 						<td class="flex space-x-2">
 							<form on:submit|preventDefault={() => resetPassword(account.id)}>
 								<button
-									class="mx-auto my-4 w-32 bg-fuchsia-600 hover:bg-fuchsia-500 disabled:bg-coolgray-200"
+									class="my-4 btn btn-sm bg-iam"
 									>Reset Password</button
 								>
 							</form>
 							<form on:submit|preventDefault={() => deleteUser(account.id)}>
 								<button
 									disabled={account.id === $appSession.userId}
-									class="mx-auto my-4 w-32 bg-red-600 hover:bg-red-500 disabled:bg-coolgray-200"
+									class="my-4 btn btn-sm"
 									type="submit">Delete User</button
 								>
 							</form>

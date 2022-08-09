@@ -28,6 +28,7 @@
 	import { errorNotification, getDomain } from '$lib/common';
 	import { onMount } from 'svelte';
 	import Loading from '$lib/components/Loading.svelte';
+import { addToast } from '$lib/store';
 
 	const { id } = $page.params;
 
@@ -59,7 +60,10 @@
 				pullmergeRequestId: container.pullmergeRequestId,
 				branch: container.branch
 			});
-			toast.push('Deployment queued');
+			addToast({
+					message: 'Deployment queued',
+					type: 'success'
+				});
 			if ($page.url.pathname.startsWith(`/applications/${id}/logs/build`)) {
 				return window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
 			} else {

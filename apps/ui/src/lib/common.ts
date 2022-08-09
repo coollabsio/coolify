@@ -1,4 +1,4 @@
-import { toast } from '@zerodevx/svelte-toast';
+import { addToast } from '$lib/store';
 
 export const supportedServiceTypesAndVersions = [
 	{
@@ -167,12 +167,20 @@ export const asyncSleep = (delay: number) =>
 export function errorNotification(error: any): void {
 	if (error.message) {
 		if (error.message === 'Cannot read properties of undefined (reading \'postMessage\')') {
-			toast.push('Currently there is background process in progress. Please try again later.');
-			return;
+			return addToast({
+				message: 'Currently there is background process in progress. Please try again later.',
+				type: 'error',
+			});
 		}
-		toast.push(error.message);
+		addToast({
+			message: error.message,
+			type: 'error',
+		});
 	} else {
-		toast.push('Ooops, something is not okay, are you okay?');
+		addToast({
+			message: 'Ooops, something is not okay, are you okay?',
+			type: 'error',
+		});
 	}
 	console.error(JSON.stringify(error));
 }

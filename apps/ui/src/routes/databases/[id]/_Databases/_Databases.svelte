@@ -16,7 +16,7 @@
 	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
-	import { appSession, status } from '$lib/store';
+	import { addToast, appSession, status } from '$lib/store';
 	import Explainer from '$lib/components/Explainer.svelte';
 
 	const { id } = $page.params;
@@ -92,7 +92,10 @@
 			loading = true;
 			await post(`/databases/${id}`, { ...database, isRunning: $status.database.isRunning });
 			generateDbDetails();
-			toast.push('Configuration saved.');
+			addToast({
+					message: 'Configuration saved.',
+					type: 'success'
+				});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
@@ -108,9 +111,10 @@
 			{#if $appSession.isAdmin}
 				<button
 					type="submit"
-					class:bg-purple-600={!loading}
-					class:hover:bg-purple-500={!loading}
-					disabled={loading}>{loading ? $t('forms.saving') : $t('forms.save')}</button
+					class="btn btn-sm"
+					class:loading={loading}
+					class:bg-databases={!loading}
+					disabled={loading}>{$t('forms.save')}</button
 				>
 			{/if}
 		</div>

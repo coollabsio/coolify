@@ -1,2 +1,6 @@
-# Low
-- Create previews model in Coolify DB
+- Destination/new is not working?
+- Check GitLab new repo
+- Services new empty secret errors
+- Services new empty storage errors
+- New SSH key modal redesign
+- Change license every package.json

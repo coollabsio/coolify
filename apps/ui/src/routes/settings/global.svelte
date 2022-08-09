@@ -24,7 +24,7 @@
 	import { browser } from '$app/env';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
-	import { appSession, features } from '$lib/store';
+	import { addToast, appSession, features } from '$lib/store';
 	import { errorNotification, getDomain } from '$lib/common';
 	import Menu from './_Menu.svelte';
 
@@ -83,7 +83,10 @@
 				isAutoUpdateEnabled,
 				isDNSCheckEnabled
 			});
-			return toast.push(t.get('application.settings_saved'));
+			return addToast({
+				message: t.get('application.settings_saved'),
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		}
@@ -104,7 +107,10 @@
 				settings.maxPort = maxPort;
 			}
 			forceSave = false;
-			toast.push('Configuration saved.');
+			return addToast({
+				message: 'Configuration saved.',
+				type: 'success'
+			});
 		} catch (error) {
 			if (error.message?.startsWith($t('application.dns_not_set_partial_error'))) {
 				forceSave = true;
@@ -129,7 +135,10 @@
 	async function isDNSValid(domain: any, isWWW: any) {
 		try {
 			await get(`/settings/check?domain=${domain}`);
-			toast.push('DNS configuration is valid.');
+			addToast({
+				message:'DNS configuration is valid.',
+				type: 'success'
+			});
 			isWWW ? (isWWWDomainOK = true) : (isNonWWWDomainOK = true);
 			return true;
 		} catch (error) {
@@ -154,10 +163,9 @@
 				<div class="flex space-x-1 pb-6">
 					<div class="title font-bold">{$t('index.global_settings')}</div>
 					<button
+					class="btn btn-sm bg-settings text-black"
 						type="submit"
-						class:bg-yellow-500={!loading.save}
 						class:bg-orange-600={forceSave}
-						class:hover:bg-yellow-500={!loading.save}
 						class:hover:bg-orange-400={forceSave}
 						disabled={loading.save}
 						>{loading.save

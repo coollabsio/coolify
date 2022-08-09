@@ -61,14 +61,14 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl ">{$t('index.applications')}</div>
+	<div class="mr-4 text-2xl">{$t('index.applications')}</div>
 	{#if $appSession.isAdmin}
 		<button
 			on:click={newApplication}
-			class="add-icon cursor-pointer bg-green-600 hover:bg-green-500"
+			class="btn btn-square btn-sm bg-applications"
 		>
 			<svg
-				class="w-6"
+				class="h-6 w-6"
 				xmlns="http://www.w3.org/2000/svg"
 				fill="none"
 				viewBox="0 0 24 24"

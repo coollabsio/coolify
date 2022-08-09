@@ -60,7 +60,7 @@
 	import { toast } from '@zerodevx/svelte-toast';
 	import { onDestroy, onMount } from 'svelte';
 	import { t } from '$lib/translations';
-	import { appSession, disabledButton, status, location, setLocation } from '$lib/store';
+	import { appSession, disabledButton, status, location, setLocation, addToast } from '$lib/store';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
 	import Loading from '$lib/components/Loading.svelte';
 
@@ -80,7 +80,10 @@
 	async function handleDeploySubmit() {
 		try {
 			const { buildId } = await post(`/applications/${id}/deploy`, { ...application });
-			toast.push($t('application.deployment_queued'));
+			addToast({
+					message: $t('application.deployment_queued'),
+					type: 'success'
+				});
 			if ($page.url.pathname.startsWith(`/applications/${id}/logs/build`)) {
 				return window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
 			} else {

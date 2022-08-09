@@ -13,7 +13,7 @@
 	import { get, post } from '$lib/api';
 	import { errorNotification, getDomain } from '$lib/common';
 	import { t } from '$lib/translations';
-	import { appSession, disabledButton, status, location, setLocation } from '$lib/store';
+	import { appSession, disabledButton, status, location, setLocation, addToast } from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
@@ -45,7 +45,10 @@
 	async function isDNSValid(domain: any, isWWW: any) {
 		try {
 			await get(`/services/${id}/check?domain=${domain}`);
-			toast.push('DNS configuration is valid.');
+			addToast({
+				message: 'DNS configuration is valid.',
+				type: 'success'
+			});
 			isWWW ? (isWWWDomainOK = true) : (isNonWWWDomainOK = true);
 			return true;
 		} catch (error) {
@@ -70,7 +73,10 @@
 			setLocation(service);
 			$disabledButton = false;
 			forceSave = false;
-			toast.push('Configuration saved.');
+			return addToast({
+				message: 'Configuration saved.',
+				type: 'success'
+			});
 		} catch (error) {
 			//@ts-ignore
 			if (error?.message.startsWith($t('application.dns_not_set_partial_error'))) {
@@ -96,7 +102,10 @@
 		loadingVerification = true;
 		try {
 			await post(`/services/${id}/${service.type}/activate`, { id: service.id });
-			toast.push(t.get('services.all_email_verified'));
+			return addToast({
+				message: t.get('services.all_email_verified'),
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
@@ -109,7 +118,10 @@
 				dualCerts = !dualCerts;
 			}
 			await post(`/services/${id}/settings`, { dualCerts });
-			return toast.push(t.get('application.settings_saved'));
+			return addToast({
+				message: t.get('application.settings_saved'),
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		}
@@ -145,13 +157,14 @@
 			{#if $appSession.isAdmin}
 				<button
 					type="submit"
-					class:bg-pink-600={!loading}
+					class="btn btn-sm"
 					class:bg-orange-600={forceSave}
-					class:hover:bg-pink-500={!loading}
 					class:hover:bg-orange-400={forceSave}
+					class:loading={loading}
+					class:bg-services={!loading}
 					disabled={loading}
 					>{loading
-						? $t('forms.saving')
+						? $t('forms.save')
 						: forceSave
 						? $t('forms.confirm_continue')
 						: $t('forms.save')}</button

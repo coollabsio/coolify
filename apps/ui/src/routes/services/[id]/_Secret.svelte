@@ -7,6 +7,7 @@
 	import { del, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
+import { addToast } from '$lib/store';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { createEventDispatcher } from 'svelte';
 
@@ -31,7 +32,6 @@
 			await post(`/services/${id}/secrets`, {
 				name,
 				value,
-
 				isNew
 			});
 			dispatch('refresh');
@@ -39,7 +39,10 @@
 				name = '';
 				value = '';
 			}
-			toast.push('Secret saved.');
+			addToast({
+				message: 'Secret saved.',
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		}
@@ -72,15 +75,15 @@
 <td>
 	{#if isNewSecret}
 		<div class="flex items-center justify-center">
-			<button class="bg-green-600 hover:bg-green-500" on:click={() => saveSecret(true)}>Add</button>
+			<button class="btn btn-sm bg-success" on:click={() => saveSecret(true)}>Add</button>
 		</div>
 	{:else}
 		<div class="flex flex-row justify-center space-x-2">
 			<div class="flex items-center justify-center">
-				<button class="" on:click={() => saveSecret(false)}>Set</button>
+				<button class="btn btn-sm bg-success" on:click={() => saveSecret(false)}>Set</button>
 			</div>
 			<div class="flex justify-center items-end">
-				<button class="bg-red-600 hover:bg-red-500" on:click={removeSecret}>Remove</button>
+				<button class="btn btn-sm bg-error" on:click={removeSecret}>Remove</button>
 			</div>
 		</div>
 	{/if}

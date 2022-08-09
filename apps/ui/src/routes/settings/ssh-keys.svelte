@@ -69,8 +69,7 @@
 				<div class="title font-bold">SSH Keys</div>
 				<button
 					on:click={() => (isModalActive = true)}
-					class:bg-yellow-500={!loading.save}
-					class:hover:bg-yellow-400={!loading.save}
+					class="btn btn-sm bg-settings text-black"
 					disabled={loading.save}>New SSH Key</button
 				>
 			</div>
@@ -82,7 +81,7 @@
 						<div class="box-selection group relative">
 							<div class="text-xl font-bold">{key.name}</div>
 							<div class="py-3 text-stone-600">Added on {key.createdAt}</div>
-							<button on:click={() => deleteSSHKey(key.id)} class="bg-red-500">Delete</button>
+							<button on:click={() => deleteSSHKey(key.id)} class="btn btn-sm bg-error">Delete</button>
 						</div>
 					{/each}
 				{/if}
@@ -91,7 +90,7 @@
 	</div>
 </div>
 {#if isModalActive}
-	<div class="relative z-10" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+	<div class="relative z-10" aria-labelledby="modal-title" role="dialog" aria-modal="true"> 
 		<div class="fixed inset-0 bg-coolgray-500 bg-opacity-75 transition-opacity" />
 		<div class="fixed z-10 inset-0 overflow-y-auto text-white">
 			<div class="flex items-end sm:items-center justify-center min-h-full p-4 text-center sm:p-0">

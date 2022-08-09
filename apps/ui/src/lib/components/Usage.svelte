@@ -19,9 +19,10 @@
 	};
 	let usageInterval: any;
 	let loading = {
-		usage: false
+		usage: false,
+		cleanup: false
 	};
-	import { appSession } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
 	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
@@ -60,7 +61,18 @@
 		disk: 'stable'
 	};
 	async function manuallyCleanupStorage() {
-		return await post('/internal/cleanup', {});
+		try {
+			loading.cleanup = true
+			await post('/internal/cleanup', {});
+			return addToast({
+				message: "Cleanup done.",
+				type:"success"
+			})
+		} catch(error) {
+			return errorNotification(error);
+		} finally {
+			loading.cleanup = false
+		}
 	}
 </script>
 
@@ -132,7 +144,7 @@
 			<dd class="mt-1 text-3xl font-semibold text-white">
 				{usage?.disk.usedGb}<span class="text-sm">GB</span>
 			</dd>
-			<button on:click={manuallyCleanupStorage} class="bg-coollabs hover:bg-coollabs-100"
+			<button on:click={manuallyCleanupStorage} class:loading={loading.cleanup} class="btn btn-sm"
 				>Cleanup Storage</button
 			>
 		</div>

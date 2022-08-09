@@ -9,7 +9,7 @@
 	import { onMount } from 'svelte';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
-	import { appSession } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	import Setting from '$lib/components/Setting.svelte';
 
 	const { id } = $page.params;
@@ -24,7 +24,10 @@
 		loading.save = true;
 		try {
 			await post(`/destinations/${id}`, { ...destination });
-			toast.push('Configuration saved.');
+			addToast({
+				message: 'Configuration saved.',
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
@@ -96,7 +99,10 @@
 	async function stopProxy() {
 		try {
 			await post(`/destinations/${id}/stop`, { engine: destination.engine });
-			return toast.push($t('destination.coolify_proxy_stopped'));
+			return addToast({
+				message: $t('destination.coolify_proxy_stopped'),
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		}
@@ -104,7 +110,10 @@
 	async function startProxy() {
 		try {
 			await post(`/destinations/${id}/start`, { engine: destination.engine });
-			return toast.push($t('destination.coolify_proxy_started'));
+			return addToast({
+				message: $t('destination.coolify_proxy_started'),
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		}
@@ -114,7 +123,10 @@
 		if (sure) {
 			try {
 				loading.restart = true;
-				toast.push($t('destination.coolify_proxy_restarting'));
+				addToast({
+					message: $t('destination.coolify_proxy_restarting'),
+					type: 'success'
+				});
 				await post(`/destinations/${id}/restart`, {
 					engine: destination.engine,
 					fqdn: settings.fqdn
@@ -136,19 +148,18 @@
 		{#if $appSession.isAdmin}
 			<button
 				type="submit"
-				class="bg-sky-600 hover:bg-sky-500"
-				class:bg-sky-600={!loading.save}
-				class:hover:bg-sky-500={!loading.save}
+				class="btn btn-sm"
+				class:bg-destinations={!loading.save}
+				class:loading={loading.save}
 				disabled={loading.save}
-				>{loading.save ? $t('forms.saving') : $t('forms.save')}
+				>{$t('forms.save')}
 			</button>
 			<button
-				class={loading.restart ? '' : 'bg-red-600 hover:bg-red-500'}
+				class="btn btn-sm"
+				class:loading={loading.restart}
+				class:bg-error={!loading.restart}
 				disabled={loading.restart}
-				on:click|preventDefault={forceRestartProxy}
-				>{loading.restart
-					? $t('destination.restarting_please_wait')
-					: $t('destination.force_restart_proxy')}</button
+				on:click|preventDefault={forceRestartProxy}>{$t('destination.force_restart_proxy')}</button
 			>
 		{/if}
 	</div>

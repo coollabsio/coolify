@@ -1,5 +1,5 @@
 {
-  "name": "coolify-api",
+  "name": "api",
   "description": "Coolify's Fastify API",
   "license": "AGPL-3.0",
   "scripts": {

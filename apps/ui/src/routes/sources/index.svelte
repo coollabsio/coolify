@@ -39,9 +39,9 @@
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">{$t('index.git_sources')}</div>
 	{#if $appSession.isAdmin}
-		<a href="/sources/new" class="add-icon bg-orange-600 hover:bg-orange-500">
+		<a href="/sources/new" class="btn btn-square btn-sm bg-sources">
 			<svg
-				class="w-6"
+				class="h-6 w-6"
 				xmlns="http://www.w3.org/2000/svg"
 				fill="none"
 				viewBox="0 0 24 24"

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { dev } from '$app/env';
 	import { get, post } from '$lib/api';
-	import { appSession, features } from '$lib/store';
+	import { addToast, appSession, features } from '$lib/store';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { asyncSleep, errorNotification } from '$lib/common';
 	import { onMount } from 'svelte';
@@ -22,7 +22,11 @@
 				return window.location.reload();
 			} else {
 				await post(`/update`, { type: 'update', latestVersion });
-				toast.push('Update completed.<br><br>Waiting for the new version to start...');
+				addToast({
+					message: 'Update completed.<br><br>Waiting for the new version to start...',
+					type: 'success'
+				});
+
 				let reachable = false;
 				let tries = 0;
 				do {
@@ -36,7 +40,10 @@
 					if (reachable) break;
 					tries++;
 				} while (!reachable || tries < 120);
-				toast.push('New version reachable. Reloading...');
+				addToast({
+					message: 'New version reachable. Reloading...',
+					type: 'success'
+				});
 				updateStatus.loading = false;
 				updateStatus.success = true;
 				await asyncSleep(3000);

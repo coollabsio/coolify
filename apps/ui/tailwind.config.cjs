@@ -1,8 +1,30 @@
 const defaultTheme = require('tailwindcss/defaultTheme');
-// const colors = require('tailwindcss/colors');
+
 module.exports = {
 	content: ['./**/*.html', './src/**/*.{js,jsx,ts,tsx,svelte}'],
-	important: true,
+	important: true, 
+	daisyui: {
+		themes: [
+			{
+				coollabs: {
+					"base-100":"#323232",
+					"base-200":"#242424",
+					"base-300":"#181818",
+					"primary": "#6d28d9",
+					"primary-content": "#fff",
+					"secondary": "#343232",
+					"accent": "#343232",
+					"neutral": "#272626",
+					"info": "#0284c7",
+					"success": "#16A34A",
+					"warning": "#FFFF00",
+					"error": "#DC2626",
+					"--rounded-btn": "0.3rem",
+					"--btn-text-case": "normal"
+				},
+			}
+		],
+	},
 	theme: {
 		extend: {
 			keyframes: {
@@ -18,6 +40,13 @@ module.exports = {
 				sans: ['Poppins', ...defaultTheme.fontFamily.sans]
 			},
 			colors: {
+				"applications":"#16A34A",
+				"databases":"#9333EA",
+				"destinations":"#0284C7",
+				"sources":"#EA580C",
+				"services":"#DB2777",
+				"settings":"#FEE440",
+				"iam":"#C026D3",
 				coollabs: '#6B16ED',
 				'coollabs-100': '#7317FF',
 				coolblack: '#161616',
@@ -33,5 +62,5 @@ module.exports = {
 		scrollbar: ['dark'],
 		extend: {}
 	},
-	plugins: [require('tailwindcss-scrollbar')]
+	plugins: [require('tailwindcss-scrollbar'), require('daisyui')]
 };

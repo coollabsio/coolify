@@ -86,6 +86,7 @@
 	import PageLoader from '$lib/components/PageLoader.svelte';
 	import { errorNotification } from '$lib/common';
 	import { appSession } from '$lib/store';
+	import Toasts from '$lib/components/Toasts.svelte';
 
 	if (userId) $appSession.userId = userId;
 	if (teamId) $appSession.teamId = teamId;
@@ -110,7 +111,8 @@
 		<link rel="icon" href={$appSession.whiteLabeledDetails.icon} />
 	{/if}
 </svelte:head>
-<SvelteToast options={{ intro: { y: -64 }, duration: 3000, pausable: true }} />
+<Toasts />
+<!-- <SvelteToast options={{ intro: { y: -64 }, duration: 3000, pausable: true }} /> -->
 {#if $navigating}
 	<div out:fade={{ delay: 100 }}>
 		<PageLoader />

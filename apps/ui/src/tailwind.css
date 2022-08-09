@@ -90,10 +90,12 @@ select {
 label {
 	@apply inline-block w-64 text-xs tracking-tight md:text-sm;
 }
-
-button, .button {
-	@apply rounded bg-coolgray-200 p-2 px-3 text-sm outline-none transition-all duration-100 hover:bg-coolgray-500 disabled:cursor-not-allowed disabled:bg-coolblack disabled:text-stone-600;
+.btn {
+	@apply text-white tracking-tighter;
 }
+/*button, .button {
+	@apply rounded bg-coolgray-200 p-2 px-3 text-sm outline-none transition-all duration-100 hover:bg-coolgray-500 disabled:cursor-not-allowed disabled:bg-coolblack disabled:text-stone-600;
+}*/
 
 a {
 	@apply underline hover:text-white;

@@ -12,8 +12,8 @@
 	import { del } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
+	import { addToast } from '$lib/store';
 	import { t } from '$lib/translations';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { createEventDispatcher } from 'svelte';
 	import { saveSecret } from './utils';
 
@@ -28,7 +28,10 @@
 				value = '';
 				isBuildSecret = false;
 			}
-			toast.push('Secret removed.');
+			addToast({
+				message: 'Secret removed.',
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		}
@@ -36,6 +39,7 @@
 
 	async function createSecret(isNew: any) {
 		try {
+			if (!name || !value) return 
 			await saveSecret({
 				isNew,
 				name,
@@ -51,9 +55,12 @@
 				isBuildSecret = false;
 			}
 			dispatch('refresh');
-			toast.push('Secret saved.');
+			addToast({
+				message: 'Secret removed.',
+				type: 'success'
+			});
 		} catch (error) {
-			console.log(error)
+			console.log(error);
 			return errorNotification(error);
 		}
 	}
@@ -71,7 +78,10 @@
 					isNewSecret,
 					applicationId: id
 				});
-				toast.push('Secret saved.');
+				addToast({
+					message: 'Secret removed.',
+					type: 'success'
+				});
 			}
 		}
 	}
@@ -100,8 +110,7 @@
 	/>
 </td>
 <td class="text-center">
-	<div
-		type="button"
+	<button
 		on:click={setSecretValue}
 		aria-pressed="false"
 		class="relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
@@ -146,23 +155,25 @@
 				</svg>
 			</span>
 		</span>
-	</div>
+	</button>
 </td>
 <td>
 	{#if isNewSecret}
 		<div class="flex items-center justify-center">
-			<button class="bg-green-600 hover:bg-green-500" on:click={() => createSecret(true)}
+			<button class="btn bg-applications btn-sm" on:click={() => createSecret(true)}
 				>{$t('forms.add')}</button
 			>
 		</div>
 	{:else}
 		<div class="flex flex-row justify-center space-x-2">
 			<div class="flex items-center justify-center">
-				<button class="" on:click={() => createSecret(false)}>{$t('forms.set')}</button>
+				<button class="btn bg-application btn-sm" on:click={() => createSecret(false)}
+					>{$t('forms.set')}</button
+				>
 			</div>
 			{#if !isPRMRSecret}
 				<div class="flex justify-center items-end">
-					<button class="bg-red-600 hover:bg-red-500" on:click={removeSecret}
+					<button class="btn btn-sm bg-red-600 hover:bg-red-500" on:click={removeSecret}
 						>{$t('forms.remove')}</button
 					>
 				</div>

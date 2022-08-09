@@ -28,6 +28,7 @@
 	import { get } from '$lib/api';
 	import { saveSecret } from './utils';
 	import { toast } from '@zerodevx/svelte-toast';
+import { addToast } from '$lib/store';
 
 	const limit = pLimit(1);
 	const { id } = $page.params;
@@ -59,7 +60,10 @@
 		);
 		batchSecrets = '';
 		await refreshSecrets();
-		toast.push('Secrets saved.');
+		addToast({
+					message: 'Secrets saved.',
+					type: 'success'
+				});
 	}
 </script>
 
@@ -148,7 +152,7 @@
 	<form on:submit|preventDefault={getValues} class="mb-12 w-full">
 		<textarea bind:value={batchSecrets} class="mb-2 min-h-[200px] w-full" />
 		<button
-			class="bg-green-600 hover:bg-green-500 disabled:text-white disabled:opacity-40"
+			class="btn btn-sm bg-applications"
 			type="submit">Batch add secrets</button
 		>
 	</form>

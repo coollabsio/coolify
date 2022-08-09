@@ -7,7 +7,7 @@
 	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
 	import { dashify, errorNotification, getDomain } from '$lib/common';
-	import { appSession } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	import { dev } from '$app/env';
 
 	const { id } = $page.params;
@@ -24,7 +24,10 @@
 				htmlUrl: source.htmlUrl.replace(/\/$/, ''),
 				apiUrl: source.apiUrl.replace(/\/$/, '')
 			});
-			toast.push('Configuration saved.');
+			return addToast({
+				message:'Configuration saved.',
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
@@ -115,7 +118,7 @@
 			<div class="flex space-x-1 pb-7">
 				<div class="title">General</div>
 				{#if !source.githubAppId}
-					<button class="bg-orange-600 font-normal" type="submit">Save</button>
+					<button class="btn btn-sm bg-sources" type="submit">Save & Redirect to GitHub</button>
 				{/if}
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
@@ -171,13 +174,12 @@
 				<div class="title">{$t('general')}</div>
 				{#if $appSession.isAdmin}
 					<button
+						class="btn btn-sm bg-sources"
 						type="submit"
-						class:bg-orange-600={!loading}
-						class:hover:bg-orange-500={!loading}
 						disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
 					>
 					<a
-						class="no-underline button justify-center flex items-center"
+						class="btn btn-sm"
 						href={`${source.htmlUrl}/apps/${source.githubApp.name}/installations/new`}
 						>{$t('source.change_app_settings', { name: 'GitHub' })}</a
 					>
@@ -250,7 +252,7 @@
 	{:else}
 		<div class="text-center">
 			<a href={`${source.htmlUrl}/apps/${source.githubApp.name}/installations/new`}>
-				<button class="box-selection bg-orange-600 hover:bg-orange-500 text-xl"
+				<button class="box-selection bg-sources text-xl"
 					>Install Repositories</button
 				></a
 			>

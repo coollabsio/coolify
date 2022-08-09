@@ -17,6 +17,11 @@ interface AppSession {
         gitlab: string | null,
     }
 }
+interface AddToast {
+    type?: "info" | "success" | "error",
+    message: string,
+    timeout?: number | undefined
+ }
 export const loginEmail: Writable<string | undefined> = writable()
 export const appSession: Writable<AppSession> = writable({
     ipv4: null,
@@ -74,4 +79,30 @@ export const setLocation = (resource: any) => {
     } else {
         location.set(resource.fqdn)
     }
+}
+
+export const toasts: any = writable([])
+
+export const dismissToast = (id: number) => {
+  toasts.update((all: any) => all.filter((t: any) => t.id !== id))
+}
+
+export const addToast = (toast: AddToast) => {
+  // Create a unique ID so we can easily find/remove it
+  // if it is dismissible/has a timeout.
+  const id = Math.floor(Math.random() * 10000)
+
+  // Setup some sensible defaults for a toast.
+  const defaults = {
+    id,
+    type: 'info',
+    timeout: 2000,
+  }
+
+  // Push the toast to the top of the list of toasts
+  const t = { ...defaults, ...toast }
+  toasts.update((all: any) => [t, ...all])
+
+  // If toast is dismissible, dismiss it after "timeout" amount of time.
+  if (t.timeout) setTimeout(() => dismissToast(id), t.timeout)
 }
