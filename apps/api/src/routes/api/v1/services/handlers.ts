@@ -2662,7 +2662,6 @@ export async function cleanupPlausibleLogs(request: FastifyRequest<OnlyId>, repl
         const {
             destinationDockerId,
             destinationDocker,
-            plausibleAnalytics: { postgresqlUser, postgresqlPassword, postgresqlDatabase }
         } = await getServiceFromDB({ id, teamId });
         if (destinationDockerId) {
             await executeDockerCmd({
