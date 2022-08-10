@@ -13,7 +13,6 @@
 	import Redis from './_Redis.svelte';
 	import CouchDb from './_CouchDb.svelte';
 	import { post } from '$lib/api';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import { addToast, appSession, status } from '$lib/store';

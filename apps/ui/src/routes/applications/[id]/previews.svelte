@@ -22,13 +22,12 @@
 	import { get, post } from '$lib/api';
 	import { page } from '$app/stores';
 	import Explainer from '$lib/components/Explainer.svelte';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
 	import { goto } from '$app/navigation';
 	import { errorNotification, getDomain } from '$lib/common';
 	import { onMount } from 'svelte';
 	import Loading from '$lib/components/Loading.svelte';
-import { addToast } from '$lib/store';
+	import { addToast } from '$lib/store';
 
 	const { id } = $page.params;
 
@@ -61,9 +60,9 @@ import { addToast } from '$lib/store';
 				branch: container.branch
 			});
 			addToast({
-					message: 'Deployment queued',
-					type: 'success'
-				});
+				message: 'Deployment queued',
+				type: 'success'
+			});
 			if ($page.url.pathname.startsWith(`/applications/${id}/logs/build`)) {
 				return window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
 			} else {

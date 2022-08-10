@@ -109,8 +109,8 @@
 			<div class="flex justify-end sticky top-0 p-1 mx-1">
 				<button
 					on:click={followBuild}
-					class="bg-transparent hover:text-green-500 hover:bg-coolgray-500"
-					data-tooltip="Follow logs"
+					class="bg-transparent tooltip tooltip-bottom hover:text-green-500 hover:bg-coolgray-500"
+					data-tip="Follow logs"
 					class:text-green-500={followingBuild}
 				>
 					<svg
@@ -134,8 +134,8 @@
 					<button
 						on:click={cancelBuild}
 						class:animation-spin={cancelInprogress}
-						class="bg-transparent hover:text-red-500 hover:bg-coolgray-500"
-						data-tooltip="Cancel build"
+						class="bg-transparent hover:text-red-500 hover:bg-coolgray-500 tooltip tooltip-bottom"
+						data-tip="Cancel build"
 					>
 						{#if cancelInprogress}
 							Cancelling...

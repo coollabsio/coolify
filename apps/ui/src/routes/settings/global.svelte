@@ -22,7 +22,6 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { del, get, post } from '$lib/api';
 	import { browser } from '$app/env';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
 	import { addToast, appSession, features } from '$lib/store';
 	import { errorNotification, getDomain } from '$lib/common';
@@ -111,7 +110,7 @@
 				message: 'Configuration saved.',
 				type: 'success'
 			});
-		} catch (error) {
+		} catch (error: any) {
 			if (error.message?.startsWith($t('application.dns_not_set_partial_error'))) {
 				forceSave = true;
 				if (dualCerts) {
@@ -136,7 +135,7 @@
 		try {
 			await get(`/settings/check?domain=${domain}`);
 			addToast({
-				message:'DNS configuration is valid.',
+				message: 'DNS configuration is valid.',
 				type: 'success'
 			});
 			isWWW ? (isWWWDomainOK = true) : (isNonWWWDomainOK = true);
@@ -163,7 +162,7 @@
 				<div class="flex space-x-1 pb-6">
 					<div class="title font-bold">{$t('index.global_settings')}</div>
 					<button
-					class="btn btn-sm bg-settings text-black"
+						class="btn btn-sm bg-settings text-black"
 						type="submit"
 						class:bg-orange-600={forceSave}
 						class:hover:bg-orange-400={forceSave}
@@ -179,6 +178,7 @@
 						<button
 							on:click|preventDefault={removeFqdn}
 							disabled={loading.remove}
+							class="btn btn-sm"
 							class:bg-red-600={!loading.remove}
 							class:hover:bg-red-500={!loading.remove}
 							>{loading.remove ? $t('forms.removing') : $t('forms.remove_domain')}</button
@@ -210,13 +210,13 @@
 								<div class="flex-col space-y-2 pt-4 text-center">
 									{#if isNonWWWDomainOK}
 										<button
-											class="bg-green-600 hover:bg-green-500"
+											class="btn btn-sm bg-success"
 											on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
 											>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
 										>
 									{:else}
 										<button
-											class="bg-red-600 hover:bg-red-500"
+											class="btn btn-sm bg-error"
 											on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
 											>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
 										>
@@ -224,14 +224,14 @@
 									{#if dualCerts}
 										{#if isWWWDomainOK}
 											<button
-												class="bg-green-600 hover:bg-green-500"
+												class="btn btn-sm bg-success"
 												on:click|preventDefault={() =>
 													isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
 												>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
 											>
 										{:else}
 											<button
-												class="bg-red-600 hover:bg-red-500"
+												class="btn btn-sm bg-error"
 												on:click|preventDefault={() =>
 													isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
 												>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button

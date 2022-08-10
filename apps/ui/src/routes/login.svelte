@@ -82,16 +82,15 @@
 				<button
 					type="submit"
 					disabled={loading}
-					class="hover:opacity-90 text-white"
-					class:bg-transparent={loading}
-					class:text-stone-600={loading}
+					class="btn btn-sm"
+					class:loading={loading}
 					class:bg-coollabs={!loading}
 					>{loading ? $t('login.authenticating') : $t('login.login')}</button
 				>
 
 				<button
 					on:click|preventDefault={gotoRegister}
-					class="bg-transparent hover:bg-coolgray-300	text-white ">{$t('register.register')}</button
+					class="btn btn-sm">{$t('register.register')}</button
 				>
 			</div>
 		</form>

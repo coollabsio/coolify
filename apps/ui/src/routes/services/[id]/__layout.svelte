@@ -177,8 +177,8 @@
 			{#if $status.service.isExited}
 				<a
 					href={!$disabledButton ? `/services/${id}/logs` : null}
-					class=" icons bg-transparent tooltip-bottom text-sm flex items-center text-red-500 tooltip-red-500"
-					data-tooltip="Service exited with an error!"
+					class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center text-red-500 tooltip-error"
+					data-tip="Service exited with an error!"
 					sveltekit:prefetch
 				>
 					<svg
@@ -229,8 +229,8 @@
 					title={$t('service.stop_service')}
 					type="submit"
 					disabled={$disabledButton}
-					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
-					data-tooltip={$appSession.isAdmin
+					class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
+					data-tip={$appSession.isAdmin
 						? $t('service.stop_service')
 						: $t('service.permission_denied_stop_service')}
 				>
@@ -255,8 +255,8 @@
 					title={$t('service.start_service')}
 					type="submit"
 					disabled={$disabledButton}
-					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
-					data-tooltip={$appSession.isAdmin
+					class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
+					data-tip={$appSession.isAdmin
 						? $t('service.start_service')
 						: $t('service.permission_denied_start_service')}
 					><svg
@@ -286,8 +286,8 @@
 			>
 				<button
 					title={$t('application.configurations')}
-					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-					data-tooltip={$t('application.configurations')}
+					class="icons bg-transparent tooltip tooltip-bottom text-sm disabled:text-red-500"
+					data-tip={$t('application.configurations')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -321,8 +321,8 @@
 			>
 				<button
 					title={$t('application.secret')}
-					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-					data-tooltip={$t('application.secret')}
+					class="icons bg-transparent tooltip tooltip-bottom text-sm disabled:text-red-500"
+					data-tip={$t('application.secret')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -352,8 +352,8 @@
 			>
 				<button
 					title="Persistent Storage"
-					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-					data-tooltip="Persistent Storage"
+					class="icons bg-transparent tooltip tooltip-bottom text-sm disabled:text-red-500"
+					data-tip="Persistent Storage"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -383,8 +383,8 @@
 				<button
 					title={$t('service.logs')}
 					disabled={!$status.service.isRunning}
-					class="icons bg-transparent tooltip-bottom text-sm"
-					data-tooltip={$t('service.logs')}
+					class="icons bg-transparent tooltip tooltip-bottom text-sm"
+					data-tip={$t('service.logs')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -412,8 +412,8 @@
 			type="submit"
 			disabled={!$appSession.isAdmin}
 			class:hover:text-red-500={$appSession.isAdmin}
-			class="icons bg-transparent tooltip-bottom text-sm"
-			data-tooltip={$appSession.isAdmin
+			class="icons bg-transparent tooltip tooltip-bottom text-sm"
+			data-tip={$appSession.isAdmin
 				? $t('service.delete_service')
 				: $t('service.permission_denied_delete_service')}><DeleteIcon /></button
 		>

@@ -7,8 +7,7 @@
 	import { del, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-import { addToast } from '$lib/store';
-	import { toast } from '@zerodevx/svelte-toast';
+	import { addToast } from '$lib/store';
 	import { createEventDispatcher } from 'svelte';
 
 	const dispatch = createEventDispatcher();
@@ -26,8 +25,8 @@ import { addToast } from '$lib/store';
 		}
 	}
 	async function saveSecret(isNew = false) {
-		if (!name) return errorNotification('Name is required.');
-		if (!value) return errorNotification('Value is required.');
+		if (!name) return errorNotification({ message: 'Name is required.' });
+		if (!value) return errorNotification({ message: 'Value is required.' });
 		try {
 			await post(`/services/${id}/secrets`, {
 				name,
@@ -55,7 +54,6 @@ import { addToast } from '$lib/store';
 		bind:value={name}
 		required
 		placeholder="EXAMPLE_VARIABLE"
-		class=" border border-dashed border-coolgray-300"
 		readonly={!isNewSecret}
 		class:bg-transparent={!isNewSecret}
 		class:cursor-not-allowed={!isNewSecret}

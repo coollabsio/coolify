@@ -1,4 +1,3 @@
-import { toast } from '@zerodevx/svelte-toast';
 import { post } from '$lib/api';
 import { t } from '$lib/translations';
 import { errorNotification } from '$lib/common';

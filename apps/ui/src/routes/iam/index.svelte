@@ -24,9 +24,7 @@
 	export let ownTeams: any;
 	export let allTeams: any;
 
-	import { page } from '$app/stores';
 	import { del, get, post } from '$lib/api';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { errorNotification } from '$lib/common';
 	import { addToast, appSession } from '$lib/store';
 	import { goto } from '$app/navigation';

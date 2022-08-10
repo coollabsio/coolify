@@ -2,7 +2,6 @@
 	import { dev } from '$app/env';
 	import { get, post } from '$lib/api';
 	import { addToast, appSession, features } from '$lib/store';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { asyncSleep, errorNotification } from '$lib/common';
 	import { onMount } from 'svelte';
 

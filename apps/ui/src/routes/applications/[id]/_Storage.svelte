@@ -8,7 +8,6 @@
 	import { page } from '$app/stores';
 	import { createEventDispatcher } from 'svelte';
 
-	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import { addToast } from '$lib/store';
@@ -65,7 +64,6 @@
 		bind:value={storage.path}
 		required
 		placeholder="eg: /sqlite.db"
-		class=" border border-dashed border-coolgray-300"
 	/>
 </td>
 <td>

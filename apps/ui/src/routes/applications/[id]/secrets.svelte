@@ -27,8 +27,7 @@
 	import { t } from '$lib/translations';
 	import { get } from '$lib/api';
 	import { saveSecret } from './utils';
-	import { toast } from '@zerodevx/svelte-toast';
-import { addToast } from '$lib/store';
+	import { addToast } from '$lib/store';
 
 	const limit = pLimit(1);
 	const { id } = $page.params;
@@ -61,9 +60,9 @@ import { addToast } from '$lib/store';
 		batchSecrets = '';
 		await refreshSecrets();
 		addToast({
-					message: 'Secrets saved.',
-					type: 'success'
-				});
+			message: 'Secrets saved.',
+			type: 'success'
+		});
 	}
 </script>
 
@@ -151,9 +150,6 @@ import { addToast } from '$lib/store';
 	<h2 class="title my-6 font-bold">Paste .env file</h2>
 	<form on:submit|preventDefault={getValues} class="mb-12 w-full">
 		<textarea bind:value={batchSecrets} class="mb-2 min-h-[200px] w-full" />
-		<button
-			class="btn btn-sm bg-applications"
-			type="submit">Batch add secrets</button
-		>
+		<button class="btn btn-sm bg-applications" type="submit">Batch add secrets</button>
 	</form>
 </div>

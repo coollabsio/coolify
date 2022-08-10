@@ -17,9 +17,10 @@
 	</div>
 </div>
 <div
+	class:tooltip-right={dataTooltip}
 	class:tooltip={dataTooltip}
 	class:text-center={isCenter}
-	data-tooltip={dataTooltip}
+	data-tip={dataTooltip}
 	class="flex justify-center"
 >
 	<div

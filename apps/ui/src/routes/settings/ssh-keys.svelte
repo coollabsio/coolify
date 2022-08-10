@@ -19,7 +19,6 @@
 <script lang="ts">
 	export let sshKeys: any;
 	import { del, post } from '$lib/api';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import Menu from './_Menu.svelte';
@@ -81,7 +80,9 @@
 						<div class="box-selection group relative">
 							<div class="text-xl font-bold">{key.name}</div>
 							<div class="py-3 text-stone-600">Added on {key.createdAt}</div>
-							<button on:click={() => deleteSSHKey(key.id)} class="btn btn-sm bg-error">Delete</button>
+							<button on:click={() => deleteSSHKey(key.id)} class="btn btn-sm bg-error"
+								>Delete</button
+							>
 						</div>
 					{/each}
 				{/if}
@@ -90,7 +91,7 @@
 	</div>
 </div>
 {#if isModalActive}
-	<div class="relative z-10" aria-labelledby="modal-title" role="dialog" aria-modal="true"> 
+	<div class="relative z-10" aria-labelledby="modal-title" role="dialog" aria-modal="true">
 		<div class="fixed inset-0 bg-coolgray-500 bg-opacity-75 transition-opacity" />
 		<div class="fixed z-10 inset-0 overflow-y-auto text-white">
 			<div class="flex items-end sm:items-center justify-center min-h-full p-4 text-center sm:p-0">
@@ -139,8 +140,10 @@
 						</div>
 					</div>
 					<div class="mt-5 flex space-x-4 justify-end">
-						<button type="submit" class="bg-green-600 hover:bg-green-500">Save</button>
-						<button on:click={() => (isModalActive = false)} type="button" class="">Cancel</button>
+						<button type="submit" class="btn btn-sm bg-success">Save</button>
+						<button on:click={() => (isModalActive = false)} type="button" class="btn btn-sm"
+							>Cancel</button
+						>
 					</div>
 				</form>
 			</div>

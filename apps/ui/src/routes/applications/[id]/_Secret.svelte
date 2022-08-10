@@ -93,7 +93,6 @@
 		bind:value={name}
 		required
 		placeholder="EXAMPLE_VARIABLE"
-		class=" border border-dashed border-coolgray-300"
 		readonly={!isNewSecret}
 		class:bg-transparent={!isNewSecret}
 		class:cursor-not-allowed={!isNewSecret}

@@ -31,7 +31,6 @@
 	import Select from 'svelte-select';
 
 	import Explainer from '$lib/components/Explainer.svelte';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { get, post } from '$lib/api';
 	import cuid from 'cuid';
 	import { browser } from '$app/env';
@@ -81,7 +80,7 @@
 		}
 	];
 	function containerClass() {
-		return 'text-white border border-dashed border-coolgray-300 bg-transparent font-thin px-0';
+		return 'text-white bg-transparent font-thin px-0';
 	}
 
 	async function getUsage() {

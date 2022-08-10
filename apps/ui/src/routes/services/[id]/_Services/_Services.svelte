@@ -8,7 +8,6 @@
 
 	import { browser } from '$app/env';
 	import { page } from '$app/stores';
-	import { toast } from '@zerodevx/svelte-toast';
 
 	import { get, post } from '$lib/api';
 	import { errorNotification, getDomain } from '$lib/common';

@@ -8,7 +8,6 @@
 	import { page } from '$app/stores';
 	import { createEventDispatcher } from 'svelte';
 
-	import { toast } from '@zerodevx/svelte-toast';
 	import { errorNotification } from '$lib/common';
 	import { addToast } from '$lib/store';
 	const { id } = $page.params;
@@ -16,7 +15,7 @@
 	const dispatch = createEventDispatcher();
 	async function saveStorage(newStorage = false) {
 		try {
-			if (!storage.path) return errorNotification('Path is required.');
+			if (!storage.path) return errorNotification({message: "Path is required!"});
 			storage.path = storage.path.startsWith('/') ? storage.path : `/${storage.path}`;
 			storage.path = storage.path.endsWith('/') ? storage.path.slice(0, -1) : storage.path;
 			storage.path.replace(/\/\//g, '/');
@@ -65,7 +64,6 @@
 			bind:value={storage.path}
 			required
 			placeholder="eg: /data"
-			class=" border border-dashed border-coolgray-300"
 		/>
 	</form>
 </td>

@@ -7,7 +7,6 @@
 	import { getAPIUrl, post } from '$lib/api';
 	import { dev } from '$app/env';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-	import { toast } from '@zerodevx/svelte-toast';
 
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';

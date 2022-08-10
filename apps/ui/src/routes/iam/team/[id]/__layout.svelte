@@ -53,8 +53,8 @@
 			type="submit"
 			disabled={!$appSession.isAdmin}
 			class:hover:text-red-500={$appSession.isAdmin}
-			class="icons tooltip-bottom bg-transparent text-sm"
-			data-tooltip={$appSession.isAdmin
+			class="icons tooltip tooltip-bottom bg-transparent text-sm"
+			data-tip={$appSession.isAdmin
 				? 'Delete Team'
 				: $t('destination.permission_denied_delete_destination')}><DeleteIcon /></button
 		>

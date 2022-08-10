@@ -2,7 +2,6 @@
 	export let destination: any;
 	export let settings: any;
 
-	import { toast } from '@zerodevx/svelte-toast';
 	import { page } from '$app/stores';
 	import { get, post } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';

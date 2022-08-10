@@ -4,7 +4,6 @@
 	import { page } from '$app/stores';
 	import { getAPIUrl, getWebhookUrl, post } from '$lib/api';
 	import Explainer from '$lib/components/Explainer.svelte';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
 	import { dashify, errorNotification, getDomain } from '$lib/common';
 	import { addToast, appSession } from '$lib/store';

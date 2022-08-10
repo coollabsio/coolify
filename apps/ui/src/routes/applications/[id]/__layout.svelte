@@ -57,7 +57,6 @@
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import { del, get, post } from '$lib/api';
 	import { goto } from '$app/navigation';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { onDestroy, onMount } from 'svelte';
 	import { t } from '$lib/translations';
 	import { appSession, disabledButton, status, location, setLocation, addToast } from '$lib/store';
@@ -180,8 +179,8 @@
 		{#if $status.application.isExited}
 			<a
 				href={!$disabledButton ? `/applications/${id}/logs` : null}
-				class=" icons bg-transparent tooltip-bottom text-sm flex items-center text-red-500 tooltip-red-500"
-				data-tooltip="Application exited with an error!"
+				class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center text-error"
+				data-tip="Application exited with an error!"
 				sveltekit:prefetch
 			>
 				<svg
@@ -232,8 +231,8 @@
 				title="Stop application"
 				type="submit"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
-				data-tooltip={$appSession.isAdmin
+				class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2 text-error"
+				data-tip={$appSession.isAdmin
 					? $t('application.stop_application')
 					: $t('application.permission_denied_stop_application')}
 			>
@@ -258,8 +257,8 @@
 					type="submit"
 					disabled={$disabledButton || !isQueueActive}
 					class:hover:text-green-500={isQueueActive}
-					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2"
-					data-tooltip={$appSession.isAdmin
+					class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2"
+					data-tip={$appSession.isAdmin
 						? isQueueActive
 							? 'Rebuild application'
 							: 'Autoupdate inprogress. Cannot rebuild application.'
@@ -289,8 +288,8 @@
 					title="Build and start application"
 					type="submit"
 					disabled={$disabledButton}
-					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
-					data-tooltip={$appSession.isAdmin
+					class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2 text-success"
+					data-tip={$appSession.isAdmin
 						? 'Build and start application'
 						: 'You do not have permission to Build and start application.'}
 				>
@@ -322,8 +321,8 @@
 			<button
 				title="Configurations"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm"
-				data-tooltip="Configurations"
+				class="icons bg-transparent tooltip tooltip-bottom text-sm"
+				data-tip="Configurations"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -358,8 +357,8 @@
 			<button
 				title="Secret"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm"
-				data-tooltip="Secret"
+				class="icons bg-transparent tooltip tooltip-bottom text-sm"
+				data-tip="Secret"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -390,8 +389,8 @@
 			<button
 				title="Persistent Storages"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm"
-				data-tooltip="Persistent Storages"
+				class="icons bg-transparent tooltip tooltip-bottom text-sm"
+				data-tip="Persistent Storages"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -420,8 +419,8 @@
 			<button
 				title="Previews"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm"
-				data-tooltip="Previews"
+				class="icons bg-transparent tooltip tooltip-bottom text-sm"
+				data-tip="Previews"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -453,8 +452,8 @@
 			<button
 				title={$t('application.logs')}
 				disabled={$disabledButton || !$status.application.isRunning}
-				class="icons bg-transparent tooltip-bottom text-sm"
-				data-tooltip={$t('application.logs')}
+				class="icons bg-transparent tooltip tooltip-bottom text-sm"
+				data-tip={$t('application.logs')}
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -485,8 +484,8 @@
 			<button
 				title="Build Logs"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm"
-				data-tooltip="Build Logs"
+				class="icons bg-transparent tooltip tooltip-bottom text-sm"
+				data-tip="Build Logs"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -518,8 +517,8 @@
 			type="submit"
 			disabled={!$appSession.isAdmin}
 			class:hover:text-red-500={$appSession.isAdmin}
-			class="icons bg-transparent  tooltip-bottom text-sm"
-			data-tooltip={$appSession.isAdmin
+			class="icons bg-transparent tooltip tooltip-bottom text-sm"
+			data-tip={$appSession.isAdmin
 				? $t('application.delete_application')
 				: $t('application.permission_denied_delete_application')}
 		>
