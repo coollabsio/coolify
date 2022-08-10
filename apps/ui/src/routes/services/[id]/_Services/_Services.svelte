@@ -33,8 +33,11 @@
 		!$appSession.isAdmin || $status.service.isRunning || $status.service.initialLoading;
 
 	let forceSave = false;
-	let loading = false;
-	let loadingVerification = false;
+	let loading = {
+		save: false,
+		verification: false,
+		cleanup: false
+	}
 	let dualCerts = service.dualCerts;
 
 	let nonWWWDomain = service.fqdn && getDomain(service.fqdn).replace(/^www\./, '');
@@ -58,8 +61,8 @@
 	}
 
 	async function handleSubmit() {
-		if (loading) return;
-		loading = true;
+		if (loading.save) return;
+		loading.save = true;
 		try {
 			await post(`/services/${id}/check`, {
 				fqdn: service.fqdn,
@@ -94,11 +97,11 @@
 			}
 			return errorNotification(error);
 		} finally {
-			loading = false;
+			loading.save = false;
 		}
 	}
 	async function setEmailsToVerified() {
-		loadingVerification = true;
+		loading.verification = true;
 		try {
 			await post(`/services/${id}/${service.type}/activate`, { id: service.id });
 			return addToast({
@@ -108,7 +111,7 @@
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
-			loadingVerification = false;
+			loading.verification = false;
 		}
 	}
 	async function changeSettings(name: any) {
@@ -126,6 +129,7 @@
 		}
 	}
 	async function cleanupLogs() {
+		loading.cleanup = true;
 		try {
 			await post(`/services/${id}/${service.type}/cleanup`, { id: service.id });
 			return addToast({
@@ -134,7 +138,9 @@
 			});
 		} catch (error) {
 			return errorNotification(error);
-		} 
+		} finally {
+			loading.cleanup = false;
+		}
 	}
 	onMount(async () => {
 		if (browser && window.location.hostname === 'demo.coolify.io' && !service.fqdn) {
@@ -170,10 +176,10 @@
 					class="btn btn-sm"
 					class:bg-orange-600={forceSave}
 					class:hover:bg-orange-400={forceSave}
-					class:loading={loading}
-					class:bg-services={!loading}
-					disabled={loading}
-					>{loading
+					class:loading={loading.save}
+					class:bg-services={!loading.save}
+					disabled={loading.save}
+					>{loading.save
 						? $t('forms.save')
 						: forceSave
 						? $t('forms.confirm_continue')
@@ -181,14 +187,21 @@
 				>
 			{/if}
 			{#if service.type === 'plausibleanalytics' && $status.service.isRunning}
-				<button class="btn btn-sm" on:click|preventDefault={setEmailsToVerified} disabled={loadingVerification}
-					>{loadingVerification
+				<button
+					class="btn btn-sm"
+					on:click|preventDefault={setEmailsToVerified}
+					disabled={loading.verification}
+					class:loading={loading.verification}
+					>{loading.verification
 						? $t('forms.verifying')
 						: $t('forms.verify_emails_without_smtp')}</button
 				>
-				<button class="btn btn-sm" on:click|preventDefault={cleanupLogs}
-				>Cleanup Unnecessary Database Logs</button
-			>
+				<button
+					class="btn btn-sm"
+					on:click|preventDefault={cleanupLogs}
+					disabled={loading.cleanup}
+					class:loading={loading.cleanup}>Cleanup Unnecessary Database Logs</button
+				>
 			{/if}
 		</div>
 
