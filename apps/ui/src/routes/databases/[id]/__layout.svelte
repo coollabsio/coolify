@@ -249,7 +249,7 @@
 				class:bg-coolgray-500={$page.url.pathname === `/databases/${id}`}
 			>
 				<button
-					class="icons bg-transparent tooltip tooltip-bottom text-sm disabled:text-red-500"
+					class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm disabled:text-red-500"
 					data-tip={$t('application.configurations')}
 				>
 					<svg

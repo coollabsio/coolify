@@ -4,6 +4,7 @@ import {
     activateWordpressFtp,
     checkService,
     checkServiceDomain,
+    cleanupPlausibleLogs,
     deleteService,
     deleteServiceSecret,
     deleteServiceStorage,
@@ -74,6 +75,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.post<ServiceStartStop & SetWordpressSettings>('/:id/:type/settings', async (request, reply) => await setSettingsService(request, reply));
 
     fastify.post<OnlyId>('/:id/plausibleanalytics/activate', async (request, reply) => await activatePlausibleUsers(request, reply));
+    fastify.post<OnlyId>('/:id/plausibleanalytics/cleanup', async (request, reply) => await cleanupPlausibleLogs(request, reply));
     fastify.post<ActivateWordpressFtp>('/:id/wordpress/ftp', async (request, reply) => await activateWordpressFtp(request, reply));
 };
 

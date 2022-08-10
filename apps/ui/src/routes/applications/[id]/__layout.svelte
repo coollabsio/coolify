@@ -352,7 +352,7 @@
 		>
 			<button
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip tooltip-bottom text-sm"
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
 				data-tip="Secret"
 			>
 				<svg
@@ -507,7 +507,7 @@
 			type="submit"
 			disabled={!$appSession.isAdmin}
 			class:hover:text-red-500={$appSession.isAdmin}
-			class="icons bg-transparent tooltip tooltip-bottom text-sm"
+			class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
 			data-tip={$appSession.isAdmin
 				? $t('application.delete_application')
 				: $t('application.permission_denied_delete_application')}

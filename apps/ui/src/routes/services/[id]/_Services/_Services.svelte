@@ -125,6 +125,17 @@
 			return errorNotification(error);
 		}
 	}
+	async function cleanupLogs() {
+		try {
+			await post(`/services/${id}/${service.type}/cleanup`, { id: service.id });
+			return addToast({
+				message: 'Cleared DB Logs',
+				type: 'success'
+			});
+		} catch (error) {
+			return errorNotification(error);
+		} 
+	}
 	onMount(async () => {
 		if (browser && window.location.hostname === 'demo.coolify.io' && !service.fqdn) {
 			service.fqdn = `http://${cuid()}.demo.coolify.io`;
@@ -170,11 +181,14 @@
 				>
 			{/if}
 			{#if service.type === 'plausibleanalytics' && $status.service.isRunning}
-				<button on:click|preventDefault={setEmailsToVerified} disabled={loadingVerification}
+				<button class="btn btn-sm" on:click|preventDefault={setEmailsToVerified} disabled={loadingVerification}
 					>{loadingVerification
 						? $t('forms.verifying')
 						: $t('forms.verify_emails_without_smtp')}</button
 				>
+				<button class="btn btn-sm" on:click|preventDefault={cleanupLogs}
+				>Cleanup Unnecessary Database Logs</button
+			>
 			{/if}
 		</div>
 

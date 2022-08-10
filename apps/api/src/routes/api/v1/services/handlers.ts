@@ -2653,6 +2653,27 @@ export async function activatePlausibleUsers(request: FastifyRequest<OnlyId>, re
         return errorHandler({ status, message })
     }
 }
+export async function cleanupPlausibleLogs(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
+    try {
+        const { id } = request.params
+        const teamId = request.user.teamId;
+        const {
+            destinationDockerId,
+            destinationDocker,
+            plausibleAnalytics: { postgresqlUser, postgresqlPassword, postgresqlDatabase }
+        } = await getServiceFromDB({ id, teamId });
+        if (destinationDockerId) {
+            await executeDockerCmd({
+                dockerId: destinationDocker.id,
+                command: `docker exec ${id}-clickhouse 'clickhouse-client -q "SELECT name FROM system.tables WHERE name LIKE '%log%';" | xargs -I{} clickhouse-client -q "TRUNCATE TABLE system.{};"'`
+            })
+            return await reply.code(201).send()
+        }
+        throw { status: 500, message: 'Could cleanup logs.' }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function activateWordpressFtp(request: FastifyRequest<ActivateWordpressFtp>, reply: FastifyReply) {
     const { id } = request.params
     const { ftpEnabled } = request.body;
