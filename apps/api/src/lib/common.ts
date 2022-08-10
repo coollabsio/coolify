@@ -1630,15 +1630,18 @@ export function persistentVolumes(id, persistentStorage, config) {
 			return `${id}${storage.path.replace(/\//gi, '-')}:${storage.path}`;
 		}) || [];
 
-	const volumes = [config.volume, ...persistentVolume]
-	const composeVolumes = volumes.map((volume) => {
+	let volumes = [ ...persistentVolume]
+	if (config.volume) volumes = [config.volume, ...volumes]
+
+	const composeVolumes = volumes.length > 0 && volumes.map((volume) => {
 		return {
 			[`${volume.split(':')[0]}`]: {
 				name: volume.split(':')[0]
 			}
 		};
-	});
-	const volumeMounts = Object.assign(
+	}) || []
+
+	const volumeMounts = config.volume && Object.assign(
 		{},
 		{
 			[config.volume.split(':')[0]]: {
@@ -1646,6 +1649,6 @@ export function persistentVolumes(id, persistentStorage, config) {
 			}
 		},
 		...composeVolumes
-	);
+	) || {}
 	return { volumes, volumeMounts }
 }

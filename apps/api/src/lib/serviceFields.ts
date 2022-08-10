@@ -344,7 +344,7 @@ export const fider = [{
 {
 	name: 'emailNoreply',
 	isEditable: true,
-	isLowerCase: true,
+	isLowerCase: false,
 	isNumber: false,
 	isBoolean: false,
 	isEncrypted: false
@@ -352,7 +352,7 @@ export const fider = [{
 {
 	name: 'emailSmtpHost',
 	isEditable: true,
-	isLowerCase: true,
+	isLowerCase: false,
 	isNumber: false,
 	isBoolean: false,
 	isEncrypted: false
@@ -376,7 +376,7 @@ export const fider = [{
 {
 	name: 'emailSmtpUser',
 	isEditable: true,
-	isLowerCase: true,
+	isLowerCase: false,
 	isNumber: false,
 	isBoolean: false,
 	isEncrypted: false
