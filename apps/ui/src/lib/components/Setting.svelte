@@ -18,6 +18,7 @@
 </div>
 <div
 	class:tooltip-right={dataTooltip}
+	class:tooltip-primary={dataTooltip}
 	class:tooltip={dataTooltip}
 	class:text-center={isCenter}
 	data-tip={dataTooltip}

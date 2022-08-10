@@ -91,7 +91,7 @@
 			type="submit"
 			disabled={!$appSession.isAdmin && isDestinationDeletable}
 			class:hover:text-red-500={$appSession.isAdmin && isDestinationDeletable}
-			class="icons tooltip tooltip-left bg-transparent text-sm"
+			class="icons tooltip tooltip-primary tooltip-left bg-transparent text-sm"
 			class:text-stone-600={!isDestinationDeletable}
 			data-tip={deletable()}><DeleteIcon /></button
 		>

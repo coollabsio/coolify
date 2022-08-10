@@ -179,7 +179,7 @@
 		{#if $status.application.isExited}
 			<a
 				href={!$disabledButton ? `/applications/${id}/logs` : null}
-				class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center text-error"
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center text-error"
 				data-tip="Application exited with an error!"
 				sveltekit:prefetch
 			>
@@ -230,7 +230,7 @@
 				on:click={stopApplication}
 				type="submit"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2 text-error"
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2 text-error"
 				data-tip={$appSession.isAdmin
 					? $t('application.stop_application')
 					: $t('application.permission_denied_stop_application')}
@@ -255,7 +255,7 @@
 					type="submit"
 					disabled={$disabledButton || !isQueueActive}
 					class:hover:text-green-500={isQueueActive}
-					class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2"
+					class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2"
 					data-tip={$appSession.isAdmin
 						? isQueueActive
 							? 'Rebuild application'
@@ -285,7 +285,7 @@
 				<button
 					type="submit"
 					disabled={$disabledButton}
-					class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2 text-success"
+					class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2 text-success"
 					data-tip={$appSession.isAdmin
 						? 'Deploy'
 						: 'You do not have permission to deploy application.'}
@@ -317,7 +317,7 @@
 		>
 			<button
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip tooltip-bottom text-sm"
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
 				data-tip="Configurations"
 			>
 				<svg
@@ -383,7 +383,7 @@
 		>
 			<button
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip tooltip-bottom text-sm"
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
 				data-tip="Persistent Storages"
 			>
 				<svg
@@ -412,7 +412,7 @@
 		>
 			<button
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip tooltip-bottom text-sm"
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
 				data-tip="Previews"
 			>
 				<svg
@@ -444,7 +444,7 @@
 		>
 			<button
 				disabled={$disabledButton || !$status.application.isRunning}
-				class="icons bg-transparent tooltip tooltip-bottom text-sm"
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
 				data-tip={$t('application.logs')}
 			>
 				<svg
@@ -475,7 +475,7 @@
 		>
 			<button
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip tooltip-bottom text-sm"
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
 				data-tip="Build Logs"
 			>
 				<svg

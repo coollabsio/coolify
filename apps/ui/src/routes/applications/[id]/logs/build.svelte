@@ -143,7 +143,7 @@
 					on:click={() => loadBuild(build.id)}
 					class:rounded-tr={index === 0}
 					class:rounded-br={index === builds.length - 1}
-					class="tooltip tooltip-top flex cursor-pointer items-center justify-center border-l-2 py-4 no-underline transition-all duration-100 hover:bg-coolgray-400 hover:shadow-xl"
+					class="tooltip tooltip-primary tooltip-top flex cursor-pointer items-center justify-center border-l-2 py-4 no-underline transition-all duration-100 hover:bg-coolgray-400 hover:shadow-xl"
 					class:bg-coolgray-400={buildId === build.id}
 					class:border-red-500={build.status === 'failed'}
 					class:border-green-500={build.status === 'success'}

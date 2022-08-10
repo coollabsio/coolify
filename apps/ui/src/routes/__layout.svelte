@@ -126,7 +126,7 @@
 				<a
 					sveltekit:prefetch
 					href="/"
-					class="icons tooltip tooltip-right bg-coolgray-200 hover:text-white"
+					class="icons tooltip tooltip-right tooltip-primary bg-coolgray-200 hover:text-white"
 					class:text-white={$page.url.pathname === '/'}
 					class:bg-coolgray-500={$page.url.pathname === '/'}
 					data-tip="Dashboard"
@@ -153,7 +153,7 @@
 				<a
 					sveltekit:prefetch
 					href="/applications"
-					class="icons tooltip  tooltip-right bg-coolgray-200"
+					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
 					class:text-applications={$page.url.pathname.startsWith('/applications') ||
 						$page.url.pathname.startsWith('/new/application')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/applications') ||
@@ -181,7 +181,7 @@
 				<a
 					sveltekit:prefetch
 					href="/sources"
-					class="icons tooltip  tooltip-right bg-coolgray-200"
+					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
 					class:text-sources={$page.url.pathname.startsWith('/sources') ||
 						$page.url.pathname.startsWith('/new/source')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/sources') ||
@@ -210,7 +210,7 @@
 				<a
 					sveltekit:prefetch
 					href="/destinations"
-					class="icons tooltip  tooltip-right bg-coolgray-200"
+					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
 					class:text-destinations={$page.url.pathname.startsWith('/destinations') ||
 						$page.url.pathname.startsWith('/new/destination')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/destinations') ||
@@ -245,7 +245,7 @@
 				<a
 					sveltekit:prefetch
 					href="/databases"
-					class="icons tooltip  tooltip-right bg-coolgray-200"
+					class="icons tooltip tooltip-primary  tooltip-right bg-coolgray-200"
 					class:text-databases={$page.url.pathname.startsWith('/databases') ||
 						$page.url.pathname.startsWith('/new/database')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/databases') ||
@@ -271,7 +271,7 @@
 				<a
 					sveltekit:prefetch
 					href="/services"
-					class="icons tooltip  tooltip-right bg-coolgray-200"
+					class="icons tooltip tooltip-primary  tooltip-right bg-coolgray-200"
 					class:text-services={$page.url.pathname.startsWith('/services') ||
 						$page.url.pathname.startsWith('/new/service')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/services') ||
@@ -300,7 +300,7 @@
 				<a
 					sveltekit:prefetch
 					href="/iam"
-					class="icons tooltip  tooltip-right bg-coolgray-200"
+					class="icons tooltip tooltip-primary  tooltip-right bg-coolgray-200"
 					class:text-iam={$page.url.pathname.startsWith('/iam')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/iam')}
 					data-tip="IAM"
@@ -324,7 +324,7 @@
 				<a
 					sveltekit:prefetch
 					href={$appSession.teamId === '0' ? '/settings/global' : '/settings/ssh-keys'}
-					class="icons tooltip  tooltip-right bg-coolgray-200"
+					class="icons tooltip tooltip-primary  tooltip-right bg-coolgray-200"
 					class:text-settings={$page.url.pathname.startsWith('/settings')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
 					data-tip="Settings"
@@ -348,7 +348,7 @@
 				</a>
 
 				<div
-					class="icons tooltip  tooltip-right bg-coolgray-200 hover:text-error"
+					class="icons tooltip tooltip-primary  tooltip-right bg-coolgray-200 hover:text-error"
 					data-tip="Logout"
 					on:click={logout}
 				>
