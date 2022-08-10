@@ -193,7 +193,6 @@
 				{:else if $status.database.isRunning}
 					<button
 						on:click={stopDatabase}
-						title={$t('database.stop_database')}
 						type="submit"
 						disabled={!$appSession.isAdmin}
 						class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
@@ -219,7 +218,6 @@
 				{:else}
 					<button
 						on:click={startDatabase}
-						title={$t('database.start_database')}
 						type="submit"
 						disabled={!$appSession.isAdmin}
 						class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
@@ -251,7 +249,6 @@
 				class:bg-coolgray-500={$page.url.pathname === `/databases/${id}`}
 			>
 				<button
-					title={$t('application.configurations')}
 					class="icons bg-transparent tooltip tooltip-bottom text-sm disabled:text-red-500"
 					data-tip={$t('application.configurations')}
 				>
@@ -287,7 +284,6 @@
 				class:bg-coolgray-500={$page.url.pathname === `/databases/${id}/logs`}
 			>
 				<button
-					title={$t('database.logs')}
 					disabled={!$status.database.isRunning}
 					class="icons bg-transparent tooltip tooltip-bottom text-sm"
 					data-tip={$t('database.logs')}
@@ -313,7 +309,6 @@
 			>
 			<button
 				on:click={deleteDatabase}
-				title={$t('database.delete_database')}
 				type="submit"
 				disabled={!$appSession.isAdmin}
 				class:hover:text-red-500={$appSession.isAdmin}

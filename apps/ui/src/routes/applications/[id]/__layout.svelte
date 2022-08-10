@@ -228,7 +228,6 @@
 		{:else if $status.application.isRunning}
 			<button
 				on:click={stopApplication}
-				title="Stop application"
 				type="submit"
 				disabled={$disabledButton}
 				class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2 text-error"
@@ -253,7 +252,6 @@
 			</button>
 			<form on:submit|preventDefault={handleDeploySubmit}>
 				<button
-					title="Rebuild application"
 					type="submit"
 					disabled={$disabledButton || !isQueueActive}
 					class:hover:text-green-500={isQueueActive}
@@ -285,13 +283,12 @@
 		{:else}
 			<form on:submit|preventDefault={handleDeploySubmit}>
 				<button
-					title="Build and start application"
 					type="submit"
 					disabled={$disabledButton}
 					class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2 text-success"
 					data-tip={$appSession.isAdmin
-						? 'Build and start application'
-						: 'You do not have permission to Build and start application.'}
+						? 'Deploy'
+						: 'You do not have permission to deploy application.'}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -319,7 +316,6 @@
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}`}
 		>
 			<button
-				title="Configurations"
 				disabled={$disabledButton}
 				class="icons bg-transparent tooltip tooltip-bottom text-sm"
 				data-tip="Configurations"
@@ -355,7 +351,6 @@
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/secrets`}
 		>
 			<button
-				title="Secret"
 				disabled={$disabledButton}
 				class="icons bg-transparent tooltip tooltip-bottom text-sm"
 				data-tip="Secret"
@@ -387,7 +382,6 @@
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/storages`}
 		>
 			<button
-				title="Persistent Storages"
 				disabled={$disabledButton}
 				class="icons bg-transparent tooltip tooltip-bottom text-sm"
 				data-tip="Persistent Storages"
@@ -417,7 +411,6 @@
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/previews`}
 		>
 			<button
-				title="Previews"
 				disabled={$disabledButton}
 				class="icons bg-transparent tooltip tooltip-bottom text-sm"
 				data-tip="Previews"
@@ -450,7 +443,6 @@
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs`}
 		>
 			<button
-				title={$t('application.logs')}
 				disabled={$disabledButton || !$status.application.isRunning}
 				class="icons bg-transparent tooltip tooltip-bottom text-sm"
 				data-tip={$t('application.logs')}
@@ -482,7 +474,6 @@
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs/build`}
 		>
 			<button
-				title="Build Logs"
 				disabled={$disabledButton}
 				class="icons bg-transparent tooltip tooltip-bottom text-sm"
 				data-tip="Build Logs"
@@ -513,7 +504,6 @@
 
 		<button
 			on:click={() => deleteApplication(application.name)}
-			title={$t('application.delete_application')}
 			type="submit"
 			disabled={!$appSession.isAdmin}
 			class:hover:text-red-500={$appSession.isAdmin}

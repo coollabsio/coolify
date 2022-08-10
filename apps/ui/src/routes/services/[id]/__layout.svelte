@@ -226,7 +226,6 @@
 			{:else if $status.service.isRunning}
 				<button
 					on:click={stopService}
-					title={$t('service.stop_service')}
 					type="submit"
 					disabled={$disabledButton}
 					class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
@@ -252,7 +251,6 @@
 			{:else}
 				<button
 					on:click={startService}
-					title={$t('service.start_service')}
 					type="submit"
 					disabled={$disabledButton}
 					class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
@@ -285,7 +283,6 @@
 				class:bg-coolgray-500={$page.url.pathname === `/services/${id}`}
 			>
 				<button
-					title={$t('application.configurations')}
 					class="icons bg-transparent tooltip tooltip-bottom text-sm disabled:text-red-500"
 					data-tip={$t('application.configurations')}
 				>
@@ -320,7 +317,6 @@
 				class:bg-coolgray-500={$page.url.pathname === `/services/${id}/secrets`}
 			>
 				<button
-					title={$t('application.secret')}
 					class="icons bg-transparent tooltip tooltip-bottom text-sm disabled:text-red-500"
 					data-tip={$t('application.secret')}
 				>
@@ -351,7 +347,6 @@
 				class:bg-coolgray-500={$page.url.pathname === `/services/${id}/storages`}
 			>
 				<button
-					title="Persistent Storage"
 					class="icons bg-transparent tooltip tooltip-bottom text-sm disabled:text-red-500"
 					data-tip="Persistent Storage"
 				>
@@ -381,7 +376,6 @@
 				class:bg-coolgray-500={$page.url.pathname === `/services/${id}/logs`}
 			>
 				<button
-					title={$t('service.logs')}
 					disabled={!$status.service.isRunning}
 					class="icons bg-transparent tooltip tooltip-bottom text-sm"
 					data-tip={$t('service.logs')}
@@ -408,7 +402,6 @@
 		{/if}
 		<button
 			on:click={deleteService}
-			title={$t('service.delete_service')}
 			type="submit"
 			disabled={!$appSession.isAdmin}
 			class:hover:text-red-500={$appSession.isAdmin}

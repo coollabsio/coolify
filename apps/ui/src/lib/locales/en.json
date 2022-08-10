@@ -167,15 +167,15 @@
 		"permission_denied_stop_application": "You do not have permission to stop the application.",
 		"rebuild_application": "Rebuild application",
 		"permission_denied_rebuild_application": "You do not have permission to rebuild application.",
-		"build_and_start_application": "Build and start application",
-		"permission_denied_build_and_start_application": "You do not have permission to Build and start application.",
+		"build_and_start_application": "Deploy",
+		"permission_denied_build_and_start_application": "You do not have permission to deploy application.",
 		"configurations": "Configurations",
 		"secret": "Secrets",
 		"persistent_storage": "Persistent Storage",
 		"previews": "Previews",
 		"logs": "Application Logs",
 		"build_logs": "Build Logs",
-		"delete_application": "Delete application",
+		"delete_application": "Delete",
 		"permission_denied_delete_application": "You do not have permission to delete this application",
 		"domain_already_in_use": "Domain {{domain}} is already used.",
 		"dns_not_set_error": "DNS not set correctly or propogated for {{domain}}.<br><br>Please check your DNS settings.",
@@ -227,14 +227,14 @@
 		"select_database_type": "Select a Database type",
 		"select_database_version": "Select a Database version",
 		"confirm_stop": "Are you sure you would like to stop {{name}}?",
-		"stop_database": "Stop database",
+		"stop_database": "Stop",
 		"permission_denied_stop_database": "You do not have permission to stop the database.",
-		"start_database": "Start database",
+		"start_database": "Start",
 		"permission_denied_start_database": "You do not have permission to start the database.",
-		"delete_database": "Delete Database",
+		"delete_database": "Delete",
 		"permission_denied_delete_database": "You do not have permission to delete a Database",
 		"no_databases_found": "No databases found",
-		"logs": "Database Logs"
+		"logs": "Logs"
 	},
 	"destination": {
 		"delete_destination": "Delete Destination",
@@ -267,7 +267,7 @@
 			"official_providers": "Official providers"
 		},
 		"no_git_sources_found": "No git sources found",
-		"delete_git_source": "Delete Git Source",
+		"delete_git_source": "Delete",
 		"permission_denied": "You do not have permission to delete a Git Source",
 		"create_new_app": "Create new {{name}} App",
 		"change_app_settings": "Change {{name}} App Settings",
@@ -293,14 +293,14 @@
 		"generate_www_non_www_ssl": "It will generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-pink-600'>both DNS entries</span> set in advance.<br><br>Service needs to be restarted."
 	},
 	"service": {
-		"stop_service": "Stop Service",
+		"stop_service": "Stop",
 		"permission_denied_stop_service": "You do not have permission to stop the service.",
-		"start_service": "Start Service",
+		"start_service": "Start",
 		"permission_denied_start_service": "You do not have permission to start the service.",
-		"delete_service": "Delete Service",
+		"delete_service": "Delete",
 		"permission_denied_delete_service": "You do not have permission to delete a service.",
 		"no_service": "No services found",
-		"logs": "Service Logs"
+		"logs": "Logs"
 	},
 	"setting": {
 		"change_language": "Change Language",

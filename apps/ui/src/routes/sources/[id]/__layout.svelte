@@ -56,7 +56,6 @@
 	<nav class="nav-side">
 		<button
 			on:click={() => deleteSource(source.name)}
-			title={$t('source.delete_git_source')}
 			type="submit"
 			disabled={!$appSession.isAdmin}
 			class:hover:text-red-500={$appSession.isAdmin}

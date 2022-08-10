@@ -81,7 +81,6 @@
 		{#if isUpdateAvailable}
 			<button
 				disabled={updateStatus.success === false}
-				title="Update available"
 				on:click={update}
 				class="icons tooltip-right bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white duration-75 hover:scale-105"
 			>
