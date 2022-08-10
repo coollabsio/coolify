@@ -760,6 +760,8 @@ async function startPlausibleAnalyticsService(request: FastifyRequest<ServiceSta
           <trace_log remove="remove"/>
           <metric_log remove="remove"/>
           <asynchronous_metric_log remove="remove"/>
+          <session_log remove="remove"/>
+          <part_log remove="remove"/>
       </yandex>`;
         const clickhouseUserConfigXml = `
         <yandex>
