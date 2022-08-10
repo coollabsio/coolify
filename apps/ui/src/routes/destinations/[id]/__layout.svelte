@@ -58,7 +58,7 @@
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 
 	const { id } = $page.params;
-	const isDestinationDeletable = destination.application.length === 0 && destination.database.length === 0 && destination.service.length === 0
+	const isDestinationDeletable = destination?.application.length === 0 && destination?.database.length === 0 && destination?.service.length === 0
 	
 	async function deleteDestination(destination: any) {
 		if (!isDestinationDeletable) return

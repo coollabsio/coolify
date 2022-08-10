@@ -40,8 +40,8 @@
 			<div class="title font-bold">{$t('forms.configuration')}</div>
 			<button
 				type="submit"
-				class:bg-sky-600={!loading}
-				class:hover:bg-sky-500={!loading}
+				class="btn btn-sm bg-destinations"
+				class:loading={loading}
 				disabled={loading}
 				>{loading
 					? payload.isCoolifyProxyUsed

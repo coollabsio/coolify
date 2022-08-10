@@ -237,7 +237,7 @@
 		"logs": "Logs"
 	},
 	"destination": {
-		"delete_destination": "Delete Destination",
+		"delete_destination": "Delete",
 		"permission_denied_delete_destination": "You do not have permission to delete this destination",
 		"add_to_coolify": "Add to Coolify",
 		"coolify_proxy_stopped": "Coolify Proxy stopped!",
