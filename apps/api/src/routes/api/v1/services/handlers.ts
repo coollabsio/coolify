@@ -2667,7 +2667,7 @@ export async function cleanupPlausibleLogs(request: FastifyRequest<OnlyId>, repl
         if (destinationDockerId) {
             await executeDockerCmd({
                 dockerId: destinationDocker.id,
-                command: `docker exec ${id}-clickhouse clickhouse-client -q "SELECT name FROM system.tables WHERE name LIKE '%log%';" | xargs -I{} clickhouse-client -q "TRUNCATE TABLE system.{};"`
+                command: `docker exec ${id}-clickhouse /usr/bin/clickhouse-client -q "SELECT name FROM system.tables WHERE name LIKE '%log%';" | xargs -I{} /usr/bin/clickhouse-client -q "TRUNCATE TABLE system.{};"`
             })
             return await reply.code(201).send()
         }
