@@ -60,7 +60,7 @@ export async function getDestination(request: FastifyRequest<OnlyId>) {
             throw { status: 404, message: `Destination not found.` };
         }
         const settings = await listSettings();
-        let payload = {
+        const payload = {
             destination,
             settings
         };
@@ -218,7 +218,11 @@ export async function verifyRemoteDockerEngine(request: FastifyRequest, reply: F
         if (!stdout) {
             await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable ${network}`);
         }
+        const { stdout:coolifyNetwork } = await asyncExecShell(`DOCKER_HOST=${host} docker network ls --filter 'name=coolify-infra' --no-trunc --format "{{json .}}"`);
 
+        if (!coolifyNetwork) {
+            await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable coolify-infra`);
+        }
         await prisma.destinationDocker.update({ where: { id }, data: { remoteVerified: true } })
         return reply.code(201).send()
 
