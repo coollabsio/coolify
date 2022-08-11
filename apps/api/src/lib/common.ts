@@ -1614,7 +1614,7 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 			return
 		}
 		try {
-			await executeDockerCmd({ dockerId, command: `docker container prune -f` })
+			await executeDockerCmd({ dockerId, command: `docker container prune -f --filter "label=coolify.managed=true"` })
 		} catch (error) {
 			//console.log(error);
 		}
