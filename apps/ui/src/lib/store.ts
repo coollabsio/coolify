@@ -1,5 +1,4 @@
-import { CODESANDBOX_HOST } from '$env/static/private';
-import { writable, readable, type Writable, type Readable } from 'svelte/store';
+import { writable, readable, type Writable } from 'svelte/store';
 
 interface AppSession {
     ipv4: string | null,

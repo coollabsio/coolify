@@ -4,7 +4,8 @@ import { sveltekit } from '@sveltejs/kit/vite';
 export default {
     plugins: [sveltekit()],
     define: {
-        'GITPOD_WORKSPACE_URL': JSON.stringify(process.env.GITPOD_WORKSPACE_URL)
+        'GITPOD_WORKSPACE_URL': JSON.stringify(process.env.GITPOD_WORKSPACE_URL),
+        'CODESANDBOX_HOST': JSON.stringify(process.env.CODESANDBOX_HOST),
     },
     server: {
         host: '0.0.0.0',

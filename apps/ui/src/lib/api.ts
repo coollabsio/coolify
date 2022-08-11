@@ -1,5 +1,4 @@
 import { dev } from '$app/env';
-import { CODESANDBOX_HOST } from '$env/static/private';
 import Cookies from 'js-cookie';
 
 export function getAPIUrl() {
