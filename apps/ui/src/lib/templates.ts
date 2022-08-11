@@ -292,7 +292,13 @@ export const buildPacks = [
 		fancyName: 'Deno',
 		hoverColor: 'hover:bg-green-700',
 		color: 'bg-green-700'
-	}
+	},
+    {
+        name: 'heroku',
+		fancyName: 'Heroku Buildpack',
+		hoverColor: 'hover:bg-indigo-700',
+		color: 'bg-indigo-700'
+    }
 ];
 export const scanningTemplates = {
 	'@sveltejs/kit': {

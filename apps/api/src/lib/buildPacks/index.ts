@@ -15,6 +15,7 @@ import eleventy from './static';
 import python from './python';
 import deno from './deno';
 import laravel from './laravel';
+import heroku from './heroku';
 
 export {
 	node,
@@ -33,5 +34,6 @@ export {
 	eleventy,
 	python,
 	deno,
-	laravel
+	laravel,
+    heroku
 };
