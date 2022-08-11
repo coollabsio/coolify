@@ -24,7 +24,7 @@ export function getWebhookUrl(type: string) {
 		}
 	}
 	if (CODESANDBOX_HOST) {
-		const newURL = CODESANDBOX_HOST.replace(/\$PORT/,'3001')
+		const newURL = `https://${CODESANDBOX_HOST.replace(/\$PORT/,'3001')}`
 		if (type === 'github') {
 			return `${newURL}/webhooks/github/events`
 		}

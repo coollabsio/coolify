@@ -17,7 +17,7 @@ import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
-export const version = '3.2.0';
+export const version = '3.2.1';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -1614,7 +1614,7 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 			return
 		}
 		try {
-			await executeDockerCmd({ dockerId, command: `docker container prune -f` })
+			await executeDockerCmd({ dockerId, command: `docker container prune -f --filter "label=coolify.managed=true"` })
 		} catch (error) {
 			//console.log(error);
 		}
