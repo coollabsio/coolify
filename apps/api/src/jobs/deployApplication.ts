@@ -192,8 +192,8 @@ import * as buildpacks from '../lib/buildPacks';
 							} catch (error) {
 								//
 							}
-							// if (!imageFound || deployNeeded) {
-							if (true) {
+							if (!imageFound || deployNeeded) {
+							// if (true) {
 								await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId, baseImage);
 								if (buildpacks[buildPack])
 									await buildpacks[buildPack]({
@@ -303,6 +303,7 @@ import * as buildpacks from '../lib/buildPacks';
 											labels,
 											depends_on: [],
 											restart: 'always',
+											expose: [port],
 											...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
 											// logging: {
 											// 	driver: 'fluentd',
