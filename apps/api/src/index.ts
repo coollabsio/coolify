@@ -16,9 +16,9 @@ declare module 'fastify' {
 			COOLIFY_DATABASE_URL: string,
 			COOLIFY_SENTRY_DSN: string,
 			COOLIFY_IS_ON: string,
-			COOLIFY_WHITE_LABELED: boolean,
+			COOLIFY_WHITE_LABELED: string,
 			COOLIFY_WHITE_LABELED_ICON: string | null,
-			COOLIFY_AUTO_UPDATE: boolean,
+			COOLIFY_AUTO_UPDATE: string,
 		};
 	}
 }
