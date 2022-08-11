@@ -7,6 +7,7 @@ export default {
         'GITPOD_WORKSPACE_URL': JSON.stringify(process.env.GITPOD_WORKSPACE_URL)
     },
     server: {
+        host: '0.0.0.0',
         port: 3000,
         hmr: process.env.GITPOD_WORKSPACE_URL
         ? {

@@ -38,13 +38,20 @@ export function getAPIUrl() {
 		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '')
 		return newURL
 	}
+    if (process.env.CODESANDBOX_HOST) {
+        return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/,'3001')}`
+	}
 	return isDev ? 'http://localhost:3001' : 'http://localhost:3000';
 }
+
 export function getUIUrl() {
 	if (process.env.GITPOD_WORKSPACE_URL) {
 		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL)
 		const newURL = href.replace('https://', 'https://3000-').replace(/\/$/, '')
 		return newURL
+	}
+    if (process.env.CODESANDBOX_HOST) {
+		     return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/,'3000')}`
 	}
 	return 'http://localhost:3000';
 }
@@ -1454,7 +1461,7 @@ export async function removeService({ id }: { id: string }): Promise<void> {
 }
 
 export function saveUpdateableFields(type: string, data: any) {
-	let update = {};
+	const update = {};
 	if (type && serviceFields[type]) {
 		serviceFields[type].map((k) => {
 			let temp = data[k.name]
@@ -1479,7 +1486,7 @@ export function saveUpdateableFields(type: string, data: any) {
 }
 
 export function getUpdateableFields(type: string, data: any) {
-	let update = {};
+	const update = {};
 	if (type && serviceFields[type]) {
 		serviceFields[type].map((k) => {
 			let temp = data[k.name]
@@ -1543,7 +1550,7 @@ export async function stopBuild(buildId, applicationId) {
 	await new Promise<void>(async (resolve, reject) => {
 		const { destinationDockerId, status } = await prisma.build.findFirst({ where: { id: buildId } });
 		const { engine, id: dockerId } = await prisma.destinationDocker.findFirst({ where: { id: destinationDockerId } });
-		let interval = setInterval(async () => {
+		const interval = setInterval(async () => {
 			try {
 				if (status === 'failed') {
 					clearInterval(interval);

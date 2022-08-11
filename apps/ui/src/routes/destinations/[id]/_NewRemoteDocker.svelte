@@ -31,7 +31,9 @@
 <div class="text-center flex justify-center">
 	<Explainer
 		customClass="max-w-[32rem]"
-		text="Remote Docker Engines are using <span class='text-white font-bold'>SSH connection</span> to initiate connection. You need to setup an <span class='text-white font-bold'>SSH key</span> in advance on the server and install Docker. <br>See <a class='text-white' href='https://docs.coollabs.io'>docs</a> for more details."
+		text="Remote Docker Engines are using <span class='text-white font-bold'>SSH</span> to communicate with the remote docker engine. 
+        You need to setup an <span class='text-white font-bold'>SSH key</span> in advance on the server and install Docker. 
+        <br>See <a class='text-white' href='https://docs.coollabs.io/coolify/destinations/remote.html'>docs</a> for more details."
 	/>
 </div>
 <div class="flex justify-center px-6 pb-8">

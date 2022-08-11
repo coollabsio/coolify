@@ -1,3 +1,4 @@
+import { CODESANDBOX_HOST } from '$env/static/private';
 import { writable, readable, type Writable, type Readable } from 'svelte/store';
 
 interface AppSession {
@@ -75,10 +76,12 @@ export const setLocation = (resource: any) => {
         const newURL = href
             .replace('https://', `https://${resource.exposePort}-`)
             .replace(/\/$/, '');
-        location.set(newURL)
-    } else {
-        location.set(resource.fqdn)
+        return location.set(newURL)
+    } else if (CODESANDBOX_HOST){
+		 const newURL = `https://${CODESANDBOX_HOST.replace(/\$PORT/,resource.exposePort)}`
+         return location.set(newURL)
     }
+    return location.set(resource.fqdn)
 }
 
 export const toasts: any = writable([])

@@ -1,4 +1,5 @@
 import { dev } from '$app/env';
+import { CODESANDBOX_HOST } from '$env/static/private';
 import Cookies from 'js-cookie';
 
 export function getAPIUrl() {
@@ -7,13 +8,24 @@ export function getAPIUrl() {
 		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '')
 		return newURL
 	}
+	if (CODESANDBOX_HOST) {
+		     return `https://${CODESANDBOX_HOST.replace(/\$PORT/,'3001')}`
+	}
 	return dev ? 'http://localhost:3001' : 'http://localhost:3000';
 }
 export function getWebhookUrl(type: string) {
-	console.log(GITPOD_WORKSPACE_URL)
 	if (GITPOD_WORKSPACE_URL) {
 		const { href } = new URL(GITPOD_WORKSPACE_URL)
 		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '')
+		if (type === 'github') {
+			return `${newURL}/webhooks/github/events`
+		}
+		if (type === 'gitlab') {
+			return `${newURL}/webhooks/gitlab/events`
+		}
+	}
+	if (CODESANDBOX_HOST) {
+		const newURL = CODESANDBOX_HOST.replace(/\$PORT/,'3001')
 		if (type === 'github') {
 			return `${newURL}/webhooks/github/events`
 		}
