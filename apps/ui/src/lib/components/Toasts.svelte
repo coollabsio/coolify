@@ -9,7 +9,7 @@
 	<section>
 		<article class="toast toast-bottom toast-end rounded-none" role="alert" transition:fade>
 			{#each $toasts as toast (toast.id)}
-				<Toast type={toast.type}>{toast.message}</Toast>
+				<Toast type={toast.type}>{@html toast.message}</Toast>
 			{/each}
 		</article>
 	</section>
