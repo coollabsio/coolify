@@ -52,7 +52,7 @@ const schema = {
 			default: 'docker'
 		},
 		COOLIFY_WHITE_LABELED: {
-			type: 'boolean',
+			type: 'string',
 			default: false
 		},
 		COOLIFY_WHITE_LABELED_ICON: {
@@ -60,7 +60,7 @@ const schema = {
 			default: null
 		},
 		COOLIFY_AUTO_UPDATE: {
-			type: 'boolean',
+			type: 'string',
 			default: false
 		},
 
