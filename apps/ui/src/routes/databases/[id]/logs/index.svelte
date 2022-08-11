@@ -1,31 +1,13 @@
-<script context="module" lang="ts">
-	import type { Load } from '@sveltejs/kit';
-	import { onDestroy, onMount } from 'svelte';
-	export const load: Load = async ({ fetch, params, url, stuff }) => {
-		try {
-			const response = await get(`/databases/${params.id}/logs`);
-			return {
-				props: {
-					database: stuff.database,
-					...response
-				}
-			};
-		} catch (error) {
-			return {
-				status: 500,
-				error: new Error(`Could not load ${url}`)
-			};
-		}
-	};
-</script>
-
 <script lang="ts">
-	export let database: any;
+	import { onDestroy, onMount } from 'svelte';
+
 	import { page } from '$app/stores';
 	import LoadingLogs from './_Loading.svelte';
 	import { get } from '$lib/api';
 	import { t } from '$lib/translations';
-import { errorNotification } from '$lib/common';
+	import { errorNotification } from '$lib/common';
+
+	const { id } = $page.params;
 
 	let loadLogsInterval: any = null;
 	let logs: any = [];
@@ -34,9 +16,12 @@ import { errorNotification } from '$lib/common';
 	let followingLogs: any;
 	let logsEl: any;
 	let position = 0;
+	let loadingLogs = false;
+	let database: any = {};
 
-	const { id } = $page.params;
 	onMount(async () => {
+		const { logs: firstLogs } = await get(`/databases/${id}/logs`);
+		logs = firstLogs;
 		loadAllLogs();
 		loadLogsInterval = setInterval(() => {
 			loadLogs();
@@ -48,6 +33,7 @@ import { errorNotification } from '$lib/common';
 	});
 	async function loadAllLogs() {
 		try {
+			loadingLogs = true;
 			const data: any = await get(`/databases/${id}/logs`);
 			if (data?.logs) {
 				lastLog = data.logs[data.logs.length - 1];
@@ -56,13 +42,15 @@ import { errorNotification } from '$lib/common';
 		} catch (error) {
 			console.log(error);
 			return errorNotification(error);
+		} finally {
+			loadingLogs = false;
 		}
 	}
 	async function loadLogs() {
+		if (loadingLogs) return;
 		try {
-			const newLogs: any = await get(
-				`/databases/${id}/logs?since=${lastLog?.split(' ')[0] || 0}`
-			);
+			loadingLogs = true;
+			const newLogs: any = await get(`/databases/${id}/logs?since=${lastLog?.split(' ')[0] || 0}`);
 
 			if (newLogs?.logs && newLogs.logs[newLogs.logs.length - 1] !== logs[logs.length - 1]) {
 				logs = logs.concat(newLogs.logs);
@@ -70,6 +58,8 @@ import { errorNotification } from '$lib/common';
 			}
 		} catch (error) {
 			return errorNotification(error);
+		} finally {
+			loadingLogs = false;
 		}
 	}
 	function detect() {
@@ -137,11 +127,11 @@ import { errorNotification } from '$lib/common';
 			{#if loadLogsInterval}
 				<LoadingLogs />
 			{/if}
-			<div class="flex justify-end sticky top-0 p-2 mx-1">
+			<div class="flex justify-end sticky top-0 p-1 mx-1">
 				<button
 					on:click={followBuild}
-					class="bg-transparent"
-					data-tooltip="Follow logs"
+					class="bg-transparent tooltip tooltip-primary tooltip-bottom"
+					data-tip="Follow logs"
 					class:text-green-500={followingLogs}
 				>
 					<svg

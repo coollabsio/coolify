@@ -3,24 +3,20 @@ import type { FastifyRequest } from 'fastify';
 import { FastifyReply } from 'fastify';
 import yaml from 'js-yaml';
 import fs from 'fs/promises';
-import { asyncExecShell, ComposeFile, createDirectories, decrypt, encrypt, errorHandler, generateDatabaseConfiguration, generatePassword, getContainerUsage, getDatabaseImage, getDatabaseVersions, getFreePort, listSettings, makeLabelForStandaloneDatabase, prisma, startTcpProxy, startTraefikTCPProxy, stopDatabaseContainer, stopTcpHttpProxy, supportedDatabaseTypesAndVersions, uniqueName, updatePasswordInDb } from '../../../../lib/common';
-import { dockerInstance, getEngine } from '../../../../lib/docker';
+import { ComposeFile, createDirectories, decrypt, encrypt, errorHandler, executeDockerCmd, generateDatabaseConfiguration, generatePassword, getContainerUsage, getDatabaseImage, getDatabaseVersions, getFreePublicPort, listSettings, makeLabelForStandaloneDatabase, prisma, startTraefikTCPProxy, stopDatabaseContainer, stopTcpHttpProxy, supportedDatabaseTypesAndVersions, uniqueName, updatePasswordInDb } from '../../../../lib/common';
+import { checkContainer } from '../../../../lib/docker';
 import { day } from '../../../../lib/dayjs';
+
 import { GetDatabaseLogs, OnlyId, SaveDatabase, SaveDatabaseDestination, SaveDatabaseSettings, SaveVersion } from '../../../../types';
 import { SaveDatabaseType } from './types';
 
 export async function listDatabases(request: FastifyRequest) {
     try {
         const teamId = request.user.teamId;
-        let databases = []
-        if (teamId === '0') {
-            databases = await prisma.database.findMany({ include: { teams: true } });
-        } else {
-            databases = await prisma.database.findMany({
-                where: { teams: { some: { id: teamId } } },
-                include: { teams: true }
-            });
-        }
+        const databases = await prisma.database.findMany({
+            where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+            include: { teams: true, destinationDocker: true }
+        });
         return {
             databases
         }
@@ -56,6 +52,36 @@ export async function newDatabase(request: FastifyRequest, reply: FastifyReply) 
         return errorHandler({ status, message })
     }
 }
+export async function getDatabaseStatus(request: FastifyRequest<OnlyId>) {
+    try {
+        const { id } = request.params;
+        const teamId = request.user.teamId;
+        let isRunning = false;
+
+        const database = await prisma.database.findFirst({
+            where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+            include: { destinationDocker: true, settings: true }
+        });
+        const { destinationDockerId, destinationDocker } = database;
+        if (destinationDockerId) {
+            try {
+                const { stdout } = await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker inspect --format '{{json .State}}' ${id}` })
+
+                if (JSON.parse(stdout).Running) {
+                    isRunning = true;
+                }
+            } catch (error) {
+                //
+            }
+        }
+        return {
+            isRunning
+        }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
 export async function getDatabase(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params;
@@ -69,29 +95,11 @@ export async function getDatabase(request: FastifyRequest<OnlyId>) {
         }
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
         if (database.rootUserPassword) database.rootUserPassword = decrypt(database.rootUserPassword);
-        const { destinationDockerId, destinationDocker } = database;
-        let isRunning = false;
-        if (destinationDockerId) {
-            const host = getEngine(destinationDocker.engine);
-
-            try {
-                const { stdout } = await asyncExecShell(
-                    `DOCKER_HOST=${host} docker inspect --format '{{json .State}}' ${id}`
-                );
-
-                if (JSON.parse(stdout).Running) {
-                    isRunning = true;
-                }
-            } catch (error) {
-                //
-            }
-        }
         const configuration = generateDatabaseConfiguration(database);
         const settings = await listSettings();
         return {
             privatePort: configuration?.privatePort,
             database,
-            isRunning,
             versions: await getDatabaseVersions(database.type),
             settings
         };
@@ -164,16 +172,15 @@ export async function saveDatabaseDestination(request: FastifyRequest<SaveDataba
 
         const {
             destinationDockerId,
-            destinationDocker: { engine },
+            destinationDocker: { engine, id: dockerId },
             version,
             type
         } = await prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } });
 
         if (destinationDockerId) {
-            const host = getEngine(engine);
             if (type && version) {
                 const baseImage = getDatabaseImage(type);
-                asyncExecShell(`DOCKER_HOST=${host} docker pull ${baseImage}:${version}`);
+                executeDockerCmd({ dockerId, command: `docker pull ${baseImage}:${version}` })
             }
         }
         return reply.code(201).send({})
@@ -194,7 +201,7 @@ export async function getDatabaseUsage(request: FastifyRequest<OnlyId>) {
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
         if (database.rootUserPassword) database.rootUserPassword = decrypt(database.rootUserPassword);
         if (database.destinationDockerId) {
-            [usage] = await Promise.all([getContainerUsage(database.destinationDocker.engine, id)]);
+            [usage] = await Promise.all([getContainerUsage(database.destinationDocker.id, id)]);
         }
         return {
             usage
@@ -225,7 +232,6 @@ export async function startDatabase(request: FastifyRequest<OnlyId>) {
             generateDatabaseConfiguration(database);
 
         const network = destinationDockerId && destinationDocker.network;
-        const host = getEngine(destinationDocker.engine);
         const volumeName = volume.split(':')[0];
         const labels = await makeLabelForStandaloneDatabase({ id, image, volume });
 
@@ -267,13 +273,13 @@ export async function startDatabase(request: FastifyRequest<OnlyId>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         try {
-            await asyncExecShell(`DOCKER_HOST=${host} docker volume create ${volumeName}`);
+            await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker volume create ${volumeName}` })
         } catch (error) {
             console.log(error);
         }
         try {
-            await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
-            if (isPublic) await startTcpProxy(destinationDocker, id, publicPort, privatePort);
+            await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up -d` })
+            if (isPublic) await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
             return {};
         } catch (error) {
             throw {
@@ -311,39 +317,27 @@ export async function stopDatabase(request: FastifyRequest<OnlyId>) {
 }
 export async function getDatabaseLogs(request: FastifyRequest<GetDatabaseLogs>) {
     try {
-        const teamId = request.user.teamId;
         const { id } = request.params;
         let { since = 0 } = request.query
         if (since !== 0) {
             since = day(since).unix();
         }
-        const { destinationDockerId, destinationDocker } = await prisma.database.findUnique({
+        const { destinationDockerId, destinationDocker: { id: dockerId } } = await prisma.database.findUnique({
             where: { id },
             include: { destinationDocker: true }
         });
         if (destinationDockerId) {
-            const docker = dockerInstance({ destinationDocker });
             try {
-                const container = await docker.engine.getContainer(id);
-                if (container) {
-                    const { default: ansi } = await import('strip-ansi')
-                    const logs = (
-                        await container.logs({
-                            stdout: true,
-                            stderr: true,
-                            timestamps: true,
-                            since,
-                            tail: 5000
-                        })
-                    )
-                        .toString()
-                        .split('\n')
-                        .map((l) => ansi(l.slice(8)))
-                        .filter((a) => a);
-                    return {
-                        logs
-                    };
-                }
+                // const found = await checkContainer({ dockerId, container: id })
+                // if (found) {
+                const { default: ansi } = await import('strip-ansi')
+                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
+                const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
+                const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
+                const logs = stripLogsStderr.concat(stripLogsStdout)
+                const sortedLogs = logs.sort((a, b) => (day(a.split(' ')[0]).isAfter(day(b.split(' ')[0])) ? 1 : -1))
+                return { logs: sortedLogs }
+                // }
             } catch (error) {
                 const { statusCode } = error;
                 if (statusCode === 404) {
@@ -432,8 +426,10 @@ export async function saveDatabaseSettings(request: FastifyRequest<SaveDatabaseS
         const teamId = request.user.teamId;
         const { id } = request.params;
         const { isPublic, appendOnly = true } = request.body;
-        const publicPort = await getFreePort();
-        const settings = await listSettings();
+
+        const { destinationDocker: { id: dockerId } } = await prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
+        const publicPort = await getFreePublicPort(id, dockerId);
+
         await prisma.database.update({
             where: { id },
             data: {
@@ -453,11 +449,7 @@ export async function saveDatabaseSettings(request: FastifyRequest<SaveDatabaseS
         if (destinationDockerId) {
             if (isPublic) {
                 await prisma.database.update({ where: { id }, data: { publicPort } });
-                if (settings.isTraefikUsed) {
-                    await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
-                } else {
-                    await startTcpProxy(destinationDocker, id, publicPort, privatePort);
-                }
+                await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
             } else {
                 await prisma.database.update({ where: { id }, data: { publicPort: null } });
                 await stopTcpHttpProxy(id, destinationDocker, oldPublicPort);

@@ -50,21 +50,24 @@
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">{$t('index.databases')}</div>
-	<div on:click={newDatabase} class="add-icon cursor-pointer bg-purple-600 hover:bg-purple-500">
-		<svg
-			class="w-6"
-			xmlns="http://www.w3.org/2000/svg"
-			fill="none"
-			viewBox="0 0 24 24"
-			stroke="currentColor"
-			><path
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				stroke-width="2"
-				d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-			/></svg
+	<button
+			on:click={newDatabase}
+			class="btn btn-square btn-sm bg-databases"
 		>
-	</div>
+			<svg
+				class="h-6 w-6"
+				xmlns="http://www.w3.org/2000/svg"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				><path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+				/></svg
+			>
+		</button>
 </div>
 
 <div class="flex-col justify-center">
@@ -77,7 +80,7 @@
 		<div class="flex flex-col">
 			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 				{#each ownDatabases as database}
-					<a href="/databases/{database.id}" class="w-96 p-2 no-underline">
+					<a href="/databases/{database.id}" class="p-2 no-underline">
 						<div class="box-selection group relative hover:bg-purple-600">
 							{#if database.type === 'clickhouse'}
 								<Clickhouse isAbsolute />
@@ -100,6 +103,9 @@
 							{#if $appSession.teamId === '0' && otherDatabases.length > 0}
 								<div class="truncate text-center">{database.teams[0].name}</div>
 							{/if}
+							{#if database.destinationDocker?.name}
+								<div class="truncate text-center">{database.destinationDocker.name}</div>
+							{/if}
 							{#if !database.type}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									{$t('application.configuration.configuration_missing')}
@@ -110,10 +116,10 @@
 				{/each}
 			</div>
 			{#if otherDatabases.length > 0 && $appSession.teamId === '0'}
-				<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Databases</div>
+				<div class="px-6 pb-5 pt-10 text-2xl font-bold text-center">Other Databases</div>
 				<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 					{#each otherDatabases as database}
-						<a href="/databases/{database.id}" class="w-96 p-2 no-underline">
+						<a href="/databases/{database.id}" class="p-2 no-underline">
 							<div class="box-selection group relative hover:bg-purple-600">
 								{#if database.type === 'clickhouse'}
 									<Clickhouse isAbsolute />

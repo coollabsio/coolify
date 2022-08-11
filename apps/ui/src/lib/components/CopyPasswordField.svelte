@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/env';
-	import { toast } from '@zerodevx/svelte-toast';
+	import { addToast } from '$lib/store';
 	let showPassword = false;
 
 	export let value: string;
@@ -9,7 +9,7 @@
 	export let readonly = false;
 	export let textarea = false;
 	export let required = false;
-	export let pattern: string|null|undefined = null;
+	export let pattern: string | null | undefined = null;
 	export let id: string;
 	export let name: string;
 	export let placeholder = '';
@@ -20,7 +20,10 @@
 	function copyToClipboard() {
 		if (isHttps && navigator.clipboard) {
 			navigator.clipboard.writeText(value);
-			toast.push('Copied to clipboard.');
+			addToast({
+				message: 'Copied to clipboard.',
+				type: 'success'
+			});
 		}
 	}
 </script>

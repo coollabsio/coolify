@@ -56,12 +56,11 @@
 	<nav class="nav-side">
 		<button
 			on:click={() => deleteSource(source.name)}
-			title={$t('source.delete_git_source')}
 			type="submit"
 			disabled={!$appSession.isAdmin}
 			class:hover:text-red-500={$appSession.isAdmin}
-			class="icons tooltip-bottom bg-transparent text-sm"
-			data-tooltip={$appSession.isAdmin
+			class="icons tooltip tooltip-primary tooltip-bottom bg-transparent text-sm"
+			data-tip={$appSession.isAdmin
 				? $t('source.delete_git_source')
 				: $t('source.permission_denied')}><DeleteIcon /></button
 		>

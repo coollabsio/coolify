@@ -1,30 +1,33 @@
 {
   "name": "coolify",
   "description": "An open-source & self-hostable Heroku / Netlify alternative.",
-  "version": "3.1.4",
-  "license": "AGPL-3.0",
+  "version": "3.2.0",
+  "license": "Apache-2.0",
+  "repository": "github:coollabsio/coolify",
   "scripts": {
-    "db:studio": "pnpm run --filter coolify-api db:studio",
-    "db:push": "pnpm run --filter coolify-api db:push",
-    "db:seed": "pnpm run --filter coolify-api db:seed",
-    "db:migrate": "pnpm run --filter coolify-api db:migrate",
+    "oc": "opencollective-setup",
+    "db:studio": "pnpm run --filter api db:studio",
+    "db:push": "pnpm run --filter api db:push",
+    "db:seed": "pnpm run --filter api db:seed",
+    "db:migrate": "pnpm run --filter api db:migrate",
     "format": "run-p -l -n format:*",
-    "format:api": "NODE_ENV=development pnpm run --filter coolify-api format",
+    "format:api": "NODE_ENV=development pnpm run --filter api format",
     "lint": "run-p -l -n lint:*",
-    "lint:api": "NODE_ENV=development pnpm run --filter coolify-api lint",
+    "lint:api": "NODE_ENV=development pnpm run --filter api lint",
     "dev": "run-p -l -n dev:*",
-    "dev:api": "NODE_ENV=development pnpm run --filter coolify-api dev",
-    "dev:ui": "NODE_ENV=development pnpm run --filter coolify-ui dev",
+    "dev:api": "NODE_ENV=development pnpm run --filter api dev",
+    "dev:ui": "NODE_ENV=development pnpm run --filter ui dev",
     "build": "NODE_ENV=production run-p -n build:*",
-    "build:api": "NODE_ENV=production pnpm run --filter coolify-api build",
-    "build:ui": "NODE_ENV=production pnpm run --filter coolify-ui build",
-    "dockerlogin":"echo $DOCKER_PASS | docker login --username=$DOCKER_USER --password-stdin",
+    "build:api": "NODE_ENV=production pnpm run --filter api build",
+    "build:ui": "NODE_ENV=production pnpm run --filter ui build",
+    "dockerlogin": "echo $DOCKER_PASS | docker login --username=$DOCKER_USER --password-stdin",
     "release:staging:amd": "cross-var docker buildx build --platform linux/amd64 -t coollabsio/coolify:$npm_package_version --push .",
-    "release:local":"rm -fr ./local-serve && mkdir ./local-serve && pnpm build && cp -Rp apps/api/build/* ./local-serve && cp -Rp apps/ui/build/ ./local-serve/public && cp -Rp apps/api/prisma/ ./local-serve/prisma && cp -Rp apps/api/package.json ./local-serve && env | grep '^COOLIFY_' > ./local-serve/.env && cd ./local-serve && pnpm install . && pnpm start"
+    "release:local": "rm -fr ./local-serve && mkdir ./local-serve && pnpm build && cp -Rp apps/api/build/* ./local-serve && cp -Rp apps/ui/build/ ./local-serve/public && cp -Rp apps/api/prisma/ ./local-serve/prisma && cp -Rp apps/api/package.json ./local-serve && env | grep '^COOLIFY_' > ./local-serve/.env && cd ./local-serve && pnpm install . && pnpm start"
   },
   "devDependencies": {
     "cross-var": "1.1.0",
-    "npm-run-all": "4.1.5"
+    "npm-run-all": "4.1.5",
+    "opencollective-setup": "1.4.1"
   },
   "keywords": [
     "docker",

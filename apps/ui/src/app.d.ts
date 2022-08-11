@@ -21,4 +21,5 @@ declare namespace App {
 }
 
 declare const GITPOD_WORKSPACE_URL: string
+
   

@@ -1,8 +1,8 @@
 import { FastifyPluginAsync } from 'fastify';
 import { OnlyId } from '../../../../types';
-import { cancelDeployment, checkDNS, checkRepository, deleteApplication, deleteSecret, deleteStorage, deployApplication, getApplication, getApplicationLogs, getBuildIdLogs, getBuildLogs, getBuildPack, getGitHubToken, getGitLabSSHKey, getImages, getPreviews, getSecrets, getStorages, getUsage, listApplications, newApplication, saveApplication, saveApplicationSettings, saveApplicationSource, saveBuildPack, saveDeployKey, saveDestination, saveGitLabSSHKey, saveRepository, saveSecret, saveStorage, stopApplication } from './handlers';
+import { cancelDeployment, checkDNS, checkDomain, checkRepository, deleteApplication, deleteSecret, deleteStorage, deployApplication, getApplication, getApplicationLogs, getApplicationStatus, getBuildIdLogs, getBuildLogs, getBuildPack, getGitHubToken, getGitLabSSHKey, getImages, getPreviews, getSecrets, getStorages, getUsage, listApplications, newApplication, saveApplication, saveApplicationSettings, saveApplicationSource, saveBuildPack, saveDeployKey, saveDestination, saveGitLabSSHKey, saveRepository, saveSecret, saveStorage, stopApplication, stopPreviewApplication } from './handlers';
 
-import type { CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, DeployApplication, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, GetImages, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage } from './types';
+import type { CancelDeployment, CheckDNS, CheckDomain, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, DeployApplication, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, GetImages, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, StopPreviewApplication } from './types';
 
 const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.addHook('onRequest', async (request) => {
@@ -17,9 +17,14 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.post<SaveApplication>('/:id', async (request, reply) => await saveApplication(request, reply));
     fastify.delete<DeleteApplication>('/:id', async (request, reply) => await deleteApplication(request, reply));
 
+    fastify.get<OnlyId>('/:id/status', async (request) => await getApplicationStatus(request));
+
     fastify.post<OnlyId>('/:id/stop', async (request, reply) => await stopApplication(request, reply));
+    fastify.post<StopPreviewApplication>('/:id/stop/preview', async (request, reply) => await stopPreviewApplication(request, reply));
 
     fastify.post<SaveApplicationSettings>('/:id/settings', async (request, reply) => await saveApplicationSettings(request, reply));
+
+    fastify.get<CheckDomain>('/:id/check', async (request) => await checkDomain(request));
     fastify.post<CheckDNS>('/:id/check', async (request) => await checkDNS(request));
 
     fastify.get<OnlyId>('/:id/secrets', async (request) => await getSecrets(request));

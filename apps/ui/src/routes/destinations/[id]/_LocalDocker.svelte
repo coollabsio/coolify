@@ -1,56 +1,67 @@
 <script lang="ts">
 	export let destination: any;
 	export let settings: any;
-	export let state: any;
 
-	import { toast } from '@zerodevx/svelte-toast';
 	import { page } from '$app/stores';
-	import { post } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { onMount } from 'svelte';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
-	import { appSession } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	import Setting from '$lib/components/Setting.svelte';
+
 	const { id } = $page.params;
 	let cannotDisable = settings.fqdn && destination.engine === '/var/run/docker.sock';
-	let loading = false;
-	let loadingProxy = false;
-	let restarting = false;
+	let loading = {
+		restart: false,
+		proxy: false,
+		save: false
+	};
+
 	async function handleSubmit() {
-		loading = true;
+		loading.save = true;
 		try {
-			return await post(`/destinations/${id}`, { ...destination });
+			await post(`/destinations/${id}`, { ...destination });
+			addToast({
+				message: 'Configuration saved.',
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
-			loading = false;
+			loading.save = false;
 		}
 	}
 	onMount(async () => {
-		if (state === false && destination.isCoolifyProxyUsed === true) {
-			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
+		loading.proxy = true;
+		const { isRunning } = await get(`/destinations/${id}/status`);
+		let proxyUsed = !destination.isCoolifyProxyUsed;
+		if (isRunning === false && destination.isCoolifyProxyUsed === true) {
 			try {
 				await post(`/destinations/${id}/settings`, {
-					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
+					isCoolifyProxyUsed: proxyUsed,
 					engine: destination.engine
 				});
 				await stopProxy();
 			} catch (error) {
 				return errorNotification(error);
 			}
-		} else if (state === true && destination.isCoolifyProxyUsed === false) {
-			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
+		} else if (isRunning === true && destination.isCoolifyProxyUsed === false) {
 			try {
 				await post(`/destinations/${id}/settings`, {
-					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
+					isCoolifyProxyUsed: proxyUsed,
 					engine: destination.engine
 				});
 				await startProxy();
+				destination.isCoolifyProxyUsed = proxyUsed;
 			} catch (error) {
 				return errorNotification(error);
+			} finally {
+				loading.proxy = false;
 			}
 		}
+		loading.proxy = false;
 	});
 	async function changeProxySetting() {
 		if (!cannotDisable) {
@@ -67,7 +78,7 @@
 			}
 			destination.isCoolifyProxyUsed = !destination.isCoolifyProxyUsed;
 			try {
-				loadingProxy = true;
+				loading.proxy = true;
 				await post(`/destinations/${id}/settings`, {
 					isCoolifyProxyUsed: destination.isCoolifyProxyUsed,
 					engine: destination.engine
@@ -80,14 +91,17 @@
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
-				loadingProxy = false;
+				loading.proxy = false;
 			}
 		}
 	}
 	async function stopProxy() {
 		try {
 			await post(`/destinations/${id}/stop`, { engine: destination.engine });
-			return toast.push($t('destination.coolify_proxy_stopped'));
+			return addToast({
+				message: $t('destination.coolify_proxy_stopped'),
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		}
@@ -95,7 +109,10 @@
 	async function startProxy() {
 		try {
 			await post(`/destinations/${id}/start`, { engine: destination.engine });
-			return toast.push($t('destination.coolify_proxy_started'));
+			return addToast({
+				message: $t('destination.coolify_proxy_started'),
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		}
@@ -104,8 +121,11 @@
 		const sure = confirm($t('destination.confirm_restart_proxy'));
 		if (sure) {
 			try {
-				restarting = true;
-				toast.push($t('destination.coolify_proxy_restarting'));
+				loading.restart = true;
+				addToast({
+					message: $t('destination.coolify_proxy_restarting'),
+					type: 'success'
+				});
 				await post(`/destinations/${id}/restart`, {
 					engine: destination.engine,
 					fqdn: settings.fqdn
@@ -115,7 +135,7 @@
 					window.location.reload();
 				}, 5000);
 			} finally {
-				restarting = false;
+				loading.restart = false;
 			}
 		}
 	}
@@ -127,24 +147,20 @@
 		{#if $appSession.isAdmin}
 			<button
 				type="submit"
-				class="bg-sky-600 hover:bg-sky-500"
-				class:bg-sky-600={!loading}
-				class:hover:bg-sky-500={!loading}
-				disabled={loading}
-				>{loading ? $t('forms.saving') : $t('forms.save')}
+				class="btn btn-sm"
+				class:bg-destinations={!loading.save}
+				class:loading={loading.save}
+				disabled={loading.save}
+				>{$t('forms.save')}
 			</button>
 			<button
-				class={restarting ? '' : 'bg-red-600 hover:bg-red-500'}
-				disabled={restarting}
-				on:click|preventDefault={forceRestartProxy}
-				>{restarting
-					? $t('destination.restarting_please_wait')
-					: $t('destination.force_restart_proxy')}</button
+				class="btn btn-sm"
+				class:loading={loading.restart}
+				class:bg-error={!loading.restart}
+				disabled={loading.restart}
+				on:click|preventDefault={forceRestartProxy}>{$t('destination.force_restart_proxy')}</button
 			>
 		{/if}
-		<!-- <button type="button" class="bg-coollabs hover:bg-coollabs-100" on:click={scanApps}
-				>Scan for applications</button
-			> -->
 	</div>
 	<div class="grid grid-cols-2 items-center px-10 ">
 		<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
@@ -168,10 +184,6 @@
 			value={destination.engine}
 		/>
 	</div>
-	<!-- <div class="flex items-center">
-			<label for="remoteEngine">Remote Engine?</label>
-			<input name="remoteEngine" type="checkbox" bind:checked={payload.remoteEngine} />
-		</div> -->
 	<div class="grid grid-cols-2 items-center px-10">
 		<label for="network" class="text-base font-bold text-stone-100">{$t('forms.network')}</label>
 		<CopyPasswordField
@@ -186,7 +198,7 @@
 	{#if $appSession.teamId === '0'}
 		<div class="grid grid-cols-2 items-center">
 			<Setting
-				loading={loadingProxy}
+				loading={loading.proxy}
 				disabled={cannotDisable}
 				bind:setting={destination.isCoolifyProxyUsed}
 				on:click={changeProxySetting}

@@ -10,12 +10,14 @@ import crypto from 'crypto';
 import { promises as dns } from 'dns';
 import { PrismaClient } from '@prisma/client';
 import cuid from 'cuid';
+import os from 'os';
+import sshConfig from 'ssh-config'
 
-import { checkContainer, getEngine, removeContainer } from './docker';
+import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
-export const version = '3.1.4';
+export const version = '3.2.0';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -29,20 +31,27 @@ const customConfig: Config = {
 export const defaultProxyImage = `coolify-haproxy-alpine:latest`;
 export const defaultProxyImageTcp = `coolify-haproxy-tcp-alpine:latest`;
 export const defaultProxyImageHttp = `coolify-haproxy-http-alpine:latest`;
-export const defaultTraefikImage = `traefik:v2.6`;
+export const defaultTraefikImage = `traefik:v2.8`;
 export function getAPIUrl() {
 	if (process.env.GITPOD_WORKSPACE_URL) {
 		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL)
 		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '')
 		return newURL
 	}
+    if (process.env.CODESANDBOX_HOST) {
+        return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/,'3001')}`
+	}
 	return isDev ? 'http://localhost:3001' : 'http://localhost:3000';
 }
+
 export function getUIUrl() {
 	if (process.env.GITPOD_WORKSPACE_URL) {
 		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL)
 		const newURL = href.replace('https://', 'https://3000-').replace(/\/$/, '')
 		return newURL
+	}
+    if (process.env.CODESANDBOX_HOST) {
+		     return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/,'3000')}`
 	}
 	return 'http://localhost:3000';
 }
@@ -113,164 +122,164 @@ export const encrypt = (text: string) => {
 };
 
 export const supportedServiceTypesAndVersions = [
-    {
-        name: 'plausibleanalytics',
-        fancyName: 'Plausible Analytics',
-        baseImage: 'plausible/analytics',
-        images: ['bitnami/postgresql:13.2.0', 'yandex/clickhouse-server:21.3.2.5'],
-        versions: ['latest', 'stable'],
-        recommendedVersion: 'stable',
-        ports: {
-            main: 8000
-        }
-    },
-    {
-        name: 'nocodb',
-        fancyName: 'NocoDB',
-        baseImage: 'nocodb/nocodb',
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 8080
-        }
-    },
-    {
-        name: 'minio',
-        fancyName: 'MinIO',
-        baseImage: 'minio/minio',
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 9001
-        }
-    },
-    {
-        name: 'vscodeserver',
-        fancyName: 'VSCode Server',
-        baseImage: 'codercom/code-server',
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 8080
-        }
-    },
-    {
-        name: 'wordpress',
-        fancyName: 'Wordpress',
-        baseImage: 'wordpress',
-        images: ['bitnami/mysql:5.7'],
-        versions: ['latest', 'php8.1', 'php8.0', 'php7.4', 'php7.3'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 80
-        }
-    },
-    {
-        name: 'vaultwarden',
-        fancyName: 'Vaultwarden',
-        baseImage: 'vaultwarden/server',
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 80
-        }
-    },
-    {
-        name: 'languagetool',
-        fancyName: 'LanguageTool',
-        baseImage: 'silviof/docker-languagetool',
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 8010
-        }
-    },
-    {
-        name: 'n8n',
-        fancyName: 'n8n',
-        baseImage: 'n8nio/n8n',
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 5678
-        }
-    },
-    {
-        name: 'uptimekuma',
-        fancyName: 'Uptime Kuma',
-        baseImage: 'louislam/uptime-kuma',
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 3001
-        }
-    },
-    {
-        name: 'ghost',
-        fancyName: 'Ghost',
-        baseImage: 'bitnami/ghost',
-        images: ['bitnami/mariadb'],
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 2368
-        }
-    },
-    {
-        name: 'meilisearch',
-        fancyName: 'Meilisearch',
-        baseImage: 'getmeili/meilisearch',
-        images: [],
-        versions: ['latest'],
-        recommendedVersion: 'latest',
-        ports: {
-            main: 7700
-        }
-    },
-    {
-        name: 'umami',
-        fancyName: 'Umami',
-        baseImage: 'ghcr.io/mikecao/umami',
-        images: ['postgres:12-alpine'],
-        versions: ['postgresql-latest'],
-        recommendedVersion: 'postgresql-latest',
-        ports: {
-            main: 3000
-        }
-    },
-    {
-        name: 'hasura',
-        fancyName: 'Hasura',
-        baseImage: 'hasura/graphql-engine',
-        images: ['postgres:12-alpine'],
-        versions: ['latest', 'v2.5.1'],
-        recommendedVersion: 'v2.5.1',
-        ports: {
-            main: 8080
-        }
-    },
-    {
-        name: 'fider',
-        fancyName: 'Fider',
-        baseImage: 'getfider/fider',
-        images: ['postgres:12-alpine'],
-        versions: ['stable'],
-        recommendedVersion: 'stable',
-        ports: {
-            main: 3000
-        }
-    },
-    // {
-    //     name: 'moodle',
-    //     fancyName: 'Moodle',
-    //     baseImage: 'bitnami/moodle',
-    //     images: [],
-    //     versions: ['latest', 'v4.0.2'],
-    //     recommendedVersion: 'latest',
-    //     ports: {
-    //         main: 8080
-    //     }
-    // }
+	{
+		name: 'plausibleanalytics',
+		fancyName: 'Plausible Analytics',
+		baseImage: 'plausible/analytics',
+		images: ['bitnami/postgresql:13.2.0', 'yandex/clickhouse-server:21.3.2.5'],
+		versions: ['latest', 'stable'],
+		recommendedVersion: 'stable',
+		ports: {
+			main: 8000
+		}
+	},
+	{
+		name: 'nocodb',
+		fancyName: 'NocoDB',
+		baseImage: 'nocodb/nocodb',
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8080
+		}
+	},
+	{
+		name: 'minio',
+		fancyName: 'MinIO',
+		baseImage: 'minio/minio',
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 9001
+		}
+	},
+	{
+		name: 'vscodeserver',
+		fancyName: 'VSCode Server',
+		baseImage: 'codercom/code-server',
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8080
+		}
+	},
+	{
+		name: 'wordpress',
+		fancyName: 'Wordpress',
+		baseImage: 'wordpress',
+		images: ['bitnami/mysql:5.7'],
+		versions: ['latest', 'php8.1', 'php8.0', 'php7.4', 'php7.3'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 80
+		}
+	},
+	{
+		name: 'vaultwarden',
+		fancyName: 'Vaultwarden',
+		baseImage: 'vaultwarden/server',
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 80
+		}
+	},
+	{
+		name: 'languagetool',
+		fancyName: 'LanguageTool',
+		baseImage: 'silviof/docker-languagetool',
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8010
+		}
+	},
+	{
+		name: 'n8n',
+		fancyName: 'n8n',
+		baseImage: 'n8nio/n8n',
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 5678
+		}
+	},
+	{
+		name: 'uptimekuma',
+		fancyName: 'Uptime Kuma',
+		baseImage: 'louislam/uptime-kuma',
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 3001
+		}
+	},
+	{
+		name: 'ghost',
+		fancyName: 'Ghost',
+		baseImage: 'bitnami/ghost',
+		images: ['bitnami/mariadb'],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 2368
+		}
+	},
+	{
+		name: 'meilisearch',
+		fancyName: 'Meilisearch',
+		baseImage: 'getmeili/meilisearch',
+		images: [],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 7700
+		}
+	},
+	{
+		name: 'umami',
+		fancyName: 'Umami',
+		baseImage: 'ghcr.io/mikecao/umami',
+		images: ['postgres:12-alpine'],
+		versions: ['postgresql-latest'],
+		recommendedVersion: 'postgresql-latest',
+		ports: {
+			main: 3000
+		}
+	},
+	{
+		name: 'hasura',
+		fancyName: 'Hasura',
+		baseImage: 'hasura/graphql-engine',
+		images: ['postgres:12-alpine'],
+		versions: ['latest', 'v2.8.4', 'v2.5.1'],
+		recommendedVersion: 'v2.8.4',
+		ports: {
+			main: 8080
+		}
+	},
+	{
+		name: 'fider',
+		fancyName: 'Fider',
+		baseImage: 'getfider/fider',
+		images: ['postgres:12-alpine'],
+		versions: ['stable'],
+		recommendedVersion: 'stable',
+		ports: {
+			main: 3000
+		}
+	},
+	// {
+	//     name: 'moodle',
+	//     fancyName: 'Moodle',
+	//     baseImage: 'bitnami/moodle',
+	//     images: [],
+	//     versions: ['latest', 'v4.0.2'],
+	//     recommendedVersion: 'latest',
+	//     ports: {
+	//         main: 8080
+	//     }
+	// }
 ];
 
 export async function checkDoubleBranch(branch: string, projectId: number): Promise<boolean> {
@@ -315,11 +324,13 @@ export function getDomain(domain: string): string {
 export async function isDomainConfigured({
 	id,
 	fqdn,
-	checkOwn = false
+	checkOwn = false,
+	remoteIpAddress = undefined
 }: {
 	id: string;
 	fqdn: string;
 	checkOwn?: boolean;
+	remoteIpAddress?: string;
 }): Promise<boolean> {
 	const domain = getDomain(fqdn);
 	const nakedDomain = domain.replace('www.', '');
@@ -329,7 +340,10 @@ export async function isDomainConfigured({
 				{ fqdn: { endsWith: `//${nakedDomain}` } },
 				{ fqdn: { endsWith: `//www.${nakedDomain}` } }
 			],
-			id: { not: id }
+			id: { not: id },
+			destinationDocker: {
+				remoteIpAddress,
+			}
 		},
 		select: { fqdn: true }
 	});
@@ -341,7 +355,10 @@ export async function isDomainConfigured({
 				{ minio: { apiFqdn: { endsWith: `//${nakedDomain}` } } },
 				{ minio: { apiFqdn: { endsWith: `//www.${nakedDomain}` } } }
 			],
-			id: { not: checkOwn ? undefined : id }
+			id: { not: checkOwn ? undefined : id },
+			destinationDocker: {
+				remoteIpAddress
+			}
 		},
 		select: { fqdn: true }
 	});
@@ -359,12 +376,9 @@ export async function isDomainConfigured({
 	return !!(foundApp || foundService || coolifyFqdn);
 }
 
-export async function getContainerUsage(engine: string, container: string): Promise<any> {
-	const host = getEngine(engine);
+export async function getContainerUsage(dockerId: string, container: string): Promise<any> {
 	try {
-		const { stdout } = await asyncExecShell(
-			`DOCKER_HOST="${host}" docker container stats ${container} --no-stream --no-trunc --format "{{json .}}"`
-		);
+		const { stdout } = await executeDockerCmd({ dockerId, command: `docker container stats ${container} --no-stream --no-trunc --format "{{json .}}"` })
 		return JSON.parse(stdout);
 	} catch (err) {
 		return {
@@ -453,7 +467,7 @@ export const supportedDatabaseTypesAndVersions = [
 		name: 'mariadb',
 		fancyName: 'MariaDB',
 		baseImage: 'bitnami/mariadb',
-		versions: ['10.7', '10.6', '10.5', '10.4', '10.3', '10.2']
+		versions: ['10.8', '10.7', '10.6', '10.5', '10.4', '10.3', '10.2']
 	},
 	{
 		name: 'postgresql',
@@ -465,24 +479,106 @@ export const supportedDatabaseTypesAndVersions = [
 		name: 'redis',
 		fancyName: 'Redis',
 		baseImage: 'bitnami/redis',
-		versions: ['6.2', '6.0', '5.0']
+		versions: ['7.0', '6.2', '6.0', '5.0']
 	},
-	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] }
+	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.2'] }
 ];
 
-export async function startTraefikProxy(engine: string): Promise<void> {
-	const host = getEngine(engine);
-	const found = await checkContainer(engine, 'coolify-proxy', true);
-	const { proxyPassword, proxyUser, id } = await listSettings();
+export async function getFreeSSHLocalPort(id: string): Promise<number> {
+	const { default: getPort, portNumbers } = await import('get-port');
+	const { remoteIpAddress, sshLocalPort } = await prisma.destinationDocker.findUnique({ where: { id } })
+	if (sshLocalPort) {
+		return Number(sshLocalPort)
+	}
+	const ports = await prisma.destinationDocker.findMany({ where: { sshLocalPort: { not: null }, remoteIpAddress: { not: remoteIpAddress } } })
+	const alreadyConfigured = await prisma.destinationDocker.findFirst({ where: { remoteIpAddress, id: { not: id }, sshLocalPort: { not: null } } })
+	if (alreadyConfigured?.sshLocalPort) {
+		await prisma.destinationDocker.update({ where: { id }, data: { sshLocalPort: alreadyConfigured.sshLocalPort } })
+		return Number(alreadyConfigured.sshLocalPort)
+	}
+	const availablePort = await getPort({ port: portNumbers(10000, 10100), exclude: ports.map(p => p.sshLocalPort) })
+	await prisma.destinationDocker.update({ where: { id }, data: { sshLocalPort: Number(availablePort) } })
+	return Number(availablePort)
+}
+
+export async function createRemoteEngineConfiguration(id: string) {
+	const homedir = os.homedir();
+	const sshKeyFile = `/tmp/id_rsa-${id}`
+	const localPort = await getFreeSSHLocalPort(id);
+	const { sshKey: { privateKey }, remoteIpAddress, remotePort, remoteUser } = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } })
+	await fs.writeFile(sshKeyFile, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 })
+	// Needed for remote docker compose
+	const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(`ps ax | grep [s]sh-agent | grep ssh-agent.pid | grep -v grep | wc -l`)
+	if (numberOfSSHAgentsRunning !== '' && Number(numberOfSSHAgentsRunning.trim()) == 0) {
+		await asyncExecShell(`eval $(ssh-agent -sa /tmp/ssh-agent.pid)`)
+	}
+	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh-add -q ${sshKeyFile}`)
+
+	const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(`ps ax | grep 'ssh -F /dev/null -o StrictHostKeyChecking no -fNL ${localPort}:localhost:${remotePort}' | grep -v grep | wc -l`)
+	if (numberOfSSHTunnelsRunning !== '' && Number(numberOfSSHTunnelsRunning.trim()) == 0) {
+		try {
+			await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh -F /dev/null -o "StrictHostKeyChecking no" -fNL ${localPort}:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`)
+
+		} catch (error) {
+			console.log(error)
+		}
+
+	}
+	const config = sshConfig.parse('')
+	const found = config.find({ Host: remoteIpAddress })
 	if (!found) {
-		const { stdout: Config } = await asyncExecShell(
-			`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
-		);
+		config.append({
+			Host: remoteIpAddress,
+			Hostname: 'localhost',
+			Port: Number(localPort),
+			User: remoteUser,
+			IdentityFile: sshKeyFile,
+			StrictHostKeyChecking: 'no'
+		})
+	}
+	try {
+		await fs.stat(`${homedir}/.ssh/`)
+	} catch (error) {
+		await fs.mkdir(`${homedir}/.ssh/`)
+	}
+	return await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config))
+}
+export async function executeDockerCmd({ dockerId, command }: { dockerId: string, command: string }) {
+	let { remoteEngine, remoteIpAddress, engine } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
+	if (remoteEngine) {
+		await createRemoteEngineConfiguration(dockerId)
+		engine = `ssh://${remoteIpAddress}`
+	} else {
+		engine = 'unix:///var/run/docker.sock'
+	}
+	return await asyncExecShell(
+		`DOCKER_BUILDKIT=1 DOCKER_HOST="${engine}" ${command}`
+	);
+
+}
+export async function startTraefikProxy(id: string): Promise<void> {
+	const { engine, network, remoteEngine, remoteIpAddress } = await prisma.destinationDocker.findUnique({ where: { id } })
+	const found = await checkContainer({ dockerId: id, container: 'coolify-proxy', remove: true });
+	const { id: settingsId, ipv4, ipv6 } = await listSettings();
+
+	if (!found) {
+		const { stdout: Config } = await executeDockerCmd({ dockerId: id, command: `docker network inspect ${network} --format '{{json .IPAM.Config }}'` })
 		const ip = JSON.parse(Config)[0].Gateway;
-		await asyncExecShell(
-			`DOCKER_HOST="${host}" docker run --restart always \
+		let traefikUrl = mainTraefikEndpoint
+		if (remoteEngine) {
+			let ip = null
+			if (isDev) {
+				ip = getAPIUrl()
+			} else {
+				ip = `http://${ipv4 || ipv6}:3000`
+			}
+			traefikUrl = `${ip}/webhooks/traefik/remote/${id}`
+		}
+		await executeDockerCmd({
+			dockerId: id,
+			command: `docker run --restart always \
 			--add-host 'host.docker.internal:host-gateway' \
-			--add-host 'host.docker.internal:${ip}' \
+			${ip ? `--add-host 'host.docker.internal:${ip}'` : ''} \
 			-v coolify-traefik-letsencrypt:/etc/traefik/acme \
 			-v /var/run/docker.sock:/var/run/docker.sock \
 			--network coolify-infra \
@@ -496,125 +592,78 @@ export async function startTraefikProxy(engine: string): Promise<void> {
 			--entrypoints.websecure.forwardedHeaders.insecure=true \
 			--providers.docker=true \
 			--providers.docker.exposedbydefault=false \
-			--providers.http.endpoint=${mainTraefikEndpoint} \
+			--providers.http.endpoint=${traefikUrl} \
 			--providers.http.pollTimeout=5s \
 			--certificatesresolvers.letsencrypt.acme.httpchallenge=true \
 			--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json \
 			--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web \
 			--log.level=error`
-		);
-		await prisma.setting.update({ where: { id }, data: { proxyHash: null } });
-		await prisma.destinationDocker.updateMany({
-			where: { engine },
+		})
+		await prisma.setting.update({ where: { id: settingsId }, data: { proxyHash: null } });
+		await prisma.destinationDocker.update({
+			where: { id },
 			data: { isCoolifyProxyUsed: true }
 		});
 	}
-	await configureNetworkTraefikProxy(engine);
-}
-
-export async function configureNetworkTraefikProxy(engine: string): Promise<void> {
-	const host = getEngine(engine);
-	const destinations = await prisma.destinationDocker.findMany({ where: { engine } });
-	const { stdout: networks } = await asyncExecShell(
-		`DOCKER_HOST="${host}" docker ps -a --filter name=coolify-proxy --format '{{json .Networks}}'`
-	);
-	const configuredNetworks = networks.replace(/"/g, '').replace('\n', '').split(',');
-	for (const destination of destinations) {
-		if (!configuredNetworks.includes(destination.network)) {
-			await asyncExecShell(
-				`DOCKER_HOST="${host}" docker network connect ${destination.network} coolify-proxy`
-			);
+	// Configure networks for local docker engine
+	if (engine) {
+		const destinations = await prisma.destinationDocker.findMany({ where: { engine } });
+		for (const destination of destinations) {
+			await configureNetworkTraefikProxy(destination);
+		}
+	}
+	// Configure networks for remote docker engine
+	if (remoteEngine) {
+		const destinations = await prisma.destinationDocker.findMany({ where: { remoteIpAddress } });
+		for (const destination of destinations) {
+			await configureNetworkTraefikProxy(destination);
 		}
 	}
 }
 
+export async function configureNetworkTraefikProxy(destination: any): Promise<void> {
+	const { id } = destination
+	const { stdout: networks } = await executeDockerCmd({
+		dockerId: id,
+		command:
+			`docker ps -a --filter name=coolify-proxy --format '{{json .Networks}}'`
+	});
+	const configuredNetworks = networks.replace(/"/g, '').replace('\n', '').split(',');
+	if (!configuredNetworks.includes(destination.network)) {
+		await executeDockerCmd({ dockerId: destination.id, command: `docker network connect ${destination.network} coolify-proxy` })
+	}
+}
+
 export async function stopTraefikProxy(
-	engine: string
+	id: string
 ): Promise<{ stdout: string; stderr: string } | Error> {
-	const host = getEngine(engine);
-	const found = await checkContainer(engine, 'coolify-proxy');
-	await prisma.destinationDocker.updateMany({
-		where: { engine },
+	const found = await checkContainer({ dockerId: id, container: 'coolify-proxy' });
+	await prisma.destinationDocker.update({
+		where: { id },
 		data: { isCoolifyProxyUsed: false }
 	});
-	const { id } = await prisma.setting.findFirst({});
-	await prisma.setting.update({ where: { id }, data: { proxyHash: null } });
+	const { id: settingsId } = await prisma.setting.findFirst({});
+	await prisma.setting.update({ where: { id: settingsId }, data: { proxyHash: null } });
 	try {
 		if (found) {
-			await asyncExecShell(
-				`DOCKER_HOST="${host}" docker stop -t 0 coolify-proxy && docker rm coolify-proxy`
-			);
+			await executeDockerCmd({
+				dockerId: id,
+				command:
+					`docker stop -t 0 coolify-proxy && docker rm coolify-proxy`
+			});
+
 		}
 	} catch (error) {
 		return error;
 	}
 }
 
-export async function startCoolifyProxy(engine: string): Promise<void> {
-	const host = getEngine(engine);
-	const found = await checkContainer(engine, 'coolify-haproxy', true);
-	const { proxyPassword, proxyUser, id } = await listSettings();
-	if (!found) {
-		const { stdout: Config } = await asyncExecShell(
-			`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
-		);
-		const ip = JSON.parse(Config)[0].Gateway;
-		await asyncExecShell(
-			`DOCKER_HOST="${host}" docker run -e HAPROXY_USERNAME=${proxyUser} -e HAPROXY_PASSWORD=${proxyPassword} --restart always --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' -v coolify-ssl-certs:/usr/local/etc/haproxy/ssl --network coolify-infra -p "80:80" -p "443:443" -p "8404:8404" -p "5555:5555" -p "5000:5000" --name coolify-haproxy -d coollabsio/${defaultProxyImage}`
-		);
-		await prisma.setting.update({ where: { id }, data: { proxyHash: null } });
-		await prisma.destinationDocker.updateMany({
-			where: { engine },
-			data: { isCoolifyProxyUsed: true }
-		});
-	}
-	await configureNetworkCoolifyProxy(engine);
-}
-
-export async function configureNetworkCoolifyProxy(engine: string): Promise<void> {
-	const host = getEngine(engine);
-	const destinations = await prisma.destinationDocker.findMany({ where: { engine } });
-	const { stdout: networks } = await asyncExecShell(
-		`DOCKER_HOST="${host}" docker ps -a --filter name=coolify-haproxy --format '{{json .Networks}}'`
-	);
-	const configuredNetworks = networks.replace(/"/g, '').replace('\n', '').split(',');
-	for (const destination of destinations) {
-		if (!configuredNetworks.includes(destination.network)) {
-			await asyncExecShell(
-				`DOCKER_HOST="${host}" docker network connect ${destination.network} coolify-haproxy`
-			);
-		}
-	}
-}
 export async function listSettings(): Promise<any> {
 	const settings = await prisma.setting.findFirst({});
 	if (settings.proxyPassword) settings.proxyPassword = decrypt(settings.proxyPassword);
 	return settings;
 }
 
-
-
-// export async function stopCoolifyProxy(
-// 	engine: string
-// ): Promise<{ stdout: string; stderr: string } | Error> {
-// 	const host = getEngine(engine);
-// 	const found = await checkContainer(engine, 'coolify-haproxy');
-// 	await prisma.destinationDocker.updateMany({
-// 		where: { engine },
-// 		data: { isCoolifyProxyUsed: false }
-// 	});
-// 	const { id } = await prisma.setting.findFirst({});
-// 	await prisma.setting.update({ where: { id }, data: { proxyHash: null } });
-// 	try {
-// 		if (found) {
-// 			await asyncExecShell(
-// 				`DOCKER_HOST="${host}" docker stop -t 0 coolify-haproxy && docker rm coolify-haproxy`
-// 			);
-// 		}
-// 	} catch (error) {
-// 		return error;
-// 	}
-// }
 
 export function generatePassword(length = 24, symbols = false): string {
 	return generator.generate({
@@ -900,38 +949,6 @@ export const createDirectories = async ({
 	};
 };
 
-export async function startTcpProxy(
-	destinationDocker: any,
-	id: string,
-	publicPort: number,
-	privatePort: number
-): Promise<{ stdout: string; stderr: string } | Error> {
-	const { network, engine } = destinationDocker;
-	const host = getEngine(engine);
-
-	const containerName = `haproxy-for-${publicPort}`;
-	const found = await checkContainer(engine, containerName, true);
-	const foundDependentContainer = await checkContainer(engine, id, true);
-	try {
-		if (foundDependentContainer && !found) {
-			const { stdout: Config } = await asyncExecShell(
-				`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
-			);
-			const ip = JSON.parse(Config)[0].Gateway;
-			return await asyncExecShell(
-				`DOCKER_HOST=${host} docker run --restart always -e PORT=${publicPort} -e APP=${id} -e PRIVATE_PORT=${privatePort} --add-host 'host.docker.internal:host-gateway' --add-host 'host.docker.internal:${ip}' --network ${network} -p ${publicPort}:${publicPort} --name ${containerName} -d coollabsio/${defaultProxyImageTcp}`
-			);
-		}
-		if (!foundDependentContainer && found) {
-			return await asyncExecShell(
-				`DOCKER_HOST=${host} docker stop -t 0 ${containerName} && docker rm ${containerName}`
-			);
-		}
-	} catch (error) {
-		return error;
-	}
-}
-
 
 export async function stopDatabaseContainer(
 	database: any
@@ -940,17 +957,15 @@ export async function stopDatabaseContainer(
 	const {
 		id,
 		destinationDockerId,
-		destinationDocker: { engine }
+		destinationDocker: { engine, id: dockerId }
 	} = database;
 	if (destinationDockerId) {
 		try {
-			const host = getEngine(engine);
-			const { stdout } = await asyncExecShell(
-				`DOCKER_HOST=${host} docker inspect --format '{{json .State}}' ${id}`
-			);
+			const { stdout } = await executeDockerCmd({ dockerId, command: `docker inspect --format '{{json .State}}' ${id}` })
+
 			if (stdout) {
 				everStarted = true;
-				await removeContainer({ id, engine });
+				await removeContainer({ id, dockerId });
 			}
 		} catch (error) {
 			//
@@ -966,21 +981,18 @@ export async function stopTcpHttpProxy(
 	publicPort: number,
 	forceName: string = null
 ): Promise<{ stdout: string; stderr: string } | Error> {
-	const { engine } = destinationDocker;
-	const host = getEngine(engine);
-	const settings = await listSettings();
-	let containerName = `${id}-${publicPort}`;
-	if (!settings.isTraefikUsed) {
-		containerName = `haproxy-for-${publicPort}`;
-	}
-	if (forceName) containerName = forceName;
-	const found = await checkContainer(engine, containerName);
-
+	const { id: dockerId } = destinationDocker;
+	let container = `${id}-${publicPort}`;
+	if (forceName) container = forceName;
+	const found = await checkContainer({ dockerId, container });
 	try {
 		if (found) {
-			return await asyncExecShell(
-				`DOCKER_HOST=${host} docker stop -t 0 ${containerName} && docker rm ${containerName}`
-			);
+			return await executeDockerCmd({
+				dockerId,
+				command:
+					`docker stop -t 0 ${container} && docker rm ${container}`
+			});
+
 		}
 	} catch (error) {
 		return error;
@@ -998,73 +1010,105 @@ export async function updatePasswordInDb(database, user, newPassword, isRoot) {
 		dbUserPassword,
 		defaultDatabase,
 		destinationDockerId,
-		destinationDocker: { engine }
+		destinationDocker: { id: dockerId }
 	} = database;
 	if (destinationDockerId) {
-		const host = getEngine(engine);
 		if (type === 'mysql') {
-			await asyncExecShell(
-				`DOCKER_HOST=${host} docker exec ${id} mysql -u ${rootUser} -p${rootUserPassword} -e \"ALTER USER '${user}'@'%' IDENTIFIED WITH caching_sha2_password BY '${newPassword}';\"`
-			);
+			await executeDockerCmd({
+				dockerId,
+				command: `docker exec ${id} mysql -u ${rootUser} -p${rootUserPassword} -e \"ALTER USER '${user}'@'%' IDENTIFIED WITH caching_sha2_password BY '${newPassword}';\"`
+			})
 		} else if (type === 'mariadb') {
-			await asyncExecShell(
-				`DOCKER_HOST=${host} docker exec ${id} mysql -u ${rootUser} -p${rootUserPassword} -e \"SET PASSWORD FOR '${user}'@'%' = PASSWORD('${newPassword}');\"`
-			);
+			await executeDockerCmd({
+				dockerId,
+				command: `docker exec ${id} mysql -u ${rootUser} -p${rootUserPassword} -e \"SET PASSWORD FOR '${user}'@'%' = PASSWORD('${newPassword}');\"`
+			})
+
 		} else if (type === 'postgresql') {
 			if (isRoot) {
-				await asyncExecShell(
-					`DOCKER_HOST=${host} docker exec ${id} psql postgresql://postgres:${rootUserPassword}@${id}:5432/${defaultDatabase} -c "ALTER role postgres WITH PASSWORD '${newPassword}'"`
-				);
+				await executeDockerCmd({
+					dockerId,
+					command: `docker exec ${id} psql postgresql://postgres:${rootUserPassword}@${id}:5432/${defaultDatabase} -c "ALTER role postgres WITH PASSWORD '${newPassword}'"`
+				})
 			} else {
-				await asyncExecShell(
-					`DOCKER_HOST=${host} docker exec ${id} psql postgresql://${dbUser}:${dbUserPassword}@${id}:5432/${defaultDatabase} -c "ALTER role ${user} WITH PASSWORD '${newPassword}'"`
-				);
+				await executeDockerCmd({
+					dockerId,
+					command: `docker exec ${id} psql postgresql://${dbUser}:${dbUserPassword}@${id}:5432/${defaultDatabase} -c "ALTER role ${user} WITH PASSWORD '${newPassword}'"`
+				})
 			}
 		} else if (type === 'mongodb') {
-			await asyncExecShell(
-				`DOCKER_HOST=${host} docker exec ${id} mongo 'mongodb://${rootUser}:${rootUserPassword}@${id}:27017/admin?readPreference=primary&ssl=false' --eval "db.changeUserPassword('${user}','${newPassword}')"`
-			);
+			await executeDockerCmd({
+				dockerId,
+				command: `docker exec ${id} mongo 'mongodb://${rootUser}:${rootUserPassword}@${id}:27017/admin?readPreference=primary&ssl=false' --eval "db.changeUserPassword('${user}','${newPassword}')"`
+			})
+
 		} else if (type === 'redis') {
-			await asyncExecShell(
-				`DOCKER_HOST=${host} docker exec ${id} redis-cli -u redis://${dbUserPassword}@${id}:6379 --raw CONFIG SET requirepass ${newPassword}`
-			);
+			await executeDockerCmd({
+				dockerId,
+				command: `docker exec ${id} redis-cli -u redis://${dbUserPassword}@${id}:6379 --raw CONFIG SET requirepass ${newPassword}`
+			})
+
 		}
 	}
 }
+export async function getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress) {
+	const { default: getPort } = await import('get-port');
+	const applicationUsed = await (
+		await prisma.application.findMany({
+			where: { exposePort: { not: null }, id: { not: id }, destinationDockerId: dockerId },
+			select: { exposePort: true }
+		})
+	).map((a) => a.exposePort);
+	const serviceUsed = await (
+		await prisma.service.findMany({
+			where: { exposePort: { not: null }, id: { not: id }, destinationDockerId: dockerId },
+			select: { exposePort: true }
+		})
+	).map((a) => a.exposePort);
+	const usedPorts = [...applicationUsed, ...serviceUsed];
+	if (remoteIpAddress) {
+		const { default: checkPort } = await import('is-port-reachable');
+		const found = await checkPort(exposePort, { host: remoteIpAddress });
+		if (!found) {
+			return exposePort
+		}
+		return false
+	}
+	return await getPort({ port: Number(exposePort), exclude: usedPorts });
 
-export async function getFreePort() {
+}
+export async function getFreePublicPort(id, dockerId) {
 	const { default: getPort, portNumbers } = await import('get-port');
 	const data = await prisma.setting.findFirst();
 	const { minPort, maxPort } = data;
 
 	const dbUsed = await (
 		await prisma.database.findMany({
-			where: { publicPort: { not: null } },
+			where: { publicPort: { not: null }, id: { not: id }, destinationDockerId: dockerId },
 			select: { publicPort: true }
 		})
 	).map((a) => a.publicPort);
 	const wpFtpUsed = await (
 		await prisma.wordpress.findMany({
-			where: { ftpPublicPort: { not: null } },
+			where: { ftpPublicPort: { not: null }, id: { not: id }, service: { destinationDockerId: dockerId } },
 			select: { ftpPublicPort: true }
 		})
 	).map((a) => a.ftpPublicPort);
 	const wpUsed = await (
 		await prisma.wordpress.findMany({
-			where: { mysqlPublicPort: { not: null } },
+			where: { mysqlPublicPort: { not: null }, id: { not: id }, service: { destinationDockerId: dockerId } },
 			select: { mysqlPublicPort: true }
 		})
 	).map((a) => a.mysqlPublicPort);
 	const minioUsed = await (
 		await prisma.minio.findMany({
-			where: { publicPort: { not: null } },
+			where: { publicPort: { not: null }, id: { not: id }, service: { destinationDockerId: dockerId } },
 			select: { publicPort: true }
 		})
 	).map((a) => a.publicPort);
 	const usedPorts = [...dbUsed, ...wpFtpUsed, ...wpUsed, ...minioUsed];
 	return await getPort({ port: portNumbers(minPort, maxPort), exclude: usedPorts });
 }
-
 
 export async function startTraefikTCPProxy(
 	destinationDocker: any,
@@ -1073,34 +1117,48 @@ export async function startTraefikTCPProxy(
 	privatePort: number,
 	type?: string
 ): Promise<{ stdout: string; stderr: string } | Error> {
-	const { network, engine } = destinationDocker;
-	const host = getEngine(engine);
-	const containerName = `${id}-${publicPort}`;
-	const found = await checkContainer(engine, containerName, true);
+	const { network, id: dockerId, remoteEngine } = destinationDocker;
+	const container = `${id}-${publicPort}`;
+	const found = await checkContainer({ dockerId, container, remove: true });
+	const { ipv4, ipv6 } = await listSettings();
+
 	let dependentId = id;
 	if (type === 'wordpressftp') dependentId = `${id}-ftp`;
-	const foundDependentContainer = await checkContainer(engine, dependentId, true);
+	const foundDependentContainer = await checkContainer({ dockerId, container: dependentId, remove: true });
 	try {
 		if (foundDependentContainer && !found) {
-			const { stdout: Config } = await asyncExecShell(
-				`DOCKER_HOST="${host}" docker network inspect bridge --format '{{json .IPAM.Config }}'`
-			);
+			const { stdout: Config } = await executeDockerCmd({
+				dockerId,
+				command: `docker network inspect ${network} --format '{{json .IPAM.Config }}'`
+			})
+
 			const ip = JSON.parse(Config)[0].Gateway;
+			let traefikUrl = otherTraefikEndpoint
+			if (remoteEngine) {
+				let ip = null
+				if (isDev) {
+					ip = getAPIUrl()
+				} else {
+					ip = `http://${ipv4 || ipv6}:3000`
+				}
+				traefikUrl = `${ip}/webhooks/traefik/other.json`
+			}
+			console.log(traefikUrl)
 			const tcpProxy = {
-				version: '3.5',
+				version: '3.8',
 				services: {
 					[`${id}-${publicPort}`]: {
-						container_name: containerName,
-						image: 'traefik:v2.6',
+						container_name: container,
+						image: defaultTraefikImage,
 						command: [
 							`--entrypoints.tcp.address=:${publicPort}`,
 							`--entryPoints.tcp.forwardedHeaders.insecure=true`,
-							`--providers.http.endpoint=${otherTraefikEndpoint}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp&address=${dependentId}`,
+							`--providers.http.endpoint=${traefikUrl}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp&address=${dependentId}`,
 							'--providers.http.pollTimeout=2s',
 							'--log.level=error'
 						],
 						ports: [`${publicPort}:${publicPort}`],
-						extra_hosts: ['host.docker.internal:host-gateway', `host.docker.internal:${ip}`],
+						extra_hosts: ['host.docker.internal:host-gateway', `host.docker.internal: ${ip}`],
 						volumes: ['/var/run/docker.sock:/var/run/docker.sock'],
 						networks: ['coolify-infra', network]
 					}
@@ -1117,15 +1175,17 @@ export async function startTraefikTCPProxy(
 				}
 			};
 			await fs.writeFile(`/tmp/docker-compose-${id}.yaml`, yaml.dump(tcpProxy));
-			await asyncExecShell(
-				`DOCKER_HOST=${host} docker compose -f /tmp/docker-compose-${id}.yaml up -d`
-			);
+			await executeDockerCmd({
+				dockerId,
+				command: `docker compose -f /tmp/docker-compose-${id}.yaml up -d`
+			})
 			await fs.rm(`/tmp/docker-compose-${id}.yaml`);
 		}
 		if (!foundDependentContainer && found) {
-			return await asyncExecShell(
-				`DOCKER_HOST=${host} docker stop -t 0 ${containerName} && docker rm ${containerName}`
-			);
+			await executeDockerCmd({
+				dockerId,
+				command: `docker stop -t 0 ${container} && docker rm ${container}`
+			})
 		}
 	} catch (error) {
 		console.log(error);
@@ -1350,7 +1410,7 @@ export async function configureServiceType({
 	} else if (type === 'moodle') {
 		const defaultUsername = cuid();
 		const defaultPassword = encrypt(generatePassword());
-		const defaultEmail = `${cuid()}@example.com`;
+		const defaultEmail = `${cuid()} @example.com`;
 		const mariadbUser = cuid();
 		const mariadbPassword = encrypt(generatePassword());
 		const mariadbDatabase = 'moodle_db';
@@ -1401,7 +1461,7 @@ export async function removeService({ id }: { id: string }): Promise<void> {
 }
 
 export function saveUpdateableFields(type: string, data: any) {
-	let update = {};
+	const update = {};
 	if (type && serviceFields[type]) {
 		serviceFields[type].map((k) => {
 			let temp = data[k.name]
@@ -1426,7 +1486,7 @@ export function saveUpdateableFields(type: string, data: any) {
 }
 
 export function getUpdateableFields(type: string, data: any) {
-	let update = {};
+	const update = {};
 	if (type && serviceFields[type]) {
 		serviceFields[type].map((k) => {
 			let temp = data[k.name]
@@ -1461,9 +1521,9 @@ export const getServiceMainPort = (service: string) => {
 export function makeLabelForServices(type) {
 	return [
 		'coolify.managed=true',
-		`coolify.version=${version}`,
-		`coolify.type=service`,
-		`coolify.service.type=${type}`
+		`coolify.version = ${version} `,
+		`coolify.type = service`,
+		`coolify.service.type = ${type} `
 	];
 }
 export function errorHandler({ status = 500, message = 'Unknown error.' }: { status: number, message: string | any }) {
@@ -1489,9 +1549,8 @@ export async function stopBuild(buildId, applicationId) {
 	let count = 0;
 	await new Promise<void>(async (resolve, reject) => {
 		const { destinationDockerId, status } = await prisma.build.findFirst({ where: { id: buildId } });
-		const { engine } = await prisma.destinationDocker.findFirst({ where: { id: destinationDockerId } });
-		const host = getEngine(engine);
-		let interval = setInterval(async () => {
+		const { engine, id: dockerId } = await prisma.destinationDocker.findFirst({ where: { id: destinationDockerId } });
+		const interval = setInterval(async () => {
 			try {
 				if (status === 'failed') {
 					clearInterval(interval);
@@ -1501,17 +1560,14 @@ export async function stopBuild(buildId, applicationId) {
 					clearInterval(interval);
 					return reject(new Error('Build canceled'));
 				}
-
-				const { stdout: buildContainers } = await asyncExecShell(
-					`DOCKER_HOST=${host} docker container ls --filter "label=coolify.buildId=${buildId}" --format '{{json .}}'`
-				);
+				const { stdout: buildContainers } = await executeDockerCmd({ dockerId, command: `docker container ls--filter "label=coolify.buildId=${buildId}" --format '{{json .}}'` })
 				if (buildContainers) {
 					const containersArray = buildContainers.trim().split('\n');
 					for (const container of containersArray) {
 						const containerObj = JSON.parse(container);
 						const id = containerObj.ID;
-						if (!containerObj.Names.startsWith(`${applicationId}`)) {
-							await removeContainer({ id, engine });
+						if (!containerObj.Names.startsWith(`${applicationId} `)) {
+							await removeContainer({ id, dockerId });
 							await cleanupDB(buildId);
 							clearInterval(interval);
 							return resolve();
@@ -1539,16 +1595,15 @@ export function convertTolOldVolumeNames(type) {
 // export async function getAvailableServices(): Promise<any> {
 // 	const { data } = await axios.get(`https://gist.githubusercontent.com/andrasbacsai/4aac36d8d6214dbfc34fa78110554a50/raw/5b27e6c37d78aaeedc1148d797112c827a2f43cf/availableServices.json`)
 // 	return data
-// }
-export async function cleanupDockerStorage(host, lowDiskSpace, force) {
+// 
+export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 	// Cleanup old coolify images
 	try {
-		let { stdout: images } = await asyncExecShell(
-			`DOCKER_HOST=${host} docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs `
-		);
+		let { stdout: images } = await executeDockerCmd({ dockerId, command: `docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs` })
+
 		images = images.trim();
 		if (images) {
-			await asyncExecShell(`DOCKER_HOST=${host} docker rmi -f ${images}`);
+			await executeDockerCmd({ dockerId, command: `docker rmi -f ${images}" -q | xargs` })
 		}
 	} catch (error) {
 		//console.log(error);
@@ -1559,19 +1614,48 @@ export async function cleanupDockerStorage(host, lowDiskSpace, force) {
 			return
 		}
 		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker container prune -f`);
+			await executeDockerCmd({ dockerId, command: `docker container prune -f` })
 		} catch (error) {
 			//console.log(error);
 		}
 		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker image prune -f`);
+			await executeDockerCmd({ dockerId, command: `docker image prune -f` })
 		} catch (error) {
 			//console.log(error);
 		}
 		try {
-			await asyncExecShell(`DOCKER_HOST=${host} docker image prune -a -f`);
+			await executeDockerCmd({ dockerId, command: `docker image prune -a -f` })
 		} catch (error) {
 			//console.log(error);
 		}
 	}
+}
+
+export function persistentVolumes(id, persistentStorage, config) {
+	const persistentVolume =
+		persistentStorage?.map((storage) => {
+			return `${id}${storage.path.replace(/\//gi, '-')}:${storage.path}`;
+		}) || [];
+
+	let volumes = [ ...persistentVolume]
+	if (config.volume) volumes = [config.volume, ...volumes]
+
+	const composeVolumes = volumes.length > 0 && volumes.map((volume) => {
+		return {
+			[`${volume.split(':')[0]}`]: {
+				name: volume.split(':')[0]
+			}
+		};
+	}) || []
+
+	const volumeMounts = config.volume && Object.assign(
+		{},
+		{
+			[config.volume.split(':')[0]]: {
+				name: config.volume.split(':')[0]
+			}
+		},
+		...composeVolumes
+	) || {}
+	return { volumes, volumeMounts }
 }

@@ -190,11 +190,11 @@
 		</div>
 		<div class="pt-5 flex-col flex justify-center items-center space-y-4">
 			<button
-				class="w-40"
+				class="btn btn-wide"
 				type="submit"
 				disabled={!showSave}
-				class:bg-orange-600={showSave}
-				class:hover:bg-orange-500={showSave}>{$t('forms.save')}</button
+				class:bg-applications={showSave}
+				>{$t('forms.save')}</button
 			>
 		</div>
 	</form>

@@ -46,21 +46,24 @@
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">{$t('index.services')}</div>
-	<div on:click={newService} class="add-icon cursor-pointer bg-pink-600 hover:bg-pink-500">
-		<svg
-			class="w-6"
-			xmlns="http://www.w3.org/2000/svg"
-			fill="none"
-			viewBox="0 0 24 24"
-			stroke="currentColor"
-			><path
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				stroke-width="2"
-				d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-			/></svg
+	<button
+			on:click={newService}
+			class="btn btn-square btn-sm bg-services"
 		>
-	</div>
+			<svg
+				class="h-6 w-6"
+				xmlns="http://www.w3.org/2000/svg"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				><path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+				/></svg
+			>
+		</button>
 </div>
 
 <div class="flex-col justify-center">
@@ -73,7 +76,7 @@
 		<div class="flex flex-col">
 			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 				{#each ownServices as service}
-					<a href="/services/{service.id}" class="w-96 p-2 no-underline">
+					<a href="/services/{service.id}" class=" p-2 no-underline">
 						<div class="box-selection group relative hover:bg-pink-600">
 							<Services type={service.type} />
 							<div class="truncate text-center text-xl font-bold">
@@ -85,6 +88,9 @@
 							{#if service.fqdn}
 								<div class="truncate text-center">{getDomain(service.fqdn) || ''}</div>
 							{/if}
+							{#if service.destinationDocker?.name}
+								<div class="truncate text-center">{service.destinationDocker.name}</div>
+							{/if}
 							{#if !service.type || !service.fqdn}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									{$t('application.configuration.configuration_missing')}
@@ -95,10 +101,10 @@
 				{/each}
 			</div>
 			{#if otherServices.length > 0 && $appSession.teamId === '0'}
-				<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Services</div>
+				<div class="px-6 pb-5 pt-10 text-2xl font-bold text-center">Other Services</div>
 				<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 					{#each otherServices as service}
-						<a href="/services/{service.id}" class="w-96 p-2 no-underline">
+						<a href="/services/{service.id}" class="p-2 no-underline">
 							<div class="box-selection group relative hover:bg-pink-600">
 								<Services type={service.type} />
 								<div class="truncate text-center text-xl font-bold">

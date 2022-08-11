@@ -5,7 +5,7 @@ import env from '@fastify/env';
 import cookie from '@fastify/cookie';
 import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
-import { asyncExecShell, isDev, prisma } from './lib/common';
+import { asyncExecShell, isDev, listSettings, prisma } from './lib/common';
 import { scheduler } from './lib/scheduler';
 
 declare module 'fastify' {
@@ -101,10 +101,10 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 		process.exit(1);
 	}
 	console.log(`Coolify's API is listening on ${host}:${port}`);
-	await initServer()
+	await initServer();
 	await scheduler.start('deployApplication');
 	await scheduler.start('cleanupStorage');
-	await scheduler.start('checkProxies')
+	await scheduler.start('checkProxies');
 
 	// Check if no build is running
 
@@ -130,11 +130,36 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 			if (!scheduler.workers.has('deployApplication')) await scheduler.start('deployApplication');
 		}
 	});
+	await getArch();
+	await getIPAddress();
 });
+async function getIPAddress() {
+	const { publicIpv4, publicIpv6 } = await import('public-ip')
+	try {
+		const settings = await listSettings();
+		if (!settings.ipv4) {
+			const ipv4 = await publicIpv4({ timeout: 2000 })
+			await prisma.setting.update({ where: { id: settings.id }, data: { ipv4 } })
+		}
 
+		if (!settings.ipv6) {
+			const ipv6 = await publicIpv6({ timeout: 2000 })
+			await prisma.setting.update({ where: { id: settings.id }, data: { ipv6 } })
+		}
+
+	} catch (error) { }
+}
 async function initServer() {
 	try {
 		await asyncExecShell(`docker network create --attachable coolify`);
+	} catch (error) { }
+}
+async function getArch() {
+	try {
+		const settings = await prisma.setting.findFirst({})
+		if (settings && !settings.arch) {
+			await prisma.setting.update({ where: { id: settings.id }, data: { arch: process.arch } })
+		}
 	} catch (error) { }
 }
 

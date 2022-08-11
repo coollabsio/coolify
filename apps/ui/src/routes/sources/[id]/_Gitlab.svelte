@@ -7,11 +7,10 @@
 	import { getAPIUrl, post } from '$lib/api';
 	import { dev } from '$app/env';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-	import { toast } from '@zerodevx/svelte-toast';
 
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
-	import { appSession } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	const { id } = $page.params;
 
 	let url = settings.fqdn ? settings.fqdn : window.location.origin;
@@ -31,7 +30,7 @@
 			appSecret: null
 		};
 	}
-	$: selfHosted = source.htmlUrl !== 'https://gitlab.com' ;
+	$: selfHosted = source.htmlUrl !== 'https://gitlab.com';
 
 	onMount(() => {
 		oauthIdEl && oauthIdEl.focus();
@@ -73,7 +72,10 @@
 					apiUrl: source.apiUrl.replace(/\/$/, ''),
 					customPort: source.customPort
 				});
-				toast.push('Configuration saved.');
+				return addToast({
+					message: 'Configuration saved.',
+					type: 'success'
+				});
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
@@ -124,8 +126,10 @@
 				break;
 			case 'group':
 				if (!source.gitlabApp.groupName) {
-					toast.push('Please enter a group name first.');
-					return;
+					return addToast({
+						message: 'Please enter a group name first.',
+						type: 'error'
+					});
 				}
 				window.open(
 					`${source.htmlUrl}/groups/${source.gitlabApp.groupName}/-/settings/applications`
@@ -141,26 +145,37 @@
 
 <div class="mx-auto max-w-4xl px-6">
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
-		<div class="flex space-x-1 pb-7 font-bold">
+		<div class="flex space-x-1 pb-7">
 			<div class="title">General</div>
 			{#if $appSession.isAdmin}
 				<button
 					type="submit"
-					class:bg-orange-600={!loading}
-					class:hover:bg-orange-500={!loading}
+					class="btn btn-sm bg-sources"
 					disabled={loading}>{loading ? $t('forms.saving') : $t('forms.save')}</button
 				>
 				{#if source.gitlabAppId}
-					<button on:click|preventDefault={changeSettings}
+					<button class="btn btn-sm" on:click|preventDefault={changeSettings}
 						>{$t('source.change_app_settings', { name: 'GitLab' })}</button
 					>
 				{:else}
-					<button on:click|preventDefault|stopPropagation={newApp}>Create new GitLab App</button>
+					<button class="btn btn-sm" on:click|preventDefault|stopPropagation={newApp}
+						>Create new GitLab App manually</button
+					>
 				{/if}
 			{/if}
 		</div>
 		<div class="grid grid-flow-row gap-2 px-10">
 			{#if !source.gitlabAppId}
+				<Explainer
+					customClass="w-full"
+					text="<span class='font-bold text-base text-white'>Scopes required:</span> 	
+<br>- <span class='text-sources font-bold'>api</span> (Access the authenticated user's API)
+<br>- <span class='text-sources font-bold'>read_repository</span> (Allows read-only access to the repository)
+<br>- <span class='text-sources font-bold'>email</span> (Allows read-only access to the user's primary email address using OpenID Connect)
+<br>
+<br>For extra security, you can set <span class='text-sources font-bold'>Expire Access Tokens</span>
+<br><br>Webhook URL: <span class='text-sources font-bold'>{url}/webhooks/gitlab</span>"
+				/>
 				<div class="grid grid-cols-2 items-center">
 					<label for="type" class="text-base font-bold text-stone-100">Application Type</label>
 					<select name="type" id="type" class="w-96" bind:value={applicationType}>
@@ -228,20 +243,22 @@
 					bind:value={source.apiUrl}
 				/>
 			</div>
-			<div class="grid grid-cols-2 items-center">
-				<label for="customPort" class="text-base font-bold text-stone-100">Custom SSH Port</label>
-				<input
-					name="customPort"
-					id="customPort"
-					disabled={!selfHosted}
-					readonly={!selfHosted}
-					required
-					bind:value={source.customPort}
-				/>
-				<Explainer
-					text="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
-				/>
-			</div>
+			{#if selfHosted}
+				<div class="grid grid-cols-2 items-center">
+					<label for="customPort" class="text-base font-bold text-stone-100">Custom SSH Port</label>
+					<input
+						name="customPort"
+						id="customPort"
+						disabled={!selfHosted}
+						readonly={!selfHosted}
+						required
+						bind:value={source.customPort}
+					/>
+					<Explainer
+						text="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
+					/>
+				</div>
+			{/if}
 			<div class="grid grid-cols-2 items-start">
 				<div class="flex-col">
 					<label for="oauthId" class="pt-2 text-base font-bold text-stone-100"
@@ -293,16 +310,4 @@
 			</div>
 		</div>
 	</form>
-	{#if !source.gitlabAppId}
-		<Explainer
-			customClass="w-full"
-			text="<span class='font-bold text-base text-white'>Scopes required:</span> 	
-<br>- <span class='text-orange-500 font-bold'>api</span> (Access the authenticated user's API)
-<br>- <span class='text-orange-500 font-bold'>read_repository</span> (Allows read-only access to the repository)
-<br>- <span class='text-orange-500 font-bold'>email</span> (Allows read-only access to the user's primary email address using OpenID Connect)
-<br>
-<br>For extra security, you can set <span class='text-orange-500 font-bold'>Expire Access Tokens</span>
-<br><br>Webhook URL: <span class='text-orange-500 font-bold'>{url}/webhooks/gitlab</span>"
-		/>
-	{/if}
 </div>

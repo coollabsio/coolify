@@ -75,18 +75,18 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
         if (!allowedGithubEvents.includes(githubEvent)) {
             throw { status: 500, message: 'Event not allowed.' }
         }
-        let repository, projectId, branch;
+        let projectId, branch;
         const body = request.body
         if (githubEvent === 'push') {
-            repository = body.repository;
-            projectId = repository.id;
-            branch = body.ref.split('/')[2];
+            projectId = body.repository.id;
+            branch = body.ref.includes('/') ? body.ref.split('/')[2] : body.ref;
         } else if (githubEvent === 'pull_request') {
-            repository = body.pull_request.head.repo;
-            projectId = repository.id;
-            branch = body.pull_request.head.ref.split('/')[2];
+            projectId = body.pull_request.base.repo.id;
+            branch = body.pull_request.base.ref.includes('/') ? body.pull_request.base.ref.split('/')[2] : body.pull_request.base.ref;
         }
-
+        if (!projectId || !branch) {
+            throw { status: 500, message: 'Cannot parse projectId or branch from the webhook?!' }
+        }
         const applicationFound = await getApplicationFromDBWebhook(projectId, branch);
         if (applicationFound) {
             const webhookSecret = applicationFound.gitSource.githubApp.webhookSecret || null;
@@ -154,7 +154,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
             } else if (githubEvent === 'pull_request') {
                 const pullmergeRequestId = body.number;
                 const pullmergeRequestAction = body.action;
-                const sourceBranch = body.pull_request.head.ref;
+                const sourceBranch = body.pull_request.head.ref.includes('/') ? body.pull_request.head.ref.split('/')[2] : body.pull_request.head.ref;
                 if (!allowedActions.includes(pullmergeRequestAction)) {
                     throw { status: 500, message: 'Action not allowed.' }
                 }
@@ -162,8 +162,10 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                 if (applicationFound.settings.previews) {
                     if (applicationFound.destinationDockerId) {
                         const isRunning = await checkContainer(
-                            applicationFound.destinationDocker.engine,
-                            applicationFound.id
+                            {
+                                dockerId: applicationFound.destinationDocker.id,
+                                container: applicationFound.id
+                            }
                         );
                         if (!isRunning) {
                             throw { status: 500, message: 'Application not running.' }
@@ -204,8 +206,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                     } else if (pullmergeRequestAction === 'closed') {
                         if (applicationFound.destinationDockerId) {
                             const id = `${applicationFound.id}-${pullmergeRequestId}`;
-                            const engine = applicationFound.destinationDocker.engine;
-                            await removeContainer({ id, engine });
+                            await removeContainer({ id, dockerId: applicationFound.destinationDocker.id });
                         }
                         return {
                             message: 'Removed preview. Thank you!'

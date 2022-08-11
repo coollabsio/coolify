@@ -58,7 +58,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
-	import { appSession, status } from '$lib/store';
+	import { appSession, status, disabledButton } from '$lib/store';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import Loading from '$lib/components/Loading.svelte';
 	import { onDestroy, onMount } from 'svelte';
@@ -66,6 +66,9 @@
 
 	let loading = false;
 	let statusInterval: any = false;
+
+	$disabledButton = !$appSession.isAdmin;
+
 	async function deleteDatabase() {
 		const sure = confirm(`Are you sure you would like to delete '${database.name}'?`);
 		if (sure) {
@@ -104,7 +107,7 @@
 	async function getStatus() {
 		if ($status.database.loading) return;
 		$status.database.loading = true;
-		const data = await get(`/databases/${id}`);
+		const data = await get(`/databases/${id}/status`);
 		$status.database.isRunning = data.isRunning;
 		$status.database.initialLoading = false;
 		$status.database.loading = false;
@@ -138,6 +141,32 @@
 			<Loading fullscreen cover />
 		{:else}
 			{#if database.type && database.destinationDockerId && database.version && database.defaultDatabase}
+				{#if $status.database.isExited}
+					<a
+						href={!$disabledButton ? `/databases/${id}/logs` : null}
+						class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center text-red-500 tooltip-error"
+						data-tip="Service exited with an error!"
+						sveltekit:prefetch
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="w-6 h-6"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentcolor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<path
+								d="M8.7 3h6.6c.3 0 .5 .1 .7 .3l4.7 4.7c.2 .2 .3 .4 .3 .7v6.6c0 .3 -.1 .5 -.3 .7l-4.7 4.7c-.2 .2 -.4 .3 -.7 .3h-6.6c-.3 0 -.5 -.1 -.7 -.3l-4.7 -4.7c-.2 -.2 -.3 -.4 -.3 -.7v-6.6c0 -.3 .1 -.5 .3 -.7l4.7 -4.7c.2 -.2 .4 -.3 .7 -.3z"
+							/>
+							<line x1="12" y1="8" x2="12" y2="12" />
+							<line x1="12" y1="16" x2="12.01" y2="16" />
+						</svg>
+					</a>
+				{/if}
 				{#if $status.database.initialLoading}
 					<button
 						class="icons tooltip-bottom flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"
@@ -164,11 +193,10 @@
 				{:else if $status.database.isRunning}
 					<button
 						on:click={stopDatabase}
-						title={$t('database.stop_database')}
 						type="submit"
 						disabled={!$appSession.isAdmin}
-						class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
-						data-tooltip={$appSession.isAdmin
+						class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
+						data-tip={$appSession.isAdmin
 							? $t('database.stop_database')
 							: $t('database.permission_denied_stop_database')}
 					>
@@ -190,11 +218,10 @@
 				{:else}
 					<button
 						on:click={startDatabase}
-						title={$t('database.start_database')}
 						type="submit"
 						disabled={!$appSession.isAdmin}
-						class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
-						data-tooltip={$appSession.isAdmin
+						class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
+						data-tip={$appSession.isAdmin
 							? $t('database.start_database')
 							: $t('database.permission_denied_start_database')}
 						><svg
@@ -222,9 +249,8 @@
 				class:bg-coolgray-500={$page.url.pathname === `/databases/${id}`}
 			>
 				<button
-					title={$t('application.configurations')}
-					class="icons bg-transparent tooltip-bottom text-sm disabled:text-red-500"
-					data-tooltip={$t('application.configurations')}
+					class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm disabled:text-red-500"
+					data-tip={$t('application.configurations')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -258,10 +284,9 @@
 				class:bg-coolgray-500={$page.url.pathname === `/databases/${id}/logs`}
 			>
 				<button
-					title={$t('database.logs')}
 					disabled={!$status.database.isRunning}
-					class="icons bg-transparent tooltip-bottom text-sm"
-					data-tooltip={$t('database.logs')}
+					class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
+					data-tip={$t('database.logs')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -284,12 +309,11 @@
 			>
 			<button
 				on:click={deleteDatabase}
-				title={$t('database.delete_database')}
 				type="submit"
 				disabled={!$appSession.isAdmin}
 				class:hover:text-red-500={$appSession.isAdmin}
-				class="icons bg-transparent tooltip-bottom text-sm"
-				data-tooltip={$appSession.isAdmin
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
+				data-tip={$appSession.isAdmin
 					? $t('database.delete_database')
 					: $t('database.permission_denied_delete_database')}><DeleteIcon /></button
 			>

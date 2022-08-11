@@ -65,11 +65,12 @@
 
 <script lang="ts">
 	export let baseSettings: any;
+	$appSession.ipv4 = baseSettings.ipv4;
+	$appSession.ipv6 = baseSettings.ipv6;
 	$appSession.version = baseSettings.version;
 	$appSession.whiteLabeled = baseSettings.whiteLabeled;
 	$appSession.whiteLabeledDetails.icon = baseSettings.whiteLabeledIcon;
 
-	export let settings: any;
 	export let userId: string;
 	export let teamId: string;
 	export let permission: string;
@@ -77,21 +78,19 @@
 	import '../tailwind.css';
 	import Cookies from 'js-cookie';
 	import { fade } from 'svelte/transition';
-	import { SvelteToast } from '@zerodevx/svelte-toast';
 	import { navigating, page } from '$app/stores';
 
 	import { get } from '$lib/api';
 	import UpdateAvailable from '$lib/components/UpdateAvailable.svelte';
 	import PageLoader from '$lib/components/PageLoader.svelte';
 	import { errorNotification } from '$lib/common';
-	import { appSession, isTraefikUsed } from '$lib/store';
+	import { appSession } from '$lib/store';
+	import Toasts from '$lib/components/Toasts.svelte';
 
 	if (userId) $appSession.userId = userId;
 	if (teamId) $appSession.teamId = teamId;
 	if (permission) $appSession.permission = permission;
 	if (isAdmin) $appSession.isAdmin = isAdmin;
-
-	$isTraefikUsed = settings?.isTraefikUsed || false;
 
 	async function logout() {
 		try {
@@ -111,7 +110,7 @@
 		<link rel="icon" href={$appSession.whiteLabeledDetails.icon} />
 	{/if}
 </svelte:head>
-<SvelteToast options={{ intro: { y: -64 }, duration: 3000, pausable: true }} />
+<Toasts />
 {#if $navigating}
 	<div out:fade={{ delay: 100 }}>
 		<PageLoader />
@@ -127,10 +126,10 @@
 				<a
 					sveltekit:prefetch
 					href="/"
-					class="icons tooltip-right bg-coolgray-200 hover:text-white"
+					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200 hover:text-white"
 					class:text-white={$page.url.pathname === '/'}
 					class:bg-coolgray-500={$page.url.pathname === '/'}
-					data-tooltip="Dashboard"
+					data-tip="Dashboard"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -154,12 +153,12 @@
 				<a
 					sveltekit:prefetch
 					href="/applications"
-					class="icons tooltip-green-500 tooltip-right bg-coolgray-200 hover:text-green-500"
-					class:text-green-500={$page.url.pathname.startsWith('/applications') ||
+					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
+					class:text-applications={$page.url.pathname.startsWith('/applications') ||
 						$page.url.pathname.startsWith('/new/application')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/applications') ||
 						$page.url.pathname.startsWith('/new/application')}
-					data-tooltip="Applications"
+					data-tip="Applications"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -182,12 +181,12 @@
 				<a
 					sveltekit:prefetch
 					href="/sources"
-					class="icons tooltip-orange-500 tooltip-right bg-coolgray-200 hover:text-orange-500"
-					class:text-orange-500={$page.url.pathname.startsWith('/sources') ||
+					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
+					class:text-sources={$page.url.pathname.startsWith('/sources') ||
 						$page.url.pathname.startsWith('/new/source')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/sources') ||
 						$page.url.pathname.startsWith('/new/source')}
-					data-tooltip="Git Sources"
+					data-tip="Git Sources"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -211,12 +210,12 @@
 				<a
 					sveltekit:prefetch
 					href="/destinations"
-					class="icons tooltip-sky-500 tooltip-right bg-coolgray-200 hover:text-sky-500"
-					class:text-sky-500={$page.url.pathname.startsWith('/destinations') ||
+					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
+					class:text-destinations={$page.url.pathname.startsWith('/destinations') ||
 						$page.url.pathname.startsWith('/new/destination')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/destinations') ||
 						$page.url.pathname.startsWith('/new/destination')}
-					data-tooltip="Destinations"
+					data-tip="Destinations"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -246,12 +245,12 @@
 				<a
 					sveltekit:prefetch
 					href="/databases"
-					class="icons tooltip-purple-500 tooltip-right bg-coolgray-200 hover:text-purple-500"
-					class:text-purple-500={$page.url.pathname.startsWith('/databases') ||
+					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
+					class:text-databases={$page.url.pathname.startsWith('/databases') ||
 						$page.url.pathname.startsWith('/new/database')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/databases') ||
 						$page.url.pathname.startsWith('/new/database')}
-					data-tooltip="Databases"
+					data-tip="Databases"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -272,12 +271,12 @@
 				<a
 					sveltekit:prefetch
 					href="/services"
-					class="icons tooltip-pink-500 tooltip-right bg-coolgray-200 hover:text-pink-500"
-					class:text-pink-500={$page.url.pathname.startsWith('/services') ||
+					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
+					class:text-services={$page.url.pathname.startsWith('/services') ||
 						$page.url.pathname.startsWith('/new/service')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/services') ||
 						$page.url.pathname.startsWith('/new/service')}
-					data-tooltip="Services"
+					data-tip="Services"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -301,10 +300,10 @@
 				<a
 					sveltekit:prefetch
 					href="/iam"
-					class="icons tooltip-fuchsia-500 tooltip-right bg-coolgray-200 hover:text-fuchsia-500"
-					class:text-fuchsia-500={$page.url.pathname.startsWith('/iam')}
+					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
+					class:text-iam={$page.url.pathname.startsWith('/iam')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/iam')}
-					data-tooltip="IAM"
+					data-tip="IAM"
 					><svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="h-8 w-8"
@@ -322,37 +321,35 @@
 						<path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
 					</svg>
 				</a>
-				{#if $appSession.teamId === '0'}
-					<a
-						sveltekit:prefetch
-						href="/settings"
-						class="icons tooltip-yellow-500 tooltip-right bg-coolgray-200 hover:text-yellow-500"
-						class:text-yellow-500={$page.url.pathname.startsWith('/settings')}
-						class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
-						data-tooltip="Settings"
+				<a
+					sveltekit:prefetch
+					href={$appSession.teamId === '0' ? '/settings/global' : '/settings/ssh-keys'}
+					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
+					class:text-settings={$page.url.pathname.startsWith('/settings')}
+					class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
+					data-tip="Settings"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-8 w-8"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
 					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-8 w-8"
-							viewBox="0 0 24 24"
-							stroke-width="1.5"
-							stroke="currentColor"
-							fill="none"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						>
-							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-							<path
-								d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"
-							/>
-							<circle cx="12" cy="12" r="3" />
-						</svg>
-					</a>
-				{/if}
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path
+							d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"
+						/>
+						<circle cx="12" cy="12" r="3" />
+					</svg>
+				</a>
 
 				<div
-					class="icons tooltip-red-500 tooltip-right bg-coolgray-200 hover:text-red-500"
-					data-tooltip="Logout"
+					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200 hover:text-error"
+					data-tip="Logout"
 					on:click={logout}
 				>
 					<svg

@@ -17,7 +17,8 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function cleanupManually() {
 	try {
-		await cleanupDockerStorage('unix:///var/run/docker.sock', true, true)
+		const destination = await prisma.destinationDocker.findFirst({ where: { engine: '/var/run/docker.sock' } })
+		await cleanupDockerStorage(destination.id, true, true)
 		return {}
 	} catch ({ status, message }) {
 		return errorHandler({ status, message })
@@ -30,11 +31,14 @@ export async function checkUpdate(request: FastifyRequest) {
 		const { data: versions } = await axios.get(
 			`https://get.coollabs.io/versions.json?appId=${process.env['COOLIFY_APP_ID']}&version=${currentVersion}`
 		);
-		const latestVersion =
-			isStaging
-				? versions['coolify'].next.version
-				: versions['coolify'].main.version;
+		const latestVersion = versions['coolify'].main.version			
 		const isUpdateAvailable = compare(latestVersion, currentVersion);
+		if (isStaging) {
+			return {
+				isUpdateAvailable: true,
+				latestVersion: 'next'
+			}
+		}
 		return {
 			isUpdateAvailable: isStaging ? true : isUpdateAvailable === 1,
 			latestVersion
@@ -154,7 +158,6 @@ export async function login(request: FastifyRequest<Login>, reply: FastifyReply)
 		}
 		if (userFound) {
 			if (userFound.type === 'email') {
-				// TODO: Review this one
 				if (userFound.password === 'RESETME') {
 					const hashedPassword = await hashPassword(password);
 					if (userFound.updatedAt < new Date(Date.now() - 1000 * 60 * 10)) {

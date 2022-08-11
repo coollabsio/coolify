@@ -36,7 +36,6 @@
 
 			return {
 				props: {
-					isQueueActive,
 					application
 				},
 				stuff: {
@@ -53,22 +52,20 @@
 
 <script lang="ts">
 	export let application: any;
-	export let isQueueActive: any;
 
 	import { page } from '$app/stores';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import { del, get, post } from '$lib/api';
 	import { goto } from '$app/navigation';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { onDestroy, onMount } from 'svelte';
 	import { t } from '$lib/translations';
-	import { appSession, disabledButton, status, location, setLocation } from '$lib/store';
+	import { appSession, disabledButton, status, location, setLocation, addToast } from '$lib/store';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
 	import Loading from '$lib/components/Loading.svelte';
 
 	let loading = false;
 	let statusInterval: any;
-
+	let isQueueActive= false;
 	$disabledButton =
 		!$appSession.isAdmin ||
 		!application.fqdn ||
@@ -82,7 +79,10 @@
 	async function handleDeploySubmit() {
 		try {
 			const { buildId } = await post(`/applications/${id}/deploy`, { ...application });
-			toast.push($t('application.deployment_queued'));
+			addToast({
+					message: $t('application.deployment_queued'),
+					type: 'success'
+				});
 			if ($page.url.pathname.startsWith(`/applications/${id}/logs/build`)) {
 				return window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
 			} else {
@@ -114,12 +114,12 @@
 			return window.location.reload();
 		} catch (error) {
 			return errorNotification(error);
-		}
+		} 
 	}
 	async function getStatus() {
 		if ($status.application.loading) return;
 		$status.application.loading = true;
-		const data = await get(`/applications/${id}`);
+		const data = await get(`/applications/${id}/status`);
 		isQueueActive = data.isQueueActive;
 		$status.application.isRunning = data.isRunning;
 		$status.application.isExited = data.isExited;
@@ -179,8 +179,8 @@
 		{#if $status.application.isExited}
 			<a
 				href={!$disabledButton ? `/applications/${id}/logs` : null}
-				class=" icons bg-transparent tooltip-bottom text-sm flex items-center text-red-500 tooltip-red-500"
-				data-tooltip="Application exited with an error!"
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center text-error"
+				data-tip="Application exited with an error!"
 				sveltekit:prefetch
 			>
 				<svg
@@ -228,11 +228,10 @@
 		{:else if $status.application.isRunning}
 			<button
 				on:click={stopApplication}
-				title="Stop application"
 				type="submit"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
-				data-tooltip={$appSession.isAdmin
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2 text-error"
+				data-tip={$appSession.isAdmin
 					? $t('application.stop_application')
 					: $t('application.permission_denied_stop_application')}
 			>
@@ -253,12 +252,11 @@
 			</button>
 			<form on:submit|preventDefault={handleDeploySubmit}>
 				<button
-					title="Rebuild application"
 					type="submit"
 					disabled={$disabledButton || !isQueueActive}
 					class:hover:text-green-500={isQueueActive}
-					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2"
-					data-tooltip={$appSession.isAdmin
+					class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2"
+					data-tip={$appSession.isAdmin
 						? isQueueActive
 							? 'Rebuild application'
 							: 'Autoupdate inprogress. Cannot rebuild application.'
@@ -285,13 +283,12 @@
 		{:else}
 			<form on:submit|preventDefault={handleDeploySubmit}>
 				<button
-					title="Build and start application"
 					type="submit"
 					disabled={$disabledButton}
-					class="icons bg-transparent tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
-					data-tooltip={$appSession.isAdmin
-						? 'Build and start application'
-						: 'You do not have permission to Build and start application.'}
+					class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2 text-success"
+					data-tip={$appSession.isAdmin
+						? 'Deploy'
+						: 'You do not have permission to deploy application.'}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -319,10 +316,9 @@
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}`}
 		>
 			<button
-				title="Configurations"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm"
-				data-tooltip="Configurations"
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
+				data-tip="Configurations"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -355,10 +351,9 @@
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/secrets`}
 		>
 			<button
-				title="Secret"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm"
-				data-tooltip="Secret"
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
+				data-tip="Secret"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -387,10 +382,9 @@
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/storages`}
 		>
 			<button
-				title="Persistent Storages"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm"
-				data-tooltip="Persistent Storages"
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
+				data-tip="Persistent Storages"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -417,10 +411,9 @@
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/previews`}
 		>
 			<button
-				title="Previews"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm"
-				data-tooltip="Previews"
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
+				data-tip="Previews"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -450,10 +443,9 @@
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs`}
 		>
 			<button
-				title={$t('application.logs')}
 				disabled={$disabledButton || !$status.application.isRunning}
-				class="icons bg-transparent tooltip-bottom text-sm"
-				data-tooltip={$t('application.logs')}
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
+				data-tip={$t('application.logs')}
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -482,10 +474,9 @@
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs/build`}
 		>
 			<button
-				title="Build Logs"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip-bottom text-sm"
-				data-tooltip="Build Logs"
+				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
+				data-tip="Build Logs"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -513,12 +504,11 @@
 
 		<button
 			on:click={() => deleteApplication(application.name)}
-			title={$t('application.delete_application')}
 			type="submit"
 			disabled={!$appSession.isAdmin}
 			class:hover:text-red-500={$appSession.isAdmin}
-			class="icons bg-transparent  tooltip-bottom text-sm"
-			data-tooltip={$appSession.isAdmin
+			class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
+			data-tip={$appSession.isAdmin
 				? $t('application.delete_application')
 				: $t('application.permission_denied_delete_application')}
 		>

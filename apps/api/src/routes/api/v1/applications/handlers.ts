@@ -5,12 +5,12 @@ import axios from 'axios';
 import { FastifyReply } from 'fastify';
 import { day } from '../../../../lib/dayjs';
 import { setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
-import { asyncExecShell, checkDomainsIsValidInDNS, checkDoubleBranch, decrypt, encrypt, errorHandler, generateSshKeyPair, getContainerUsage, getDomain, isDev, isDomainConfigured, prisma, stopBuild, uniqueName } from '../../../../lib/common';
-import { checkContainer, dockerInstance, getEngine, isContainerExited, removeContainer } from '../../../../lib/docker';
+import { checkDomainsIsValidInDNS, checkDoubleBranch, decrypt, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, getFreeExposedPort, isDev, isDomainConfigured, prisma, stopBuild, uniqueName } from '../../../../lib/common';
+import { checkContainer, formatLabelsOnDocker, isContainerExited, removeContainer } from '../../../../lib/docker';
 import { scheduler } from '../../../../lib/scheduler';
 
 import type { FastifyRequest } from 'fastify';
-import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication } from './types';
+import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain, StopPreviewApplication } from './types';
 import { OnlyId } from '../../../../types';
 
 export async function listApplications(request: FastifyRequest) {
@@ -18,7 +18,7 @@ export async function listApplications(request: FastifyRequest) {
         const { teamId } = request.user
         const applications = await prisma.application.findMany({
             where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-            include: { teams: true }
+            include: { teams: true, destinationDocker: true }
         });
         const settings = await prisma.setting.findFirst()
         return {
@@ -57,7 +57,28 @@ export async function getImages(request: FastifyRequest<GetImages>) {
         }
 
 
-        return { baseImage, baseBuildImage, baseBuildImages, baseImages, publishDirectory, port }
+        return { baseBuildImage, baseBuildImages, publishDirectory, port }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+export async function getApplicationStatus(request: FastifyRequest<OnlyId>) {
+    try {
+        const { id } = request.params
+        const { teamId } = request.user
+        let isRunning = false;
+        let isExited = false;
+
+        const application: any = await getApplicationFromDB(id, teamId);
+        if (application?.destinationDockerId) {
+            isRunning = await checkContainer({ dockerId: application.destinationDocker.id, container: id });
+            isExited = await isContainerExited(application.destinationDocker.id, id);
+        }
+        return {
+            isQueueActive: scheduler.workers.has('deployApplication'),
+            isRunning,
+            isExited,
+        };
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
@@ -68,17 +89,9 @@ export async function getApplication(request: FastifyRequest<OnlyId>) {
         const { id } = request.params
         const { teamId } = request.user
         const appId = process.env['COOLIFY_APP_ID'];
-        let isRunning = false;
-        let isExited = false;
         const application: any = await getApplicationFromDB(id, teamId);
-        if (application?.destinationDockerId && application.destinationDocker?.engine) {
-            isRunning = await checkContainer(application.destinationDocker.engine, id);
-            isExited = await isContainerExited(application.destinationDocker.engine, id);
-        }
+
         return {
-            isQueueActive: scheduler.workers.has('deployApplication'),
-            isRunning,
-            isExited,
             application,
             appId
         };
@@ -279,16 +292,35 @@ export async function saveApplicationSettings(request: FastifyRequest<SaveApplic
     }
 }
 
+export async function stopPreviewApplication(request: FastifyRequest<StopPreviewApplication>, reply: FastifyReply) {
+    try {
+        const { id } = request.params
+        const { pullmergeRequestId } = request.body
+        const { teamId } = request.user
+        const application: any = await getApplicationFromDB(id, teamId);
+        if (application?.destinationDockerId) {
+            const container = `${id}-${pullmergeRequestId}`
+            const { id: dockerId } = application.destinationDocker;
+            const found = await checkContainer({ dockerId, container });
+            if (found) {
+                await removeContainer({ id: container, dockerId: application.destinationDocker.id });
+            }
+        }
+        return reply.code(201).send();
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function stopApplication(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
     try {
         const { id } = request.params
         const { teamId } = request.user
         const application: any = await getApplicationFromDB(id, teamId);
-        if (application?.destinationDockerId && application.destinationDocker?.engine) {
-            const { engine } = application.destinationDocker;
-            const found = await checkContainer(engine, id);
+        if (application?.destinationDockerId) {
+            const { id: dockerId } = application.destinationDocker;
+            const found = await checkContainer({ dockerId, container: id });
             if (found) {
-                await removeContainer({ id, engine });
+                await removeContainer({ id, dockerId: application.destinationDocker.id });
             }
         }
         return reply.code(201).send();
@@ -304,17 +336,17 @@ export async function deleteApplication(request: FastifyRequest<DeleteApplicatio
             where: { id },
             include: { destinationDocker: true }
         });
-        if (application?.destinationDockerId && application.destinationDocker?.engine && application.destinationDocker?.network) {
-            const host = getEngine(application.destinationDocker.engine);
-            const { stdout: containers } = await asyncExecShell(
-                `DOCKER_HOST=${host} docker ps -a --filter network=${application.destinationDocker.network} --filter name=${id} --format '{{json .}}'`
-            );
+        if (application?.destinationDockerId && application.destinationDocker?.network) {
+            const { stdout: containers } = await executeDockerCmd({
+                dockerId: application.destinationDocker.id,
+                command: `docker ps -a --filter network=${application.destinationDocker.network} --filter name=${id} --format '{{json .}}'`
+            })
             if (containers) {
                 const containersArray = containers.trim().split('\n');
                 for (const container of containersArray) {
                     const containerObj = JSON.parse(container);
                     const id = containerObj.ID;
-                    await removeContainer({ id, engine: application.destinationDocker.engine });
+                    await removeContainer({ id, dockerId: application.destinationDocker.id });
                 }
             }
         }
@@ -333,33 +365,48 @@ export async function deleteApplication(request: FastifyRequest<DeleteApplicatio
         return errorHandler({ status, message })
     }
 }
-
+export async function checkDomain(request: FastifyRequest<CheckDomain>) {
+    try {
+        const { id } = request.params
+        const { domain } = request.query
+        const { fqdn, settings: { dualCerts } } = await prisma.application.findUnique({ where: { id }, include: { settings: true } })
+        return await checkDomainsIsValidInDNS({ hostname: domain, fqdn, dualCerts });
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function checkDNS(request: FastifyRequest<CheckDNS>) {
     try {
         const { id } = request.params
 
         let { exposePort, fqdn, forceSave, dualCerts } = request.body
-        fqdn = fqdn.toLowerCase();
 
+        if (fqdn) fqdn = fqdn.toLowerCase();
+        if (exposePort) exposePort = Number(exposePort);
+
+        const { destinationDocker: { id: dockerId, remoteIpAddress, remoteEngine }, exposePort: configuredPort } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
         const { isDNSCheckEnabled } = await prisma.setting.findFirst({});
-        const found = await isDomainConfigured({ id, fqdn });
+
+        const found = await isDomainConfigured({ id, fqdn, remoteIpAddress });
         if (found) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
         if (exposePort) {
-            exposePort = Number(exposePort);
-
             if (exposePort < 1024 || exposePort > 65535) {
                 throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
             }
-            const { default: getPort } = await import('get-port');
-            const publicPort = await getPort({ port: exposePort });
-            if (publicPort !== exposePort) {
-                throw { status: 500, message: `Port ${exposePort} is already in use.` }
+
+            if (configuredPort !== exposePort) {
+                const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
+                if (availablePort.toString() !== exposePort.toString()) {
+                    throw { status: 500, message: `Port ${exposePort} is already in use.` }
+                }
             }
         }
         if (isDNSCheckEnabled && !isDev && !forceSave) {
-            return await checkDomainsIsValidInDNS({ hostname: request.hostname.split(':')[0], fqdn, dualCerts });
+            let hostname = request.hostname.split(':')[0];
+            if (remoteEngine) hostname = remoteIpAddress;
+            return await checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts });
         }
         return {}
     } catch ({ status, message }) {
@@ -375,7 +422,7 @@ export async function getUsage(request) {
 
         const application: any = await getApplicationFromDB(id, teamId);
         if (application.destinationDockerId) {
-            [usage] = await Promise.all([getContainerUsage(application.destinationDocker.engine, id)]);
+            [usage] = await Promise.all([getContainerUsage(application.destinationDocker.id, id)]);
         }
         return {
             usage
@@ -701,21 +748,20 @@ export async function getPreviews(request: FastifyRequest<OnlyId>) {
             secret.value = decrypt(secret.value);
             return secret;
         });
+
         const applicationSecrets = secrets.filter((secret) => !secret.isPRMRSecret);
         const PRMRSecrets = secrets.filter((secret) => secret.isPRMRSecret);
-        const destinationDocker = await prisma.destinationDocker.findFirst({
-            where: { application: { some: { id } }, teams: { some: { id: teamId } } }
-        });
-        const docker = dockerInstance({ destinationDocker });
-        const listContainers = await docker.engine.listContainers({
-            filters: { network: [destinationDocker.network], name: [id] }
-        });
-        const containers = listContainers.filter((container) => {
-            return (
-                container.Labels['coolify.configuration'] &&
-                container.Labels['coolify.type'] === 'standalone-application'
-            );
-        });
+        const application = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } });
+        const { stdout } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker container ls --filter 'name=${id}-' --format "{{json .}}"` })
+        if (stdout === '') {
+            return {
+                containers: [],
+                applicationSecrets: [],
+                PRMRSecrets: []
+            }
+        }
+        const containers = formatLabelsOnDocker(stdout).filter(container => container.Labels['coolify.configuration'] && container.Labels['coolify.type'] === 'standalone-application')
+
         const jsonContainers = containers
             .map((container) =>
                 JSON.parse(Buffer.from(container.Labels['coolify.configuration'], 'base64').toString())
@@ -733,49 +779,45 @@ export async function getPreviews(request: FastifyRequest<OnlyId>) {
             })
         }
     } catch ({ status, message }) {
+        console.log({ status, message })
         return errorHandler({ status, message })
     }
 }
 
 export async function getApplicationLogs(request: FastifyRequest<GetApplicationLogs>) {
     try {
-        const { id } = request.params
+        const { id } = request.params;
         let { since = 0 } = request.query
         if (since !== 0) {
             since = day(since).unix();
         }
-        const { destinationDockerId, destinationDocker } = await prisma.application.findUnique({
+        const { destinationDockerId, destinationDocker: { id: dockerId } } = await prisma.application.findUnique({
             where: { id },
             include: { destinationDocker: true }
         });
         if (destinationDockerId) {
-            const docker = dockerInstance({ destinationDocker });
             try {
-                const container = await docker.engine.getContainer(id);
-                if (container) {
-                    const { default: ansi } = await import('strip-ansi')
-                    const logs = (
-                        await container.logs({
-                            stdout: true,
-                            stderr: true,
-                            timestamps: true,
-                            since,
-                            tail: 5000
-                        })
-                    )
-                        .toString()
-                        .split('\n')
-                        .map((l) => ansi(l.slice(8)))
-                        .filter((a) => a);
+                // const found = await checkContainer({ dockerId, container: id })
+                // if (found) {
+                const { default: ansi } = await import('strip-ansi')
+                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
+                const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
+                const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
+                const logs = stripLogsStderr.concat(stripLogsStdout)
+                const sortedLogs = logs.sort((a, b) => (day(a.split(' ')[0]).isAfter(day(b.split(' ')[0])) ? 1 : -1))
+                return { logs: sortedLogs }
+                // }
+            } catch (error) {
+                const { statusCode } = error;
+                if (statusCode === 404) {
                     return {
-                        logs
+                        logs: []
                     };
                 }
-            } catch (error) {
-                return {
-                    logs: []
-                };
             }
+        }
+        return {
+            message: 'No logs found.'
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })

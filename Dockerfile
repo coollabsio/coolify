@@ -1,4 +1,4 @@
-FROM node:18-alpine as build
+FROM node:18-alpine3.16 as build
 WORKDIR /app
 
 RUN apk add --no-cache curl
@@ -9,7 +9,7 @@ RUN pnpm install
 RUN pnpm build
 
 # Production build
-FROM node:18-alpine
+FROM node:18-alpine3.16
 WORKDIR /app
 ENV NODE_ENV production
 ARG TARGETPLATFORM
@@ -27,8 +27,10 @@ RUN apk add --no-cache git git-lfs openssh-client curl jq cmake sqlite openssl
 RUN curl -sL https://unpkg.com/@pnpm/self-installer | node
 
 RUN mkdir -p ~/.docker/cli-plugins/
+# https://download.docker.com/linux/static/stable/
 RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-20.10.9 -o /usr/bin/docker
-RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-compose-linux-2.3.4 -o ~/.docker/cli-plugins/docker-compose
+# https://github.com/docker/compose/releases
+RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-compose-linux-2.7.0 -o ~/.docker/cli-plugins/docker-compose
 RUN chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker
 
 COPY --from=build /app/apps/api/build/ .

@@ -31,17 +31,17 @@
 	import Select from 'svelte-select';
 
 	import Explainer from '$lib/components/Explainer.svelte';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { get, post } from '$lib/api';
 	import cuid from 'cuid';
 	import { browser } from '$app/env';
-	import { appSession, disabledButton, setLocation, status } from '$lib/store';
+	import { addToast, appSession, disabledButton, setLocation, status } from '$lib/store';
 	import { t } from '$lib/translations';
 	import { errorNotification, getDomain, notNodeDeployments, staticDeployments } from '$lib/common';
 	import Setting from './_Setting.svelte';
 	const { id } = $page.params;
 
-	$: isDisabled = !$appSession.isAdmin || $status.application.isRunning;
+	$: isDisabled =
+		!$appSession.isAdmin || $status.application.isRunning || $status.application.initialLoading;
 
 	let domainEl: HTMLInputElement;
 
@@ -80,7 +80,7 @@
 		}
 	];
 	function containerClass() {
-		return 'text-white border border-dashed border-coolgray-300 bg-transparent font-thin px-0';
+		return 'text-white bg-transparent font-thin px-0';
 	}
 
 	async function getUsage() {
@@ -138,7 +138,10 @@
 				branch: application.branch,
 				projectId: application.projectId
 			});
-			return toast.push($t('application.settings_saved'));
+			return addToast({
+					message: $t('application.settings_saved'),
+					type: 'success'
+				});
 		} catch (error) {
 			if (name === 'debug') {
 				debug = !debug;
@@ -169,10 +172,13 @@
 				exposePort: application.exposePort
 			});
 			await post(`/applications/${id}`, { ...application });
-			setLocation(application)
+			setLocation(application);
 			$disabledButton = false;
 			forceSave = false;
-			return toast.push('Configurations saved.');
+			addToast({
+				message: 'Configuration saved.',
+				type: 'success',
+			});
 		} catch (error) {
 			console.log(error);
 			//@ts-ignore
@@ -215,7 +221,10 @@
 	async function isDNSValid(domain: any, isWWW: any) {
 		try {
 			await get(`/applications/${id}/check?domain=${domain}`);
-			toast.push('DNS configuration is valid.');
+			addToast({
+					message: 'DNS configuration is valid.',
+					type: 'success'
+				});
 			isWWW ? (isWWWDomainOK = true) : (isNonWWWDomainOK = true);
 			return true;
 		} catch (error) {
@@ -308,33 +317,25 @@
 <div class="mx-auto max-w-4xl px-6">
 	<!-- svelte-ignore missing-declaration -->
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
-		<div class="flex space-x-1 pb-5 font-bold">
+		<div class="flex space-x-1 pb-5">
 			<div class="title">{$t('general')}</div>
 			{#if $appSession.isAdmin}
 				<button
+					class="btn btn-sm"
 					type="submit"
-					class:bg-green-600={!loading}
+					class:bg-applications={!loading}
+					class:loading={loading}
 					class:bg-orange-600={forceSave}
-					class:hover:bg-green-500={!loading}
 					class:hover:bg-orange-400={forceSave}
 					disabled={loading}
-					>{loading
-						? $t('forms.saving')
-						: forceSave
-						? $t('forms.confirm_continue')
-						: $t('forms.save')}</button
+					>{$t('forms.save')}</button
 				>
 			{/if}
 		</div>
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="mt-2 grid grid-cols-2 items-center">
 				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
-				<input
-					name="name"
-					id="name"
-					bind:value={application.name}
-					required
-				/>
+				<input name="name" id="name" bind:value={application.name} required />
 			</div>
 			<div class="grid grid-cols-2 items-center">
 				<label for="gitSource" class="text-base font-bold text-stone-100"
@@ -536,7 +537,7 @@
 			<div class="grid grid-cols-2 items-center pb-8">
 				<Setting
 					dataTooltip={$t('forms.must_be_stopped_to_modify')}
-					disabled={isDisabled}
+					disabled={$status.application.isRunning}
 					isCenter={false}
 					bind:setting={dualCerts}
 					title={$t('application.ssl_www_and_non_www')}

@@ -413,11 +413,10 @@
 	<div class="flex flex-col items-center justify-center space-y-4 pt-5">
 		<button
 			on:click|preventDefault={save}
-			class="w-40"
+			class="btn btn-wide"
 			type="submit"
 			disabled={!showSave || loading.save}
-			class:bg-orange-600={showSave && !loading.save}
-			class:hover:bg-orange-500={showSave && !loading.save}
+			class:bg-applications={showSave && !loading.save}
 			>{loading.save ? $t('forms.saving') : $t('forms.save')}</button
 		>
 		{#if tryAgain}

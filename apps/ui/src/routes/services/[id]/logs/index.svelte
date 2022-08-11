@@ -1,32 +1,13 @@
-<script context="module" lang="ts">
-	import type { Load } from '@sveltejs/kit';
-	import { onDestroy, onMount } from 'svelte';
-	export const load: Load = async ({ fetch, params, url, stuff }) => {
-		try {
-			const response = await get(`/services/${params.id}/logs`);
-			return {
-				props: {
-					service: stuff.service,
-					...response
-				}
-			};
-		} catch (error) {
-			return {
-				status: 500,
-				error: new Error(`Could not load ${url}`)
-			};
-		}
-	};
-</script>
-
 <script lang="ts">
-	export let service: any;
 	import { page } from '$app/stores';
 	import LoadingLogs from './_Loading.svelte';
 	import { get } from '$lib/api';
 	import { t } from '$lib/translations';
-import { errorNotification } from '$lib/common';
+	import { errorNotification } from '$lib/common';
+	import { onDestroy, onMount } from 'svelte';
 
+	let service: any = {};
+	let logsLoading = false;
 	let loadLogsInterval: any = null;
 	let logs: any = [];
 	let lastLog: any = null;
@@ -36,18 +17,23 @@ import { errorNotification } from '$lib/common';
 	let position = 0;
 
 	const { id } = $page.params;
+
 	onMount(async () => {
+		const response = await get(`/services/${id}`);
+		service = response.service;
 		loadAllLogs();
 		loadLogsInterval = setInterval(() => {
 			loadLogs();
 		}, 1000);
 	});
+
 	onDestroy(() => {
 		clearInterval(loadLogsInterval);
 		clearInterval(followingInterval);
 	});
 	async function loadAllLogs() {
 		try {
+			logsLoading = true;
 			const data: any = await get(`/services/${id}/logs`);
 			if (data?.logs) {
 				lastLog = data.logs[data.logs.length - 1];
@@ -56,13 +42,14 @@ import { errorNotification } from '$lib/common';
 		} catch (error) {
 			console.log(error);
 			return errorNotification(error);
+		} finally {
+			logsLoading = false;
 		}
 	}
 	async function loadLogs() {
+		if (logsLoading) return;
 		try {
-			const newLogs: any = await get(
-				`/services/${id}/logs?since=${lastLog?.split(' ')[0] || 0}`
-			);
+			const newLogs: any = await get(`/services/${id}/logs?since=${lastLog?.split(' ')[0] || 0}`);
 
 			if (newLogs?.logs && newLogs.logs[newLogs.logs.length - 1] !== logs[logs.length - 1]) {
 				logs = logs.concat(newLogs.logs);
@@ -137,11 +124,11 @@ import { errorNotification } from '$lib/common';
 			{#if loadLogsInterval}
 				<LoadingLogs />
 			{/if}
-			<div class="flex justify-end sticky top-0 p-2 mx-1">
+			<div class="flex justify-end sticky top-0 p-1 mx-1">
 				<button
 					on:click={followBuild}
-					class="bg-transparent"
-					data-tooltip="Follow logs"
+					class="bg-transparent tooltip tooltip-primary tooltip-bottom"
+					data-tip="Follow logs"
 					class:text-green-500={followingLogs}
 				>
 					<svg

@@ -30,6 +30,9 @@ export interface SaveApplicationSettings extends OnlyId {
 export interface DeleteApplication extends OnlyId {
     Querystring: { domain: string; };
 }
+export interface CheckDomain extends OnlyId {
+    Querystring: { domain: string; };
+}
 export interface CheckDNS extends OnlyId {
     Querystring: { domain: string; };
     Body: {
@@ -113,5 +116,11 @@ export interface DeployApplication extends OnlyId {
     Body: {
         pullmergeRequestId: string | null,
         branch: string
+    }
+}
+
+export interface StopPreviewApplication extends OnlyId {
+    Body: {
+        pullmergeRequestId: string | null,
     }
 }

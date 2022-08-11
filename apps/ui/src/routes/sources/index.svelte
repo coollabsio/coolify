@@ -39,9 +39,9 @@
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">{$t('index.git_sources')}</div>
 	{#if $appSession.isAdmin}
-		<a href="/sources/new" class="add-icon bg-orange-600 hover:bg-orange-500">
+		<a href="/sources/new" class="btn btn-square btn-sm bg-sources">
 			<svg
-				class="w-6"
+				class="h-6 w-6"
 				xmlns="http://www.w3.org/2000/svg"
 				fill="none"
 				viewBox="0 0 24 24"
@@ -66,7 +66,7 @@
 		<div class="flex flex-col">
 			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 				{#each ownSources as source}
-					<a href="/sources/{source.id}" class="w-96 p-2 no-underline">
+					<a href="/sources/{source.id}" class="p-2 no-underline">
 						<div
 							class="box-selection group relative hover:bg-orange-600"
 							class:border-red-500={source.gitlabApp && !source.gitlabAppId}
@@ -128,10 +128,10 @@
 			</div>
 
 			{#if otherSources.length > 0 && $appSession.teamId === '0'}
-				<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Sources</div>
+				<div class="px-6 pb-5 pt-10 text-2xl font-bold text-center">Other Sources</div>
 				<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
 					{#each otherSources as source}
-						<a href="/sources/{source.id}" class="w-96 p-2 no-underline">
+						<a href="/sources/{source.id}" class="p-2 no-underline">
 							<div
 								class="box-selection group hover:bg-orange-600"
 								class:border-red-500={source.gitlabApp && !source.gitlabAppId}
