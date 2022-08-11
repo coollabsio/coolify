@@ -33,6 +33,8 @@ RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-20.10.9 -o /usr/
 RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-compose-linux-2.7.0 -o ~/.docker/cli-plugins/docker-compose
 RUN chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker
 
+RUN (curl -sSL "https://github.com/buildpacks/pack/releases/download/v0.27.0/pack-v0.27.0-linux.tgz" | tar -C /usr/local/bin/ --no-same-owner -xzv pack)
+
 COPY --from=build /app/apps/api/build/ .
 COPY --from=build /app/apps/ui/build/ ./public
 COPY --from=build /app/apps/api/prisma/ ./prisma
