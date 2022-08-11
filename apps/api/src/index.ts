@@ -53,7 +53,7 @@ const schema = {
 		},
 		COOLIFY_WHITE_LABELED: {
 			type: 'string',
-			default: "false"
+			default: 'false'
 		},
 		COOLIFY_WHITE_LABELED_ICON: {
 			type: 'string',
@@ -61,7 +61,7 @@ const schema = {
 		},
 		COOLIFY_AUTO_UPDATE: {
 			type: 'string',
-			default: "false"
+			default: 'false'
 		},
 
 	}
