@@ -147,7 +147,7 @@
 			<div class="flex justify-end sticky top-0 p-1 mx-1">
 				<button
 					on:click={followBuild}
-					class="bg-transparent tooltip tooltip-primary tooltip-bottom"
+					class="bg-transparent btn btn-sm btn-link tooltip tooltip-primary tooltip-bottom"
 					data-tip="Follow logs"
 					class:text-green-500={followingLogs}
 				>
