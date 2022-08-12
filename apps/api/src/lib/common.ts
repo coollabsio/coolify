@@ -807,7 +807,7 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 			volume: `${id}-${type}-data:/bitnami/mysql/data`,
 			ulimits: {}
 		}
-		if (!isARM(arch)) {
+		if (isARM(arch)) {
 			configuration.volume = `${id}-${type}-data:/var/lib/mysql`;
 		}
 		return configuration
@@ -825,7 +825,7 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 			volume: `${id}-${type}-data:/bitnami/mariadb`,
 			ulimits: {}
 		};
-		if (!isARM(arch)) {
+		if (isARM(arch)) {
 			configuration.volume = `${id}-${type}-data:/var/lib/mysql`;
 		}
 		return configuration
@@ -853,7 +853,7 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 			volume: `${id}-${type}-data:/bitnami/postgresql`,
 			ulimits: {}
 		}
-		if (!isARM(arch)) {
+		if (isARM(arch)) {
 			configuration.volume = `${id}-${type}-data:/var/lib/postgresql`;
 		}
 		return configuration
@@ -869,7 +869,7 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 			volume: `${id}-${type}-data:/bitnami/redis/data`,
 			ulimits: {}
 		};
-		if (!isARM(arch)) {
+		if (isARM(arch)) {
 			configuration.volume = `${id}-${type}-data:/data`;
 			configuration.command = `/usr/local/bin/redis-server --appendonly ${appendOnly ? 'yes' : 'no'} --requirepass ${dbUserPassword}`;
 		}
@@ -885,7 +885,7 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 			volume: `${id}-${type}-data:/bitnami/couchdb`,
 			ulimits: {}
 		};
-		if (!isARM(arch)) {
+		if (isARM(arch)) {
 			configuration.volume = `${id}-${type}-data:/opt/couchdb/data`;
 		}
 		return configuration
@@ -900,7 +900,7 @@ export function isARM(arch) {
 export function getDatabaseImage(type: string, arch: string): string {
 	const found = supportedDatabaseTypesAndVersions.find((t) => t.name === type);
 	if (found) {
-		if (!isARM(arch)) {
+		if (isARM(arch)) {
 			return found.baseImageARM || found.baseImage
 		}
 		return found.baseImage;
@@ -911,7 +911,7 @@ export function getDatabaseImage(type: string, arch: string): string {
 export function getDatabaseVersions(type: string, arch: string): string[] {
 	const found = supportedDatabaseTypesAndVersions.find((t) => t.name === type);
 	if (found) {
-		if (!isARM(arch)) {
+		if (isARM(arch)) {
 			return found.versionsARM || found.versions
 		}
 		return found.versions;
