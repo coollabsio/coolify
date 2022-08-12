@@ -96,17 +96,23 @@ export const base64Decode = (text: string): string => {
 };
 export const decrypt = (hashString: string) => {
 	if (hashString) {
-		const hash = JSON.parse(hashString);
-		const decipher = crypto.createDecipheriv(
-			algorithm,
-			process.env['COOLIFY_SECRET_KEY'],
-			Buffer.from(hash.iv, 'hex')
-		);
-		const decrpyted = Buffer.concat([
-			decipher.update(Buffer.from(hash.content, 'hex')),
-			decipher.final()
-		]);
-		return decrpyted.toString();
+		try {
+			const hash = JSON.parse(hashString);
+			const decipher = crypto.createDecipheriv(
+				algorithm,
+				process.env['COOLIFY_SECRET_KEY'],
+				Buffer.from(hash.iv, 'hex')
+			);
+			const decrpyted = Buffer.concat([
+				decipher.update(Buffer.from(hash.content, 'hex')),
+				decipher.final()
+			]);
+			return decrpyted.toString();
+		} catch (error) {
+			console.log({ decryptionError: error.message })
+			return hashString
+		}
+
 	}
 };
 export const encrypt = (text: string) => {
