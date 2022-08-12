@@ -104,6 +104,7 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 	await initServer();
 	await scheduler.start('deployApplication');
 	await scheduler.start('cleanupStorage');
+	await scheduler.start('cleanupPrismaEngines');
 	await scheduler.start('checkProxies');
 
 	// Check if no build is running
@@ -116,14 +117,14 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 				scheduler.workers.get('deployApplication').postMessage("status:autoUpdater");
 			}
 		}
-	}, 60000 * 15)
+	}, isDev ? 5000 : 60000 * 15)
 
 	// Cleanup storage
 	setInterval(async () => {
 		if (scheduler.workers.has('deployApplication')) {
 			scheduler.workers.get('deployApplication').postMessage("status:cleanupStorage");
 		}
-	}, 60000 * 10)
+	}, isDev ? 5000 : 60000 * 10)
 
 	scheduler.on('worker deleted', async (name) => {
 		if (name === 'autoUpdater' || name === 'cleanupStorage') {

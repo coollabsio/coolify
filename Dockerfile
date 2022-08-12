@@ -23,7 +23,7 @@ ENV PRISMA_QUERY_ENGINE_BINARY=/app/prisma-engines/query-engine \
 
 COPY --from=coollabsio/prisma-engine:3.15 /prisma-engines/query-engine /prisma-engines/migration-engine /prisma-engines/introspection-engine /prisma-engines/prisma-fmt /app/prisma-engines/
 
-RUN apk add --no-cache git git-lfs openssh-client curl jq cmake sqlite openssl
+RUN apk add --no-cache git git-lfs openssh-client curl jq cmake sqlite openssl psmisc
 RUN curl -sL https://unpkg.com/@pnpm/self-installer | node
 
 RUN mkdir -p ~/.docker/cli-plugins/
