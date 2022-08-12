@@ -124,7 +124,7 @@
 											Application
 										</div></td
 									>
-									<td>
+									<td class="flex justify-end">
 										{#if application.fqdn}
 											<a
 												href={application.fqdn}
@@ -200,7 +200,7 @@
 										</div>
 									</td>
 
-									<td>
+									<td class="flex justify-end">
 										{#if service.fqdn}
 											<a
 												href={service.fqdn}
@@ -274,7 +274,7 @@
 											Database
 										</div>
 									</td>
-									<td>
+									<td class="flex justify-end">
 										<a
 											href={`/databases/${database.id}`}
 											class="icons bg-transparent text-sm inline-flex ml-11"
