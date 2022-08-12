@@ -34,31 +34,6 @@
 		}
 	}
 
-	async function installRepositories(source: any) {
-		const { htmlUrl } = source;
-        let endpoint = 'apps'
-        if (htmlUrl !== 'https://github.com') {
-            endpoint = 'github-apps'
-        }
-		const left = screen.width / 2 - 1020 / 2;
-		const top = screen.height / 2 - 1000 / 2;
-		const newWindow = open(
-			`${htmlUrl}/${endpoint}/${source.githubApp.name}/installations/new`,
-			'GitHub',
-			'resizable=1, scrollbars=1, fullscreen=0, height=1000, width=1020,top=' +
-				top +
-				', left=' +
-				left +
-				', toolbar=0, menubar=0, status=0'
-		);
-		const timer = setInterval(() => {
-			if (newWindow?.closed) {
-				clearInterval(timer);
-				window.location.reload();
-			}
-		}, 100);
-	}
-
 	async function newGithubApp() {
 		loading = true;
 		try {
@@ -183,7 +158,7 @@
 					>
 					<a
 						class="btn btn-sm"
-						href={`${source.htmlUrl}/apps/${source.githubApp.name}/installations/new`}
+						href={`${source.htmlUrl}/${source.htmlUrl === 'https://github.com' ? 'apps' : 'github-apps'}/${source.githubApp.name}/installations/new`}
 						>{$t('source.change_app_settings', { name: 'GitHub' })}</a
 					>
 				{/if}
@@ -254,8 +229,8 @@
 		</form>
 	{:else}
 		<div class="text-center">
-			<a href={`${source.htmlUrl}/apps/${source.githubApp.name}/installations/new`}>
-				<button class="box-selection bg-sources text-xl"
+			<a href={`${source.htmlUrl}/${source.htmlUrl === 'https://github.com' ? 'apps' : 'github-apps'}/${source.githubApp.name}/installations/new`}>
+				<button class="box-selection bg-sources text-xl font-bold"
 					>Install Repositories</button
 				></a
 			>
