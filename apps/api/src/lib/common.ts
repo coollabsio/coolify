@@ -17,7 +17,7 @@ import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
-export const version = '3.2.2';
+export const version = '3.2.3';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -38,8 +38,8 @@ export function getAPIUrl() {
 		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '')
 		return newURL
 	}
-    if (process.env.CODESANDBOX_HOST) {
-        return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/,'3001')}`
+	if (process.env.CODESANDBOX_HOST) {
+		return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/, '3001')}`
 	}
 	return isDev ? 'http://localhost:3001' : 'http://localhost:3000';
 }
@@ -50,8 +50,8 @@ export function getUIUrl() {
 		const newURL = href.replace('https://', 'https://3000-').replace(/\/$/, '')
 		return newURL
 	}
-    if (process.env.CODESANDBOX_HOST) {
-		     return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/,'3000')}`
+	if (process.env.CODESANDBOX_HOST) {
+		return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/, '3000')}`
 	}
 	return 'http://localhost:3000';
 }
@@ -1637,7 +1637,7 @@ export function persistentVolumes(id, persistentStorage, config) {
 			return `${id}${storage.path.replace(/\//gi, '-')}:${storage.path}`;
 		}) || [];
 
-	let volumes = [ ...persistentVolume]
+	let volumes = [...persistentVolume]
 	if (config.volume) volumes = [config.volume, ...volumes]
 
 	const composeVolumes = volumes.length > 0 && volumes.map((volume) => {
