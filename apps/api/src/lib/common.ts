@@ -17,7 +17,7 @@ import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
-export const version = '3.2.3';
+export const version = '3.3.0';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -460,28 +460,50 @@ export const supportedDatabaseTypesAndVersions = [
 		name: 'mongodb',
 		fancyName: 'MongoDB',
 		baseImage: 'bitnami/mongodb',
-		versions: ['5.0', '4.4', '4.2']
+		baseImageARM: 'mongo',
+		versions: ['5.0', '4.4', '4.2'],
+		versionsARM: ['5.0', '4.4', '4.2']
 	},
-	{ name: 'mysql', fancyName: 'MySQL', baseImage: 'bitnami/mysql', versions: ['8.0', '5.7'] },
+	{
+		name: 'mysql',
+		fancyName: 'MySQL',
+		baseImage: 'bitnami/mysql',
+		baseImageARM: 'mysql',
+		versions: ['8.0', '5.7'],
+		versionsARM: ['8.0', '5.7']
+	},
 	{
 		name: 'mariadb',
 		fancyName: 'MariaDB',
 		baseImage: 'bitnami/mariadb',
-		versions: ['10.8', '10.7', '10.6', '10.5', '10.4', '10.3', '10.2']
+		baseImageARM: 'mariadb',
+		versions: ['10.8', '10.7', '10.6', '10.5', '10.4', '10.3', '10.2'],
+		versionsARM: ['10.8', '10.7', '10.6', '10.5', '10.4', '10.3', '10.2']
 	},
 	{
 		name: 'postgresql',
 		fancyName: 'PostgreSQL',
 		baseImage: 'bitnami/postgresql',
-		versions: ['14.4.0', '13.6.0', '12.10.0', '11.15.0', '10.20.0']
+		baseImageARM: 'postgres',
+		versions: ['14.5.0', '13.8.0', '12.12.0', '11.17.0', '10.22.0'],
+		versionsARM: ['14.5', '13.8', '12.12', '11.17', '10.22']
 	},
 	{
 		name: 'redis',
 		fancyName: 'Redis',
 		baseImage: 'bitnami/redis',
-		versions: ['7.0', '6.2', '6.0', '5.0']
+		baseImageARM: 'redis',
+		versions: ['7.0', '6.2', '6.0', '5.0'],
+		versionsARM: ['7.0', '6.2', '6.0', '5.0']
 	},
-	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.2'] }
+	{
+		name: 'couchdb',
+		fancyName: 'CouchDB',
+		baseImage: 'bitnami/couchdb',
+		baseImageARM: 'couchdb',
+		versions: ['3.2.2', '3.1.2', '2.3.1'],
+		versionsARM: ['3.2.2', '3.1.2', '2.3.1']
+	}
 ];
 
 export async function getFreeSSHLocalPort(id: string): Promise<number> {
@@ -674,10 +696,11 @@ export function generatePassword(length = 24, symbols = false): string {
 	});
 }
 
-export function generateDatabaseConfiguration(database: any):
+export function generateDatabaseConfiguration(database: any, arch: string):
 	| {
 		volume: string;
 		image: string;
+		command?: string;
 		ulimits: Record<string, unknown>;
 		privatePort: number;
 		environmentVariables: {
@@ -691,16 +714,20 @@ export function generateDatabaseConfiguration(database: any):
 	| {
 		volume: string;
 		image: string;
+		command?: string;
 		ulimits: Record<string, unknown>;
 		privatePort: number;
 		environmentVariables: {
-			MONGODB_ROOT_USER: string;
-			MONGODB_ROOT_PASSWORD: string;
+			MONGO_INITDB_ROOT_USERNAME?: string;
+			MONGO_INITDB_ROOT_PASSWORD?: string;
+			MONGODB_ROOT_USER?: string;
+			MONGODB_ROOT_PASSWORD?: string;
 		};
 	}
 	| {
 		volume: string;
 		image: string;
+		command?: string;
 		ulimits: Record<string, unknown>;
 		privatePort: number;
 		environmentVariables: {
@@ -714,6 +741,7 @@ export function generateDatabaseConfiguration(database: any):
 	| {
 		volume: string;
 		image: string;
+		command?: string;
 		ulimits: Record<string, unknown>;
 		privatePort: number;
 		environmentVariables: {
@@ -726,6 +754,19 @@ export function generateDatabaseConfiguration(database: any):
 	| {
 		volume: string;
 		image: string;
+		command?: string;
+		ulimits: Record<string, unknown>;
+		privatePort: number;
+		environmentVariables: {
+			POSTGRES_USER: string;
+			POSTGRES_PASSWORD: string;
+			POSTGRES_DB: string;
+		};
+	}
+	| {
+		volume: string;
+		image: string;
+		command?: string;
 		ulimits: Record<string, unknown>;
 		privatePort: number;
 		environmentVariables: {
@@ -736,6 +777,7 @@ export function generateDatabaseConfiguration(database: any):
 	| {
 		volume: string;
 		image: string;
+		command?: string;
 		ulimits: Record<string, unknown>;
 		privatePort: number;
 		environmentVariables: {
@@ -754,9 +796,9 @@ export function generateDatabaseConfiguration(database: any):
 		type,
 		settings: { appendOnly }
 	} = database;
-	const baseImage = getDatabaseImage(type);
+	const baseImage = getDatabaseImage(type, arch);
 	if (type === 'mysql') {
-		return {
+		const configuration = {
 			privatePort: 3306,
 			environmentVariables: {
 				MYSQL_USER: dbUser,
@@ -768,9 +810,13 @@ export function generateDatabaseConfiguration(database: any):
 			image: `${baseImage}:${version}`,
 			volume: `${id}-${type}-data:/bitnami/mysql/data`,
 			ulimits: {}
-		};
+		}
+		if (isARM(arch)) {
+			configuration.volume = `${id}-${type}-data:/var/lib/mysql`;
+		}
+		return configuration
 	} else if (type === 'mariadb') {
-		return {
+		const configuration = {
 			privatePort: 3306,
 			environmentVariables: {
 				MARIADB_ROOT_USER: rootUser,
@@ -783,8 +829,12 @@ export function generateDatabaseConfiguration(database: any):
 			volume: `${id}-${type}-data:/bitnami/mariadb`,
 			ulimits: {}
 		};
+		if (isARM(arch)) {
+			configuration.volume = `${id}-${type}-data:/var/lib/mysql`;
+		}
+		return configuration
 	} else if (type === 'mongodb') {
-		return {
+		const configuration = {
 			privatePort: 27017,
 			environmentVariables: {
 				MONGODB_ROOT_USER: rootUser,
@@ -794,8 +844,16 @@ export function generateDatabaseConfiguration(database: any):
 			volume: `${id}-${type}-data:/bitnami/mongodb`,
 			ulimits: {}
 		};
+		if (isARM(arch)) {
+			configuration.environmentVariables = {
+				MONGO_INITDB_ROOT_USERNAME: rootUser,
+				MONGO_INITDB_ROOT_PASSWORD: rootUserPassword
+			}
+			configuration.volume = `${id}-${type}-data:/data/db`;
+		}
+		return configuration
 	} else if (type === 'postgresql') {
-		return {
+		const configuration = {
 			privatePort: 5432,
 			environmentVariables: {
 				POSTGRESQL_POSTGRES_PASSWORD: rootUserPassword,
@@ -806,10 +864,15 @@ export function generateDatabaseConfiguration(database: any):
 			image: `${baseImage}:${version}`,
 			volume: `${id}-${type}-data:/bitnami/postgresql`,
 			ulimits: {}
-		};
+		}
+		if (isARM(arch)) {
+			configuration.volume = `${id}-${type}-data:/var/lib/postgresql`;
+		}
+		return configuration
 	} else if (type === 'redis') {
-		return {
+		const configuration = {
 			privatePort: 6379,
+			command: undefined,
 			environmentVariables: {
 				REDIS_PASSWORD: dbUserPassword,
 				REDIS_AOF_ENABLED: appendOnly ? 'yes' : 'no'
@@ -818,8 +881,13 @@ export function generateDatabaseConfiguration(database: any):
 			volume: `${id}-${type}-data:/bitnami/redis/data`,
 			ulimits: {}
 		};
+		if (isARM(arch)) {
+			configuration.volume = `${id}-${type}-data:/data`;
+			configuration.command = `/usr/local/bin/redis-server --appendonly ${appendOnly ? 'yes' : 'no'} --requirepass ${dbUserPassword}`;
+		}
+		return configuration
 	} else if (type === 'couchdb') {
-		return {
+		const configuration = {
 			privatePort: 5984,
 			environmentVariables: {
 				COUCHDB_PASSWORD: dbUserPassword,
@@ -829,20 +897,35 @@ export function generateDatabaseConfiguration(database: any):
 			volume: `${id}-${type}-data:/bitnami/couchdb`,
 			ulimits: {}
 		};
+		if (isARM(arch)) {
+			configuration.volume = `${id}-${type}-data:/opt/couchdb/data`;
+		}
+		return configuration
 	}
 }
-
-export function getDatabaseImage(type: string): string {
+export function isARM(arch) {
+	if (arch === 'arm' || arch === 'arm64') {
+		return true
+	}
+	return false
+}
+export function getDatabaseImage(type: string, arch: string): string {
 	const found = supportedDatabaseTypesAndVersions.find((t) => t.name === type);
 	if (found) {
+		if (isARM(arch)) {
+			return found.baseImageARM || found.baseImage
+		}
 		return found.baseImage;
 	}
 	return '';
 }
 
-export function getDatabaseVersions(type: string): string[] {
+export function getDatabaseVersions(type: string, arch: string): string[] {
 	const found = supportedDatabaseTypesAndVersions.find((t) => t.name === type);
 	if (found) {
+		if (isARM(arch)) {
+			return found.versionsARM || found.versions
+		}
 		return found.versions;
 	}
 	return [];

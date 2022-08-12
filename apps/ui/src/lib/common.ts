@@ -232,35 +232,6 @@ export function changeQueryParams(buildId: string) {
 	return history.pushState(null, null, '?' + queryParams.toString());
 }
 
-export const supportedDatabaseTypesAndVersions = [
-	{
-		name: 'mongodb',
-		fancyName: 'MongoDB',
-		baseImage: 'bitnami/mongodb',
-		versions: ['5.0', '4.4', '4.2']
-	},
-	{ name: 'mysql', fancyName: 'MySQL', baseImage: 'bitnami/mysql', versions: ['8.0', '5.7'] },
-	{
-		name: 'mariadb',
-		fancyName: 'MariaDB',
-		baseImage: 'bitnami/mariadb',
-		versions: ['10.7', '10.6', '10.5', '10.4', '10.3', '10.2']
-	},
-	{
-		name: 'postgresql',
-		fancyName: 'PostgreSQL',
-		baseImage: 'bitnami/postgresql',
-		versions: ['14.2.0', '13.6.0', '12.10.0	', '11.15.0', '10.20.0']
-	},
-	{
-		name: 'redis',
-		fancyName: 'Redis',
-		baseImage: 'bitnami/redis',
-		versions: ['6.2', '6.0', '5.0']
-	},
-	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] }
-];
-
 export const getServiceMainPort = (service: string) => {
 	const serviceType = supportedServiceTypesAndVersions.find((s) => s.name === service);
 	if (serviceType) {

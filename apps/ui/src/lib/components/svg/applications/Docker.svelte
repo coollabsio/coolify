@@ -1,4 +1,11 @@
-<svg viewBox="0 0 128 128" class="absolute top-0 left-0 -m-8 h-16 w-16">
+<script lang="ts">
+	export let isAbsolute = true;
+</script>
+
+<svg
+	viewBox="0 0 128 128"
+	class={isAbsolute ? 'absolute top-0 left-0 -m-8 h-16 w-16' : 'mx-auto w-8 h-8'}
+>
 	<g
 		><path
 			fill-rule="evenodd"

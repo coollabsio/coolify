@@ -32,7 +32,7 @@
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
-	import Services from '../_Services.svelte';
+	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -56,7 +56,7 @@
 		<div class="p-2">
 			<form on:submit|preventDefault={() => handleSubmit(type.name)}>
 				<button type="submit" class="box-selection relative text-xl font-bold hover:bg-pink-600">
-					<Services type={type.name} />
+					<ServiceIcons type={type.name} />
 					{type.fancyName}
 				</button>
 			</form>

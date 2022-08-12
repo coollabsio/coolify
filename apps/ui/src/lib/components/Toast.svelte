@@ -1,10 +1,16 @@
 <script>
+	import { createEventDispatcher } from 'svelte';
+	const dispatch = createEventDispatcher();
 	export let type = 'info';
 </script>
 
 <div
+	on:mouseover={() => dispatch('pause')}
+	on:focus={() => dispatch('pause')}
+	on:mouseout={() => dispatch('resume')}
+	on:blur={() => dispatch('resume')}
 	class="alert shadow-lg text-white rounded"
-	class:alert-success={type === 'success'}
+	class:bg-coollabs={type === 'success'}
 	class:alert-error={type === 'error'}
 	class:alert-info={type === 'info'}
 >

@@ -58,7 +58,9 @@
 	}
 
 	async function changeSettings(name: any) {
-		if (publicLoading || !$status.database.isRunning) return;
+		if (name !== 'appendOnly') {
+			if (publicLoading || !$status.database.isRunning || name !== 'appendOnly') return;
+		}
 		publicLoading = true;
 		let data = {
 			isPublic,
@@ -92,9 +94,9 @@
 			await post(`/databases/${id}`, { ...database, isRunning: $status.database.isRunning });
 			generateDbDetails();
 			addToast({
-					message: 'Configuration saved.',
-					type: 'success'
-				});
+				message: 'Configuration saved.',
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
@@ -111,7 +113,7 @@
 				<button
 					type="submit"
 					class="btn btn-sm"
-					class:loading={loading}
+					class:loading
 					class:bg-databases={!loading}
 					disabled={loading}>{$t('forms.save')}</button
 				>

@@ -1,10 +1,11 @@
 import { parentPort } from 'node:worker_threads';
-import { prisma, startTraefikTCPProxy, generateDatabaseConfiguration, startTraefikProxy, executeDockerCmd } from '../lib/common';
+import { prisma, startTraefikTCPProxy, generateDatabaseConfiguration, startTraefikProxy, executeDockerCmd, listSettings } from '../lib/common';
 import { checkContainer } from '../lib/docker';
 
 (async () => {
     if (parentPort) {
         try {
+            const { arch } = await listSettings();
             // Coolify Proxy local
             const engine = '/var/run/docker.sock';
             const localDocker = await prisma.destinationDocker.findFirst({
@@ -30,7 +31,7 @@ import { checkContainer } from '../lib/docker';
             for (const database of databasesWithPublicPort) {
                 const { destinationDockerId, destinationDocker, publicPort, id } = database;
                 if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-                    const { privatePort } = generateDatabaseConfiguration(database);
+                    const { privatePort } = generateDatabaseConfiguration(database, arch);
                     // Remove HAProxy
                     const found = await checkContainer({
                         dockerId: localDocker.id, container: `haproxy-for-${publicPort}`

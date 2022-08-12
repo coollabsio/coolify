@@ -31,7 +31,7 @@ export async function checkUpdate(request: FastifyRequest) {
 		const { data: versions } = await axios.get(
 			`https://get.coollabs.io/versions.json?appId=${process.env['COOLIFY_APP_ID']}&version=${currentVersion}`
 		);
-		const latestVersion = versions['coolify'].main.version			
+		const latestVersion = versions['coolify'].main.version
 		const isUpdateAvailable = compare(latestVersion, currentVersion);
 		if (isStaging) {
 			return {
@@ -96,34 +96,19 @@ export async function showDashboard(request: FastifyRequest) {
 	try {
 		const userId = request.user.userId;
 		const teamId = request.user.teamId;
-		const applicationsCount = await prisma.application.count({
+		const applications = await prisma.application.findMany({
 			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
 		});
-		const sourcesCount = await prisma.gitSource.count({
+		const databases = await prisma.database.findMany({
 			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
 		});
-		const destinationsCount = await prisma.destinationDocker.count({
+		const services = await prisma.service.findMany({
 			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
-		});
-		const teamsCount = await prisma.permission.count({ where: { userId } });
-		const databasesCount = await prisma.database.count({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
-		});
-		const servicesCount = await prisma.service.count({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
-		});
-		const teams = await prisma.permission.findMany({
-			where: { userId },
-			include: { team: { include: { _count: { select: { users: true } } } } }
 		});
 		return {
-			teams,
-			applicationsCount,
-			sourcesCount,
-			destinationsCount,
-			teamsCount,
-			databasesCount,
-			servicesCount,
+			applications,
+			databases,
+			services,
 		};
 	} catch ({ status, message }) {
 		return errorHandler({ status, message })

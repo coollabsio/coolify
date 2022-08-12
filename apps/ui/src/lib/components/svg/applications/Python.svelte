@@ -1,4 +1,11 @@
-<svg class="absolute top-0 left-0 -m-6 h-14 w-14" viewBox="0 0 128 128">
+<script lang="ts">
+	export let isAbsolute = true;
+</script>
+
+<svg
+	class={isAbsolute ? 'absolute top-0 left-0 -m-6 h-14 w-14' : 'mx-auto w-8 h-8'}
+	viewBox="0 0 128 128"
+>
 	<linearGradient
 		id="a"
 		gradientUnits="userSpaceOnUse"
