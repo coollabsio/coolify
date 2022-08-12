@@ -24,7 +24,7 @@
 	import Usage from '$lib/components/Usage.svelte';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
-	import { addToast } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 
 	import ApplicationsIcons from '$lib/components/svg/applications/ApplicationIcons.svelte';
 	import DatabaseIcons from '$lib/components/svg/databases/DatabaseIcons.svelte';
@@ -297,7 +297,9 @@
 					</table>
 				</div>
 			</div>
-			<Usage />
+			{#if $appSession.teamId === '0'}
+				<Usage />
+			{/if}
 		</div>
 	</div>
 </div>

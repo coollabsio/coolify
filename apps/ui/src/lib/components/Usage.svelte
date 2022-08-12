@@ -50,66 +50,64 @@
 	});
 </script>
 
-{#if $appSession.teamId === '0'}
-	<div class="pb-4">
-		<div class="title">Hardware Details</div>
-		<div class="text-center p-8 ">
-			<div>
-				<div class="stat w-64">
-					<div class="stat-title">Total Memory</div>
-					<div class="stat-value">
-						{(usage?.memory.totalMemMb).toFixed(0)}<span class="text-sm">MB</span>
-					</div>
-				</div>
-				<div class="stat w-64">
-					<div class="stat-title">Used Memory</div>
-					<div class="stat-value">
-						{(usage?.memory.usedMemMb).toFixed(0)}<span class="text-sm">MB</span>
-					</div>
-				</div>
-				<div class="stat w-64">
-					<div class="stat-title">Free Memory</div>
-					<div class="stat-value">
-						{usage?.memory.freeMemPercentage}<span class="text-sm">%</span>
-					</div>
+<div class="pb-4">
+	<div class="title">Hardware Details</div>
+	<div class="text-center p-8 ">
+		<div>
+			<div class="stat w-64">
+				<div class="stat-title">Total Memory</div>
+				<div class="stat-value">
+					{(usage?.memory.totalMemMb).toFixed(0)}<span class="text-sm">MB</span>
 				</div>
 			</div>
-			<div class="py-10">
-				<div class="stat w-64">
-					<div class="stat-title">Total CPUs</div>
-					<div class="stat-value">
-						{usage?.cpu.count}
-					</div>
-				</div>
-				<div class="stat w-64">
-					<div class="stat-title">CPU Usage</div>
-					<div class="stat-value">
-						{usage?.cpu.usage}<span class="text-sm">%</span>
-					</div>
-				</div>
-				<div class="stat w-64">
-					<div class="stat-title">Load Average (5,10,30mins)</div>
-					<div class="stat-value">{usage?.cpu.load}</div>
+			<div class="stat w-64">
+				<div class="stat-title">Used Memory</div>
+				<div class="stat-value">
+					{(usage?.memory.usedMemMb).toFixed(0)}<span class="text-sm">MB</span>
 				</div>
 			</div>
-			<div>
-				<div class="stat w-64">
-					<div class="stat-title">Total Disk</div>
-					<div class="stat-value">
-						{usage?.disk.totalGb}<span class="text-sm">GB</span>
-					</div>
-				</div>
-				<div class="stat w-64">
-					<div class="stat-title">Used Disk</div>
-					<div class="stat-value">
-						{usage?.disk.usedGb}<span class="text-sm">GB</span>
-					</div>
-				</div>
-				<div class="stat w-64">
-					<div class="stat-title">Free Disk</div>
-					<div class="stat-value">{usage?.disk.freePercentage}<span class="text-sm">%</span></div>
+			<div class="stat w-64">
+				<div class="stat-title">Free Memory</div>
+				<div class="stat-value">
+					{usage?.memory.freeMemPercentage}<span class="text-sm">%</span>
 				</div>
 			</div>
 		</div>
+		<div class="py-10">
+			<div class="stat w-64">
+				<div class="stat-title">Total CPUs</div>
+				<div class="stat-value">
+					{usage?.cpu.count}
+				</div>
+			</div>
+			<div class="stat w-64">
+				<div class="stat-title">CPU Usage</div>
+				<div class="stat-value">
+					{usage?.cpu.usage}<span class="text-sm">%</span>
+				</div>
+			</div>
+			<div class="stat w-64">
+				<div class="stat-title">Load Average (5,10,30mins)</div>
+				<div class="stat-value">{usage?.cpu.load}</div>
+			</div>
+		</div>
+		<div>
+			<div class="stat w-64">
+				<div class="stat-title">Total Disk</div>
+				<div class="stat-value">
+					{usage?.disk.totalGb}<span class="text-sm">GB</span>
+				</div>
+			</div>
+			<div class="stat w-64">
+				<div class="stat-title">Used Disk</div>
+				<div class="stat-value">
+					{usage?.disk.usedGb}<span class="text-sm">GB</span>
+				</div>
+			</div>
+			<div class="stat w-64">
+				<div class="stat-title">Free Disk</div>
+				<div class="stat-value">{usage?.disk.freePercentage}<span class="text-sm">%</span></div>
+			</div>
+		</div>
 	</div>
-{/if}
+</div>
