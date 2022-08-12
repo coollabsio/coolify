@@ -3,7 +3,7 @@ import type { FastifyRequest } from 'fastify';
 import { FastifyReply } from 'fastify';
 import yaml from 'js-yaml';
 import fs from 'fs/promises';
-import { ComposeFile, createDirectories, decrypt, encrypt, errorHandler, executeDockerCmd, generateDatabaseConfiguration, generatePassword, getContainerUsage, getDatabaseImage, getDatabaseVersions, getFreePublicPort, listSettings, makeLabelForStandaloneDatabase, prisma, startTraefikTCPProxy, stopDatabaseContainer, stopTcpHttpProxy, supportedDatabaseTypesAndVersions, uniqueName, updatePasswordInDb } from '../../../../lib/common';
+import { ComposeFile, createDirectories, decrypt, encrypt, errorHandler, executeDockerCmd, generateDatabaseConfiguration, generatePassword, getContainerUsage, getDatabaseImage, getDatabaseVersions, getFreePublicPort, isARM, listSettings, makeLabelForStandaloneDatabase, prisma, startTraefikTCPProxy, stopDatabaseContainer, stopTcpHttpProxy, supportedDatabaseTypesAndVersions, uniqueName, updatePasswordInDb } from '../../../../lib/common';
 import { checkContainer } from '../../../../lib/docker';
 import { day } from '../../../../lib/dayjs';
 
@@ -93,14 +93,15 @@ export async function getDatabase(request: FastifyRequest<OnlyId>) {
         if (!database) {
             throw { status: 404, message: 'Database not found.' }
         }
+        const { arch } = await listSettings();
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
         if (database.rootUserPassword) database.rootUserPassword = decrypt(database.rootUserPassword);
-        const configuration = generateDatabaseConfiguration(database);
+        const configuration = generateDatabaseConfiguration(database, arch);
         const settings = await listSettings();
         return {
             privatePort: configuration?.privatePort,
             database,
-            versions: await getDatabaseVersions(database.type),
+            versions: await getDatabaseVersions(database.type, arch),
             settings
         };
     } catch ({ status, message }) {
@@ -137,8 +138,10 @@ export async function getVersions(request: FastifyRequest<OnlyId>) {
             where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: { destinationDocker: true, settings: true }
         });
+        const { arch } = await listSettings();
+        const versions = getDatabaseVersions(type, arch);
         return {
-            versions: supportedDatabaseTypesAndVersions.find((name) => name.name === type).versions
+            versions
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -219,6 +222,7 @@ export async function startDatabase(request: FastifyRequest<OnlyId>) {
             where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: { destinationDocker: true, settings: true }
         });
+        const { arch } = await listSettings();
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
         if (database.rootUserPassword) database.rootUserPassword = decrypt(database.rootUserPassword);
         const {
@@ -228,8 +232,8 @@ export async function startDatabase(request: FastifyRequest<OnlyId>) {
             publicPort,
             settings: { isPublic }
         } = database;
-        const { privatePort, environmentVariables, image, volume, ulimits } =
-            generateDatabaseConfiguration(database);
+        const { privatePort, command, environmentVariables, image, volume, ulimits } =
+            generateDatabaseConfiguration(database, arch);
 
         const network = destinationDockerId && destinationDocker.network;
         const volumeName = volume.split(':')[0];
@@ -243,6 +247,7 @@ export async function startDatabase(request: FastifyRequest<OnlyId>) {
                 [id]: {
                     container_name: id,
                     image,
+                    command,
                     networks: [network],
                     environment: environmentVariables,
                     volumes: [volume],
@@ -270,6 +275,7 @@ export async function startDatabase(request: FastifyRequest<OnlyId>) {
                 }
             }
         };
+
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         try {
@@ -282,6 +288,7 @@ export async function startDatabase(request: FastifyRequest<OnlyId>) {
             if (isPublic) await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
             return {};
         } catch (error) {
+            console.log(error)
             throw {
                 error
             };
@@ -440,11 +447,12 @@ export async function saveDatabaseSettings(request: FastifyRequest<SaveDatabaseS
             where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: { destinationDocker: true, settings: true }
         });
+        const { arch } = await listSettings();
         if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
         if (database.rootUserPassword) database.rootUserPassword = decrypt(database.rootUserPassword);
 
         const { destinationDockerId, destinationDocker, publicPort: oldPublicPort } = database;
-        const { privatePort } = generateDatabaseConfiguration(database);
+        const { privatePort } = generateDatabaseConfiguration(database, arch);
 
         if (destinationDockerId) {
             if (isPublic) {
