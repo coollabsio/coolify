@@ -39,7 +39,7 @@
 
 	async function createSecret(isNew: any) {
 		try {
-			if (!name || !value) return 
+			if (!name || !value) return;
 			await saveSecret({
 				isNew,
 				name,
@@ -53,12 +53,16 @@
 				name = '';
 				value = '';
 				isBuildSecret = false;
+				addToast({
+					message: 'Secret added.',
+					type: 'success'
+				});
 			}
-			dispatch('refresh');
 			addToast({
-				message: 'Secret removed.',
+				message: 'Secret updated.',
 				type: 'success'
 			});
+			dispatch('refresh');
 		} catch (error) {
 			console.log(error);
 			return errorNotification(error);
@@ -79,7 +83,7 @@
 					applicationId: id
 				});
 				addToast({
-					message: 'Secret removed.',
+					message: 'Secret updated.',
 					type: 'success'
 				});
 			}
