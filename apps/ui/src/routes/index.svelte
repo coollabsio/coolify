@@ -23,9 +23,9 @@
 	import { get, post } from '$lib/api';
 	import Usage from '$lib/components/Usage.svelte';
 	import { t } from '$lib/translations';
-	import { errorNotification } from '$lib/common';
+	import { errorNotification, asyncSleep } from '$lib/common';
 	import { addToast, appSession } from '$lib/store';
-
+ 
 	import ApplicationsIcons from '$lib/components/svg/applications/ApplicationIcons.svelte';
 	import DatabaseIcons from '$lib/components/svg/databases/DatabaseIcons.svelte';
 	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
@@ -37,8 +37,18 @@
 	export let applications: any;
 	export let databases: any;
 	export let services: any;
+    let numberOfGetStatus = 0;
+    
+    function getRndInteger(min, max) {
+        return Math.floor(Math.random() * (max - min + 1) ) + min;
+    }
+
 	async function getStatus(resources: any) {
+		while (numberOfGetStatus > 1){
+			await asyncSleep(getRndInteger(100,200));
+		}
 		try {
+            numberOfGetStatus++;
 			const { id, buildPack, dualCerts } = resources;
 			let isRunning = false;
 			if (buildPack) {
@@ -58,7 +68,9 @@
 			}
 		} catch (error) {
 			return 'Error';
-		}
+		} finally {
+            numberOfGetStatus--;
+        }
 	}
 	async function manuallyCleanupStorage() {
 		try {
@@ -82,7 +94,6 @@
 		>Cleanup Storage</button
 	>
 </div>
-
 <div class="mt-10 pb-12 tracking-tight sm:pb-16">
 	<div class="mx-auto px-10">
 		<div class="flex flex-col justify-center xl:flex-row">
@@ -113,7 +124,7 @@
 											Application
 										</div></td
 									>
-									<td>
+									<td class="flex justify-end">
 										{#if application.fqdn}
 											<a
 												href={application.fqdn}
@@ -189,7 +200,7 @@
 										</div>
 									</td>
 
-									<td>
+									<td class="flex justify-end">
 										{#if service.fqdn}
 											<a
 												href={service.fqdn}
@@ -263,7 +274,7 @@
 											Database
 										</div>
 									</td>
-									<td>
+									<td class="flex justify-end">
 										<a
 											href={`/databases/${database.id}`}
 											class="icons bg-transparent text-sm inline-flex ml-11"
