@@ -193,3 +193,12 @@ a {
 .sub-menu-active {
 	@apply  bg-coolgray-500  text-white;
 }
+
+.table tbody td,
+.table tbody th,
+.table thead th{
+  background-color: transparent;
+}
+.table *{
+  border: none;
+}

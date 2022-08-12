@@ -1,4 +1,13 @@
-<svg class="absolute top-0 left-0 -m-4 h-10 w-10 text-green-500" viewBox="0 0 128 128">
+<script lang="ts">
+	export let isAbsolute = true;
+</script>
+
+<svg
+	class={isAbsolute
+		? 'absolute top-0 left-0 -m-4 h-10 w-10 text-green-500'
+		: 'mx-auto w-8 h-8 text-green-500'}
+	viewBox="0 0 128 128"
+>
 	<path
 		d="m-2.3125e-8 8.9337 49.854 0.1586 14.167 24.47 14.432-24.47 49.547-0.1577-63.834 110.14zm126.98 0.6374-24.36 0.0207-38.476 66.052-38.453-66.052-24.749-0.0194 63.211 107.89zm-25.149-0.008-22.745 0.16758l-15.053 24.647-14.817-24.647-22.794-0.1679 37.731 64.476zM25.997 9.3929l23.002 0.0087M25.997 9.3929l23.002 0.0087"
 		fill="none"

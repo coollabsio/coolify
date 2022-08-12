@@ -139,9 +139,9 @@
 				projectId: application.projectId
 			});
 			return addToast({
-					message: $t('application.settings_saved'),
-					type: 'success'
-				});
+				message: $t('application.settings_saved'),
+				type: 'success'
+			});
 		} catch (error) {
 			if (name === 'debug') {
 				debug = !debug;
@@ -177,7 +177,7 @@
 			forceSave = false;
 			addToast({
 				message: 'Configuration saved.',
-				type: 'success',
+				type: 'success'
 			});
 		} catch (error) {
 			console.log(error);
@@ -222,9 +222,9 @@
 		try {
 			await get(`/applications/${id}/check?domain=${domain}`);
 			addToast({
-					message: 'DNS configuration is valid.',
-					type: 'success'
-				});
+				message: 'DNS configuration is valid.',
+				type: 'success'
+			});
 			isWWW ? (isWWWDomainOK = true) : (isNonWWWDomainOK = true);
 			return true;
 		} catch (error) {
@@ -289,29 +289,21 @@
 
 <div class="mx-auto max-w-4xl px-6 py-4">
 	<div class="text-2xl font-bold">Application Usage</div>
-	<div class="mx-auto">
-		<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-			<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
-				<dt class=" text-sm font-medium text-white">Used Memory / Memory Limit</dt>
-				<dd class="mt-1 text-xl font-semibold text-white">
-					{usage?.MemUsage}
-				</dd>
-			</div>
+	<div class="text-center">
+		<div class="stat w-64">
+			<div class="stat-title">Used Memory / Memory Limit</div>
+			<div class="stat-value text-xl">{usage?.MemUsage}</div>
+		</div>
 
-			<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
-				<dt class="truncate text-sm font-medium text-white">Used CPU</dt>
-				<dd class="mt-1 text-xl font-semibold text-white ">
-					{usage?.CPUPerc}
-				</dd>
-			</div>
+		<div class="stat w-64">
+			<div class="stat-title">Used CPU</div>
+			<div class="stat-value text-xl">{usage?.CPUPerc}</div>
+		</div>
 
-			<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
-				<dt class="truncate text-sm font-medium text-white">Network IO</dt>
-				<dd class="mt-1 text-xl font-semibold text-white ">
-					{usage?.NetIO}
-				</dd>
-			</div>
-		</dl>
+		<div class="stat w-64">
+			<div class="stat-title">Network IO</div>
+			<div class="stat-value text-xl">{usage?.NetIO}</div>
+		</div>
 	</div>
 </div>
 <div class="mx-auto max-w-4xl px-6">
@@ -324,11 +316,10 @@
 					class="btn btn-sm"
 					type="submit"
 					class:bg-applications={!loading}
-					class:loading={loading}
+					class:loading
 					class:bg-orange-600={forceSave}
 					class:hover:bg-orange-400={forceSave}
-					disabled={loading}
-					>{$t('forms.save')}</button
+					disabled={loading}>{$t('forms.save')}</button
 				>
 			{/if}
 		</div>
