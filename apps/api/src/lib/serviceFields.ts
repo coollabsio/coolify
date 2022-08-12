@@ -395,7 +395,7 @@ export const fider = [{
 	isLowerCase: false,
 	isNumber: false,
 	isBoolean: false,
-	isEncrypted: false
+	isEncrypted: true
 },
 {
 	name: 'emailMailgunDomain',
