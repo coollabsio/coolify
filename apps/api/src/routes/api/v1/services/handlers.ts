@@ -197,15 +197,15 @@ export async function getService(request: FastifyRequest<OnlyId>) {
         const teamId = request.user.teamId;
         const { id } = request.params;
         const service = await getServiceFromDB({ id, teamId });
-        const settings = await listSettings()
+        console.log(service)
         if (!service) {
             throw { status: 404, message: 'Service not found.' }
         }
         return {
-            service,
-            settings
+            service
         }
     } catch ({ status, message }) {
+        console.log({status, message})
         return errorHandler({ status, message })
     }
 }
