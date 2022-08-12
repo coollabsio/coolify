@@ -460,7 +460,9 @@ export const supportedDatabaseTypesAndVersions = [
 		name: 'mongodb',
 		fancyName: 'MongoDB',
 		baseImage: 'bitnami/mongodb',
-		versions: ['5.0', '4.4', '4.2']
+		baseImageARM: 'mongo',
+		versions: ['5.0', '4.4', '4.2'],
+		versionsARM: ['5.0', '4.4', '4.2']
 	},
 	{
 		name: 'mysql',
@@ -716,8 +718,10 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 		ulimits: Record<string, unknown>;
 		privatePort: number;
 		environmentVariables: {
-			MONGODB_ROOT_USER: string;
-			MONGODB_ROOT_PASSWORD: string;
+			MONGO_INITDB_ROOT_USERNAME?: string;
+			MONGO_INITDB_ROOT_PASSWORD?: string;
+			MONGODB_ROOT_USER?: string;
+			MONGODB_ROOT_PASSWORD?: string;
 		};
 	}
 	| {
@@ -830,7 +834,7 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 		}
 		return configuration
 	} else if (type === 'mongodb') {
-		return {
+		const configuration = {
 			privatePort: 27017,
 			environmentVariables: {
 				MONGODB_ROOT_USER: rootUser,
@@ -840,6 +844,14 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 			volume: `${id}-${type}-data:/bitnami/mongodb`,
 			ulimits: {}
 		};
+		if (isARM(arch)) {
+			configuration.environmentVariables = {
+				MONGO_INITDB_ROOT_USERNAME: rootUser,
+				MONGO_INITDB_ROOT_PASSWORD: rootUserPassword
+			}
+			configuration.volume = `${id}-${type}-data:/data/db`;
+		}
+		return configuration
 	} else if (type === 'postgresql') {
 		const configuration = {
 			privatePort: 5432,
