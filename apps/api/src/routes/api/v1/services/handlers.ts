@@ -196,6 +196,7 @@ export async function getService(request: FastifyRequest<OnlyId>) {
     try {
         const teamId = request.user.teamId;
         const { id } = request.params;
+        console.log({id, teamId})
         const service = await getServiceFromDB({ id, teamId });
         console.log(service)
         if (!service) {

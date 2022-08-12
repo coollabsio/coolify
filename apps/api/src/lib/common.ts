@@ -1284,13 +1284,14 @@ export async function getServiceFromDB({ id, teamId }: { id: string; teamId: str
 	});
 	let { type } = body
 	type = fixType(type)
-
+	console.log({body})
 	if (body?.serviceSecret.length > 0) {
 		body.serviceSecret = body.serviceSecret.map((s) => {
 			s.value = decrypt(s.value);
 			return s;
 		});
 	}
+	console.log({body2:body})
 	body[type] = { ...body[type], ...getUpdateableFields(type, body[type]) }
 	return { ...body, settings };
 }
@@ -1582,6 +1583,7 @@ export function getUpdateableFields(type: string, data: any) {
 			update[k.name] = temp
 		});
 	}
+	console.log({update})
 	return update
 }
 
