@@ -36,6 +36,10 @@ const options: any = {
 			name: 'cleanupStorage',
 		},
 		{
+			name: 'cleanupPrismaEngines',
+			interval: '1m'
+		},
+		{
 			name: 'checkProxies',
 			interval: '10s'
 		},

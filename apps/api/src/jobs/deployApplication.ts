@@ -192,9 +192,9 @@ import * as buildpacks from '../lib/buildPacks';
 							} catch (error) {
 								//
 							}
+							await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId, baseImage);
 							if (!imageFound || deployNeeded) {
 							// if (true) {
-								await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId, baseImage);
 								if (buildpacks[buildPack])
 									await buildpacks[buildPack]({
 										dockerId: destinationDocker.id,
@@ -248,11 +248,11 @@ import * as buildpacks from '../lib/buildPacks';
 								secrets.forEach((secret) => {
 									if (pullmergeRequestId) {
 										if (secret.isPRMRSecret) {
-											envs.push(`${secret.name}=${secret.value}`);
+											envs.push(`${secret.name}='${secret.value}'`);
 										}
 									} else {
 										if (!secret.isPRMRSecret) {
-											envs.push(`${secret.name}=${secret.value}`);
+											envs.push(`${secret.name}='${secret.value}'`);
 										}
 									}
 								});

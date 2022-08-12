@@ -523,7 +523,7 @@ export async function buildImage({
 		await saveBuildLog({ line: `Building image started.`, buildId, applicationId });
 	}
 	if (debug) {
-		await saveBuildLog({ line: `\n###############\nIMPORTANT: Due to some issues during implementing Remote Docker Engine, the builds logs are not streamed at the moment. You will see the full build log when the build is finished!\n###############`, buildId, applicationId });
+		await saveBuildLog({ line: `\n###############\nIMPORTANT: Due to some issues during implementing Remote Docker Engine, the builds logs are not streamed at the moment - but will be soon! You will see the full build log when the build is finished!\n###############`, buildId, applicationId });
 	}
 	if (!debug && isCache) {
 		await saveBuildLog({
