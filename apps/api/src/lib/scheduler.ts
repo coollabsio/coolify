@@ -37,6 +37,7 @@ const options: any = {
 		},
 		{
 			name: 'cleanupPrismaEngines',
+			interval: '1m'
 		},
 		{
 			name: 'checkProxies',

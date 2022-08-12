@@ -5,7 +5,10 @@ import { asyncExecShell, isDev, prisma } from '../lib/common';
     if (parentPort) {
         if (!isDev) {
             try {
-                await asyncExecShell(`killall -q -e /app/prisma-engines/query-engine -o 10m`)
+                const { stdout } = await asyncExecShell(`ps -ef | grep /app/prisma-engines/query-engine | grep -v grep | wc -l | xargs`)
+                if (stdout.trim() != null && stdout.trim() != '' && Number(stdout.trim()) > 1) {
+                    await asyncExecShell(`killall -q -e /app/prisma-engines/query-engine -o 10m`)
+                }
             } catch (error) {
                 console.log(error);
             } finally {
