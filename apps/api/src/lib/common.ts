@@ -873,6 +873,11 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 		}
 		if (isARM(arch)) {
 			configuration.volume = `${id}-${type}-data:/var/lib/postgresql`;
+            configuration.environmentVariables = {
+                POSTGRES_PASSWORD: dbUserPassword,
+                POSTGRES_USER: dbUser,
+                POSTGRES_DB: defaultDatabase
+            }
 		}
 		return configuration
 	} else if (type === 'redis') {
@@ -909,7 +914,7 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 		return configuration
 	}
 }
-export function isARM(arch) {
+export function isARM(arch: string) {
 	if (arch === 'arm' || arch === 'arm64') {
 		return true
 	}
