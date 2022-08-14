@@ -326,7 +326,7 @@ export const fider = [{
 	isBoolean: false,
 	isEncrypted: true
 }, {
-	name: 'postgreslUser',
+	name: 'postgresqlUser',
 	isEditable: false,
 	isLowerCase: false,
 	isNumber: false,

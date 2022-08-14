@@ -17,7 +17,7 @@ import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
-export const version = '3.3.2';
+export const version = '3.3.3';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -96,17 +96,23 @@ export const base64Decode = (text: string): string => {
 };
 export const decrypt = (hashString: string) => {
 	if (hashString) {
-		const hash = JSON.parse(hashString);
-		const decipher = crypto.createDecipheriv(
-			algorithm,
-			process.env['COOLIFY_SECRET_KEY'],
-			Buffer.from(hash.iv, 'hex')
-		);
-		const decrpyted = Buffer.concat([
-			decipher.update(Buffer.from(hash.content, 'hex')),
-			decipher.final()
-		]);
-		return decrpyted.toString();
+		try {
+			const hash = JSON.parse(hashString);
+			const decipher = crypto.createDecipheriv(
+				algorithm,
+				process.env['COOLIFY_SECRET_KEY'],
+				Buffer.from(hash.iv, 'hex')
+			);
+			const decrpyted = Buffer.concat([
+				decipher.update(Buffer.from(hash.content, 'hex')),
+				decipher.final()
+			]);
+			return decrpyted.toString();
+		} catch (error) {
+			console.log({ decryptionError: error.message })
+			return hashString
+		}
+
 	}
 };
 export const encrypt = (text: string) => {
@@ -867,6 +873,11 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 		}
 		if (isARM(arch)) {
 			configuration.volume = `${id}-${type}-data:/var/lib/postgresql`;
+            configuration.environmentVariables = {
+                POSTGRES_PASSWORD: dbUserPassword,
+                POSTGRES_USER: dbUser,
+                POSTGRES_DB: defaultDatabase
+            }
 		}
 		return configuration
 	} else if (type === 'redis') {
@@ -903,7 +914,7 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 		return configuration
 	}
 }
-export function isARM(arch) {
+export function isARM(arch: string) {
 	if (arch === 'arm' || arch === 'arm64') {
 		return true
 	}
@@ -1226,7 +1237,6 @@ export async function startTraefikTCPProxy(
 				}
 				traefikUrl = `${ip}/webhooks/traefik/other.json`
 			}
-			console.log(traefikUrl)
 			const tcpProxy = {
 				version: '3.8',
 				services: {
@@ -1291,6 +1301,7 @@ export async function getServiceFromDB({ id, teamId }: { id: string; teamId: str
 			return s;
 		});
 	}
+
 	body[type] = { ...body[type], ...getUpdateableFields(type, body[type]) }
 	return { ...body, settings };
 }
