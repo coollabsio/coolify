@@ -59,7 +59,7 @@
 
 	async function changeSettings(name: any) {
 		if (name !== 'appendOnly') {
-			if (publicLoading || !$status.database.isRunning || name !== 'appendOnly') return;
+			if (publicLoading || !$status.database.isRunning) return;
 		}
 		publicLoading = true;
 		let data = {
