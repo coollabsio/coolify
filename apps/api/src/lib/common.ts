@@ -579,6 +579,11 @@ export async function executeDockerCmd({ dockerId, command }: { dockerId: string
 	} else {
 		engine = 'unix:///var/run/docker.sock'
 	}
+	if (process.env.CODESANDBOX_HOST) {
+		if (command.startsWith('docker compose')) {
+			command = command.replace(/docker compose/gi, 'docker-compose')
+		}
+	}
 	return await asyncExecShell(
 		`DOCKER_BUILDKIT=1 DOCKER_HOST="${engine}" ${command}`
 	);
@@ -873,11 +878,11 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 		}
 		if (isARM(arch)) {
 			configuration.volume = `${id}-${type}-data:/var/lib/postgresql`;
-            configuration.environmentVariables = {
-                POSTGRES_PASSWORD: dbUserPassword,
-                POSTGRES_USER: dbUser,
-                POSTGRES_DB: defaultDatabase
-            }
+			configuration.environmentVariables = {
+				POSTGRES_PASSWORD: dbUserPassword,
+				POSTGRES_USER: dbUser,
+				POSTGRES_DB: defaultDatabase
+			}
 		}
 		return configuration
 	} else if (type === 'redis') {
