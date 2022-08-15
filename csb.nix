@@ -5,5 +5,6 @@ stdenv.mkDerivation {
     buildInputs = [
         git
         git-lfs
+        docker-compose
     ];
 }
