@@ -97,6 +97,7 @@
 <div class="mt-10 pb-12 tracking-tight sm:pb-16">
 	<div class="mx-auto px-10">
 		<div class="flex flex-col justify-center xl:flex-row">
+			{#if applications.length > 0}
 			<div>
 				<div class="title">Resources</div>
 				<div class="flex items-start justify-center p-8">
@@ -308,6 +309,7 @@
 					</table>
 				</div>
 			</div>
+			{/if}
 			{#if $appSession.teamId === '0'}
 				<Usage />
 			{/if}
