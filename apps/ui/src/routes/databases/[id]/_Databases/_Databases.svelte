@@ -247,6 +247,7 @@
 		{#if database.type === 'redis'}
 			<div class="grid grid-cols-2 items-center">
 				<Setting
+					loading={publicLoading}
 					bind:setting={appendOnly}
 					on:click={() => changeSettings('appendOnly')}
 					title={$t('database.change_append_only_mode')}
