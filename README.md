@@ -129,6 +129,7 @@ You quickly need to host a self-hostable, open-source service? You can do it wit
 - [Umami](https://github.com/mikecao/umami)
 - [Fider](https://fider.io)
 - [Hasura](https://hasura.io)
+- [GlitchTip](https://glitchtip.com)
 
 
 If you have a new service you would like to add, raise an idea [here](https://feedback.coolify.io/) to get feedback from the community!

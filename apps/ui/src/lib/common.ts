@@ -159,6 +159,17 @@ export const supportedServiceTypesAndVersions = [
 	//         main: 8080
 	//     }
 	// }
+	{
+		name: 'glitchTip',
+		fancyName: 'GlitchTip',
+		baseImage: 'glitchtip/glitchtip',
+		images: ['postgres:14-alpine', 'redis:7-alpine'],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8000
+		}
+	},
 ];
 
 export const asyncSleep = (delay: number) =>

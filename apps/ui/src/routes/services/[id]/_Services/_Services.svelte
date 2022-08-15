@@ -19,6 +19,7 @@
 
 	import Fider from './_Fider.svelte';
 	import Ghost from './_Ghost.svelte';
+	import GlitchTip from './_GlitchTip.svelte';
 	import Hasura from './_Hasura.svelte';
 	import MeiliSearch from './_MeiliSearch.svelte';
 	import MinIo from './_MinIO.svelte';
@@ -37,7 +38,7 @@
 		save: false,
 		verification: false,
 		cleanup: false
-	}
+	};
 	let dualCerts = service.dualCerts;
 
 	let nonWWWDomain = service.fqdn && getDomain(service.fqdn).replace(/^www\./, '');
@@ -396,6 +397,8 @@
 				<Fider bind:service {readOnly} />
 			{:else if service.type === 'moodle'}
 				<Moodle bind:service {readOnly} />
+			{:else if service.type === 'glitchTip'}
+				<GlitchTip bind:service />
 			{/if}
 		</div>
 	</form>

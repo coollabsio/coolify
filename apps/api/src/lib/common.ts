@@ -78,6 +78,7 @@ export const include: any = {
 	umami: true,
 	hasura: true,
 	fider: true,
+	glitchTip: true,
 };
 
 export const uniqueName = (): string => uniqueNamesGenerator(customConfig);
@@ -280,6 +281,17 @@ export const supportedServiceTypesAndVersions = [
 	//         main: 8080
 	//     }
 	// }
+	{
+		name: 'glitchTip',
+		fancyName: 'GlitchTip',
+		baseImage: 'glitchtip/glitchtip',
+		images: ['postgres:14-alpine', 'redis:7-alpine'],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8000
+		}
+	},
 ];
 
 export async function checkDoubleBranch(branch: string, projectId: number): Promise<boolean> {
@@ -1517,7 +1529,33 @@ export async function configureServiceType({
 				}
 			}
 		});
-	} else {
+	} else if (type === 'glitchTip') {
+		const defaultUsername = cuid();
+		const defaultEmail = `${defaultUsername}@example.com`;
+		const defaultPassword = encrypt(generatePassword());
+		const postgresqlUser = cuid();
+		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlDatabase = 'glitchTip';
+		const secretKeyBase = encrypt(generatePassword(64));
+
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				glitchTip: {
+					create: {
+						postgresqlDatabase,
+						postgresqlUser,
+						postgresqlPassword,
+						secretKeyBase,
+						defaultEmail,
+						defaultUsername,
+						defaultPassword,
+					}
+				}
+			}
+		});
+	 } else {
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1538,6 +1576,7 @@ export async function removeService({ id }: { id: string }): Promise<void> {
 	await prisma.minio.deleteMany({ where: { serviceId: id } });
 	await prisma.vscodeserver.deleteMany({ where: { serviceId: id } });
 	await prisma.wordpress.deleteMany({ where: { serviceId: id } });
+	await prisma.glitchTip.deleteMany({ where: { serviceId: id } });
 	await prisma.serviceSecret.deleteMany({ where: { serviceId: id } });
 
 	await prisma.service.delete({ where: { id } });

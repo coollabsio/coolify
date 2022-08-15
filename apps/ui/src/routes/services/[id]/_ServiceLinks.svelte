@@ -59,5 +59,8 @@
 	<a href="https://moodle.org" target="_blank">
 		<Icons.Moodle />
 	</a>
+{:else if service.type === 'glitchTip'}
+	<a href="https://glitchtip.com" target="_blank">
+		<Icons.GlitchTip />
+	</a>
 {/if}
-
