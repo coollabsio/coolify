@@ -595,6 +595,11 @@ export async function startTraefikProxy(id: string): Promise<void> {
 	const { id: settingsId, ipv4, ipv6 } = await listSettings();
 
 	if (!found) {
+		const { stdout: coolifyNetwork } = await executeDockerCmd({ dockerId: id, command: `docker network ls --filter 'name=coolify-infra' --no-trunc --format "{{json .}}"` })
+		
+		if (!coolifyNetwork) {
+			await executeDockerCmd({ dockerId: id, command: `docker network create --attachable coolify-infra` })
+		}
 		const { stdout: Config } = await executeDockerCmd({ dockerId: id, command: `docker network inspect ${network} --format '{{json .IPAM.Config }}'` })
 		const ip = JSON.parse(Config)[0].Gateway;
 		let traefikUrl = mainTraefikEndpoint
