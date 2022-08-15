@@ -158,7 +158,7 @@ export const supportedServiceTypesAndVersions = [
 		ports: {
 			main: 80
 		}
-	}
+	},
 	// {
 	//     name: 'moodle',
 	//     fancyName: 'Moodle',
