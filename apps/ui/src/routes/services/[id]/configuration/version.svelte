@@ -35,7 +35,6 @@
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
-
 	let recommendedVersion = supportedServiceTypesAndVersions.find(
 		({ name }) => name === type
 	)?.recommendedVersion;

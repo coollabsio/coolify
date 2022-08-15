@@ -16,6 +16,7 @@ export function formatLabelsOnDocker(data) {
 export async function checkContainer({ dockerId, container, remove = false }: { dockerId: string, container: string, remove?: boolean }): Promise<boolean> {
 	let containerFound = false;
 	try {
+		console.log('checking ', container)
 		const { stdout } = await executeDockerCmd({
 			dockerId,
 			command:
@@ -71,7 +72,7 @@ export async function removeContainer({
 }): Promise<void> {
 	try {
 		const { stdout } = await executeDockerCmd({ dockerId, command: `docker inspect --format '{{json .State}}' ${id}` })
-
+		console.log(id)
 		if (JSON.parse(stdout).Running) {
 			await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}` })
 			await executeDockerCmd({ dockerId, command: `docker rm ${id}` })

@@ -1,9 +1,10 @@
 with import <nixpkgs> {};
 
 stdenv.mkDerivation {
-    name = "git";
+    name = "environment";
     buildInputs = [
         git
         git-lfs
+        docker-compose
     ];
 }

@@ -292,8 +292,7 @@ export const buildPacks = [
 		fancyName: 'Deno',
 		hoverColor: 'hover:bg-green-700',
 		color: 'bg-green-700'
-	}
-	// },
+	},
     // {
     //     name: 'heroku',
 	// 	fancyName: 'Heroku Buildpack',

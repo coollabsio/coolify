@@ -55,6 +55,10 @@
 	<a href="https://fider.io" target="_blank">
 		<Icons.Fider />
 	</a>
+{:else if service.type === 'appwrote'}
+	<a href="https://appwrite.io" target="_blank">
+		<Icons.Appwrite/>
+	</a>
 {:else if service.type === 'moodle'}
 	<a href="https://moodle.org" target="_blank">
 		<Icons.Moodle />

@@ -13,5 +13,6 @@ export { default as MeiliSearch }  from './MeiliSearch.svelte';
 export { default as Umami }  from './Umami.svelte';
 export { default as Hasura }  from './Hasura.svelte';
 export { default as Fider }  from './Fider.svelte';
+export { default as Appwrite }  from './Moodle.svelte';
 export { default as Moodle }  from './Moodle.svelte';
 export { default as GlitchTip }  from './GlitchTip.svelte';
