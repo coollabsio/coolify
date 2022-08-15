@@ -312,30 +312,33 @@ model DatabaseSettings {
 }
 
 model Service {
-  id                  String                     @id @default(cuid())
+  id                  String             @id @default(cuid())
   name                String
   fqdn                String?
   exposePort          Int?
-  dualCerts           Boolean                    @default(false)
+  dualCerts           Boolean            @default(false)
   type                String?
   version             String?
   destinationDockerId String?
-  createdAt           DateTime                   @default(now())
-  updatedAt           DateTime                   @updatedAt
-  destinationDocker   DestinationDocker?         @relation(fields: [destinationDockerId], references: [id])
-  fider               Fider?
-  ghost               Ghost?
-  hasura              Hasura?
-  meiliSearch         MeiliSearch?
-  minio               Minio?
-  moodle              Moodle?
-  plausibleAnalytics  PlausibleAnalytics?
-  persistentStorage   ServicePersistentStorage[]
-  serviceSecret       ServiceSecret[]
-  umami               Umami?
-  vscodeserver        Vscodeserver?
-  wordpress           Wordpress?
-  teams               Team[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  destinationDocker   DestinationDocker? @relation(fields: [destinationDockerId], references: [id])
+
+  fider              Fider?
+  ghost              Ghost?
+  hasura             Hasura?
+  meiliSearch        MeiliSearch?
+  minio              Minio?
+  moodle             Moodle?
+  plausibleAnalytics PlausibleAnalytics?
+  persistentStorage  ServicePersistentStorage[]
+  serviceSecret      ServiceSecret[]
+  umami              Umami?
+  vscodeserver       Vscodeserver?
+  wordpress          Wordpress?
+  appwrite           Appwrite?
+
+  teams Team[]
 }
 
 model PlausibleAnalytics {
@@ -481,6 +484,25 @@ model Moodle {
   defaultUsername         String
   defaultPassword         String
   defaultEmail            String
+  mariadbUser             String
+  mariadbPassword         String
+  mariadbRootUser         String
+  mariadbRootUserPassword String
+  mariadbDatabase         String
+  mariadbPublicPort       Int?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  service                 Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Appwrite {
+  id                      String   @id @default(cuid())
+  serviceId               String   @unique
+  opensslKeyV1            String
+  executorSecret          String
+  redisPassword           String
+  mariadbHost             String?
+  mariadbPort             Int      @default(3306)
   mariadbUser             String
   mariadbPassword         String
   mariadbRootUser         String

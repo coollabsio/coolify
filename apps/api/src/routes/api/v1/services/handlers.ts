@@ -9,6 +9,7 @@ import cuid from 'cuid';
 
 import type { OnlyId } from '../../../../types';
 import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetWordpressSettings } from './types';
+import { defaultServiceComposeConfiguration, defaultServiceConfigurations } from '../../../../lib/services';
 
 // async function startServiceNew(request: FastifyRequest<OnlyId>) {
 //     try {
@@ -588,6 +589,9 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         if (type === 'moodle') {
             return await startMoodleService(request)
         }
+        if (type === 'appwrite') {
+            return await startAppWriteService(request)
+        }
         throw `Service type ${type} not supported.`
     } catch (error) {
         throw { status: 500, message: error?.message || error }
@@ -637,6 +641,9 @@ export async function stopService(request: FastifyRequest<ServiceStartStop>) {
         }
         if (type === 'fider') {
             return await stopFiderService(request)
+        }
+        if (type === 'appwrite') {
+            return await stopAppWriteService(request)
         }
         if (type === 'moodle') {
             return await stopMoodleService(request)
@@ -2472,7 +2479,511 @@ async function stopFiderService(request: FastifyRequest<ServiceStartStop>) {
         return errorHandler({ status, message })
     }
 }
+async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
+    try {
+        const { id } = request.params;
+        const teamId = request.user.teamId;
+        const { version, fqdn, destinationDocker, secrets, exposePort, network, port, workdir, image, appwrite } = await defaultServiceConfigurations({ id, teamId })
 
+        let isStatsEnabled = false
+        if (secrets._APP_USAGE_STATS) {
+            isStatsEnabled = true
+        }
+        const {
+            opensslKeyV1,
+            executorSecret,
+            mariadbHost,
+            mariadbPort,
+            mariadbUser,
+            mariadbPassword,
+            mariadbRootUser,
+            mariadbRootUserPassword,
+            mariadbDatabase
+        } = appwrite;
+
+        const dockerCompose = {
+            [id]: {
+                ...defaultServiceComposeConfiguration(network),
+                image: `${image}:${version}`,
+                container_name: id,
+                labels: makeLabelForServices('appwrite'),
+                ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                "volumes": [
+                    `${id}-uploads:/storage/uploads:rw`,
+                    `${id}-cache:/storage/cache:rw`,
+                    `${id}-config:/storage/config:rw`,
+                    `${id}-certificates:/storage/certificates:rw`,
+                    `${id}-functions:/storage/functions:rw`
+                ],
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    "_APP_LOCALE=en",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_DOMAIN=${fqdn}`,
+                    `_APP_DOMAIN_TARGET=${fqdn}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    `_APP_INFLUXDB_HOST=${id}-influxdb`,
+                    "_APP_INFLUXDB_PORT=8806",
+                    `_APP_EXECUTOR_SECRET=${executorSecret}`,
+                    `_APP_EXECUTOR_HOST=http://${id}-executor/v1`,
+                    `_APP_STATSD_HOST=${id}-telegraf`,
+                    "_APP_STATSD_PORT=8125",
+                    ...secrets
+                ]
+            },
+            [`${id}-realtime`]: {
+                ...defaultServiceComposeConfiguration(network),
+                image: `${image}:${version}`,
+                container_name: `${id}-realtime`,
+                entrypoint: "realtime",
+                labels: makeLabelForServices('appwrite'),
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    ...secrets
+                ]
+            },
+            [`${id}-worker-audits`]: {
+                ...defaultServiceComposeConfiguration(network),
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-audits`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-audits",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    ...secrets
+                ]
+            },
+            [`${id}-worker-webhooks`]: {
+                ...defaultServiceComposeConfiguration(network),
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-webhooks`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-webhooks",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    ...secrets
+                ]
+            },
+            [`${id}-worker-deletes`]: {
+                ...defaultServiceComposeConfiguration(network),
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-deletes`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-deletes",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "volumes": [
+                    `${id}-uploads:/storage/uploads:rw`,
+                    `${id}-cache:/storage/cache:rw`,
+                    `${id}-config:/storage/config:rw`,
+                    `${id}-certificates:/storage/certificates:rw`,
+                    `${id}-functions:/storage/functions:rw`,
+                    `${id}-builds:/storage/builds:rw`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    `_APP_EXECUTOR_SECRET=${executorSecret}`,
+                    `_APP_EXECUTOR_HOST=http://${id}-executor/v1`,
+                    ...secrets
+                ]
+            },
+            [`${id}-worker-databases`]: {
+                ...defaultServiceComposeConfiguration(network),
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-databases`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-databases",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    ...secrets
+                ]
+            },
+            [`${id}-worker-builds`]: {
+                ...defaultServiceComposeConfiguration(network),
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-builds`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-builds",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_EXECUTOR_SECRET=${executorSecret}`,
+                    `_APP_EXECUTOR_HOST=http://${id}-executor/v1`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    ...secrets
+                ]
+            },
+            [`${id}-worker-certificates`]: {
+                ...defaultServiceComposeConfiguration(network),
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-certificates`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-certificates",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "volumes": [
+                    `${id}-config:/storage/config:rw`,
+                    `${id}-certificates:/storage/certificates:rw`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_DOMAIN=${fqdn}`,
+                    `_APP_DOMAIN_TARGET=${fqdn}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    ...secrets
+                ]
+            },
+            [`${id}-worker-functions`]: {
+                ...defaultServiceComposeConfiguration(network),
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-functions`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-functions",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                    `${id}-executor`
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    `_APP_EXECUTOR_SECRET=${executorSecret}`,
+                    `_APP_EXECUTOR_HOST=http://${id}-executor/v1`,
+                    ...secrets
+                ]
+            },
+            [`${id}-executor`]: {
+                ...defaultServiceComposeConfiguration(network),
+                image: `${image}:${version}`,
+                container_name: `${id}-executor`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "executor",
+                "stop_signal": "SIGINT",
+                "volumes": [
+                    `${id}-functions:/storage/functions:rw`,
+                    `${id}-builds:/storage/builds:rw`,
+                    "/var/run/docker.sock:/var/run/docker.sock",
+                    "/tmp:/tmp:rw"
+                ],
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                    `${id}`
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_EXECUTOR_SECRET=${executorSecret}`,
+                    ...secrets
+                ]
+            },
+            [`${id}-worker-mails`]: {
+                ...defaultServiceComposeConfiguration(network),
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-mails`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-mails",
+                "depends_on": [
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    ...secrets
+                ]
+            },
+            [`${id}-worker-messaging`]: {
+                ...defaultServiceComposeConfiguration(network),
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-messaging`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-messaging",
+                "depends_on": [
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    ...secrets
+                ]
+            },
+            [`${id}-maintenance`]: {
+                ...defaultServiceComposeConfiguration(network),
+                image: `${image}:${version}`,
+                container_name: `${id}-maintenance`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "maintenance",
+                "depends_on": [
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_DOMAIN=${fqdn}`,
+                    `_APP_DOMAIN_TARGET=${fqdn}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    ...secrets
+                ]
+            },
+            [`${id}-schedule`]: {
+                ...defaultServiceComposeConfiguration(network),
+                image: `${image}:${version}`,
+                container_name: `${id}-schedule`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "schedule",
+                "depends_on": [
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    ...secrets
+                ]
+            },
+            [`${id}-mariadb`]: {
+                ...defaultServiceComposeConfiguration(network),
+                "image": "mariadb:10.7",
+                container_name: `${id}-mariadb`,
+                labels: makeLabelForServices('appwrite'),
+                "volumes": [
+                    `${id}-mariadb:/var/lib/mysql:rw`
+                ],
+                "environment": [
+                    `MYSQL_ROOT_USER=${mariadbRootUser}`,
+                    `MYSQL_ROOT_PASSWORD=${mariadbRootUserPassword}`,
+                    `MYSQL_USER=${mariadbUser}`,
+                    `MYSQL_PASSWORD=${mariadbPassword}`,
+                    `MYSQL_DATABASE=${mariadbDatabase}`
+                ],
+                "command": "mysqld --innodb-flush-method=fsync"
+            },
+            [`${id}-redis`]: {
+                ...defaultServiceComposeConfiguration(network),
+                "image": "redis:6.2-alpine",
+                container_name: `${id}-redis`,
+                "command": `redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru --maxmemory-samples 5\n`,
+                "volumes": [
+                    `${id}-redis:/data:rw`
+                ]
+            },
+
+        };
+        if (isStatsEnabled) {
+            dockerCompose.id.depends_on.push(`${id}-influxdb`);
+            dockerCompose[`${id}-usage`] = {
+                ...defaultServiceComposeConfiguration(network),
+                image: `${image}:${version}`,
+                container_name: `${id}-usage`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "usage",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-influxdb`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    `_APP_INFLUXDB_HOST=${id}-influxdb`,
+                    "_APP_INFLUXDB_PORT=8806",
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    ...secrets
+                ]
+            }
+            dockerCompose[`${id}-influxdb`] = {
+                ...defaultServiceComposeConfiguration(network),
+                "image": "appwrite/influxdb:1.5.0",
+                container_name: `${id}-influxdb`,
+                "volumes": [
+                    `${id}-influxdb:/var/lib/influxdb:rw`
+                ]
+            }
+            dockerCompose[`${id}-telegraf`] = {
+                ...defaultServiceComposeConfiguration(network),
+                "image": "appwrite/telegraf:1.4.0",
+                container_name: `${id}-telegraf`,
+                "environment": [
+                    `_APP_INFLUXDB_HOST=${id}-influxdb`,
+                    "_APP_INFLUXDB_PORT=8806",
+                ]
+            }
+        }
+
+        const composeFile: any = {
+            version: '3.8',
+            services: dockerCompose,
+            networks: {
+                [network]: {
+                    external: true
+                }
+            },
+            volumes: {
+                [`${id}-uploads`]: {
+                    name: `${id}-uploads`
+                },
+                [`${id}-cache`]: {
+                    name: `${id}-cache`
+                },
+                [`${id}-config`]: {
+                    name: `${id}-config`
+                },
+                [`${id}-certificates`]: {
+                    name: `${id}-certificates`
+                },
+                [`${id}-functions`]: {
+                    name: `${id}-functions`
+                },
+                [`${id}-builds`]: {
+                    name: `${id}-builds`
+                },
+                [`${id}-mariadb`]: {
+                    name: `${id}-mariadb`
+                },
+                [`${id}-redis`]: {
+                    name: `${id}-redis`
+                },
+                [`${id}-influxdb`]: {
+                    name: `${id}-influxdb`
+                }
+            }
+
+        };
+        const composeFileDestination = `${workdir}/docker-compose.yaml`;
+        await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
+
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+
+        return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+async function stopAppWriteService(request: FastifyRequest<ServiceStartStop>) {
+    try {
+        // TODO: Fix async for of
+        const { id } = request.params;
+        const teamId = request.user.teamId;
+        const service = await getServiceFromDB({ id, teamId });
+        const { destinationDockerId, destinationDocker } = service;
+        const containers = [`${id}-mariadb`, `${id}-redis`, `${id}-influxdb`, `${id}-telegraf`, id, `${id}-realtime`, `${id}-worker-audits`, `${id}worker-webhooks`, `${id}-worker-deletes`, `${id}-worker-databases`, `${id}-worker-builds`, `${id}-worker-certificates`, `${id}-worker-functions`, `${id}-worker-mails`, `${id}-worker-messaging`, `${id}-maintenance`, `${id}-schedule`, `${id}-executor`, `${id}-usage`]
+        if (destinationDockerId) {
+            for (const container of containers) {
+                const found = await checkContainer({ dockerId: destinationDocker.id, container });
+                if (found) {
+                    await removeContainer({ id, dockerId: destinationDocker.id });
+                }
+
+            }
+        }
+        return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
