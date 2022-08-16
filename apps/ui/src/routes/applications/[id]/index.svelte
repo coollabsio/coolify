@@ -5,7 +5,8 @@
 			if (stuff?.application?.id) {
 				return {
 					props: {
-						application: stuff.application
+						application: stuff.application,
+						settings: stuff.settings
 					}
 				};
 			}
@@ -26,6 +27,7 @@
 
 <script lang="ts">
 	export let application: any;
+	export let settings: any;
 	import { page } from '$app/stores';
 	import { onDestroy, onMount } from 'svelte';
 	import Select from 'svelte-select';
@@ -132,6 +134,7 @@
 		}
 		if (name === 'isBot') {
 			isBot = !isBot;
+			setLocation(application, settings);
 		}
 		try {
 			await post(`/applications/${id}/settings`, {
@@ -181,7 +184,7 @@
 					exposePort: application.exposePort
 				}));
 			await post(`/applications/${id}`, { ...application });
-			setLocation(application);
+			setLocation(application, settings);
 			$disabledButton = false;
 			forceSave = false;
 			addToast({

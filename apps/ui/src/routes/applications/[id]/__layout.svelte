@@ -127,18 +127,14 @@
 		$status.application.loading = false;
 		$status.application.initialLoading = false;
 	}
+
 	onDestroy(() => {
 		$status.application.initialLoading = true;
 		$location = null;
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
-		setLocation(application);
-		console.log(settings)
-		if (application.settings.isBot) {
-			$location = `${settings.ipv4}:${application.exposePort}`;
-			console.log($location)
-		}
+		setLocation(application, settings);
 		$status.application.isRunning = false;
 		$status.application.isExited = false;
 		$status.application.loading = false;
