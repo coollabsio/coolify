@@ -25,7 +25,7 @@ export interface SaveApplication extends OnlyId {
 }
 export interface SaveApplicationSettings extends OnlyId {
     Querystring: { domain: string; };
-    Body: { debug: boolean; previews: boolean; dualCerts: boolean; autodeploy: boolean; branch: string; projectId: number; };
+    Body: { debug: boolean; previews: boolean; dualCerts: boolean; autodeploy: boolean; branch: string; projectId: number; isBot: boolean; };
 }
 export interface DeleteApplication extends OnlyId {
     Querystring: { domain: string; };

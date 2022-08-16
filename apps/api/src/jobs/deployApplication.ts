@@ -298,7 +298,6 @@ import * as buildpacks from '../lib/buildPacks';
 										}
 									};
 								});
-								console.log({port})
 								const composeFile = {
 									version: '3.8',
 									services: {
