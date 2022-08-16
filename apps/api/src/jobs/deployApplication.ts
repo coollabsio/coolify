@@ -152,6 +152,13 @@ import * as buildpacks from '../lib/buildPacks';
 									.createHash('sha256')
 									.update(
 										JSON.stringify({
+											pythonWSGI,
+											pythonModule,
+											pythonVariable,
+											deploymentType,
+											denoOptions, 
+											baseImage,
+											baseBuildImage,
 											buildPack,
 											port,
 											exposePort,

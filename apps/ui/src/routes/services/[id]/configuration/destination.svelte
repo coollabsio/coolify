@@ -32,10 +32,16 @@
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
+	import { onMount } from 'svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
 
+	onMount(async () => {
+		if (destinations.length === 1) {
+			await handleSubmit(destinations[0].id);
+		}
+	});
 	async function handleSubmit(destinationId: any) {
 		try {
 			await post(`/services/${id}/configuration/destination`, { destinationId });
@@ -54,7 +60,9 @@
 <div class="flex justify-center">
 	{#if !destinations || destinations.length === 0}
 		<div class="flex-col">
-			<div class="pb-2 text-center font-bold">{$t('application.configuration.no_configurable_destination')}</div>
+			<div class="pb-2 text-center font-bold">
+				{$t('application.configuration.no_configurable_destination')}
+			</div>
 			<div class="flex justify-center">
 				<a href="/new/destination" sveltekit:prefetch class="add-icon bg-sky-600 hover:bg-sky-500">
 					<svg

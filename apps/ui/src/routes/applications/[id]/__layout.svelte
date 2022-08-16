@@ -16,7 +16,7 @@
 	export const load: Load = async ({ fetch, url, params }) => {
 		try {
 			const response = await get(`/applications/${params.id}`);
-			let { application, appId, settings, isQueueActive } = response;
+			let { application, appId, settings } = response;
 			if (!application || Object.entries(application).length === 0) {
 				return {
 					status: 302,
@@ -36,7 +36,8 @@
 
 			return {
 				props: {
-					application
+					application,
+					settings
 				},
 				stuff: {
 					application,
@@ -52,7 +53,7 @@
 
 <script lang="ts">
 	export let application: any;
-
+	export let settings: any;
 	import { page } from '$app/stores';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import { del, get, post } from '$lib/api';
@@ -65,10 +66,10 @@
 
 	let loading = false;
 	let statusInterval: any;
-	let isQueueActive= false;
+	let isQueueActive = false;
 	$disabledButton =
 		!$appSession.isAdmin ||
-		!application.fqdn ||
+		(!application.fqdn && !application.settings.isBot) ||
 		!application.gitSource ||
 		!application.repository ||
 		!application.destinationDocker ||
@@ -80,9 +81,9 @@
 		try {
 			const { buildId } = await post(`/applications/${id}/deploy`, { ...application });
 			addToast({
-					message: $t('application.deployment_queued'),
-					type: 'success'
-				});
+				message: $t('application.deployment_queued'),
+				type: 'success'
+			});
 			if ($page.url.pathname.startsWith(`/applications/${id}/logs/build`)) {
 				return window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
 			} else {
@@ -114,7 +115,7 @@
 			return window.location.reload();
 		} catch (error) {
 			return errorNotification(error);
-		} 
+		}
 	}
 	async function getStatus() {
 		if ($status.application.loading) return;
@@ -126,18 +127,23 @@
 		$status.application.loading = false;
 		$status.application.initialLoading = false;
 	}
+
 	onDestroy(() => {
 		$status.application.initialLoading = true;
 		$location = null;
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {
-		setLocation(application);
-
+		setLocation(application, settings);
 		$status.application.isRunning = false;
 		$status.application.isExited = false;
 		$status.application.loading = false;
-		if (application.gitSourceId && application.destinationDockerId && application.fqdn) {
+		if (
+			application.gitSourceId &&
+			application.destinationDockerId &&
+			application.fqdn &&
+			!application.settings.isBot
+		) {
 			await getStatus();
 			statusInterval = setInterval(async () => {
 				await getStatus();

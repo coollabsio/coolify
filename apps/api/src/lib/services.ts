@@ -13,13 +13,13 @@ export async function defaultServiceConfigurations({ id, teamId }) {
     let secrets = [];
     if (serviceSecret.length > 0) {
         serviceSecret.forEach((secret) => {
-            secrets.push([secret.name]=secret.value);
+            secrets.push(`${secret.name}=${secret.value}`);
         });
     }
     return { ...service, network, port, workdir, image, secrets }
 }
 
-export function defaultServiceComposeConfiguration(network: string) {
+export function defaultServiceComposeConfiguration(network: string): any {
     return {
         networks: [network],
         restart: 'always',

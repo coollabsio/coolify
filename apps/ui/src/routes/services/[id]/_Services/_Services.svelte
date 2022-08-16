@@ -323,13 +323,13 @@
 				<div class="flex-col space-y-2 pt-4 text-center">
 					{#if isNonWWWDomainOK}
 						<button
-							class="bg-green-600 hover:bg-green-500"
+							class="btn btn-sm bg-green-600 hover:bg-green-500"
 							on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
 							>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
 						>
 					{:else}
 						<button
-							class="bg-red-600 hover:bg-red-500"
+							class="btn btn-sm bg-red-600 hover:bg-red-500"
 							on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
 							>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
 						>
@@ -337,13 +337,13 @@
 					{#if dualCerts}
 						{#if isWWWDomainOK}
 							<button
-								class="bg-green-600 hover:bg-green-500"
+								class="btn btn-sm bg-green-600 hover:bg-green-500"
 								on:click|preventDefault={() => isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
 								>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
 							>
 						{:else}
 							<button
-								class="bg-red-600 hover:bg-red-500"
+								class="btn btn-sm bg-red-600 hover:bg-red-500"
 								on:click|preventDefault={() => isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
 								>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
 							>

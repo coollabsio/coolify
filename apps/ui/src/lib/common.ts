@@ -131,8 +131,8 @@ export const supportedServiceTypesAndVersions = [
 		fancyName: 'Hasura',
 		baseImage: 'hasura/graphql-engine',
 		images: ['postgres:12-alpine'],
-		versions: ['latest', 'v2.5.1'],
-		recommendedVersion: 'v2.5.1',
+		versions: ['latest', 'v2.10.0', 'v2.5.1'],
+		recommendedVersion: 'v2.10.0',
 		ports: {
 			main: 8080
 		}
@@ -240,7 +240,7 @@ export const staticDeployments = [
 	'astro',
 	'eleventy'
 ];
-export const notNodeDeployments = ['php', 'docker', 'rust', 'python', 'deno', 'laravel'];
+export const notNodeDeployments = ['php', 'docker', 'rust', 'python', 'deno', 'laravel', 'heroku'];
 
 
 export function generateRemoteEngine(destination: any) {

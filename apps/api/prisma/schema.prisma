@@ -124,6 +124,7 @@ model ApplicationSettings {
   debug         Boolean     @default(false)
   previews      Boolean     @default(false)
   autodeploy    Boolean     @default(true)
+  isBot         Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   application   Application @relation(fields: [applicationId], references: [id])

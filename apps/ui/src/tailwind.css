@@ -46,7 +46,7 @@ textarea {
 }
 
 #svelte .custom-select-wrapper .selectContainer {
-	@apply h-12 w-96 rounded border-none bg-coolgray-200 p-2 px-0 text-xs  tracking-tight  outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 md:text-sm;
+	@apply h-12 w-96 rounded border border-coolgray-300 border-dashed  bg-coolgray-200 p-2 px-0 text-xs tracking-tight outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 md:text-sm;
 }
 
 #svelte .listContainer {

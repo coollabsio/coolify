@@ -3,8 +3,7 @@ import type { FastifyRequest } from 'fastify';
 import { FastifyReply } from 'fastify';
 import yaml from 'js-yaml';
 import fs from 'fs/promises';
-import { ComposeFile, createDirectories, decrypt, encrypt, errorHandler, executeDockerCmd, generateDatabaseConfiguration, generatePassword, getContainerUsage, getDatabaseImage, getDatabaseVersions, getFreePublicPort, isARM, listSettings, makeLabelForStandaloneDatabase, prisma, startTraefikTCPProxy, stopDatabaseContainer, stopTcpHttpProxy, supportedDatabaseTypesAndVersions, uniqueName, updatePasswordInDb } from '../../../../lib/common';
-import { checkContainer } from '../../../../lib/docker';
+import { ComposeFile, createDirectories, decrypt, encrypt, errorHandler, executeDockerCmd, generateDatabaseConfiguration, generatePassword, getContainerUsage, getDatabaseImage, getDatabaseVersions, getFreePublicPort, listSettings, makeLabelForStandaloneDatabase, prisma, startTraefikTCPProxy, stopDatabaseContainer, stopTcpHttpProxy, supportedDatabaseTypesAndVersions, uniqueName, updatePasswordInDb } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 
 import { GetDatabaseLogs, OnlyId, SaveDatabase, SaveDatabaseDestination, SaveDatabaseSettings, SaveVersion } from '../../../../types';

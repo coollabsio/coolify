@@ -17,7 +17,7 @@ import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
-export const version = '3.4.0';
+export const version = '3.5.0';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -261,8 +261,8 @@ export const supportedServiceTypesAndVersions = [
 		fancyName: 'Hasura',
 		baseImage: 'hasura/graphql-engine',
 		images: ['postgres:12-alpine'],
-		versions: ['latest', 'v2.8.4', 'v2.5.1'],
-		recommendedVersion: 'v2.8.4',
+		versions: ['latest', 'v2.10.0', 'v2.5.1'],
+		recommendedVersion: 'v2.10.0',
 		ports: {
 			main: 8080
 		}

@@ -38,4 +38,6 @@
 	<Icons.Deno {isAbsolute} />
 {:else if application.buildPack?.toLowerCase() === 'laravel'}
 	<Icons.Laravel {isAbsolute} />
+{:else if application.buildPack?.toLowerCase() === 'heroku'}
+	<Icons.Heroku {isAbsolute} />
 {/if}

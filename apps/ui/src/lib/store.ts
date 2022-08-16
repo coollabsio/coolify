@@ -70,7 +70,10 @@ export const features = readable({
 });
 
 export const location: Writable<null | string> = writable(null)
-export const setLocation = (resource: any) => {
+export const setLocation = (resource: any, settings?: any) => {
+    if (resource.settings.isBot) {
+        return location.set(`http://${settings.ipv4}:${resource.exposePort}`)
+    }
     if (GITPOD_WORKSPACE_URL && resource.exposePort) {
         const { href } = new URL(GITPOD_WORKSPACE_URL);
         const newURL = href
