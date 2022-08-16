@@ -16,7 +16,6 @@ export function formatLabelsOnDocker(data) {
 export async function checkContainer({ dockerId, container, remove = false }: { dockerId: string, container: string, remove?: boolean }): Promise<boolean> {
 	let containerFound = false;
 	try {
-		console.log('checking ', container)
 		const { stdout } = await executeDockerCmd({
 			dockerId,
 			command:
