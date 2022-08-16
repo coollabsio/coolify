@@ -115,6 +115,7 @@ If you have a new database you would like to add, raise an idea [here](https://f
 ### Services
 
 You quickly need to host a self-hostable, open-source service? You can do it with a few clicks!
+- [Appwrite](https://appwrite.io)
 - [WordPress](https://docs.coollabs.io/coolify/services/wordpress)
 - [Ghost](https://ghost.org)
 - [Plausible Analytics](https://docs.coollabs.io/coolify/services/plausible-analytics)
@@ -129,7 +130,6 @@ You quickly need to host a self-hostable, open-source service? You can do it wit
 - [Umami](https://github.com/mikecao/umami)
 - [Fider](https://fider.io)
 - [Hasura](https://hasura.io)
-
 
 If you have a new service you would like to add, raise an idea [here](https://feedback.coolify.io/) to get feedback from the community!
 

@@ -31,7 +31,7 @@
 	import { t } from '$lib/translations';
 	import { appSession } from '$lib/store';
 	import { errorNotification } from '$lib/common';
-	import { onMount } from 'svelte/types/runtime/internal/lifecycle';
+	import { onMount } from 'svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
