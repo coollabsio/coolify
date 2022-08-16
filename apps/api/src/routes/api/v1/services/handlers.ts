@@ -2,13 +2,14 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings, getFreeExposedPort, checkDomainsIsValidInDNS, persistentVolumes } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceImage, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings, getFreeExposedPort, checkDomainsIsValidInDNS, persistentVolumes, asyncSleep, isARM } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, isContainerExited, removeContainer } from '../../../../lib/docker';
 import cuid from 'cuid';
 
 import type { OnlyId } from '../../../../types';
 import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetWordpressSettings } from './types';
+import { defaultServiceComposeConfiguration, defaultServiceConfigurations } from '../../../../lib/services';
 
 // async function startServiceNew(request: FastifyRequest<OnlyId>) {
 //     try {
@@ -134,8 +135,7 @@ import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServ
 //         // config.services[id].environment = environmentVariables
 //         const composeFileDestination = `${workdir}/docker-compose.yaml`;
 //         // await fs.writeFile(composeFileDestination, yaml.dump(config));
-//         // await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} pull`);
-//         // await asyncExecShell(`DOCKER_HOST=${host} docker compose -f ${composeFileDestination} up -d`);
+// await startServiceContainers(destinationDocker.id, composeFileDestination)
 //         return {}
 //     } catch ({ status, message }) {
 //         return errorHandler({ status, message })
@@ -588,6 +588,9 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         if (type === 'moodle') {
             return await startMoodleService(request)
         }
+        if (type === 'appwrite') {
+            return await startAppWriteService(request)
+        }
         throw `Service type ${type} not supported.`
     } catch (error) {
         throw { status: 500, message: error?.message || error }
@@ -595,53 +598,54 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
 }
 export async function stopService(request: FastifyRequest<ServiceStartStop>) {
     try {
-        const { type } = request.params
-        if (type === 'plausibleanalytics') {
-            return await stopPlausibleAnalyticsService(request)
-        }
-        if (type === 'nocodb') {
-            return await stopNocodbService(request)
-        }
-        if (type === 'minio') {
-            return await stopMinioService(request)
-        }
-        if (type === 'vscodeserver') {
-            return await stopVscodeService(request)
-        }
-        if (type === 'wordpress') {
-            return await stopWordpressService(request)
-        }
-        if (type === 'vaultwarden') {
-            return await stopVaultwardenService(request)
-        }
-        if (type === 'languagetool') {
-            return await stopLanguageToolService(request)
-        }
-        if (type === 'n8n') {
-            return await stopN8nService(request)
-        }
-        if (type === 'uptimekuma') {
-            return await stopUptimekumaService(request)
-        }
-        if (type === 'ghost') {
-            return await stopGhostService(request)
-        }
-        if (type === 'meilisearch') {
-            return await stopMeilisearchService(request)
-        }
-        if (type === 'umami') {
-            return await stopUmamiService(request)
-        }
-        if (type === 'hasura') {
-            return await stopHasuraService(request)
-        }
-        if (type === 'fider') {
-            return await stopFiderService(request)
-        }
-        if (type === 'moodle') {
-            return await stopMoodleService(request)
-        }
-        throw `Service type ${type} not supported.`
+        return await stopServiceContainers(request)
+        // const { type } = request.params
+        // if (type === 'plausibleanalytics') {
+        //     return await stopPlausibleAnalyticsService(request)
+        // }
+        // if (type === 'nocodb') {
+        //     return await stopNocodbService(request)
+        // }
+        // if (type === 'minio') {
+        //     return await stopMinioService(request)
+        // }
+        // if (type === 'vscodeserver') {
+        //     return await stopVscodeService(request)
+        // }
+        // if (type === 'wordpress') {
+        //     return await stopWordpressService(request)
+        // }
+        // if (type === 'vaultwarden') {
+        //     return await stopVaultwardenService(request)
+        // }
+        // if (type === 'languagetool') {
+        //     return await stopLanguageToolService(request)
+        // }
+        // if (type === 'n8n') {
+        //     return await stopN8nService(request)
+        // }
+        // if (type === 'uptimekuma') {
+        //     return await stopUptimekumaService(request)
+        // }
+        // if (type === 'ghost') {
+        //     return await stopGhostService(request)
+        // }
+        // if (type === 'meilisearch') {
+        //     return await stopMeilisearchService(request)
+        // }
+        // if (type === 'umami') {
+        //     return await stopUmamiService(request)
+        // }
+        // if (type === 'hasura') {
+        //     return await stopHasuraService(request)
+        // }
+        // if (type === 'fider') {
+        //     return await stopFiderService(request)
+        // }
+        // if (type === 'moodle') {
+        //     return await stopMoodleService(request)
+        // }
+        // throw `Service type ${type} not supported.`
     } catch (error) {
         throw { status: 500, message: error?.message || error }
     }
@@ -798,52 +802,25 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
                     volumes,
                     command:
                         'sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh db init-admin && /entrypoint.sh run"',
-                    networks: [network],
                     environment: config.plausibleAnalytics.environmentVariables,
-                    restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     depends_on: [`${id}-postgresql`, `${id}-clickhouse`],
                     labels: makeLabelForServices('plausibleAnalytics'),
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '10s',
-                            max_attempts: 5,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 },
                 [`${id}-postgresql`]: {
                     container_name: `${id}-postgresql`,
                     image: config.postgresql.image,
-                    networks: [network],
                     environment: config.postgresql.environmentVariables,
                     volumes: [config.postgresql.volume],
-                    restart: 'always',
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '10s',
-                            max_attempts: 5,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 },
                 [`${id}-clickhouse`]: {
                     build: workdir,
                     container_name: `${id}-clickhouse`,
-                    networks: [network],
                     environment: config.clickhouse.environmentVariables,
                     volumes: [config.clickhouse.volume],
-                    restart: 'always',
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '10s',
-                            max_attempts: 5,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 }
             },
             networks: {
@@ -863,36 +840,7 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
-        return {}
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
-async function stopPlausibleAnalyticsService(request: FastifyRequest<ServiceStartStop>) {
-    try {
-        const { id } = request.params;
-        const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker, fqdn } = service;
-        if (destinationDockerId) {
-            const engine = destinationDocker.engine;
-
-            let found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-            if (found) {
-                await removeContainer({ id, dockerId: destinationDocker.id });
-            }
-            found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-postgresql` });
-            if (found) {
-                await removeContainer({ id: `${id}-postgresql`, dockerId: destinationDocker.id });
-            }
-            found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-clickhouse` });
-            if (found) {
-                await removeContainer({ id: `${id}-clickhouse`, dockerId: destinationDocker.id });
-            }
-        }
-
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -929,20 +877,11 @@ async function startNocodbService(request: FastifyRequest<ServiceStartStop>) {
                 [id]: {
                     container_name: id,
                     image: config.image,
-                    networks: [network],
                     volumes,
                     environment: config.environmentVariables,
-                    restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('nocodb'),
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 }
             },
             networks: {
@@ -954,25 +893,7 @@ async function startNocodbService(request: FastifyRequest<ServiceStartStop>) {
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
-        return {}
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
-async function stopNocodbService(request: FastifyRequest<ServiceStartStop>) {
-    try {
-        const { id } = request.params;
-        const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker, fqdn } = service;
-        if (destinationDockerId) {
-            const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-            if (found) {
-                await removeContainer({ id, dockerId: destinationDocker.id });
-            }
-        }
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1029,19 +950,10 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
                     image: config.image,
                     command: `server /data --console-address ":${consolePort}"`,
                     environment: config.environmentVariables,
-                    networks: [network],
                     volumes,
-                    restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('minio'),
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1053,27 +965,8 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
         await prisma.minio.update({ where: { serviceId: id }, data: { publicPort } });
-        return {}
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
-async function stopMinioService(request: FastifyRequest<ServiceStartStop>) {
-    try {
-        const { id } = request.params;
-        const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker } = service;
-        await prisma.minio.update({ where: { serviceId: id }, data: { publicPort: null } })
-        if (destinationDockerId) {
-            const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-            if (found) {
-                await removeContainer({ id, dockerId: destinationDocker.id });
-            }
-        }
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1123,19 +1016,10 @@ async function startVscodeService(request: FastifyRequest<ServiceStartStop>) {
                     container_name: id,
                     image: config.image,
                     environment: config.environmentVariables,
-                    networks: [network],
                     volumes,
-                    restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('vscodeServer'),
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1148,8 +1032,7 @@ async function startVscodeService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
 
         const changePermissionOn = persistentStorage.map((p) => p.path);
         if (changePermissionOn.length > 0) {
@@ -1164,23 +1047,6 @@ async function startVscodeService(request: FastifyRequest<ServiceStartStop>) {
         return errorHandler({ status, message })
     }
 }
-async function stopVscodeService(request: FastifyRequest<ServiceStartStop>) {
-    try {
-        const { id } = request.params;
-        const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker } = service;
-        if (destinationDockerId) {
-            const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-            if (found) {
-                await removeContainer({ id, dockerId: destinationDocker.id });
-            }
-        }
-        return {}
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
 
 async function startWordpressService(request: FastifyRequest<ServiceStartStop>) {
     try {
@@ -1188,6 +1054,7 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
         const {
+            arch,
             type,
             version,
             destinationDockerId,
@@ -1237,6 +1104,10 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
                 }
             }
         };
+        if (isARM(arch)) {
+            config.mysql.image = 'mysql:5.7'
+            config.mysql.volume = `${id}-mysql-data:/var/lib/mysql`
+        }
         if (serviceSecret.length > 0) {
             serviceSecret.forEach((secret) => {
                 config.wordpress.environmentVariables[secret.name] = secret.value;
@@ -1253,18 +1124,9 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
                     image: config.wordpress.image,
                     environment: config.wordpress.environmentVariables,
                     volumes,
-                    networks: [network],
-                    restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('wordpress'),
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1281,16 +1143,7 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
                 image: config.mysql.image,
                 volumes: [config.mysql.volume],
                 environment: config.mysql.environmentVariables,
-                networks: [network],
-                restart: 'always',
-                deploy: {
-                    restart_policy: {
-                        condition: 'on-failure',
-                        delay: '5s',
-                        max_attempts: 3,
-                        window: '120s'
-                    }
-                }
+                ...defaultServiceComposeConfiguration(network),
             };
 
             composeFile.volumes[config.mysql.volume.split(':')[0]] = {
@@ -1300,56 +1153,8 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
 
-        return {}
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
-async function stopWordpressService(request: FastifyRequest<ServiceStartStop>) {
-    try {
-        const { id } = request.params;
-        const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const {
-            destinationDockerId,
-            destinationDocker,
-            wordpress: { ftpEnabled }
-        } = service;
-        if (destinationDockerId) {
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-                if (found) {
-                    await removeContainer({ id, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-mysql` });
-                if (found) {
-                    await removeContainer({ id: `${id}-mysql`, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-            try {
-                if (ftpEnabled) {
-                    const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-ftp` });
-                    if (found) {
-                        await removeContainer({ id: `${id}-ftp`, dockerId: destinationDocker.id });
-                    }
-                    await prisma.wordpress.update({
-                        where: { serviceId: id },
-                        data: { ftpEnabled: false }
-                    });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-        }
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1388,19 +1193,10 @@ async function startVaultwardenService(request: FastifyRequest<ServiceStartStop>
                     container_name: id,
                     image: config.image,
                     environment: config.environmentVariables,
-                    networks: [network],
                     volumes,
-                    restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('vaultWarden'),
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1413,30 +1209,8 @@ async function startVaultwardenService(request: FastifyRequest<ServiceStartStop>
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
 
-        return {}
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
-async function stopVaultwardenService(request: FastifyRequest<ServiceStartStop>) {
-    try {
-        const { id } = request.params;
-        const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker } = service;
-        if (destinationDockerId) {
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-                if (found) {
-                    await removeContainer({ id, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-        }
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1474,20 +1248,11 @@ async function startLanguageToolService(request: FastifyRequest<ServiceStartStop
                 [id]: {
                     container_name: id,
                     image: config.image,
-                    networks: [network],
                     environment: config.environmentVariables,
-                    restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     volumes,
                     labels: makeLabelForServices('languagetool'),
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1500,30 +1265,8 @@ async function startLanguageToolService(request: FastifyRequest<ServiceStartStop
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
 
-        return {}
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
-async function stopLanguageToolService(request: FastifyRequest<ServiceStartStop>) {
-    try {
-        const { id } = request.params;
-        const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker } = service;
-        if (destinationDockerId) {
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-                if (found) {
-                    await removeContainer({ id, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-        }
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1562,20 +1305,11 @@ async function startN8nService(request: FastifyRequest<ServiceStartStop>) {
                 [id]: {
                     container_name: id,
                     image: config.image,
-                    networks: [network],
                     volumes,
                     environment: config.environmentVariables,
-                    restart: 'always',
                     labels: makeLabelForServices('n8n'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1588,30 +1322,8 @@ async function startN8nService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
 
-        return {}
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
-async function stopN8nService(request: FastifyRequest<ServiceStartStop>) {
-    try {
-        const { id } = request.params;
-        const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker } = service;
-        if (destinationDockerId) {
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-                if (found) {
-                    await removeContainer({ id, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-        }
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1648,20 +1360,11 @@ async function startUptimekumaService(request: FastifyRequest<ServiceStartStop>)
                 [id]: {
                     container_name: id,
                     image: config.image,
-                    networks: [network],
                     volumes,
                     environment: config.environmentVariables,
-                    restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('uptimekuma'),
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1674,30 +1377,8 @@ async function startUptimekumaService(request: FastifyRequest<ServiceStartStop>)
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
 
-        return {}
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
-async function stopUptimekumaService(request: FastifyRequest<ServiceStartStop>) {
-    try {
-        const { id } = request.params;
-        const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker } = service;
-        if (destinationDockerId) {
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-                if (found) {
-                    await removeContainer({ id, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-        }
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1777,37 +1458,19 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
                 [id]: {
                     container_name: id,
                     image: config.ghost.image,
-                    networks: [network],
                     volumes,
                     environment: config.ghost.environmentVariables,
-                    restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('ghost'),
                     depends_on: [`${id}-mariadb`],
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 },
                 [`${id}-mariadb`]: {
                     container_name: `${id}-mariadb`,
                     image: config.mariadb.image,
-                    networks: [network],
                     volumes: [config.mariadb.volume],
                     environment: config.mariadb.environmentVariables,
-                    restart: 'always',
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1825,34 +1488,8 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
 
-        return {}
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
-async function stopGhostService(request: FastifyRequest<ServiceStartStop>) {
-    try {
-        const { id } = request.params;
-        const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker } = service;
-        if (destinationDockerId) {
-            try {
-                let found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-                if (found) {
-                    await removeContainer({ id, dockerId: destinationDocker.id });
-                }
-                found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-mariadb` });
-                if (found) {
-                    await removeContainer({ id: `${id}-mariadb`, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-        }
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1895,20 +1532,11 @@ async function startMeilisearchService(request: FastifyRequest<ServiceStartStop>
                 [id]: {
                     container_name: id,
                     image: config.image,
-                    networks: [network],
                     environment: config.environmentVariables,
-                    restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     volumes,
                     labels: makeLabelForServices('meilisearch'),
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1920,29 +1548,7 @@ async function startMeilisearchService(request: FastifyRequest<ServiceStartStop>
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
-        return {}
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
-async function stopMeilisearchService(request: FastifyRequest<ServiceStartStop>) {
-    try {
-        const { id } = request.params;
-        const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker } = service;
-        if (destinationDockerId) {
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-                if (found) {
-                    await removeContainer({ id, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-        }
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -2092,36 +1698,18 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
                     container_name: id,
                     image: config.umami.image,
                     environment: config.umami.environmentVariables,
-                    networks: [network],
                     volumes,
-                    restart: 'always',
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('umami'),
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    },
-                    depends_on: [`${id}-postgresql`]
+                    depends_on: [`${id}-postgresql`],
+                    ...defaultServiceComposeConfiguration(network),
                 },
                 [`${id}-postgresql`]: {
                     build: workdir,
                     container_name: `${id}-postgresql`,
                     environment: config.postgresql.environmentVariables,
-                    networks: [network],
                     volumes: [config.postgresql.volume],
-                    restart: 'always',
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 }
             },
             networks: {
@@ -2138,37 +1726,7 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
-        return {}
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
-async function stopUmamiService(request: FastifyRequest<ServiceStartStop>) {
-    try {
-        const { id } = request.params;
-        const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker } = service;
-        if (destinationDockerId) {
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-                if (found) {
-                    await removeContainer({ id, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-postgresql` });
-                if (found) {
-                    await removeContainer({ id: `${id}-postgresql`, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-        }
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -2227,36 +1785,18 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
                     container_name: id,
                     image: config.hasura.image,
                     environment: config.hasura.environmentVariables,
-                    networks: [network],
                     volumes,
-                    restart: 'always',
                     labels: makeLabelForServices('hasura'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    },
-                    depends_on: [`${id}-postgresql`]
+                    depends_on: [`${id}-postgresql`],
+                    ...defaultServiceComposeConfiguration(network),
                 },
                 [`${id}-postgresql`]: {
                     image: config.postgresql.image,
                     container_name: `${id}-postgresql`,
                     environment: config.postgresql.environmentVariables,
-                    networks: [network],
                     volumes: [config.postgresql.volume],
-                    restart: 'always',
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 }
             },
             networks: {
@@ -2274,38 +1814,8 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
 
-        return {}
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
-async function stopHasuraService(request: FastifyRequest<ServiceStartStop>) {
-    try {
-        const { id } = request.params;
-        const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker } = service;
-        if (destinationDockerId) {
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-                if (found) {
-                    await removeContainer({ id, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-postgresql` });
-                if (found) {
-                    await removeContainer({ id: `${id}-postgresql`, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-        }
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -2388,36 +1898,18 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
                     container_name: id,
                     image: config.fider.image,
                     environment: config.fider.environmentVariables,
-                    networks: [network],
                     volumes,
-                    restart: 'always',
                     labels: makeLabelForServices('fider'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    },
-                    depends_on: [`${id}-postgresql`]
+                    depends_on: [`${id}-postgresql`],
+                    ...defaultServiceComposeConfiguration(network),
                 },
                 [`${id}-postgresql`]: {
                     image: config.postgresql.image,
                     container_name: `${id}-postgresql`,
                     environment: config.postgresql.environmentVariables,
-                    networks: [network],
                     volumes: [config.postgresql.volume],
-                    restart: 'always',
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultServiceComposeConfiguration(network),
                 }
             },
             networks: {
@@ -2435,44 +1927,525 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
 
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
-async function stopFiderService(request: FastifyRequest<ServiceStartStop>) {
+
+async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker } = service;
-        if (destinationDockerId) {
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-                if (found) {
-                    await removeContainer({ id, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
+        const { version, fqdn, destinationDocker, secrets, exposePort, network, port, workdir, image, appwrite } = await defaultServiceConfigurations({ id, teamId })
+
+        let isStatsEnabled = false
+        if (secrets.find(s => s === '_APP_USAGE_STATS=enabled')) {
+            isStatsEnabled = true
+        }
+        const {
+            opensslKeyV1,
+            executorSecret,
+            mariadbHost,
+            mariadbPort,
+            mariadbUser,
+            mariadbPassword,
+            mariadbRootUser,
+            mariadbRootUserPassword,
+            mariadbDatabase
+        } = appwrite;
+
+        const dockerCompose = {
+            [id]: {
+                image: `${image}:${version}`,
+                container_name: id,
+                labels: makeLabelForServices('appwrite'),
+                ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                "volumes": [
+                    `${id}-uploads:/storage/uploads:rw`,
+                    `${id}-cache:/storage/cache:rw`,
+                    `${id}-config:/storage/config:rw`,
+                    `${id}-certificates:/storage/certificates:rw`,
+                    `${id}-functions:/storage/functions:rw`
+                ],
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    "_APP_LOCALE=en",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_DOMAIN=${fqdn}`,
+                    `_APP_DOMAIN_TARGET=${fqdn}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    `_APP_INFLUXDB_HOST=${id}-influxdb`,
+                    "_APP_INFLUXDB_PORT=8086",
+                    `_APP_EXECUTOR_SECRET=${executorSecret}`,
+                    `_APP_EXECUTOR_HOST=http://${id}-executor/v1`,
+                    `_APP_STATSD_HOST=${id}-telegraf`,
+                    "_APP_STATSD_PORT=8125",
+                    ...secrets
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            },
+            [`${id}-realtime`]: {
+                image: `${image}:${version}`,
+                container_name: `${id}-realtime`,
+                entrypoint: "realtime",
+                labels: makeLabelForServices('appwrite'),
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    ...secrets
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            },
+            [`${id}-worker-audits`]: {
+
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-audits`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-audits",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    ...secrets
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            },
+            [`${id}-worker-webhooks`]: {
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-webhooks`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-webhooks",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    ...secrets
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            },
+            [`${id}-worker-deletes`]: {
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-deletes`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-deletes",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "volumes": [
+                    `${id}-uploads:/storage/uploads:rw`,
+                    `${id}-cache:/storage/cache:rw`,
+                    `${id}-config:/storage/config:rw`,
+                    `${id}-certificates:/storage/certificates:rw`,
+                    `${id}-functions:/storage/functions:rw`,
+                    `${id}-builds:/storage/builds:rw`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    `_APP_EXECUTOR_SECRET=${executorSecret}`,
+                    `_APP_EXECUTOR_HOST=http://${id}-executor/v1`,
+                    ...secrets
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            },
+            [`${id}-worker-databases`]: {
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-databases`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-databases",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    ...secrets
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            },
+            [`${id}-worker-builds`]: {
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-builds`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-builds",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_EXECUTOR_SECRET=${executorSecret}`,
+                    `_APP_EXECUTOR_HOST=http://${id}-executor/v1`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    ...secrets
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            },
+            [`${id}-worker-certificates`]: {
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-certificates`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-certificates",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                ],
+                "volumes": [
+                    `${id}-config:/storage/config:rw`,
+                    `${id}-certificates:/storage/certificates:rw`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_DOMAIN=${fqdn}`,
+                    `_APP_DOMAIN_TARGET=${fqdn}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    ...secrets
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            },
+            [`${id}-worker-functions`]: {
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-functions`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-functions",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                    `${id}-executor`
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    `_APP_EXECUTOR_SECRET=${executorSecret}`,
+                    `_APP_EXECUTOR_HOST=http://${id}-executor/v1`,
+                    ...secrets
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            },
+            [`${id}-executor`]: {
+                image: `${image}:${version}`,
+                container_name: `${id}-executor`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "executor",
+                "stop_signal": "SIGINT",
+                "volumes": [
+                    `${id}-functions:/storage/functions:rw`,
+                    `${id}-builds:/storage/builds:rw`,
+                    "/var/run/docker.sock:/var/run/docker.sock",
+                    "/tmp:/tmp:rw"
+                ],
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-redis`,
+                    `${id}`
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_EXECUTOR_SECRET=${executorSecret}`,
+                    ...secrets
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            },
+            [`${id}-worker-mails`]: {
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-mails`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-mails",
+                "depends_on": [
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    ...secrets
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            },
+            [`${id}-worker-messaging`]: {
+                image: `${image}:${version}`,
+                container_name: `${id}-worker-messaging`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "worker-messaging",
+                "depends_on": [
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    ...secrets
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            },
+            [`${id}-maintenance`]: {
+                image: `${image}:${version}`,
+                container_name: `${id}-maintenance`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "maintenance",
+                "depends_on": [
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_DOMAIN=${fqdn}`,
+                    `_APP_DOMAIN_TARGET=${fqdn}`,
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    ...secrets
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            },
+            [`${id}-schedule`]: {
+                image: `${image}:${version}`,
+                container_name: `${id}-schedule`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "schedule",
+                "depends_on": [
+                    `${id}-redis`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    ...secrets
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            },
+            [`${id}-mariadb`]: {
+                "image": "mariadb:10.7",
+                container_name: `${id}-mariadb`,
+                labels: makeLabelForServices('appwrite'),
+                "volumes": [
+                    `${id}-mariadb:/var/lib/mysql:rw`
+                ],
+                "environment": [
+                    `MYSQL_ROOT_USER=${mariadbRootUser}`,
+                    `MYSQL_ROOT_PASSWORD=${mariadbRootUserPassword}`,
+                    `MYSQL_USER=${mariadbUser}`,
+                    `MYSQL_PASSWORD=${mariadbPassword}`,
+                    `MYSQL_DATABASE=${mariadbDatabase}`
+                ],
+                "command": "mysqld --innodb-flush-method=fsync",
+                ...defaultServiceComposeConfiguration(network),
+            },
+            [`${id}-redis`]: {
+                "image": "redis:6.2-alpine",
+                container_name: `${id}-redis`,
+                "command": `redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru --maxmemory-samples 5\n`,
+                "volumes": [
+                    `${id}-redis:/data:rw`
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            },
+
+        };
+        if (isStatsEnabled) {
+            dockerCompose[id].depends_on.push(`${id}-influxdb`);
+            dockerCompose[`${id}-usage`] = {
+                image: `${image}:${version}`,
+                container_name: `${id}-usage`,
+                labels: makeLabelForServices('appwrite'),
+                "entrypoint": "usage",
+                "depends_on": [
+                    `${id}-mariadb`,
+                    `${id}-influxdb`,
+                ],
+                "environment": [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    `_APP_INFLUXDB_HOST=${id}-influxdb`,
+                    "_APP_INFLUXDB_PORT=8086",
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    ...secrets
+                ],
+                ...defaultServiceComposeConfiguration(network),
             }
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-postgresql` });
-                if (found) {
-                    await removeContainer({ id: `${id}-postgresql`, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
+            dockerCompose[`${id}-influxdb`] = {
+                "image": "appwrite/influxdb:1.5.0",
+                container_name: `${id}-influxdb`,
+                "volumes": [
+                    `${id}-influxdb:/var/lib/influxdb:rw`
+                ],
+                ...defaultServiceComposeConfiguration(network),
+            }
+            dockerCompose[`${id}-telegraf`] = {
+                "image": "appwrite/telegraf:1.4.0",
+                container_name: `${id}-telegraf`,
+                "environment": [
+                    `_APP_INFLUXDB_HOST=${id}-influxdb`,
+                    "_APP_INFLUXDB_PORT=8086",
+                ],
+                ...defaultServiceComposeConfiguration(network),
             }
         }
+
+        const composeFile: any = {
+            version: '3.8',
+            services: dockerCompose,
+            networks: {
+                [network]: {
+                    external: true
+                }
+            },
+            volumes: {
+                [`${id}-uploads`]: {
+                    name: `${id}-uploads`
+                },
+                [`${id}-cache`]: {
+                    name: `${id}-cache`
+                },
+                [`${id}-config`]: {
+                    name: `${id}-config`
+                },
+                [`${id}-certificates`]: {
+                    name: `${id}-certificates`
+                },
+                [`${id}-functions`]: {
+                    name: `${id}-functions`
+                },
+                [`${id}-builds`]: {
+                    name: `${id}-builds`
+                },
+                [`${id}-mariadb`]: {
+                    name: `${id}-mariadb`
+                },
+                [`${id}-redis`]: {
+                    name: `${id}-redis`
+                },
+                [`${id}-influxdb`]: {
+                    name: `${id}-influxdb`
+                }
+            }
+
+        };
+        const composeFileDestination = `${workdir}/docker-compose.yaml`;
+        await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
+
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
+
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
-
+async function startServiceContainers(dockerId, composeFileDestination) {
+    await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} pull` })
+    await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} create` })
+    await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} start` })
+    await asyncSleep(1000);
+    await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} up -d` })
+}
+async function stopServiceContainers(request: FastifyRequest<ServiceStartStop>) {
+    try {
+        const { id } = request.params;
+        const teamId = request.user.teamId;
+        const { destinationDockerId } = await getServiceFromDB({ id, teamId });
+        if (destinationDockerId) {
+            await executeDockerCmd({
+                dockerId: destinationDockerId,
+                command: `docker ps -a --filter 'label=com.docker.compose.project=${id}' --format {{.ID}}|xargs -n 1 docker stop -t 0`
+            })
+            await executeDockerCmd({
+                dockerId: destinationDockerId,
+                command: `docker ps -a --filter 'label=com.docker.compose.project=${id}' --format {{.ID}}|xargs -n 1 docker rm --force`
+            })
+            return {}
+        }
+        throw { status: 500, message: 'Could not stop containers.' }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
@@ -2593,44 +2566,13 @@ async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
 
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
-async function stopMoodleService(request: FastifyRequest<ServiceStartStop>) {
-    try {
-        const { id } = request.params;
-        const teamId = request.user.teamId;
-        const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker } = service;
-        if (destinationDockerId) {
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-                if (found) {
-                    await removeContainer({ id, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-mariadb` });
-                if (found) {
-                    await removeContainer({ id: `${id}-mariadb`, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-        }
-        return {}
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
-
 
 export async function activatePlausibleUsers(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
     try {

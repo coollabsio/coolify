@@ -32,13 +32,20 @@
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { errorNotification, supportedServiceTypesAndVersions } from '$lib/common';
+	import { onMount } from 'svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
-
 	let recommendedVersion = supportedServiceTypesAndVersions.find(
 		({ name }) => name === type
 	)?.recommendedVersion;
+
+	onMount(async () => {
+		if (versions.length === 1) {
+			await handleSubmit(versions[0]);
+		}
+	});
+
 	async function handleSubmit(version: any) {
 		try {
 			await post(`/services/${id}/configuration/version`, { version });

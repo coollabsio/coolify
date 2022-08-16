@@ -477,3 +477,84 @@ export const moodle = [{
 	isBoolean: false,
 	isEncrypted: false
 }]
+
+export const appwrite = [{
+	name: 'opensslKeyV1',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'executorSecret',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'redisPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'mariadbHost',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'mariadbPort',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'mariadbUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'mariadbPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'mariadbRootUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'mariadbRootUserPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'mariadbDatabase',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+}]

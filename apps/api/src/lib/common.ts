@@ -17,7 +17,7 @@ import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
-export const version = '3.3.4';
+export const version = '3.4.0';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -78,6 +78,8 @@ export const include: any = {
 	umami: true,
 	hasura: true,
 	fider: true,
+	moodle: true,
+	appwrite: true
 };
 
 export const uniqueName = (): string => uniqueNamesGenerator(customConfig);
@@ -258,8 +260,8 @@ export const supportedServiceTypesAndVersions = [
 		fancyName: 'Hasura',
 		baseImage: 'hasura/graphql-engine',
 		images: ['postgres:12-alpine'],
-		versions: ['latest', 'v2.8.4', 'v2.5.1'],
-		recommendedVersion: 'v2.8.4',
+		versions: ['latest', 'v2.10.0', 'v2.5.1'],
+		recommendedVersion: 'v2.10.0',
 		ports: {
 			main: 8080
 		}
@@ -275,6 +277,17 @@ export const supportedServiceTypesAndVersions = [
 			main: 3000
 		}
 	},
+	{
+		name: 'appwrite',
+		fancyName: 'Appwrite',
+		baseImage: 'appwrite/appwrite',
+		images: ['mariadb:10.7', 'redis:6.2-alpine', 'appwrite/telegraf:1.4.0'],
+		versions: ['latest', '0.15.3'],
+		recommendedVersion: '0.15.3',
+		ports: {
+			main: 80
+		}
+	}
 	// {
 	//     name: 'moodle',
 	//     fancyName: 'Moodle',
@@ -579,6 +592,11 @@ export async function executeDockerCmd({ dockerId, command }: { dockerId: string
 	} else {
 		engine = 'unix:///var/run/docker.sock'
 	}
+	if (process.env.CODESANDBOX_HOST) {
+		if (command.startsWith('docker compose')) {
+			command = command.replace(/docker compose/gi, 'docker-compose')
+		}
+	}
 	return await asyncExecShell(
 		`DOCKER_BUILDKIT=1 DOCKER_HOST="${engine}" ${command}`
 	);
@@ -590,6 +608,11 @@ export async function startTraefikProxy(id: string): Promise<void> {
 	const { id: settingsId, ipv4, ipv6 } = await listSettings();
 
 	if (!found) {
+		const { stdout: coolifyNetwork } = await executeDockerCmd({ dockerId: id, command: `docker network ls --filter 'name=coolify-infra' --no-trunc --format "{{json .}}"` })
+
+		if (!coolifyNetwork) {
+			await executeDockerCmd({ dockerId: id, command: `docker network create --attachable coolify-infra` })
+		}
 		const { stdout: Config } = await executeDockerCmd({ dockerId: id, command: `docker network inspect ${network} --format '{{json .IPAM.Config }}'` })
 		const ip = JSON.parse(Config)[0].Gateway;
 		let traefikUrl = mainTraefikEndpoint
@@ -873,11 +896,11 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 		}
 		if (isARM(arch)) {
 			configuration.volume = `${id}-${type}-data:/var/lib/postgresql`;
-            configuration.environmentVariables = {
-                POSTGRES_PASSWORD: dbUserPassword,
-                POSTGRES_USER: dbUser,
-                POSTGRES_DB: defaultDatabase
-            }
+			configuration.environmentVariables = {
+				POSTGRES_PASSWORD: dbUserPassword,
+				POSTGRES_USER: dbUser,
+				POSTGRES_DB: defaultDatabase
+			}
 		}
 		return configuration
 	} else if (type === 'redis') {
@@ -1528,6 +1551,35 @@ export async function configureServiceType({
 				}
 			}
 		});
+	} else if (type === 'appwrite') {
+		const opensslKeyV1 = encrypt(generatePassword());
+		const executorSecret  = encrypt(generatePassword());
+		const redisPassword = encrypt(generatePassword());
+		const mariadbHost = `${id}-mariadb`
+		const mariadbUser = cuid();
+		const mariadbPassword = encrypt(generatePassword());
+		const mariadbDatabase = 'appwrite';
+		const mariadbRootUser = cuid();
+		const mariadbRootUserPassword = encrypt(generatePassword());
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				appwrite: {
+					create: {
+						opensslKeyV1,
+						executorSecret,
+						redisPassword,
+						mariadbHost,
+						mariadbUser,
+						mariadbPassword,
+						mariadbDatabase,
+						mariadbRootUser,
+						mariadbRootUserPassword
+					}
+				}
+			}
+		});
 	} else {
 		await prisma.service.update({
 			where: { id },
@@ -1539,6 +1591,7 @@ export async function configureServiceType({
 }
 
 export async function removeService({ id }: { id: string }): Promise<void> {
+	await prisma.serviceSecret.deleteMany({ where: { serviceId: id } });
 	await prisma.servicePersistentStorage.deleteMany({ where: { serviceId: id } });
 	await prisma.meiliSearch.deleteMany({ where: { serviceId: id } });
 	await prisma.fider.deleteMany({ where: { serviceId: id } });
@@ -1549,8 +1602,8 @@ export async function removeService({ id }: { id: string }): Promise<void> {
 	await prisma.minio.deleteMany({ where: { serviceId: id } });
 	await prisma.vscodeserver.deleteMany({ where: { serviceId: id } });
 	await prisma.wordpress.deleteMany({ where: { serviceId: id } });
-	await prisma.serviceSecret.deleteMany({ where: { serviceId: id } });
-
+	await prisma.moodle.deleteMany({ where: { serviceId: id } });
+	await prisma.appwrite.deleteMany({ where: { serviceId: id } });
 	await prisma.service.delete({ where: { id } });
 }
 
@@ -1615,9 +1668,9 @@ export const getServiceMainPort = (service: string) => {
 export function makeLabelForServices(type) {
 	return [
 		'coolify.managed=true',
-		`coolify.version = ${version} `,
+		`coolify.version = ${version}`,
 		`coolify.type = service`,
-		`coolify.service.type = ${type} `
+		`coolify.service.type = ${type}`
 	];
 }
 export function errorHandler({ status = 500, message = 'Unknown error.' }: { status: number, message: string | any }) {

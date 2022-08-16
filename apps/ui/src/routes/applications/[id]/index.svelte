@@ -332,53 +332,56 @@
 				<label for="gitSource" class="text-base font-bold text-stone-100"
 					>{$t('application.git_source')}</label
 				>
-				<a
-					href={!isDisabled
-						? `/applications/${id}/configuration/source?from=/applications/${id}`
-						: ''}
-					class="no-underline"
-					><input
-						value={application.gitSource.name}
-						id="gitSource"
-						disabled
-						class="cursor-pointer hover:bg-coolgray-500"
-					/></a
-				>
+				{#if isDisabled}
+					<input disabled={isDisabled} value={application.gitSource.name} />
+				{:else}
+					<a
+						href={`/applications/${id}/configuration/source?from=/applications/${id}`}
+						class="no-underline"
+						><input
+							value={application.gitSource.name}
+							id="gitSource"
+							class="cursor-pointer hover:bg-coolgray-500"
+						/></a
+					>
+				{/if}
 			</div>
 			<div class="grid grid-cols-2 items-center">
 				<label for="repository" class="text-base font-bold text-stone-100"
 					>{$t('application.git_repository')}</label
 				>
-				<a
-					href={!isDisabled
-						? `/applications/${id}/configuration/repository?from=/applications/${id}&to=/applications/${id}/configuration/buildpack`
-						: ''}
-					class="no-underline"
-					><input
-						value="{application.repository}/{application.branch}"
-						id="repository"
-						disabled
-						class="cursor-pointer hover:bg-coolgray-500"
-					/></a
-				>
+				{#if isDisabled}
+					<input disabled={isDisabled} value="{application.repository}/{application.branch}" />
+				{:else}
+					<a
+						href={`/applications/${id}/configuration/repository?from=/applications/${id}&to=/applications/${id}/configuration/buildpack`}
+						class="no-underline"
+						><input
+							value="{application.repository}/{application.branch}"
+							id="repository"
+							class="cursor-pointer hover:bg-coolgray-500"
+						/></a
+					>
+				{/if}
 			</div>
 			<div class="grid grid-cols-2 items-center">
 				<label for="buildPack" class="text-base font-bold text-stone-100"
 					>{$t('application.build_pack')}</label
 				>
+				{#if isDisabled}
+					<input class="capitalize" disabled={isDisabled} value={application.buildPack} />
+				{:else}
 				<a
-					href={!isDisabled
-						? `/applications/${id}/configuration/buildpack?from=/applications/${id}`
-						: ''}
+					href={`/applications/${id}/configuration/buildpack?from=/applications/${id}`}
 					class="no-underline "
 				>
 					<input
 						value={application.buildPack}
 						id="buildPack"
-						disabled
-						class="cursor-pointer hover:bg-coolgray-500"
+						class="cursor-pointer hover:bg-coolgray-500 capitalize"
 					/></a
 				>
+				{/if}
 			</div>
 			<div class="grid grid-cols-2 items-center pb-8">
 				<label for="destination" class="text-base font-bold text-stone-100"
@@ -698,7 +701,7 @@
 					/>
 				</div>
 			{/if}
-			{#if application.buildPack !== 'laravel'}
+			{#if application.buildPack !== 'laravel' && application.buildPack !== 'heroku'}
 				<div class="grid grid-cols-2 items-center">
 					<div class="flex-col">
 						<label for="baseDirectory" class="pt-2 text-base font-bold text-stone-100"

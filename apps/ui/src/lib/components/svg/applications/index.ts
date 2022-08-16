@@ -16,4 +16,4 @@ export { default as Astro } from './Astro.svelte';
 export { default as Eleventy } from './Eleventy.svelte';
 export { default as Deno } from './Deno.svelte';
 export { default as Laravel } from './Laravel.svelte';
-
+export { default as Heroku } from './Heroku.svelte';

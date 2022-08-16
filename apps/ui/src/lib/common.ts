@@ -131,8 +131,8 @@ export const supportedServiceTypesAndVersions = [
 		fancyName: 'Hasura',
 		baseImage: 'hasura/graphql-engine',
 		images: ['postgres:12-alpine'],
-		versions: ['latest', 'v2.5.1'],
-		recommendedVersion: 'v2.5.1',
+		versions: ['latest', 'v2.10.0', 'v2.5.1'],
+		recommendedVersion: 'v2.10.0',
 		ports: {
 			main: 8080
 		}
@@ -148,6 +148,17 @@ export const supportedServiceTypesAndVersions = [
 			main: 3000
 		}
 	},
+	{
+		name: 'appwrite',
+		fancyName: 'Appwrite',
+		baseImage: 'appwrite/appwrite',
+		images: ['mariadb:10.7', 'redis:6.2-alpine', 'appwrite/telegraf:1.4.0'],
+		versions: ['latest', '0.15.3'],
+		recommendedVersion: '0.15.3',
+		ports: {
+			main: 80
+		}
+	}
 	// {
 	//     name: 'moodle',
 	//     fancyName: 'Moodle',
@@ -218,7 +229,7 @@ export const staticDeployments = [
 	'astro',
 	'eleventy'
 ];
-export const notNodeDeployments = ['php', 'docker', 'rust', 'python', 'deno', 'laravel'];
+export const notNodeDeployments = ['php', 'docker', 'rust', 'python', 'deno', 'laravel', 'heroku'];
 
 
 export function generateRemoteEngine(destination: any) {

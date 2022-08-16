@@ -22,7 +22,7 @@
 	function generateUrl(publicPort: any) {
 		return browser
 			? `sftp://${
-					settings.fqdn ? getDomain(settings.fqdn) : window.location.hostname
+					settings?.fqdn ? getDomain(settings.fqdn) : window.location.hostname
 			  }:${publicPort}`
 			: 'Loading...';
 	}

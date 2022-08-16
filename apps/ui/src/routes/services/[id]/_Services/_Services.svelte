@@ -26,6 +26,7 @@
 	import Umami from './_Umami.svelte';
 	import VsCodeServer from './_VSCodeServer.svelte';
 	import Wordpress from './_Wordpress.svelte';
+	import Appwrite from './_Appwrite.svelte';
 	import Moodle from './_Moodle.svelte';
 
 	const { id } = $page.params;
@@ -37,7 +38,7 @@
 		save: false,
 		verification: false,
 		cleanup: false
-	}
+	};
 	let dualCerts = service.dualCerts;
 
 	let nonWWWDomain = service.fqdn && getDomain(service.fqdn).replace(/^www\./, '');
@@ -394,6 +395,8 @@
 				<Hasura bind:service />
 			{:else if service.type === 'fider'}
 				<Fider bind:service {readOnly} />
+			{:else if service.type === 'appwrite'}
+				<Appwrite bind:service {readOnly} />
 			{:else if service.type === 'moodle'}
 				<Moodle bind:service {readOnly} />
 			{/if}

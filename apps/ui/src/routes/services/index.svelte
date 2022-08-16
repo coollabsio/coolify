@@ -102,7 +102,7 @@
 					{#each otherServices as service}
 						<a href="/services/{service.id}" class="p-2 no-underline">
 							<div class="box-selection group relative hover:bg-pink-600">
-								<Services type={service.type} />
+								<ServiceIcons type={service.type} />
 								<div class="truncate text-center text-xl font-bold">
 									{service.name}
 								</div>

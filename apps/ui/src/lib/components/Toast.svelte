@@ -5,16 +5,17 @@
 </script>
 
 <div
+	on:click={() => dispatch('click')}
 	on:mouseover={() => dispatch('pause')}
 	on:focus={() => dispatch('pause')}
 	on:mouseout={() => dispatch('resume')}
 	on:blur={() => dispatch('resume')}
-	class="alert shadow-lg text-white rounded"
+	class="alert shadow-lg text-white rounded hover:scale-105 transition-all duration-100 cursor-pointer"
 	class:bg-coollabs={type === 'success'}
 	class:alert-error={type === 'error'}
 	class:alert-info={type === 'info'}
 >
-	<!-- {#if type === 'success'}
+	{#if type === 'success'}
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
 			class="stroke-current flex-shrink-0 h-6 w-6"
@@ -53,6 +54,6 @@
 				d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
 			/></svg
 		>
-	{/if} -->
+	{/if}
 	<slot />
 </div>

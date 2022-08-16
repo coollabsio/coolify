@@ -152,6 +152,13 @@ import * as buildpacks from '../lib/buildPacks';
 									.createHash('sha256')
 									.update(
 										JSON.stringify({
+											pythonWSGI,
+											pythonModule,
+											pythonVariable,
+											deploymentType,
+											denoOptions, 
+											baseImage,
+											baseBuildImage,
 											buildPack,
 											port,
 											exposePort,
@@ -291,6 +298,7 @@ import * as buildpacks from '../lib/buildPacks';
 										}
 									};
 								});
+								console.log({port})
 								const composeFile = {
 									version: '3.8',
 									services: {
