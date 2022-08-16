@@ -55,7 +55,7 @@
 	<a href="https://fider.io" target="_blank">
 		<Icons.Fider />
 	</a>
-{:else if service.type === 'appwrote'}
+{:else if service.type === 'appwrite'}
 	<a href="https://appwrite.io" target="_blank">
 		<Icons.Appwrite/>
 	</a>
