@@ -30,7 +30,6 @@
 	import { page } from '$app/stores';
 	import { get } from '$lib/api';
 	import { appSession } from '$lib/store';
-	import { browser } from '$app/env';
 	import { t } from '$lib/translations';
 	import { buildPacks, findBuildPack, scanningTemplates } from '$lib/templates';
 	import { errorNotification } from '$lib/common';
@@ -263,11 +262,27 @@
 		</div>
 	</div>
 {:else}
-	<div class="max-w-7xl mx-auto flex flex-wrap justify-center">
-		{#each buildPacks as buildPack}
+
+
+	<div class="max-w-7xl mx-auto ">
+		<div class="title pb-2">Coolify Buildpacks</div>
+		<div class="flex flex-wrap justify-center">
+		{#each buildPacks.filter(bp => bp.isCoolifyBuildPack === true) as buildPack}
 			<div class="p-2">
 				<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
 			</div>
 		{/each}
+		</div>
+	</div>
+
+	<div class="max-w-7xl mx-auto ">
+		<div class="title pb-2">Heroku</div>
+		<div class="flex flex-wrap justify-center">
+		{#each buildPacks.filter(bp => bp.isHerokuBuildPack === true) as buildPack}
+			<div class="p-2">
+				<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
+			</div>
+		{/each}
+	</div>
 	</div>
 {/if}

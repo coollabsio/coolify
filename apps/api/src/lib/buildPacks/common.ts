@@ -252,6 +252,20 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 			label: 'python:3.7-slim-bullseye'
 		}
 	];
+	const herokuVersions = [
+		{
+			value: 'heroku/builder:22',
+			label: 'heroku/builder:22'
+		},
+		{
+			value: 'heroku/buildpacks:20',
+			label: 'heroku/buildpacks:20'
+		},
+		{
+			value: 'heroku/builder-classic:22',
+			label: 'heroku/builder-classic:22'
+		},
+	]
 	let payload: any = {
 		baseImage: null,
 		baseBuildImage: null,
@@ -298,6 +312,11 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 		payload.baseImage = 'webdevops/php-apache:8.0-alpine';
 		payload.baseBuildImage = 'node:18';
 		payload.baseBuildImages = nodeVersions;
+	}
+	if (buildPack === 'heroku') {
+		payload.baseImage = 'heroku/buildpacks:20';
+		payload.baseImages = herokuVersions;
+
 	}
 	return payload;
 }

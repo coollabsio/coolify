@@ -2,7 +2,7 @@
 	import { fade } from 'svelte/transition';
 	import Toast from './Toast.svelte';
 
-	import { pauseToast, resumeToast, toasts } from '$lib/store';
+	import { dismissToast, pauseToast, resumeToast, toasts } from '$lib/store';
 </script>
 
 {#if $toasts}
@@ -12,7 +12,8 @@
 				<Toast
 					type={toast.type}
 					on:resume={() => resumeToast(toast.id)}
-					on:pause={() => pauseToast(toast.id)}>{@html toast.message}</Toast
+					on:pause={() => pauseToast(toast.id)}
+					on:click={() => dismissToast(toast.id)}>{@html toast.message}</Toast
 				>
 			{/each}
 		</article>

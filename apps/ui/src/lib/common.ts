@@ -229,7 +229,7 @@ export const staticDeployments = [
 	'astro',
 	'eleventy'
 ];
-export const notNodeDeployments = ['php', 'docker', 'rust', 'python', 'deno', 'laravel'];
+export const notNodeDeployments = ['php', 'docker', 'rust', 'python', 'deno', 'laravel', 'heroku'];
 
 
 export function generateRemoteEngine(destination: any) {
