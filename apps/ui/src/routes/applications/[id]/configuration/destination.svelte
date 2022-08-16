@@ -31,6 +31,7 @@
 	import { t } from '$lib/translations';
 	import { appSession } from '$lib/store';
 	import { errorNotification } from '$lib/common';
+	import { onMount } from 'svelte/types/runtime/internal/lifecycle';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -55,6 +56,11 @@
 			return errorNotification(error);
 		}
 	}
+	onMount(async () => {
+		if (destinations.length === 1) {
+			await handleSubmit(destinations[0].id);
+		}
+	});
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -65,7 +71,9 @@
 <div class="flex flex-col justify-center">
 	{#if !destinations || ownDestinations.length === 0}
 		<div class="flex-col">
-			<div class="pb-2 text-center font-bold">{$t('application.configuration.no_configurable_destination')}</div>
+			<div class="pb-2 text-center font-bold">
+				{$t('application.configuration.no_configurable_destination')}
+			</div>
 			<div class="flex justify-center">
 				<a href="/new/destination" sveltekit:prefetch class="add-icon bg-sky-600 hover:bg-sky-500">
 					<svg
