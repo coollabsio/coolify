@@ -5,8 +5,10 @@ import env from '@fastify/env';
 import cookie from '@fastify/cookie';
 import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
-import { asyncExecShell, isDev, listSettings, prisma } from './lib/common';
+import { asyncExecShell, isDev, listSettings, prisma, version } from './lib/common';
 import { scheduler } from './lib/scheduler';
+import axios from 'axios';
+import compareVersions from 'compare-versions';
 
 declare module 'fastify' {
 	interface FastifyInstance {
@@ -113,8 +115,22 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 	setInterval(async () => {
 		const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
 		if (isAutoUpdateEnabled) {
-			if (scheduler.workers.has('deployApplication')) {
-				scheduler.workers.get('deployApplication').postMessage("status:autoUpdater");
+			const currentVersion = version;
+			const { data: versions } = await axios
+				.get(
+					`https://get.coollabs.io/versions.json`
+					, {
+						params: {
+							appId: process.env['COOLIFY_APP_ID'] || undefined,
+							version: currentVersion
+						}
+					})
+			const latestVersion = versions['coolify'].main.version;
+			const isUpdateAvailable = compareVersions(latestVersion, currentVersion);
+			if (isUpdateAvailable === 1) {
+				if (scheduler.workers.has('deployApplication')) {
+					scheduler.workers.get('deployApplication').postMessage("status:autoUpdater");
+				}
 			}
 		}
 	}, isDev ? 5000 : 60000 * 15)

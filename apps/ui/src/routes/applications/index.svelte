@@ -87,6 +87,9 @@
 							{#if application.fqdn}
 								<div class="truncate text-center">{getDomain(application.fqdn) || ''}</div>
 							{/if}
+							{#if application.settings.isBot}
+								<div class="truncate text-center">BOT</div>
+							{/if}
 							{#if application.destinationDocker?.name}
 								<div class="truncate text-center">{application.destinationDocker.name}</div>
 							{/if}

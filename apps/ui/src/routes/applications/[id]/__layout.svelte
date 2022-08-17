@@ -264,7 +264,7 @@
 					class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2"
 					data-tip={$appSession.isAdmin
 						? isQueueActive
-							? 'Rebuild application'
+							? 'Rebuild Application'
 							: 'Autoupdate inprogress. Cannot rebuild application.'
 						: 'You do not have permission to rebuild application.'}
 				>
