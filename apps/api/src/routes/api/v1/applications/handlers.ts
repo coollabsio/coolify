@@ -657,13 +657,14 @@ export async function saveSecret(request: FastifyRequest<SaveSecret>, reply: Fas
             if (found) {
                 throw { status: 500, message: `Secret ${name} already exists.` }
             } else {
-                value = encrypt(value);
+                value = encrypt(value.trim());
+                console.log({value})
                 await prisma.secret.create({
                     data: { name, value, isBuildSecret, isPRMRSecret, application: { connect: { id } } }
                 });
             }
         } else {
-            value = encrypt(value);
+            value = encrypt(value.trim());
             const found = await prisma.secret.findFirst({ where: { applicationId: id, name, isPRMRSecret } });
 
             if (found) {
