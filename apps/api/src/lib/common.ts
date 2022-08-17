@@ -1813,4 +1813,20 @@ export function persistentVolumes(id, persistentStorage, config) {
 		...composeVolumes
 	) || {}
 	return { volumes, volumeMounts }
+
+
+}
+export function defaultComposeConfiguration(network: string): any {
+	return {
+		networks: [network],
+		restart: 'on-failure',
+		deploy: {
+			restart_policy: {
+				condition: 'on-failure',
+				delay: '5s',
+				max_attempts: 10,
+				window: '120s'
+			}
+		}
+	}
 }

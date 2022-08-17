@@ -2,14 +2,14 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings, getFreeExposedPort, checkDomainsIsValidInDNS, persistentVolumes, asyncSleep, isARM } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceImage, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings, getFreeExposedPort, checkDomainsIsValidInDNS, persistentVolumes, asyncSleep, isARM, defaultComposeConfiguration } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, isContainerExited, removeContainer } from '../../../../lib/docker';
 import cuid from 'cuid';
 
 import type { OnlyId } from '../../../../types';
 import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetWordpressSettings } from './types';
-import { defaultServiceComposeConfiguration, defaultServiceConfigurations } from '../../../../lib/services';
+import { defaultServiceConfigurations } from '../../../../lib/services';
 
 // async function startServiceNew(request: FastifyRequest<OnlyId>) {
 //     try {
@@ -806,21 +806,21 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     depends_on: [`${id}-postgresql`, `${id}-clickhouse`],
                     labels: makeLabelForServices('plausibleAnalytics'),
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 },
                 [`${id}-postgresql`]: {
                     container_name: `${id}-postgresql`,
                     image: config.postgresql.image,
                     environment: config.postgresql.environmentVariables,
                     volumes: [config.postgresql.volume],
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 },
                 [`${id}-clickhouse`]: {
                     build: workdir,
                     container_name: `${id}-clickhouse`,
                     environment: config.clickhouse.environmentVariables,
                     volumes: [config.clickhouse.volume],
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 }
             },
             networks: {
@@ -881,7 +881,7 @@ async function startNocodbService(request: FastifyRequest<ServiceStartStop>) {
                     environment: config.environmentVariables,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('nocodb'),
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 }
             },
             networks: {
@@ -953,7 +953,7 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
                     volumes,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('minio'),
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1019,7 +1019,7 @@ async function startVscodeService(request: FastifyRequest<ServiceStartStop>) {
                     volumes,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('vscodeServer'),
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1126,7 +1126,7 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
                     volumes,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('wordpress'),
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1143,7 +1143,7 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
                 image: config.mysql.image,
                 volumes: [config.mysql.volume],
                 environment: config.mysql.environmentVariables,
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             };
 
             composeFile.volumes[config.mysql.volume.split(':')[0]] = {
@@ -1196,7 +1196,7 @@ async function startVaultwardenService(request: FastifyRequest<ServiceStartStop>
                     volumes,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('vaultWarden'),
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1252,7 +1252,7 @@ async function startLanguageToolService(request: FastifyRequest<ServiceStartStop
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     volumes,
                     labels: makeLabelForServices('languagetool'),
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1309,7 +1309,7 @@ async function startN8nService(request: FastifyRequest<ServiceStartStop>) {
                     environment: config.environmentVariables,
                     labels: makeLabelForServices('n8n'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1364,7 +1364,7 @@ async function startUptimekumaService(request: FastifyRequest<ServiceStartStop>)
                     environment: config.environmentVariables,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('uptimekuma'),
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1463,14 +1463,14 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('ghost'),
                     depends_on: [`${id}-mariadb`],
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 },
                 [`${id}-mariadb`]: {
                     container_name: `${id}-mariadb`,
                     image: config.mariadb.image,
                     volumes: [config.mariadb.volume],
                     environment: config.mariadb.environmentVariables,
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1536,7 +1536,7 @@ async function startMeilisearchService(request: FastifyRequest<ServiceStartStop>
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     volumes,
                     labels: makeLabelForServices('meilisearch'),
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1702,14 +1702,14 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('umami'),
                     depends_on: [`${id}-postgresql`],
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 },
                 [`${id}-postgresql`]: {
                     build: workdir,
                     container_name: `${id}-postgresql`,
                     environment: config.postgresql.environmentVariables,
                     volumes: [config.postgresql.volume],
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1789,14 +1789,14 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
                     labels: makeLabelForServices('hasura'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     depends_on: [`${id}-postgresql`],
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 },
                 [`${id}-postgresql`]: {
                     image: config.postgresql.image,
                     container_name: `${id}-postgresql`,
                     environment: config.postgresql.environmentVariables,
                     volumes: [config.postgresql.volume],
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1902,14 +1902,14 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
                     labels: makeLabelForServices('fider'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     depends_on: [`${id}-postgresql`],
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 },
                 [`${id}-postgresql`]: {
                     image: config.postgresql.image,
                     container_name: `${id}-postgresql`,
                     environment: config.postgresql.environmentVariables,
                     volumes: [config.postgresql.volume],
-                    ...defaultServiceComposeConfiguration(network),
+                    ...defaultComposeConfiguration(network),
                 }
             },
             networks: {
@@ -1995,7 +1995,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     "_APP_STATSD_PORT=8125",
                     ...secrets
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
             [`${id}-realtime`]: {
                 image: `${image}:${version}`,
@@ -2018,7 +2018,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     `_APP_DB_PASS=${mariadbPassword}`,
                     ...secrets
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
             [`${id}-worker-audits`]: {
 
@@ -2042,7 +2042,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     `_APP_DB_PASS=${mariadbPassword}`,
                     ...secrets
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
             [`${id}-worker-webhooks`]: {
                 image: `${image}:${version}`,
@@ -2060,7 +2060,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     "_APP_REDIS_PORT=6379",
                     ...secrets
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
             [`${id}-worker-deletes`]: {
                 image: `${image}:${version}`,
@@ -2093,7 +2093,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     `_APP_EXECUTOR_HOST=http://${id}-executor/v1`,
                     ...secrets
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
             [`${id}-worker-databases`]: {
                 image: `${image}:${version}`,
@@ -2116,7 +2116,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     `_APP_DB_PASS=${mariadbPassword}`,
                     ...secrets
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
             [`${id}-worker-builds`]: {
                 image: `${image}:${version}`,
@@ -2141,7 +2141,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     `_APP_DB_PASS=${mariadbPassword}`,
                     ...secrets
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
             [`${id}-worker-certificates`]: {
                 image: `${image}:${version}`,
@@ -2170,7 +2170,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     `_APP_DB_PASS=${mariadbPassword}`,
                     ...secrets
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
             [`${id}-worker-functions`]: {
                 image: `${image}:${version}`,
@@ -2196,7 +2196,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     `_APP_EXECUTOR_HOST=http://${id}-executor/v1`,
                     ...secrets
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
             [`${id}-executor`]: {
                 image: `${image}:${version}`,
@@ -2220,7 +2220,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     `_APP_EXECUTOR_SECRET=${executorSecret}`,
                     ...secrets
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
             [`${id}-worker-mails`]: {
                 image: `${image}:${version}`,
@@ -2237,7 +2237,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     "_APP_REDIS_PORT=6379",
                     ...secrets
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
             [`${id}-worker-messaging`]: {
                 image: `${image}:${version}`,
@@ -2253,7 +2253,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     "_APP_REDIS_PORT=6379",
                     ...secrets
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
             [`${id}-maintenance`]: {
                 image: `${image}:${version}`,
@@ -2277,7 +2277,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     `_APP_DB_PASS=${mariadbPassword}`,
                     ...secrets
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
             [`${id}-schedule`]: {
                 image: `${image}:${version}`,
@@ -2293,7 +2293,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     "_APP_REDIS_PORT=6379",
                     ...secrets
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
             [`${id}-mariadb`]: {
                 "image": "mariadb:10.7",
@@ -2310,7 +2310,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     `MYSQL_DATABASE=${mariadbDatabase}`
                 ],
                 "command": "mysqld --innodb-flush-method=fsync",
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
             [`${id}-redis`]: {
                 "image": "redis:6.2-alpine",
@@ -2319,7 +2319,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 "volumes": [
                     `${id}-redis:/data:rw`
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             },
 
         };
@@ -2348,7 +2348,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     "_APP_REDIS_PORT=6379",
                     ...secrets
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             }
             dockerCompose[`${id}-influxdb`] = {
                 "image": "appwrite/influxdb:1.5.0",
@@ -2356,7 +2356,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 "volumes": [
                     `${id}-influxdb:/var/lib/influxdb:rw`
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             }
             dockerCompose[`${id}-telegraf`] = {
                 "image": "appwrite/telegraf:1.4.0",
@@ -2365,7 +2365,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                     `_APP_INFLUXDB_HOST=${id}-influxdb`,
                     "_APP_INFLUXDB_PORT=8086",
                 ],
-                ...defaultServiceComposeConfiguration(network),
+                ...defaultComposeConfiguration(network),
             }
         }
 
