@@ -83,7 +83,7 @@
 				disabled={updateStatus.success === false}
 				on:click={update}
 				class="icons tooltip tooltip-right tooltip-primary bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white duration-75 hover:scale-105"
-				data-tip="Update available!"
+				data-tip="Update Available!"
 			>
 				{#if updateStatus.loading}
 					<svg
