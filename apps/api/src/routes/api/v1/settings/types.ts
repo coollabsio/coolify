@@ -8,7 +8,8 @@ export interface SaveSettings {
         minPort: number,
         maxPort: number,
         isAutoUpdateEnabled: boolean,
-        isDNSCheckEnabled: boolean
+        isDNSCheckEnabled: boolean,
+        DNSServers: string
     }
 }
 export interface DeleteDomain {

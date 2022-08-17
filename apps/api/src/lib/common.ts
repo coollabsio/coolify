@@ -307,6 +307,10 @@ export async function checkDoubleBranch(branch: string, projectId: number): Prom
 }
 export async function isDNSValid(hostname: any, domain: string): Promise<any> {
 	const { isIP } = await import('is-ip');
+	const { DNSServers } = await listSettings();
+	if (DNSServers) {
+		dns.setServers([DNSServers]);
+	}
 	let resolves = [];
 	try {
 		if (isIP(hostname)) {
@@ -320,7 +324,6 @@ export async function isDNSValid(hostname: any, domain: string): Promise<any> {
 
 	try {
 		let ipDomainFound = false;
-		dns.setServers(['1.1.1.1', '8.8.8.8']);
 		const dnsResolve = await dns.resolve4(domain);
 		if (dnsResolve.length > 0) {
 			for (const ip of dnsResolve) {
@@ -412,7 +415,12 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 	const { isIP } = await import('is-ip');
 	const domain = getDomain(fqdn);
 	const domainDualCert = domain.includes('www.') ? domain.replace('www.', '') : `www.${domain}`;
-	dns.setServers(['1.1.1.1', '8.8.8.8']);
+
+	const { DNSServers } = await listSettings();
+	if (DNSServers) {
+		dns.setServers([DNSServers]);
+	}
+
 	let resolves = [];
 	try {
 		if (isIP(hostname)) {
@@ -1553,7 +1561,7 @@ export async function configureServiceType({
 		});
 	} else if (type === 'appwrite') {
 		const opensslKeyV1 = encrypt(generatePassword());
-		const executorSecret  = encrypt(generatePassword());
+		const executorSecret = encrypt(generatePassword());
 		const redisPassword = encrypt(generatePassword());
 		const mariadbHost = `${id}-mariadb`
 		const mariadbUser = cuid();

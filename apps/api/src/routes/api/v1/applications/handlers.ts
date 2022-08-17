@@ -18,7 +18,7 @@ export async function listApplications(request: FastifyRequest) {
         const { teamId } = request.user
         const applications = await prisma.application.findMany({
             where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-            include: { teams: true, destinationDocker: true }
+            include: { teams: true, destinationDocker: true, settings: true }
         });
         const settings = await prisma.setting.findFirst()
         return {

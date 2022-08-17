@@ -98,7 +98,7 @@
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									Destination Missing
 								</div>
-							{:else if !application.fqdn}
+							{:else if !application.fqdn && !application.settings.isBot}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									URL Missing
 								</div>

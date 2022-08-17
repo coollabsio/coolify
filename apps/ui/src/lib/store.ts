@@ -1,3 +1,4 @@
+import { dev } from '$app/env';
 import cuid from 'cuid';
 import { writable, readable, type Writable } from 'svelte/store';
 
@@ -73,7 +74,7 @@ export const location: Writable<null | string> = writable(null)
 export const setLocation = (resource: any, settings?: any) => {
     if (resource.settings.isBot && resource.exposePort) {
         disabledButton.set(false);
-        return location.set(`http://${settings.ipv4}:${resource.exposePort}`)
+        return location.set(`http://${dev ? 'localhost' : settings.ipv4}:${resource.exposePort}`)
     }
     if (GITPOD_WORKSPACE_URL && resource.exposePort) {
         const { href } = new URL(GITPOD_WORKSPACE_URL);

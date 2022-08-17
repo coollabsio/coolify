@@ -779,15 +779,17 @@
 				description={$t('application.enable_auto_deploy_webhooks')}
 			/>
 		</div>
-		<div class="grid grid-cols-2 items-center">
-			<Setting
-				isCenter={false}
-				bind:setting={previews}
-				on:click={() => changeSettings('previews')}
-				title={$t('application.enable_mr_pr_previews')}
-				description={$t('application.enable_preview_deploy_mr_pr_requests')}
-			/>
-		</div>
+		{#if !application.settings.isBot}
+			<div class="grid grid-cols-2 items-center">
+				<Setting
+					isCenter={false}
+					bind:setting={previews}
+					on:click={() => changeSettings('previews')}
+					title={$t('application.enable_mr_pr_previews')}
+					description={$t('application.enable_preview_deploy_mr_pr_requests')}
+				/>
+			</div>
+		{/if}
 		<div class="grid grid-cols-2 items-center">
 			<Setting
 				isCenter={false}

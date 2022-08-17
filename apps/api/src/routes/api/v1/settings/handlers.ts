@@ -33,12 +33,13 @@ export async function saveSettings(request: FastifyRequest<SaveSettings>, reply:
             minPort,
             maxPort,
             isAutoUpdateEnabled,
-            isDNSCheckEnabled
+            isDNSCheckEnabled,
+            DNSServers
         } = request.body
         const { id } = await listSettings();
         await prisma.setting.update({
             where: { id },
-            data: { isRegistrationEnabled, dualCerts, isAutoUpdateEnabled, isDNSCheckEnabled }
+            data: { isRegistrationEnabled, dualCerts, isAutoUpdateEnabled, isDNSCheckEnabled, DNSServers }
         });
         if (fqdn) {
             await prisma.setting.update({ where: { id }, data: { fqdn } });
@@ -54,6 +55,10 @@ export async function saveSettings(request: FastifyRequest<SaveSettings>, reply:
 export async function deleteDomain(request: FastifyRequest<DeleteDomain>, reply: FastifyReply) {
     try {
         const { fqdn } = request.body
+        const { DNSServers } = await listSettings();
+        if (DNSServers) {
+            dns.setServers([DNSServers]);
+        }
         let ip;
         try {
             ip = await dns.resolve(fqdn);
