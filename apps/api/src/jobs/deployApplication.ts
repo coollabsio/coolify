@@ -255,11 +255,11 @@ import * as buildpacks from '../lib/buildPacks';
 								secrets.forEach((secret) => {
 									if (pullmergeRequestId) {
 										if (secret.isPRMRSecret) {
-											envs.push(`${secret.name}='${secret.value}'`);
+											envs.push(`${secret.name}=${secret.value}`);
 										}
 									} else {
 										if (!secret.isPRMRSecret) {
-											envs.push(`${secret.name}='${secret.value}'`);
+											envs.push(`${secret.name}=${secret.value}`);
 										}
 									}
 								});

@@ -458,13 +458,13 @@ export async function saveServiceSecret(request: FastifyRequest<SaveServiceSecre
             if (found) {
                 throw `Secret ${name} already exists.`
             } else {
-                value = encrypt(value);
+                value = encrypt(value.trim());
                 await prisma.serviceSecret.create({
                     data: { name, value, service: { connect: { id } } }
                 });
             }
         } else {
-            value = encrypt(value);
+            value = encrypt(value.trim());
             const found = await prisma.serviceSecret.findFirst({ where: { serviceId: id, name } });
 
             if (found) {
