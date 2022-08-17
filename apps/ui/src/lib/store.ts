@@ -71,7 +71,8 @@ export const features = readable({
 
 export const location: Writable<null | string> = writable(null)
 export const setLocation = (resource: any, settings?: any) => {
-    if (resource.settings.isBot) {
+    if (resource.settings.isBot && resource.exposePort) {
+        disabledButton.set(false);
         return location.set(`http://${settings.ipv4}:${resource.exposePort}`)
     }
     if (GITPOD_WORKSPACE_URL && resource.exposePort) {
@@ -84,7 +85,12 @@ export const setLocation = (resource: any, settings?: any) => {
         const newURL = `https://${CODESANDBOX_HOST.replace(/\$PORT/, resource.exposePort)}`
         return location.set(newURL)
     }
-    return location.set(resource.fqdn)
+    if (resource.fqdn) {
+        return location.set(resource.fqdn)
+    } else {
+        location.set(null);
+        disabledButton.set(true);
+    }
 }
 
 export const toasts: any = writable([])

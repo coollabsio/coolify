@@ -134,6 +134,7 @@
 		}
 		if (name === 'isBot') {
 			isBot = !isBot;
+			application.settings.isBot = isBot;
 			setLocation(application, settings);
 		}
 		try {
@@ -486,7 +487,7 @@
 					bind:setting={isBot}
 					on:click={() => changeSettings('isBot')}
 					title="Is your application a bot?"
-					description="You can deploy applications without domains. <br>They will listen on <span class='text-green-500 font-bold'>IP:PORT</span> instead.<br></Setting><br>Useful for <span class='text-green-500 font-bold'>example bots.</span>"
+					description="You can deploy applications without domains. <br>They will listen on <span class='text-green-500 font-bold'>IP:EXPOSEDPORT</span> instead.<br></Setting><br>Useful to host <span class='text-green-500 font-bold'>Twitch bots.</span>"
 				/>
 			</div>
 			{#if !isBot}
