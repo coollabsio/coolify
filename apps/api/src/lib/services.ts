@@ -18,18 +18,3 @@ export async function defaultServiceConfigurations({ id, teamId }) {
     }
     return { ...service, network, port, workdir, image, secrets }
 }
-
-export function defaultServiceComposeConfiguration(network: string): any {
-    return {
-        networks: [network],
-        restart: 'always',
-        deploy: {
-            restart_policy: {
-                condition: 'on-failure',
-                delay: '10s',
-                max_attempts: 10,
-                window: '120s'
-            }
-        }
-    }
-}

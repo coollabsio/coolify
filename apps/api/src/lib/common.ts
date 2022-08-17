@@ -17,7 +17,7 @@ import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
-export const version = '3.5.1';
+export const version = '3.5.2';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -1813,4 +1813,20 @@ export function persistentVolumes(id, persistentStorage, config) {
 		...composeVolumes
 	) || {}
 	return { volumes, volumeMounts }
+
+
+}
+export function defaultComposeConfiguration(network: string): any {
+	return {
+		networks: [network],
+		restart: 'on-failure',
+		deploy: {
+			restart_policy: {
+				condition: 'on-failure',
+				delay: '5s',
+				max_attempts: 10,
+				window: '120s'
+			}
+		}
+	}
 }

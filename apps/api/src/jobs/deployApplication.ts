@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import yaml from 'js-yaml';
 
 import { copyBaseConfigurationFiles, makeLabelForStandaloneApplication, saveBuildLog, setDefaultConfiguration } from '../lib/buildPacks/common';
-import { createDirectories, decrypt, executeDockerCmd, getDomain, prisma } from '../lib/common';
+import { createDirectories, decrypt, defaultComposeConfiguration, executeDockerCmd, getDomain, prisma } from '../lib/common';
 import * as importers from '../lib/importers';
 import * as buildpacks from '../lib/buildPacks';
 
@@ -306,23 +306,14 @@ import * as buildpacks from '../lib/buildPacks';
 											container_name: imageId,
 											volumes,
 											env_file: envFound ? [`${workdir}/.env`] : [],
-											networks: [destinationDocker.network],
 											labels,
 											depends_on: [],
-											restart: 'always',
 											expose: [port],
 											...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
 											// logging: {
 											// 	driver: 'fluentd',
 											// },
-											deploy: {
-												restart_policy: {
-													condition: 'on-failure',
-													delay: '5s',
-													max_attempts: 3,
-													window: '120s'
-												}
-											}
+											...defaultComposeConfiguration(destinationDocker.network),
 										}
 									},
 									networks: {
