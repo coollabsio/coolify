@@ -5,7 +5,8 @@
 			if (stuff?.application?.id) {
 				return {
 					props: {
-						application: stuff.application
+						application: stuff.application,
+						settings: stuff.settings
 					}
 				};
 			}
@@ -26,6 +27,7 @@
 
 <script lang="ts">
 	export let application: any;
+	export let settings: any;
 	import { page } from '$app/stores';
 	import { onDestroy, onMount } from 'svelte';
 	import Select from 'svelte-select';
@@ -60,6 +62,7 @@
 	let previews = application.settings.previews;
 	let dualCerts = application.settings.dualCerts;
 	let autodeploy = application.settings.autodeploy;
+	let isBot = application.settings.isBot;
 
 	let nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
 	let isNonWWWDomainOK = false;
@@ -99,7 +102,7 @@
 			application.fqdn = `http://${cuid()}.demo.coolify.io`;
 			await handleSubmit();
 		}
-		domainEl.focus();
+		// !isBot && domainEl.focus();
 		await getUsage();
 		usageInterval = setInterval(async () => {
 			await getUsage();
@@ -129,11 +132,17 @@
 		if (name === 'autodeploy') {
 			autodeploy = !autodeploy;
 		}
+		if (name === 'isBot') {
+			isBot = !isBot;
+			application.settings.isBot = isBot;
+			setLocation(application, settings);
+		}
 		try {
 			await post(`/applications/${id}/settings`, {
 				previews,
 				debug,
 				dualCerts,
+				isBot,
 				autodeploy,
 				branch: application.branch,
 				projectId: application.projectId
@@ -155,24 +164,28 @@
 			if (name === 'autodeploy') {
 				autodeploy = !autodeploy;
 			}
+			if (name === 'isBot') {
+				isBot = !isBot;
+			}
 			return errorNotification(error);
 		}
 	}
 	async function handleSubmit() {
-		if (loading || !application.fqdn) return;
+		if (loading || (!application.fqdn && !isBot)) return;
 		loading = true;
 		try {
 			nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
 			if (application.deploymentType)
 				application.deploymentType = application.deploymentType.toLowerCase();
-			await post(`/applications/${id}/check`, {
-				fqdn: application.fqdn,
-				forceSave,
-				dualCerts,
-				exposePort: application.exposePort
-			});
+			!isBot &&
+				(await post(`/applications/${id}/check`, {
+					fqdn: application.fqdn,
+					forceSave,
+					dualCerts,
+					exposePort: application.exposePort
+				}));
 			await post(`/applications/${id}`, { ...application });
-			setLocation(application);
+			setLocation(application, settings);
 			$disabledButton = false;
 			forceSave = false;
 			addToast({
@@ -371,16 +384,16 @@
 				{#if isDisabled}
 					<input class="capitalize" disabled={isDisabled} value={application.buildPack} />
 				{:else}
-				<a
-					href={`/applications/${id}/configuration/buildpack?from=/applications/${id}`}
-					class="no-underline "
-				>
-					<input
-						value={application.buildPack}
-						id="buildPack"
-						class="cursor-pointer hover:bg-coolgray-500 capitalize"
-					/></a
-				>
+					<a
+						href={`/applications/${id}/configuration/buildpack?from=/applications/${id}`}
+						class="no-underline "
+					>
+						<input
+							value={application.buildPack}
+							id="buildPack"
+							class="cursor-pointer hover:bg-coolgray-500 capitalize"
+						/></a
+					>
 				{/if}
 			</div>
 			<div class="grid grid-cols-2 items-center pb-8">
@@ -468,77 +481,88 @@
 			<div class="title">{$t('application.application')}</div>
 		</div>
 		<div class="grid grid-flow-row gap-2 px-10">
-			<div class="grid grid-cols-2">
-				<div class="flex-col">
-					<label for="fqdn" class="pt-2 text-base font-bold text-stone-100"
-						>{$t('application.url_fqdn')}</label
-					>
-					{#if browser && window.location.hostname === 'demo.coolify.io'}
-						<Explainer
-							text="<span class='text-white font-bold'>You can use the predefined random url name or enter your own domain name.</span>"
+			<div class="grid grid-cols-2 items-center">
+				<Setting
+					isCenter={false}
+					bind:setting={isBot}
+					on:click={() => changeSettings('isBot')}
+					title="Is your application a bot?"
+					description="You can deploy applications without domains. <br>They will listen on <span class='text-green-500 font-bold'>IP:EXPOSEDPORT</span> instead.<br></Setting><br>Useful to host <span class='text-green-500 font-bold'>Twitch bots.</span>"
+				/>
+			</div>
+			{#if !isBot}
+				<div class="grid grid-cols-2">
+					<div class="flex-col">
+						<label for="fqdn" class="pt-2 text-base font-bold text-stone-100"
+							>{$t('application.url_fqdn')}</label
+						>
+						{#if browser && window.location.hostname === 'demo.coolify.io'}
+							<Explainer
+								text="<span class='text-white font-bold'>You can use the predefined random url name or enter your own domain name.</span>"
+							/>
+						{/if}
+						<Explainer text={$t('application.https_explainer')} />
+					</div>
+					<div>
+						<input
+							readonly={isDisabled}
+							disabled={isDisabled}
+							bind:this={domainEl}
+							name="fqdn"
+							id="fqdn"
+							required
+							bind:value={application.fqdn}
+							pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+							placeholder="eg: https://coollabs.io"
 						/>
-					{/if}
-					<Explainer text={$t('application.https_explainer')} />
-				</div>
-				<div>
-					<input
-						readonly={isDisabled}
-						disabled={isDisabled}
-						bind:this={domainEl}
-						name="fqdn"
-						id="fqdn"
-						required
-						bind:value={application.fqdn}
-						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-						placeholder="eg: https://coollabs.io"
-					/>
-					{#if forceSave}
-						<div class="flex-col space-y-2 pt-4 text-center">
-							{#if isNonWWWDomainOK}
-								<button
-									class="bg-green-600 hover:bg-green-500"
-									on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
-									>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
-								>
-							{:else}
-								<button
-									class="bg-red-600 hover:bg-red-500"
-									on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
-									>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
-								>
-							{/if}
-							{#if dualCerts}
-								{#if isWWWDomainOK}
+						{#if forceSave}
+							<div class="flex-col space-y-2 pt-4 text-center">
+								{#if isNonWWWDomainOK}
 									<button
-										class="bg-green-600 hover:bg-green-500"
-										on:click|preventDefault={() =>
-											isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
-										>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
+										class="btn btn-sm bg-green-600 hover:bg-green-500"
+										on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+										>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
 									>
 								{:else}
 									<button
-										class="bg-red-600 hover:bg-red-500"
-										on:click|preventDefault={() =>
-											isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
-										>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
+										class="btn btn-sm bg-red-600 hover:bg-red-500"
+										on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+										>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
 									>
 								{/if}
-							{/if}
-						</div>
-					{/if}
+								{#if dualCerts}
+									{#if isWWWDomainOK}
+										<button
+											class="btn btn-sm bg-green-600 hover:bg-green-500"
+											on:click|preventDefault={() =>
+												isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+											>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
+										>
+									{:else}
+										<button
+											class="btn btn-sm bg-red-600 hover:bg-red-500"
+											on:click|preventDefault={() =>
+												isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+											>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
+										>
+									{/if}
+								{/if}
+							</div>
+						{/if}
+					</div>
 				</div>
-			</div>
-			<div class="grid grid-cols-2 items-center pb-8">
-				<Setting
-					dataTooltip={$t('forms.must_be_stopped_to_modify')}
-					disabled={$status.application.isRunning}
-					isCenter={false}
-					bind:setting={dualCerts}
-					title={$t('application.ssl_www_and_non_www')}
-					description={$t('application.ssl_explainer')}
-					on:click={() => !$status.application.isRunning && changeSettings('dualCerts')}
-				/>
-			</div>
+				<div class="grid grid-cols-2 items-center pb-8">
+					<Setting
+						dataTooltip={$t('forms.must_be_stopped_to_modify')}
+						disabled={$status.application.isRunning}
+						isCenter={false}
+						bind:setting={dualCerts}
+						title={$t('application.ssl_www_and_non_www')}
+						description={$t('application.ssl_explainer')}
+						on:click={() => !$status.application.isRunning && changeSettings('dualCerts')}
+					/>
+				</div>
+			{/if}
 			{#if application.buildPack === 'python'}
 				<div class="grid grid-cols-2 items-center">
 					<label for="pythonModule" class="text-base font-bold text-stone-100">WSGI / ASGI</label>
@@ -588,7 +612,7 @@
 					</div>
 				{/if}
 			{/if}
-			{#if !staticDeployments.includes(application.buildPack)}
+			{#if !staticDeployments.includes(application.buildPack) && !isBot}
 				<div class="grid grid-cols-2 items-center">
 					<label for="port" class="text-base font-bold text-stone-100">{$t('forms.port')}</label>
 					<input
@@ -609,6 +633,7 @@
 					name="exposePort"
 					id="exposePort"
 					bind:value={application.exposePort}
+					required={isBot}
 					placeholder="12345"
 				/>
 				<Explainer
@@ -754,15 +779,17 @@
 				description={$t('application.enable_auto_deploy_webhooks')}
 			/>
 		</div>
-		<div class="grid grid-cols-2 items-center">
-			<Setting
-				isCenter={false}
-				bind:setting={previews}
-				on:click={() => changeSettings('previews')}
-				title={$t('application.enable_mr_pr_previews')}
-				description={$t('application.enable_preview_deploy_mr_pr_requests')}
-			/>
-		</div>
+		{#if !application.settings.isBot}
+			<div class="grid grid-cols-2 items-center">
+				<Setting
+					isCenter={false}
+					bind:setting={previews}
+					on:click={() => changeSettings('previews')}
+					title={$t('application.enable_mr_pr_previews')}
+					description={$t('application.enable_preview_deploy_mr_pr_requests')}
+				/>
+			</div>
+		{/if}
 		<div class="grid grid-cols-2 items-center">
 			<Setting
 				isCenter={false}

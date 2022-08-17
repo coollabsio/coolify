@@ -5,7 +5,7 @@ import axios from 'axios';
 import { FastifyReply } from 'fastify';
 import { day } from '../../../../lib/dayjs';
 import { setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
-import { checkDomainsIsValidInDNS, checkDoubleBranch, decrypt, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, getFreeExposedPort, isDev, isDomainConfigured, prisma, stopBuild, uniqueName } from '../../../../lib/common';
+import { checkDomainsIsValidInDNS, checkDoubleBranch, decrypt, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, getFreeExposedPort, isDev, isDomainConfigured, listSettings, prisma, stopBuild, uniqueName } from '../../../../lib/common';
 import { checkContainer, formatLabelsOnDocker, isContainerExited, removeContainer } from '../../../../lib/docker';
 import { scheduler } from '../../../../lib/scheduler';
 
@@ -18,7 +18,7 @@ export async function listApplications(request: FastifyRequest) {
         const { teamId } = request.user
         const applications = await prisma.application.findMany({
             where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-            include: { teams: true, destinationDocker: true }
+            include: { teams: true, destinationDocker: true, settings: true }
         });
         const settings = await prisma.setting.findFirst()
         return {
@@ -90,10 +90,11 @@ export async function getApplication(request: FastifyRequest<OnlyId>) {
         const { teamId } = request.user
         const appId = process.env['COOLIFY_APP_ID'];
         const application: any = await getApplicationFromDB(id, teamId);
-
+        const settings = await listSettings();
         return {
             application,
-            appId
+            appId,
+            settings
         };
 
     } catch ({ status, message }) {
@@ -275,7 +276,7 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
 export async function saveApplicationSettings(request: FastifyRequest<SaveApplicationSettings>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        const { debug, previews, dualCerts, autodeploy, branch, projectId } = request.body
+        const { debug, previews, dualCerts, autodeploy, branch, projectId, isBot } = request.body
         const isDouble = await checkDoubleBranch(branch, projectId);
         if (isDouble && autodeploy) {
             await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false } })
@@ -283,7 +284,7 @@ export async function saveApplicationSettings(request: FastifyRequest<SaveApplic
         }
         await prisma.application.update({
             where: { id },
-            data: { settings: { update: { debug, previews, dualCerts, autodeploy } } },
+            data: { fqdn: isBot ? null : undefined, settings: { update: { debug, previews, dualCerts, autodeploy, isBot } } },
             include: { destinationDocker: true }
         });
         return reply.code(201).send();

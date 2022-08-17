@@ -31,7 +31,7 @@
 	let dualCerts = settings.dualCerts;
 	let isAutoUpdateEnabled = settings.isAutoUpdateEnabled;
 	let isDNSCheckEnabled = settings.isDNSCheckEnabled;
-
+	let DNSServers = settings.DNSServers;
 	let minPort = settings.minPort;
 	let maxPort = settings.maxPort;
 
@@ -104,6 +104,10 @@
 				await post(`/settings`, { minPort, maxPort });
 				settings.minPort = minPort;
 				settings.maxPort = maxPort;
+			}
+			if (DNSServers !== settings.DNSServers) {
+				await post(`/settings`, { DNSServers });
+				settings.DNSServers = DNSServers;
 			}
 			forceSave = false;
 			return addToast({
@@ -274,6 +278,17 @@
 							description={$t('setting.is_dns_check_enabled_explainer')}
 							on:click={() => changeSettings('isDNSCheckEnabled')}
 						/>
+					</div>
+					<div class="grid grid-cols-2 items-center">
+						<div class="flex-col">
+							<div class="pt-2 text-base font-bold text-stone-100">
+								Custom DNS servers
+							</div>
+							<Explainer text="You can specify a custom DNS server to verify your domains all over Coolify.<br><br>By default, the OS defined DNS servers are used." />
+						</div>
+						<div class="mx-auto flex-row items-center justify-center space-y-2">
+							<input placeholder="1.1.1.1,8.8.8.8" bind:value={DNSServers} />
+						</div>
 					</div>
 					<div class="grid grid-cols-2 items-center">
 						<Setting

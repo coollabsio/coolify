@@ -87,6 +87,9 @@
 							{#if application.fqdn}
 								<div class="truncate text-center">{getDomain(application.fqdn) || ''}</div>
 							{/if}
+							{#if application.settings.isBot}
+								<div class="truncate text-center">BOT</div>
+							{/if}
 							{#if application.destinationDocker?.name}
 								<div class="truncate text-center">{application.destinationDocker.name}</div>
 							{/if}
@@ -98,7 +101,7 @@
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									Destination Missing
 								</div>
-							{:else if !application.fqdn}
+							{:else if !application.fqdn && !application.settings.isBot}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									URL Missing
 								</div>

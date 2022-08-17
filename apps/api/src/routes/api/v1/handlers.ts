@@ -4,7 +4,7 @@ import axios from 'axios';
 import compare from 'compare-versions';
 import cuid from 'cuid';
 import bcrypt from 'bcryptjs';
-import { asyncExecShell, asyncSleep, cleanupDockerStorage, errorHandler, isDev, prisma, uniqueName, version } from '../../../lib/common';
+import { asyncExecShell, asyncSleep, cleanupDockerStorage, errorHandler, isDev, listSettings, prisma, uniqueName, version } from '../../../lib/common';
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Login, Update } from '.';
@@ -97,7 +97,8 @@ export async function showDashboard(request: FastifyRequest) {
 		const userId = request.user.userId;
 		const teamId = request.user.teamId;
 		const applications = await prisma.application.findMany({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
+			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+			include: { settings: true }
 		});
 		const databases = await prisma.database.findMany({
 			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
@@ -105,10 +106,12 @@ export async function showDashboard(request: FastifyRequest) {
 		const services = await prisma.service.findMany({
 			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
 		});
+		const settings = await listSettings();
 		return {
 			applications,
 			databases,
 			services,
+			settings,
 		};
 	} catch ({ status, message }) {
 		return errorHandler({ status, message })
