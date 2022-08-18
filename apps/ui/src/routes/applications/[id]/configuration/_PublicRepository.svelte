@@ -157,22 +157,16 @@
 	}
 </script>
 
-<div class="mx-auto max-w-7xl">
+<div class="mx-auto max-w-5xl">
 	<div class="grid grid-flow-row gap-2 px-10">
 		<div class="flex">
 			<form class="flex" on:submit|preventDefault={loadBranches}>
-				<div class="flex-col">
-					<label for="fqdn" class="pt-2 w-40 text-base font-bold text-stone-100"
-						>Public Git HTTP Url</label
-					>
-
-					<Explainer
-					customClass="w-[32rem]"
-						text="Only works with Github.com and Gitlab.com.<br><br>Examples:<br>https://github.com/coollabsio/nodejs-example<br>https://github.com/coollabsio/nodejs-example/tree/main<br>https://gitlab.com/aleveha/fastify-example<br>https://gitlab.com/aleveha/fastify-example/-/tree/master"
-					/>
-				</div>
 				<div class="space-y-4">
-					<input placeholder="eg: https://github.com/coollabsio/nodejs-example/tree/main" class="w-[32rem]" bind:value={publicRepositoryLink} />
+					<input
+						placeholder="eg: https://github.com/coollabsio/nodejs-example/tree/main"
+						class="text-xs"
+						bind:value={publicRepositoryLink}
+					/>
 					{#if branchSelectOptions.length > 0}
 						<div class="custom-select-wrapper">
 							<Select
@@ -193,10 +187,13 @@
 					{/if}
 				</div>
 
-				<button class="btn mx-4 bg-green-600" class:loading={loading.branches} type="submit"
+				<button class="btn mx-4 bg-orange-600" class:loading={loading.branches} type="submit"
 					>Load Repository</button
 				>
 			</form>
 		</div>
 	</div>
+	<Explainer
+		text="Examples:<br><br>https://github.com/coollabsio/nodejs-example<br>https://github.com/coollabsio/nodejs-example/tree/main<br>https://gitlab.com/aleveha/fastify-example<br>https://gitlab.com/aleveha/fastify-example/-/tree/master<br><br>Only works with Github.com and Gitlab.com."
+	/>
 </div>

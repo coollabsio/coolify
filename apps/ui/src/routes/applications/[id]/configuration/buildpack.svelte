@@ -267,8 +267,8 @@
 		</div>
 	</div>
 {:else}
-	<div class="max-w-7xl mx-auto ">
-		<div class="title pb-2">Coolify Buildpacks</div>
+	<div class="max-w-5xl mx-auto ">
+		<div class="title pb-2">Coolify</div>
 		<div class="flex flex-wrap justify-center">
 			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true) as buildPack}
 				<div class="p-2">
@@ -278,8 +278,8 @@
 		</div>
 	</div>
 
-	<div class="max-w-7xl mx-auto ">
-		<div class="title pb-2">Heroku</div>
+	<div class="max-w-5xl mx-auto ">
+		<div class="title pb-2">Other</div>
 		<div class="flex flex-wrap justify-center">
 			{#each buildPacks.filter((bp) => bp.isHerokuBuildPack === true) as buildPack}
 				<div class="p-2">

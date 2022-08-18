@@ -73,7 +73,7 @@ import Explainer from '$lib/components/Explainer.svelte';
 		{$t('application.configuration.select_a_git_source')}
 	</div>
 </div>
-<div class="max-w-7xl mx-auto ">
+<div class="max-w-5xl mx-auto ">
 	<div class="title pb-8">Git App</div>
 	<div class="flex flex-wrap justify-center">
 		{#if !filteredSources || ownSources.length === 0}
@@ -192,9 +192,7 @@ import Explainer from '$lib/components/Explainer.svelte';
 			</div>
 		{/if}
 	</div>
-	<div class="title">Public Repository</div>
+	<div class="title py-4">Public Repository</div>
 
-	<div class="flex flex-wrap justify-center items-center pt-4">
 		<PublicRepository />
-	</div>
 </div>
