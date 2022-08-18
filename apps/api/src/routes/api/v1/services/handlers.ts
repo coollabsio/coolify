@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings, getFreeExposedPort, checkDomainsIsValidInDNS, persistentVolumes, asyncSleep, isARM, defaultComposeConfiguration } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceImage, configureServiceType, getServiceFromDB, getContainerUsage, removeService, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, supportedServiceTypesAndVersions, executeDockerCmd, listSettings, getFreeExposedPort, checkDomainsIsValidInDNS, persistentVolumes, asyncSleep, isARM, defaultComposeConfiguration, checkExposedPort } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, isContainerExited, removeContainer } from '../../../../lib/docker';
 import cuid from 'cuid';
@@ -378,18 +378,7 @@ export async function checkService(request: FastifyRequest<CheckService>) {
                 }
             }
         }
-        if (exposePort) {
-            if (exposePort < 1024 || exposePort > 65535) {
-                throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
-            }
-
-            if (configuredPort !== exposePort) {
-                const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
-                if (availablePort.toString() !== exposePort.toString()) {
-                    throw { status: 500, message: `Port ${exposePort} is already in use.` }
-                }
-            }
-        }
+        await checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress })
         if (isDNSCheckEnabled && !isDev && !forceSave) {
             let hostname = request.hostname.split(':')[0];
             if (remoteEngine) hostname = remoteIpAddress;

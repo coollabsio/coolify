@@ -77,9 +77,9 @@
 
 	const { id } = $page.params;
 
-	async function handleDeploySubmit() {
+	async function handleDeploySubmit(forceRebuild = false) {
 		try {
-			const { buildId } = await post(`/applications/${id}/deploy`, { ...application });
+			const { buildId } = await post(`/applications/${id}/deploy`, { ...application, forceRebuild });
 			addToast({
 				message: $t('application.deployment_queued'),
 				type: 'success'
@@ -141,8 +141,7 @@
 		if (
 			application.gitSourceId &&
 			application.destinationDockerId &&
-			(application.fqdn ||
-			application.settings.isBot)
+			(application.fqdn || application.settings.isBot)
 		) {
 			await getStatus();
 			statusInterval = setInterval(async () => {
@@ -256,7 +255,7 @@
 					<rect x="14" y="5" width="4" height="14" rx="1" />
 				</svg>
 			</button>
-			<form on:submit|preventDefault={handleDeploySubmit}>
+			<form on:submit|preventDefault={() => handleDeploySubmit(true)}>
 				<button
 					type="submit"
 					disabled={$disabledButton || !isQueueActive}
@@ -264,7 +263,7 @@
 					class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2"
 					data-tip={$appSession.isAdmin
 						? isQueueActive
-							? 'Rebuild Application'
+							? 'Force Rebuild Application'
 							: 'Autoupdate inprogress. Cannot rebuild application.'
 						: 'You do not have permission to rebuild application.'}
 				>

@@ -66,6 +66,34 @@ async function main() {
 			}
 		});
 	}
+	const github = await prisma.gitSource.findFirst({
+		where: { htmlUrl: 'https://github.com', forPublic: true }
+	});
+	const gitlab = await prisma.gitSource.findFirst({
+		where: { htmlUrl: 'https://gitlab.com', forPublic: true }
+	});
+	if (!github) {
+		await prisma.gitSource.create({
+			data: {
+				apiUrl: 'https://api.github.com',
+				htmlUrl: 'https://github.com',
+				forPublic: true,
+				name: 'Github Public',
+				type: 'github'
+			}
+		});
+	}
+	if (!gitlab) {
+		await prisma.gitSource.create({
+			data: {
+				apiUrl: 'https://gitlab.com/api/v4',
+				htmlUrl: 'https://gitlab.com',
+				forPublic: true,
+				name: 'Gitlab Public',
+				type: 'gitlab'
+			}
+		});
+	}
 }
 main()
 	.catch((e) => {
