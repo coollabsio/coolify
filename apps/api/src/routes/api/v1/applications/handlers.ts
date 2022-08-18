@@ -428,7 +428,7 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
     try {
         const { id } = request.params
         const teamId = request.user?.teamId;
-        const { pullmergeRequestId = null, branch } = request.body
+        const { pullmergeRequestId = null, branch, forceRebuild } = request.body
         const buildId = cuid();
         const application = await getApplicationFromDB(id, teamId);
         if (application) {
@@ -467,13 +467,15 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
                     type: 'manual',
                     ...application,
                     sourceBranch: branch,
-                    pullmergeRequestId
+                    pullmergeRequestId,
+                    forceRebuild
                 });
             } else {
                 scheduler.workers.get('deployApplication').postMessage({
                     build_id: buildId,
                     type: 'manual',
-                    ...application
+                    ...application,
+                    forceRebuild
                 });
 
             }

@@ -56,6 +56,7 @@ import * as buildpacks from '../lib/buildPacks';
 						baseImage,
 						baseBuildImage,
 						deploymentType,
+						forceRebuild
 					} = message
 					let {
 						branch,
@@ -174,7 +175,6 @@ import * as buildpacks from '../lib/buildPacks';
 
 							if (!pullmergeRequestId) {
 
-
 								if (configHash !== currentHash) {
 									deployNeeded = true;
 									if (configHash) {
@@ -198,6 +198,8 @@ import * as buildpacks from '../lib/buildPacks';
 								//
 							}
 							await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId, baseImage);
+
+							if (forceRebuild) deployNeeded = true
 							if (!imageFound || deployNeeded) {
 								// if (true) {
 								if (buildpacks[buildPack])
@@ -248,7 +250,9 @@ import * as buildpacks from '../lib/buildPacks';
 							} catch (error) {
 								//
 							}
-							const envs = [];
+							const envs = [
+								`PORT=${port}`
+							];
 							if (secrets.length > 0) {
 								secrets.forEach((secret) => {
 									if (pullmergeRequestId) {

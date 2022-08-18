@@ -1189,9 +1189,7 @@ export async function checkExposedPort({ id, configuredPort, exposePort, dockerI
 			}
 		}
 	} else {
-
 		const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
-console.log(availablePort, exposePort)
 		if (availablePort.toString() !== exposePort.toString()) {
 			throw { status: 500, message: `Port ${exposePort} is already in use.` }
 		}

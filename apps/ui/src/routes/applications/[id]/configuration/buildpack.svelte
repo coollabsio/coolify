@@ -249,7 +249,6 @@
 		if (!isPublicRepository) {
 			await scanRepository();
 		} else {
-			foundConfig = findBuildPack('node', packageManager);
 			scanning = false;
 		}
 	});

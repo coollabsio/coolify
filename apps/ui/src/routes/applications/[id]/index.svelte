@@ -620,7 +620,7 @@
 					</div>
 				{/if}
 			{/if}
-			{#if !staticDeployments.includes(application.buildPack) && !isBot}
+			{#if !staticDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-2 items-center">
 					<label for="port" class="text-base font-bold text-stone-100">{$t('forms.port')}</label>
 					<input
@@ -631,6 +631,9 @@
 						bind:value={application.port}
 						placeholder="{$t('forms.default')}: 'python' ? '8000' : '3000'"
 					/>
+					<Explainer
+					text={'The port your application listens on.'}
+				/>
 				</div>
 			{/if}
 			<div class="grid grid-cols-2 items-center">

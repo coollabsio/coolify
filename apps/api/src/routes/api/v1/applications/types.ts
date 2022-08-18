@@ -44,7 +44,7 @@ export interface CheckDNS extends OnlyId {
 }
 export interface DeployApplication {
     Querystring: { domain: string }
-    Body: { pullmergeRequestId: string | null, branch: string }
+    Body: { pullmergeRequestId: string | null, branch: string, forceRebuild?: boolean }
 }
 export interface GetImages {
     Body: { buildPack: string, deploymentType: string }
@@ -115,7 +115,8 @@ export interface CancelDeployment {
 export interface DeployApplication extends OnlyId {
     Body: {
         pullmergeRequestId: string | null,
-        branch: string
+        branch: string,
+        forceRebuild?: boolean
     }
 }
 
