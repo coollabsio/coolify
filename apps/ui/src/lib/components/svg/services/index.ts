@@ -15,4 +15,4 @@ export { default as Hasura } from './Hasura.svelte';
 export { default as Fider } from './Fider.svelte';
 export { default as Appwrite } from './Appwrite.svelte';
 export { default as Moodle } from './Moodle.svelte';
-
+export { default as GlitchTip }  from './GlitchTip.svelte';

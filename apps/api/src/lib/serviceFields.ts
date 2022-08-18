@@ -558,3 +558,116 @@ export const appwrite = [{
 	isBoolean: false,
 	isEncrypted: false
 }]
+
+export const glitchTip = [{
+	name: 'postgresqlUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'postgresqlDatabase',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlPublicPort',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: true,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'secretKeyBase',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'defaultEmail',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'defaultUsername',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'defaultPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'defaultFromEmail',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'emailUrl',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'emailBackend',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'mailgunApiKey',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'sendgridApiKey',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'enableOpenUserRegistration',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: true,
+	isEncrypted: false
+}]

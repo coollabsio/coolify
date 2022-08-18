@@ -92,6 +92,7 @@ Deploy your resource to:
 - [Umami](https://github.com/mikecao/umami)
 - [Fider](https://fider.io)
 - [Hasura](https://hasura.io)
+- [GlitchTip](https://glitchtip.com)
 
 ## Migration from v1
 
