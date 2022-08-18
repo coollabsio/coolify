@@ -79,7 +79,6 @@ export async function newDestination(request: FastifyRequest<NewDestination>, re
 
         let { name, network, engine, isCoolifyProxyUsed, remoteIpAddress, remoteUser, remotePort } = request.body
         if (id === 'new') {
-            console.log(engine)
             if (engine) {
                 const { stdout } = await asyncExecShell(`DOCKER_HOST=unix:///var/run/docker.sock docker network ls --filter 'name=^${network}$' --format '{{json .}}'`);
                 if (stdout === '') {

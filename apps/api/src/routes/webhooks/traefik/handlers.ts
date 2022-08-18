@@ -484,7 +484,6 @@ export async function traefikOtherConfiguration(request: FastifyRequest<TraefikO
 		}
 		throw { status: 500 }
 	} catch ({ status, message }) {
-		console.log(status, message);
 		return errorHandler({ status, message })
 	}
 }

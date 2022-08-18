@@ -17,7 +17,7 @@ import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
-export const version = '3.5.2';
+export const version = '3.6.0';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -1173,6 +1173,25 @@ export async function updatePasswordInDb(database, user, newPassword, isRoot) {
 				command: `docker exec ${id} redis-cli -u redis://${dbUserPassword}@${id}:6379 --raw CONFIG SET requirepass ${newPassword}`
 			})
 
+		}
+	}
+}
+export async function checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress }: { id: string, configuredPort?: number, exposePort: number, dockerId: string, remoteIpAddress?: string }) {
+	if (exposePort < 1024 || exposePort > 65535) {
+		throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
+	}
+
+	if (configuredPort) {
+		if (configuredPort !== exposePort) {
+			const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
+			if (availablePort.toString() !== exposePort.toString()) {
+				throw { status: 500, message: `Port ${exposePort} is already in use.` }
+			}
+		}
+	} else {
+		const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
+		if (availablePort.toString() !== exposePort.toString()) {
+			throw { status: 500, message: `Port ${exposePort} is already in use.` }
 		}
 	}
 }
