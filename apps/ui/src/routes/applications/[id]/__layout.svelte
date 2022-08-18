@@ -178,9 +178,10 @@
 					<polyline points="15 4 20 4 20 9" />
 				</svg></a
 			>
+		<div class="border border-coolgray-500 h-8" />
+
 		{/if}
 
-		<div class="border border-coolgray-500 h-8" />
 		{#if $status.application.isExited}
 			<a
 				href={!$disabledButton ? `/applications/${id}/logs` : null}

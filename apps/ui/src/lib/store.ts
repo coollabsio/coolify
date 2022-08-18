@@ -90,7 +90,7 @@ export const setLocation = (resource: any, settings?: any) => {
         return location.set(resource.fqdn)
     } else {
         location.set(null);
-        disabledButton.set(true);
+        disabledButton.set(false);
     }
 }
 

@@ -494,7 +494,7 @@
 					bind:setting={isBot}
 					on:click={() => changeSettings('isBot')}
 					title="Is your application a bot?"
-					description="You can deploy applications without domains. <br>They will listen on <span class='text-green-500 font-bold'>IP:EXPOSEDPORT</span> instead.<br></Setting><br>Useful to host <span class='text-green-500 font-bold'>Twitch bots.</span>"
+					description="You can deploy applications without domains. <br>You can also make them to listen on <span class='text-green-500 font-bold'>IP:EXPOSEDPORT</span> as well.<br></Setting><br>Useful to host <span class='text-green-500 font-bold'>Twitch bots, regular jobs, or anything that does not require an incoming connection.</span>"
 					disabled={$status.application.isRunning}
 				/>
 			</div>
@@ -644,7 +644,6 @@
 					name="exposePort"
 					id="exposePort"
 					bind:value={application.exposePort}
-					required={isBot}
 					placeholder="12345"
 				/>
 				<Explainer
