@@ -10,7 +10,7 @@
 
 	const { id } = $page.params;
 
-	let publicRepositoryLink: string = 'https://gitlab.com/aleveha/fastify-example';
+	let publicRepositoryLink: string;
 	let projectId: number;
 	let repositoryName: string;
 	let branchName: string;
@@ -167,11 +167,12 @@
 					>
 
 					<Explainer
-						text="Only works with Github.com and Gitlab.com.<br><br><span class='text-green-500 font-bold'>https://github.com/zekth/fastify-typescript-example</span><br>or<br><span class='text-green-500 font-bold'>https://github.com/zekth/fastify-typescript-example/tree/main</span> to import a specific branch <br>or<br>https://gitlab.com/aleveha/fastify-example <br>or<br>"
+					customClass="w-[32rem]"
+						text="Only works with Github.com and Gitlab.com.<br><br>Examples:<br>https://github.com/coollabsio/nodejs-example<br>https://github.com/coollabsio/nodejs-example/tree/main<br>https://gitlab.com/aleveha/fastify-example<br>https://gitlab.com/aleveha/fastify-example/-/tree/master"
 					/>
 				</div>
 				<div class="space-y-4">
-					<input class="w-[32rem]" bind:value={publicRepositoryLink} />
+					<input placeholder="eg: https://github.com/coollabsio/nodejs-example/tree/main" class="w-[32rem]" bind:value={publicRepositoryLink} />
 					{#if branchSelectOptions.length > 0}
 						<div class="custom-select-wrapper">
 							<Select
