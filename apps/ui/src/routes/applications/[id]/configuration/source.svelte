@@ -31,6 +31,7 @@
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import { appSession } from '$lib/store';
+	import PublicRepository from './_PublicRepository.svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -187,4 +188,8 @@
 			{/each}
 		</div>
 	{/if}
+</div>
+
+<div class="flex flex-wrap justify-center pt-10 items-center">
+	<PublicRepository />
 </div>

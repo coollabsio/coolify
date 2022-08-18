@@ -499,11 +499,21 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
 export async function saveApplicationSource(request: FastifyRequest<SaveApplicationSource>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        const { gitSourceId } = request.body
-        await prisma.application.update({
-            where: { id },
-            data: { gitSource: { connect: { id: gitSourceId } } }
-        });
+        const { gitSourceId, forPublic, type } = request.body
+        console.log({ id, gitSourceId, forPublic, type })
+        if (forPublic) {
+            const publicGit = await prisma.gitSource.findFirst({ where: { type, forPublic } });
+            await prisma.application.update({
+                where: { id },
+                data: { gitSource: { connect: { id: publicGit.id } } }
+            });
+        } else {
+            await prisma.application.update({
+                where: { id },
+                data: { gitSource: { connect: { id: gitSourceId } } }
+            });
+        }
+
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -557,7 +567,7 @@ export async function checkRepository(request: FastifyRequest<CheckRepository>) 
 export async function saveRepository(request, reply) {
     try {
         const { id } = request.params
-        let { repository, branch, projectId, autodeploy, webhookToken } = request.body
+        let { repository, branch, projectId, autodeploy, webhookToken, isPublicRepository = false } = request.body
 
         repository = repository.toLowerCase();
         branch = branch.toLowerCase();
@@ -565,17 +575,19 @@ export async function saveRepository(request, reply) {
         if (webhookToken) {
             await prisma.application.update({
                 where: { id },
-                data: { repository, branch, projectId, gitSource: { update: { gitlabApp: { update: { webhookToken: webhookToken ? webhookToken : undefined } } } }, settings: { update: { autodeploy } } }
+                data: { repository, branch, projectId, gitSource: { update: { gitlabApp: { update: { webhookToken: webhookToken ? webhookToken : undefined } } } }, settings: { update: { autodeploy, isPublicRepository } } }
             });
         } else {
             await prisma.application.update({
                 where: { id },
-                data: { repository, branch, projectId, settings: { update: { autodeploy } } }
+                data: { repository, branch, projectId, settings: { update: { autodeploy, isPublicRepository } } }
             });
         }
-        const isDouble = await checkDoubleBranch(branch, projectId);
-        if (isDouble) {
-            await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false } })
+        if (!isPublicRepository) {
+            const isDouble = await checkDoubleBranch(branch, projectId);
+            if (isDouble) {
+                await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false, isPublicRepository } })
+            }
         }
         return reply.code(201).send()
     } catch ({ status, message }) {
@@ -607,7 +619,8 @@ export async function getBuildPack(request) {
             projectId: application.projectId,
             repository: application.repository,
             branch: application.branch,
-            apiUrl: application.gitSource.apiUrl
+            apiUrl: application.gitSource.apiUrl,
+            isPublicRepository: application.settings.isPublicRepository
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -658,7 +671,7 @@ export async function saveSecret(request: FastifyRequest<SaveSecret>, reply: Fas
                 throw { status: 500, message: `Secret ${name} already exists.` }
             } else {
                 value = encrypt(value.trim());
-                console.log({value})
+                console.log({ value })
                 await prisma.secret.create({
                     data: { name, value, isBuildSecret, isPRMRSecret, application: { connect: { id } } }
                 });

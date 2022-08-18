@@ -31,7 +31,6 @@ export default async function ({
 	const body = await prisma.githubApp.findUnique({ where: { id: githubAppId } });
 	if (body.privateKey) body.privateKey = decrypt(body.privateKey);
 	const { privateKey, appId, installationId } = body
-
 	const githubPrivateKey = privateKey.replace(/\\n/g, '\n').replace(/"/g, '');
 
 	const payload = {

@@ -47,7 +47,8 @@
 	export let branch: any;
 	export let type: any;
 	export let application: any;
-
+	export let isPublicRepository: boolean;
+	console.log(isPublicRepository)
 	function checkPackageJSONContents({ key, json }: { key: any; json: any }) {
 		return json?.dependencies?.hasOwnProperty(key) || json?.devDependencies?.hasOwnProperty(key);
 	}

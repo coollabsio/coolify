@@ -50,7 +50,7 @@ export interface GetImages {
     Body: { buildPack: string, deploymentType: string }
 }
 export interface SaveApplicationSource extends OnlyId {
-    Body: { gitSourceId: string }
+    Body: { gitSourceId?: string | null, forPublic?: boolean, type?: string }
 }
 export interface CheckRepository extends OnlyId {
     Querystring: { repository: string, branch: string }
