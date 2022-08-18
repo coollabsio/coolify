@@ -20,6 +20,7 @@ model Setting {
   proxyHash             String?
   isAutoUpdateEnabled   Boolean  @default(false)
   isDNSCheckEnabled     Boolean  @default(true)
+  DNSServers            String?
   isTraefikUsed         Boolean  @default(true)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
@@ -118,16 +119,17 @@ model Application {
 }
 
 model ApplicationSettings {
-  id            String      @id @default(cuid())
-  applicationId String      @unique
-  dualCerts     Boolean     @default(false)
-  debug         Boolean     @default(false)
-  previews      Boolean     @default(false)
-  autodeploy    Boolean     @default(true)
-  isBot         Boolean     @default(false)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  application   Application @relation(fields: [applicationId], references: [id])
+  id                 String      @id @default(cuid())
+  applicationId      String      @unique
+  dualCerts          Boolean     @default(false)
+  debug              Boolean     @default(false)
+  previews           Boolean     @default(false)
+  autodeploy         Boolean     @default(true)
+  isBot              Boolean     @default(false)
+  isPublicRepository Boolean     @default(false)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  application        Application @relation(fields: [applicationId], references: [id])
 }
 
 model ApplicationPersistentStorage {
@@ -237,6 +239,7 @@ model SshKey {
 model GitSource {
   id           String        @id @default(cuid())
   name         String
+  forPublic    Boolean       @default(false)
   type         String?
   apiUrl       String?
   htmlUrl      String?

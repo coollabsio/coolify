@@ -5,7 +5,7 @@ import axios from 'axios';
 import { FastifyReply } from 'fastify';
 import { day } from '../../../../lib/dayjs';
 import { setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
-import { checkDomainsIsValidInDNS, checkDoubleBranch, decrypt, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, getFreeExposedPort, isDev, isDomainConfigured, listSettings, prisma, stopBuild, uniqueName } from '../../../../lib/common';
+import { checkDomainsIsValidInDNS, checkDoubleBranch, checkExposedPort, decrypt, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, getFreeExposedPort, isDev, isDomainConfigured, listSettings, prisma, stopBuild, uniqueName } from '../../../../lib/common';
 import { checkContainer, formatLabelsOnDocker, isContainerExited, removeContainer } from '../../../../lib/docker';
 import { scheduler } from '../../../../lib/scheduler';
 
@@ -18,7 +18,7 @@ export async function listApplications(request: FastifyRequest) {
         const { teamId } = request.user
         const applications = await prisma.application.findMany({
             where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-            include: { teams: true, destinationDocker: true }
+            include: { teams: true, destinationDocker: true, settings: true }
         });
         const settings = await prisma.setting.findFirst()
         return {
@@ -238,6 +238,9 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
         if (exposePort) {
             exposePort = Number(exposePort);
         }
+
+        const { destinationDockerId } = await prisma.application.findUnique({ where: { id } })
+        if (exposePort) await checkExposedPort({ id, exposePort, dockerId: destinationDockerId })
         if (denoOptions) denoOptions = denoOptions.trim();
         const defaultConfiguration = await setDefaultConfiguration({
             buildPack,
@@ -392,18 +395,7 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
         if (found) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
-        if (exposePort) {
-            if (exposePort < 1024 || exposePort > 65535) {
-                throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
-            }
-
-            if (configuredPort !== exposePort) {
-                const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
-                if (availablePort.toString() !== exposePort.toString()) {
-                    throw { status: 500, message: `Port ${exposePort} is already in use.` }
-                }
-            }
-        }
+        await checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress })
         if (isDNSCheckEnabled && !isDev && !forceSave) {
             let hostname = request.hostname.split(':')[0];
             if (remoteEngine) hostname = remoteIpAddress;
@@ -436,7 +428,7 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
     try {
         const { id } = request.params
         const teamId = request.user?.teamId;
-        const { pullmergeRequestId = null, branch } = request.body
+        const { pullmergeRequestId = null, branch, forceRebuild } = request.body
         const buildId = cuid();
         const application = await getApplicationFromDB(id, teamId);
         if (application) {
@@ -475,13 +467,15 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
                     type: 'manual',
                     ...application,
                     sourceBranch: branch,
-                    pullmergeRequestId
+                    pullmergeRequestId,
+                    forceRebuild
                 });
             } else {
                 scheduler.workers.get('deployApplication').postMessage({
                     build_id: buildId,
                     type: 'manual',
-                    ...application
+                    ...application,
+                    forceRebuild
                 });
 
             }
@@ -499,11 +493,20 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
 export async function saveApplicationSource(request: FastifyRequest<SaveApplicationSource>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        const { gitSourceId } = request.body
-        await prisma.application.update({
-            where: { id },
-            data: { gitSource: { connect: { id: gitSourceId } } }
-        });
+        const { gitSourceId, forPublic, type } = request.body
+        if (forPublic) {
+            const publicGit = await prisma.gitSource.findFirst({ where: { type, forPublic } });
+            await prisma.application.update({
+                where: { id },
+                data: { gitSource: { connect: { id: publicGit.id } } }
+            });
+        } else {
+            await prisma.application.update({
+                where: { id },
+                data: { gitSource: { connect: { id: gitSourceId } } }
+            });
+        }
+
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -557,7 +560,7 @@ export async function checkRepository(request: FastifyRequest<CheckRepository>) 
 export async function saveRepository(request, reply) {
     try {
         const { id } = request.params
-        let { repository, branch, projectId, autodeploy, webhookToken } = request.body
+        let { repository, branch, projectId, autodeploy, webhookToken, isPublicRepository = false } = request.body
 
         repository = repository.toLowerCase();
         branch = branch.toLowerCase();
@@ -565,17 +568,19 @@ export async function saveRepository(request, reply) {
         if (webhookToken) {
             await prisma.application.update({
                 where: { id },
-                data: { repository, branch, projectId, gitSource: { update: { gitlabApp: { update: { webhookToken: webhookToken ? webhookToken : undefined } } } }, settings: { update: { autodeploy } } }
+                data: { repository, branch, projectId, gitSource: { update: { gitlabApp: { update: { webhookToken: webhookToken ? webhookToken : undefined } } } }, settings: { update: { autodeploy, isPublicRepository } } }
             });
         } else {
             await prisma.application.update({
                 where: { id },
-                data: { repository, branch, projectId, settings: { update: { autodeploy } } }
+                data: { repository, branch, projectId, settings: { update: { autodeploy, isPublicRepository } } }
             });
         }
-        const isDouble = await checkDoubleBranch(branch, projectId);
-        if (isDouble) {
-            await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false } })
+        if (!isPublicRepository) {
+            const isDouble = await checkDoubleBranch(branch, projectId);
+            if (isDouble) {
+                await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false, isPublicRepository } })
+            }
         }
         return reply.code(201).send()
     } catch ({ status, message }) {
@@ -607,7 +612,8 @@ export async function getBuildPack(request) {
             projectId: application.projectId,
             repository: application.repository,
             branch: application.branch,
-            apiUrl: application.gitSource.apiUrl
+            apiUrl: application.gitSource.apiUrl,
+            isPublicRepository: application.settings.isPublicRepository
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -657,13 +663,13 @@ export async function saveSecret(request: FastifyRequest<SaveSecret>, reply: Fas
             if (found) {
                 throw { status: 500, message: `Secret ${name} already exists.` }
             } else {
-                value = encrypt(value);
+                value = encrypt(value.trim());
                 await prisma.secret.create({
                     data: { name, value, isBuildSecret, isPRMRSecret, application: { connect: { id } } }
                 });
             }
         } else {
-            value = encrypt(value);
+            value = encrypt(value.trim());
             const found = await prisma.secret.findFirst({ where: { applicationId: id, name, isPRMRSecret } });
 
             if (found) {

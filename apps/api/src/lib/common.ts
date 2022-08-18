@@ -17,7 +17,7 @@ import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
-export const version = '3.5.0';
+export const version = '3.6.0';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -319,6 +319,10 @@ export async function checkDoubleBranch(branch: string, projectId: number): Prom
 }
 export async function isDNSValid(hostname: any, domain: string): Promise<any> {
 	const { isIP } = await import('is-ip');
+	const { DNSServers } = await listSettings();
+	if (DNSServers) {
+		dns.setServers([DNSServers]);
+	}
 	let resolves = [];
 	try {
 		if (isIP(hostname)) {
@@ -332,7 +336,6 @@ export async function isDNSValid(hostname: any, domain: string): Promise<any> {
 
 	try {
 		let ipDomainFound = false;
-		dns.setServers(['1.1.1.1', '8.8.8.8']);
 		const dnsResolve = await dns.resolve4(domain);
 		if (dnsResolve.length > 0) {
 			for (const ip of dnsResolve) {
@@ -424,7 +427,12 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 	const { isIP } = await import('is-ip');
 	const domain = getDomain(fqdn);
 	const domainDualCert = domain.includes('www.') ? domain.replace('www.', '') : `www.${domain}`;
-	dns.setServers(['1.1.1.1', '8.8.8.8']);
+
+	const { DNSServers } = await listSettings();
+	if (DNSServers) {
+		dns.setServers([DNSServers]);
+	}
+
 	let resolves = [];
 	try {
 		if (isIP(hostname)) {
@@ -1180,6 +1188,25 @@ export async function updatePasswordInDb(database, user, newPassword, isRoot) {
 		}
 	}
 }
+export async function checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress }: { id: string, configuredPort?: number, exposePort: number, dockerId: string, remoteIpAddress?: string }) {
+	if (exposePort < 1024 || exposePort > 65535) {
+		throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
+	}
+
+	if (configuredPort) {
+		if (configuredPort !== exposePort) {
+			const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
+			if (availablePort.toString() !== exposePort.toString()) {
+				throw { status: 500, message: `Port ${exposePort} is already in use.` }
+			}
+		}
+	} else {
+		const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
+		if (availablePort.toString() !== exposePort.toString()) {
+			throw { status: 500, message: `Port ${exposePort} is already in use.` }
+		}
+	}
+}
 export async function getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress) {
 	const { default: getPort } = await import('get-port');
 	const applicationUsed = await (
@@ -1565,7 +1592,7 @@ export async function configureServiceType({
 		});
 	} else if (type === 'appwrite') {
 		const opensslKeyV1 = encrypt(generatePassword());
-		const executorSecret  = encrypt(generatePassword());
+		const executorSecret = encrypt(generatePassword());
 		const redisPassword = encrypt(generatePassword());
 		const mariadbHost = `${id}-mariadb`
 		const mariadbUser = cuid();
@@ -1844,4 +1871,18 @@ export function persistentVolumes(id, persistentStorage, config) {
 		...composeVolumes
 	) || {}
 	return { volumes, volumeMounts }
+}
+export function defaultComposeConfiguration(network: string): any {
+	return {
+		networks: [network],
+		restart: 'on-failure',
+		deploy: {
+			restart_policy: {
+				condition: 'on-failure',
+				delay: '5s',
+				max_attempts: 10,
+				window: '120s'
+			}
+		}
+	}
 }

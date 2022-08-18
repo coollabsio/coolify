@@ -4,7 +4,7 @@
 		"wait_new_version_startup": "Waiting for the new version to start...",
 		"new_version": "New version reachable. Reloading...",
 		"switch_to_a_different_team": "Switch to a different team...",
-		"update_available": "Update available"
+		"update_available": "Update Available"
 	},
 	"error": {
 		"you_can_find_your_way_back": "You can find your way back",
@@ -159,13 +159,13 @@
 			"storage_saved": "Storage saved.",
 			"storage_updated": "Storage updated.",
 			"storage_deleted": "Storage deleted.",
-			"persistent_storage_explainer": "You can specify any folder that you want to be persistent across deployments. <br>This is useful for storing data such as a database (SQLite) or a cache."
+			"persistent_storage_explainer": "You can specify any folder that you want to be persistent across deployments.<br><span class='text-green-500 font-bold'>/example</span> means it will preserve <span class='text-green-500 font-bold'>/app/example</span> in the container as <span class='text-green-500 font-bold'>/app</span> is <span class='text-green-500 font-bold'>the root directory</span> for your application.<br><br>This is useful for storing data such as a <span class='text-green-500 font-bold'>database (SQLite)</span> or a <span class='text-green-500 font-bold'>cache</span>."
 		},
 		"deployment_queued": "Deployment queued.",
 		"confirm_to_delete": "Are you sure you would like to delete '{{name}}'?",
-		"stop_application": "Stop application",
+		"stop_application": "Stop Application",
 		"permission_denied_stop_application": "You do not have permission to stop the application.",
-		"rebuild_application": "Rebuild application",
+		"rebuild_application": "Rebuild Application",
 		"permission_denied_rebuild_application": "You do not have permission to rebuild application.",
 		"build_and_start_application": "Deploy",
 		"permission_denied_build_and_start_application": "You do not have permission to deploy application.",

@@ -26,7 +26,7 @@
 			delete tempBuildPack.color;
 			delete tempBuildPack.hoverColor;
 
-			if (foundConfig.buildPack !== name) {
+			if (foundConfig?.buildPack !== name) {
 				await post(`/applications/${id}`, { ...tempBuildPack, buildPack: name });
 			}
 			await post(`/applications/${id}/configuration/buildpack`, { buildPack: name });

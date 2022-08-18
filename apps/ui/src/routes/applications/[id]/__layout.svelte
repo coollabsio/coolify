@@ -77,9 +77,9 @@
 
 	const { id } = $page.params;
 
-	async function handleDeploySubmit() {
+	async function handleDeploySubmit(forceRebuild = false) {
 		try {
-			const { buildId } = await post(`/applications/${id}/deploy`, { ...application });
+			const { buildId } = await post(`/applications/${id}/deploy`, { ...application, forceRebuild });
 			addToast({
 				message: $t('application.deployment_queued'),
 				type: 'success'
@@ -141,8 +141,7 @@
 		if (
 			application.gitSourceId &&
 			application.destinationDockerId &&
-			application.fqdn &&
-			!application.settings.isBot
+			(application.fqdn || application.settings.isBot)
 		) {
 			await getStatus();
 			statusInterval = setInterval(async () => {
@@ -179,9 +178,10 @@
 					<polyline points="15 4 20 4 20 9" />
 				</svg></a
 			>
+		<div class="border border-coolgray-500 h-8" />
+
 		{/if}
 
-		<div class="border border-coolgray-500 h-8" />
 		{#if $status.application.isExited}
 			<a
 				href={!$disabledButton ? `/applications/${id}/logs` : null}
@@ -256,7 +256,7 @@
 					<rect x="14" y="5" width="4" height="14" rx="1" />
 				</svg>
 			</button>
-			<form on:submit|preventDefault={handleDeploySubmit}>
+			<form on:submit|preventDefault={() => handleDeploySubmit(true)}>
 				<button
 					type="submit"
 					disabled={$disabledButton || !isQueueActive}
@@ -264,7 +264,7 @@
 					class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2"
 					data-tip={$appSession.isAdmin
 						? isQueueActive
-							? 'Rebuild application'
+							? 'Force Rebuild Application'
 							: 'Autoupdate inprogress. Cannot rebuild application.'
 						: 'You do not have permission to rebuild application.'}
 				>
@@ -409,37 +409,39 @@
 				</svg>
 			</button></a
 		>
-		<a
-			href={!$disabledButton ? `/applications/${id}/previews` : null}
-			sveltekit:prefetch
-			class="hover:text-orange-500 rounded"
-			class:text-orange-500={$page.url.pathname === `/applications/${id}/previews`}
-			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/previews`}
-		>
-			<button
-				disabled={$disabledButton}
-				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
-				data-tip="Previews"
+		{#if !application.settings.isBot}
+			<a
+				href={!$disabledButton ? `/applications/${id}/previews` : null}
+				sveltekit:prefetch
+				class="hover:text-orange-500 rounded"
+				class:text-orange-500={$page.url.pathname === `/applications/${id}/previews`}
+				class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/previews`}
 			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6"
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
+				<button
+					disabled={$disabledButton}
+					class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
+					data-tip="Previews"
 				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<circle cx="7" cy="18" r="2" />
-					<circle cx="7" cy="6" r="2" />
-					<circle cx="17" cy="12" r="2" />
-					<line x1="7" y1="8" x2="7" y2="16" />
-					<path d="M7 8a4 4 0 0 0 4 4h4" />
-				</svg></button
-			></a
-		>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<circle cx="7" cy="18" r="2" />
+						<circle cx="7" cy="6" r="2" />
+						<circle cx="17" cy="12" r="2" />
+						<line x1="7" y1="8" x2="7" y2="16" />
+						<path d="M7 8a4 4 0 0 0 4 4h4" />
+					</svg></button
+				></a
+			>
+		{/if}
 		<div class="border border-coolgray-500 h-8" />
 		<a
 			href={!$disabledButton && $status.application.isRunning ? `/applications/${id}/logs` : null}

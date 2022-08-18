@@ -48,3 +48,4 @@
 		<GitlabRepositories {application} {appId} {settings} />
 	{/if}
 </div>
+

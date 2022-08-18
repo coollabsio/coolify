@@ -1,3 +1,4 @@
+import { dev } from '$app/env';
 import cuid from 'cuid';
 import { writable, readable, type Writable } from 'svelte/store';
 
@@ -71,8 +72,9 @@ export const features = readable({
 
 export const location: Writable<null | string> = writable(null)
 export const setLocation = (resource: any, settings?: any) => {
-    if (resource.settings.isBot) {
-        return location.set(`http://${settings.ipv4}:${resource.exposePort}`)
+    if (resource.settings.isBot && resource.exposePort) {
+        disabledButton.set(false);
+        return location.set(`http://${dev ? 'localhost' : settings.ipv4}:${resource.exposePort}`)
     }
     if (GITPOD_WORKSPACE_URL && resource.exposePort) {
         const { href } = new URL(GITPOD_WORKSPACE_URL);
@@ -84,7 +86,12 @@ export const setLocation = (resource: any, settings?: any) => {
         const newURL = `https://${CODESANDBOX_HOST.replace(/\$PORT/, resource.exposePort)}`
         return location.set(newURL)
     }
-    return location.set(resource.fqdn)
+    if (resource.fqdn) {
+        return location.set(resource.fqdn)
+    } else {
+        location.set(null);
+        disabledButton.set(false);
+    }
 }
 
 export const toasts: any = writable([])

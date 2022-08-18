@@ -20,7 +20,6 @@ const options: any = {
 				}
 				if (message.caller === 'cleanupStorage') {
 					if (!scheduler.workers.has('cleanupStorage')) {
-						await scheduler.stop('deployApplication');
 						await scheduler.run('cleanupStorage')
 					}
 				}
