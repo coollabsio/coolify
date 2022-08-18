@@ -1176,6 +1176,27 @@ export async function updatePasswordInDb(database, user, newPassword, isRoot) {
 		}
 	}
 }
+export async function checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress }: { id: string, configuredPort?: number, exposePort: number, dockerId: string, remoteIpAddress?: string }) {
+	if (exposePort < 1024 || exposePort > 65535) {
+		throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
+	}
+
+	if (configuredPort) {
+		if (configuredPort !== exposePort) {
+			const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
+			if (availablePort.toString() !== exposePort.toString()) {
+				throw { status: 500, message: `Port ${exposePort} is already in use.` }
+			}
+		}
+	} else {
+
+		const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
+console.log(availablePort, exposePort)
+		if (availablePort.toString() !== exposePort.toString()) {
+			throw { status: 500, message: `Port ${exposePort} is already in use.` }
+		}
+	}
+}
 export async function getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress) {
 	const { default: getPort } = await import('get-port');
 	const applicationUsed = await (

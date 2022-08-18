@@ -5,7 +5,7 @@ import axios from 'axios';
 import { FastifyReply } from 'fastify';
 import { day } from '../../../../lib/dayjs';
 import { setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
-import { checkDomainsIsValidInDNS, checkDoubleBranch, decrypt, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, getFreeExposedPort, isDev, isDomainConfigured, listSettings, prisma, stopBuild, uniqueName } from '../../../../lib/common';
+import { checkDomainsIsValidInDNS, checkDoubleBranch, checkExposedPort, decrypt, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, getFreeExposedPort, isDev, isDomainConfigured, listSettings, prisma, stopBuild, uniqueName } from '../../../../lib/common';
 import { checkContainer, formatLabelsOnDocker, isContainerExited, removeContainer } from '../../../../lib/docker';
 import { scheduler } from '../../../../lib/scheduler';
 
@@ -238,6 +238,9 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
         if (exposePort) {
             exposePort = Number(exposePort);
         }
+
+        const { destinationDockerId } = await prisma.application.findUnique({ where: { id } })
+        if (exposePort) await checkExposedPort({ id, exposePort, dockerId: destinationDockerId })
         if (denoOptions) denoOptions = denoOptions.trim();
         const defaultConfiguration = await setDefaultConfiguration({
             buildPack,
@@ -392,18 +395,7 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
         if (found) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
-        if (exposePort) {
-            if (exposePort < 1024 || exposePort > 65535) {
-                throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
-            }
-
-            if (configuredPort !== exposePort) {
-                const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
-                if (availablePort.toString() !== exposePort.toString()) {
-                    throw { status: 500, message: `Port ${exposePort} is already in use.` }
-                }
-            }
-        }
+        await checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress })
         if (isDNSCheckEnabled && !isDev && !forceSave) {
             let hostname = request.hostname.split(':')[0];
             if (remoteEngine) hostname = remoteIpAddress;
@@ -500,7 +492,6 @@ export async function saveApplicationSource(request: FastifyRequest<SaveApplicat
     try {
         const { id } = request.params
         const { gitSourceId, forPublic, type } = request.body
-        console.log({ id, gitSourceId, forPublic, type })
         if (forPublic) {
             const publicGit = await prisma.gitSource.findFirst({ where: { type, forPublic } });
             await prisma.application.update({
@@ -671,7 +662,6 @@ export async function saveSecret(request: FastifyRequest<SaveSecret>, reply: Fas
                 throw { status: 500, message: `Secret ${name} already exists.` }
             } else {
                 value = encrypt(value.trim());
-                console.log({ value })
                 await prisma.secret.create({
                     data: { name, value, isBuildSecret, isPRMRSecret, application: { connect: { id } } }
                 });

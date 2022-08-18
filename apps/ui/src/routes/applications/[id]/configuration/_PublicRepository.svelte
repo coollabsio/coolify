@@ -25,8 +25,10 @@
 		const gitUrl = publicRepositoryLink.replace('http://', '').replace('https://', '');
 		let [host, ...path] = gitUrl.split('/');
 		const [owner, repository, ...branch] = path;
+
 		ownerName = owner;
 		repositoryName = repository;
+
 		if (branch[0] === 'tree') {
 			branchName = branch[1];
 			await saveRepository();
@@ -42,20 +44,20 @@
 		}
 		const apiUrl = `${protocol}://${host}`;
 
-		const repositoryDetails = await get(`${apiUrl}/repos/${owner}/${repository}`);
+		const repositoryDetails = await get(`${apiUrl}/repos/${ownerName}/${repositoryName}`);
 		projectId = repositoryDetails.id.toString();
 
 		let branches: any[] = [];
 		let page = 1;
 		let branchCount = 0;
 		loading.branches = true;
-		const loadedBranches = await loadBranchesByPage(apiUrl, owner, repository, page);
+		const loadedBranches = await loadBranchesByPage(apiUrl, ownerName, repositoryName, page);
 		branches = branches.concat(loadedBranches);
 		branchCount = branches.length;
 		if (branchCount === 100) {
 			while (branchCount === 100) {
 				page = page + 1;
-				const nextBranches = await loadBranchesByPage(apiUrl, owner, repository, page);
+				const nextBranches = await loadBranchesByPage(apiUrl, ownerName, repositoryName, page);
 				branches = branches.concat(nextBranches);
 				branchCount = nextBranches.length;
 			}
@@ -68,7 +70,6 @@
 	}
 	async function loadBranchesByPage(apiUrl: string, owner: string, repository: string, page = 1) {
 		return await get(`${apiUrl}/repos/${owner}/${repository}/branches?per_page=100&page=${page}`);
-		// console.log(publicRepositoryLink);
 	}
 	async function saveRepository(event?: any) {
 		try {
@@ -81,7 +82,7 @@
 				type
 			});
 			await post(`/applications/${id}/configuration/repository`, {
-				repository: `${repositoryName}/${branchName}`,
+				repository: `${ownerName}/${repositoryName}`,
 				branch: branchName,
 				projectId,
 				autodeploy: false,

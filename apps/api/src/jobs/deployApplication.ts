@@ -69,6 +69,30 @@ import * as buildpacks from '../lib/buildPacks';
 						dockerFileLocation,
 						denoMainFile
 					} = message
+					const currentHash = crypto
+						.createHash('sha256')
+						.update(
+							JSON.stringify({
+								pythonWSGI,
+								pythonModule,
+								pythonVariable,
+								deploymentType,
+								denoOptions,
+								baseImage,
+								baseBuildImage,
+								buildPack,
+								port,
+								exposePort,
+								installCommand,
+								buildCommand,
+								startCommand,
+								secrets,
+								branch,
+								repository,
+								fqdn
+							})
+						)
+						.digest('hex');
 					try {
 						const { debug } = settings;
 						if (concurrency === 1) {
@@ -131,7 +155,8 @@ import * as buildpacks from '../lib/buildPacks';
 								htmlUrl: gitSource.htmlUrl,
 								projectId,
 								deployKeyId: gitSource.gitlabApp?.deployKeyId || null,
-								privateSshKey: decrypt(gitSource.gitlabApp?.privateSshKey) || null
+								privateSshKey: decrypt(gitSource.gitlabApp?.privateSshKey) || null,
+								forPublic: gitSource.forPublic
 							});
 							if (!commit) {
 								throw new Error('No commit found?');
@@ -146,38 +171,11 @@ import * as buildpacks from '../lib/buildPacks';
 							} catch (err) {
 								console.log(err);
 							}
+
 							if (!pullmergeRequestId) {
-								const currentHash = crypto
-									//@ts-ignore
-									.createHash('sha256')
-									.update(
-										JSON.stringify({
-											pythonWSGI,
-											pythonModule,
-											pythonVariable,
-											deploymentType,
-											denoOptions, 
-											baseImage,
-											baseBuildImage,
-											buildPack,
-											port,
-											exposePort,
-											installCommand,
-											buildCommand,
-											startCommand,
-											secrets,
-											branch,
-											repository,
-											fqdn
-										})
-									)
-									.digest('hex');
+
 
 								if (configHash !== currentHash) {
-									await prisma.application.update({
-										where: { id: applicationId },
-										data: { configHash: currentHash }
-									});
 									deployNeeded = true;
 									if (configHash) {
 										await saveBuildLog({ line: 'Configuration changed.', buildId, applicationId });
@@ -201,7 +199,7 @@ import * as buildpacks from '../lib/buildPacks';
 							}
 							await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId, baseImage);
 							if (!imageFound || deployNeeded) {
-							// if (true) {
+								// if (true) {
 								if (buildpacks[buildPack])
 									await buildpacks[buildPack]({
 										dockerId: destinationDocker.id,
@@ -336,6 +334,10 @@ import * as buildpacks from '../lib/buildPacks';
 							}
 							await saveBuildLog({ line: 'Proxy will be updated shortly.', buildId, applicationId });
 							await prisma.build.update({ where: { id: message.build_id }, data: { status: 'success' } });
+							if (!pullmergeRequestId) await prisma.application.update({
+								where: { id: applicationId },
+								data: { configHash: currentHash }
+							});
 						}
 
 					}

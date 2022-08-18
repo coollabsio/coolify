@@ -133,6 +133,7 @@
 			autodeploy = !autodeploy;
 		}
 		if (name === 'isBot') {
+			if ($status.application.isRunning) return;
 			isBot = !isBot;
 			application.settings.isBot = isBot;
 			setLocation(application, settings);
@@ -345,8 +346,11 @@
 				<label for="gitSource" class="text-base font-bold text-stone-100"
 					>{$t('application.git_source')}</label
 				>
-				{#if isDisabled}
-					<input disabled={isDisabled} value={application.gitSource.name} />
+				{#if isDisabled || application.settings.isPublicRepository}
+					<input
+						disabled={isDisabled || application.settings.isPublicRepository}
+						value={application.gitSource.name}
+					/>
 				{:else}
 					<a
 						href={`/applications/${id}/configuration/source?from=/applications/${id}`}
@@ -363,8 +367,11 @@
 				<label for="repository" class="text-base font-bold text-stone-100"
 					>{$t('application.git_repository')}</label
 				>
-				{#if isDisabled}
-					<input disabled={isDisabled} value="{application.repository}/{application.branch}" />
+				{#if isDisabled || application.settings.isPublicRepository}
+					<input
+						disabled={isDisabled || application.settings.isPublicRepository}
+						value="{application.repository}/{application.branch}"
+					/>
 				{:else}
 					<a
 						href={`/applications/${id}/configuration/repository?from=/applications/${id}&to=/applications/${id}/configuration/buildpack`}
@@ -488,6 +495,7 @@
 					on:click={() => changeSettings('isBot')}
 					title="Is your application a bot?"
 					description="You can deploy applications without domains. <br>They will listen on <span class='text-green-500 font-bold'>IP:EXPOSEDPORT</span> instead.<br></Setting><br>Useful to host <span class='text-green-500 font-bold'>Twitch bots.</span>"
+					disabled={$status.application.isRunning}
 				/>
 			</div>
 			{#if !isBot}
@@ -770,15 +778,17 @@
 		<div class="title">{$t('application.features')}</div>
 	</div>
 	<div class="px-10 pb-10">
-		<div class="grid grid-cols-2 items-center">
-			<Setting
-				isCenter={false}
-				bind:setting={autodeploy}
-				on:click={() => changeSettings('autodeploy')}
-				title={$t('application.enable_automatic_deployment')}
-				description={$t('application.enable_auto_deploy_webhooks')}
-			/>
-		</div>
+		{#if !application.settings.isPublicRepository}
+			<div class="grid grid-cols-2 items-center">
+				<Setting
+					isCenter={false}
+					bind:setting={autodeploy}
+					on:click={() => changeSettings('autodeploy')}
+					title={$t('application.enable_automatic_deployment')}
+					description={$t('application.enable_auto_deploy_webhooks')}
+				/>
+			</div>
+		{/if}
 		{#if !application.settings.isBot}
 			<div class="grid grid-cols-2 items-center">
 				<Setting

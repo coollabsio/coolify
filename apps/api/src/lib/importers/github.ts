@@ -12,7 +12,8 @@ export default async function ({
 	htmlUrl,
 	branch,
 	buildId,
-	customPort
+	customPort,
+	forPublic
 }: {
 	applicationId: string;
 	workdir: string;
@@ -23,40 +24,55 @@ export default async function ({
 	branch: string;
 	buildId: string;
 	customPort: number;
+	forPublic?: boolean;
 }): Promise<string> {
 	const { default: got } = await import('got')
 	const url = htmlUrl.replace('https://', '').replace('http://', '');
 	await saveBuildLog({ line: 'GitHub importer started.', buildId, applicationId });
+	if (forPublic) {
+		await saveBuildLog({
+			line: `Cloning ${repository}:${branch} branch.`,
+			buildId,
+			applicationId
+		});
+		await asyncExecShell(
+			`git clone -q -b ${branch} https://${url}/${repository}.git ${workdir}/ && cd ${workdir} && git submodule update --init --recursive && git lfs pull && cd .. `
+		);
 
-	const body = await prisma.githubApp.findUnique({ where: { id: githubAppId } });
-	if (body.privateKey) body.privateKey = decrypt(body.privateKey);
-	const { privateKey, appId, installationId } = body
-	const githubPrivateKey = privateKey.replace(/\\n/g, '\n').replace(/"/g, '');
+	} else {
+		const body = await prisma.githubApp.findUnique({ where: { id: githubAppId } });
+		if (body.privateKey) body.privateKey = decrypt(body.privateKey);
+		const { privateKey, appId, installationId } = body
+		const githubPrivateKey = privateKey.replace(/\\n/g, '\n').replace(/"/g, '');
 
-	const payload = {
-		iat: Math.round(new Date().getTime() / 1000),
-		exp: Math.round(new Date().getTime() / 1000 + 60),
-		iss: appId
-	};
-	const jwtToken = jsonwebtoken.sign(payload, githubPrivateKey, {
-		algorithm: 'RS256'
-	});
-	const { token } = await got
-		.post(`${apiUrl}/app/installations/${installationId}/access_tokens`, {
-			headers: {
-				Authorization: `Bearer ${jwtToken}`,
-				Accept: 'application/vnd.github.machine-man-preview+json'
-			}
-		})
-		.json();
-	await saveBuildLog({
-		line: `Cloning ${repository}:${branch} branch.`,
-		buildId,
-		applicationId
-	});
-	await asyncExecShell(
-		`git clone -q -b ${branch} https://x-access-token:${token}@${url}/${repository}.git --config core.sshCommand="ssh -p ${customPort}" ${workdir}/ && cd ${workdir} && git submodule update --init --recursive && git lfs pull && cd .. `
-	);
+		const payload = {
+			iat: Math.round(new Date().getTime() / 1000),
+			exp: Math.round(new Date().getTime() / 1000 + 60),
+			iss: appId
+		};
+		const jwtToken = jsonwebtoken.sign(payload, githubPrivateKey, {
+			algorithm: 'RS256'
+		});
+		const { token } = await got
+			.post(`${apiUrl}/app/installations/${installationId}/access_tokens`, {
+				headers: {
+					Authorization: `Bearer ${jwtToken}`,
+					Accept: 'application/vnd.github.machine-man-preview+json'
+				}
+			})
+			.json();
+		await saveBuildLog({
+			line: `Cloning ${repository}:${branch} branch.`,
+			buildId,
+			applicationId
+		});
+		await asyncExecShell(
+			`git clone -q -b ${branch} https://x-access-token:${token}@${url}/${repository}.git --config core.sshCommand="ssh -p ${customPort}" ${workdir}/ && cd ${workdir} && git submodule update --init --recursive && git lfs pull && cd .. `
+		);
+	}
 	const { stdout: commit } = await asyncExecShell(`cd ${workdir}/ && git rev-parse HEAD`);
+
 	return commit.replace('\n', '');
+
+
 }

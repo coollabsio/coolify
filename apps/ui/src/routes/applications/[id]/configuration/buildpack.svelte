@@ -48,7 +48,7 @@
 	export let type: any;
 	export let application: any;
 	export let isPublicRepository: boolean;
-	console.log(isPublicRepository)
+
 	function checkPackageJSONContents({ key, json }: { key: any; json: any }) {
 		return json?.dependencies?.hasOwnProperty(key) || json?.devDependencies?.hasOwnProperty(key);
 	}
@@ -237,7 +237,7 @@
 			if (error.message === 'Bad credentials') {
 				const { token } = await get(`/applications/${id}/configuration/githubToken`);
 				$appSession.tokens.github = token;
-				return await scanRepository()
+				return await scanRepository();
 			}
 			return errorNotification(error);
 		} finally {
@@ -246,7 +246,12 @@
 		}
 	}
 	onMount(async () => {
-		await scanRepository();
+		if (!isPublicRepository) {
+			await scanRepository();
+		} else {
+			foundConfig = findBuildPack('node', packageManager);
+			scanning = false;
+		}
 	});
 </script>
 
@@ -263,27 +268,25 @@
 		</div>
 	</div>
 {:else}
-
-
 	<div class="max-w-7xl mx-auto ">
 		<div class="title pb-2">Coolify Buildpacks</div>
 		<div class="flex flex-wrap justify-center">
-		{#each buildPacks.filter(bp => bp.isCoolifyBuildPack === true) as buildPack}
-			<div class="p-2">
-				<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
-			</div>
-		{/each}
+			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true) as buildPack}
+				<div class="p-2">
+					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
+				</div>
+			{/each}
 		</div>
 	</div>
 
 	<div class="max-w-7xl mx-auto ">
 		<div class="title pb-2">Heroku</div>
 		<div class="flex flex-wrap justify-center">
-		{#each buildPacks.filter(bp => bp.isHerokuBuildPack === true) as buildPack}
-			<div class="p-2">
-				<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
-			</div>
-		{/each}
-	</div>
+			{#each buildPacks.filter((bp) => bp.isHerokuBuildPack === true) as buildPack}
+				<div class="p-2">
+					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
+				</div>
+			{/each}
+		</div>
 	</div>
 {/if}
