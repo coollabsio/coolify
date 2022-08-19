@@ -378,7 +378,7 @@ export async function checkService(request: FastifyRequest<CheckService>) {
                 }
             }
         }
-        await checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress })
+        if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress })
         if (isDNSCheckEnabled && !isDev && !forceSave) {
             let hostname = request.hostname.split(':')[0];
             if (remoteEngine) hostname = remoteIpAddress;
