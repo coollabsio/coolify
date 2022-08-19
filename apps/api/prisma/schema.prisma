@@ -316,31 +316,32 @@ model DatabaseSettings {
 }
 
 model Service {
-  id                  String             @id @default(cuid())
+  id                  String                     @id @default(cuid())
   name                String
   fqdn                String?
   exposePort          Int?
-  dualCerts           Boolean            @default(false)
+  dualCerts           Boolean                    @default(false)
   type                String?
   version             String?
   destinationDockerId String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  destinationDocker   DestinationDocker? @relation(fields: [destinationDockerId], references: [id])
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+  destinationDocker   DestinationDocker?         @relation(fields: [destinationDockerId], references: [id])
 
-  fider              Fider?
-  ghost              Ghost?
-  hasura             Hasura?
-  meiliSearch        MeiliSearch?
-  minio              Minio?
-  moodle             Moodle?
-  plausibleAnalytics PlausibleAnalytics?
-  persistentStorage  ServicePersistentStorage[]
-  serviceSecret      ServiceSecret[]
-  umami              Umami?
-  vscodeserver       Vscodeserver?
-  wordpress          Wordpress?
-  appwrite           Appwrite?
+  fider               Fider?
+  ghost               Ghost?
+  glitchTip           GlitchTip?
+  hasura              Hasura?
+  meiliSearch         MeiliSearch?
+  minio               Minio?
+  moodle              Moodle?
+  plausibleAnalytics  PlausibleAnalytics?
+  persistentStorage   ServicePersistentStorage[]
+  serviceSecret       ServiceSecret[]
+  umami               Umami?
+  vscodeserver        Vscodeserver?
+  wordpress           Wordpress?
+  appwrite            Appwrite?
 
   teams Team[]
 }
@@ -516,4 +517,31 @@ model Appwrite {
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
   service                 Service  @relation(fields: [serviceId], references: [id])
+}
+
+model GlitchTip {
+  id                         String   @id @default(cuid())
+  postgresqlUser             String
+  postgresqlPassword         String
+  postgresqlDatabase         String
+  postgresqlPublicPort       Int?
+  secretKeyBase              String?
+  defaultEmail               String
+  defaultUsername            String
+  defaultPassword            String
+  defaultEmailFrom           String   @default("glitchtip@domain.tdl")
+  emailSmtpHost              String?  @default("domain.tdl")
+  emailSmtpPort              Int?     @default(25)
+  emailSmtpUser              String?
+  emailSmtpPassword          String?
+  emailSmtpUseTls            Boolean? @default(false)
+  emailSmtpUseSsl            Boolean? @default(false)
+  emailBackend               String?
+  mailgunApiKey              String?
+  sendgridApiKey             String?
+  enableOpenUserRegistration Boolean  @default(true)
+  serviceId                  String   @unique
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+  service                    Service  @relation(fields: [serviceId], references: [id])
 }

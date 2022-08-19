@@ -36,4 +36,6 @@
 	<Icons.Appwrite {isAbsolute} />
 {:else if type === 'moodle'}
 	<Icons.Moodle {isAbsolute} />
+{:else if type === 'glitchTip'}
+	<Icons.GlitchTip {isAbsolute} />
 {/if}

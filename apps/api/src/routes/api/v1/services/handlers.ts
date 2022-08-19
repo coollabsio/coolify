@@ -30,7 +30,7 @@ import { defaultServiceConfigurations } from '../../../../lib/services';
 //             serviceSecret.forEach((secret) => {
 //                 environmentVariables[secret.name] = secret.value;
 //             });
-//         } 
+//         }
 //         config.newVolumes = {}
 //         for (const service of Object.entries(config.services)) {
 //             const name = service[0]
@@ -98,7 +98,7 @@ import { defaultServiceConfigurations } from '../../../../lib/services';
 
 //         }
 //         console.log(config.services)
-//         console.log(config.volumes) 
+//         console.log(config.volumes)
 
 //         // config.services[id] = JSON.parse(JSON.stringify(config.services[type]))
 //         // config.services[id].container_name = id
@@ -378,7 +378,7 @@ export async function checkService(request: FastifyRequest<CheckService>) {
                 }
             }
         }
-        await checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress })
+        if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress })
         if (isDNSCheckEnabled && !isDev && !forceSave) {
             let hostname = request.hostname.split(':')[0];
             if (remoteEngine) hostname = remoteIpAddress;
@@ -580,6 +580,9 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         if (type === 'appwrite') {
             return await startAppWriteService(request)
         }
+        if (type === 'glitchTip') {
+            return await startGlitchTipService(request)
+        }
         throw `Service type ${type} not supported.`
     } catch (error) {
         throw { status: 500, message: error?.message || error }
@@ -633,6 +636,9 @@ export async function stopService(request: FastifyRequest<ServiceStartStop>) {
         // }
         // if (type === 'moodle') {
         //     return await stopMoodleService(request)
+        // }
+        // if (type === 'glitchTip') {
+        //     return await stopGlitchTipService(request)
         // }
         // throw `Service type ${type} not supported.`
     } catch (error) {
@@ -1105,7 +1111,7 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
 
         const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.wordpress)
 
-        let composeFile: ComposeFile = {
+        const composeFile: ComposeFile = {
             version: '3.8',
             services: {
                 [id]: {
@@ -2557,6 +2563,252 @@ async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
 
         await startServiceContainers(destinationDocker.id, composeFileDestination)
 
+        return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
+async function startGlitchTipService(request: FastifyRequest<ServiceStartStop>) {
+    try {
+        const { id } = request.params;
+        const teamId = request.user.teamId;
+        const service = await getServiceFromDB({ id, teamId });
+        const {
+            type,
+            version,
+            fqdn,
+            destinationDockerId,
+            destinationDocker,
+            serviceSecret,
+            persistentStorage,
+            exposePort,
+            glitchTip: {
+                postgresqlDatabase,
+                postgresqlPassword,
+                postgresqlUser,
+                secretKeyBase,
+                defaultEmail,
+                defaultUsername,
+                defaultPassword,
+                defaultFromEmail,
+                emailSmtpHost,
+                emailSmtpPort,
+                emailSmtpUser,
+                emailSmtpPassword,
+                emailSmtpUseTls,
+                emailSmtpUseSsl,
+                emailBackend,
+                mailgunApiKey,
+                sendgridApiKey,
+                enableOpenUserRegistration,
+            }
+        } = service;
+        const network = destinationDockerId && destinationDocker.network;
+        const port = getServiceMainPort('glitchTip');
+
+        const { workdir } = await createDirectories({ repository: type, buildId: id });
+        const image = getServiceImage(type);
+
+        const config = {
+            glitchTip: {
+                image: `${image}:${version}`,
+                environmentVariables: {
+                    PORT: port,
+                    GLITCHTIP_DOMAIN: fqdn,
+                    SECRET_KEY: secretKeyBase,
+                    DATABASE_URL: `postgresql://${postgresqlUser}:${postgresqlPassword}@${id}-postgresql:5432/${postgresqlDatabase}`,
+                    REDIS_URL: `redis://${id}-redis:6379/0`,
+                    DEFAULT_FROM_EMAIL: defaultFromEmail,
+                    EMAIL_HOST: emailSmtpHost,
+                    EMAIL_PORT: emailSmtpPort,
+                    EMAIL_HOST_USER: emailSmtpUser,
+                    EMAIL_HOST_PASSWORD: emailSmtpPassword,
+                    EMAIL_USE_TLS: emailSmtpUseTls,
+                    EMAIL_USE_SSL: emailSmtpUseSsl,
+                    EMAIL_BACKEND: emailBackend,
+                    MAILGUN_API_KEY: mailgunApiKey,
+                    SENDGRID_API_KEY: sendgridApiKey,
+                    ENABLE_OPEN_USER_REGISTRATION: enableOpenUserRegistration,
+                    DJANGO_SUPERUSER_EMAIL: defaultEmail,
+                    DJANGO_SUPERUSER_USERNAME: defaultUsername,
+                    DJANGO_SUPERUSER_PASSWORD: defaultPassword,
+                }
+            },
+            postgresql: {
+                image: 'postgres:14-alpine',
+                volume: `${id}-postgresql-data:/var/lib/postgresql/data`,
+                environmentVariables: {
+                    POSTGRES_USER: postgresqlUser,
+                    POSTGRES_PASSWORD: postgresqlPassword,
+                    POSTGRES_DB: postgresqlDatabase
+                }
+            },
+            redis: {
+                image: 'redis:7-alpine',
+                volume: `${id}-redis-data:/data`,
+            }
+        };
+        if (serviceSecret.length > 0) {
+            serviceSecret.forEach((secret) => {
+                config.glitchTip.environmentVariables[secret.name] = secret.value;
+            });
+        }
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.glitchTip)
+        const composeFile: ComposeFile = {
+            version: '3.8',
+            services: {
+                [id]: {
+                    container_name: id,
+                    image: config.glitchTip.image,
+                    environment: config.glitchTip.environmentVariables,
+                    networks: [network],
+                    volumes,
+                    restart: 'always',
+                    labels: makeLabelForServices('glitchTip'),
+                    ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                    deploy: {
+                        restart_policy: {
+                            condition: 'on-failure',
+                            delay: '5s',
+                            max_attempts: 3,
+                            window: '120s'
+                        }
+                    },
+                    depends_on: [`${id}-postgresql`, `${id}-redis`]
+                },
+                [`${id}-worker`]: {
+                    container_name: `${id}-worker`,
+                    image: config.glitchTip.image,
+                    command: './bin/run-celery-with-beat.sh',
+                    environment: config.glitchTip.environmentVariables,
+                    networks: [network],
+                    restart: 'always',
+                    deploy: {
+                        restart_policy: {
+                            condition: 'on-failure',
+                            delay: '5s',
+                            max_attempts: 3,
+                            window: '120s'
+                        }
+                    },
+                    depends_on: [`${id}-postgresql`, `${id}-redis`]
+                },
+                [`${id}-setup`]: {
+                    container_name: `${id}-setup`,
+                    image: config.glitchTip.image,
+                    command: 'sh -c "(./manage.py migrate || true) && (./manage.py createsuperuser --noinput || true)"',
+                    environment: config.glitchTip.environmentVariables,
+                    networks: [network],
+                    restart: "no",
+                    depends_on: [`${id}-postgresql`, `${id}-redis`]
+                },
+                [`${id}-postgresql`]: {
+                    image: config.postgresql.image,
+                    container_name: `${id}-postgresql`,
+                    environment: config.postgresql.environmentVariables,
+                    networks: [network],
+                    volumes: [config.postgresql.volume],
+                    restart: 'always',
+                    deploy: {
+                        restart_policy: {
+                            condition: 'on-failure',
+                            delay: '5s',
+                            max_attempts: 3,
+                            window: '120s'
+                        }
+                    }
+                },
+                [`${id}-redis`]: {
+                    image: config.redis.image,
+                    container_name: `${id}-redis`,
+                    networks: [network],
+                    volumes: [config.redis.volume],
+                    restart: 'always',
+                    deploy: {
+                        restart_policy: {
+                            condition: 'on-failure',
+                            delay: '5s',
+                            max_attempts: 3,
+                            window: '120s'
+                        }
+                    }
+                }
+            },
+            networks: {
+                [network]: {
+                    external: true
+                }
+            },
+            volumes: {
+                ...volumeMounts,
+                [config.postgresql.volume.split(':')[0]]: {
+                    name: config.postgresql.volume.split(':')[0]
+                },
+                [config.redis.volume.split(':')[0]]: {
+                    name: config.redis.volume.split(':')[0]
+                }
+            }
+        };
+        const composeFileDestination = `${workdir}/docker-compose.yaml`;
+        await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
+
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
+
+        return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+async function stopGlitchTipService(request: FastifyRequest<ServiceStartStop>) {
+    try {
+        const { id } = request.params;
+        const teamId = request.user.teamId;
+        const service = await getServiceFromDB({ id, teamId });
+        const { destinationDockerId, destinationDocker } = service;
+        if (destinationDockerId) {
+            try {
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
+                if (found) {
+                    await removeContainer({ id, dockerId: destinationDocker.id });
+                }
+            } catch (error) {
+                console.error(error);
+            }
+            try {
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-worker` });
+                if (found) {
+                    await removeContainer({ id: `${id}-worker`, dockerId: destinationDocker.id });
+                }
+            } catch (error) {
+                console.error(error);
+            }
+            try {
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-setup` });
+                if (found) {
+                    await removeContainer({ id: `${id}-setup`, dockerId: destinationDocker.id });
+                }
+            } catch (error) {
+                console.error(error);
+            }
+            try {
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-postgresql` });
+                if (found) {
+                    await removeContainer({ id: `${id}-postgresql`, dockerId: destinationDocker.id });
+                }
+            } catch (error) {
+                console.error(error);
+            }
+            try {
+                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-redis` });
+                if (found) {
+                    await removeContainer({ id: `${id}-redis`, dockerId: destinationDocker.id });
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })

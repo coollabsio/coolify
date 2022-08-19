@@ -1,2 +1,2 @@
-FROM gitpod/workspace-node:2022-06-20-19-54-55
+FROM gitpod/workspace-full:2022-08-17-18-37-55
 RUN brew install buildpacks/tap/pack

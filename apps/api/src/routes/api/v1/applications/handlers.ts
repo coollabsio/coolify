@@ -395,7 +395,7 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
         if (found) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
-        await checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress })
+        if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress })
         if (isDNSCheckEnabled && !isDev && !forceSave) {
             let hostname = request.hostname.split(':')[0];
             if (remoteEngine) hostname = remoteIpAddress;

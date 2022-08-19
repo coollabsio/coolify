@@ -17,7 +17,7 @@ import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
-export const version = '3.6.0';
+export const version = '3.7.0';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -79,7 +79,8 @@ export const include: any = {
 	hasura: true,
 	fider: true,
 	moodle: true,
-	appwrite: true
+	appwrite: true,
+	glitchTip: true,
 };
 
 export const uniqueName = (): string => uniqueNamesGenerator(customConfig);
@@ -287,7 +288,7 @@ export const supportedServiceTypesAndVersions = [
 		ports: {
 			main: 80
 		}
-	}
+	},
 	// {
 	//     name: 'moodle',
 	//     fancyName: 'Moodle',
@@ -299,6 +300,17 @@ export const supportedServiceTypesAndVersions = [
 	//         main: 8080
 	//     }
 	// }
+	{
+		name: 'glitchTip',
+		fancyName: 'GlitchTip',
+		baseImage: 'glitchtip/glitchtip',
+		images: ['postgres:14-alpine', 'redis:7-alpine'],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8000
+		}
+	},
 ];
 
 export async function checkDoubleBranch(branch: string, projectId: number): Promise<boolean> {
@@ -1607,7 +1619,33 @@ export async function configureServiceType({
 				}
 			}
 		});
-	} else {
+	} else if (type === 'glitchTip') {
+		const defaultUsername = cuid();
+		const defaultEmail = `${defaultUsername}@example.com`;
+		const defaultPassword = encrypt(generatePassword());
+		const postgresqlUser = cuid();
+		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlDatabase = 'glitchTip';
+		const secretKeyBase = encrypt(generatePassword(64));
+
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				glitchTip: {
+					create: {
+						postgresqlDatabase,
+						postgresqlUser,
+						postgresqlPassword,
+						secretKeyBase,
+						defaultEmail,
+						defaultUsername,
+						defaultPassword,
+					}
+				}
+			}
+		});
+	 } else {
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1629,6 +1667,7 @@ export async function removeService({ id }: { id: string }): Promise<void> {
 	await prisma.minio.deleteMany({ where: { serviceId: id } });
 	await prisma.vscodeserver.deleteMany({ where: { serviceId: id } });
 	await prisma.wordpress.deleteMany({ where: { serviceId: id } });
+	await prisma.glitchTip.deleteMany({ where: { serviceId: id } });
 	await prisma.moodle.deleteMany({ where: { serviceId: id } });
 	await prisma.appwrite.deleteMany({ where: { serviceId: id } });
 	await prisma.service.delete({ where: { id } });
@@ -1769,7 +1808,7 @@ export function convertTolOldVolumeNames(type) {
 // export async function getAvailableServices(): Promise<any> {
 // 	const { data } = await axios.get(`https://gist.githubusercontent.com/andrasbacsai/4aac36d8d6214dbfc34fa78110554a50/raw/5b27e6c37d78aaeedc1148d797112c827a2f43cf/availableServices.json`)
 // 	return data
-// 
+//
 export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 	// Cleanup old coolify images
 	try {
@@ -1832,8 +1871,6 @@ export function persistentVolumes(id, persistentStorage, config) {
 		...composeVolumes
 	) || {}
 	return { volumes, volumeMounts }
-
-
 }
 export function defaultComposeConfiguration(network: string): any {
 	return {
