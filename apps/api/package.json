@@ -35,7 +35,6 @@
     "fastify": "4.4.0",
     "fastify-plugin": "4.1.0",
     "generate-password": "1.7.0",
-    "get-port": "6.1.2",
     "got": "12.3.1",
     "is-ip": "5.0.0",
     "is-port-reachable": "4.0.0",

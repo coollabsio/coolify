@@ -433,9 +433,13 @@ export async function saveDatabaseSettings(request: FastifyRequest<SaveDatabaseS
         const { id } = request.params;
         const { isPublic, appendOnly = true } = request.body;
 
-        const { destinationDocker: { id: dockerId } } = await prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
-        const publicPort = await getFreePublicPort(id, dockerId);
+        let publicPort = null
 
+        const { destinationDocker: { id: dockerId } } = await prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
+       
+        if (isPublic) {
+            publicPort = await getFreePublicPort(id, dockerId);
+        }
         await prisma.database.update({
             where: { id },
             data: {

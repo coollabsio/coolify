@@ -17,7 +17,7 @@ import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 
-export const version = '3.7.0';
+export const version = '3.7.1';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -545,21 +545,38 @@ export const supportedDatabaseTypesAndVersions = [
 	}
 ];
 
-export async function getFreeSSHLocalPort(id: string): Promise<number> {
-	const { default: getPort, portNumbers } = await import('get-port');
+export async function getFreeSSHLocalPort(id: string): Promise<number | boolean> {
+	const { default: isReachable } = await import('is-port-reachable');
 	const { remoteIpAddress, sshLocalPort } = await prisma.destinationDocker.findUnique({ where: { id } })
 	if (sshLocalPort) {
 		return Number(sshLocalPort)
 	}
+
+	const data = await prisma.setting.findFirst();
+	const { minPort, maxPort } = data;
+
 	const ports = await prisma.destinationDocker.findMany({ where: { sshLocalPort: { not: null }, remoteIpAddress: { not: remoteIpAddress } } })
-	const alreadyConfigured = await prisma.destinationDocker.findFirst({ where: { remoteIpAddress, id: { not: id }, sshLocalPort: { not: null } } })
+
+	const alreadyConfigured = await prisma.destinationDocker.findFirst({
+		where: {
+			remoteIpAddress, id: { not: id }, sshLocalPort: { not: null }
+		}
+	})
 	if (alreadyConfigured?.sshLocalPort) {
 		await prisma.destinationDocker.update({ where: { id }, data: { sshLocalPort: alreadyConfigured.sshLocalPort } })
 		return Number(alreadyConfigured.sshLocalPort)
 	}
-	const availablePort = await getPort({ port: portNumbers(10000, 10100), exclude: ports.map(p => p.sshLocalPort) })
-	await prisma.destinationDocker.update({ where: { id }, data: { sshLocalPort: Number(availablePort) } })
-	return Number(availablePort)
+	const range = generateRangeArray(minPort, maxPort)
+	console.log({ ports })
+	const availablePorts = range.filter(port => !ports.map(p => p.sshLocalPort).includes(port))
+	for (const port of availablePorts) {
+		const found = await isReachable(port, { host: 'localhost' })
+		if (!found) {
+			await prisma.destinationDocker.update({ where: { id }, data: { sshLocalPort: Number(port) } })
+			return Number(port)
+		}
+	}
+	return false
 }
 
 export async function createRemoteEngineConfiguration(id: string) {
@@ -1208,7 +1225,7 @@ export async function checkExposedPort({ id, configuredPort, exposePort, dockerI
 	}
 }
 export async function getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress) {
-	const { default: getPort } = await import('get-port');
+	const { default: checkPort } = await import('is-port-reachable');
 	const applicationUsed = await (
 		await prisma.application.findMany({
 			where: { exposePort: { not: null }, id: { not: id }, destinationDockerId: dockerId },
@@ -1222,22 +1239,23 @@ export async function getFreeExposedPort(id, exposePort, dockerId, remoteIpAddre
 		})
 	).map((a) => a.exposePort);
 	const usedPorts = [...applicationUsed, ...serviceUsed];
-	if (remoteIpAddress) {
-		const { default: checkPort } = await import('is-port-reachable');
-		const found = await checkPort(exposePort, { host: remoteIpAddress });
-		if (!found) {
-			return exposePort
-		}
+	if (usedPorts.includes(exposePort)) {
 		return false
 	}
-	return await getPort({ port: Number(exposePort), exclude: usedPorts });
+	const found = await checkPort(exposePort, { host: remoteIpAddress || 'localhost' });
+	if (!found) {
+		return exposePort
+	}
+	return false
 
 }
+export function generateRangeArray(start, end) {
+	return Array.from({ length: (end - start) }, (v, k) => k + start);
+}
 export async function getFreePublicPort(id, dockerId) {
-	const { default: getPort, portNumbers } = await import('get-port');
+	const { default: isReachable } = await import('is-port-reachable');
 	const data = await prisma.setting.findFirst();
 	const { minPort, maxPort } = data;
-
 	const dbUsed = await (
 		await prisma.database.findMany({
 			where: { publicPort: { not: null }, id: { not: id }, destinationDockerId: dockerId },
@@ -1263,7 +1281,15 @@ export async function getFreePublicPort(id, dockerId) {
 		})
 	).map((a) => a.publicPort);
 	const usedPorts = [...dbUsed, ...wpFtpUsed, ...wpUsed, ...minioUsed];
-	return await getPort({ port: portNumbers(minPort, maxPort), exclude: usedPorts });
+	const range = generateRangeArray(minPort, maxPort)
+	const availablePorts = range.filter(port => !usedPorts.includes(port))
+	for (const port of availablePorts) {
+		const found = await isReachable(port, { host: 'localhost' })
+		if (!found) {
+			return port
+		}
+	}
+	return false
 }
 
 export async function startTraefikTCPProxy(
@@ -1645,7 +1671,7 @@ export async function configureServiceType({
 				}
 			}
 		});
-	 } else {
+	} else {
 		await prisma.service.update({
 			where: { id },
 			data: {
