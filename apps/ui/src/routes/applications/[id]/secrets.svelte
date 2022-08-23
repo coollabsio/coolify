@@ -43,7 +43,8 @@
 		const batchSecretsPairs = eachValuePair
 			.filter((secret) => !secret.startsWith('#') && secret)
 			.map((secret) => {
-				const [name, value] = secret.split('=');
+				const [name, ...rest] = secret.split('=');
+				const value = rest.join('=');
 				const cleanValue = value?.replaceAll('"', '') || '';
 				return {
 					name,
