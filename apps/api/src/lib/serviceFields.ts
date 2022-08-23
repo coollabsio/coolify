@@ -671,3 +671,20 @@ export const glitchTip = [{
 	isBoolean: true,
 	isEncrypted: false
 }]
+
+export const searxng = [{
+	name: 'secretKey',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'redisPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+}]

@@ -38,4 +38,6 @@
 	<Icons.Moodle {isAbsolute} />
 {:else if type === 'glitchTip'}
 	<Icons.GlitchTip {isAbsolute} />
+{:else if type === 'searxng'}
+	<Icons.Searxng {isAbsolute} />
 {/if}

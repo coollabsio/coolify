@@ -81,6 +81,7 @@ export const include: any = {
 	moodle: true,
 	appwrite: true,
 	glitchTip: true,
+	searxng: true
 };
 
 export const uniqueName = (): string => uniqueNamesGenerator(customConfig);
@@ -309,6 +310,17 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 8000
+		}
+	},
+	{
+		name: 'searxng',
+		fancyName: 'SearXNG',
+		baseImage: 'searxng/searxng',
+		images: [],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8080
 		}
 	},
 ];
@@ -608,7 +620,7 @@ export async function createRemoteEngineConfiguration(id: string) {
 		config.append({
 			Host: remoteIpAddress,
 			Hostname: 'localhost',
-			Port: Number(localPort),
+			Port: localPort.toString(),
 			User: remoteUser,
 			IdentityFile: sshKeyFile,
 			StrictHostKeyChecking: 'no'
@@ -753,13 +765,18 @@ export async function listSettings(): Promise<any> {
 }
 
 
-export function generatePassword(length = 24, symbols = false): string {
-	return generator.generate({
+export function generatePassword({ length = 24, symbols = false, isHex = false }: { length?: number, symbols?: boolean, isHex?: boolean } | null): string {
+	if (isHex) {
+		return crypto.randomBytes(length).toString("hex");
+	}
+	const password = generator.generate({
 		length,
 		numbers: true,
 		strict: true,
 		symbols
 	});
+
+	return password;
 }
 
 export function generateDatabaseConfiguration(database: any, arch: string):
@@ -1418,11 +1435,11 @@ export async function configureServiceType({
 	type: string;
 }): Promise<void> {
 	if (type === 'plausibleanalytics') {
-		const password = encrypt(generatePassword());
+		const password = encrypt(generatePassword({}));
 		const postgresqlUser = cuid();
-		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlPassword = encrypt(generatePassword({}));
 		const postgresqlDatabase = 'plausibleanalytics';
-		const secretKeyBase = encrypt(generatePassword(64));
+		const secretKeyBase = encrypt(generatePassword({ length: 64 }));
 
 		await prisma.service.update({
 			where: { id },
@@ -1446,22 +1463,22 @@ export async function configureServiceType({
 		});
 	} else if (type === 'minio') {
 		const rootUser = cuid();
-		const rootUserPassword = encrypt(generatePassword());
+		const rootUserPassword = encrypt(generatePassword({}));
 		await prisma.service.update({
 			where: { id },
 			data: { type, minio: { create: { rootUser, rootUserPassword } } }
 		});
 	} else if (type === 'vscodeserver') {
-		const password = encrypt(generatePassword());
+		const password = encrypt(generatePassword({}));
 		await prisma.service.update({
 			where: { id },
 			data: { type, vscodeserver: { create: { password } } }
 		});
 	} else if (type === 'wordpress') {
 		const mysqlUser = cuid();
-		const mysqlPassword = encrypt(generatePassword());
+		const mysqlPassword = encrypt(generatePassword({}));
 		const mysqlRootUser = cuid();
-		const mysqlRootUserPassword = encrypt(generatePassword());
+		const mysqlRootUserPassword = encrypt(generatePassword({}));
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1499,11 +1516,11 @@ export async function configureServiceType({
 		});
 	} else if (type === 'ghost') {
 		const defaultEmail = `${cuid()}@example.com`;
-		const defaultPassword = encrypt(generatePassword());
+		const defaultPassword = encrypt(generatePassword({}));
 		const mariadbUser = cuid();
-		const mariadbPassword = encrypt(generatePassword());
+		const mariadbPassword = encrypt(generatePassword({}));
 		const mariadbRootUser = cuid();
-		const mariadbRootUserPassword = encrypt(generatePassword());
+		const mariadbRootUserPassword = encrypt(generatePassword({}));
 
 		await prisma.service.update({
 			where: { id },
@@ -1522,7 +1539,7 @@ export async function configureServiceType({
 			}
 		});
 	} else if (type === 'meilisearch') {
-		const masterKey = encrypt(generatePassword(32));
+		const masterKey = encrypt(generatePassword({ length: 32 }));
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1531,11 +1548,11 @@ export async function configureServiceType({
 			}
 		});
 	} else if (type === 'umami') {
-		const umamiAdminPassword = encrypt(generatePassword());
+		const umamiAdminPassword = encrypt(generatePassword({}));
 		const postgresqlUser = cuid();
-		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlPassword = encrypt(generatePassword({}));
 		const postgresqlDatabase = 'umami';
-		const hashSalt = encrypt(generatePassword(64));
+		const hashSalt = encrypt(generatePassword({ length: 64 }));
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1553,9 +1570,9 @@ export async function configureServiceType({
 		});
 	} else if (type === 'hasura') {
 		const postgresqlUser = cuid();
-		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlPassword = encrypt(generatePassword({}));
 		const postgresqlDatabase = 'hasura';
-		const graphQLAdminPassword = encrypt(generatePassword());
+		const graphQLAdminPassword = encrypt(generatePassword({}));
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1572,9 +1589,9 @@ export async function configureServiceType({
 		});
 	} else if (type === 'fider') {
 		const postgresqlUser = cuid();
-		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlPassword = encrypt(generatePassword({}));
 		const postgresqlDatabase = 'fider';
-		const jwtSecret = encrypt(generatePassword(64, true));
+		const jwtSecret = encrypt(generatePassword({ length: 64, symbols: true }));
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1591,13 +1608,13 @@ export async function configureServiceType({
 		});
 	} else if (type === 'moodle') {
 		const defaultUsername = cuid();
-		const defaultPassword = encrypt(generatePassword());
+		const defaultPassword = encrypt(generatePassword({}));
 		const defaultEmail = `${cuid()} @example.com`;
 		const mariadbUser = cuid();
-		const mariadbPassword = encrypt(generatePassword());
+		const mariadbPassword = encrypt(generatePassword({}));
 		const mariadbDatabase = 'moodle_db';
 		const mariadbRootUser = cuid();
-		const mariadbRootUserPassword = encrypt(generatePassword());
+		const mariadbRootUserPassword = encrypt(generatePassword({}));
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1617,15 +1634,15 @@ export async function configureServiceType({
 			}
 		});
 	} else if (type === 'appwrite') {
-		const opensslKeyV1 = encrypt(generatePassword());
-		const executorSecret = encrypt(generatePassword());
-		const redisPassword = encrypt(generatePassword());
+		const opensslKeyV1 = encrypt(generatePassword({}));
+		const executorSecret = encrypt(generatePassword({}));
+		const redisPassword = encrypt(generatePassword({}));
 		const mariadbHost = `${id}-mariadb`
 		const mariadbUser = cuid();
-		const mariadbPassword = encrypt(generatePassword());
+		const mariadbPassword = encrypt(generatePassword({}));
 		const mariadbDatabase = 'appwrite';
 		const mariadbRootUser = cuid();
-		const mariadbRootUserPassword = encrypt(generatePassword());
+		const mariadbRootUserPassword = encrypt(generatePassword({}));
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1648,11 +1665,11 @@ export async function configureServiceType({
 	} else if (type === 'glitchTip') {
 		const defaultUsername = cuid();
 		const defaultEmail = `${defaultUsername}@example.com`;
-		const defaultPassword = encrypt(generatePassword());
+		const defaultPassword = encrypt(generatePassword({}));
 		const postgresqlUser = cuid();
-		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlPassword = encrypt(generatePassword({}));
 		const postgresqlDatabase = 'glitchTip';
-		const secretKeyBase = encrypt(generatePassword(64));
+		const secretKeyBase = encrypt(generatePassword({ length: 64 }));
 
 		await prisma.service.update({
 			where: { id },
@@ -1667,6 +1684,21 @@ export async function configureServiceType({
 						defaultEmail,
 						defaultUsername,
 						defaultPassword,
+					}
+				}
+			}
+		});
+	} else if (type === 'searxng') {
+		const secretKey = encrypt(generatePassword({ length: 32, isHex: true }))
+		const redisPassword = encrypt(generatePassword({}));
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				searxng: {
+					create: {
+						secretKey,
+						redisPassword,
 					}
 				}
 			}
@@ -1696,6 +1728,7 @@ export async function removeService({ id }: { id: string }): Promise<void> {
 	await prisma.glitchTip.deleteMany({ where: { serviceId: id } });
 	await prisma.moodle.deleteMany({ where: { serviceId: id } });
 	await prisma.appwrite.deleteMany({ where: { serviceId: id } });
+	await prisma.searxng.deleteMany({ where: { serviceId: id } });
 	await prisma.service.delete({ where: { id } });
 }
 
