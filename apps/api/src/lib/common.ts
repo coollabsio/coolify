@@ -1795,11 +1795,11 @@ export async function stopBuild(buildId, applicationId) {
 					clearInterval(interval);
 					return resolve();
 				}
-				if (count > 100) {
+				if (count > 50) {
 					clearInterval(interval);
 					return reject(new Error('Build canceled'));
 				}
-				const { stdout: buildContainers } = await executeDockerCmd({ dockerId, command: `docker container ls--filter "label=coolify.buildId=${buildId}" --format '{{json .}}'` })
+				const { stdout: buildContainers } = await executeDockerCmd({ dockerId, command: `docker container ls --filter "label=coolify.buildId=${buildId}" --format '{{json .}}'` })
 				if (buildContainers) {
 					const containersArray = buildContainers.trim().split('\n');
 					for (const container of containersArray) {
@@ -1807,14 +1807,15 @@ export async function stopBuild(buildId, applicationId) {
 						const id = containerObj.ID;
 						if (!containerObj.Names.startsWith(`${applicationId} `)) {
 							await removeContainer({ id, dockerId });
-							await cleanupDB(buildId);
 							clearInterval(interval);
 							return resolve();
 						}
 					}
 				}
 				count++;
-			} catch (error) { }
+			} catch (error) { } finally {
+				await cleanupDB(buildId);
+			}
 		}, 100);
 	});
 }
