@@ -541,9 +541,6 @@ export async function buildImage({
 	} else {
 		await saveBuildLog({ line: `Building image started.`, buildId, applicationId });
 	}
-	if (debug) {
-		await saveBuildLog({ line: `\n###############\nIMPORTANT: Due to some issues during implementing Remote Docker Engine, the builds logs are not streamed at the moment - but will be soon! You will see the full build log when the build is finished!\n###############`, buildId, applicationId });
-	}
 	if (!debug && isCache) {
 		await saveBuildLog({
 			line: `Debug turned off. To see more details, allow it in the configuration.`,
@@ -553,54 +550,7 @@ export async function buildImage({
 	}
 	const dockerFile = isCache ? `${dockerFileLocation}-cache` : `${dockerFileLocation}`
 	const cache = `${applicationId}:${tag}${isCache ? '-cache' : ''}`
-	const { stderr } = await executeDockerCmd({ dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} ${workdir}` })
-	if (debug) {
-		const array = stderr.split('\n')
-		for (const line of array) {
-			if (line !== '\n') {
-				await saveBuildLog({
-					line: `${line.replace('\n', '')}`,
-					buildId,
-					applicationId
-				});
-			}
-		}
-	}
-
-
-	// await new Promise((resolve, reject) => {
-	// 	const command = spawn(`docker`, ['build', '-f', `${workdir}${dockerFile}`, '-t', `${cache}`,`${workdir}`], {
-	// 		env: {
-	// 			DOCKER_HOST: 'ssh://root@95.217.178.202',
-	// 			DOCKER_BUILDKIT: '1'
-	// 		}
-	// 	});
-	// 	command.stdout.on('data', function (data) {
-	// 		console.log('stdout: ' + data);
-	// 	});
-	// 	command.stderr.on('data', function (data) {
-	// 		console.log('stderr: ' + data);
-	// 	});
-	// 	command.on('error', function (error) {
-	// 		console.log(error)
-	// 		reject(error)
-	// 	})
-	// 	command.on('exit', function (code) {
-	// 		console.log('exit code: ' + code);
-	// 		resolve(code)
-	// 	});
-	// })
-
-
-	// console.log({ stdout, stderr })
-	// const stream = await docker.engine.buildImage(
-	// 	{ src: ['.'], context: workdir },
-	// 	{
-	// 		dockerfile: isCache ? `${dockerFileLocation}-cache` : dockerFileLocation,
-	// 		t: `${applicationId}:${tag}${isCache ? '-cache' : ''}`
-	// 	}
-	// );
-	// await streamEvents({ stream, docker, buildId, applicationId, debug });
+	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} ${workdir}` })
 	if (isCache) {
 		await saveBuildLog({ line: `Building cache image successful.`, buildId, applicationId });
 	} else {

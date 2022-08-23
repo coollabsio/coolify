@@ -1,4 +1,4 @@
-import child from 'child_process';
+import { exec } from 'node:child_process'
 import util from 'util';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
@@ -16,6 +16,7 @@ import sshConfig from 'ssh-config'
 import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
+import { saveBuildLog } from './buildPacks/common';
 
 export const version = '3.8.0';
 export const isDev = process.env.NODE_ENV === 'development';
@@ -85,7 +86,50 @@ export const include: any = {
 };
 
 export const uniqueName = (): string => uniqueNamesGenerator(customConfig);
-export const asyncExecShell = util.promisify(child.exec);
+export const asyncExecShell = util.promisify(exec);
+export const asyncExecShellStream = async ({ debug, buildId, applicationId, command, engine }: { debug: boolean, buildId: string, applicationId: string, command: string, engine: string }) => {
+	return await new Promise(async (resolve, reject) => {
+		const { execaCommand } = await import('execa')
+		const subprocess = execaCommand(command, { env: { DOCKER_BUILDKIT: "1", DOCKER_HOST: engine } })
+		if (debug) {
+			subprocess.stdout.on('data', async (data) => {
+				const stdout = data.toString();
+				const array = stdout.split('\n')
+				for (const line of array) {
+					if (line !== '\n' && line !== '') {
+						await saveBuildLog({
+							line: `${line.replace('\n', '')}`,
+							buildId,
+							applicationId
+						});
+					}
+				}
+			})
+			subprocess.stderr.on('data', async (data) => {
+				const stderr = data.toString();
+				const array = stderr.split('\n')
+				for (const line of array) {
+					if (line !== '\n' && line !== '') {
+						await saveBuildLog({
+							line: `${line.replace('\n', '')}`,
+							buildId,
+							applicationId
+						});
+					}
+				}
+			})
+		}
+		subprocess.on('exit', async (code) => {
+			await asyncSleep(1000);
+			if (code === 0) {
+				resolve(code)
+			} else {
+				reject(code)
+			}
+		})
+	})
+}
+
 export const asyncSleep = (delay: number): Promise<unknown> =>
 	new Promise((resolve) => setTimeout(resolve, delay));
 export const prisma = new PrismaClient({
@@ -633,7 +677,7 @@ export async function createRemoteEngineConfiguration(id: string) {
 	}
 	return await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config))
 }
-export async function executeDockerCmd({ dockerId, command }: { dockerId: string, command: string }) {
+export async function executeDockerCmd({ debug, buildId, applicationId, dockerId, command }: { debug?: boolean, buildId?: string, applicationId?: string, dockerId: string, command: string }): Promise<any> {
 	let { remoteEngine, remoteIpAddress, engine } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
 	if (remoteEngine) {
 		await createRemoteEngineConfiguration(dockerId)
@@ -645,6 +689,9 @@ export async function executeDockerCmd({ dockerId, command }: { dockerId: string
 		if (command.startsWith('docker compose')) {
 			command = command.replace(/docker compose/gi, 'docker-compose')
 		}
+	}
+	if (command.startsWith(`docker build --progress plain`)) {
+		return await asyncExecShellStream({ debug, buildId, applicationId, command, engine });
 	}
 	return await asyncExecShell(
 		`DOCKER_BUILDKIT=1 DOCKER_HOST="${engine}" ${command}`
