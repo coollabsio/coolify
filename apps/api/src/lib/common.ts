@@ -92,6 +92,7 @@ export const asyncExecShellStream = async ({ debug, buildId, applicationId, comm
 		const { execaCommand } = await import('execa')
 		const subprocess = execaCommand(command, { env: { DOCKER_BUILDKIT: "1", DOCKER_HOST: engine } })
 		if (debug) {
+			await saveBuildLog({ line: `=========================`, buildId, applicationId });
 			subprocess.stdout.on('data', async (data) => {
 				const stdout = data.toString();
 				const array = stdout.split('\n')
@@ -121,6 +122,7 @@ export const asyncExecShellStream = async ({ debug, buildId, applicationId, comm
 		}
 		subprocess.on('exit', async (code) => {
 			await asyncSleep(1000);
+			await saveBuildLog({ line: `=========================`, buildId, applicationId });
 			if (code === 0) {
 				resolve(code)
 			} else {
