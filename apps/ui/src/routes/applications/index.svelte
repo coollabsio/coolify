@@ -64,7 +64,7 @@
 		</button>
 	{/if}
 </div>
-<div class="flex-col justify-center">
+<div class="flex-col justify-center mt-10 pb-12 sm:pb-16">
 	{#if !applications || ownApplications.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">{$t('application.no_applications_found')}</div>
