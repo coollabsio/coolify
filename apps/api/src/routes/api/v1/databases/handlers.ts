@@ -29,9 +29,9 @@ export async function newDatabase(request: FastifyRequest, reply: FastifyReply) 
 
         const name = uniqueName();
         const dbUser = cuid();
-        const dbUserPassword = encrypt(generatePassword());
+        const dbUserPassword = encrypt(generatePassword({}));
         const rootUser = cuid();
-        const rootUserPassword = encrypt(generatePassword());
+        const rootUserPassword = encrypt(generatePassword({}));
         const defaultDatabase = cuid();
 
         const { id } = await prisma.database.create({
@@ -433,9 +433,13 @@ export async function saveDatabaseSettings(request: FastifyRequest<SaveDatabaseS
         const { id } = request.params;
         const { isPublic, appendOnly = true } = request.body;
 
-        const { destinationDocker: { id: dockerId } } = await prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
-        const publicPort = await getFreePublicPort(id, dockerId);
+        let publicPort = null
 
+        const { destinationDocker: { id: dockerId } } = await prisma.database.findUnique({ where: { id }, include: { destinationDocker: true } })
+       
+        if (isPublic) {
+            publicPort = await getFreePublicPort(id, dockerId);
+        }
         await prisma.database.update({
             where: { id },
             data: {

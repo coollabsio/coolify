@@ -1,4 +1,4 @@
-import child from 'child_process';
+import { exec } from 'node:child_process'
 import util from 'util';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
@@ -16,8 +16,9 @@ import sshConfig from 'ssh-config'
 import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
+import { saveBuildLog } from './buildPacks/common';
 
-export const version = '3.7.0';
+export const version = '3.8.0';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -81,10 +82,56 @@ export const include: any = {
 	moodle: true,
 	appwrite: true,
 	glitchTip: true,
+	searxng: true
 };
 
 export const uniqueName = (): string => uniqueNamesGenerator(customConfig);
-export const asyncExecShell = util.promisify(child.exec);
+export const asyncExecShell = util.promisify(exec);
+export const asyncExecShellStream = async ({ debug, buildId, applicationId, command, engine }: { debug: boolean, buildId: string, applicationId: string, command: string, engine: string }) => {
+	return await new Promise(async (resolve, reject) => {
+		const { execaCommand } = await import('execa')
+		const subprocess = execaCommand(command, { env: { DOCKER_BUILDKIT: "1", DOCKER_HOST: engine } })
+		if (debug) {
+			await saveBuildLog({ line: `=========================`, buildId, applicationId });
+			subprocess.stdout.on('data', async (data) => {
+				const stdout = data.toString();
+				const array = stdout.split('\n')
+				for (const line of array) {
+					if (line !== '\n' && line !== '') {
+						await saveBuildLog({
+							line: `${line.replace('\n', '')}`,
+							buildId,
+							applicationId
+						});
+					}
+				}
+			})
+			subprocess.stderr.on('data', async (data) => {
+				const stderr = data.toString();
+				const array = stderr.split('\n')
+				for (const line of array) {
+					if (line !== '\n' && line !== '') {
+						await saveBuildLog({
+							line: `${line.replace('\n', '')}`,
+							buildId,
+							applicationId
+						});
+					}
+				}
+			})
+		}
+		subprocess.on('exit', async (code) => {
+			await asyncSleep(1000);
+			await saveBuildLog({ line: `=========================`, buildId, applicationId });
+			if (code === 0) {
+				resolve(code)
+			} else {
+				reject(code)
+			}
+		})
+	})
+}
+
 export const asyncSleep = (delay: number): Promise<unknown> =>
 	new Promise((resolve) => setTimeout(resolve, delay));
 export const prisma = new PrismaClient({
@@ -309,6 +356,17 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 8000
+		}
+	},
+	{
+		name: 'searxng',
+		fancyName: 'SearXNG',
+		baseImage: 'searxng/searxng',
+		images: [],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8080
 		}
 	},
 ];
@@ -545,21 +603,38 @@ export const supportedDatabaseTypesAndVersions = [
 	}
 ];
 
-export async function getFreeSSHLocalPort(id: string): Promise<number> {
-	const { default: getPort, portNumbers } = await import('get-port');
+export async function getFreeSSHLocalPort(id: string): Promise<number | boolean> {
+	const { default: isReachable } = await import('is-port-reachable');
 	const { remoteIpAddress, sshLocalPort } = await prisma.destinationDocker.findUnique({ where: { id } })
 	if (sshLocalPort) {
 		return Number(sshLocalPort)
 	}
+
+	const data = await prisma.setting.findFirst();
+	const { minPort, maxPort } = data;
+
 	const ports = await prisma.destinationDocker.findMany({ where: { sshLocalPort: { not: null }, remoteIpAddress: { not: remoteIpAddress } } })
-	const alreadyConfigured = await prisma.destinationDocker.findFirst({ where: { remoteIpAddress, id: { not: id }, sshLocalPort: { not: null } } })
+
+	const alreadyConfigured = await prisma.destinationDocker.findFirst({
+		where: {
+			remoteIpAddress, id: { not: id }, sshLocalPort: { not: null }
+		}
+	})
 	if (alreadyConfigured?.sshLocalPort) {
 		await prisma.destinationDocker.update({ where: { id }, data: { sshLocalPort: alreadyConfigured.sshLocalPort } })
 		return Number(alreadyConfigured.sshLocalPort)
 	}
-	const availablePort = await getPort({ port: portNumbers(10000, 10100), exclude: ports.map(p => p.sshLocalPort) })
-	await prisma.destinationDocker.update({ where: { id }, data: { sshLocalPort: Number(availablePort) } })
-	return Number(availablePort)
+	const range = generateRangeArray(minPort, maxPort)
+	console.log({ ports })
+	const availablePorts = range.filter(port => !ports.map(p => p.sshLocalPort).includes(port))
+	for (const port of availablePorts) {
+		const found = await isReachable(port, { host: 'localhost' })
+		if (!found) {
+			await prisma.destinationDocker.update({ where: { id }, data: { sshLocalPort: Number(port) } })
+			return Number(port)
+		}
+	}
+	return false
 }
 
 export async function createRemoteEngineConfiguration(id: string) {
@@ -591,7 +666,7 @@ export async function createRemoteEngineConfiguration(id: string) {
 		config.append({
 			Host: remoteIpAddress,
 			Hostname: 'localhost',
-			Port: Number(localPort),
+			Port: localPort.toString(),
 			User: remoteUser,
 			IdentityFile: sshKeyFile,
 			StrictHostKeyChecking: 'no'
@@ -604,7 +679,7 @@ export async function createRemoteEngineConfiguration(id: string) {
 	}
 	return await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config))
 }
-export async function executeDockerCmd({ dockerId, command }: { dockerId: string, command: string }) {
+export async function executeDockerCmd({ debug, buildId, applicationId, dockerId, command }: { debug?: boolean, buildId?: string, applicationId?: string, dockerId: string, command: string }): Promise<any> {
 	let { remoteEngine, remoteIpAddress, engine } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
 	if (remoteEngine) {
 		await createRemoteEngineConfiguration(dockerId)
@@ -616,6 +691,9 @@ export async function executeDockerCmd({ dockerId, command }: { dockerId: string
 		if (command.startsWith('docker compose')) {
 			command = command.replace(/docker compose/gi, 'docker-compose')
 		}
+	}
+	if (command.startsWith(`docker build --progress plain`)) {
+		return await asyncExecShellStream({ debug, buildId, applicationId, command, engine });
 	}
 	return await asyncExecShell(
 		`DOCKER_BUILDKIT=1 DOCKER_HOST="${engine}" ${command}`
@@ -736,13 +814,18 @@ export async function listSettings(): Promise<any> {
 }
 
 
-export function generatePassword(length = 24, symbols = false): string {
-	return generator.generate({
+export function generatePassword({ length = 24, symbols = false, isHex = false }: { length?: number, symbols?: boolean, isHex?: boolean } | null): string {
+	if (isHex) {
+		return crypto.randomBytes(length).toString("hex");
+	}
+	const password = generator.generate({
 		length,
 		numbers: true,
 		strict: true,
 		symbols
 	});
+
+	return password;
 }
 
 export function generateDatabaseConfiguration(database: any, arch: string):
@@ -1208,7 +1291,7 @@ export async function checkExposedPort({ id, configuredPort, exposePort, dockerI
 	}
 }
 export async function getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress) {
-	const { default: getPort } = await import('get-port');
+	const { default: checkPort } = await import('is-port-reachable');
 	const applicationUsed = await (
 		await prisma.application.findMany({
 			where: { exposePort: { not: null }, id: { not: id }, destinationDockerId: dockerId },
@@ -1222,22 +1305,23 @@ export async function getFreeExposedPort(id, exposePort, dockerId, remoteIpAddre
 		})
 	).map((a) => a.exposePort);
 	const usedPorts = [...applicationUsed, ...serviceUsed];
-	if (remoteIpAddress) {
-		const { default: checkPort } = await import('is-port-reachable');
-		const found = await checkPort(exposePort, { host: remoteIpAddress });
-		if (!found) {
-			return exposePort
-		}
+	if (usedPorts.includes(exposePort)) {
 		return false
 	}
-	return await getPort({ port: Number(exposePort), exclude: usedPorts });
+	const found = await checkPort(exposePort, { host: remoteIpAddress || 'localhost' });
+	if (!found) {
+		return exposePort
+	}
+	return false
 
 }
+export function generateRangeArray(start, end) {
+	return Array.from({ length: (end - start) }, (v, k) => k + start);
+}
 export async function getFreePublicPort(id, dockerId) {
-	const { default: getPort, portNumbers } = await import('get-port');
+	const { default: isReachable } = await import('is-port-reachable');
 	const data = await prisma.setting.findFirst();
 	const { minPort, maxPort } = data;
-
 	const dbUsed = await (
 		await prisma.database.findMany({
 			where: { publicPort: { not: null }, id: { not: id }, destinationDockerId: dockerId },
@@ -1263,7 +1347,15 @@ export async function getFreePublicPort(id, dockerId) {
 		})
 	).map((a) => a.publicPort);
 	const usedPorts = [...dbUsed, ...wpFtpUsed, ...wpUsed, ...minioUsed];
-	return await getPort({ port: portNumbers(minPort, maxPort), exclude: usedPorts });
+	const range = generateRangeArray(minPort, maxPort)
+	const availablePorts = range.filter(port => !usedPorts.includes(port))
+	for (const port of availablePorts) {
+		const found = await isReachable(port, { host: 'localhost' })
+		if (!found) {
+			return port
+		}
+	}
+	return false
 }
 
 export async function startTraefikTCPProxy(
@@ -1392,11 +1484,11 @@ export async function configureServiceType({
 	type: string;
 }): Promise<void> {
 	if (type === 'plausibleanalytics') {
-		const password = encrypt(generatePassword());
+		const password = encrypt(generatePassword({}));
 		const postgresqlUser = cuid();
-		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlPassword = encrypt(generatePassword({}));
 		const postgresqlDatabase = 'plausibleanalytics';
-		const secretKeyBase = encrypt(generatePassword(64));
+		const secretKeyBase = encrypt(generatePassword({ length: 64 }));
 
 		await prisma.service.update({
 			where: { id },
@@ -1420,22 +1512,22 @@ export async function configureServiceType({
 		});
 	} else if (type === 'minio') {
 		const rootUser = cuid();
-		const rootUserPassword = encrypt(generatePassword());
+		const rootUserPassword = encrypt(generatePassword({}));
 		await prisma.service.update({
 			where: { id },
 			data: { type, minio: { create: { rootUser, rootUserPassword } } }
 		});
 	} else if (type === 'vscodeserver') {
-		const password = encrypt(generatePassword());
+		const password = encrypt(generatePassword({}));
 		await prisma.service.update({
 			where: { id },
 			data: { type, vscodeserver: { create: { password } } }
 		});
 	} else if (type === 'wordpress') {
 		const mysqlUser = cuid();
-		const mysqlPassword = encrypt(generatePassword());
+		const mysqlPassword = encrypt(generatePassword({}));
 		const mysqlRootUser = cuid();
-		const mysqlRootUserPassword = encrypt(generatePassword());
+		const mysqlRootUserPassword = encrypt(generatePassword({}));
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1473,11 +1565,11 @@ export async function configureServiceType({
 		});
 	} else if (type === 'ghost') {
 		const defaultEmail = `${cuid()}@example.com`;
-		const defaultPassword = encrypt(generatePassword());
+		const defaultPassword = encrypt(generatePassword({}));
 		const mariadbUser = cuid();
-		const mariadbPassword = encrypt(generatePassword());
+		const mariadbPassword = encrypt(generatePassword({}));
 		const mariadbRootUser = cuid();
-		const mariadbRootUserPassword = encrypt(generatePassword());
+		const mariadbRootUserPassword = encrypt(generatePassword({}));
 
 		await prisma.service.update({
 			where: { id },
@@ -1496,7 +1588,7 @@ export async function configureServiceType({
 			}
 		});
 	} else if (type === 'meilisearch') {
-		const masterKey = encrypt(generatePassword(32));
+		const masterKey = encrypt(generatePassword({ length: 32 }));
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1505,11 +1597,11 @@ export async function configureServiceType({
 			}
 		});
 	} else if (type === 'umami') {
-		const umamiAdminPassword = encrypt(generatePassword());
+		const umamiAdminPassword = encrypt(generatePassword({}));
 		const postgresqlUser = cuid();
-		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlPassword = encrypt(generatePassword({}));
 		const postgresqlDatabase = 'umami';
-		const hashSalt = encrypt(generatePassword(64));
+		const hashSalt = encrypt(generatePassword({ length: 64 }));
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1527,9 +1619,9 @@ export async function configureServiceType({
 		});
 	} else if (type === 'hasura') {
 		const postgresqlUser = cuid();
-		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlPassword = encrypt(generatePassword({}));
 		const postgresqlDatabase = 'hasura';
-		const graphQLAdminPassword = encrypt(generatePassword());
+		const graphQLAdminPassword = encrypt(generatePassword({}));
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1546,9 +1638,9 @@ export async function configureServiceType({
 		});
 	} else if (type === 'fider') {
 		const postgresqlUser = cuid();
-		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlPassword = encrypt(generatePassword({}));
 		const postgresqlDatabase = 'fider';
-		const jwtSecret = encrypt(generatePassword(64, true));
+		const jwtSecret = encrypt(generatePassword({ length: 64, symbols: true }));
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1565,13 +1657,13 @@ export async function configureServiceType({
 		});
 	} else if (type === 'moodle') {
 		const defaultUsername = cuid();
-		const defaultPassword = encrypt(generatePassword());
+		const defaultPassword = encrypt(generatePassword({}));
 		const defaultEmail = `${cuid()} @example.com`;
 		const mariadbUser = cuid();
-		const mariadbPassword = encrypt(generatePassword());
+		const mariadbPassword = encrypt(generatePassword({}));
 		const mariadbDatabase = 'moodle_db';
 		const mariadbRootUser = cuid();
-		const mariadbRootUserPassword = encrypt(generatePassword());
+		const mariadbRootUserPassword = encrypt(generatePassword({}));
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1591,15 +1683,15 @@ export async function configureServiceType({
 			}
 		});
 	} else if (type === 'appwrite') {
-		const opensslKeyV1 = encrypt(generatePassword());
-		const executorSecret = encrypt(generatePassword());
-		const redisPassword = encrypt(generatePassword());
+		const opensslKeyV1 = encrypt(generatePassword({}));
+		const executorSecret = encrypt(generatePassword({}));
+		const redisPassword = encrypt(generatePassword({}));
 		const mariadbHost = `${id}-mariadb`
 		const mariadbUser = cuid();
-		const mariadbPassword = encrypt(generatePassword());
+		const mariadbPassword = encrypt(generatePassword({}));
 		const mariadbDatabase = 'appwrite';
 		const mariadbRootUser = cuid();
-		const mariadbRootUserPassword = encrypt(generatePassword());
+		const mariadbRootUserPassword = encrypt(generatePassword({}));
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1622,11 +1714,11 @@ export async function configureServiceType({
 	} else if (type === 'glitchTip') {
 		const defaultUsername = cuid();
 		const defaultEmail = `${defaultUsername}@example.com`;
-		const defaultPassword = encrypt(generatePassword());
+		const defaultPassword = encrypt(generatePassword({}));
 		const postgresqlUser = cuid();
-		const postgresqlPassword = encrypt(generatePassword());
+		const postgresqlPassword = encrypt(generatePassword({}));
 		const postgresqlDatabase = 'glitchTip';
-		const secretKeyBase = encrypt(generatePassword(64));
+		const secretKeyBase = encrypt(generatePassword({ length: 64 }));
 
 		await prisma.service.update({
 			where: { id },
@@ -1645,7 +1737,22 @@ export async function configureServiceType({
 				}
 			}
 		});
-	 } else {
+	} else if (type === 'searxng') {
+		const secretKey = encrypt(generatePassword({ length: 32, isHex: true }))
+		const redisPassword = encrypt(generatePassword({}));
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				searxng: {
+					create: {
+						secretKey,
+						redisPassword,
+					}
+				}
+			}
+		});
+	} else {
 		await prisma.service.update({
 			where: { id },
 			data: {
@@ -1670,6 +1777,7 @@ export async function removeService({ id }: { id: string }): Promise<void> {
 	await prisma.glitchTip.deleteMany({ where: { serviceId: id } });
 	await prisma.moodle.deleteMany({ where: { serviceId: id } });
 	await prisma.appwrite.deleteMany({ where: { serviceId: id } });
+	await prisma.searxng.deleteMany({ where: { serviceId: id } });
 	await prisma.service.delete({ where: { id } });
 }
 
@@ -1769,11 +1877,11 @@ export async function stopBuild(buildId, applicationId) {
 					clearInterval(interval);
 					return resolve();
 				}
-				if (count > 100) {
+				if (count > 50) {
 					clearInterval(interval);
 					return reject(new Error('Build canceled'));
 				}
-				const { stdout: buildContainers } = await executeDockerCmd({ dockerId, command: `docker container ls--filter "label=coolify.buildId=${buildId}" --format '{{json .}}'` })
+				const { stdout: buildContainers } = await executeDockerCmd({ dockerId, command: `docker container ls --filter "label=coolify.buildId=${buildId}" --format '{{json .}}'` })
 				if (buildContainers) {
 					const containersArray = buildContainers.trim().split('\n');
 					for (const container of containersArray) {
@@ -1781,14 +1889,15 @@ export async function stopBuild(buildId, applicationId) {
 						const id = containerObj.ID;
 						if (!containerObj.Names.startsWith(`${applicationId} `)) {
 							await removeContainer({ id, dockerId });
-							await cleanupDB(buildId);
 							clearInterval(interval);
 							return resolve();
 						}
 					}
 				}
 				count++;
-			} catch (error) { }
+			} catch (error) { } finally {
+				await cleanupDB(buildId);
+			}
 		}, 100);
 	});
 }

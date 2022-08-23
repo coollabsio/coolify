@@ -583,6 +583,9 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         if (type === 'glitchTip') {
             return await startGlitchTipService(request)
         }
+        if (type === 'searxng') {
+            return await startSearXNGService(request)
+        }
         throw `Service type ${type} not supported.`
     } catch (error) {
         throw { status: 500, message: error?.message || error }
@@ -591,56 +594,6 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
 export async function stopService(request: FastifyRequest<ServiceStartStop>) {
     try {
         return await stopServiceContainers(request)
-        // const { type } = request.params
-        // if (type === 'plausibleanalytics') {
-        //     return await stopPlausibleAnalyticsService(request)
-        // }
-        // if (type === 'nocodb') {
-        //     return await stopNocodbService(request)
-        // }
-        // if (type === 'minio') {
-        //     return await stopMinioService(request)
-        // }
-        // if (type === 'vscodeserver') {
-        //     return await stopVscodeService(request)
-        // }
-        // if (type === 'wordpress') {
-        //     return await stopWordpressService(request)
-        // }
-        // if (type === 'vaultwarden') {
-        //     return await stopVaultwardenService(request)
-        // }
-        // if (type === 'languagetool') {
-        //     return await stopLanguageToolService(request)
-        // }
-        // if (type === 'n8n') {
-        //     return await stopN8nService(request)
-        // }
-        // if (type === 'uptimekuma') {
-        //     return await stopUptimekumaService(request)
-        // }
-        // if (type === 'ghost') {
-        //     return await stopGhostService(request)
-        // }
-        // if (type === 'meilisearch') {
-        //     return await stopMeilisearchService(request)
-        // }
-        // if (type === 'umami') {
-        //     return await stopUmamiService(request)
-        // }
-        // if (type === 'hasura') {
-        //     return await stopHasuraService(request)
-        // }
-        // if (type === 'fider') {
-        //     return await stopFiderService(request)
-        // }
-        // if (type === 'moodle') {
-        //     return await stopMoodleService(request)
-        // }
-        // if (type === 'glitchTip') {
-        //     return await stopGlitchTipService(request)
-        // }
-        // throw `Service type ${type} not supported.`
     } catch (error) {
         throw { status: 500, message: error?.message || error }
     }
@@ -2415,6 +2368,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
 }
 async function startServiceContainers(dockerId, composeFileDestination) {
     await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} pull` })
+    await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} build --no-cache` })
     await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} create` })
     await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} start` })
     await asyncSleep(1000);
@@ -2662,37 +2616,19 @@ async function startGlitchTipService(request: FastifyRequest<ServiceStartStop>) 
                     container_name: id,
                     image: config.glitchTip.image,
                     environment: config.glitchTip.environmentVariables,
-                    networks: [network],
                     volumes,
-                    restart: 'always',
                     labels: makeLabelForServices('glitchTip'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    },
-                    depends_on: [`${id}-postgresql`, `${id}-redis`]
+                    depends_on: [`${id}-postgresql`, `${id}-redis`],
+                    ...defaultComposeConfiguration(network),
                 },
                 [`${id}-worker`]: {
                     container_name: `${id}-worker`,
                     image: config.glitchTip.image,
                     command: './bin/run-celery-with-beat.sh',
                     environment: config.glitchTip.environmentVariables,
-                    networks: [network],
-                    restart: 'always',
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    },
-                    depends_on: [`${id}-postgresql`, `${id}-redis`]
+                    depends_on: [`${id}-postgresql`, `${id}-redis`],
+                    ...defaultComposeConfiguration(network),
                 },
                 [`${id}-setup`]: {
                     container_name: `${id}-setup`,
@@ -2707,32 +2643,14 @@ async function startGlitchTipService(request: FastifyRequest<ServiceStartStop>) 
                     image: config.postgresql.image,
                     container_name: `${id}-postgresql`,
                     environment: config.postgresql.environmentVariables,
-                    networks: [network],
                     volumes: [config.postgresql.volume],
-                    restart: 'always',
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultComposeConfiguration(network),
                 },
                 [`${id}-redis`]: {
                     image: config.redis.image,
                     container_name: `${id}-redis`,
-                    networks: [network],
                     volumes: [config.redis.volume],
-                    restart: 'always',
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    }
+                    ...defaultComposeConfiguration(network),
                 }
             },
             networks: {
@@ -2761,54 +2679,93 @@ async function startGlitchTipService(request: FastifyRequest<ServiceStartStop>) 
         return errorHandler({ status, message })
     }
 }
-async function stopGlitchTipService(request: FastifyRequest<ServiceStartStop>) {
+
+async function startSearXNGService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const { destinationDockerId, destinationDocker } = service;
-        if (destinationDockerId) {
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: id });
-                if (found) {
-                    await removeContainer({ id, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
+        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort, persistentStorage, fqdn, searxng: { secretKey, redisPassword } } =
+            service;
+        const network = destinationDockerId && destinationDocker.network;
+        const port = getServiceMainPort('searxng');
+
+        const { workdir } = await createDirectories({ repository: type, buildId: id });
+        const image = getServiceImage(type);
+
+        const config = {
+            searxng: {
+                image: `${image}:${version}`,
+                volume: `${id}-searxng:/etc/searxng`,
+                environmentVariables: {
+                    SEARXNG_BASE_URL: `${fqdn}`
+                },
+            },
+            redis: {
+                image: 'redis:7-alpine',
             }
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-worker` });
-                if (found) {
-                    await removeContainer({ id: `${id}-worker`, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-setup` });
-                if (found) {
-                    await removeContainer({ id: `${id}-setup`, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-postgresql` });
-                if (found) {
-                    await removeContainer({ id: `${id}-postgresql`, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-            try {
-                const found = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-redis` });
-                if (found) {
-                    await removeContainer({ id: `${id}-redis`, dockerId: destinationDocker.id });
-                }
-            } catch (error) {
-                console.error(error);
-            }
+        };
+
+        const settingsYml = `
+        # see https://docs.searxng.org/admin/engines/settings.html#use-default-settings
+        use_default_settings: true
+        server:
+          secret_key: ${secretKey}
+          limiter: true
+          image_proxy: true
+        ui:
+          static_use_hash: true
+        redis:
+          url: redis://:${redisPassword}@${id}-redis:6379/0`
+
+        const Dockerfile = `
+        FROM ${config.searxng.image}
+        COPY ./settings.yml /etc/searxng/settings.yml`;
+
+        if (serviceSecret.length > 0) {
+            serviceSecret.forEach((secret) => {
+                config.searxng.environmentVariables[secret.name] = secret.value;
+            });
         }
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
+        const composeFile: ComposeFile = {
+            version: '3.8',
+            services: {
+                [id]: {
+                    build: workdir,
+                    container_name: id,
+                    volumes,
+                    environment: config.searxng.environmentVariables,
+                    ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                    labels: makeLabelForServices('searxng'),
+                    cap_drop: ['ALL'],
+                    cap_add: ['CHOWN', 'SETGID', 'SETUID', 'DAC_OVERRIDE'],
+                    depends_on: [`${id}-redis`],
+                    ...defaultComposeConfiguration(network),
+                },
+                [`${id}-redis`]: {
+                    container_name: `${id}-redis`,
+                    image: config.redis.image,
+                    command: `redis-server --requirepass ${redisPassword} --save "" --appendonly "no"`,
+                    labels: makeLabelForServices('searxng'),
+                    cap_drop: ['ALL'],
+                    cap_add: ['SETGID', 'SETUID', 'DAC_OVERRIDE'],
+                    ...defaultComposeConfiguration(network),
+                },
+            },
+            networks: {
+                [network]: {
+                    external: true
+                }
+            },
+            volumes: volumeMounts
+        };
+        const composeFileDestination = `${workdir}/docker-compose.yaml`;
+        await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
+        await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile);
+        await fs.writeFile(`${workdir}/settings.yml`, settingsYml);
+
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -2865,7 +2822,7 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
     const publicPort = await getFreePublicPort(id, dockerId);
 
     let ftpUser = cuid();
-    let ftpPassword = generatePassword();
+    let ftpPassword = generatePassword({});
 
     const hostkeyDir = isDev ? '/tmp/hostkeys' : '/app/ssl/hostkeys';
     try {

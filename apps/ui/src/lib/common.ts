@@ -181,6 +181,17 @@ export const supportedServiceTypesAndVersions = [
 			main: 8000
 		}
 	},
+	{
+		name: 'searxng',
+		fancyName: 'SearXNG',
+		baseImage: 'searxng/searxng',
+		images: ['redis:6.2-alpine'],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8080
+		}
+	},
 ];
 
 export const asyncSleep = (delay: number) =>

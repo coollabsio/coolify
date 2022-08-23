@@ -327,23 +327,23 @@ model Service {
   createdAt           DateTime                   @default(now())
   updatedAt           DateTime                   @updatedAt
   destinationDocker   DestinationDocker?         @relation(fields: [destinationDockerId], references: [id])
-
-  fider               Fider?
-  ghost               Ghost?
-  glitchTip           GlitchTip?
-  hasura              Hasura?
-  meiliSearch         MeiliSearch?
-  minio               Minio?
-  moodle              Moodle?
-  plausibleAnalytics  PlausibleAnalytics?
   persistentStorage   ServicePersistentStorage[]
   serviceSecret       ServiceSecret[]
-  umami               Umami?
-  vscodeserver        Vscodeserver?
-  wordpress           Wordpress?
-  appwrite            Appwrite?
+  teams               Team[]
 
-  teams Team[]
+  fider              Fider?
+  ghost              Ghost?
+  glitchTip          GlitchTip?
+  hasura             Hasura?
+  meiliSearch        MeiliSearch?
+  minio              Minio?
+  moodle             Moodle?
+  plausibleAnalytics PlausibleAnalytics?
+  umami              Umami?
+  vscodeserver       Vscodeserver?
+  wordpress          Wordpress?
+  appwrite           Appwrite?
+  searxng            Searxng?
 }
 
 model PlausibleAnalytics {
@@ -544,4 +544,14 @@ model GlitchTip {
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
   service                    Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Searxng {
+  id            String   @id @default(cuid())
+  secretKey     String
+  redisPassword String
+  serviceId     String   @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  service       Service  @relation(fields: [serviceId], references: [id])
 }

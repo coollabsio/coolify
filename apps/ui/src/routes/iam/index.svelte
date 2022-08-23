@@ -212,6 +212,7 @@
 						<div class="flex items-center justify-center pt-3">
 							<button
 								on:click|preventDefault={() => switchTeam(team.id)}
+								class="btn btn-sm"
 								class:bg-fuchsia-600={$appSession.teamId !== team.id}
 								class:hover:bg-fuchsia-500={$appSession.teamId !== team.id}
 								class:bg-transparent={$appSession.teamId === team.id}

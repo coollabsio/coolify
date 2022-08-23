@@ -239,8 +239,8 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             exposePort = Number(exposePort);
         }
 
-        const { destinationDockerId } = await prisma.application.findUnique({ where: { id } })
-        if (exposePort) await checkExposedPort({ id, exposePort, dockerId: destinationDockerId })
+        const { destinationDocker: { id: dockerId, remoteIpAddress } } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
+        if (exposePort) await checkExposedPort({ id, exposePort, dockerId, remoteIpAddress })
         if (denoOptions) denoOptions = denoOptions.trim();
         const defaultConfiguration = await setDefaultConfiguration({
             buildPack,

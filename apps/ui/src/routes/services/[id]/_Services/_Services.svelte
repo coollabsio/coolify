@@ -29,6 +29,7 @@
 	import Wordpress from './_Wordpress.svelte';
 	import Appwrite from './_Appwrite.svelte';
 	import Moodle from './_Moodle.svelte';
+	import Searxng from './_Searxng.svelte';
 
 	const { id } = $page.params;
 	$: isDisabled =
@@ -402,6 +403,8 @@
 				<Moodle bind:service {readOnly} />
 			{:else if service.type === 'glitchTip'}
 				<GlitchTip bind:service />
+			{:else if service.type === 'searxng'}
+				<Searxng bind:service />
 			{/if}
 		</div>
 	</form>

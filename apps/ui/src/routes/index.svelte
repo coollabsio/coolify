@@ -93,11 +93,13 @@
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">{$t('index.dashboard')}</div>
-	<button on:click={manuallyCleanupStorage} class:loading={loading.cleanup} class="btn btn-sm"
-		>Cleanup Storage</button
-	>
+	{#if $appSession.teamId === '0'}
+		<button on:click={manuallyCleanupStorage} class:loading={loading.cleanup} class="btn btn-sm"
+			>Cleanup Storage</button
+		>
+	{/if}
 </div>
-<div class="mt-10 pb-12 tracking-tight sm:pb-16">
+<div class="mt-10 pb-12 sm:pb-16">
 	<div class="mx-auto px-10">
 		<div class="flex flex-col justify-center xl:flex-row">
 			{#if applications.length > 0}
@@ -341,6 +343,8 @@
 						</table>
 					</div>
 				</div>
+			{:else}
+				<div class="text-center text-xl font-bold">Nothing is configured yet.</div>
 			{/if}
 			{#if $appSession.teamId === '0'}
 				<Usage />
