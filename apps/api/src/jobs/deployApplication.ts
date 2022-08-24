@@ -334,8 +334,8 @@ import * as buildpacks from '../lib/buildPacks';
 								await saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
 							} catch (error) {
 								await saveBuildLog({ line: error, buildId, applicationId });
-								await prisma.build.update({
-									where: { id: message.build_id },
+								await prisma.build.updateMany({
+									where: { id: message.build_id, status: { in: ['queued', 'running'] } },
 									data: { status: 'failed' }
 								});
 								throw new Error(error);
@@ -350,8 +350,8 @@ import * as buildpacks from '../lib/buildPacks';
 
 					}
 					catch (error) {
-						await prisma.build.update({
-							where: { id: message.build_id },
+						await prisma.build.updateMany({
+							where: { id: message.build_id, status: { in: ['queued', 'running'] } },
 							data: { status: 'failed' }
 						});
 						await saveBuildLog({ line: error, buildId, applicationId });

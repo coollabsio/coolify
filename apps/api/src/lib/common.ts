@@ -1874,11 +1874,11 @@ export async function stopBuild(buildId, applicationId) {
 		const { engine, id: dockerId } = await prisma.destinationDocker.findFirst({ where: { id: destinationDockerId } });
 		const interval = setInterval(async () => {
 			try {
-				if (status === 'failed') {
+				if (status === 'failed' || status === 'canceled') {
 					clearInterval(interval);
 					return resolve();
 				}
-				if (count > 50) {
+				if (count > 15) {
 					clearInterval(interval);
 					if (scheduler.workers.has('deployApplication')) {
 						scheduler.workers.get('deployApplication').postMessage("action:flushQueue")
@@ -1894,8 +1894,11 @@ export async function stopBuild(buildId, applicationId) {
 						const id = containerObj.ID;
 						if (!containerObj.Names.startsWith(`${applicationId} `)) {
 							await removeContainer({ id, dockerId });
-
 							clearInterval(interval);
+							if (scheduler.workers.has('deployApplication')) {
+								scheduler.workers.get('deployApplication').postMessage("action:flushQueue")
+							}
+							await cleanupDB(buildId);
 							return resolve();
 						}
 					}
@@ -1909,7 +1912,7 @@ export async function stopBuild(buildId, applicationId) {
 async function cleanupDB(buildId: string) {
 	const data = await prisma.build.findUnique({ where: { id: buildId } });
 	if (data?.status === 'queued' || data?.status === 'running') {
-		await prisma.build.update({ where: { id: buildId }, data: { status: 'failed' } });
+		await prisma.build.update({ where: { id: buildId }, data: { status: 'canceled' } });
 	}
 }
 
