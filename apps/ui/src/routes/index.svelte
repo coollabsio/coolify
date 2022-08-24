@@ -343,7 +343,7 @@
 						</table>
 					</div>
 				</div>
-			{:else}
+			{:else if $appSession.teamId !== '0'}
 				<div class="text-center text-xl font-bold">Nothing is configured yet.</div>
 			{/if}
 			{#if $appSession.teamId === '0'}

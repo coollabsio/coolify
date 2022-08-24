@@ -194,12 +194,13 @@
 						</div>
 					</a>
 					<div class="flex items-center justify-center">
-						<button class="bg-coollabs hover:bg-coollabs-100" on:click={() => redeploy(container)}
+						<button class="btn btn-sm bg-coollabs hover:bg-coollabs-100" on:click={() => redeploy(container)}
 							>{$t('application.preview.redeploy')}</button
 						>
 					</div>
 					<div class="flex items-center justify-center">
 						<button
+							class="btn btn-sm"
 							class:bg-red-600={!loading.removing}
 							class:hover:bg-red-500={!loading.removing}
 							disabled={loading.removing}

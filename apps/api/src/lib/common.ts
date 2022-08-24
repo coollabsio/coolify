@@ -17,8 +17,9 @@ import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import * as serviceFields from './serviceFields'
 import { saveBuildLog } from './buildPacks/common';
+import { scheduler } from './scheduler';
 
-export const version = '3.8.0';
+export const version = '3.8.1';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -1873,12 +1874,16 @@ export async function stopBuild(buildId, applicationId) {
 		const { engine, id: dockerId } = await prisma.destinationDocker.findFirst({ where: { id: destinationDockerId } });
 		const interval = setInterval(async () => {
 			try {
-				if (status === 'failed') {
+				if (status === 'failed' || status === 'canceled') {
 					clearInterval(interval);
 					return resolve();
 				}
-				if (count > 50) {
+				if (count > 15) {
 					clearInterval(interval);
+					if (scheduler.workers.has('deployApplication')) {
+						scheduler.workers.get('deployApplication').postMessage("action:flushQueue")
+					}
+					await cleanupDB(buildId);
 					return reject(new Error('Build canceled'));
 				}
 				const { stdout: buildContainers } = await executeDockerCmd({ dockerId, command: `docker container ls --filter "label=coolify.buildId=${buildId}" --format '{{json .}}'` })
@@ -1890,14 +1895,16 @@ export async function stopBuild(buildId, applicationId) {
 						if (!containerObj.Names.startsWith(`${applicationId} `)) {
 							await removeContainer({ id, dockerId });
 							clearInterval(interval);
+							if (scheduler.workers.has('deployApplication')) {
+								scheduler.workers.get('deployApplication').postMessage("action:flushQueue")
+							}
+							await cleanupDB(buildId);
 							return resolve();
 						}
 					}
 				}
 				count++;
-			} catch (error) { } finally {
-				await cleanupDB(buildId);
-			}
+			} catch (error) { }
 		}, 100);
 	});
 }
@@ -1905,7 +1912,7 @@ export async function stopBuild(buildId, applicationId) {
 async function cleanupDB(buildId: string) {
 	const data = await prisma.build.findUnique({ where: { id: buildId } });
 	if (data?.status === 'queued' || data?.status === 'running') {
-		await prisma.build.update({ where: { id: buildId }, data: { status: 'failed' } });
+		await prisma.build.update({ where: { id: buildId }, data: { status: 'canceled' } });
 	}
 }
 
@@ -1914,10 +1921,7 @@ export function convertTolOldVolumeNames(type) {
 		return 'nc'
 	}
 }
-// export async function getAvailableServices(): Promise<any> {
-// 	const { data } = await axios.get(`https://gist.githubusercontent.com/andrasbacsai/4aac36d8d6214dbfc34fa78110554a50/raw/5b27e6c37d78aaeedc1148d797112c827a2f43cf/availableServices.json`)
-// 	return data
-//
+
 export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 	// Cleanup old coolify images
 	try {
