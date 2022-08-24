@@ -15,7 +15,6 @@ const options: any = {
 			if (message.pending === 0 && message.size === 0) {
 				if (message.caller === 'autoUpdater') {
 					if (!scheduler.workers.has('autoUpdater')) {
-						await scheduler.stop('deployApplication');
 						await scheduler.run('autoUpdater')
 					}
 				}
