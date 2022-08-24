@@ -19,7 +19,7 @@ import * as serviceFields from './serviceFields'
 import { saveBuildLog } from './buildPacks/common';
 import { scheduler } from './scheduler';
 
-export const version = '3.8.1';
+export const version = '3.8.2';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
