@@ -28,6 +28,10 @@ import * as buildpacks from '../lib/buildPacks';
 					parentPort.postMessage({ size: queue.size, pending: queue.pending, caller: 'cleanupStorage' });
 					return;
 				}
+				if (message === 'action:flushQueue') {
+					queue.clear()
+					return;
+				}
 
 				await queue.add(async () => {
 					const {

@@ -2,7 +2,8 @@ import Bree from 'bree';
 import path from 'path';
 import Cabin from 'cabin';
 import TSBree from '@breejs/ts-worker';
-import { isDev } from './common';
+
+export const isDev = process.env.NODE_ENV === 'development';
 
 Bree.extend(TSBree);
 
