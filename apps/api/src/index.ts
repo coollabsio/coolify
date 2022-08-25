@@ -108,11 +108,11 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 	// await scheduler.start('cleanupPrismaEngines');
 	// await scheduler.start('checkProxies');
 
-	setInterval(async () => {
-		if (!scheduler.workers.has('test')) {
-			scheduler.run('test');
-		}
-	}, 2000)
+	// setInterval(async () => {
+	// 	if (!scheduler.workers.has('test')) {
+	// 		scheduler.run('test');
+	// 	}
+	// }, 2000)
 	// setInterval(async () => {
 	// 	if (!scheduler.workers.has('deployApplication')) {
 	// 		scheduler.run('deployApplication');
