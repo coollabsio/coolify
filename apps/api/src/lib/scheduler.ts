@@ -18,6 +18,7 @@ const options: any = {
 		}
 	},
 	jobs: [
+		{ name: 'test' },
 		{
 			name: 'deployApplication',
 		},
