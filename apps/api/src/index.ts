@@ -107,11 +107,11 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 	await scheduler.start('cleanupPrismaEngines');
 	await scheduler.start('checkProxies');
 
-	// setInterval(async () => {
-	// 	if (!scheduler.workers.has('deployApplication')) {
-	// 		scheduler.run('deployApplication');
-	// 	}
-	// }, 2000)
+	setInterval(async () => {
+		if (!scheduler.workers.has('deployApplication')) {
+			scheduler.run('deployApplication');
+		}
+	}, 2000)
 
 	// Check for update & if no build is running
 	setInterval(async () => {
