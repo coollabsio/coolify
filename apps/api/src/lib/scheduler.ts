@@ -18,7 +18,6 @@ const options: any = {
 		}
 	},
 	jobs: [
-		{ name: 'test',interval: '2s' },
 		{
 			name: 'deployApplication',
 		},

@@ -104,7 +104,6 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 	}
 	console.log(`Coolify's API is listening on ${host}:${port}`);
 	await initServer();
-	await scheduler.start('test');
 	// await scheduler.start('cleanupPrismaEngines');
 	// await scheduler.start('checkProxies');
 
