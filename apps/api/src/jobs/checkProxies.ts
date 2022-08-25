@@ -74,6 +74,7 @@ import { checkContainer } from '../lib/docker';
         } catch (error) {
 
         } finally {
+            await prisma.$disconnect();
         }
 
     } else process.exit(0);
