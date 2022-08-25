@@ -9,27 +9,17 @@ Bree.extend(TSBree);
 
 const options: any = {
 	defaultExtension: 'js',
-	logger: false,
+	logger: new Cabin(),
 	workerMessageHandler: async ({ name, message }) => {
-		if (name === 'deployApplication') {
-			if (message.pending === 0 && message.size === 0) {
-				if (message.caller === 'autoUpdater') {
-					if (!scheduler.workers.has('autoUpdater')) {
-						await scheduler.run('autoUpdater')
-					}
-				}
-				if (message.caller === 'cleanupStorage') {
-					if (!scheduler.workers.has('cleanupStorage')) {
-						await scheduler.run('cleanupStorage')
-					}
-				}
-
+		if (name === 'deployApplication' && message?.deploying) {
+			if (scheduler.workers.has('autoUpdater') || scheduler.workers.has('cleanupStorage')) {
+				scheduler.workers.get('deployApplication').postMessage('cancel')
 			}
 		}
 	},
 	jobs: [
 		{
-			name: 'deployApplication'
+			name: 'deployApplication',
 		},
 		{
 			name: 'cleanupStorage',

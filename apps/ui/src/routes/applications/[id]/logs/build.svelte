@@ -178,7 +178,7 @@
 		{#if !noMoreBuilds}
 			{#if buildCount > 5}
 				<div class="flex space-x-2">
-					<button disabled={noMoreBuilds} class="w-full" on:click={loadMoreBuilds}
+					<button disabled={noMoreBuilds} class=" btn btn-sm w-full" on:click={loadMoreBuilds}
 						>{$t('application.build.load_more')}</button
 					>
 				</div>

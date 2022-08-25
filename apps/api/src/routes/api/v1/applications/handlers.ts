@@ -75,7 +75,6 @@ export async function getApplicationStatus(request: FastifyRequest<OnlyId>) {
             isExited = await isContainerExited(application.destinationDocker.id, id);
         }
         return {
-            isQueueActive: scheduler.workers.has('deployApplication'),
             isRunning,
             isExited,
         };
@@ -453,6 +452,8 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
                     id: buildId,
                     applicationId: id,
                     branch: application.branch,
+                    pullmergeRequestId,
+                    forceRebuild,
                     destinationDockerId: application.destinationDocker?.id,
                     gitSourceId: application.gitSource?.id,
                     githubAppId: application.gitSource?.githubApp?.id,
@@ -461,24 +462,6 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
                     type: 'manual'
                 }
             });
-            if (pullmergeRequestId) {
-                scheduler.workers.get('deployApplication').postMessage({
-                    build_id: buildId,
-                    type: 'manual',
-                    ...application,
-                    sourceBranch: branch,
-                    pullmergeRequestId,
-                    forceRebuild
-                });
-            } else {
-                scheduler.workers.get('deployApplication').postMessage({
-                    build_id: buildId,
-                    type: 'manual',
-                    ...application,
-                    forceRebuild
-                });
-
-            }
             return {
                 buildId
             };

@@ -93,7 +93,6 @@ export const asyncExecShellStream = async ({ debug, buildId, applicationId, comm
 		const { execaCommand } = await import('execa')
 		const subprocess = execaCommand(command, { env: { DOCKER_BUILDKIT: "1", DOCKER_HOST: engine } })
 		if (debug) {
-			await saveBuildLog({ line: `=========================`, buildId, applicationId });
 			subprocess.stdout.on('data', async (data) => {
 				const stdout = data.toString();
 				const array = stdout.split('\n')
@@ -123,7 +122,6 @@ export const asyncExecShellStream = async ({ debug, buildId, applicationId, comm
 		}
 		subprocess.on('exit', async (code) => {
 			await asyncSleep(1000);
-			await saveBuildLog({ line: `=========================`, buildId, applicationId });
 			if (code === 0) {
 				resolve(code)
 			} else {
@@ -1871,7 +1869,7 @@ export async function stopBuild(buildId, applicationId) {
 	let count = 0;
 	await new Promise<void>(async (resolve, reject) => {
 		const { destinationDockerId, status } = await prisma.build.findFirst({ where: { id: buildId } });
-		const { engine, id: dockerId } = await prisma.destinationDocker.findFirst({ where: { id: destinationDockerId } });
+		const { id: dockerId } = await prisma.destinationDocker.findFirst({ where: { id: destinationDockerId } });
 		const interval = setInterval(async () => {
 			try {
 				if (status === 'failed' || status === 'canceled') {
@@ -1881,10 +1879,10 @@ export async function stopBuild(buildId, applicationId) {
 				if (count > 15) {
 					clearInterval(interval);
 					if (scheduler.workers.has('deployApplication')) {
-						scheduler.workers.get('deployApplication').postMessage("action:flushQueue")
+						scheduler.workers.get('deployApplication').postMessage('cancel')
 					}
-					await cleanupDB(buildId);
-					return reject(new Error('Build canceled'));
+					await cleanupDB(buildId, applicationId);
+					return reject(new Error('Deployment canceled.'));
 				}
 				const { stdout: buildContainers } = await executeDockerCmd({ dockerId, command: `docker container ls --filter "label=coolify.buildId=${buildId}" --format '{{json .}}'` })
 				if (buildContainers) {
@@ -1896,9 +1894,9 @@ export async function stopBuild(buildId, applicationId) {
 							await removeContainer({ id, dockerId });
 							clearInterval(interval);
 							if (scheduler.workers.has('deployApplication')) {
-								scheduler.workers.get('deployApplication').postMessage("action:flushQueue")
+								scheduler.workers.get('deployApplication').postMessage('cancel')
 							}
-							await cleanupDB(buildId);
+							await cleanupDB(buildId, applicationId);
 							return resolve();
 						}
 					}
@@ -1909,11 +1907,12 @@ export async function stopBuild(buildId, applicationId) {
 	});
 }
 
-async function cleanupDB(buildId: string) {
+async function cleanupDB(buildId: string, applicationId: string) {
 	const data = await prisma.build.findUnique({ where: { id: buildId } });
 	if (data?.status === 'queued' || data?.status === 'running') {
 		await prisma.build.update({ where: { id: buildId }, data: { status: 'canceled' } });
 	}
+	await saveBuildLog({ line: 'Deployment canceled.', buildId, applicationId });
 }
 
 export function convertTolOldVolumeNames(type) {

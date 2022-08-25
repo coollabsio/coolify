@@ -553,7 +553,7 @@ export async function buildImage({
 	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} ${workdir}` })
 	const { status } = await prisma.build.findUnique({ where: { id: buildId } })
 	if (status === 'canceled') {
-		throw new Error('Build canceled.')
+		throw new Error('Deployment canceled.')
 	}
 	if (isCache) {
 		await saveBuildLog({ line: `Building cache image successful.`, buildId, applicationId });
