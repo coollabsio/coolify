@@ -23,7 +23,6 @@ import { checkContainer } from '../lib/docker';
                     })
                 }
                 portReachable = await isReachable(80, { host: 'localhost' })
-                console.log({ port: 80, portReachable })
                 if (!portReachable) {
                     await startTraefikProxy(localDocker.id);
                 }
@@ -49,7 +48,6 @@ import { checkContainer } from '../lib/docker';
                         })
                     }
                     portReachable = await isReachable(publicPort, { host: destinationDocker.remoteIpAddress || 'localhost' })
-                    console.log({ publicPort, portReachable })
                     if (!portReachable) {
                         await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
                     }
@@ -72,7 +70,6 @@ import { checkContainer } from '../lib/docker';
                         })
                     }
                     portReachable = await isReachable(ftpPublicPort, { host: destinationDocker.remoteIpAddress || 'localhost' })
-                    console.log({ ftpPublicPort, portReachable })
                     if (!portReachable) {
                         await startTraefikTCPProxy(destinationDocker, id, ftpPublicPort, 22, 'wordpressftp');
                     }
@@ -97,7 +94,6 @@ import { checkContainer } from '../lib/docker';
                         })
                     }
                     portReachable = await isReachable(publicPort, { host: destinationDocker.remoteIpAddress || 'localhost' })
-                    console.log({ publicPort, portReachable })
                     if (!portReachable) {
                         await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
                     }
