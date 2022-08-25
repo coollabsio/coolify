@@ -7,7 +7,7 @@ import { checkContainer } from '../lib/docker';
         try {
             const { default: isReachable } = await import('is-port-reachable');
             let portReachable;
-            const { arch } = await listSettings();
+            const { arch, ipv4, ipv6 } = await listSettings();
             // Coolify Proxy local
             const engine = '/var/run/docker.sock';
             const localDocker = await prisma.destinationDocker.findFirst({
@@ -22,7 +22,7 @@ import { checkContainer } from '../lib/docker';
                         command: `docker stop -t 0 coolify-haproxy && docker rm coolify-haproxy`
                     })
                 }
-                portReachable = await isReachable(80, { host: 'localhost' })
+                portReachable = await isReachable(80, { host: ipv4 || ipv6 })
                 if (!portReachable) {
                     await startTraefikProxy(localDocker.id);
                 }
@@ -47,7 +47,7 @@ import { checkContainer } from '../lib/docker';
                             command: `docker stop -t 0 haproxy-for-${publicPort} && docker rm haproxy-for-${publicPort}`
                         })
                     }
-                    portReachable = await isReachable(publicPort, { host: destinationDocker.remoteIpAddress || 'localhost' })
+                    portReachable = await isReachable(publicPort, { host: destinationDocker.remoteIpAddress || ipv4 || ipv6 })
                     if (!portReachable) {
                         await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
                     }
@@ -69,7 +69,7 @@ import { checkContainer } from '../lib/docker';
                             command: `docker stop -t 0 haproxy -for-${ftpPublicPort} && docker rm haproxy-for-${ftpPublicPort}`
                         })
                     }
-                    portReachable = await isReachable(ftpPublicPort, { host: destinationDocker.remoteIpAddress || 'localhost' })
+                    portReachable = await isReachable(ftpPublicPort, { host: destinationDocker.remoteIpAddress || ipv4 || ipv6 })
                     if (!portReachable) {
                         await startTraefikTCPProxy(destinationDocker, id, ftpPublicPort, 22, 'wordpressftp');
                     }
@@ -93,7 +93,7 @@ import { checkContainer } from '../lib/docker';
                             command: `docker stop -t 0 ${id}-${publicPort} && docker rm ${id}-${publicPort} `
                         })
                     }
-                    portReachable = await isReachable(publicPort, { host: destinationDocker.remoteIpAddress || 'localhost' })
+                    portReachable = await isReachable(publicPort, { host: destinationDocker.remoteIpAddress || ipv4 || ipv6 })
                     if (!portReachable) {
                         await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
                     }
