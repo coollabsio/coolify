@@ -104,19 +104,14 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 	}
 	console.log(`Coolify's API is listening on ${host}:${port}`);
 	await initServer();
-	// await scheduler.start('cleanupPrismaEngines');
-	// await scheduler.start('checkProxies');
+	await scheduler.start('cleanupPrismaEngines');
+	await scheduler.start('checkProxies');
 
-	// setInterval(async () => {
-	// 	if (!scheduler.workers.has('test')) {
-	// 		scheduler.run('test');
-	// 	}
-	// }, 2000)
-	// setInterval(async () => {
-	// 	if (!scheduler.workers.has('deployApplication')) {
-	// 		scheduler.run('deployApplication');
-	// 	}
-	// }, 2000)
+	setInterval(async () => {
+		if (!scheduler.workers.has('deployApplication')) {
+			scheduler.run('deployApplication');
+		}
+	}, 2000)
 
 	// Check for update & if no build is running
 	setInterval(async () => {

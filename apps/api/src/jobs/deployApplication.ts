@@ -347,14 +347,9 @@ import * as buildpacks from '../lib/buildPacks';
 						}
 					});
 				}
-
 				await pAll.default(actions, { concurrency })
 			}
-
-		} catch (error) {
-			process.exit(0);
-
-		} finally {
+		} catch (error) { } finally {
 			await prisma.$disconnect();
 			process.exit(0);
 		}
