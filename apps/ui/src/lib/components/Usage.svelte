@@ -22,9 +22,9 @@
 		usage: false,
 		cleanup: false
 	};
-	import { appSession } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
-	import { get } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	async function getStatus() {
 		if (loading.usage) return;
@@ -48,13 +48,36 @@
 			return errorNotification(error);
 		}
 	});
+	async function manuallyCleanupStorage() {
+		try {
+			loading.cleanup = true;
+			await post('/internal/cleanup', {});
+			return addToast({
+				message: 'Cleanup done.',
+				type: 'success'
+			});
+		} catch (error) {
+			return errorNotification(error);
+		} finally {
+			loading.cleanup = false;
+		}
+	}
 </script>
 
 <div class="w-full">
-	<h1 class="title text-4xl">Hardware details</h1>
+	<div class="flex items-center">
+		<h1 class="title text-4xl">Hardware Details</h1>
+		{#if $appSession.teamId === '0'}
+			<button on:click={manuallyCleanupStorage} class:loading={loading.cleanup} class="btn btn-sm"
+				>Cleanup Storage</button
+			>
+		{/if}
+	</div>
 	<div class="divider" />
 	<div class="grid grid-flow-col gap-4 grid-rows-3 lg:grid-rows-1">
-		<div class="stats stats-vertical lg:stats-horizontal shadow w-full mb-5 bg-coolgray-100 rounded">
+		<div
+			class="stats stats-vertical lg:stats-horizontal shadow w-full mb-5 bg-coolgray-200 rounded"
+		>
 			<div class="stat">
 				<div class="stat-title">Total Memory</div>
 				<div class="stat-value text-2xl">
@@ -77,7 +100,9 @@
 			</div>
 		</div>
 
-		<div class="stats stats-vertical lg:stats-horizontal shadow w-full mb-5 bg-coolgray-100 rounded">
+		<div
+			class="stats stats-vertical lg:stats-horizontal shadow w-full mb-5 bg-coolgray-200 rounded"
+		>
 			<div class="stat">
 				<div class="stat-title">Total CPUs</div>
 				<div class="stat-value text-2xl">
@@ -98,7 +123,9 @@
 			</div>
 		</div>
 
-		<div class="stats stats-vertical lg:stats-horizontal shadow w-full mb-5 bg-coolgray-100 rounded">
+		<div
+			class="stats stats-vertical lg:stats-horizontal shadow w-full mb-5 bg-coolgray-200 rounded"
+		>
 			<div class="stat">
 				<div class="stat-title">Total Disk</div>
 				<div class="stat-value text-2xl">
@@ -115,7 +142,9 @@
 
 			<div class="stat">
 				<div class="stat-title">Free Disk</div>
-				<div class="stat-value text-2xl">{usage?.disk.freePercentage}<span class="text-sm">%</span></div>
+				<div class="stat-value text-2xl">
+					{usage?.disk.freePercentage}<span class="text-sm">%</span>
+				</div>
 			</div>
 		</div>
 	</div>
