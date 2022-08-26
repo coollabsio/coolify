@@ -160,6 +160,7 @@ export async function getTeam(request: FastifyRequest<OnlyId>, reply: FastifyRep
         const invitations = await prisma.teamInvitation.findMany({ where: { teamId: team.id } });
         const { teams } = await prisma.user.findUnique({ where: { id: userId }, include: { teams: true } })
         return {
+            currentTeam: teamId,
             team,
             teams,
             permissions,
