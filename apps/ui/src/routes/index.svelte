@@ -108,14 +108,14 @@
 		<div class="divider" />
 		<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3">
 			{#each applications as application}
-				<div class="w-full rounded p-5 bg-neutral indicator mb-5">
+				<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-coolgray-300 indicator mb-5">
 					{#await getStatus(application)}
-						<span class="indicator-item badge bg-yellow-500" />
+						<span class="indicator-item badge bg-yellow-500 badge-xs" />
 					{:then status}
-						{#if status === 'Running'}1
-							<span class="indicator-item badge bg-success" />
+						{#if status === 'Running'}
+							<span class="indicator-item badge bg-success badge-xs" />
 						{:else}
-							<span class="indicator-item badge bg-error" />
+							<span class="indicator-item badge bg-error badge-xs" />
 						{/if}
 					{/await}
 					<div class="w-full flex flex-row">
@@ -129,12 +129,12 @@
 							</span>
 							<h1 class="font-bold text-lg">{application.name}</h1>
 							<div class="divider" />
-							<div class="btn-group justify-end">
+							<div class="flex justify-end space-x-2">
 								{#if application.fqdn}
-									<a href={application.fqdn} target="_blank" class="btn btn-sm">
+									<a href={application.fqdn} target="_blank" class="icons">
 										<svg
 											xmlns="http://www.w3.org/2000/svg"
-											class="h-6 w-6 mr-2"
+											class="h-6 w-6"
 											viewBox="0 0 24 24"
 											stroke-width="1.5"
 											stroke="currentColor"
@@ -147,18 +147,17 @@
 											<line x1="10" y1="14" x2="20" y2="4" />
 											<polyline points="15 4 20 4 20 9" />
 										</svg>
-										Website
 									</a>
 								{/if}
 								{#if application.settings.isBot && application.exposePort}
 									<a
 										href={`http://${dev ? 'localhost' : settings.ipv4}:${application.exposePort}`}
 										target="_blank"
-										class="btn btn-sm"
+										class="icons"
 									>
 										<svg
 											xmlns="http://www.w3.org/2000/svg"
-											class="h-6 w-6 mr-2"
+											class="h-6 w-6"
 											viewBox="0 0 24 24"
 											stroke-width="1.5"
 											stroke="currentColor"
@@ -171,13 +170,12 @@
 											<line x1="10" y1="14" x2="20" y2="4" />
 											<polyline points="15 4 20 4 20 9" />
 										</svg>
-										Server
 									</a>
 								{/if}
-								<a class="btn btn-sm btn-active" href={`/applications/${application.id}`}>
+								<a class="icons" href={`/applications/${application.id}`}>
 									<svg
 										xmlns="http://www.w3.org/2000/svg"
-										class="h-6 w-6 mr-2"
+										class="h-6 w-6"
 										viewBox="0 0 24 24"
 										stroke-width="1.5"
 										stroke="currentColor"
@@ -196,7 +194,6 @@
 										<line x1="18" y1="4" x2="18" y2="5" />
 										<line x1="18" y1="9" x2="18" y2="20" />
 									</svg>
-									Manage
 								</a>
 							</div>
 						</div>
@@ -208,14 +205,14 @@
 		<div class="divider" />
 		<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3">
 			{#each services as service}
-				<div class="w-full rounded p-5 bg-neutral indicator mb-5">
+				<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-coolgray-300 indicator mb-5">
 					{#await getStatus(service)}
-						<span class="indicator-item badge bg-yellow-500" />
+						<span class="indicator-item badge bg-yellow-500 badge-xs" />
 					{:then status}
 						{#if status === 'Running'}1
-							<span class="indicator-item badge bg-success" />
+							<span class="indicator-item badge bg-success badge-xs" />
 						{:else}
-							<span class="indicator-item badge bg-error" />
+							<span class="indicator-item badge bg-error badge-xs" />
 						{/if}
 					{/await}
 					<div class="w-full flex flex-row">
@@ -226,12 +223,12 @@
 							</span>
 							<h1 class="font-bold text-lg">{service.name}</h1>
 							<div class="divider" />
-							<div class="btn-group justify-end">
+							<div class="flex justify-end space-x-2">
 								{#if service.fqdn}
-									<a href={service.fqdn} target="_blank" class="btn btn-sm">
+									<a href={service.fqdn} target="_blank" class="icons">
 										<svg
 											xmlns="http://www.w3.org/2000/svg"
-											class="h-6 w-6 mr-2"
+											class="h-6 w-6"
 											viewBox="0 0 24 24"
 											stroke-width="1.5"
 											stroke="currentColor"
@@ -244,13 +241,12 @@
 											<line x1="10" y1="14" x2="20" y2="4" />
 											<polyline points="15 4 20 4 20 9" />
 										</svg>
-										Website
 									</a>
 								{/if}
-								<a class="btn btn-sm btn-active" href={`/services/${service.id}`}>
+								<a class="icons" href={`/services/${service.id}`}>
 									<svg
 										xmlns="http://www.w3.org/2000/svg"
-										class="h-6 w-6 mr-2"
+										class="h-6 w-6"
 										viewBox="0 0 24 24"
 										stroke-width="1.5"
 										stroke="currentColor"
@@ -269,7 +265,6 @@
 										<line x1="18" y1="4" x2="18" y2="5" />
 										<line x1="18" y1="9" x2="18" y2="20" />
 									</svg>
-									Manage
 								</a>
 							</div>
 						</div>
@@ -281,14 +276,14 @@
 		<div class="divider" />
 		<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3">
 			{#each databases as database}
-				<div class="w-full rounded p-5 bg-neutral indicator mb-5">
+				<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-coolgray-300 indicator mb-5">
 					{#await getStatus(database)}
-						<span class="indicator-item badge bg-yellow-500" />
+						<span class="indicator-item badge bg-yellow-500 badge-xs" />
 					{:then status}
 						{#if status === 'Running'}1
-							<span class="indicator-item badge bg-success" />
+							<span class="indicator-item badge bg-success badge-xs" />
 						{:else}
-							<span class="indicator-item badge bg-error" />
+							<span class="indicator-item badge bg-error badge-xs" />
 						{/if}
 					{/await}
 					<div class="w-full flex flex-row">
@@ -299,11 +294,11 @@
 							</span>
 							<h1 class="font-bold text-lg">{database.name}</h1>
 							<div class="divider" />
-							<div class="btn-group justify-end">
-								<a class="btn btn-sm btn-active" href={`/databases/${database.id}`}>
+							<div class="flex justify-end space-x-2">
+								<a class="icons" href={`/databases/${database.id}`}>
 									<svg
 										xmlns="http://www.w3.org/2000/svg"
-										class="h-6 w-6 mr-2"
+										class="h-6 w-6"
 										viewBox="0 0 24 24"
 										stroke-width="1.5"
 										stroke="currentColor"
@@ -322,7 +317,6 @@
 										<line x1="18" y1="4" x2="18" y2="5" />
 										<line x1="18" y1="9" x2="18" y2="20" />
 									</svg>
-									Manage
 								</a>
 							</div>
 						</div>
