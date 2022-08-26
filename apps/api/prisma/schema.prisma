@@ -27,6 +27,7 @@ model Setting {
   ipv4                  String?
   ipv6                  String?
   arch                  String?
+  concurrentBuilds      Int      @default(1)
 }
 
 model User {
@@ -197,6 +198,9 @@ model Build {
   githubAppId         String?
   gitlabAppId         String?
   commit              String?
+  pullmergeRequestId  String?
+  forceRebuild        Boolean  @default(false)
+  sourceBranch        String?  
   branch              String?
   status              String?  @default("queued")
   createdAt           DateTime @default(now())

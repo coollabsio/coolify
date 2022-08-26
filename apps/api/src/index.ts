@@ -5,7 +5,7 @@ import env from '@fastify/env';
 import cookie from '@fastify/cookie';
 import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
-import { asyncExecShell, isDev, listSettings, prisma, version } from './lib/common';
+import { asyncExecShell, asyncSleep, isDev, listSettings, prisma, version } from './lib/common';
 import { scheduler } from './lib/scheduler';
 import axios from 'axios';
 import compareVersions from 'compare-versions';
@@ -104,14 +104,16 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 	}
 	console.log(`Coolify's API is listening on ${host}:${port}`);
 	await initServer();
-	await scheduler.start('deployApplication');
-	await scheduler.start('cleanupStorage');
 	await scheduler.start('cleanupPrismaEngines');
 	await scheduler.start('checkProxies');
 
-	// Check if no build is running
+	setInterval(async () => {
+		if (!scheduler.workers.has('deployApplication')) {
+			scheduler.run('deployApplication');
+		}
+	}, 2000)
 
-	// Check for update
+	// Check for update & if no build is running
 	setInterval(async () => {
 		const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
 		if (isAutoUpdateEnabled) {
@@ -128,8 +130,8 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 			const latestVersion = versions['coolify'].main.version;
 			const isUpdateAvailable = compareVersions(latestVersion, currentVersion);
 			if (isUpdateAvailable === 1) {
-				if (scheduler.workers.has('deployApplication')) {
-					scheduler.workers.get('deployApplication').postMessage("status:autoUpdater");
+				if (!scheduler.workers.has('deployApplication')) {
+					await scheduler.run('autoUpdater')
 				}
 			}
 		}
@@ -137,16 +139,11 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 
 	// Cleanup storage
 	setInterval(async () => {
-		if (scheduler.workers.has('deployApplication')) {
-			scheduler.workers.get('deployApplication').postMessage("status:cleanupStorage");
+		if (!scheduler.workers.has('deployApplication') && !scheduler.workers.has('cleanupStorage')) {
+			await scheduler.run('cleanupStorage')
 		}
 	}, isDev ? 5000 : 60000 * 10)
 
-	scheduler.on('worker deleted', async (name) => {
-		if (name === 'autoUpdater' || name === 'cleanupStorage') {
-			if (!scheduler.workers.has('deployApplication')) await scheduler.start('deployApplication');
-		}
-	});
 	await getArch();
 	await getIPAddress();
 });
@@ -169,6 +166,12 @@ async function getIPAddress() {
 async function initServer() {
 	try {
 		await asyncExecShell(`docker network create --attachable coolify`);
+	} catch (error) { }
+	try {
+		const isOlder = compareVersions('3.8.1', version);
+		if (isOlder === -1) {
+			await prisma.build.updateMany({ where: { status: { in: ['running', 'queued'] } }, data: { status: 'failed' } });
+		}
 	} catch (error) { }
 }
 async function getArch() {

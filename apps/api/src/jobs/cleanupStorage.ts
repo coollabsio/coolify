@@ -1,5 +1,5 @@
 import { parentPort } from 'node:worker_threads';
-import { asyncExecShell, cleanupDockerStorage, executeDockerCmd, isDev, prisma, version } from '../lib/common';
+import { asyncExecShell, cleanupDockerStorage, executeDockerCmd, isDev, prisma } from '../lib/common';
 
 (async () => {
     if (parentPort) {
@@ -9,7 +9,7 @@ import { asyncExecShell, cleanupDockerStorage, executeDockerCmd, isDev, prisma, 
             if (enginesDone.has(destination.engine) || enginesDone.has(destination.remoteIpAddress)) return
             if (destination.engine) enginesDone.add(destination.engine)
             if (destination.remoteIpAddress) enginesDone.add(destination.remoteIpAddress)
-            
+
             let lowDiskSpace = false;
             try {
                 let stdout = null

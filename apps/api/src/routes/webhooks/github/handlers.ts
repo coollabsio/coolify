@@ -142,12 +142,6 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                         type: 'webhook_commit'
                     }
                 });
-                scheduler.workers.get('deployApplication').postMessage({
-                    build_id: buildId,
-                    type: 'webhook_commit',
-                    ...applicationFound
-                });
-
                 return {
                     message: 'Queued. Thank you!'
                 };
@@ -183,6 +177,8 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                         await prisma.build.create({
                             data: {
                                 id: buildId,
+                                pullmergeRequestId,
+                                sourceBranch,
                                 applicationId: applicationFound.id,
                                 destinationDockerId: applicationFound.destinationDocker.id,
                                 gitSourceId: applicationFound.gitSource.id,
@@ -192,14 +188,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                                 type: 'webhook_pr'
                             }
                         });
-                        scheduler.workers.get('deployApplication').postMessage({
-                            build_id: buildId,
-                            type: 'webhook_pr',
-                            ...applicationFound,
-                            sourceBranch,
-                            pullmergeRequestId
-                        });
-
+                    
                         return {
                             message: 'Queued. Thank you!'
                         };

@@ -66,7 +66,6 @@
 
 	let loading = false;
 	let statusInterval: any;
-	let isQueueActive = false;
 	$disabledButton =
 		!$appSession.isAdmin ||
 		(!application.fqdn && !application.settings.isBot) ||
@@ -121,7 +120,6 @@
 		if ($status.application.loading) return;
 		$status.application.loading = true;
 		const data = await get(`/applications/${id}/status`);
-		isQueueActive = data.isQueueActive;
 		$status.application.isRunning = data.isRunning;
 		$status.application.isExited = data.isExited;
 		$status.application.loading = false;
@@ -259,13 +257,10 @@
 			<form on:submit|preventDefault={() => handleDeploySubmit(true)}>
 				<button
 					type="submit"
-					disabled={$disabledButton || !isQueueActive}
-					class:hover:text-green-500={isQueueActive}
+					disabled={$disabledButton}
 					class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2"
 					data-tip={$appSession.isAdmin
-						? isQueueActive
-							? 'Force Rebuild Application'
-							: 'Autoupdate inprogress. Cannot rebuild application.'
+						? 'Force Rebuild Application'
 						: 'You do not have permission to rebuild application.'}
 				>
 					<svg
@@ -287,7 +282,7 @@
 				</button>
 			</form>
 		{:else}
-			<form on:submit|preventDefault={handleDeploySubmit}>
+			<form on:submit|preventDefault={() => handleDeploySubmit(false)}>
 				<button
 					type="submit"
 					disabled={$disabledButton}
@@ -359,7 +354,7 @@
 			<button
 				disabled={$disabledButton}
 				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
-				data-tip="Secret"
+				data-tip="Secrets"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
