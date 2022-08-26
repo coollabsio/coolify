@@ -14,17 +14,19 @@ import * as buildpacks from '../lib/buildPacks';
 			if (message === 'error') throw new Error('oops');
 			if (message === 'cancel') {
 				parentPort.postMessage('cancelled');
+				await prisma.$disconnect()
 				process.exit(0);
 			}
 		});
-		try {
-			const pThrottle = await import('p-throttle')
-			const throttle = pThrottle.default({
-				limit: 1,
-				interval: 2000
-			});
+		const pThrottle = await import('p-throttle')
+		const throttle = pThrottle.default({
+			limit: 1,
+			interval: 2000
+		});
 
-			const th = throttle(async () => {
+
+		const th = throttle(async () => {
+			try {
 				const queuedBuilds = await prisma.build.findMany({ where: { status: 'queued' }, orderBy: { createdAt: 'asc' } });
 				const { concurrentBuilds } = await prisma.setting.findFirst({})
 				if (queuedBuilds.length > 0) {
@@ -356,14 +358,13 @@ import * as buildpacks from '../lib/buildPacks';
 					}
 					await pAll.default(actions, { concurrency })
 				}
-			})
-			while (true) {
-				await th()
+			} catch (error) {
+			} finally {
 			}
+		})
 
-		} catch (error) {
-		} finally {
-			await prisma.$disconnect()
+		while (true) {
+			await th()
 		}
 
 

@@ -18,23 +18,22 @@ const options: any = {
 		}
 	},
 	jobs: [
-		{
-			name: 'deployApplication',
-		},
-		{
-			name: 'cleanupStorage',
-		},
-		{
-			name: 'cleanupPrismaEngines',
-			interval: '1m'
-		},
-		{
-			name: 'checkProxies',
-			interval: '10s'
-		},
-		{
-			name: 'autoUpdater',
-		}
+		{ name: 'infrastructure' },
+		{ name: 'deployApplication' },
+		// {
+		// 	name: 'cleanupStorage',
+		// },
+		// {
+		// 	name: 'cleanupPrismaEngines',
+		// 	interval: '1m'
+		// },
+		// {
+		// 	name: 'checkProxies',
+		// 	interval: '10s'
+		// },
+		// {
+		// 	name: 'autoUpdater',
+		// }
 	],
 };
 if (isDev) options.root = path.join(__dirname, '../jobs');

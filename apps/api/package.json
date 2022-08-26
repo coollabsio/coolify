@@ -22,6 +22,7 @@
     "@fastify/jwt": "6.3.2",
     "@fastify/static": "6.5.0",
     "@iarna/toml": "2.2.5",
+    "@ladjs/graceful": "3.0.2",
     "@prisma/client": "3.15.2",
     "axios": "0.27.2",
     "bcryptjs": "2.4.3",
