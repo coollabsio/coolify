@@ -118,6 +118,7 @@ importers:
       '@playwright/test': 1.24.2
       '@sveltejs/adapter-static': 1.0.0-next.39
       '@sveltejs/kit': 1.0.0-next.405
+      '@tailwindcss/typography': ^0.5.4
       '@types/js-cookie': 3.0.2
       '@typescript-eslint/eslint-plugin': 5.33.0
       '@typescript-eslint/parser': 5.33.0
@@ -144,6 +145,7 @@ importers:
       vite: 3.0.5
     dependencies:
       '@sveltejs/adapter-static': 1.0.0-next.39
+      '@tailwindcss/typography': 0.5.4_tailwindcss@3.1.8
       cuid: 2.1.8
       daisyui: 2.22.0_25hquoklqeoqwmt7fwvvcyxm5e
       js-cookie: 3.0.1
@@ -166,7 +168,7 @@ importers:
       svelte: 3.49.0
       svelte-check: 2.8.0_vylzxgme5yisu3bsyvcau4hjtq
       svelte-preprocess: 4.10.7_fje22ktja5v2dh6nbkissncqme
-      tailwindcss: 3.1.8
+      tailwindcss: 3.1.8_postcss@8.4.16
       tailwindcss-scrollbar: 0.1.0_tailwindcss@3.1.8
       tslib: 2.4.0
       typescript: 4.7.4
@@ -511,6 +513,17 @@ packages:
     engines: {node: '>=14.16'}
     dependencies:
       defer-to-connect: 2.0.1
+    dev: false
+
+  /@tailwindcss/typography/0.5.4_tailwindcss@3.1.8:
+    resolution: {integrity: sha512-QEdg40EmGvE7kKoDei8zr5sf4D1pIayHj4R31bH3lX8x2BtTiR+jNejYPOkhbmy3DXgkMF9jC8xqNiGFAuL9Sg==}
+    peerDependencies:
+      tailwindcss: '>=3.0.0 || insiders'
+    dependencies:
+      lodash.castarray: 4.4.0
+      lodash.isplainobject: 4.0.6
+      lodash.merge: 4.6.2
+      tailwindcss: 3.1.8_postcss@8.4.16
     dev: false
 
   /@tsconfig/node10/1.0.8:
@@ -2235,7 +2248,7 @@ packages:
       css-selector-tokenizer: 0.8.0
       postcss: 8.4.16
       postcss-js: 4.0.0_postcss@8.4.16
-      tailwindcss: 3.1.8
+      tailwindcss: 3.1.8_postcss@8.4.16
     transitivePeerDependencies:
       - ts-node
     dev: false
@@ -4254,6 +4267,10 @@ packages:
       lodash._basetostring: 4.12.0
     dev: false
 
+  /lodash.castarray/4.4.0:
+    resolution: {integrity: sha512-aVx8ztPv7/2ULbArGJ2Y42bG1mEQ5mGjpdvrbJcJFU3TbYybe+QlLS4pst9zV52ymy2in1KpFPiZnAOATxD4+Q==}
+    dev: false
+
   /lodash.includes/4.3.0:
     resolution: {integrity: sha512-W3Bx6mdkRTGtlJISOvVD/lbqjTlPPUDTMnlXZFnVwi9NKJ6tiAk6LVdlhZMm17VZisqhKcgzpO5Wz91PCt5b0w==}
     dev: false
@@ -4280,7 +4297,6 @@ packages:
 
   /lodash.merge/4.6.2:
     resolution: {integrity: sha512-0KpjqXRVvrYyCsX1swR/XTK0va6VQkQM6MNo7PqW77ByjAhoARA8EfrP1N4+KlKj8YS0ZUCtRT/YUuhyYDujIQ==}
-    dev: true
 
   /lodash.omit/4.5.0:
     resolution: {integrity: sha512-XeqSp49hNGmlkj2EJlfrQFIzQ6lXdNro9sddtQzcJY8QaoC2GO0DT7xaIokHeyM+mIT0mPMlPvkYzg2xCuHdZg==}
@@ -5863,13 +5879,15 @@ packages:
     peerDependencies:
       tailwindcss: '>= 2.x.x'
     dependencies:
-      tailwindcss: 3.1.8
+      tailwindcss: 3.1.8_postcss@8.4.16
     dev: true
 
-  /tailwindcss/3.1.8:
+  /tailwindcss/3.1.8_postcss@8.4.16:
     resolution: {integrity: sha512-YSneUCZSFDYMwk+TGq8qYFdCA3yfBRdBlS7txSq0LUmzyeqRe3a8fBQzbz9M3WS/iFT4BNf/nmw9mEzrnSaC0g==}
     engines: {node: '>=12.13.0'}
     hasBin: true
+    peerDependencies:
+      postcss: ^8.0.9
     dependencies:
       arg: 5.0.2
       chokidar: 3.5.3

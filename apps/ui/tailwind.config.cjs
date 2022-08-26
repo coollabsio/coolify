@@ -62,5 +62,5 @@ module.exports = {
 		scrollbar: ['dark'],
 		extend: {}
 	},
-	plugins: [require('tailwindcss-scrollbar'), require('daisyui')]
+	plugins: [require('tailwindcss-scrollbar'), require('daisyui'), require("@tailwindcss/typography")]
 };
