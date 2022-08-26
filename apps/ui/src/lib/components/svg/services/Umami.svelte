@@ -7,7 +7,7 @@
 	xmlns="http://www.w3.org/2000/svg"
 	viewBox="0 0 856.000000 856.000000"
 	preserveAspectRatio="xMidYMid meet"
-	class={isAbsolute ? 'w-10 h-10 absolute top-0 left-0 -m-5' : 'w-8 mx-auto'}
+	class={isAbsolute ? 'w-10 h-10 absolute top-0 left-0 -m-5' : 'w-8 h-8 mx-auto'}
 >
 	<metadata> Created by potrace 1.11, written by Peter Selinger 2001-2013 </metadata>
 	<g

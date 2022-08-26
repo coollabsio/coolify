@@ -4,6 +4,6 @@
 
 <img
 	alt="nocodb logo"
-	class={isAbsolute ? 'w-10 absolute top-0 left-0 -m-5' : 'w-8 mx-auto'}
+	class={isAbsolute ? 'w-10 h-10 absolute top-0 left-0 -m-5' : 'w-8 h-8 mx-auto'}
 	src="/nocodb.png"
 />
