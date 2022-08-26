@@ -89,12 +89,6 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                     }
                 });
 
-                scheduler.workers.get('deployApplication').postMessage({
-                    build_id: buildId,
-                    type: 'webhook_commit',
-                    ...applicationFound
-                });
-
                 return {
                     message: 'Queued. Thank you!'
                 };
@@ -141,6 +135,8 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                         await prisma.build.create({
                             data: {
                                 id: buildId,
+                                pullmergeRequestId,
+                                sourceBranch,
                                 applicationId: applicationFound.id,
                                 destinationDockerId: applicationFound.destinationDocker.id,
                                 gitSourceId: applicationFound.gitSource.id,
@@ -150,14 +146,6 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                                 type: 'webhook_mr'
                             }
                         });
-                        scheduler.workers.get('deployApplication').postMessage({
-                            build_id: buildId,
-                            type: 'webhook_mr',
-                            ...applicationFound,
-                            sourceBranch,
-                            pullmergeRequestId
-                        });
-
                         return {
                             message: 'Queued. Thank you!'
                         };

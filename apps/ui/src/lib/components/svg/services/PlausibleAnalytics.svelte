@@ -4,6 +4,6 @@
 
 <img
 	alt="plausible logo"
-	class={isAbsolute ? 'w-9 absolute top-0 left-0 -m-4' : 'w-6 mx-auto'}
+	class={isAbsolute ? 'w-9 h-12 absolute top-0 left-0 -m-4' : 'w-6 h-8 mx-auto'}
 	src="/plausible.png"
 />

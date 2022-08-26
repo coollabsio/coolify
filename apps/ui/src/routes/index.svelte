@@ -36,10 +36,6 @@
 	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
 	import { dev } from '$app/env';
 
-	let loading = {
-		cleanup: false
-	};
-
 	let numberOfGetStatus = 0;
 
 	function getRndInteger(min: number, max: number) {
@@ -75,280 +71,217 @@
 			numberOfGetStatus--;
 		}
 	}
-	async function manuallyCleanupStorage() {
-		try {
-			loading.cleanup = true;
-			await post('/internal/cleanup', {});
-			return addToast({
-				message: 'Cleanup done.',
-				type: 'success'
-			});
-		} catch (error) {
-			return errorNotification(error);
-		} finally {
-			loading.cleanup = false;
-		}
-	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">{$t('index.dashboard')}</div>
-	{#if $appSession.teamId === '0'}
-		<button on:click={manuallyCleanupStorage} class:loading={loading.cleanup} class="btn btn-sm"
-			>Cleanup Storage</button
-		>
-	{/if}
 </div>
-<div class="mt-10 pb-12 sm:pb-16">
-	<div class="mx-auto px-10">
-		<div class="flex flex-col justify-center xl:flex-row">
-			{#if applications.length > 0}
-				<div>
-					<div class="title">Resources</div>
-					<div class="flex items-start justify-center p-8">
-						<table class="rounded-none text-base">
-							<tbody>
-								{#each applications as application}
-									<tr>
-										<td class="space-x-2 items-center tracking-tight font-bold">
-											{#await getStatus(application)}
-												<div class="inline-flex w-2 h-2 bg-yellow-500 rounded-full" />
-											{:then status}
-												{#if status === 'Running'}
-													<div class="inline-flex w-2 h-2 bg-success rounded-full" />
-												{:else}
-													<div class="inline-flex w-2 h-2 bg-error rounded-full" />
-												{/if}
-											{/await}
-											<div class="inline-flex">{application.name}</div>
-										</td>
-										<td class="px-10 inline-flex">
-											<ApplicationsIcons {application} isAbsolute={false} />
-										</td>
-										<td class="px-10">
-											<div
-												class="badge badge-outline text-xs border-applications rounded text-white"
+<div class="container lg:mx-auto lg:p-0 p-5">
+	{#if $appSession.teamId === '0'}
+		<Usage />
+	{/if}
+	<h1 class="title text-4xl mt-10">Applications</h1>
+	<div class="divider" />
+	<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3 p-4">
+		{#if applications.length > 0}
+			{#each applications as application}
+				<a class="no-underline mb-5" href={`/applications/${application.id}`}>
+					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-green-600 indicator">
+						{#await getStatus(application)}
+							<span class="indicator-item badge bg-yellow-500 badge-xs" />
+						{:then status}
+							{#if status === 'Running'}
+								<span class="indicator-item badge bg-success badge-xs" />
+							{:else}
+								<span class="indicator-item badge bg-error badge-xs" />
+							{/if}
+						{/await}
+						<div class="w-full flex flex-row">
+							<ApplicationsIcons {application} isAbsolute={false} />
+							<div class="w-full flex flex-col ml-5">
+								<h1 class="font-bold text-xl truncate">
+									{application.name}
+									{#if application.settings.isBot}
+										<span class="text-xs"> BOT</span>
+									{/if}
+								</h1>
+								<div class="h-10">
+									{#if application?.fqdn}
+										<h2>{application?.fqdn.replace('https://', '').replace('http://', '')}</h2>
+									{:else if !application.settings.isBot && !application?.fqdn}
+										<h2 class="text-red-500">Not configured</h2>
+									{/if}
+								</div>
+								<div class="flex justify-end items-end space-x-2 h-10">
+									{#if application.fqdn}
+										<a href={application.fqdn} target="_blank" class="icons hover:bg-green-500">
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												class="h-6 w-6"
+												viewBox="0 0 24 24"
+												stroke-width="1.5"
+												stroke="currentColor"
+												fill="none"
+												stroke-linecap="round"
+												stroke-linejoin="round"
 											>
-												Application
-												{#if application.settings.isBot}
-													| BOT
-												{/if}
-											</div></td
+												<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+												<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
+												<line x1="10" y1="14" x2="20" y2="4" />
+												<polyline points="15 4 20 4 20 9" />
+											</svg>
+										</a>
+									{/if}
+									{#if application.settings.isBot && application.exposePort}
+										<a
+											href={`http://${dev ? 'localhost' : settings.ipv4}:${application.exposePort}`}
+											target="_blank"
+											class="icons hover:bg-green-500"
 										>
-										<td class="flex justify-end">
-											{#if application.fqdn}
-												<a
-													href={application.fqdn}
-													target="_blank"
-													class="icons bg-transparent text-sm inline-flex"
-													><svg
-														xmlns="http://www.w3.org/2000/svg"
-														class="h-6 w-6"
-														viewBox="0 0 24 24"
-														stroke-width="1.5"
-														stroke="currentColor"
-														fill="none"
-														stroke-linecap="round"
-														stroke-linejoin="round"
-													>
-														<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-														<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
-														<line x1="10" y1="14" x2="20" y2="4" />
-														<polyline points="15 4 20 4 20 9" />
-													</svg></a
-												>
-											{/if}
-											{#if application.settings.isBot && application.exposePort}
-												<a
-													href={`http://${dev ? 'localhost' : settings.ipv4}:${
-														application.exposePort
-													}`}
-													target="_blank"
-													class="icons bg-transparent text-sm inline-flex"
-													><svg
-														xmlns="http://www.w3.org/2000/svg"
-														class="h-6 w-6"
-														viewBox="0 0 24 24"
-														stroke-width="1.5"
-														stroke="currentColor"
-														fill="none"
-														stroke-linecap="round"
-														stroke-linejoin="round"
-													>
-														<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-														<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
-														<line x1="10" y1="14" x2="20" y2="4" />
-														<polyline points="15 4 20 4 20 9" />
-													</svg></a
-												>
-											{/if}
-											<a
-												href={`/applications/${application.id}`}
-												class="icons bg-transparent text-sm inline-flex"
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												class="h-6 w-6"
+												viewBox="0 0 24 24"
+												stroke-width="1.5"
+												stroke="currentColor"
+												fill="none"
+												stroke-linecap="round"
+												stroke-linejoin="round"
 											>
-												<svg
-													xmlns="http://www.w3.org/2000/svg"
-													class="h-6 w-6"
-													viewBox="0 0 24 24"
-													stroke-width="1.5"
-													stroke="currentColor"
-													fill="none"
-													stroke-linecap="round"
-													stroke-linejoin="round"
-												>
-													<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-													<rect x="4" y="8" width="4" height="4" />
-													<line x1="6" y1="4" x2="6" y2="8" />
-													<line x1="6" y1="12" x2="6" y2="20" />
-													<rect x="10" y="14" width="4" height="4" />
-													<line x1="12" y1="4" x2="12" y2="14" />
-													<line x1="12" y1="18" x2="12" y2="20" />
-													<rect x="16" y="5" width="4" height="4" />
-													<line x1="18" y1="4" x2="18" y2="5" />
-													<line x1="18" y1="9" x2="18" y2="20" />
-												</svg>
-											</a>
-										</td>
-									</tr>
-								{/each}
-
-								{#each services as service}
-									<tr>
-										<td class="space-x-2 items-center tracking-tight font-bold">
-											{#await getStatus(service)}
-												<div class="inline-flex w-2 h-2 bg-yellow-500 rounded-full" />
-											{:then status}
-												{#if status === 'Running'}
-													<div class="inline-flex w-2 h-2 bg-success rounded-full" />
-												{:else}
-													<div class="inline-flex w-2 h-2 bg-error rounded-full" />
-												{/if}
-											{/await}
-											<div class="inline-flex">{service.name}</div>
-										</td>
-										<td class="px-10 inline-flex">
-											<ServiceIcons type={service.type} isAbsolute={false} />
-										</td>
-										<td class="px-10"
-											><div class="badge badge-outline text-xs border-services rounded text-white">
-												Service
-											</div>
-										</td>
-
-										<td class="flex justify-end">
-											{#if service.fqdn}
-												<a
-													href={service.fqdn}
-													target="_blank"
-													class="icons bg-transparent text-sm inline-flex"
-													><svg
-														xmlns="http://www.w3.org/2000/svg"
-														class="h-6 w-6"
-														viewBox="0 0 24 24"
-														stroke-width="1.5"
-														stroke="currentColor"
-														fill="none"
-														stroke-linecap="round"
-														stroke-linejoin="round"
-													>
-														<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-														<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
-														<line x1="10" y1="14" x2="20" y2="4" />
-														<polyline points="15 4 20 4 20 9" />
-													</svg></a
-												>
-											{/if}
-											<a
-												href={`/services/${service.id}`}
-												class="icons bg-transparent text-sm inline-flex"
-											>
-												<svg
-													xmlns="http://www.w3.org/2000/svg"
-													class="h-6 w-6"
-													viewBox="0 0 24 24"
-													stroke-width="1.5"
-													stroke="currentColor"
-													fill="none"
-													stroke-linecap="round"
-													stroke-linejoin="round"
-												>
-													<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-													<rect x="4" y="8" width="4" height="4" />
-													<line x1="6" y1="4" x2="6" y2="8" />
-													<line x1="6" y1="12" x2="6" y2="20" />
-													<rect x="10" y="14" width="4" height="4" />
-													<line x1="12" y1="4" x2="12" y2="14" />
-													<line x1="12" y1="18" x2="12" y2="20" />
-													<rect x="16" y="5" width="4" height="4" />
-													<line x1="18" y1="4" x2="18" y2="5" />
-													<line x1="18" y1="9" x2="18" y2="20" />
-												</svg>
-											</a>
-										</td>
-									</tr>
-								{/each}
-								{#each databases as database}
-									<tr>
-										<td class="space-x-2 items-center tracking-tight font-bold">
-											{#await getStatus(database)}
-												<div class="inline-flex w-2 h-2 bg-yellow-500 rounded-full" />
-											{:then status}
-												{#if status === 'Running'}
-													<div class="inline-flex w-2 h-2 bg-success rounded-full" />
-												{:else}
-													<div class="inline-flex w-2 h-2 bg-error rounded-full" />
-												{/if}
-											{/await}
-											<div class="inline-flex">{database.name}</div>
-										</td>
-										<td class="px-10 inline-flex">
-											<DatabaseIcons type={database.type} />
-										</td>
-										<td class="px-10">
-											<div class="badge badge-outline text-xs border-databases rounded text-white">
-												Database
-											</div>
-										</td>
-										<td class="flex justify-end">
-											<a
-												href={`/databases/${database.id}`}
-												class="icons bg-transparent text-sm inline-flex ml-11"
-											>
-												<svg
-													xmlns="http://www.w3.org/2000/svg"
-													class="h-6 w-6"
-													viewBox="0 0 24 24"
-													stroke-width="1.5"
-													stroke="currentColor"
-													fill="none"
-													stroke-linecap="round"
-													stroke-linejoin="round"
-												>
-													<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-													<rect x="4" y="8" width="4" height="4" />
-													<line x1="6" y1="4" x2="6" y2="8" />
-													<line x1="6" y1="12" x2="6" y2="20" />
-													<rect x="10" y="14" width="4" height="4" />
-													<line x1="12" y1="4" x2="12" y2="14" />
-													<line x1="12" y1="18" x2="12" y2="20" />
-													<rect x="16" y="5" width="4" height="4" />
-													<line x1="18" y1="4" x2="18" y2="5" />
-													<line x1="18" y1="9" x2="18" y2="20" />
-												</svg>
-											</a>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
+												<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+												<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
+												<line x1="10" y1="14" x2="20" y2="4" />
+												<polyline points="15 4 20 4 20 9" />
+											</svg>
+										</a>
+									{/if}
+								</div>
+							</div>
+						</div>
 					</div>
-				</div>
-			{:else if $appSession.teamId !== '0'}
-				<div class="text-center text-xl font-bold">Nothing is configured yet.</div>
-			{/if}
-			{#if $appSession.teamId === '0'}
-				<Usage />
-			{/if}
-		</div>
+				</a>
+			{/each}
+		{:else}
+			<h1 class="">Nothing is configured yet.</h1>
+		{/if}
+	</div>
+	<h1 class="title text-4xl mt-10">Services</h1>
+	<div class="divider" />
+	<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3 p-4">
+		{#if services.length > 0}
+			{#each services as service}
+				<a class="no-underline mb-5" href={`/services/${service.id}`}>
+					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-pink-600 indicator">
+						{#await getStatus(service)}
+							<span class="indicator-item badge bg-yellow-500 badge-xs" />
+						{:then status}
+							{#if status === 'Running'}
+								<span class="indicator-item badge bg-success badge-xs" />
+							{:else}
+								<span class="indicator-item badge bg-error badge-xs" />
+							{/if}
+						{/await}
+						<div class="w-full flex flex-row">
+							<ServiceIcons type={service.type} isAbsolute={false} />
+							<div class="w-full flex flex-col ml-5">
+								<h1 class="font-bold text-xl truncate">{service.name}</h1>
+								<div class="h-10">
+									{#if service?.fqdn}
+										<h2>{service?.fqdn.replace('https://', '').replace('http://', '')}</h2>
+									{:else}
+										<h2 class="text-red-500">Not configured</h2>
+									{/if}
+								</div>
+								<div class="flex justify-end items-end space-x-2 h-10">
+									{#if service.fqdn}
+										<a href={service.fqdn} target="_blank" class="icons hover:bg-pink-500">
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												class="h-6 w-6"
+												viewBox="0 0 24 24"
+												stroke-width="1.5"
+												stroke="currentColor"
+												fill="none"
+												stroke-linecap="round"
+												stroke-linejoin="round"
+											>
+												<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+												<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
+												<line x1="10" y1="14" x2="20" y2="4" />
+												<polyline points="15 4 20 4 20 9" />
+											</svg>
+										</a>
+									{/if}
+								</div>
+							</div>
+						</div>
+					</div>
+				</a>
+			{/each}
+		{:else}
+			<h1 class="">Nothing is configured yet.</h1>
+		{/if}
+	</div>
+
+	<h1 class="title text-4xl mt-10">Databases</h1>
+	<div class="divider" />
+	<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3 p-4 mb-32">
+		{#if databases.length > 0}
+			{#each databases as database}
+				<a class="no-underline mb-5" href={`/databases/${database.id}`}>
+					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-purple-500 indicator">
+						{#await getStatus(database)}
+							<span class="indicator-item badge bg-yellow-500 badge-xs" />
+						{:then status}
+							{#if status === 'Running'}
+								<span class="indicator-item badge bg-success badge-xs" />
+							{:else}
+								<span class="indicator-item badge bg-error badge-xs" />
+							{/if}
+						{/await}
+						<div class="w-full flex flex-row pt-2">
+							<DatabaseIcons type={database.type} isAbsolute={false} />
+							<div class="w-full flex flex-col ml-5">
+								<div class="h-10">
+									<h1 class="font-bold text-xl truncate">{database.name}</h1>
+									<div class="h-10">
+										{#if database?.version}
+											<h2>{database?.version}</h2>
+										{:else}
+											<h2 class="text-red-500">Not configured</h2>
+										{/if}
+									</div>
+								</div>
+								<div class="flex justify-end items-end space-x-2 h-10">
+									{#if database.settings.isPublic}
+										<div title="Public">
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												class="h-6 w-6 "
+												viewBox="0 0 24 24"
+												stroke-width="1.5"
+												stroke="currentColor"
+												fill="none"
+												stroke-linecap="round"
+												stroke-linejoin="round"
+											>
+												<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+												<circle cx="12" cy="12" r="9" />
+												<line x1="3.6" y1="9" x2="20.4" y2="9" />
+												<line x1="3.6" y1="15" x2="20.4" y2="15" />
+												<path d="M11.5 3a17 17 0 0 0 0 18" />
+												<path d="M12.5 3a17 17 0 0 1 0 18" />
+											</svg>
+										</div>
+									{/if}
+								</div>
+							</div>
+						</div>
+					</div>
+				</a>
+			{/each}
+		{:else}
+			<h1 class="">Nothing is configured yet.</h1>
+		{/if}
 	</div>
 </div>

@@ -73,6 +73,23 @@ export async function update(request: FastifyRequest<Update>) {
 		return errorHandler({ status, message })
 	}
 }
+export async function restartCoolify(request: FastifyRequest<any>) {
+	try {
+		const teamId = request.user.teamId;
+		if (teamId === '0') {
+			if (!isDev) {
+				await asyncExecShell(`docker restart coolify`);
+				return {};
+			} else {
+				console.log('Restarting Coolify')
+				return {};
+			}
+		}
+		throw { status: 500, message: 'You are not authorized to restart Coolify.' };
+	} catch ({ status, message }) {
+		return errorHandler({ status, message })
+	}
+}
 export async function showUsage() {
 	try {
 		return {
@@ -101,7 +118,8 @@ export async function showDashboard(request: FastifyRequest) {
 			include: { settings: true }
 		});
 		const databases = await prisma.database.findMany({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
+			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+			include: { settings: true }
 		});
 		const services = await prisma.service.findMany({
 			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }

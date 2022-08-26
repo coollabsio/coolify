@@ -3,7 +3,6 @@
 </script>
 
 <svg
-	xmlns:dc="http://purl.org/dc/elements/1.1/"
 	xmlns:cc="http://creativecommons.org/ns#"
 	xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 	xmlns:svg="http://www.w3.org/2000/svg"
@@ -11,7 +10,7 @@
 	id="svg8"
 	version="1.1"
 	viewBox="0 0 92 92"
-	class={isAbsolute ? 'w-12 absolute top-0 left-0 -m-3 -mt-5' : 'w-8 mx-auto'}
+	class={isAbsolute ? 'w-12 h-12 absolute top-0 left-0 -m-3 -mt-5' : 'w-8 h-8 mx-auto'}
 >
 	<defs id="defs2" />
 	<metadata id="metadata5">

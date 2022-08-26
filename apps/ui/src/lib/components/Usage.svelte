@@ -20,11 +20,12 @@
 	let usageInterval: any;
 	let loading = {
 		usage: false,
-		cleanup: false
+		cleanup: false,
+		restart: false
 	};
-	import { appSession } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
-	import { get } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	async function getStatus() {
 		if (loading.usage) return;
@@ -32,6 +33,25 @@
 		const data = await get('/usage');
 		usage = data.usage;
 		loading.usage = false;
+	}
+	async function restartCoolify() {
+		const sure = confirm(
+			'Are you sure you would like to restart Coolify? Currently running deployments will be stopped and restarted.'
+		);
+		if (sure) {
+			loading.restart = true;
+			try {
+				await post(`/internal/restart`, {});
+				addToast({
+					type: 'success',
+					message: 'Coolify restarted successfully. It will take a moment.'
+				});
+			} catch (error) {
+				return errorNotification(error);
+			} finally {
+				loading.restart = false;
+			}
+		}
 	}
 	onDestroy(() => {
 		clearInterval(usageInterval);
@@ -48,65 +68,106 @@
 			return errorNotification(error);
 		}
 	});
+	async function manuallyCleanupStorage() {
+		try {
+			loading.cleanup = true;
+			await post('/internal/cleanup', {});
+			return addToast({
+				message: 'Cleanup done.',
+				type: 'success'
+			});
+		} catch (error) {
+			return errorNotification(error);
+		} finally {
+			loading.cleanup = false;
+		}
+	}
 </script>
 
-<div class="pb-4">
-	<div class="title">Hardware Details</div>
-	<div class="text-center p-8 ">
-		<div>
-			<div class="stat w-64">
-				<div class="stat-title">Total Memory</div>
-				<div class="stat-value">
+<div class="w-full">
+	<div class="flex items-center">
+		<h1 class="title text-4xl">Hardware Details</h1>
+		<div class="flex  space-x-4">
+			{#if $appSession.teamId === '0'}
+				<button on:click={manuallyCleanupStorage} class:loading={loading.cleanup} class="btn btn-sm"
+					>Cleanup Storage</button
+				>
+				<button
+					on:click={restartCoolify}
+					class:loading={loading.restart}
+					class="btn btn-sm bg-red-600 hover:bg-red-500">Restart Coolify</button
+				>
+			{/if}
+		</div>
+	</div>
+	<div class="divider" />
+	<div class="grid grid-flow-col gap-4 grid-rows-3 lg:grid-rows-1">
+		<div class="stats stats-vertical lg:stats-horizontal w-full mb-5 bg-transparent rounded">
+			<div class="font-bold flex lg:justify-center">Memory</div>
+			<div class="stat">
+				<div class="stat-title">Total</div>
+				<div class="stat-value text-2xl">
 					{(usage?.memory.totalMemMb).toFixed(0)}<span class="text-sm">MB</span>
 				</div>
 			</div>
-			<div class="stat w-64">
-				<div class="stat-title">Used Memory</div>
-				<div class="stat-value">
+
+			<div class="stat">
+				<div class="stat-title">Used</div>
+				<div class="stat-value text-2xl">
 					{(usage?.memory.usedMemMb).toFixed(0)}<span class="text-sm">MB</span>
 				</div>
 			</div>
-			<div class="stat w-64">
-				<div class="stat-title">Free Memory</div>
-				<div class="stat-value">
+
+			<div class="stat">
+				<div class="stat-title">Free</div>
+				<div class="stat-value text-2xl">
 					{usage?.memory.freeMemPercentage}<span class="text-sm">%</span>
 				</div>
 			</div>
 		</div>
-		<div class="py-10">
-			<div class="stat w-64">
-				<div class="stat-title">Total CPUs</div>
-				<div class="stat-value">
+
+		<div class="stats stats-vertical lg:stats-horizontal w-full mb-5 bg-transparent rounded">
+			<div class="font-bold flex lg:justify-center">CPU</div>
+			<div class="stat">
+				<div class="stat-title">Total</div>
+				<div class="stat-value text-2xl">
 					{usage?.cpu.count}
 				</div>
 			</div>
-			<div class="stat w-64">
-				<div class="stat-title">CPU Usage</div>
-				<div class="stat-value">
+
+			<div class="stat">
+				<div class="stat-title">Usage</div>
+				<div class="stat-value text-2xl">
 					{usage?.cpu.usage}<span class="text-sm">%</span>
 				</div>
 			</div>
-			<div class="stat w-64">
+
+			<div class="stat">
 				<div class="stat-title">Load Average (5,10,30mins)</div>
-				<div class="stat-value">{usage?.cpu.load}</div>
+				<div class="stat-value text-2xl">{usage?.cpu.load}</div>
 			</div>
 		</div>
-		<div>
-			<div class="stat w-64">
-				<div class="stat-title">Total Disk</div>
-				<div class="stat-value">
+		<div class="stats stats-vertical lg:stats-horizontal w-full mb-5 bg-transparent rounded">
+			<div class="font-bold flex lg:justify-center">Disk</div>
+			<div class="stat">
+				<div class="stat-title">Total</div>
+				<div class="stat-value text-2xl">
 					{usage?.disk.totalGb}<span class="text-sm">GB</span>
 				</div>
 			</div>
-			<div class="stat w-64">
-				<div class="stat-title">Used Disk</div>
-				<div class="stat-value">
+
+			<div class="stat">
+				<div class="stat-title">Used</div>
+				<div class="stat-value text-2xl">
 					{usage?.disk.usedGb}<span class="text-sm">GB</span>
 				</div>
 			</div>
-			<div class="stat w-64">
-				<div class="stat-title">Free Disk</div>
-				<div class="stat-value">{usage?.disk.freePercentage}<span class="text-sm">%</span></div>
+
+			<div class="stat">
+				<div class="stat-title">Free</div>
+				<div class="stat-value text-2xl">
+					{usage?.disk.freePercentage}<span class="text-sm">%</span>
+				</div>
 			</div>
 		</div>
 	</div>

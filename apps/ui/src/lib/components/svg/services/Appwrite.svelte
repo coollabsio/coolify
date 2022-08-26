@@ -4,7 +4,7 @@
 
 <svg
 	xmlns="http://www.w3.org/2000/svg"
-	class={isAbsolute ? 'w-14 h-14 absolute top-0 left-0 -m-5' : 'w-9 mx-auto'}
+	class={isAbsolute ? 'w-14 h-14 absolute top-0 left-0 -m-5' : 'w-9 h-9 mx-auto'}
 	viewBox="0 0 384 384"
 	fill="none"
 >

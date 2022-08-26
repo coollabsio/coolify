@@ -5,11 +5,10 @@ import env from '@fastify/env';
 import cookie from '@fastify/cookie';
 import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
-import { asyncExecShell, isDev, listSettings, prisma, version } from './lib/common';
+import { asyncExecShell, asyncSleep, isDev, listSettings, prisma, version } from './lib/common';
 import { scheduler } from './lib/scheduler';
-import axios from 'axios';
 import compareVersions from 'compare-versions';
-
+import Graceful from '@ladjs/graceful'
 declare module 'fastify' {
 	interface FastifyInstance {
 		config: {
@@ -104,49 +103,39 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 	}
 	console.log(`Coolify's API is listening on ${host}:${port}`);
 	await initServer();
-	await scheduler.start('deployApplication');
-	await scheduler.start('cleanupStorage');
-	await scheduler.start('cleanupPrismaEngines');
-	await scheduler.start('checkProxies');
 
-	// Check if no build is running
-
-	// Check for update
+	const graceful = new Graceful({ brees: [scheduler] });
+	graceful.listen();
+	
 	setInterval(async () => {
-		const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
-		if (isAutoUpdateEnabled) {
-			const currentVersion = version;
-			const { data: versions } = await axios
-				.get(
-					`https://get.coollabs.io/versions.json`
-					, {
-						params: {
-							appId: process.env['COOLIFY_APP_ID'] || undefined,
-							version: currentVersion
-						}
-					})
-			const latestVersion = versions['coolify'].main.version;
-			const isUpdateAvailable = compareVersions(latestVersion, currentVersion);
-			if (isUpdateAvailable === 1) {
-				if (scheduler.workers.has('deployApplication')) {
-					scheduler.workers.get('deployApplication').postMessage("status:autoUpdater");
-				}
-			}
+		if (!scheduler.workers.has('deployApplication')) {
+			scheduler.run('deployApplication');
 		}
+		if (!scheduler.workers.has('infrastructure')) {
+			scheduler.run('infrastructure');
+		}
+	}, 2000)
+
+	// autoUpdater
+	setInterval(async () => {
+		scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:autoUpdater")
 	}, isDev ? 5000 : 60000 * 15)
 
-	// Cleanup storage
+	// cleanupStorage
 	setInterval(async () => {
-		if (scheduler.workers.has('deployApplication')) {
-			scheduler.workers.get('deployApplication').postMessage("status:cleanupStorage");
-		}
-	}, isDev ? 5000 : 60000 * 10)
+		scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupStorage")
+	}, isDev ? 6000 : 60000 * 10)
 
-	scheduler.on('worker deleted', async (name) => {
-		if (name === 'autoUpdater' || name === 'cleanupStorage') {
-			if (!scheduler.workers.has('deployApplication')) await scheduler.start('deployApplication');
-		}
-	});
+	// checkProxies
+	setInterval(async () => {
+		scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkProxies")
+	}, 10000)
+
+	// cleanupPrismaEngines
+	// setInterval(async () => {
+	// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupPrismaEngines")
+	// }, 60000)
+
 	await getArch();
 	await getIPAddress();
 });
@@ -169,6 +158,12 @@ async function getIPAddress() {
 async function initServer() {
 	try {
 		await asyncExecShell(`docker network create --attachable coolify`);
+	} catch (error) { }
+	try {
+		const isOlder = compareVersions('3.8.1', version);
+		if (isOlder === -1) {
+			await prisma.build.updateMany({ where: { status: { in: ['running', 'queued'] } }, data: { status: 'failed' } });
+		}
 	} catch (error) { }
 }
 async function getArch() {
