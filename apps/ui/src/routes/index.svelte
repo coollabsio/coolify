@@ -80,7 +80,7 @@
 	{#if $appSession.teamId === '0'}
 		<Usage />
 	{/if}
-	<h1 class="title text-4xl mt-10">Applications</h1>
+	<h1 class="title lg:text-3xl mt-10">Applications</h1>
 	<div class="divider" />
 	<div class="grid grid-col gap-8 auto-cols-max grid-cols-1 lg:grid-cols-3 p-4">
 		{#if applications.length > 0}
@@ -165,7 +165,7 @@
 			<h1 class="">Nothing is configured yet.</h1>
 		{/if}
 	</div>
-	<h1 class="title text-4xl mt-10">Services</h1>
+	<h1 class="title lg:text-3xl mt-10">Services</h1>
 	<div class="divider" />
 	<div class="grid grid-col gap-8 auto-cols-max grid-cols-1 lg:grid-cols-3 p-4">
 		{#if services.length > 0}
@@ -223,7 +223,7 @@
 		{/if}
 	</div>
 
-	<h1 class="title text-4xl mt-10">Databases</h1>
+	<h1 class="title lg:text-3xl mt-10">Databases</h1>
 	<div class="divider" />
 	<div class="grid grid-col gap-8 auto-cols-max grid-cols-1 lg:grid-cols-3 p-4 mb-32">
 		{#if databases.length > 0}
