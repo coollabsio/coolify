@@ -39,7 +39,7 @@ async function autoUpdater() {
         console.log(error);
     }
 }
-async function checkProxies(){
+async function checkProxies() {
     try {
         const { default: isReachable } = await import('is-port-reachable');
         let portReachable;
@@ -50,7 +50,7 @@ async function checkProxies(){
         const localDocker = await prisma.destinationDocker.findFirst({
             where: { engine, network: 'coolify' }
         });
-        if (localDocker && localDocker.isCoolifyProxyUsed) {      
+        if (localDocker && localDocker.isCoolifyProxyUsed) {
             portReachable = await isReachable(80, { host: ipv4 || ipv6 })
             console.log({ port: 80, portReachable });
             if (!portReachable) {
@@ -106,16 +106,16 @@ async function checkProxies(){
                 }
             }
         }
-    } catch(error) {
+    } catch (error) {
 
     }
 }
-async function cleanupPrismaEngines(){
+async function cleanupPrismaEngines() {
     if (!isDev) {
         try {
             const { stdout } = await asyncExecShell(`ps -ef | grep /app/prisma-engines/query-engine | grep -v grep | wc -l | xargs`)
             if (stdout.trim() != null && stdout.trim() != '' && Number(stdout.trim()) > 1) {
-                await asyncExecShell(`killall -q -e /app/prisma-engines/query-engine -o 10m`)
+                await asyncExecShell(`killall -q -e /app/prisma-engines/query-engine -o 1m`)
             }
         } catch (error) {
             console.log(error);
@@ -178,7 +178,7 @@ async function cleanupStorage() {
 }
 
 (async () => {
-    let status ={ 
+    let status = {
         cleanupStorage: false,
         autoUpdater: false
     }

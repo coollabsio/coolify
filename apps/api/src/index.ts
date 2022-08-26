@@ -103,8 +103,7 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 	}
 	console.log(`Coolify's API is listening on ${host}:${port}`);
 	await initServer();
-	// await scheduler.start('cleanupPrismaEngines');
-	// await scheduler.start('checkProxies');
+
 	const graceful = new Graceful({ brees: [scheduler] });
 	graceful.listen();
 	
@@ -133,9 +132,9 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 	}, 10000)
 
 	// cleanupPrismaEngines
-	setInterval(async () => {
-		scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupPrismaEngines")
-	}, 60000)
+	// setInterval(async () => {
+	// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupPrismaEngines")
+	// }, 60000)
 
 	await getArch();
 	await getIPAddress();

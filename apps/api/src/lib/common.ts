@@ -155,11 +155,11 @@ export const prisma = new PrismaClient({
 	  ],
 });
 
-// prisma.$on('query', (e) => {
-// 	console.log('Query: ' + e.query)
-// 	console.log('Params: ' + e.params)
-// 	console.log('Duration: ' + e.duration + 'ms')
-//   })
+prisma.$on('query', (e) => {
+	console.log('Query: ' + e.query)
+	console.log('Params: ' + e.params)
+	console.log('Duration: ' + e.duration + 'ms')
+  })
 export const base64Encode = (text: string): string => {
 	return Buffer.from(text).toString('base64');
 };
