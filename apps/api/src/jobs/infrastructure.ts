@@ -52,7 +52,6 @@ async function checkProxies() {
         });
         if (localDocker && localDocker.isCoolifyProxyUsed) {
             portReachable = await isReachable(80, { host: ipv4 || ipv6 })
-            console.log({ port: 80, portReachable });
             if (!portReachable) {
                 await startTraefikProxy(localDocker.id);
             }
@@ -68,7 +67,6 @@ async function checkProxies() {
             if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
                 const { privatePort } = generateDatabaseConfiguration(database, arch);
                 portReachable = await isReachable(publicPort, { host: destinationDocker.remoteIpAddress || ipv4 || ipv6 })
-                console.log({ publicPort, portReachable });
                 if (!portReachable) {
                     await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
                 }
@@ -83,7 +81,6 @@ async function checkProxies() {
             const { destinationDockerId, destinationDocker, id } = service;
             if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
                 portReachable = await isReachable(ftpPublicPort, { host: destinationDocker.remoteIpAddress || ipv4 || ipv6 })
-                console.log({ ftpPublicPort, portReachable });
                 if (!portReachable) {
                     await startTraefikTCPProxy(destinationDocker, id, ftpPublicPort, 22, 'wordpressftp');
                 }
@@ -100,14 +97,13 @@ async function checkProxies() {
             const { destinationDockerId, destinationDocker, id } = service;
             if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
                 portReachable = await isReachable(publicPort, { host: destinationDocker.remoteIpAddress || ipv4 || ipv6 })
-                console.log({ publicPort, portReachable });
                 if (!portReachable) {
                     await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
                 }
             }
         }
     } catch (error) {
-
+        
     }
 }
 async function cleanupPrismaEngines() {

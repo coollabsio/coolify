@@ -158,7 +158,6 @@
 							{build.type}
 						</div>
 					</div>
-					<div class="flex-1" />
 
 					<div class="w-48 text-center text-xs">
 						{#if build.status === 'running'}
