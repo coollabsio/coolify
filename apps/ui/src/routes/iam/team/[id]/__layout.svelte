@@ -25,18 +25,33 @@
 </script>
 
 <script lang="ts">
+	export let teams: any;
 	import { page } from '$app/stores';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
 	import { appSession } from '$lib/store';
 	import { t } from '$lib/translations';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import { goto } from '$app/navigation';
+	import Cookies from 'js-cookie';
 	const { id } = $page.params;
+
 	async function deleteTeam() {
 		const sure = confirm('Are you sure you want to delete this team?');
 		if (sure) {
 			try {
 				await del(`/iam/team/${id}`, { id });
+				const switchTeam = teams.find((team: any) => team.id !== id)
+				const payload = await get(`/user?teamId=${switchTeam.id}`);
+				if (payload.token) {
+					Cookies.set('token', payload.token, {
+						path: '/'
+					});
+					$appSession.teamId = payload.teamId;
+					$appSession.userId = payload.userId;
+					$appSession.permission = payload.permission;
+					$appSession.isAdmin = payload.isAdmin;
+					return window.location.assign('/iam');
+				}
 				return await goto('/iam', { replaceState: true });
 			} catch (error) {
 				return errorNotification(error);
