@@ -258,6 +258,7 @@ import * as buildpacks from '../lib/buildPacks';
 									];
 									if (secrets.length > 0) {
 										secrets.forEach((secret) => {
+											secret.value = decrypt(secret.value)
 											if (pullmergeRequestId) {
 												if (secret.isPRMRSecret) {
 													envs.push(`${secret.name}=${secret.value}`);
