@@ -107,14 +107,14 @@
 								</h1>
 								<div class="h-10">
 									{#if application?.fqdn}
-										<h2>{application?.fqdn}</h2>
+										<h2>{application?.fqdn.replace('https://','').replace('http://','')}</h2>
 									{:else if !application.settings.isBot && !application?.fqdn}
 										<h2 class="text-red-500">Not configured</h2>
 									{/if}
 								</div>
 								<div class="flex justify-end items-end space-x-2 h-10">
 									{#if application.fqdn}
-										<a href={application.fqdn} target="_blank" class="icons">
+										<a href={application.fqdn} target="_blank" class="icons hover:bg-green-500">
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
 												class="h-6 w-6"
@@ -136,7 +136,7 @@
 										<a
 											href={`http://${dev ? 'localhost' : settings.ipv4}:${application.exposePort}`}
 											target="_blank"
-											class="icons  hover:bg-green-500"
+											class="icons hover:bg-green-500"
 										>
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
@@ -187,7 +187,7 @@
 								<h1 class="font-bold text-xl truncate">{service.name}</h1>
 								<div class="h-10">
 									{#if service?.fqdn}
-										<h2>{service?.fqdn}</h2>
+										<h2>{service?.fqdn.replace('https://','').replace('http://','')}</h2>
 									{:else}
 										<h2 class="text-red-500">Not configured</h2>
 									{/if}
@@ -244,26 +244,31 @@
 							<div class="w-full flex flex-col ml-5">
 								<div class="h-10">
 									<h1 class="font-bold text-xl truncate">{database.name}</h1>
+									<div class="h-10">
+											<h2>{database?.version}</h2>
+									</div>
 								</div>
 								<div class="flex justify-end items-end space-x-2 h-10">
 									{#if database.settings.isPublic}
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											class="h-6 w-6"
-											viewBox="0 0 24 24"
-											stroke-width="1.5"
-											stroke="currentColor"
-											fill="none"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-										>
-											<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-											<circle cx="12" cy="12" r="9" />
-											<line x1="3.6" y1="9" x2="20.4" y2="9" />
-											<line x1="3.6" y1="15" x2="20.4" y2="15" />
-											<path d="M11.5 3a17 17 0 0 0 0 18" />
-											<path d="M12.5 3a17 17 0 0 1 0 18" />
-										</svg>
+										<div title="Public">
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												class="h-6 w-6 "
+												viewBox="0 0 24 24"
+												stroke-width="1.5"
+												stroke="currentColor"
+												fill="none"
+												stroke-linecap="round"
+												stroke-linejoin="round"
+											>
+												<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+												<circle cx="12" cy="12" r="9" />
+												<line x1="3.6" y1="9" x2="20.4" y2="9" />
+												<line x1="3.6" y1="15" x2="20.4" y2="15" />
+												<path d="M11.5 3a17 17 0 0 0 0 18" />
+												<path d="M12.5 3a17 17 0 0 1 0 18" />
+											</svg>
+										</div>
 									{/if}
 								</div>
 							</div>
