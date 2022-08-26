@@ -86,7 +86,7 @@
 		<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3">
 			{#each applications as application}
 				<a class="no-underline mb-5" href={`/applications/${application.id}`}>
-					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-coolgray-300 indicator">
+					<div class="w-full rounded p-5 bg-coolgray-100 hover:bg-coolgray-300 indicator">
 						{#await getStatus(application)}
 							<span class="indicator-item badge bg-yellow-500 badge-xs" />
 						{:then status}
@@ -99,15 +99,18 @@
 						<div class="w-full flex flex-row">
 							<ApplicationsIcons {application} isAbsolute={false} />
 							<div class="w-full flex flex-col ml-5">
-								<span>
-									Application
+								<h1 class="font-bold text-lg">
+									{application.name}
 									{#if application.settings.isBot}
 										| BOT
 									{/if}
-								</span>
-								<h1 class="font-bold text-lg">{application.name}</h1>
-								<div class="divider" />
-								<div class="flex justify-end space-x-2">
+								</h1>
+								{#if application?.fqdn}
+									<h2>{application?.fqdn}</h2>
+								{:else if !application.settings.isBot && !application?.fqdn}
+									<h2 class="text-red-500">Not configured</h2>
+								{/if}
+								<div class="flex justify-end space-x-2 pt-2">
 									{#if application.fqdn}
 										<a href={application.fqdn} target="_blank" class="icons">
 											<svg
@@ -157,12 +160,14 @@
 				</a>
 			{/each}
 		</div>
+	{/if}
+	{#if services.length > 0}
 		<h1 class="title text-4xl mt-10">Services</h1>
 		<div class="divider" />
 		<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3">
 			{#each services as service}
 				<a class="no-underline mb-5" href={`/services/${service.id}`}>
-					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-coolgray-300 indicator">
+					<div class="w-full rounded p-5 bg-coolgray-100 hover:bg-coolgray-300 indicator">
 						{#await getStatus(service)}
 							<span class="indicator-item badge bg-yellow-500 badge-xs" />
 						{:then status}
@@ -175,10 +180,13 @@
 						<div class="w-full flex flex-row">
 							<ServiceIcons type={service.type} isAbsolute={false} />
 							<div class="w-full flex flex-col ml-5">
-								<span> Service </span>
 								<h1 class="font-bold text-lg">{service.name}</h1>
-								<div class="divider" />
-								<div class="flex justify-end space-x-2">
+								{#if service?.fqdn}
+									<h2>{service?.fqdn}</h2>
+								{:else}
+									<h2 class="text-red-500">Not configured</h2>
+								{/if}
+								<div class="flex justify-end space-x-2 pt-2">
 									{#if service.fqdn}
 										<a href={service.fqdn} target="_blank" class="icons">
 											<svg
@@ -205,12 +213,14 @@
 				</a>
 			{/each}
 		</div>
+	{/if}
+	{#if databases.length > 0}
 		<h1 class="title text-4xl mt-10">Databases</h1>
 		<div class="divider" />
 		<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3">
 			{#each databases as database}
 				<a class="no-underline mb-5" href={`/databases/${database.id}`}>
-					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-coolgray-300 indicator">
+					<div class="w-full rounded p-5 bg-coolgray-100 hover:bg-coolgray-300 indicator">
 						{#await getStatus(database)}
 							<span class="indicator-item badge bg-yellow-500 badge-xs" />
 						{:then status}
@@ -220,12 +230,10 @@
 								<span class="indicator-item badge bg-error badge-xs" />
 							{/if}
 						{/await}
-						<div class="w-full flex flex-row">
+						<div class="w-full flex flex-row pt-2">
 							<DatabaseIcons type={database.type} isAbsolute={false} />
 							<div class="w-full flex flex-col ml-5">
-								<span> Service </span>
 								<h1 class="font-bold text-lg">{database.name}</h1>
-								<div class="divider" />
 							</div>
 						</div>
 					</div>
