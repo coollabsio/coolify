@@ -99,10 +99,10 @@
 						<div class="w-full flex flex-row">
 							<ApplicationsIcons {application} isAbsolute={true} />
 							<div class="w-full flex flex-col">
-								<h1 class="font-bold text-xl truncate">
+								<h1 class="font-bold text-lg lg:text-sm truncate">
 									{application.name}
 									{#if application.settings.isBot}
-										<span class="text-xs"> BOT</span>
+										<span class="text-xs">BOT</span>
 									{/if}
 								</h1>
 								<div class="h-10">
@@ -184,7 +184,7 @@
 						<div class="w-full flex flex-row">
 							<ServiceIcons type={service.type} isAbsolute={true} />
 							<div class="w-full flex flex-col">
-								<h1 class="font-bold text-xl truncate">{service.name}</h1>
+								<h1 class="font-bold text-lg lg:text-sm truncate">{service.name}</h1>
 								<div class="h-10">
 									{#if service?.fqdn}
 										<h2>{service?.fqdn.replace('https://', '').replace('http://', '')}</h2>
@@ -239,14 +239,14 @@
 								<span class="indicator-item badge bg-error badge-xs" />
 							{/if}
 						{/await}
-						<div class="w-full flex flex-row pt-2">
+						<div class="w-full flex flex-row">
 							<DatabaseIcons type={database.type} isAbsolute={true} />
 							<div class="w-full flex flex-col">
 								<div class="h-10">
-									<h1 class="font-bold text-xl truncate">{database.name}</h1>
+									<h1 class="font-bold text-lg lg:text-sm truncate">{database.name}</h1>
 									<div class="h-10">
 										{#if database?.version}
-											<h2>{database?.version}</h2>
+											<h2 class="text-xs">{database?.version}</h2>
 										{:else}
 											<h2 class="text-red-500">Not configured</h2>
 										{/if}
