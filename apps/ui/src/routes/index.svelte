@@ -107,7 +107,7 @@
 								</h1>
 								<div class="h-10">
 									{#if application?.fqdn}
-										<h2>{application?.fqdn.replace('https://','').replace('http://','')}</h2>
+										<h2>{application?.fqdn.replace('https://', '').replace('http://', '')}</h2>
 									{:else if !application.settings.isBot && !application?.fqdn}
 										<h2 class="text-red-500">Not configured</h2>
 									{/if}
@@ -187,7 +187,7 @@
 								<h1 class="font-bold text-xl truncate">{service.name}</h1>
 								<div class="h-10">
 									{#if service?.fqdn}
-										<h2>{service?.fqdn.replace('https://','').replace('http://','')}</h2>
+										<h2>{service?.fqdn.replace('https://', '').replace('http://', '')}</h2>
 									{:else}
 										<h2 class="text-red-500">Not configured</h2>
 									{/if}
@@ -245,7 +245,11 @@
 								<div class="h-10">
 									<h1 class="font-bold text-xl truncate">{database.name}</h1>
 									<div class="h-10">
+										{#if database?.version}
 											<h2>{database?.version}</h2>
+										{:else}
+											<h2 class="text-red-500">Not configured</h2>
+										{/if}
 									</div>
 								</div>
 								<div class="flex justify-end items-end space-x-2 h-10">
