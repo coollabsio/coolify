@@ -9,7 +9,8 @@ Bree.extend(TSBree);
 
 const options: any = {
 	defaultExtension: 'js',
-	logger: new Cabin(),
+	// logger: new Cabin(),
+	logger: false,
 	workerMessageHandler: async ({ name, message }) => {
 		if (name === 'deployApplication' && message?.deploying) {
 			if (scheduler.workers.has('autoUpdater') || scheduler.workers.has('cleanupStorage')) {
@@ -18,27 +19,11 @@ const options: any = {
 		}
 	},
 	jobs: [
-		{
-			name: 'deployApplication',
-		},
-		{
-			name: 'cleanupStorage',
-		},
-		{
-			name: 'cleanupPrismaEngines',
-			interval: '1m'
-		},
-		{
-			name: 'checkProxies',
-			interval: '10s'
-		},
-		{
-			name: 'autoUpdater',
-		}
+		{ name: 'infrastructure' },
+		{ name: 'deployApplication' },
 	],
 };
 if (isDev) options.root = path.join(__dirname, '../jobs');
-
 
 export const scheduler = new Bree(options);
 

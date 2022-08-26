@@ -22,6 +22,7 @@ importers:
       '@fastify/jwt': 6.3.2
       '@fastify/static': 6.5.0
       '@iarna/toml': 2.2.5
+      '@ladjs/graceful': 3.0.2
       '@prisma/client': 3.15.2
       '@types/node': 18.7.13
       '@types/node-os-utils': 1.3.0
@@ -52,7 +53,8 @@ importers:
       node-forge: 1.3.1
       node-os-utils: 1.3.7
       nodemon: 2.0.19
-      p-queue: 7.3.0
+      p-all: 4.0.0
+      p-throttle: 5.0.0
       prettier: 2.7.1
       prisma: 3.15.2
       public-ip: 6.0.1
@@ -63,7 +65,7 @@ importers:
       typescript: 4.7.4
       unique-names-generator: 4.7.1
     dependencies:
-      '@breejs/ts-worker': 2.0.0_yjs2yukaec33oijlee4f5n7fqa
+      '@breejs/ts-worker': 2.0.0_rzqxabipis2a5sxrpk4obdh4zu
       '@fastify/autoload': 5.2.0
       '@fastify/cookie': 8.0.0
       '@fastify/cors': 8.1.0
@@ -71,6 +73,7 @@ importers:
       '@fastify/jwt': 6.3.2
       '@fastify/static': 6.5.0
       '@iarna/toml': 2.2.5
+      '@ladjs/graceful': 3.0.2
       '@prisma/client': 3.15.2_prisma@3.15.2
       axios: 0.27.2
       bcryptjs: 2.4.3
@@ -214,12 +217,11 @@ packages:
     engines: {node: '>= 10'}
     dev: false
 
-  /@breejs/ts-worker/2.0.0_yjs2yukaec33oijlee4f5n7fqa:
+  /@breejs/ts-worker/2.0.0_rzqxabipis2a5sxrpk4obdh4zu:
     resolution: {integrity: sha512-6anHRcmgYlF7mrm/YVRn6rx2cegLuiY3VBxkkimOTWC/dVQeH336imVSuIKEGKTwiuNTPr2hswVdDSneNuXg3A==}
     engines: {node: '>= 12.11'}
     peerDependencies:
       bree: '>=9.0.0'
-      tsconfig-paths: '>= 4'
     dependencies:
       bree: 9.1.2
       ts-node: 10.8.2_57uwcby55h6tzvkj3v5sfcgxoe
@@ -378,6 +380,14 @@ packages:
     resolution: {integrity: sha512-hZere0rUga8kTzSTFbHREXpD9E/jwi94+B5RyLAmMIzl/w/EK1z7rFEnMHzPkU4AZkL42JWSsGXoV8LXMihybg==}
     dev: false
 
+  /@ladjs/graceful/3.0.2:
+    resolution: {integrity: sha512-T4Z+0R0zgZfR32KIs3FEuH7oFSnhj3c+00wVtp07aeIl8PDfQGcXGB3C8SfOZ2EzPMRuIpIul5kHkVBdSTULXw==}
+    engines: {node: '>=14'}
+    dependencies:
+      lil-http-terminator: 1.2.2
+      p-is-promise: 3.0.0
+    dev: false
+
   /@leichtgewicht/ip-codec/2.0.4:
     resolution: {integrity: sha512-Hcv+nVC0kZnQ3tD9GVu5xSMR4VVYOteQIr/hwFPVEvPdlXqgGEuRjiheChHgdM+JyqdgNcmzZOX/tnl0JOiI7A==}
     dev: false
@@ -405,8 +415,8 @@ packages:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.13.0
 
-  /@playwright/test/1.24.2:
-    resolution: {integrity: sha512-Q4X224pRHw4Dtkk5PoNJplZCokLNvVbXD9wDQEMrHcEuvWpJWEQDeJ9gEwkZ3iCWSFSWBshIX177B231XW4wOQ==}
+  /@playwright/test/1.25.1:
+    resolution: {integrity: sha512-IJ4X0yOakXtwkhbnNzKkaIgXe6df7u3H3FnuhI9Jqh+CdO0e/lYQlDLYiyI9cnXK8E7UAppAWP+VqAv6VX7HQg==}
     engines: {node: '>=14'}
     hasBin: true
     dependencies:
@@ -2158,7 +2168,7 @@ packages:
       css-selector-tokenizer: 0.8.0
       postcss: 8.4.16
       postcss-js: 4.0.0_postcss@8.4.16
-      tailwindcss: 3.1.8_postcss@8.4.16
+      tailwindcss: 3.1.8
     transitivePeerDependencies:
       - ts-node
     dev: false
@@ -4031,6 +4041,11 @@ packages:
       set-cookie-parser: 2.4.8
     dev: false
 
+  /lil-http-terminator/1.2.2:
+    resolution: {integrity: sha512-2n6gKJIKgPjy4JfSlwsQnAA7wK4SEA1cegqdsYwr7qObVfIHdELjDGjEcYWJanfF/u/mRzIT2WPqhpzC6R9pZw==}
+    engines: {node: '>=8'}
+    dev: false
+
   /lilconfig/2.0.6:
     resolution: {integrity: sha512-9JROoBW7pobfsx+Sq2JsASvCo6Pfo6WWoUW79HuB1BCoBXD4PLWJPqDF6fNj67pqBYTbAHkE57M1kS/+L1neOg==}
     engines: {node: '>=10'}
@@ -4575,6 +4590,11 @@ packages:
     engines: {node: '>=4'}
     dev: false
 
+  /p-is-promise/3.0.0:
+    resolution: {integrity: sha512-Wo8VsW4IRQSKVXsJCn7TomUaVtyfjVDn3nUP7kE967BQk0CwFpdbZs0X0uk5sW9mkBa9eNM7hCMaG93WUAwxYQ==}
+    engines: {node: '>=8'}
+    dev: false
+
   /p-limit/2.3.0:
     resolution: {integrity: sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w==}
     engines: {node: '>=6'}
@@ -4616,8 +4636,8 @@ packages:
       p-limit: 3.1.0
     dev: true
 
-  /p-queue/7.3.0:
-    resolution: {integrity: sha512-5fP+yVQ0qp0rEfZoDTlP2c3RYBgxvRsw30qO+VtPPc95lyvSG+x6USSh1TuLB4n96IO6I8/oXQGsTgtna4q2nQ==}
+  /p-map/5.5.0:
+    resolution: {integrity: sha512-VFqfGDHlx87K66yZrNdI4YGtD70IRyd+zSvgks6mzHPRNkoKy+9EKP4SFC77/vTTQYmRmti7dvqC+m5jBrBAcg==}
     engines: {node: '>=12'}
     dependencies:
       aggregate-error: 4.0.1
@@ -5724,15 +5744,13 @@ packages:
     peerDependencies:
       tailwindcss: '>= 2.x.x'
     dependencies:
-      tailwindcss: 3.1.8_postcss@8.4.16
+      tailwindcss: 3.1.8
     dev: true
 
-  /tailwindcss/3.1.8_postcss@8.4.16:
+  /tailwindcss/3.1.8:
     resolution: {integrity: sha512-YSneUCZSFDYMwk+TGq8qYFdCA3yfBRdBlS7txSq0LUmzyeqRe3a8fBQzbz9M3WS/iFT4BNf/nmw9mEzrnSaC0g==}
     engines: {node: '>=12.13.0'}
     hasBin: true
-    peerDependencies:
-      postcss: ^8.0.9
     dependencies:
       arg: 5.0.2
       chokidar: 3.5.3

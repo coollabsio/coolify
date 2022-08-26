@@ -7,9 +7,8 @@ import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
 import { asyncExecShell, asyncSleep, isDev, listSettings, prisma, version } from './lib/common';
 import { scheduler } from './lib/scheduler';
-import axios from 'axios';
 import compareVersions from 'compare-versions';
-
+import Graceful from '@ladjs/graceful'
 declare module 'fastify' {
 	interface FastifyInstance {
 		config: {
@@ -104,45 +103,38 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 	}
 	console.log(`Coolify's API is listening on ${host}:${port}`);
 	await initServer();
-	await scheduler.start('cleanupPrismaEngines');
-	await scheduler.start('checkProxies');
 
+	const graceful = new Graceful({ brees: [scheduler] });
+	graceful.listen();
+	
 	setInterval(async () => {
 		if (!scheduler.workers.has('deployApplication')) {
 			scheduler.run('deployApplication');
 		}
+		if (!scheduler.workers.has('infrastructure')) {
+			scheduler.run('infrastructure');
+		}
 	}, 2000)
 
-	// Check for update & if no build is running
+	// autoUpdater
 	setInterval(async () => {
-		const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
-		if (isAutoUpdateEnabled) {
-			const currentVersion = version;
-			const { data: versions } = await axios
-				.get(
-					`https://get.coollabs.io/versions.json`
-					, {
-						params: {
-							appId: process.env['COOLIFY_APP_ID'] || undefined,
-							version: currentVersion
-						}
-					})
-			const latestVersion = versions['coolify'].main.version;
-			const isUpdateAvailable = compareVersions(latestVersion, currentVersion);
-			if (isUpdateAvailable === 1) {
-				if (!scheduler.workers.has('deployApplication')) {
-					await scheduler.run('autoUpdater')
-				}
-			}
-		}
+		scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:autoUpdater")
 	}, isDev ? 5000 : 60000 * 15)
 
-	// Cleanup storage
+	// cleanupStorage
 	setInterval(async () => {
-		if (!scheduler.workers.has('deployApplication') && !scheduler.workers.has('cleanupStorage')) {
-			await scheduler.run('cleanupStorage')
-		}
-	}, isDev ? 5000 : 60000 * 10)
+		scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupStorage")
+	}, isDev ? 6000 : 60000 * 10)
+
+	// checkProxies
+	setInterval(async () => {
+		scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkProxies")
+	}, 10000)
+
+	// cleanupPrismaEngines
+	// setInterval(async () => {
+	// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupPrismaEngines")
+	// }, 60000)
 
 	await getArch();
 	await getIPAddress();
