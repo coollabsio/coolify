@@ -166,7 +166,7 @@
 						{#await getStatus(service)}
 							<span class="indicator-item badge bg-yellow-500 badge-xs" />
 						{:then status}
-							{#if status === 'Running'}1
+							{#if status === 'Running'}
 								<span class="indicator-item badge bg-success badge-xs" />
 							{:else}
 								<span class="indicator-item badge bg-error badge-xs" />
@@ -214,7 +214,7 @@
 						{#await getStatus(database)}
 							<span class="indicator-item badge bg-yellow-500 badge-xs" />
 						{:then status}
-							{#if status === 'Running'}1
+							{#if status === 'Running'}
 								<span class="indicator-item badge bg-success badge-xs" />
 							{:else}
 								<span class="indicator-item badge bg-error badge-xs" />
