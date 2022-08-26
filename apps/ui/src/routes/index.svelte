@@ -80,13 +80,13 @@
 	{#if $appSession.teamId === '0'}
 		<Usage />
 	{/if}
-	{#if applications.length > 0}
-		<h1 class="title text-4xl mt-10">Applications</h1>
-		<div class="divider" />
-		<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3">
+	<h1 class="title text-4xl mt-10">Applications</h1>
+	<div class="divider" />
+	<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3 p-4">
+		{#if applications.length > 0}
 			{#each applications as application}
 				<a class="no-underline mb-5" href={`/applications/${application.id}`}>
-					<div class="w-full rounded p-5 bg-coolgray-100 hover:bg-coolgray-300 indicator">
+					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-green-600 indicator">
 						{#await getStatus(application)}
 							<span class="indicator-item badge bg-yellow-500 badge-xs" />
 						{:then status}
@@ -99,18 +99,20 @@
 						<div class="w-full flex flex-row">
 							<ApplicationsIcons {application} isAbsolute={false} />
 							<div class="w-full flex flex-col ml-5">
-								<h1 class="font-bold text-lg">
+								<h1 class="font-bold text-xl truncate">
 									{application.name}
 									{#if application.settings.isBot}
-										| BOT
+										<span class="text-xs"> BOT</span>
 									{/if}
 								</h1>
-								{#if application?.fqdn}
-									<h2>{application?.fqdn}</h2>
-								{:else if !application.settings.isBot && !application?.fqdn}
-									<h2 class="text-red-500">Not configured</h2>
-								{/if}
-								<div class="flex justify-end space-x-2 pt-2">
+								<div class="h-10">
+									{#if application?.fqdn}
+										<h2>{application?.fqdn}</h2>
+									{:else if !application.settings.isBot && !application?.fqdn}
+										<h2 class="text-red-500">Not configured</h2>
+									{/if}
+								</div>
+								<div class="flex justify-end items-end space-x-2 h-10">
 									{#if application.fqdn}
 										<a href={application.fqdn} target="_blank" class="icons">
 											<svg
@@ -134,7 +136,7 @@
 										<a
 											href={`http://${dev ? 'localhost' : settings.ipv4}:${application.exposePort}`}
 											target="_blank"
-											class="icons"
+											class="icons  hover:bg-green-500"
 										>
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
@@ -159,15 +161,17 @@
 					</div>
 				</a>
 			{/each}
-		</div>
-	{/if}
-	{#if services.length > 0}
-		<h1 class="title text-4xl mt-10">Services</h1>
-		<div class="divider" />
-		<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3">
+		{:else}
+			<h1 class="">Nothing is configured yet.</h1>
+		{/if}
+	</div>
+	<h1 class="title text-4xl mt-10">Services</h1>
+	<div class="divider" />
+	<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3 p-4">
+		{#if services.length > 0}
 			{#each services as service}
 				<a class="no-underline mb-5" href={`/services/${service.id}`}>
-					<div class="w-full rounded p-5 bg-coolgray-100 hover:bg-coolgray-300 indicator">
+					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-pink-600 indicator">
 						{#await getStatus(service)}
 							<span class="indicator-item badge bg-yellow-500 badge-xs" />
 						{:then status}
@@ -180,15 +184,17 @@
 						<div class="w-full flex flex-row">
 							<ServiceIcons type={service.type} isAbsolute={false} />
 							<div class="w-full flex flex-col ml-5">
-								<h1 class="font-bold text-lg">{service.name}</h1>
-								{#if service?.fqdn}
-									<h2>{service?.fqdn}</h2>
-								{:else}
-									<h2 class="text-red-500">Not configured</h2>
-								{/if}
-								<div class="flex justify-end space-x-2 pt-2">
+								<h1 class="font-bold text-xl truncate">{service.name}</h1>
+								<div class="h-10">
+									{#if service?.fqdn}
+										<h2>{service?.fqdn}</h2>
+									{:else}
+										<h2 class="text-red-500">Not configured</h2>
+									{/if}
+								</div>
+								<div class="flex justify-end items-end space-x-2 h-10">
 									{#if service.fqdn}
-										<a href={service.fqdn} target="_blank" class="icons">
+										<a href={service.fqdn} target="_blank" class="icons hover:bg-pink-500">
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
 												class="h-6 w-6"
@@ -212,15 +218,18 @@
 					</div>
 				</a>
 			{/each}
-		</div>
-	{/if}
-	{#if databases.length > 0}
-		<h1 class="title text-4xl mt-10">Databases</h1>
-		<div class="divider" />
-		<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3">
+		{:else}
+			<h1 class="">Nothing is configured yet.</h1>
+		{/if}
+	</div>
+
+	<h1 class="title text-4xl mt-10">Databases</h1>
+	<div class="divider" />
+	<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3 p-4 mb-32">
+		{#if databases.length > 0}
 			{#each databases as database}
 				<a class="no-underline mb-5" href={`/databases/${database.id}`}>
-					<div class="w-full rounded p-5 bg-coolgray-100 hover:bg-coolgray-300 indicator">
+					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-purple-500 indicator">
 						{#await getStatus(database)}
 							<span class="indicator-item badge bg-yellow-500 badge-xs" />
 						{:then status}
@@ -233,16 +242,37 @@
 						<div class="w-full flex flex-row pt-2">
 							<DatabaseIcons type={database.type} isAbsolute={false} />
 							<div class="w-full flex flex-col ml-5">
-								<h1 class="font-bold text-lg">{database.name}</h1>
+								<div class="h-10">
+									<h1 class="font-bold text-xl truncate">{database.name}</h1>
+								</div>
+								<div class="flex justify-end items-end space-x-2 h-10">
+									{#if database.settings.isPublic}
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											class="h-6 w-6"
+											viewBox="0 0 24 24"
+											stroke-width="1.5"
+											stroke="currentColor"
+											fill="none"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+											<circle cx="12" cy="12" r="9" />
+											<line x1="3.6" y1="9" x2="20.4" y2="9" />
+											<line x1="3.6" y1="15" x2="20.4" y2="15" />
+											<path d="M11.5 3a17 17 0 0 0 0 18" />
+											<path d="M12.5 3a17 17 0 0 1 0 18" />
+										</svg>
+									{/if}
+								</div>
 							</div>
 						</div>
 					</div>
 				</a>
 			{/each}
-		</div>
-	{:else if $appSession.teamId !== '0'}
-		<div class="text-center text-xl font-bold h-screen w-full flex flex-col justify-center">
-			<h1 class="text-5xl">Nothing is configured yet.</h1>
-		</div>
-	{/if}
+		{:else}
+			<h1 class="">Nothing is configured yet.</h1>
+		{/if}
+	</div>
 </div>

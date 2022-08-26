@@ -118,7 +118,8 @@ export async function showDashboard(request: FastifyRequest) {
 			include: { settings: true }
 		});
 		const databases = await prisma.database.findMany({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
+			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+			include: { settings: true }
 		});
 		const services = await prisma.service.findMany({
 			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
