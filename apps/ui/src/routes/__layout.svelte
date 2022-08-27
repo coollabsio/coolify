@@ -121,6 +121,10 @@
 		<div class="flex h-screen w-full flex-col items-center transition-all duration-100">
 			{#if !$appSession.whiteLabeled}
 				<div class="my-4 h-10 w-10"><img src="/favicon.png" alt="coolLabs logo" /></div>
+			{:else if $appSession.whiteLabeledDetails.icon}
+				<div class="my-4 h-10 w-10">
+					<img src={$appSession.whiteLabeledDetails.icon} alt="White labeled logo" />
+				</div>
 			{/if}
 			<div class="flex flex-col space-y-2 py-2" class:mt-2={$appSession.whiteLabeled}>
 				<a
