@@ -135,7 +135,10 @@
 		if (application.deploymentType === 'node' && application.port === '80') {
 			application.port = data.port;
 		}
-		if (!application.publishDirectory) {
+		if (application.deploymentType === 'static' && !application.publishDirectory) {
+			application.publishDirectory = data.publishDirectory;
+		}
+		if (application.deploymentType === 'node' && application.publishDirectory === 'out') {
 			application.publishDirectory = data.publishDirectory;
 		}
 	}
