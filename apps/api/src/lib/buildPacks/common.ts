@@ -671,11 +671,10 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 	if (isPnpm) {
 		Dockerfile.push('RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7');
 	}
+	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	if (installCommand) {
-		Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
-	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	Dockerfile.push(`RUN ${buildCommand}`);
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
 	await buildImage({ ...data, isCache: true });
