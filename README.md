@@ -103,7 +103,7 @@ A fresh installation is necessary. v2 and v3 are not compatible with v1.
 - Twitter: [@andrasbacsai](https://twitter.com/andrasbacsai)
 - Telegram: [@andrasbacsai](https://t.me/andrasbacsai)
 - Email: [andras@coollabs.io](mailto:andras@coollabs.io)
-- Discord: [Invitation](https://discord.gg/6rDM4fkymF)
+- Discord: [Invitation](https://coollabs.io/discord)
 
 ## Financial Contributors
 
