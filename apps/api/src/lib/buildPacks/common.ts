@@ -672,7 +672,7 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 		Dockerfile.push('RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7');
 	}
 	if (installCommand) {
-		Dockerfile.push(`COPY .${baseDirectory || ''}/ ./`);
+		Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
 	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
