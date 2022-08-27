@@ -44,10 +44,6 @@ import * as buildpacks from '../lib/buildPacks';
 								if (queueBuild.status === 'running') {
 									await saveBuildLog({ line: 'Building halted, restarting...', buildId, applicationId: application.id });
 								}
-								// if (pullmergeRequestId) {
-								// 	pullmergeRequestId = pullmergeRequestId.toString()
-								// }
-
 								const {
 									id: applicationId,
 									repository,
@@ -264,7 +260,6 @@ import * as buildpacks from '../lib/buildPacks';
 									const envs = [
 										`PORT=${port}`
 									];
-									console.log({secrets})
 									if (secrets.length > 0) {
 										secrets.forEach((secret) => {
 											if (pullmergeRequestId) {
