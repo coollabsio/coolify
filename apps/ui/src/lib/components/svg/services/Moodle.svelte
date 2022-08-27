@@ -3,6 +3,6 @@
 </script>
 <img
 	alt="moodle logo"
-	class={isAbsolute ? 'w-9 absolute top-0 left-0 -m-3 -mt-5' : 'w-8 mx-auto'}
+	class={isAbsolute ? 'w-9 h-9 absolute top-0 left-0 -m-3 -mt-5' : 'w-8 h-8 mx-auto'}
 	src="/moodle.png"
 />

@@ -76,13 +76,13 @@
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">{$t('index.dashboard')}</div>
 </div>
-<div class="container lg:mx-auto lg:p-0 p-5">
+<div class="container lg:mx-auto lg:p-0 px-8 p-5">
 	{#if $appSession.teamId === '0'}
 		<Usage />
 	{/if}
-	<h1 class="title text-4xl mt-10">Applications</h1>
+	<h1 class="title lg:text-3xl mt-10">Applications</h1>
 	<div class="divider" />
-	<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3 p-4">
+	<div class="grid grid-col gap-8 auto-cols-max grid-cols-1 lg:grid-cols-3 p-4">
 		{#if applications.length > 0}
 			{#each applications as application}
 				<a class="no-underline mb-5" href={`/applications/${application.id}`}>
@@ -97,12 +97,12 @@
 							{/if}
 						{/await}
 						<div class="w-full flex flex-row">
-							<ApplicationsIcons {application} isAbsolute={false} />
-							<div class="w-full flex flex-col ml-5">
-								<h1 class="font-bold text-xl truncate">
+							<ApplicationsIcons {application} isAbsolute={true} />
+							<div class="w-full flex flex-col">
+								<h1 class="font-bold text-lg lg:text-sm truncate">
 									{application.name}
 									{#if application.settings.isBot}
-										<span class="text-xs"> BOT</span>
+										<span class="text-xs">BOT</span>
 									{/if}
 								</h1>
 								<div class="h-10">
@@ -165,9 +165,9 @@
 			<h1 class="">Nothing is configured yet.</h1>
 		{/if}
 	</div>
-	<h1 class="title text-4xl mt-10">Services</h1>
+	<h1 class="title lg:text-3xl mt-10">Services</h1>
 	<div class="divider" />
-	<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3 p-4">
+	<div class="grid grid-col gap-8 auto-cols-max grid-cols-1 lg:grid-cols-3 p-4">
 		{#if services.length > 0}
 			{#each services as service}
 				<a class="no-underline mb-5" href={`/services/${service.id}`}>
@@ -182,9 +182,9 @@
 							{/if}
 						{/await}
 						<div class="w-full flex flex-row">
-							<ServiceIcons type={service.type} isAbsolute={false} />
-							<div class="w-full flex flex-col ml-5">
-								<h1 class="font-bold text-xl truncate">{service.name}</h1>
+							<ServiceIcons type={service.type} isAbsolute={true} />
+							<div class="w-full flex flex-col">
+								<h1 class="font-bold text-lg lg:text-sm truncate">{service.name}</h1>
 								<div class="h-10">
 									{#if service?.fqdn}
 										<h2>{service?.fqdn.replace('https://', '').replace('http://', '')}</h2>
@@ -223,9 +223,9 @@
 		{/if}
 	</div>
 
-	<h1 class="title text-4xl mt-10">Databases</h1>
+	<h1 class="title lg:text-3xl mt-10">Databases</h1>
 	<div class="divider" />
-	<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 lg:grid-cols-3 p-4 mb-32">
+	<div class="grid grid-col gap-8 auto-cols-max grid-cols-1 lg:grid-cols-3 p-4 mb-32">
 		{#if databases.length > 0}
 			{#each databases as database}
 				<a class="no-underline mb-5" href={`/databases/${database.id}`}>
@@ -239,14 +239,14 @@
 								<span class="indicator-item badge bg-error badge-xs" />
 							{/if}
 						{/await}
-						<div class="w-full flex flex-row pt-2">
-							<DatabaseIcons type={database.type} isAbsolute={false} />
-							<div class="w-full flex flex-col ml-5">
+						<div class="w-full flex flex-row">
+							<DatabaseIcons type={database.type} isAbsolute={true} />
+							<div class="w-full flex flex-col">
 								<div class="h-10">
-									<h1 class="font-bold text-xl truncate">{database.name}</h1>
+									<h1 class="font-bold text-lg lg:text-sm truncate">{database.name}</h1>
 									<div class="h-10">
 										{#if database?.version}
-											<h2>{database?.version}</h2>
+											<h2 class="text-xs">{database?.version}</h2>
 										{:else}
 											<h2 class="text-red-500">Not configured</h2>
 										{/if}

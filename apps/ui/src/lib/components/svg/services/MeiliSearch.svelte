@@ -4,7 +4,7 @@
 
 <svg
 	viewBox="0 0 127 74"
-	class={isAbsolute ? 'w-10 h-10 absolute top-0 left-0 -m-5' : 'w-8 mx-auto'}
+	class={isAbsolute ? 'w-10 h-10 absolute top-0 left-0 -m-5' : 'w-8 h-8mx-auto'}
 	xmlns="http://www.w3.org/2000/svg"
 	><path
 		d="M.825 73.993l23.244-59.47A21.85 21.85 0 0144.42.625h14.014L35.19 60.096a21.85 21.85 0 01-20.352 13.897H.825z"

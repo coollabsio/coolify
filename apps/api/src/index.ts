@@ -161,7 +161,7 @@ async function initServer() {
 	} catch (error) { }
 	try {
 		const isOlder = compareVersions('3.8.1', version);
-		if (isOlder === -1) {
+		if (isOlder === 1) {
 			await prisma.build.updateMany({ where: { status: { in: ['running', 'queued'] } }, data: { status: 'failed' } });
 		}
 	} catch (error) { }

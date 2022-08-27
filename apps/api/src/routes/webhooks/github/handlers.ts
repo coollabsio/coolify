@@ -146,7 +146,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                     message: 'Queued. Thank you!'
                 };
             } else if (githubEvent === 'pull_request') {
-                const pullmergeRequestId = body.number;
+                const pullmergeRequestId = body.number.toString();
                 const pullmergeRequestAction = body.action;
                 const sourceBranch = body.pull_request.head.ref.includes('/') ? body.pull_request.head.ref.split('/')[2] : body.pull_request.head.ref;
                 if (!allowedActions.includes(pullmergeRequestAction)) {
