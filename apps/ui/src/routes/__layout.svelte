@@ -388,5 +388,7 @@
 	{/if}
 {/if}
 <main>
-	<slot />
+	<div class="px-20">
+		<slot />
+	</div>
 </main>

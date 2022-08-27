@@ -69,6 +69,7 @@
 				required
 				bind:this={emailEl}
 				bind:value={email}
+				class="w-56 md:w-96"
 			/>
 			<input
 				type="password"
@@ -76,6 +77,7 @@
 				placeholder={$t('forms.password')}
 				bind:value={password}
 				required
+				class="w-56 md:w-96"
 			/>
 
 			<div class="flex space-x-2 h-8 items-center justify-center pt-8">
@@ -83,14 +85,13 @@
 					type="submit"
 					disabled={loading}
 					class="btn btn-sm"
-					class:loading={loading}
+					class:loading
 					class:bg-coollabs={!loading}
 					>{loading ? $t('login.authenticating') : $t('login.login')}</button
 				>
 
-				<button
-					on:click|preventDefault={gotoRegister}
-					class="btn btn-sm">{$t('register.register')}</button
+				<button on:click|preventDefault={gotoRegister} class="btn btn-sm"
+					>{$t('register.register')}</button
 				>
 			</div>
 		</form>
