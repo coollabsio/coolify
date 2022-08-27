@@ -57,11 +57,12 @@
 					message: 'Secret added.',
 					type: 'success'
 				});
-			}
-			addToast({
+			} else {
+				addToast({
 				message: 'Secret updated.',
 				type: 'success'
 			});
+			}
 			dispatch('refresh');
 		} catch (error) {
 			console.log(error);

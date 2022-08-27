@@ -451,6 +451,7 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
                 data: {
                     id: buildId,
                     applicationId: id,
+                    sourceBranch: branch,
                     branch: application.branch,
                     pullmergeRequestId,
                     forceRebuild,
