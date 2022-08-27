@@ -120,9 +120,11 @@
 	<nav class="nav-main">
 		<div class="flex h-screen w-full flex-col items-center transition-all duration-100">
 			{#if !$appSession.whiteLabeled}
-				<div class="my-4 h-10 w-10"><img src="/favicon.png" alt="coolLabs logo" /></div>
+				<div class="mb-2 mt-4 h-10 w-10">
+					<img src="/favicon.png" alt="coolLabs logo" />
+				</div>
 			{:else if $appSession.whiteLabeledDetails.icon}
-				<div class="my-4 h-10 w-10">
+				<div class="mb-2 mt-4 h-10 w-10">
 					<img src={$appSession.whiteLabeledDetails.icon} alt="White labeled logo" />
 				</div>
 			{/if}
