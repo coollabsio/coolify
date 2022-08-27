@@ -4,7 +4,7 @@
 
 <svg
 	xmlns="http://www.w3.org/2000/svg"
-	class={isAbsolute ? 'w-10 h-10 absolute top-0 left-0 -m-5' : 'w-8 mx-auto'}
+	class={isAbsolute ? 'w-10 h-10 absolute top-0 left-0 -m-5' : 'w-8 h-8 mx-auto'}
 	fill="none"
 	viewBox="0 0 140 140"
 	data-lt-extension-installed="true"

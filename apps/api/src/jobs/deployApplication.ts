@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import yaml from 'js-yaml';
 
 import { copyBaseConfigurationFiles, makeLabelForStandaloneApplication, saveBuildLog, setDefaultConfiguration } from '../lib/buildPacks/common';
-import { createDirectories, decrypt, defaultComposeConfiguration, executeDockerCmd, getDomain, prisma } from '../lib/common';
+import { createDirectories, decrypt, defaultComposeConfiguration, executeDockerCmd, getDomain, prisma, decryptApplication } from '../lib/common';
 import * as importers from '../lib/importers';
 import * as buildpacks from '../lib/buildPacks';
 
@@ -27,7 +27,7 @@ import * as buildpacks from '../lib/buildPacks';
 
 		const th = throttle(async () => {
 			try {
-				const queuedBuilds = await prisma.build.findMany({ where: { status: 'queued' }, orderBy: { createdAt: 'asc' } });
+				const queuedBuilds = await prisma.build.findMany({ where: { status: { in: ['queued', 'running'] } }, orderBy: { createdAt: 'asc' } });
 				const { concurrentBuilds } = await prisma.setting.findFirst({})
 				if (queuedBuilds.length > 0) {
 					parentPort.postMessage({ deploying: true });
@@ -37,68 +37,72 @@ import * as buildpacks from '../lib/buildPacks';
 
 					for (const queueBuild of queuedBuilds) {
 						actions.push(async () => {
-							const application = await prisma.application.findUnique({ where: { id: queueBuild.applicationId }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, persistentStorage: true, secrets: true, settings: true, teams: true } })
-							const { id: buildId, type, sourceBranch = null, pullmergeRequestId = null, forceRebuild } = queueBuild
-							const {
-								id: applicationId,
-								repository,
-								name,
-								destinationDocker,
-								destinationDockerId,
-								gitSource,
-								configHash,
-								fqdn,
-								projectId,
-								secrets,
-								phpModules,
-								settings,
-								persistentStorage,
-								pythonWSGI,
-								pythonModule,
-								pythonVariable,
-								denoOptions,
-								exposePort,
-								baseImage,
-								baseBuildImage,
-								deploymentType,
-							} = application
-							let {
-								branch,
-								buildPack,
-								port,
-								installCommand,
-								buildCommand,
-								startCommand,
-								baseDirectory,
-								publishDirectory,
-								dockerFileLocation,
-								denoMainFile
-							} = application
-							const currentHash = crypto
-								.createHash('sha256')
-								.update(
-									JSON.stringify({
-										pythonWSGI,
-										pythonModule,
-										pythonVariable,
-										deploymentType,
-										denoOptions,
-										baseImage,
-										baseBuildImage,
-										buildPack,
-										port,
-										exposePort,
-										installCommand,
-										buildCommand,
-										startCommand,
-										secrets,
-										branch,
-										repository,
-										fqdn
-									})
-								)
-								.digest('hex');
+							let application = await prisma.application.findUnique({ where: { id: queueBuild.applicationId }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, persistentStorage: true, secrets: true, settings: true, teams: true } })
+							let { id: buildId, type, sourceBranch = null, pullmergeRequestId = null, forceRebuild } = queueBuild
+							application = decryptApplication(application)
 							try {
+								if (queueBuild.status === 'running') {
+									await saveBuildLog({ line: 'Building halted, restarting...', buildId, applicationId: application.id });
+								}
+								const {
+									id: applicationId,
+									repository,
+									name,
+									destinationDocker,
+									destinationDockerId,
+									gitSource,
+									configHash,
+									fqdn,
+									projectId,
+									secrets,
+									phpModules,
+									settings,
+									persistentStorage,
+									pythonWSGI,
+									pythonModule,
+									pythonVariable,
+									denoOptions,
+									exposePort,
+									baseImage,
+									baseBuildImage,
+									deploymentType,
+								} = application
+								let {
+									branch,
+									buildPack,
+									port,
+									installCommand,
+									buildCommand,
+									startCommand,
+									baseDirectory,
+									publishDirectory,
+									dockerFileLocation,
+									denoMainFile
+								} = application
+								const currentHash = crypto
+									.createHash('sha256')
+									.update(
+										JSON.stringify({
+											pythonWSGI,
+											pythonModule,
+											pythonVariable,
+											deploymentType,
+											denoOptions,
+											baseImage,
+											baseBuildImage,
+											buildPack,
+											port,
+											exposePort,
+											installCommand,
+											buildCommand,
+											startCommand,
+											secrets,
+											branch,
+											repository,
+											fqdn
+										})
+									)
+									.digest('hex');
 								const { debug } = settings;
 								if (concurrency === 1) {
 									await prisma.build.updateMany({
@@ -258,7 +262,6 @@ import * as buildpacks from '../lib/buildPacks';
 									];
 									if (secrets.length > 0) {
 										secrets.forEach((secret) => {
-											secret.value = decrypt(secret.value)
 											if (pullmergeRequestId) {
 												if (secret.isPRMRSecret) {
 													envs.push(`${secret.name}=${secret.value}`);
@@ -353,13 +356,16 @@ import * as buildpacks from '../lib/buildPacks';
 									where: { id: buildId, status: { in: ['queued', 'running'] } },
 									data: { status: 'failed' }
 								});
-								await saveBuildLog({ line: error, buildId, applicationId });
+								await saveBuildLog({ line: error, buildId, applicationId: application.id });
 							}
 						});
+
 					}
+
 					await pAll.default(actions, { concurrency })
 				}
 			} catch (error) {
+				console.log(error)
 			} finally {
 			}
 		})

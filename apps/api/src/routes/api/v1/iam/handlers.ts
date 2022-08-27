@@ -158,8 +158,11 @@ export async function getTeam(request: FastifyRequest<OnlyId>, reply: FastifyRep
         });
         const team = await prisma.team.findUnique({ where: { id }, include: { permissions: true } });
         const invitations = await prisma.teamInvitation.findMany({ where: { teamId: team.id } });
+        const { teams } = await prisma.user.findUnique({ where: { id: userId }, include: { teams: true } })
         return {
+            currentTeam: teamId,
             team,
+            teams,
             permissions,
             invitations
         };
@@ -275,10 +278,10 @@ export async function inviteToTeam(request: FastifyRequest<InviteToTeam>, reply:
         if (!userFound) {
             throw {
                 message: `No user found with '${email}' email address.`
-            };         
+            };
         }
         const uid = userFound.id;
-        if (uid === userId) {          
+        if (uid === userId) {
             throw {
                 message: `Invitation to yourself? Whaaaaat?`
             };

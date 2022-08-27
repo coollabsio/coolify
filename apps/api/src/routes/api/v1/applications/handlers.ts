@@ -34,7 +34,7 @@ export async function getImages(request: FastifyRequest<GetImages>) {
         const { buildPack, deploymentType } = request.body
         let publishDirectory = undefined;
         let port = undefined
-        const { baseImage, baseBuildImage, baseBuildImages, baseImages, } = setDefaultBaseImage(
+        const { baseImage, baseBuildImage, baseBuildImages, baseImages } = setDefaultBaseImage(
             buildPack, deploymentType
         );
         if (buildPack === 'nextjs') {
@@ -56,8 +56,7 @@ export async function getImages(request: FastifyRequest<GetImages>) {
             }
         }
 
-
-        return { baseBuildImage, baseBuildImages, publishDirectory, port }
+        return { baseImage, baseImages, baseBuildImage, baseBuildImages, publishDirectory, port }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
@@ -232,7 +231,6 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             baseBuildImage,
             deploymentType
         } = request.body
-
         if (port) port = Number(port);
         if (exposePort) {
             exposePort = Number(exposePort);
@@ -451,6 +449,7 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
                 data: {
                     id: buildId,
                     applicationId: id,
+                    sourceBranch: branch,
                     branch: application.branch,
                     pullmergeRequestId,
                     forceRebuild,

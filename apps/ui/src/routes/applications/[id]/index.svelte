@@ -114,10 +114,33 @@
 			buildPack: application.buildPack,
 			deploymentType: application.deploymentType
 		});
-		application = {
-			...application,
-			...data
-		};
+		const baseImageCorrect = data.baseImages.filter(
+			(image: any) => image.value === application.baseImage
+		);
+		if (baseImageCorrect.length === 0) {
+			application.baseImage = data.baseImage;
+		}
+		application.baseImages = data.baseImages;
+
+		const baseBuildImageCorrect = data.baseBuildImages.filter(
+			(image: any) => image.value === application.baseBuildImage
+		);
+		if (baseBuildImageCorrect.length === 0) {
+			application.baseBuildImage = data.baseBuildImage;
+		}
+		application.baseBuildImages = data.baseBuildImages;
+		if (application.deploymentType === 'static' && application.port !== '80') {
+			application.port = data.port;
+		}
+		if (application.deploymentType === 'node' && application.port === '80') {
+			application.port = data.port;
+		}
+		if (application.deploymentType === 'static' && !application.publishDirectory) {
+			application.publishDirectory = data.publishDirectory;
+		}
+		if (application.deploymentType === 'node' && application.publishDirectory === 'out') {
+			application.publishDirectory = data.publishDirectory;
+		}
 	}
 	async function changeSettings(name: any) {
 		if (name === 'debug') {
@@ -631,9 +654,7 @@
 						bind:value={application.port}
 						placeholder="{$t('forms.default')}: 'python' ? '8000' : '3000'"
 					/>
-					<Explainer
-					text={'The port your application listens on.'}
-				/>
+					<Explainer text={'The port your application listens on.'} />
 				</div>
 			{/if}
 			<div class="grid grid-cols-2 items-center">
