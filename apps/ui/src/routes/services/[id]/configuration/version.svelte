@@ -31,12 +31,13 @@
 	import { goto } from '$app/navigation';
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
-	import { errorNotification, supportedServiceTypesAndVersions } from '$lib/common';
+	import { errorNotification } from '$lib/common';
 	import { onMount } from 'svelte';
+	import { appSession } from '$lib/store';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
-	let recommendedVersion = supportedServiceTypesAndVersions.find(
+	let recommendedVersion = $appSession.supportedServiceTypesAndVersions.find(
 		({ name }) => name === type
 	)?.recommendedVersion;
 

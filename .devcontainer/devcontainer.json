@@ -8,7 +8,7 @@
 		// Append -bullseye or -buster to pin to an OS version.
 		// Use -bullseye variants on local arm64/Apple Silicon.
 		"args": {
-			"VARIANT": "16-bullseye"
+			"VARIANT": "18-bullseye"
 		}
 	},
 	// Set *default* container specific settings.json values on container create.
@@ -23,9 +23,9 @@
 		"bradlc.vscode-tailwindcss"
 	],
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	"forwardPorts": [3000],
+	"forwardPorts": [3000, 3001],
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "cp .env.template .env && pnpm install && pnpm db:push && pnpm db:seed",
+	"postCreateCommand": "cp apps/api/.env.example pps/api/.env && pnpm install && pnpm db:push && pnpm db:seed",
 	// Comment out to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
 	"remoteUser": "node",
 	"features": {

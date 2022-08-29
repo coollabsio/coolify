@@ -5,7 +5,7 @@ import compare from 'compare-versions';
 import cuid from 'cuid';
 import bcrypt from 'bcryptjs';
 import { asyncExecShell, asyncSleep, cleanupDockerStorage, errorHandler, isDev, listSettings, prisma, uniqueName, version } from '../../../lib/common';
-
+import { supportedServiceTypesAndVersions } from '../../../lib/services/supportedVersions';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Login, Update } from '.';
 import type { GetCurrentUser } from './types';
@@ -300,6 +300,7 @@ export async function getCurrentUser(request: FastifyRequest<GetCurrentUser>, fa
 	}
 	return {
 		settings: await prisma.setting.findFirst(),
+		supportedServiceTypesAndVersions,
 		token,
 		...request.user
 	}
