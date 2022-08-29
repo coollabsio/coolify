@@ -24,12 +24,6 @@ body {
 	@apply min-h-screen overflow-x-hidden bg-coolblack text-sm text-white scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200;
 }
 
-main,
-.main {
-	width: calc(100% - 4rem);
-	margin-left: 4rem;
-}
-
 input {
 	@apply h-12 w-96 rounded border border-transparent bg-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:border disabled:border-dashed disabled:border-coolgray-300 disabled:bg-transparent md:text-sm;
 }
@@ -106,7 +100,7 @@ a {
 	@apply mr-4 text-base tracking-tight md:text-2xl font-bold;
 }
 .nav-main {
-	@apply fixed top-0 left-0 min-h-screen w-16 min-w-[4rem] overflow-auto border-r border-stone-800 bg-coolgray-200 scrollbar-w-1  scrollbar-thumb-coollabs scrollbar-track-coolgray-200 xl:overflow-visible;
+	@apply fixed top-0 left-0 min-h-screen w-16 min-w-[4rem] overflow-hidden border-r border-stone-800 bg-coolgray-200 scrollbar-w-1  scrollbar-thumb-coollabs scrollbar-track-coolgray-200 xl:overflow-visible;
 }
 
 .nav-side {

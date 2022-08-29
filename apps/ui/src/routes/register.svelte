@@ -101,6 +101,7 @@
 					required
 					bind:this={emailEl}
 					bind:value={email}
+					class="w-56 md:w-96"
 				/>
 				<input
 					type="password"
@@ -109,6 +110,7 @@
 					bind:this={passwordEl}
 					bind:value={password}
 					required
+					class="w-56 md:w-96"
 				/>
 				<input
 					type="password"
@@ -116,6 +118,7 @@
 					placeholder={$t('forms.password_again')}
 					bind:value={passwordCheck}
 					required
+					class="w-56 md:w-96"
 				/>
 
 				<div class="flex space-x-2 h-8 items-center justify-center pt-8">
@@ -125,8 +128,7 @@
 						disabled={loading}
 						class:bg-transparent={loading}
 						class:bg-coollabs={!loading}
-						class:loading={loading}
-						>{loading ? $t('register.registering') : $t('register.register')}</button
+						class:loading>{loading ? $t('register.registering') : $t('register.register')}</button
 					>
 				</div>
 			</form>
