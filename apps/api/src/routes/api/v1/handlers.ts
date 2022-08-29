@@ -1,7 +1,7 @@
 import os from 'node:os';
 import osu from 'node-os-utils';
 import axios from 'axios';
-import compare from 'compare-versions';
+import { compareVersions } from 'compare-versions';
 import cuid from 'cuid';
 import bcrypt from 'bcryptjs';
 import { asyncExecShell, asyncSleep, cleanupDockerStorage, errorHandler, isDev, listSettings, prisma, uniqueName, version } from '../../../lib/common';
@@ -32,7 +32,7 @@ export async function checkUpdate(request: FastifyRequest) {
 			`https://get.coollabs.io/versions.json?appId=${process.env['COOLIFY_APP_ID']}&version=${currentVersion}`
 		);
 		const latestVersion = versions['coolify'].main.version
-		const isUpdateAvailable = compare(latestVersion, currentVersion);
+		const isUpdateAvailable = compareVersions(latestVersion, currentVersion);
 		if (isStaging) {
 			return {
 				isUpdateAvailable: true,
