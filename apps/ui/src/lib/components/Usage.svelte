@@ -85,17 +85,19 @@
 </script>
 
 <div class="w-full">
-	<div class="flex items-center">
+	<div class="items-center grid grid-flow-row md:grid-flow-col md:w-96 gap-4">
 		<h1 class="title lg:text-3xl">Hardware Details</h1>
-		<div class="flex space-x-4">
+		<div class="grid lg:grid-flow-col gap-4">
 			{#if $appSession.teamId === '0'}
-				<button on:click={manuallyCleanupStorage} class:loading={loading.cleanup} class="btn btn-sm"
-					>Cleanup Storage</button
+				<button
+					on:click={manuallyCleanupStorage}
+					class:loading={loading.cleanup}
+					class="btn btn-sm w-36 h-14">Cleanup Storage</button
 				>
 				<button
 					on:click={restartCoolify}
 					class:loading={loading.restart}
-					class="btn btn-sm bg-red-600 hover:bg-red-500">Restart Coolify</button
+					class="btn btn-sm w-36 h-14 bg-red-600 hover:bg-red-500">Restart Coolify</button
 				>
 			{/if}
 		</div>
@@ -126,7 +128,6 @@
 		</div>
 
 		<div class="stats stats-vertical min-w-[20rem] mb-5 bg-transparent rounded">
-
 			<div class="stat">
 				<div class="stat-title">Total CPU</div>
 				<div class="stat-value text-2xl">
