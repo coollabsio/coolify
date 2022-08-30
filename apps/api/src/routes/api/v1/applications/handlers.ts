@@ -451,7 +451,7 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
                     applicationId: id,
                     sourceBranch: branch,
                     branch: application.branch,
-                    pullmergeRequestId: pullmergeRequestId.toString(),
+                    pullmergeRequestId: pullmergeRequestId?.toString(),
                     forceRebuild,
                     destinationDockerId: application.destinationDocker?.id,
                     gitSourceId: application.gitSource?.id,
