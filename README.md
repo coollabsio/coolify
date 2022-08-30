@@ -16,7 +16,7 @@ If you have a new service / build pack you would like to add, raise an idea [her
 
 ## How to install
 
-For more details goto the [docs](https://docs.coollabs.io/coolify/installation.html).
+For more details goto the [docs](https://docs.coollabs.io/coolify/installation).
 
 Installation is automated with the following command:
 
