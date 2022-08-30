@@ -65,7 +65,7 @@
 				{$t('application.configuration.no_configurable_destination')}
 			</div>
 			<div class="flex justify-center">
-				<a href="/new/destination" sveltekit:prefetch class="add-icon bg-sky-600 hover:bg-sky-500">
+				<a href="/destinations/new" sveltekit:prefetch class="add-icon bg-sky-600 hover:bg-sky-500">
 					<svg
 						class="w-6"
 						xmlns="http://www.w3.org/2000/svg"

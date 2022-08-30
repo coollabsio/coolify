@@ -1,5 +1,7 @@
 import { FastifyRequest } from "fastify";
-import { errorHandler, getDomain, isDev, prisma, supportedServiceTypesAndVersions, include, executeDockerCmd } from "../../../lib/common";
+import { errorHandler, getDomain, isDev, prisma, executeDockerCmd } from "../../../lib/common";
+import { supportedServiceTypesAndVersions } from "../../../lib/services/supportedVersions";
+import { includeServices } from "../../../lib/services/common";
 import { TraefikOtherConfiguration } from "./types";
 
 function configureMiddleware(
@@ -234,7 +236,7 @@ export async function traefikConfiguration(request, reply) {
 		}
 		const services: any = await prisma.service.findMany({
 			where: { destinationDocker: { remoteEngine: false } },
-			include,
+			include: includeServices,
 			orderBy: { createdAt: 'desc' },
 		});
 
@@ -590,7 +592,7 @@ export async function remoteTraefikConfiguration(request: FastifyRequest) {
 		}
 		const services: any = await prisma.service.findMany({
 			where: { destinationDocker: { id } },
-			include,
+			include: includeServices,
 			orderBy: { createdAt: 'desc' }
 		});
 

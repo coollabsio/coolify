@@ -152,7 +152,6 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                     } else if (action === 'close') {
                         if (applicationFound.destinationDockerId) {
                             const id = `${applicationFound.id}-${pullmergeRequestId}`;
-                            const engine = applicationFound.destinationDocker.engine;
                             await removeContainer({ id, dockerId: applicationFound.destinationDocker.id });
                         }
                         return {

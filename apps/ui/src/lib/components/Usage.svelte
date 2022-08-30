@@ -85,19 +85,19 @@
 </script>
 
 <div class="w-full">
-	<div class="items-center grid grid-flow-row md:grid-flow-col md:w-96 gap-4">
+	<div class="flex lg:flex-row flex-col gap-4">
 		<h1 class="title lg:text-3xl">Hardware Details</h1>
-		<div class="grid lg:grid-flow-col gap-4">
+		<div class="flex lg:flex-row flex-col space-x-0 lg:space-x-2 space-y-2 lg:space-y-0">
 			{#if $appSession.teamId === '0'}
 				<button
 					on:click={manuallyCleanupStorage}
 					class:loading={loading.cleanup}
-					class="btn btn-sm w-36 h-14">Cleanup Storage</button
+					class="btn btn-sm">Cleanup Storage</button
 				>
 				<button
 					on:click={restartCoolify}
 					class:loading={loading.restart}
-					class="btn btn-sm w-36 h-14 bg-red-600 hover:bg-red-500">Restart Coolify</button
+					class="btn btn-sm bg-red-600 hover:bg-red-500">Restart Coolify</button
 				>
 			{/if}
 		</div>

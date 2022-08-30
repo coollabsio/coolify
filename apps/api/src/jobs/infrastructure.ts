@@ -1,6 +1,6 @@
 import { parentPort } from 'node:worker_threads';
 import axios from 'axios';
-import compareVersions from 'compare-versions';
+import { compareVersions } from 'compare-versions';
 import { asyncExecShell, cleanupDockerStorage, executeDockerCmd, isDev, prisma, startTraefikTCPProxy, generateDatabaseConfiguration, startTraefikProxy, listSettings, version } from '../lib/common';
 
 async function disconnect() {
@@ -103,7 +103,7 @@ async function checkProxies() {
             }
         }
     } catch (error) {
-        
+
     }
 }
 async function cleanupPrismaEngines() {

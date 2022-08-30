@@ -5,9 +5,9 @@ import env from '@fastify/env';
 import cookie from '@fastify/cookie';
 import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
-import { asyncExecShell, asyncSleep, isDev, listSettings, prisma, version } from './lib/common';
+import { asyncExecShell, isDev, listSettings, prisma, version } from './lib/common';
 import { scheduler } from './lib/scheduler';
-import compareVersions from 'compare-versions';
+import { compareVersions } from 'compare-versions';
 import Graceful from '@ladjs/graceful'
 declare module 'fastify' {
 	interface FastifyInstance {
@@ -106,7 +106,7 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 
 	const graceful = new Graceful({ brees: [scheduler] });
 	graceful.listen();
-	
+
 	setInterval(async () => {
 		if (!scheduler.workers.has('deployApplication')) {
 			scheduler.run('deployApplication');

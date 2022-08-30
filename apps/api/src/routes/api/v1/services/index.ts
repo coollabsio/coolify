@@ -26,12 +26,11 @@ import {
     saveServiceType,
     saveServiceVersion,
     setSettingsService,
-    startService,
-    stopService
 } from './handlers';
 
 import type { OnlyId } from '../../../../types';
 import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetWordpressSettings } from './types';
+import { startService, stopService } from '../../../../lib/services/handlers';
 
 const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.addHook('onRequest', async (request) => {
