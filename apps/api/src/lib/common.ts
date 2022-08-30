@@ -1258,7 +1258,7 @@ export async function getServiceFromDB({ id, teamId }: { id: string; teamId: str
 	const settings = await prisma.setting.findFirst();
 	const body = await prisma.service.findFirst({
 		where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-		include
+		include: includeServices
 	});
 	let { type } = body
 	type = fixType(type)
