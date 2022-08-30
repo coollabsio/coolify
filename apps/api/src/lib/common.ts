@@ -21,7 +21,7 @@ import { scheduler } from './scheduler';
 import { supportedServiceTypesAndVersions } from './services/supportedVersions';
 import { includeServices } from './services/common';
 
-export const version = '3.8.8';
+export const version = '3.8.9';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
