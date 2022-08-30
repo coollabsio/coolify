@@ -592,7 +592,7 @@ export async function remoteTraefikConfiguration(request: FastifyRequest) {
 		}
 		const services: any = await prisma.service.findMany({
 			where: { destinationDocker: { id } },
-			include,
+			include: includeServices,
 			orderBy: { createdAt: 'desc' }
 		});
 
