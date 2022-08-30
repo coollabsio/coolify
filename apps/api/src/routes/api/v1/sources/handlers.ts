@@ -9,7 +9,7 @@ export async function listSources(request: FastifyRequest) {
     try {
         const teamId = request.user?.teamId;
         const sources = await prisma.gitSource.findMany({
-            where: { teams: { some: { id: teamId === '0' ? undefined : teamId } }, githubApp: { gitSource: { forPublic: false } } },
+            where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: { teams: true, githubApp: true, gitlabApp: true }
         });
         return {
