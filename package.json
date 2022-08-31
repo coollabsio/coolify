@@ -6,6 +6,7 @@
   "repository": "github:coollabsio/coolify",
   "scripts": {
     "oc": "opencollective-setup",
+    "translate": "pnpm run --filter i18n-converter translate",
     "db:studio": "pnpm run --filter api db:studio",
     "db:push": "pnpm run --filter api db:push",
     "db:seed": "pnpm run --filter api db:seed",

@@ -1,0 +1,15 @@
+{
+	"name": "i18n-converter",
+	"description": "Convert Weblate translations to sveltekit-i18n",
+	"license": "Apache-2.0",
+	"scripts": {
+		"translate": "node index.mjs"
+	},
+	"type": "module",
+	"dependencies": {
+		"node-gettext": "3.0.0",
+		"gettext-parser": "6.0.0",
+		"got": "12.3.1",
+		"dotenv": "16.0.2"
+	}
+}
