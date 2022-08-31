@@ -10,16 +10,16 @@ const __filename = fileURLToPath(import.meta.url);
 
 const __dirname = path.dirname(__filename);
 
-const webletInstanceURL = process.env.WEBLET_INSTANCE_URL;
-const webletComponentName = process.env.WEBLET_COMPONENT_NAME
-const token = process.env.WEBLET_TOKEN;
+const weblateInstanceURL = process.env.WEBLATE_INSTANCE_URL;
+const weblateComponentName = process.env.WEBLATE_COMPONENT_NAME
+const token = process.env.WEBLATE_TOKEN;
 
 const translationsDir = process.env.TRANSLATION_DIR;
 const translationsPODir = './locales';
 const locales = []
 const domain = 'locale'
 
-const translations = await got(`${webletInstanceURL}/api/components/${webletComponentName}/glossary/translations/?format=json`, {
+const translations = await got(`${weblateInstanceURL}/api/components/${weblateComponentName}/glossary/translations/?format=json`, {
     headers: {
         "Authorization": `Token ${token}`
     }
