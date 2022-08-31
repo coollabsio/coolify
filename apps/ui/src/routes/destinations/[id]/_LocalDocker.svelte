@@ -142,7 +142,7 @@
 </script>
 
 <form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
-	<div class="grid gap-1 lg:grid-flow-col">
+	<div class="flex md:flex-row space-y-2 md:space-y-0 space-x-0 md:space-x-2 flex-col pb-5">
 		<div class="title">{$t('forms.configuration')}</div>
 		{#if $appSession.isAdmin}
 			<button

@@ -148,7 +148,7 @@
 		</form>
 	{:else if source.githubApp?.installationId}
 		<form on:submit|preventDefault={handleSubmit} class="py-4">
-			<div class="grid gap-1 lg:grid-flow-col pb-5 ">
+			<div class="flex md:flex-row space-y-2 md:space-y-0 space-x-0 md:space-x-2 flex-col pb-5">
 				<div class="title">{$t('general')}</div>
 			
 				{#if $appSession.isAdmin}
