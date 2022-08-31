@@ -2,13 +2,13 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceFromDB, getContainerUsage,isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, executeDockerCmd, checkDomainsIsValidInDNS, persistentVolumes, asyncSleep, isARM, defaultComposeConfiguration, checkExposedPort } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceFromDB, getContainerUsage, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, executeDockerCmd, checkDomainsIsValidInDNS, persistentVolumes, asyncSleep, isARM, defaultComposeConfiguration, checkExposedPort } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, isContainerExited, removeContainer } from '../../../../lib/docker';
 import cuid from 'cuid';
 
 import type { OnlyId } from '../../../../types';
-import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetWordpressSettings } from './types';
+import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetGlitchTipSettings, SetWordpressSettings } from './types';
 import { defaultServiceConfigurations } from '../../../../lib/services';
 import { supportedServiceTypesAndVersions } from '../../../../lib/services/supportedVersions';
 import { configureServiceType, removeService } from '../../../../lib/services/common';
@@ -269,7 +269,6 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
         if (exposePort) exposePort = Number(exposePort);
 
         type = fixType(type)
-
         const update = saveUpdateableFields(type, request.body[type])
         const data = {
             fqdn,
@@ -400,13 +399,29 @@ export async function deleteServiceStorage(request: FastifyRequest<DeleteService
     }
 }
 
-export async function setSettingsService(request: FastifyRequest<ServiceStartStop & SetWordpressSettings>, reply: FastifyReply) {
+export async function setSettingsService(request: FastifyRequest<ServiceStartStop & SetWordpressSettings & SetGlitchTipSettings>, reply: FastifyReply) {
     try {
         const { type } = request.params
         if (type === 'wordpress') {
             return await setWordpressSettings(request, reply)
         }
+        if (type === 'glitchtip') {
+            return await setGlitchTipSettings(request, reply)
+        }
         throw `Service type ${type} not supported.`
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+async function setGlitchTipSettings(request: FastifyRequest<SetGlitchTipSettings>, reply: FastifyReply) {
+    try {
+        const { id } = request.params
+        const { enableOpenUserRegistration, emailSmtpUseSsl, emailSmtpUseTls } = request.body
+        await prisma.glitchTip.update({
+            where: { serviceId: id },
+            data: { enableOpenUserRegistration, emailSmtpUseSsl, emailSmtpUseTls }
+        });
+        return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
