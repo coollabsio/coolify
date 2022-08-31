@@ -24,7 +24,7 @@
 				apiUrl: source.apiUrl.replace(/\/$/, '')
 			});
 			return addToast({
-				message:'Configuration saved.',
+				message: 'Configuration saved.',
 				type: 'success'
 			});
 		} catch (error) {
@@ -93,7 +93,7 @@
 <div class="mx-auto max-w-4xl px-6">
 	{#if !source.githubAppId}
 		<form on:submit|preventDefault={newGithubApp} class="py-4">
-			<div class="flex space-x-1 pb-7">
+			<div class="grid gap-1 lg:grid-flow-col pb-7">
 				<div class="title">General</div>
 				{#if !source.githubAppId}
 					<button class="btn btn-sm bg-sources" type="submit">Save & Redirect to GitHub</button>
@@ -101,20 +101,20 @@
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
 				<div class="grid grid-flow-row gap-2">
-					<div class="mt-2 grid grid-cols-2 items-center">
+					<div class="mt-2 grid lg:grid-cols-2 items-center">
 						<label for="name" class="text-base font-bold text-stone-100">Name</label>
 						<input name="name" id="name" required bind:value={source.name} />
 					</div>
 				</div>
-				<div class="grid grid-cols-2 items-center">
+				<div class="grid lg:grid-cols-2 items-center">
 					<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
 					<input name="htmlUrl" id="htmlUrl" required bind:value={source.htmlUrl} />
 				</div>
-				<div class="grid grid-cols-2 items-center">
+				<div class="grid lg:grid-cols-2 items-center">
 					<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
 					<input name="apiUrl" id="apiUrl" required bind:value={source.apiUrl} />
 				</div>
-				<div class="grid grid-cols-2 items-center">
+				<div class="grid lg:grid-cols-2 items-center">
 					<label for="customPort" class="text-base font-bold text-stone-100">Custom SSH Port</label>
 					<input
 						name="customPort"
@@ -128,7 +128,7 @@
 						text="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
 					/>
 				</div>
-				<div class="grid grid-cols-2">
+				<div class="grid lg:grid-cols-2">
 					<div class="flex flex-col">
 						<label for="organization" class="pt-2 text-base font-bold text-stone-100"
 							>Organization</label
@@ -148,29 +148,29 @@
 		</form>
 	{:else if source.githubApp?.installationId}
 		<form on:submit|preventDefault={handleSubmit} class="py-4">
-			<div class="flex space-x-1 pb-5 ">
+			<div class="grid gap-1 lg:grid-flow-col pb-5 ">
 				<div class="title">{$t('general')}</div>
 				{#if $appSession.isAdmin}
-					<button
-						class="btn btn-sm bg-sources"
-						type="submit"
-						disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
+					<button class="btn btn-sm bg-sources" type="submit" disabled={loading}
+						>{loading ? 'Saving...' : 'Save'}</button
 					>
 					<a
 						class="btn btn-sm"
-						href={`${source.htmlUrl}/${source.htmlUrl === 'https://github.com' ? 'apps' : 'github-apps'}/${source.githubApp.name}/installations/new`}
+						href={`${source.htmlUrl}/${
+							source.htmlUrl === 'https://github.com' ? 'apps' : 'github-apps'
+						}/${source.githubApp.name}/installations/new`}
 						>{$t('source.change_app_settings', { name: 'GitHub' })}</a
 					>
 				{/if}
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
 				<div class="grid grid-flow-row gap-2">
-					<div class="mt-2 grid grid-cols-2 items-center">
+					<div class="mt-2 grid lg:grid-cols-2 items-center">
 						<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 						<input name="name" id="name" required bind:value={source.name} />
 					</div>
 				</div>
-				<div class="grid grid-cols-2 items-center">
+				<div class="grid lg:grid-cols-2 items-center">
 					<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
 					<input
 						name="htmlUrl"
@@ -181,7 +181,7 @@
 						bind:value={source.htmlUrl}
 					/>
 				</div>
-				<div class="grid grid-cols-2 items-center">
+				<div class="grid lg:grid-cols-2 items-center">
 					<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
 					<input
 						name="apiUrl"
@@ -193,7 +193,7 @@
 					/>
 				</div>
 				{#if selfHosted}
-					<div class="grid grid-cols-2 items-center">
+					<div class="grid lg:grid-cols-2 items-center">
 						<label for="customPort" class="text-base font-bold text-stone-100"
 							>Custom SSH Port</label
 						>
@@ -210,7 +210,7 @@
 						/>
 					</div>
 				{/if}
-				<div class="grid grid-cols-2">
+				<div class="grid lg:grid-cols-2">
 					<div class="flex flex-col">
 						<label for="organization" class="pt-2 text-base font-bold text-stone-100"
 							>Organization</label
@@ -229,10 +229,12 @@
 		</form>
 	{:else}
 		<div class="text-center">
-			<a href={`${source.htmlUrl}/${source.htmlUrl === 'https://github.com' ? 'apps' : 'github-apps'}/${source.githubApp.name}/installations/new`}>
-				<button class="box-selection bg-sources text-xl font-bold"
-					>Install Repositories</button
-				></a
+			<a
+				href={`${source.htmlUrl}/${
+					source.htmlUrl === 'https://github.com' ? 'apps' : 'github-apps'
+				}/${source.githubApp.name}/installations/new`}
+			>
+				<button class="box-selection bg-sources text-xl font-bold">Install Repositories</button></a
 			>
 		</div>
 	{/if}

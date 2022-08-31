@@ -10,7 +10,7 @@
 	export let loading = false;
 </script>
 
-<div class="flex items-center py-4 pr-8">
+<div class="flex items-center py-4 pr-8 max-w-xs">
 	<div class="flex w-96 flex-col">
 		<div class="text-xs font-bold text-stone-100 md:text-base">{title}</div>
 		<Explainer text={description} />
