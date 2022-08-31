@@ -17,3 +17,4 @@ export { default as Appwrite } from './Appwrite.svelte';
 export { default as Moodle } from './Moodle.svelte';
 export { default as GlitchTip }  from './GlitchTip.svelte';
 export { default as Searxng }  from './Searxng.svelte';
+export { default as Weblate }  from './Weblate.svelte';

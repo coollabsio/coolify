@@ -200,7 +200,7 @@ model Build {
   commit              String?
   pullmergeRequestId  String?
   forceRebuild        Boolean  @default(false)
-  sourceBranch        String?  
+  sourceBranch        String?
   branch              String?
   status              String?  @default("queued")
   createdAt           DateTime @default(now())
@@ -348,6 +348,7 @@ model Service {
   wordpress          Wordpress?
   appwrite           Appwrite?
   searxng            Searxng?
+  weblate            Weblate?
 }
 
 model PlausibleAnalytics {
@@ -558,4 +559,19 @@ model Searxng {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   service       Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Weblate {
+  id                   String   @id @default(cuid())
+  adminPassword        String
+  postgresqlHost       String
+  postgresqlPort       Int
+  postgresqlUser       String
+  postgresqlPassword   String
+  postgresqlDatabase   String
+  postgresqlPublicPort Int?
+  serviceId            String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  service              Service  @relation(fields: [serviceId], references: [id])
 }

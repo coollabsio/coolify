@@ -190,4 +190,15 @@ export const supportedServiceTypesAndVersions = [
 			main: 8080
 		}
 	},
+	{
+		name: 'weblate',
+		fancyName: 'Weblate',
+		baseImage: 'weblate/weblate',
+		images: ['postgres:14-alpine','redis:6-alpine'],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8080
+		}
+	},
 ];
