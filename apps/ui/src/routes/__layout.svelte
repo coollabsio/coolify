@@ -71,7 +71,7 @@
 	$appSession.version = baseSettings.version;
 	$appSession.whiteLabeled = baseSettings.whiteLabeled;
 	$appSession.whiteLabeledDetails.icon = baseSettings.whiteLabeledIcon;
-	$appSession.supportedServiceTypesAndVersions = supportedServiceTypesAndVersions
+	$appSession.supportedServiceTypesAndVersions = supportedServiceTypesAndVersions;
 
 	export let userId: string;
 	export let teamId: string;
@@ -396,7 +396,7 @@
 	{/if}
 {/if}
 <main>
-	<div class="px-20">
+	<div class="pl-14 lg:px-20">
 		<slot />
 	</div>
 </main>
