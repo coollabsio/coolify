@@ -142,7 +142,7 @@
 </script>
 
 <form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
-	<div class="flex space-x-1 pb-5">
+	<div class="grid gap-1 lg:grid-flow-col lg:w-96 w-64">
 		<div class="title font-bold">{$t('forms.configuration')}</div>
 		{#if $appSession.isAdmin}
 			<button
@@ -162,7 +162,7 @@
 			>
 		{/if}
 	</div>
-	<div class="grid grid-cols-2 items-center px-10 ">
+	<div class="grid lg:grid-cols-2 items-center px-10 ">
 		<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 		<input
 			name="name"
@@ -173,7 +173,7 @@
 		/>
 	</div>
 
-	<div class="grid grid-cols-2 items-center px-10">
+	<div class="grid lg:grid-cols-2 items-center px-10">
 		<label for="engine" class="text-base font-bold text-stone-100">{$t('forms.engine')}</label>
 		<CopyPasswordField
 			id="engine"
@@ -184,7 +184,7 @@
 			value={destination.engine}
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center px-10">
+	<div class="grid lg:grid-cols-2 items-center px-10">
 		<label for="network" class="text-base font-bold text-stone-100">{$t('forms.network')}</label>
 		<CopyPasswordField
 			id="network"
@@ -196,7 +196,7 @@
 		/>
 	</div>
 	{#if $appSession.teamId === '0'}
-		<div class="grid grid-cols-2 items-center">
+		<div class="grid lg:grid-cols-2 items-center">
 			<Setting
 				loading={loading.proxy}
 				disabled={cannotDisable}
