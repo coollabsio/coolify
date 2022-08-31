@@ -85,7 +85,7 @@ label {
 	@apply inline-block w-64 text-xs tracking-tight md:text-sm;
 }
 .btn {
-	@apply text-white text-base min-w-fit h-12;
+	@apply text-white text-base min-w-fit;
 }
 
 a {

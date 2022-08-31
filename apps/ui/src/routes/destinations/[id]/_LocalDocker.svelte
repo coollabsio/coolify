@@ -142,8 +142,8 @@
 </script>
 
 <form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
-	<div class="grid gap-1 lg:grid-flow-col lg:w-96 w-64">
-		<div class="title font-bold">{$t('forms.configuration')}</div>
+	<div class="grid gap-1 lg:grid-flow-col">
+		<div class="title">{$t('forms.configuration')}</div>
 		{#if $appSession.isAdmin}
 			<button
 				type="submit"

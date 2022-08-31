@@ -150,6 +150,7 @@
 		<form on:submit|preventDefault={handleSubmit} class="py-4">
 			<div class="grid gap-1 lg:grid-flow-col pb-5 ">
 				<div class="title">{$t('general')}</div>
+			
 				{#if $appSession.isAdmin}
 					<button class="btn btn-sm bg-sources" type="submit" disabled={loading}
 						>{loading ? 'Saving...' : 'Save'}</button
