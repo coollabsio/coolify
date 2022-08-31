@@ -3,15 +3,22 @@ import crypto from 'node:crypto'
 import jsonwebtoken from 'jsonwebtoken';
 import axios from 'axios';
 import { FastifyReply } from 'fastify';
+import fs from 'fs/promises';
+import yaml from 'js-yaml';
+
 import { day } from '../../../../lib/dayjs';
-import { setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
-import { checkDomainsIsValidInDNS, checkDoubleBranch, checkExposedPort, decrypt, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, getFreeExposedPort, isDev, isDomainConfigured, listSettings, prisma, stopBuild, uniqueName } from '../../../../lib/common';
+import { makeLabelForStandaloneApplication, setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
+import { checkDomainsIsValidInDNS, checkDoubleBranch, checkExposedPort, createDirectories, decrypt, defaultComposeConfiguration, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, isDev, isDomainConfigured, listSettings, prisma, stopBuild, uniqueName } from '../../../../lib/common';
 import { checkContainer, formatLabelsOnDocker, isContainerExited, removeContainer } from '../../../../lib/docker';
-import { scheduler } from '../../../../lib/scheduler';
 
 import type { FastifyRequest } from 'fastify';
 import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain, StopPreviewApplication } from './types';
 import { OnlyId } from '../../../../types';
+
+function filterObject(obj, callback) {
+    return Object.fromEntries(Object.entries(obj).
+        filter(([key, val]) => callback(val, key)));
+}
 
 export async function listApplications(request: FastifyRequest) {
     try {
@@ -308,6 +315,113 @@ export async function stopPreviewApplication(request: FastifyRequest<StopPreview
             }
         }
         return reply.code(201).send();
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
+export async function restartApplication(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
+    try {
+        const { id } = request.params
+        const { teamId } = request.user
+        let application: any = await getApplicationFromDB(id, teamId);
+        if (application?.destinationDockerId) {
+            const buildId = cuid();
+            const { id: dockerId, network } = application.destinationDocker;
+            const { secrets, pullmergeRequestId, port, repository, persistentStorage, id: applicationId, buildPack, exposePort } = application;
+
+            const envs = [
+                `PORT=${port}`
+            ];
+            if (secrets.length > 0) {
+                secrets.forEach((secret) => {
+                    if (pullmergeRequestId) {
+                        if (secret.isPRMRSecret) {
+                            envs.push(`${secret.name}=${secret.value}`);
+                        }
+                    } else {
+                        if (!secret.isPRMRSecret) {
+                            envs.push(`${secret.name}=${secret.value}`);
+                        }
+                    }
+                });
+            }
+            const { workdir } = await createDirectories({ repository, buildId });
+            const labels = []
+            let image = null
+            const { stdout: container } = await executeDockerCmd({ dockerId, command: `docker container ls --filter 'label=com.docker.compose.service=${id}' --format '{{json .}}'` })
+            const containersArray = container.trim().split('\n');
+            for (const container of containersArray) {
+                const containerObj = formatLabelsOnDocker(container);
+                image = containerObj[0].Image
+                Object.keys(containerObj[0].Labels).forEach(function (key) {
+                    if (key.startsWith('coolify')) {
+                        labels.push(`${key}=${containerObj[0].Labels[key]}`)
+                    }
+                })
+            }
+            let imageFound = false;
+            try {
+                await executeDockerCmd({
+                    dockerId,
+                    command: `docker image inspect ${image}`
+                })
+                imageFound = true;
+            } catch (error) {
+                //
+            }
+            if (!imageFound) {
+                throw { status: 500, message: 'Image not found, cannot restart application.' }
+            }
+            await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
+
+            let envFound = false;
+            try {
+                envFound = !!(await fs.stat(`${workdir}/.env`));
+            } catch (error) {
+                //
+            }
+            const volumes =
+                persistentStorage?.map((storage) => {
+                    return `${applicationId}${storage.path.replace(/\//gi, '-')}:${buildPack !== 'docker' ? '/app' : ''
+                        }${storage.path}`;
+                }) || [];
+            const composeVolumes = volumes.map((volume) => {
+                return {
+                    [`${volume.split(':')[0]}`]: {
+                        name: volume.split(':')[0]
+                    }
+                };
+            });
+            const composeFile = {
+                version: '3.8',
+                services: {
+                    [applicationId]: {
+                        image,
+                        container_name: applicationId,
+                        volumes,
+                        env_file: envFound ? [`${workdir}/.env`] : [],
+                        labels,
+                        depends_on: [],
+                        expose: [port],
+                        ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                        ...defaultComposeConfiguration(network),
+                    }
+                },
+                networks: {
+                    [network]: {
+                        external: true
+                    }
+                },
+                volumes: Object.assign({}, ...composeVolumes)
+            };
+            await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
+            await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}` })
+            await executeDockerCmd({ dockerId, command: `docker rm ${id}` })
+            await executeDockerCmd({ dockerId, command: `docker compose --project-directory ${workdir} up -d` })
+            return reply.code(201).send();
+        }
+        throw { status: 500, message: 'Application cannot be restarted.' }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
