@@ -89,6 +89,12 @@ export interface ActivateWordpressFtp extends OnlyId {
     }
 }
 
-
+export interface SetGlitchTipSettings extends OnlyId {
+    Body: {
+        enableOpenUserRegistration: boolean,
+        emailSmtpUseSsl: boolean,
+        emailSmtpUseTls: boolean
+    }
+}
 
 

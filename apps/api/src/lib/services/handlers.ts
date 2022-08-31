@@ -63,6 +63,9 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         if (type === 'searxng') {
             return await startSearXNGService(request)
         }
+        if (type === 'weblate') {
+            return await startWeblateService(request)
+        }
         throw `Service type ${type} not supported.`
     } catch (error) {
         throw { status: 500, message: error?.message || error }
@@ -2224,3 +2227,106 @@ async function startSearXNGService(request: FastifyRequest<ServiceStartStop>) {
         return errorHandler({ status, message })
     }
 }
+
+
+async function startWeblateService(request: FastifyRequest<ServiceStartStop>) {
+    try {
+        const { id } = request.params;
+        const teamId = request.user.teamId;
+        const service = await getServiceFromDB({ id, teamId });
+        const {
+            weblate: { adminPassword, postgresqlHost, postgresqlPort, postgresqlUser, postgresqlPassword, postgresqlDatabase }
+        } = service;
+        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort, persistentStorage, fqdn } =
+            service;
+        const network = destinationDockerId && destinationDocker.network;
+        const port = getServiceMainPort('weblate');
+
+        const { workdir } = await createDirectories({ repository: type, buildId: id });
+        const image = getServiceImage(type);
+
+        const config = {
+            weblate: {
+                image: `${image}:${version}`,
+                volume: `${id}-data:/app/data`,
+                environmentVariables: {
+                    WEBLATE_SITE_DOMAIN: getDomain(fqdn),
+                    WEBLATE_ADMIN_PASSWORD: adminPassword,
+                    POSTGRES_PASSWORD: postgresqlPassword,
+                    POSTGRES_USER: postgresqlUser,
+                    POSTGRES_DATABASE: postgresqlDatabase,
+                    POSTGRES_HOST: postgresqlHost,
+                    POSTGRES_PORT: postgresqlPort,
+                    REDIS_HOST: `${id}-redis`,
+                }
+            },
+            postgresql: {
+                image: `postgres:14-alpine`,
+                volume: `${id}-postgresql-data:/var/lib/postgresql/data`,
+                environmentVariables: {
+                    POSTGRES_PASSWORD: postgresqlPassword,
+                    POSTGRES_USER: postgresqlUser,
+                    POSTGRES_DB: postgresqlDatabase,
+                    POSTGRES_HOST: postgresqlHost,
+                    POSTGRES_PORT: postgresqlPort,
+                }
+            },
+            redis: {
+                image: `redis:6-alpine`,
+                volume: `${id}-redis-data:/data`,
+            }
+
+        };
+
+        if (serviceSecret.length > 0) {
+            serviceSecret.forEach((secret) => {
+                config.weblate.environmentVariables[secret.name] = secret.value;
+            });
+        }
+        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
+        const composeFile: ComposeFile = {
+            version: '3.8',
+            services: {
+                [id]: {
+                    container_name: id,
+                    image: config.weblate.image,
+                    environment: config.weblate.environmentVariables,
+                    ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                    volumes,
+                    labels: makeLabelForServices('weblate'),
+                    ...defaultComposeConfiguration(network),
+                },
+                [`${id}-postgresql`]: {
+                    container_name: `${id}-postgresql`,
+                    image: config.postgresql.image,
+                    environment: config.postgresql.environmentVariables,
+                    ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                    volumes,
+                    labels: makeLabelForServices('weblate'),
+                    ...defaultComposeConfiguration(network),
+                },
+                [`${id}-redis`]: {
+                    container_name: `${id}-redis`,
+                    image: config.redis.image,
+                    ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                    volumes,
+                    labels: makeLabelForServices('weblate'),
+                    ...defaultComposeConfiguration(network),
+                }
+            },
+            networks: {
+                [network]: {
+                    external: true
+                }
+            },
+            volumes: volumeMounts
+        };
+        const composeFileDestination = `${workdir}/docker-compose.yaml`;
+        await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
+        return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+

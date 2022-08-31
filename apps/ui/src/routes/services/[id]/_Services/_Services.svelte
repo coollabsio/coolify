@@ -30,6 +30,7 @@
 	import Appwrite from './_Appwrite.svelte';
 	import Moodle from './_Moodle.svelte';
 	import Searxng from './_Searxng.svelte';
+	import Weblate from './_Weblate.svelte';
 
 	const { id } = $page.params;
 	$: isDisabled =
@@ -405,6 +406,8 @@
 				<GlitchTip bind:service />
 			{:else if service.type === 'searxng'}
 				<Searxng bind:service />
+			{:else if service.type === 'weblate'}
+				<Weblate bind:service />
 			{/if}
 		</div>
 	</form>

@@ -71,4 +71,8 @@
 	<a href="https://searxng.org" target="_blank">
 		<Icons.Searxng />
 	</a>
+{:else if service.type === 'weblate'}
+	<a href="https://weblate.org" target="_blank">
+		<Icons.Weblate />
+	</a>
 {/if}

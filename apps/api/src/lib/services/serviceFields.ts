@@ -600,6 +600,54 @@ export const glitchTip = [{
 	isEncrypted: true
 },
 {
+	name: 'emailSmtpHost',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'emailSmtpPassword',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'emailSmtpUseSsl',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: true,
+	isEncrypted: false
+},
+{
+	name: 'emailSmtpUseSsl',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: true,
+	isEncrypted: false
+},
+{
+	name: 'emailSmtpPort',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: true,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'emailSmtpUser',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
 	name: 'defaultEmail',
 	isEditable: false,
 	isLowerCase: false,
@@ -624,7 +672,7 @@ export const glitchTip = [{
 	isEncrypted: true
 },
 {
-	name: 'defaultFromEmail',
+	name: 'defaultEmailFrom',
 	isEditable: true,
 	isLowerCase: false,
 	isNumber: false,
@@ -687,4 +735,53 @@ export const searxng = [{
 	isNumber: false,
 	isBoolean: false,
 	isEncrypted: true
+}]
+
+export const weblate = [{
+	name: 'adminPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'postgresqlHost',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlPort',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'postgresqlDatabase',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
 }]

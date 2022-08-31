@@ -1,11 +1,12 @@
 {
   "name": "coolify",
   "description": "An open-source & self-hostable Heroku / Netlify alternative.",
-  "version": "3.8.9",
+  "version": "3.9.0",
   "license": "Apache-2.0",
   "repository": "github:coollabsio/coolify",
   "scripts": {
     "oc": "opencollective-setup",
+    "translate": "pnpm run --filter i18n-converter translate",
     "db:studio": "pnpm run --filter api db:studio",
     "db:push": "pnpm run --filter api db:push",
     "db:seed": "pnpm run --filter api db:seed",

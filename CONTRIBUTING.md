@@ -125,7 +125,7 @@ If you are finished with the Prisma schema, you should update the database schem
 
 Supported versions are hardcoded into Coolify (for now).
 
-You need to update `supportedServiceTypesAndVersions` function at [src/apps/api/src/lib/supportedVersions.ts](src/apps/api/src/lib/supportedVersions.ts). Example JSON:
+You need to update `supportedServiceTypesAndVersions` function at [apps/api/src/lib/services/supportedVersions.ts](apps/api/src/lib/services/supportedVersions.ts). Example JSON:
 
 ```js
      {
@@ -209,21 +209,22 @@ export const umami = [{
 4. Add service deletion query to `removeService` function in [apps/api/src/lib/services/common.ts](apps/api/src/lib/services/common.ts)
 
 
-5. You need to add start process for the new service in [apps/api/src/routes/api/v1/services/handlers.ts](apps/api/src/routes/api/v1/services/handlers.ts)
+5. Add start process for the new service in [apps/api/src/routes/api/v1/services/handlers.ts](apps/api/src/routes/api/v1/services/handlers.ts)
 
 > See startUmamiService() function as example.
 
+6. Add the newly added start process to `startService` in [apps/api/src/routes/api/v1/services/handlers.ts](apps/api/src/routes/api/v1/services/handlers.ts)
 
-6. You need to add a custom logo at [apps/ui/src/lib/components/svg/services](apps/ui/src/lib/components/svg/services) as a svelte component and export it in [apps/ui/src/lib/components/svg/services/index.ts](apps/ui/src/lib/components/svg/services/index.ts)
+7. You need to add a custom logo at [apps/ui/src/lib/components/svg/services](apps/ui/src/lib/components/svg/services) as a svelte component and export it in [apps/ui/src/lib/components/svg/services/index.ts](apps/ui/src/lib/components/svg/services/index.ts)
 
    SVG is recommended, but you can use PNG as well. It should have the `isAbsolute` variable with the suitable CSS classes, primarily for sizing and positioning.
 
-7. You need to include it the logo at:
+8. You need to include it the logo at:
 
 - [apps/ui/src/lib/components/svg/services/ServiceIcons.svelte](apps/ui/src/lib/components/svg/services/ServiceIcons.svelte) with `isAbsolute`.
 - [apps/ui/src/routes/services/[id]/_ServiceLinks.svelte](apps/ui/src/routes/services/[id]/_ServiceLinks.svelte) with the link to the docs/main site of the service
 
-8. By default the URL and the name frontend forms are included in [apps/ui/src/routes/services/[id]/_Services/_Services.svelte](apps/ui/src/routes/services/[id]/_Services/_Services.svelte).
+9. By default the URL and the name frontend forms are included in [apps/ui/src/routes/services/[id]/_Services/_Services.svelte](apps/ui/src/routes/services/[id]/_Services/_Services.svelte).
 
    If you need to show more details on the frontend, such as users/passwords, you need to add Svelte component to [apps/ui/src/routes/services/[id]/_Services](apps/ui/src/routes/services/[id]/_Services) with an underscore. 
    
