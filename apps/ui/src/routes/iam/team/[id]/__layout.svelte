@@ -35,6 +35,7 @@
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import { goto } from '$app/navigation';
 	import Cookies from 'js-cookie';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 	const { id } = $page.params;
 
 	async function deleteTeam() {
@@ -69,15 +70,14 @@
 	<nav class="nav-side">
 		{#if team.id !== '0'}
 			<button
+				id="delete"
 				on:click={deleteTeam}
 				type="submit"
 				disabled={!$appSession.isAdmin}
 				class:hover:text-red-500={$appSession.isAdmin}
-				class="icons tooltip tooltip-primary tooltip-left bg-transparent text-sm"
-				data-tip={$appSession.isAdmin
-					? 'Delete'
-					: $t('destination.permission_denied_delete_destination')}><DeleteIcon /></button
+				class="icons bg-transparent text-sm"><DeleteIcon /></button
 			>
+			<Tooltip triggeredBy="#delete">Delete</Tooltip>
 		{/if}
 	</nav>
 {/if}

@@ -131,7 +131,9 @@ importers:
 
   apps/ui:
     specifiers:
+      '@floating-ui/dom': ^1.0.1
       '@playwright/test': 1.25.1
+      '@popperjs/core': ^2.11.6
       '@sveltejs/adapter-static': 1.0.0-next.39
       '@sveltejs/kit': 1.0.0-next.405
       '@tailwindcss/typography': ^0.5.4
@@ -139,11 +141,14 @@ importers:
       '@typescript-eslint/eslint-plugin': 5.35.1
       '@typescript-eslint/parser': 5.35.1
       autoprefixer: 10.4.8
+      classnames: ^2.3.1
       cuid: 2.1.8
       daisyui: 2.24.0
       eslint: 8.22.0
       eslint-config-prettier: 8.5.0
       eslint-plugin-svelte3: 4.0.0
+      flowbite: ^1.5.2
+      flowbite-svelte: ^0.26.2
       js-cookie: 3.0.1
       p-limit: 4.0.0
       postcss: 8.4.16
@@ -169,15 +174,20 @@ importers:
       svelte-select: 4.4.7
       sveltekit-i18n: 2.2.2_svelte@3.49.0
     devDependencies:
+      '@floating-ui/dom': 1.0.1
       '@playwright/test': 1.25.1
+      '@popperjs/core': 2.11.6
       '@sveltejs/kit': 1.0.0-next.405_svelte@3.49.0+vite@3.0.5
       '@types/js-cookie': 3.0.2
       '@typescript-eslint/eslint-plugin': 5.35.1_ktjxjibzrfqejavile4bhmzhjq
       '@typescript-eslint/parser': 5.35.1_4rv7y5c6xz3vfxwhbrcxxi73bq
       autoprefixer: 10.4.8_postcss@8.4.16
+      classnames: 2.3.1
       eslint: 8.22.0
       eslint-config-prettier: 8.5.0_eslint@8.22.0
       eslint-plugin-svelte3: 4.0.0_laaqauvsmoyypsiqkozwyi2fn4
+      flowbite: 1.5.2
+      flowbite-svelte: 0.26.2
       postcss: 8.4.16
       prettier: 2.7.1
       prettier-plugin-svelte: 2.7.0_o3ioganyptcsrh6x4hnxvjkpqi
@@ -369,6 +379,16 @@ packages:
       - supports-color
     dev: false
 
+  /@floating-ui/core/1.0.1:
+    resolution: {integrity: sha512-bO37brCPfteXQfFY0DyNDGB3+IMe4j150KFQcgJ5aBP295p9nBGeHEs/p0czrRbtlHq4Px/yoPXO/+dOCcF4uA==}
+    dev: true
+
+  /@floating-ui/dom/1.0.1:
+    resolution: {integrity: sha512-wBDiLUKWU8QNPNOTAFHiIAkBv1KlHauG2AhqjSeh2H+wR8PX+AArXfz8NkRexH5PgMJMmSOS70YS89AbWYh5dA==}
+    dependencies:
+      '@floating-ui/core': 1.0.1
+    dev: true
+
   /@humanwhocodes/config-array/0.10.4:
     resolution: {integrity: sha512-mXAIHxZT3Vcpg83opl1wGlVZ9xydbfZO3r5YfRSH6Gpp2J/PfdBP0wbDa2sO6/qRbcalpoevVyW6A/fI6LfeMw==}
     engines: {node: '>=10.10.0'}
@@ -456,6 +476,10 @@ packages:
     dependencies:
       '@types/node': 18.7.13
       playwright-core: 1.25.1
+    dev: true
+
+  /@popperjs/core/2.11.6:
+    resolution: {integrity: sha512-50/17A98tWUfQ176raKiOGXuYpLyyVMkxxG6oylzL3BPOlA6ADGdK7EYunSa4I064xerltq9TGXs8HmOk5E+vw==}
     dev: true
 
   /@prisma/client/3.15.2_prisma@3.15.2:
@@ -2000,6 +2024,10 @@ packages:
     resolution: {integrity: sha512-jJ0bqzaylmJtVnNgzTeSOs8DPavpbYgEr/b0YL8/2GO3xJEhInFmhKMUnEJQjZumK7KXGFhUy89PrsJWlakBVg==}
     dev: false
 
+  /classnames/2.3.1:
+    resolution: {integrity: sha512-OlQdbZ7gLfGarSqxesMesDa5uz7KFbID8Kpq/SxIoNGDqY8lSYs0D+hhtBXhcdB3rcbXArFr7vlHheLk1voeNA==}
+    dev: true
+
   /clean-stack/4.2.0:
     resolution: {integrity: sha512-LYv6XPxoyODi36Dp976riBtSY27VmFo+MKqEU9QCCWyTrdEPDog+RWA7xQWHi6Vbp61j5c4cdzzX1NidnwtUWg==}
     engines: {node: '>=12'}
@@ -3461,6 +3489,24 @@ packages:
     resolution: {integrity: sha512-WIWGi2L3DyTUvUrwRKgGi9TwxQMUEqPOPQBVi71R96jZXJdFskXEmf54BoZaS1kknGODoIGASGEzBUYdyMCBJg==}
     dev: true
 
+  /flowbite-svelte/0.26.2:
+    resolution: {integrity: sha512-CpZ33fyMuzrYvECKN2rD5zNa/ZY0c4cDMcY6wE/hvajFybbCqwMYzd0AkA88zTNm5fknEN0/E23TVmD4Qkhzzw==}
+    engines: {node: '>=16.0.0', npm: '>=7.0.0'}
+    dependencies:
+      '@floating-ui/dom': 1.0.1
+      '@popperjs/core': 2.11.6
+      classnames: 2.3.1
+      flowbite: 1.5.2
+      svelte-heros: 2.3.5
+    dev: true
+
+  /flowbite/1.5.2:
+    resolution: {integrity: sha512-oSKhPkg0bYb4dZG4ypSh++dPrFM3IOSER6HOwJHYRFPW5u9PXL4AQFMQh7Kytgws2xrDQyl/zqefZmymeWt2IA==}
+    dependencies:
+      '@popperjs/core': 2.11.6
+      mini-svg-data-uri: 1.4.4
+    dev: true
+
   /follow-redirects/1.15.0:
     resolution: {integrity: sha512-aExlJShTV4qOUOL7yF1U5tvLCB0xQuudbf6toyYA0E/acBNw71mvjFTnLaRp50aQaYocMR0a/RMMBIHeZnGyjQ==}
     engines: {node: '>=4.0'}
@@ -4480,6 +4526,11 @@ packages:
   /min-indent/1.0.1:
     resolution: {integrity: sha512-I9jwMn07Sy/IwOj3zVkVik2JTvgpaykDZEigL6Rx6N9LbMywwUSMtxET+7lVoDLLd3O3IXwJwvuuns8UB/HeAg==}
     engines: {node: '>=4'}
+    dev: true
+
+  /mini-svg-data-uri/1.4.4:
+    resolution: {integrity: sha512-r9deDe9p5FJUPZAk3A59wGH7Ii9YrjjWw0jmw/liSbHl2CHiyXj6FcDXDu2K3TjVAXqiJdaw3xxwlZZr9E6nHg==}
+    hasBin: true
     dev: true
 
   /minimalistic-assert/1.0.1:
@@ -5854,6 +5905,10 @@ packages:
       - sass
       - stylus
       - sugarss
+    dev: true
+
+  /svelte-heros/2.3.5:
+    resolution: {integrity: sha512-08PdccaeRPP1pVa90AGieTwGzrNtXpC1Fry+i95OTvcR3xbGRU/hxK4rnaFYvGgk1Pxj9YT6GKGTEX8uXE9XJQ==}
     dev: true
 
   /svelte-hmr/0.14.12_svelte@3.49.0:

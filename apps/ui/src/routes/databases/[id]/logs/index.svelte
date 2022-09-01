@@ -6,6 +6,7 @@
 	import { get } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 
 	const { id } = $page.params;
 
@@ -129,9 +130,9 @@
 			{/if}
 			<div class="flex justify-end sticky top-0 p-1 mx-1">
 				<button
+					id="follow"
 					on:click={followBuild}
-					class="bg-transparent btn btn-sm tooltip tooltip-primary tooltip-bottom"
-					data-tip="Follow logs"
+					class="bg-transparent btn btn-sm"
 					class:text-green-500={followingLogs}
 				>
 					<svg
@@ -151,6 +152,7 @@
 						<line x1="16" y1="12" x2="12" y2="16" />
 					</svg>
 				</button>
+				<Tooltip triggeredBy="#follow">Follow Logs</Tooltip>
 			</div>
 			<div
 				class="font-mono w-full leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"

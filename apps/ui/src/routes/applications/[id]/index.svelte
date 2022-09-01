@@ -39,7 +39,9 @@
 	import { addToast, appSession, disabledButton, setLocation, status } from '$lib/store';
 	import { t } from '$lib/translations';
 	import { errorNotification, getDomain, notNodeDeployments, staticDeployments } from '$lib/common';
-	import Setting from './_Setting.svelte';
+	import Setting from '$lib/components/Setting.svelte';
+	import Tooltip from '$lib/components/Tooltip.svelte';
+	import DocLink from '$lib/components/DocLink.svelte';
 	const { id } = $page.params;
 
 	$: isDisabled =
@@ -281,6 +283,7 @@
 	</div>
 	{#if application.gitSource?.htmlUrl && application.repository && application.branch}
 		<a
+			id="git"
 			href="{application.gitSource.htmlUrl}/{application.repository}/tree/{application.branch}"
 			target="_blank"
 			class="w-10"
@@ -321,6 +324,7 @@
 				</svg>
 			{/if}
 		</a>
+		<Tooltip triggeredBy="#git">Open on Git</Tooltip>
 	{/if}
 </div>
 
@@ -426,7 +430,7 @@
 					>
 				{/if}
 			</div>
-			<div class="grid grid-cols-2 items-center pb-8">
+			<div class="grid grid-cols-2 items-center">
 				<label for="destination" class="text-base font-bold text-stone-100"
 					>{$t('application.destination')}</label
 				>
@@ -440,10 +444,15 @@
 				</div>
 			</div>
 			{#if application.buildCommand || application.buildPack === 'rust' || application.buildPack === 'laravel'}
-				<div class="grid grid-cols-2 items-center pb-8">
+				<div class="grid grid-cols-2 items-center">
 					<label for="baseBuildImage" class="text-base font-bold text-stone-100"
-						>{$t('application.base_build_image')}</label
-					>
+						>{$t('application.base_build_image')}
+						<DocLink
+							explanation={application.buildPack === 'laravel'
+								? 'For building frontend assets with webpack.'
+								: 'Image that will be used during the build process.'}
+						/>
+					</label>
 
 					<div class="custom-select-wrapper">
 						<Select
@@ -457,17 +466,13 @@
 							isClearable={false}
 						/>
 					</div>
-					{#if application.buildPack === 'laravel'}
-						<Explainer text="For building frontend assets with webpack." />
-					{:else}
-						<Explainer text={$t('application.base_build_image_explainer')} />
-					{/if}
 				</div>
 			{/if}
 			{#if application.buildPack !== 'docker'}
 				<div class="grid grid-cols-2 items-center">
 					<label for="baseImage" class="text-base font-bold text-stone-100"
-						>{$t('application.base_image')}</label
+						>{$t('application.base_image')}
+						<DocLink explanation={'Image that will be used for the deployment.'} /></label
 					>
 					<div class="custom-select-wrapper">
 						<Select
@@ -481,13 +486,15 @@
 							isClearable={false}
 						/>
 					</div>
-					<Explainer text={$t('application.base_image_explainer')} />
 				</div>
 			{/if}
 			{#if application.buildPack !== 'docker' && (application.buildPack === 'nextjs' || application.buildPack === 'nuxtjs')}
 				<div class="grid grid-cols-2 items-center pb-8">
 					<label for="deploymentType" class="text-base font-bold text-stone-100"
-						>Deployment Type</label
+						>Deployment Type
+						<DocLink
+							explanation={"Defines how to deploy your application. <br><br><span class='text-green-500 font-bold'>Static</span> is for static websites, <span class='text-green-500 font-bold'>node</span> is for server-side applications."}
+						/></label
 					>
 					<div class="custom-select-wrapper">
 						<Select
@@ -501,9 +508,6 @@
 							isClearable={false}
 						/>
 					</div>
-					<Explainer
-						text="Defines how to deploy your application. <br><br><span class='text-green-500 font-bold'>Static</span> is for static websites, <span class='text-green-500 font-bold'>node</span> is for server-side applications."
-					/>
 				</div>
 			{/if}
 		</div>
@@ -513,26 +517,36 @@
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="grid grid-cols-2 items-center">
 				<Setting
+					id="isBot"
 					isCenter={false}
 					bind:setting={isBot}
 					on:click={() => changeSettings('isBot')}
 					title="Is your application a bot?"
-					description="You can deploy applications without domains. <br>You can also make them to listen on <span class='text-green-500 font-bold'>IP:EXPOSEDPORT</span> as well.<br></Setting><br>Useful to host <span class='text-green-500 font-bold'>Twitch bots, regular jobs, or anything that does not require an incoming connection.</span>"
+					description="You can deploy applications without domains or make them to listen on the <span class='text-settings font-bold'>Exposed Port</span>.<br></Setting><br>Useful to host <span class='text-settings font-bold'>Twitch bots, regular jobs, or anything that does not require an incoming HTTP connection.</span>"
 					disabled={$status.application.isRunning}
+				/>
+			</div>
+			<div class="grid grid-cols-2 items-center pb-8">
+				<Setting
+					id="dualCerts"
+					dataTooltip={$t('forms.must_be_stopped_to_modify')}
+					disabled={$status.application.isRunning}
+					isCenter={false}
+					bind:setting={dualCerts}
+					title={$t('application.ssl_www_and_non_www')}
+					description="It will generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-settings'>both DNS entries</span> set in advance.<br><br>Useful if you expect to have visitors on both."
+					on:click={() => !$status.application.isRunning && changeSettings('dualCerts')}
 				/>
 			</div>
 			{#if !isBot}
 				<div class="grid grid-cols-2">
 					<div class="flex-col">
 						<label for="fqdn" class="pt-2 text-base font-bold text-stone-100"
-							>{$t('application.url_fqdn')}</label
-						>
-						{#if browser && window.location.hostname === 'demo.coolify.io'}
-							<Explainer
-								text="<span class='text-white font-bold'>You can use the predefined random url name or enter your own domain name.</span>"
+							>{$t('application.url_fqdn')}
+							<DocLink
+								explanation={"If you specify <span class='text-settings font-bold'>https</span>, the application will be accessible only over https.<br>SSL certificate will be generated automatically.<br><br>If you specify <span class='text-settings font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application.<br><br><span class='text-settings font-bold'>You must set your DNS to point to the server IP in advance.</span>"}
 							/>
-						{/if}
-						<Explainer text={$t('application.https_explainer')} />
+						</label>
 					</div>
 					<div>
 						<input
@@ -581,17 +595,6 @@
 							</div>
 						{/if}
 					</div>
-				</div>
-				<div class="grid grid-cols-2 items-center pb-8">
-					<Setting
-						dataTooltip={$t('forms.must_be_stopped_to_modify')}
-						disabled={$status.application.isRunning}
-						isCenter={false}
-						bind:setting={dualCerts}
-						title={$t('application.ssl_www_and_non_www')}
-						description={$t('application.ssl_explainer')}
-						on:click={() => !$status.application.isRunning && changeSettings('dualCerts')}
-					/>
 				</div>
 			{/if}
 			{#if application.buildPack === 'python'}
@@ -658,7 +661,11 @@
 				</div>
 			{/if}
 			<div class="grid grid-cols-2 items-center">
-				<label for="exposePort" class="text-base font-bold text-stone-100">Exposed Port</label>
+				<label for="exposePort" class="text-base font-bold text-stone-100"
+					>Exposed Port <DocLink
+						explanation={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
+					/></label
+				>
 				<input
 					readonly={!$appSession.isAdmin && !$status.application.isRunning}
 					disabled={isDisabled}
@@ -666,9 +673,6 @@
 					id="exposePort"
 					bind:value={application.exposePort}
 					placeholder="12345"
-				/>
-				<Explainer
-					text={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
 				/>
 			</div>
 			{#if !notNodeDeployments.includes(application.buildPack)}
@@ -715,7 +719,9 @@
 			{#if application.buildPack === 'docker'}
 				<div class="grid grid-cols-2 items-center pt-4">
 					<label for="dockerFileLocation" class="text-base font-bold text-stone-100"
-						>Dockerfile Location</label
+						>Dockerfile Location <DocLink
+							explanation={"Should be absolute path, like <span class='text-settings font-bold'>/data/Dockerfile</span> or <span class='text-settings font-bold'>/Dockerfile.</span>"}
+						/></label
 					>
 					<input
 						disabled={isDisabled}
@@ -724,9 +730,6 @@
 						id="dockerFileLocation"
 						bind:value={application.dockerFileLocation}
 						placeholder="default: /Dockerfile"
-					/>
-					<Explainer
-						text="Should be absolute path, like <span class='text-green-500 font-bold'>/data/Dockerfile</span> or <span class='text-green-500 font-bold'>/Dockerfile.</span>"
 					/>
 				</div>
 			{/if}
@@ -743,7 +746,11 @@
 					/>
 				</div>
 				<div class="grid grid-cols-2 items-center">
-					<label for="denoOptions" class="text-base font-bold text-stone-100">Arguments</label>
+					<label for="denoOptions" class="text-base font-bold text-stone-100"
+						>Arguments <DocLink
+							explanation={"List of arguments to pass to <span class='text-settings font-bold'>deno run</span> command. Could include permissions, configurations files, etc."}
+						/></label
+					>
 					<input
 						disabled={isDisabled}
 						readonly={!$appSession.isAdmin}
@@ -752,18 +759,17 @@
 						bind:value={application.denoOptions}
 						placeholder="eg: --allow-net --allow-hrtime --config path/to/file.json"
 					/>
-					<Explainer
-						text="List of arguments to pass to <span class='text-green-500 font-bold'>deno run</span> command. Could include permissions, configurations files, etc."
-					/>
 				</div>
 			{/if}
 			{#if application.buildPack !== 'laravel' && application.buildPack !== 'heroku'}
 				<div class="grid grid-cols-2 items-center">
 					<div class="flex-col">
 						<label for="baseDirectory" class="pt-2 text-base font-bold text-stone-100"
-							>{$t('forms.base_directory')}</label
+							>{$t('forms.base_directory')}
+							<DocLink
+								explanation={"Directory to use as the base for all commands.<br>Could be useful with <span class='text-settings font-bold'>monorepos</span>."}
+							/></label
 						>
-						<Explainer text={$t('application.directory_to_use_explainer')} />
 					</div>
 					<input
 						disabled={isDisabled}
@@ -779,9 +785,11 @@
 				<div class="grid grid-cols-2 items-center">
 					<div class="flex-col">
 						<label for="publishDirectory" class="pt-2 text-base font-bold text-stone-100"
-							>{$t('forms.publish_directory')}</label
+							>{$t('forms.publish_directory')}
+							<DocLink
+								explanation={"Directory containing all the assets for deployment. <br> For example: <span class='text-settings font-bold'>dist</span>,<span class='text-settings font-bold'>_site</span> or <span class='text-settings font-bold'>public</span>."}
+							/></label
 						>
-						<Explainer text={$t('application.publish_directory_explainer')} />
 					</div>
 
 					<input
@@ -804,6 +812,7 @@
 		{#if !application.settings.isPublicRepository}
 			<div class="grid grid-cols-2 items-center">
 				<Setting
+					id="autodeploy"
 					isCenter={false}
 					bind:setting={autodeploy}
 					on:click={() => changeSettings('autodeploy')}
@@ -815,6 +824,7 @@
 		{#if !application.settings.isBot}
 			<div class="grid grid-cols-2 items-center">
 				<Setting
+					id="previews"
 					isCenter={false}
 					bind:setting={previews}
 					on:click={() => changeSettings('previews')}
@@ -825,6 +835,7 @@
 		{/if}
 		<div class="grid grid-cols-2 items-center">
 			<Setting
+				id="debug"
 				isCenter={false}
 				bind:setting={debug}
 				on:click={() => changeSettings('debug')}

@@ -26,6 +26,7 @@
 	import { addToast, appSession, features } from '$lib/store';
 	import { errorNotification, getDomain } from '$lib/common';
 	import Menu from './_Menu.svelte';
+	import DocLink from '$lib/components/DocLink.svelte';
 
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
 	let dualCerts = settings.dualCerts;
@@ -195,8 +196,8 @@
 						<div class="flex-col">
 							<div class="pt-2 text-base font-bold text-stone-100">
 								{$t('application.url_fqdn')}
+								<DocLink explanation={$t('setting.ssl_explainer')} />
 							</div>
-							<Explainer text={$t('setting.ssl_explainer')} />
 						</div>
 						<div class="justify-start text-left">
 							<input
@@ -250,8 +251,8 @@
 						<div class="flex-col">
 							<div class="pt-2 text-base font-bold text-stone-100">
 								{$t('forms.public_port_range')}
+								<DocLink explanation={$t('forms.public_port_range_explainer')} />
 							</div>
-							<Explainer text={$t('forms.public_port_range_explainer')} />
 						</div>
 						<div class="mx-auto flex-row items-center justify-center space-y-2">
 							<input
@@ -273,6 +274,7 @@
 					</div>
 					<div class="grid grid-cols-2 items-center">
 						<Setting
+							id="isDNSCheckEnabled"
 							bind:setting={isDNSCheckEnabled}
 							title={$t('setting.is_dns_check_enabled')}
 							description={$t('setting.is_dns_check_enabled_explainer')}
@@ -280,18 +282,19 @@
 						/>
 					</div>
 					<div class="grid grid-cols-2 items-center">
-						<div class="flex-col">
-							<div class="pt-2 text-base font-bold text-stone-100">
-								Custom DNS servers
-							</div>
-							<Explainer text="You can specify a custom DNS server to verify your domains all over Coolify.<br><br>By default, the OS defined DNS servers are used." />
+						<div class="text-base font-bold text-stone-100">
+							Custom DNS servers <DocLink
+								explanation="You can specify a custom DNS server to verify your domains all over Coolify.<br><br>By default, the OS defined DNS servers are used."
+							/>
 						</div>
-						<div class="mx-auto flex-row items-center justify-center space-y-2">
+
+						<div class="flex-row items-center justify-center">
 							<input placeholder="1.1.1.1,8.8.8.8" bind:value={DNSServers} />
 						</div>
 					</div>
 					<div class="grid grid-cols-2 items-center">
 						<Setting
+							id="dualCerts"
 							dataTooltip={$t('setting.must_remove_domain_before_changing')}
 							disabled={isFqdnSet}
 							bind:setting={dualCerts}

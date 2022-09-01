@@ -62,6 +62,7 @@
 	import { t } from '$lib/translations';
 	import { appSession, disabledButton, status, location, setLocation, addToast } from '$lib/store';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 
 	let statusInterval: any;
 	$disabledButton =
@@ -115,6 +116,10 @@
 			$status.application.initialLoading = true;
 			$status.application.loading = true;
 			await post(`/applications/${id}/restart`, {});
+			addToast({
+					type: 'success',
+					message: 'Restart successful.'
+				});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
@@ -174,9 +179,10 @@
 <nav class="nav-side">
 	{#if $location}
 		<a
+			id="open"
 			href={$location}
 			target="_blank"
-			class="icons tooltip-bottom flex items-center bg-transparent text-sm"
+			class="icons flex items-center bg-transparent text-sm"
 			><svg
 				xmlns="http://www.w3.org/2000/svg"
 				class="h-6 w-6"
@@ -193,14 +199,16 @@
 				<polyline points="15 4 20 4 20 9" />
 			</svg></a
 		>
+		<Tooltip triggeredBy="#open">Open</Tooltip>
+
 		<div class="border border-coolgray-500 h-8" />
 	{/if}
 
 	{#if $status.application.isExited}
 		<a
+			id="applicationerror"
 			href={!$disabledButton ? `/applications/${id}/logs` : null}
-			class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center text-error"
-			data-tip="Application exited with an error!"
+			class="icons bg-transparent text-sm flex items-center text-error"
 			sveltekit:prefetch
 		>
 			<svg
@@ -221,10 +229,11 @@
 				<line x1="12" y1="16" x2="12.01" y2="16" />
 			</svg>
 		</a>
+		<Tooltip triggeredBy="#applicationerror">Application exited with an error!</Tooltip>
 	{/if}
 	{#if $status.application.initialLoading}
 		<button
-			class="icons tooltip-bottom flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"
+			class="icons flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"
 		>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -247,13 +256,11 @@
 		</button>
 	{:else if $status.application.isRunning}
 		<button
+			id="stop"
 			on:click={stopApplication}
 			type="submit"
 			disabled={$disabledButton}
-			class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2 text-error"
-			data-tip={$appSession.isAdmin
-				? 'Stop'
-				: $t('application.permission_denied_stop_application')}
+			class="icons bg-transparent text-sm flex items-center space-x-2 text-error"
 		>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -270,14 +277,14 @@
 				<rect x="14" y="5" width="4" height="14" rx="1" />
 			</svg>
 		</button>
+		<Tooltip triggeredBy="#stop">Stop</Tooltip>
+
 		<button
+			id="restart"
 			on:click={restartApplication}
 			type="submit"
 			disabled={$disabledButton}
-			class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2 "
-			data-tip={$appSession.isAdmin
-				? 'Restart (useful for changing secrets)'
-				: $t('application.permission_denied_stop_application')}
+			class="icons bg-transparent text-sm flex items-center space-x-2"
 		>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -294,14 +301,14 @@
 				<path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
 			</svg>
 		</button>
+		<Tooltip triggeredBy="#restart">Restart (useful to change secrets)</Tooltip>
+
 		<form on:submit|preventDefault={() => handleDeploySubmit(true)}>
 			<button
+				id="forceredeploy"
 				type="submit"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2"
-				data-tip={$appSession.isAdmin
-					? 'Force Rebuild without cache'
-					: 'You do not have permission to rebuild application.'}
+				class="icons bg-transparent text-sm flex items-center space-x-2"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -320,16 +327,15 @@
 					/>
 				</svg>
 			</button>
+			<Tooltip triggeredBy="#forceredeploy">Force redeploy (without cache)</Tooltip>
 		</form>
 	{:else}
 		<form on:submit|preventDefault={() => handleDeploySubmit(false)}>
 			<button
+				id="deploy"
 				type="submit"
 				disabled={$disabledButton}
-				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2 text-success"
-				data-tip={$appSession.isAdmin
-					? 'Deploy'
-					: 'You do not have permission to deploy application.'}
+				class="icons bg-transparent text-sm flex items-center space-x-2 text-success"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -345,22 +351,20 @@
 					<path d="M7 4v16l13 -8z" />
 				</svg>
 			</button>
+			<Tooltip triggeredBy="#deploy">Deploy</Tooltip>
 		</form>
 	{/if}
 
 	<div class="border border-coolgray-500 h-8" />
 	<a
+		id="configurations"
 		href={!$disabledButton ? `/applications/${id}` : null}
 		sveltekit:prefetch
 		class="hover:text-yellow-500 rounded"
 		class:text-yellow-500={$page.url.pathname === `/applications/${id}`}
 		class:bg-coolgray-500={$page.url.pathname === `/applications/${id}`}
 	>
-		<button
-			disabled={$disabledButton}
-			class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
-			data-tip="Configurations"
-		>
+		<button disabled={$disabledButton} class="icons bg-transparent text-sm">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				class="h-6 w-6"
@@ -385,17 +389,14 @@
 		></a
 	>
 	<a
+		id="secrets"
 		href={!$disabledButton ? `/applications/${id}/secrets` : null}
 		sveltekit:prefetch
 		class="hover:text-pink-500 rounded"
 		class:text-pink-500={$page.url.pathname === `/applications/${id}/secrets`}
 		class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/secrets`}
 	>
-		<button
-			disabled={$disabledButton}
-			class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
-			data-tip="Secrets"
-		>
+		<button disabled={$disabledButton} class="icons bg-transparent text-sm">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				class="w-6 h-6"
@@ -416,17 +417,14 @@
 		></a
 	>
 	<a
+		id="persistentstorages"
 		href={!$disabledButton ? `/applications/${id}/storages` : null}
 		sveltekit:prefetch
 		class="hover:text-pink-500 rounded"
 		class:text-pink-500={$page.url.pathname === `/applications/${id}/storages`}
 		class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/storages`}
 	>
-		<button
-			disabled={$disabledButton}
-			class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
-			data-tip="Persistent Storages"
-		>
+		<button disabled={$disabledButton} class="icons bg-transparent text-sm">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				class="w-6 h-6"
@@ -446,17 +444,14 @@
 	>
 	{#if !application.settings.isBot}
 		<a
+			id="previews"
 			href={!$disabledButton ? `/applications/${id}/previews` : null}
 			sveltekit:prefetch
 			class="hover:text-orange-500 rounded"
 			class:text-orange-500={$page.url.pathname === `/applications/${id}/previews`}
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/previews`}
 		>
-			<button
-				disabled={$disabledButton}
-				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
-				data-tip="Previews"
-			>
+			<button disabled={$disabledButton} class="icons bg-transparent text-sm">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="w-6 h-6"
@@ -479,6 +474,7 @@
 	{/if}
 	<div class="border border-coolgray-500 h-8" />
 	<a
+		id="applicationlogs"
 		href={!$disabledButton && $status.application.isRunning ? `/applications/${id}/logs` : null}
 		sveltekit:prefetch
 		class="hover:text-sky-500 rounded"
@@ -487,8 +483,7 @@
 	>
 		<button
 			disabled={$disabledButton || !$status.application.isRunning}
-			class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
-			data-tip={$t('application.logs')}
+			class="icons bg-transparent text-sm"
 		>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -510,17 +505,14 @@
 		</button></a
 	>
 	<a
+		id="buildlogs"
 		href={!$disabledButton ? `/applications/${id}/logs/build` : null}
 		sveltekit:prefetch
 		class="hover:text-red-500 rounded"
 		class:text-red-500={$page.url.pathname === `/applications/${id}/logs/build`}
 		class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs/build`}
 	>
-		<button
-			disabled={$disabledButton}
-			class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
-			data-tip="Build Logs"
-		>
+		<button disabled={$disabledButton} class="icons bg-transparent text-sm">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				class="h-6 w-6"
@@ -546,16 +538,22 @@
 	<div class="border border-coolgray-500 h-8" />
 
 	<button
+		id="delete"
 		on:click={() => deleteApplication(application.name)}
 		type="submit"
 		disabled={!$appSession.isAdmin}
 		class:hover:text-red-500={$appSession.isAdmin}
-		class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
-		data-tip={$appSession.isAdmin
-			? $t('application.delete_application')
-			: $t('application.permission_denied_delete_application')}
+		class="icons bg-transparent text-sm"
 	>
 		<DeleteIcon />
 	</button>
 </nav>
 <slot />
+
+<Tooltip triggeredBy="#configurations">Configurations</Tooltip>
+<Tooltip triggeredBy="#secrets">Secrets</Tooltip>
+<Tooltip triggeredBy="#persistentstorages">Persistent Storages</Tooltip>
+<Tooltip triggeredBy="#previews">Previews</Tooltip>
+<Tooltip triggeredBy="#applicationlogs">Application Logs</Tooltip>
+<Tooltip triggeredBy="#buildlogs">Build Logs</Tooltip>
+<Tooltip triggeredBy="#delete">Delete</Tooltip>

@@ -11,6 +11,7 @@
 	import { t } from '$lib/translations';
 	import LoadingLogs from '$lib/components/LoadingLogs.svelte';
 	import { errorNotification } from '$lib/common';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 
 	let logs: any = [];
 	let loading = true;
@@ -108,9 +109,9 @@
 		{:else}
 			<div class="flex justify-end sticky top-0 p-2 mx-1">
 				<button
+					id="follow"
 					on:click={followBuild}
-					class="bg-transparent btn btn-sm btn-link tooltip tooltip-primary tooltip-bottom hover:text-green-500 hover:bg-coolgray-500"
-					data-tip="Follow logs"
+					class="bg-transparent btn btn-sm btn-linkhover:text-green-500 hover:bg-coolgray-500"
 					class:text-green-500={followingBuild}
 				>
 					<svg
@@ -130,12 +131,13 @@
 						<line x1="16" y1="12" x2="12" y2="16" />
 					</svg>
 				</button>
+				<Tooltip triggeredBy="#follow">Follow Logs</Tooltip>
 				{#if currentStatus === 'running'}
 					<button
+						id="cancel"
 						on:click={cancelBuild}
 						class:animation-spin={cancelInprogress}
-						class="bg-transparent btn btn-sm btn-link hover:text-red-500 hover:bg-coolgray-500 tooltip tooltip-primary tooltip-bottom"
-						data-tip="Cancel build"
+						class="bg-transparent btn btn-sm btn-link hover:text-red-500 hover:bg-coolgray-500"
 					>
 						{#if cancelInprogress}
 							Cancelling...
@@ -156,6 +158,7 @@
 							</svg>
 						{/if}
 					</button>
+					<Tooltip triggeredBy="#cancel">Cancel build</Tooltip>
 				{/if}
 			</div>
 			{#if logs.length > 0}

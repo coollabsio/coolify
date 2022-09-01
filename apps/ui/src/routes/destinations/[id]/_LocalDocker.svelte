@@ -196,14 +196,15 @@
 		/>
 	</div>
 	{#if $appSession.teamId === '0'}
-		<div class="grid lg:grid-cols-2 items-center">
+		<div class="grid lg:grid-cols-2 items-center px-10">
 			<Setting
+				id="changeProxySetting"
 				loading={loading.proxy}
 				disabled={cannotDisable}
 				bind:setting={destination.isCoolifyProxyUsed}
 				on:click={changeProxySetting}
 				title={$t('destination.use_coolify_proxy')}
-				description={`This will install a proxy on the destination to allow you to access your applications and services without any manual configuration. Databases will have their own proxy. <br><br>${
+				description={`This will install a proxy on the destination to allow you to access your applications and services without any manual configuration.${
 					cannotDisable
 						? '<span class="font-bold text-white">You cannot disable this proxy as FQDN is configured for Coolify.</span>'
 						: ''

@@ -33,11 +33,7 @@
 	<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
 		<div class="flex items-center space-x-2 pb-5">
 			<div class="title font-bold">{$t('forms.configuration')}</div>
-			<button
-				type="submit"
-				class="btn btn-sm bg-destinations"
-				class:loading={loading}
-				disabled={loading}
+			<button type="submit" class="btn btn-sm bg-destinations" class:loading disabled={loading}
 				>{loading
 					? payload.isCoolifyProxyUsed
 						? $t('destination.new.saving_and_configuring_proxy')
@@ -69,12 +65,13 @@
 			/>
 		</div>
 		{#if $appSession.teamId === '0'}
-			<div class="grid grid-cols-2 items-center">
+			<div class="grid grid-cols-2 items-center px-10">
 				<Setting
+					id="changeProxySetting"
 					bind:setting={payload.isCoolifyProxyUsed}
 					on:click={() => (payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed)}
 					title={$t('destination.use_coolify_proxy')}
-					description={$t('destination.new.install_proxy')}
+					description={'This will install a proxy on the destination to allow you to access your applications and services without any manual configuration.'}
 				/>
 			</div>
 		{/if}

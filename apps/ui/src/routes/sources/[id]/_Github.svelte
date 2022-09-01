@@ -8,6 +8,7 @@
 	import { dashify, errorNotification, getDomain } from '$lib/common';
 	import { addToast, appSession } from '$lib/store';
 	import { dev } from '$app/env';
+import DocLink from '$lib/components/DocLink.svelte';
 
 	const { id } = $page.params;
 
@@ -115,7 +116,9 @@
 					<input name="apiUrl" id="apiUrl" required bind:value={source.apiUrl} />
 				</div>
 				<div class="grid lg:grid-cols-2 items-center">
-					<label for="customPort" class="text-base font-bold text-stone-100">Custom SSH Port</label>
+					<label for="customPort" class="text-base font-bold text-stone-100">Custom SSH Port <DocLink
+						explanation={"If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."}
+					/></label>
 					<input
 						name="customPort"
 						id="customPort"
@@ -124,18 +127,15 @@
 						required
 						value={source.customPort}
 					/>
-					<Explainer
-						text="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
-					/>
 				</div>
 				<div class="grid lg:grid-cols-2">
 					<div class="flex flex-col">
 						<label for="organization" class="pt-2 text-base font-bold text-stone-100"
-							>Organization</label
+							>Organization
+							<DocLink
+						explanation={"Fill it if you would like to use an organization's as your Git Source. Otherwise your user will be used."}
+					/></label
 						>
-						<Explainer
-							text="Fill it if you would like to use an organization's as your Git Source. Otherwise your user will be used."
-						/>
 					</div>
 					<input
 						name="organization"

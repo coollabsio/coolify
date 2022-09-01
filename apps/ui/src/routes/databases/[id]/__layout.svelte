@@ -61,6 +61,7 @@
 	import { appSession, status, disabledButton } from '$lib/store';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import { onDestroy, onMount } from 'svelte';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 	const { id } = $page.params;
 
 	let statusInterval: any = false;
@@ -143,9 +144,9 @@
 		{#if database.type && database.destinationDockerId && database.version && database.defaultDatabase}
 			{#if $status.database.isExited}
 				<a
+					id="exited"
 					href={!$disabledButton ? `/databases/${id}/logs` : null}
-					class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center text-red-500 tooltip-error"
-					data-tip="Service exited with an error!"
+					class="icons bg-transparent text-sm flex items-center text-red-500 tooltip-error"
 					sveltekit:prefetch
 				>
 					<svg
@@ -166,10 +167,11 @@
 						<line x1="12" y1="16" x2="12.01" y2="16" />
 					</svg>
 				</a>
+				<Tooltip triggeredBy="#exited">{'Service exited with an error!'}</Tooltip>
 			{/if}
 			{#if $status.database.initialLoading}
 				<button
-					class="icons tooltip-bottom flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"
+					class="icons flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -192,13 +194,11 @@
 				</button>
 			{:else if $status.database.isRunning}
 				<button
+					id="stop"
 					on:click={stopDatabase}
 					type="submit"
 					disabled={!$appSession.isAdmin}
-					class="icons bg-transparent tooltip tooltip-bottom text-sm flex items-center space-x-2 text-red-500"
-					data-tip={$appSession.isAdmin
-						? $t('database.stop_database')
-						: $t('database.permission_denied_stop_database')}
+					class="icons bg-transparent text-sm flex items-center space-x-2 text-red-500"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -215,15 +215,14 @@
 						<rect x="14" y="5" width="4" height="14" rx="1" />
 					</svg>
 				</button>
+				<Tooltip triggeredBy="#stop">{'Stop'}</Tooltip>
 			{:else}
 				<button
+					id="start"
 					on:click={startDatabase}
 					type="submit"
 					disabled={!$appSession.isAdmin}
-					class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm flex items-center space-x-2 text-green-500"
-					data-tip={$appSession.isAdmin
-						? $t('database.start_database')
-						: $t('database.permission_denied_start_database')}
+					class="icons bg-transparent text-sm flex items-center space-x-2 text-green-500"
 					><svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="w-6 h-6"
@@ -238,20 +237,19 @@
 						<path d="M7 4v16l13 -8z" />
 					</svg>
 				</button>
+				<Tooltip triggeredBy="#start">{'Start'}</Tooltip>
 			{/if}
 		{/if}
 		<div class="border border-stone-700 h-8" />
 		<a
+			id="configuration"
 			href="/databases/{id}"
 			sveltekit:prefetch
 			class="hover:text-yellow-500 rounded"
 			class:text-yellow-500={$page.url.pathname === `/databases/${id}`}
 			class:bg-coolgray-500={$page.url.pathname === `/databases/${id}`}
 		>
-			<button
-				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm disabled:text-red-500"
-				data-tip={$t('application.configurations')}
-			>
+			<button class="icons bg-transparent m text-sm disabled:text-red-500">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="h-6 w-6"
@@ -275,19 +273,17 @@
 				</svg></button
 			></a
 		>
+		<Tooltip triggeredBy="#configuration">{'Configuration'}</Tooltip>
 		<div class="border border-stone-700 h-8" />
 		<a
+			id="databaselogs"
 			href={$status.database.isRunning ? `/databases/${id}/logs` : null}
 			sveltekit:prefetch
 			class="hover:text-pink-500 rounded"
 			class:text-pink-500={$page.url.pathname === `/databases/${id}/logs`}
 			class:bg-coolgray-500={$page.url.pathname === `/databases/${id}/logs`}
 		>
-			<button
-				disabled={!$status.database.isRunning}
-				class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
-				data-tip={$t('database.logs')}
-			>
+			<button disabled={!$status.database.isRunning} class="icons bg-transparent text-sm">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="h-6 w-6"
@@ -307,16 +303,16 @@
 				</svg></button
 			></a
 		>
+		<Tooltip triggeredBy="#databaselogs">{'Logs'}</Tooltip>
 		<button
+			id="delete"
 			on:click={deleteDatabase}
 			type="submit"
 			disabled={!$appSession.isAdmin}
 			class:hover:text-red-500={$appSession.isAdmin}
-			class="icons bg-transparent tooltip tooltip-primary tooltip-bottom text-sm"
-			data-tip={$appSession.isAdmin
-				? $t('database.delete_database')
-				: $t('database.permission_denied_delete_database')}><DeleteIcon /></button
+			class="icons bg-transparent text-sm"><DeleteIcon /></button
 		>
+		<Tooltip triggeredBy="#delete">{'Delete'}</Tooltip>
 	</nav>
 {/if}
 <slot />
