@@ -25,7 +25,30 @@ function configureMiddleware(
 				]
 			}
 		};
+		if (type === 'appwrite') {
+			traefik.http.routers[`${id}-realtime`] = {
+				entrypoints: ['websecure'],
+				rule: `PathPrefix(\`/v1/realtime\`)`,
+				service: `${`${id}-realtime`}`,
+				tls: {
+					domains: {
+						main: `${domain}`
+					}
+				},
+				middlewares: []
+			};
 
+
+			traefik.http.services[`${id}-realtime`] = {
+				loadbalancer: {
+					servers: [
+						{
+							url: `http://${container}-realtime:${port}`
+						}
+					]
+				}
+			};
+		}
 		if (isDualCerts) {
 			traefik.http.routers[`${id}-secure`] = {
 				entrypoints: ['websecure'],
@@ -112,6 +135,23 @@ function configureMiddleware(
 				]
 			}
 		};
+		if (type === 'appwrite') {
+			traefik.http.routers[`${id}-realtime`] = {
+				entrypoints: ['web'],
+				rule: `PathPrefix(\`/v1/realtime\`)`,
+				service: `${id}-realtime`,
+				middlewares: []
+			};
+			traefik.http.services[`${id}-realtime`] = {
+				loadbalancer: {
+					servers: [
+						{
+							url: `http://${container}-realtime:${port}`
+						}
+					]
+				}
+			};
+		}
 
 		if (!isDualCerts) {
 			if (isWWW) {
