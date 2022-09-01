@@ -11,7 +11,7 @@ function configureMiddleware(
 	if (isHttps) {
 		traefik.http.routers[id] = {
 			entrypoints: ['web'],
-			rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`) && PathPrefix(\`/\`)`,
+			rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
 			service: `${id}`,
 			middlewares: ['redirect-to-https']
 		};
@@ -28,7 +28,7 @@ function configureMiddleware(
 		if (type === 'appwrite') {
 			traefik.http.routers[`${id}-realtime`] = {
 				entrypoints: ['websecure'],
-				rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`) && PathPrefix(\`/v1/realtime\`)`,
+				rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`/v1/realtime\`)`,
 				service: `${`${id}-realtime`}`,
 				tls: {
 					domains: {
@@ -52,7 +52,7 @@ function configureMiddleware(
 		if (isDualCerts) {
 			traefik.http.routers[`${id}-secure`] = {
 				entrypoints: ['websecure'],
-				rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`) && PathPrefix(\`/\`)`,
+				rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
 				service: `${id}`,
 				tls: {
 					certresolver: 'letsencrypt'
@@ -63,7 +63,7 @@ function configureMiddleware(
 			if (isWWW) {
 				traefik.http.routers[`${id}-secure-www`] = {
 					entrypoints: ['websecure'],
-					rule: `Host(\`www.${nakedDomain}\`) && PathPrefix(\`/\`)`,
+					rule: `Host(\`www.${nakedDomain}\`)`,
 					service: `${id}`,
 					tls: {
 						certresolver: 'letsencrypt'
@@ -72,7 +72,7 @@ function configureMiddleware(
 				};
 				traefik.http.routers[`${id}-secure`] = {
 					entrypoints: ['websecure'],
-					rule: `Host(\`${nakedDomain}\`) && PathPrefix(\`/\`)`,
+					rule: `Host(\`${nakedDomain}\`)`,
 					service: `${id}`,
 					tls: {
 						domains: {
@@ -85,7 +85,7 @@ function configureMiddleware(
 			} else {
 				traefik.http.routers[`${id}-secure-www`] = {
 					entrypoints: ['websecure'],
-					rule: `Host(\`www.${nakedDomain}\`) && PathPrefix(\`/\`)`,
+					rule: `Host(\`www.${nakedDomain}\`)`,
 					service: `${id}`,
 					tls: {
 						domains: {
@@ -96,7 +96,7 @@ function configureMiddleware(
 				};
 				traefik.http.routers[`${id}-secure`] = {
 					entrypoints: ['websecure'],
-					rule: `Host(\`${domain}\`) && PathPrefix(\`/\`)`,
+					rule: `Host(\`${domain}\`)`,
 					service: `${id}`,
 					tls: {
 						certresolver: 'letsencrypt'
@@ -109,14 +109,14 @@ function configureMiddleware(
 	} else {
 		traefik.http.routers[id] = {
 			entrypoints: ['web'],
-			rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`) && PathPrefix(\`/\`)`,
+			rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
 			service: `${id}`,
 			middlewares: []
 		};
 
 		traefik.http.routers[`${id}-secure`] = {
 			entrypoints: ['websecure'],
-			rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`) && PathPrefix(\`/\`)`,
+			rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
 			service: `${id}`,
 			tls: {
 				domains: {
@@ -138,7 +138,7 @@ function configureMiddleware(
 		if (type === 'appwrite') {
 			traefik.http.routers[`${id}-realtime`] = {
 				entrypoints: ['web'],
-				rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`) && PathPrefix(\`/v1/realtime\`)`,
+				rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`/v1/realtime\`)`,
 				service: `${id}-realtime`,
 				middlewares: []
 			};
