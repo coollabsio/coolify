@@ -4,7 +4,6 @@ import crypto from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { errorHandler, getAPIUrl, isDev, listSettings, prisma } from "../../../lib/common";
 import { checkContainer, removeContainer } from "../../../lib/docker";
-import { scheduler } from "../../../lib/scheduler";
 import { getApplicationFromDB, getApplicationFromDBWebhook } from "../../api/v1/applications/handlers";
 
 import type { ConfigureGitLabApp, GitLabEvents } from "./types";
@@ -40,7 +39,6 @@ export async function configureGitLabApp(request: FastifyRequest<ConfigureGitLab
 export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
     const { object_kind: objectKind, ref, project_id } = request.body
     try {
-        const buildId = cuid();
 
         const allowedActions = ['opened', 'reopen', 'close', 'open', 'update'];
 
@@ -51,48 +49,46 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
         if (objectKind === 'push') {
             const projectId = Number(project_id);
             const branch = ref.split('/')[2];
-            const applicationFound = await getApplicationFromDBWebhook(projectId, branch);
-            if (applicationFound) {
-                if (!applicationFound.configHash) {
-                    const configHash = crypto
-                        .createHash('sha256')
-                        .update(
-                            JSON.stringify({
-                                buildPack: applicationFound.buildPack,
-                                port: applicationFound.port,
-                                exposePort: applicationFound.exposePort,
-                                installCommand: applicationFound.installCommand,
-                                buildCommand: applicationFound.buildCommand,
-                                startCommand: applicationFound.startCommand
-                            })
-                        )
-                        .digest('hex');
-                    await prisma.application.updateMany({
-                        where: { branch, projectId },
-                        data: { configHash }
+            const applicationsFound = await getApplicationFromDBWebhook(projectId, branch);
+            if (applicationsFound && applicationsFound.length > 0) {
+                for (const application of applicationsFound) {
+                    const buildId = cuid();
+                    if (!application.configHash) {
+                        const configHash = crypto
+                            .createHash('sha256')
+                            .update(
+                                JSON.stringify({
+                                    buildPack: application.buildPack,
+                                    port: application.port,
+                                    exposePort: application.exposePort,
+                                    installCommand: application.installCommand,
+                                    buildCommand: application.buildCommand,
+                                    startCommand: application.startCommand
+                                })
+                            )
+                            .digest('hex');
+                        await prisma.application.update({
+                            where: { id: application.id },
+                            data: { configHash }
+                        });
+                    }
+                    await prisma.application.update({
+                        where: { id: application.id },
+                        data: { updatedAt: new Date() }
+                    });
+                    await prisma.build.create({
+                        data: {
+                            id: buildId,
+                            applicationId: application.id,
+                            destinationDockerId: application.destinationDocker.id,
+                            gitSourceId: application.gitSource.id,
+                            githubAppId: application.gitSource.githubApp?.id,
+                            gitlabAppId: application.gitSource.gitlabApp?.id,
+                            status: 'queued',
+                            type: 'webhook_commit'
+                        }
                     });
                 }
-                await prisma.application.update({
-                    where: { id: applicationFound.id },
-                    data: { updatedAt: new Date() }
-                });
-                await prisma.build.create({
-                    data: {
-                        id: buildId,
-                        applicationId: applicationFound.id,
-                        destinationDockerId: applicationFound.destinationDocker.id,
-                        gitSourceId: applicationFound.gitSource.id,
-                        githubAppId: applicationFound.gitSource.githubApp?.id,
-                        gitlabAppId: applicationFound.gitSource.gitlabApp?.id,
-                        status: 'queued',
-                        type: 'webhook_commit'
-                    }
-                });
-
-                return {
-                    message: 'Queued. Thank you!'
-                };
-
             }
         } else if (objectKind === 'merge_request') {
             const { object_attributes: { work_in_progress: isDraft, action, source_branch: sourceBranch, target_branch: targetBranch, iid: pullmergeRequestId }, project: { id } } = request.body
@@ -105,64 +101,63 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                 throw { status: 500, message: 'Draft MR, do nothing.' }
             }
 
-            const applicationFound = await getApplicationFromDBWebhook(projectId, targetBranch);
-            if (applicationFound) {
-                if (applicationFound.settings.previews) {
-                    if (applicationFound.destinationDockerId) {
-                        const isRunning = await checkContainer(
-                            {
-                                dockerId: applicationFound.destinationDocker.id,
-                                container: applicationFound.id
+            const applicationsFound = await getApplicationFromDBWebhook(projectId, targetBranch);
+            if (applicationsFound && applicationsFound.length > 0) {
+                for (const application of applicationsFound) {
+                    const buildId = cuid();
+                    if (application.settings.previews) {
+                        if (application.destinationDockerId) {
+                            const isRunning = await checkContainer(
+                                {
+                                    dockerId: application.destinationDocker.id,
+                                    container: application.id
+                                }
+                            );
+                            if (!isRunning) {
+                                throw { status: 500, message: 'Application not running.' }
                             }
-                        );
-                        if (!isRunning) {
-                            throw { status: 500, message: 'Application not running.' }
                         }
-                    }
-                    if (!isDev && applicationFound.gitSource.gitlabApp.webhookToken !== webhookToken) {
-                        throw { status: 500, message: 'Invalid webhookToken. Are you doing something nasty?!' }
-                    }
-                    if (
-                        action === 'opened' ||
-                        action === 'reopen' ||
-                        action === 'open' ||
-                        action === 'update'
-                    ) {
-                        await prisma.application.update({
-                            where: { id: applicationFound.id },
-                            data: { updatedAt: new Date() }
-                        });
-                        await prisma.build.create({
-                            data: {
-                                id: buildId,
-                                pullmergeRequestId,
-                                sourceBranch,
-                                applicationId: applicationFound.id,
-                                destinationDockerId: applicationFound.destinationDocker.id,
-                                gitSourceId: applicationFound.gitSource.id,
-                                githubAppId: applicationFound.gitSource.githubApp?.id,
-                                gitlabAppId: applicationFound.gitSource.gitlabApp?.id,
-                                status: 'queued',
-                                type: 'webhook_mr'
+                        if (!isDev && application.gitSource.gitlabApp.webhookToken !== webhookToken) {
+                            throw { status: 500, message: 'Invalid webhookToken. Are you doing something nasty?!' }
+                        }
+                        if (
+                            action === 'opened' ||
+                            action === 'reopen' ||
+                            action === 'open' ||
+                            action === 'update'
+                        ) {
+                            await prisma.application.update({
+                                where: { id: application.id },
+                                data: { updatedAt: new Date() }
+                            });
+                            await prisma.build.create({
+                                data: {
+                                    id: buildId,
+                                    pullmergeRequestId,
+                                    sourceBranch,
+                                    applicationId: application.id,
+                                    destinationDockerId: application.destinationDocker.id,
+                                    gitSourceId: application.gitSource.id,
+                                    githubAppId: application.gitSource.githubApp?.id,
+                                    gitlabAppId: application.gitSource.gitlabApp?.id,
+                                    status: 'queued',
+                                    type: 'webhook_mr'
+                                }
+                            });
+                            return {
+                                message: 'Queued. Thank you!'
+                            };
+                        } else if (action === 'close') {
+                            if (application.destinationDockerId) {
+                                const id = `${application.id}-${pullmergeRequestId}`;
+                                await removeContainer({ id, dockerId: application.destinationDocker.id });
                             }
-                        });
-                        return {
-                            message: 'Queued. Thank you!'
-                        };
-                    } else if (action === 'close') {
-                        if (applicationFound.destinationDockerId) {
-                            const id = `${applicationFound.id}-${pullmergeRequestId}`;
-                            await removeContainer({ id, dockerId: applicationFound.destinationDocker.id });
+
                         }
-                        return {
-                            message: 'Removed preview. Thank you!'
-                        };
                     }
                 }
-                throw { status: 500, message: 'Merge request previews are not enabled.' }
             }
         }
-        throw { status: 500, message: 'Not handled event.' }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
