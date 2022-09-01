@@ -2,8 +2,8 @@
 	export let database: any;
 	import { status } from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-	import Explainer from '$lib/components/Explainer.svelte';
 	import { t } from '$lib/translations';
+	import DocLink from '$lib/components/DocLink.svelte';
 </script>
 
 <div class="flex space-x-1 py-5 font-bold">
@@ -12,7 +12,8 @@
 <div class="space-y-2 px-10">
 	<div class="grid grid-cols-2 items-center">
 		<label for="dbUserPassword" class="text-base font-bold text-stone-100"
-			>{$t('forms.password')}</label
+			>{$t('forms.password')}
+			<DocLink explanation="Could be changed while the database is running." /></label
 		>
 		<CopyPasswordField
 			disabled={!$status.database.isRunning}
@@ -23,6 +24,5 @@
 			name="dbUserPassword"
 			bind:value={database.dbUserPassword}
 		/>
-		<Explainer text="Could be changed while the database is running." />
 	</div>
 </div>

@@ -452,12 +452,14 @@ export async function stopApplication(request: FastifyRequest<OnlyId>, reply: Fa
 export async function deleteApplication(request: FastifyRequest<DeleteApplication>, reply: FastifyReply) {
     try {
         const { id } = request.params
+        const { force } = request.body
+
         const { teamId } = request.user
         const application = await prisma.application.findUnique({
             where: { id },
             include: { destinationDocker: true }
         });
-        if (application?.destinationDockerId && application.destinationDocker?.network) {
+        if (!force && application?.destinationDockerId && application.destinationDocker?.network) {
             const { stdout: containers } = await executeDockerCmd({
                 dockerId: application.destinationDocker.id,
                 command: `docker ps -a --filter network=${application.destinationDocker.network} --filter name=${id} --format '{{json .}}'`

@@ -65,6 +65,7 @@
 	import Tooltip from '$lib/components/Tooltip.svelte';
 
 	let statusInterval: any;
+	let forceDelete = false;
 	$disabledButton =
 		!$appSession.isAdmin ||
 		(!application.fqdn && !application.settings.isBot) ||
@@ -97,14 +98,17 @@
 		}
 	}
 
-	async function deleteApplication(name: string) {
+	async function deleteApplication(name: string, force: boolean) {
 		const sure = confirm($t('application.confirm_to_delete', { name }));
 		if (sure) {
 			$status.application.initialLoading = true;
 			try {
-				await del(`/applications/${id}`, { id });
+				await del(`/applications/${id}`, { id, force });
 				return await goto(`/applications`);
 			} catch (error) {
+				if (error.message.startsWith(`Command failed: SSH_AUTH_SOCK=/tmp/ssh-agent.pid`)) {
+					forceDelete = true;
+				}
 				return errorNotification(error);
 			} finally {
 				$status.application.initialLoading = false;
@@ -117,9 +121,9 @@
 			$status.application.loading = true;
 			await post(`/applications/${id}/restart`, {});
 			addToast({
-					type: 'success',
-					message: 'Restart successful.'
-				});
+				type: 'success',
+				message: 'Restart successful.'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
@@ -537,16 +541,29 @@
 	>
 	<div class="border border-coolgray-500 h-8" />
 
-	<button
-		id="delete"
-		on:click={() => deleteApplication(application.name)}
-		type="submit"
-		disabled={!$appSession.isAdmin}
-		class:hover:text-red-500={$appSession.isAdmin}
-		class="icons bg-transparent text-sm"
-	>
-		<DeleteIcon />
-	</button>
+	{#if forceDelete}
+		<button
+			on:click={() => deleteApplication(application.name, true)}
+			type="submit"
+			disabled={!$appSession.isAdmin}
+			class:bg-red-600={$appSession.isAdmin}
+			class:hover:bg-red-500={$appSession.isAdmin}
+			class="icons bg-transparent text-sm"
+		>
+			Force Delete
+		</button>
+	{:else}
+		<button
+			id="delete"
+			on:click={() => deleteApplication(application.name, false)}
+			type="submit"
+			disabled={!$appSession.isAdmin}
+			class:hover:text-red-500={$appSession.isAdmin}
+			class="icons bg-transparent text-sm"
+		>
+			<DeleteIcon />
+		</button>
+	{/if}
 </nav>
 <slot />
 

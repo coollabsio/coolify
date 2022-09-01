@@ -1,6 +1,6 @@
 <script lang="ts">
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-	import Explainer from '$lib/components/Explainer.svelte';
+	import DocLink from '$lib/components/DocLink.svelte';
 	import { appSession, status } from '$lib/store';
 	import { t } from '$lib/translations';
 	export let service: any;
@@ -11,7 +11,11 @@
 	<div class="title">Plausible Analytics</div>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="scriptName">Script Name</label>
+	<label for="scriptName"
+		>Script Name <DocLink
+			explanation="Useful if you would like to rename the collector script to prevent it blocked by AdBlockers."
+		/></label
+	>
 	<input
 		name="scriptName"
 		id="scriptName"
@@ -20,9 +24,6 @@
 		placeholder="plausible.js"
 		bind:value={service.plausibleAnalytics.scriptName}
 		required
-	/>
-	<Explainer
-		text="Useful if you would like to rename the collector script to prevent it blocked by AdBlockers."
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">

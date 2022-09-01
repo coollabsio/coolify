@@ -526,7 +526,7 @@
 					disabled={$status.application.isRunning}
 				/>
 			</div>
-			<div class="grid grid-cols-2 items-center pb-8">
+			<div class="grid grid-cols-2 items-center">
 				<Setting
 					id="dualCerts"
 					dataTooltip={$t('forms.must_be_stopped_to_modify')}
@@ -539,15 +539,13 @@
 				/>
 			</div>
 			{#if !isBot}
-				<div class="grid grid-cols-2">
-					<div class="flex-col">
-						<label for="fqdn" class="pt-2 text-base font-bold text-stone-100"
-							>{$t('application.url_fqdn')}
-							<DocLink
-								explanation={"If you specify <span class='text-settings font-bold'>https</span>, the application will be accessible only over https.<br>SSL certificate will be generated automatically.<br><br>If you specify <span class='text-settings font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application.<br><br><span class='text-settings font-bold'>You must set your DNS to point to the server IP in advance.</span>"}
-							/>
-						</label>
-					</div>
+				<div class="grid grid-cols-2 items-center">
+					<label for="fqdn" class="text-base font-bold text-stone-100"
+						>{$t('application.url_fqdn')}
+						<DocLink
+							explanation={"If you specify <span class='text-settings font-bold'>https</span>, the application will be accessible only over https.<br>SSL certificate will be generated automatically.<br><br>If you specify <span class='text-settings font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application.<br><br><span class='text-settings font-bold'>You must set your DNS to point to the server IP in advance.</span>"}
+						/>
+					</label>
 					<div>
 						<input
 							readonly={isDisabled}
@@ -648,7 +646,10 @@
 			{/if}
 			{#if !staticDeployments.includes(application.buildPack)}
 				<div class="grid grid-cols-2 items-center">
-					<label for="port" class="text-base font-bold text-stone-100">{$t('forms.port')}</label>
+					<label for="port" class="text-base font-bold text-stone-100"
+						>{$t('forms.port')}
+						<DocLink explanation={'The port your application listens on.'} /></label
+					>
 					<input
 						disabled={isDisabled}
 						readonly={!$appSession.isAdmin}
@@ -657,7 +658,6 @@
 						bind:value={application.port}
 						placeholder="{$t('forms.default')}: 'python' ? '8000' : '3000'"
 					/>
-					<Explainer text={'The port your application listens on.'} />
 				</div>
 			{/if}
 			<div class="grid grid-cols-2 items-center">
@@ -676,7 +676,7 @@
 				/>
 			</div>
 			{#if !notNodeDeployments.includes(application.buildPack)}
-				<div class="grid grid-cols-2 items-center pt-4">
+				<div class="grid grid-cols-2 items-center">
 					<label for="installCommand" class="text-base font-bold text-stone-100"
 						>{$t('application.install_command')}</label
 					>

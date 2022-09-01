@@ -29,6 +29,7 @@ export interface SaveApplicationSettings extends OnlyId {
 }
 export interface DeleteApplication extends OnlyId {
     Querystring: { domain: string; };
+    Body: { force: boolean }
 }
 export interface CheckDomain extends OnlyId {
     Querystring: { domain: string; };

@@ -65,15 +65,16 @@
 	const { id } = $page.params;
 
 	let statusInterval: any = false;
+	let forceDelete = false;
 
 	$disabledButton = !$appSession.isAdmin;
 
-	async function deleteDatabase() {
+	async function deleteDatabase(force: boolean) {
 		const sure = confirm(`Are you sure you would like to delete '${database.name}'?`);
 		if (sure) {
 			$status.database.initialLoading = true;
 			try {
-				await del(`/databases/${database.id}`, { id: database.id });
+				await del(`/databases/${database.id}`, { id: database.id, force });
 				return await goto('/databases');
 			} catch (error) {
 				return errorNotification(error);
@@ -304,14 +305,26 @@
 			></a
 		>
 		<Tooltip triggeredBy="#databaselogs">{'Logs'}</Tooltip>
-		<button
-			id="delete"
-			on:click={deleteDatabase}
-			type="submit"
-			disabled={!$appSession.isAdmin}
-			class:hover:text-red-500={$appSession.isAdmin}
-			class="icons bg-transparent text-sm"><DeleteIcon /></button
-		>
+		{#if forceDelete}
+			<button
+				on:click={() => deleteDatabase(true)}
+				type="submit"
+				disabled={!$appSession.isAdmin}
+				class:hover:text-red-500={$appSession.isAdmin}
+				class="icons bg-transparent text-sm"
+			>
+				Force Delete</button
+			>{:else}
+			<button
+				id="delete"
+				on:click={() => deleteDatabase(false)}
+				type="submit"
+				disabled={!$appSession.isAdmin}
+				class:hover:text-red-500={$appSession.isAdmin}
+				class="icons bg-transparent text-sm"><DeleteIcon /></button
+			>
+		{/if}
+
 		<Tooltip triggeredBy="#delete">{'Delete'}</Tooltip>
 	</nav>
 {/if}

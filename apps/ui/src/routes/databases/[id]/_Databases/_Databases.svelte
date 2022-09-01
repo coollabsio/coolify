@@ -16,7 +16,7 @@
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import { addToast, appSession, status } from '$lib/store';
-	import Explainer from '$lib/components/Explainer.svelte';
+	import DocLink from '$lib/components/DocLink.svelte';
 
 	const { id } = $page.params;
 
@@ -209,13 +209,13 @@
 			<div class="grid grid-cols-2 items-center px-10 pb-8">
 				<div>
 					<label for="url" class="text-base font-bold text-stone-100"
-						>{$t('database.connection_string')}</label
+						>{$t('database.connection_string')}
+						{#if !isPublic && database.destinationDocker.remoteEngine}
+							<DocLink
+								explanation="You can only access the database with this URL if your application is deployed to the same Destination."
+							/>
+						{/if}</label
 					>
-					{#if !isPublic && database.destinationDocker.remoteEngine}
-						<Explainer
-							text="You can only access the database with this URL if your application is deployed to the same Destination."
-						/>
-					{/if}
 				</div>
 				<CopyPasswordField
 					textarea={true}

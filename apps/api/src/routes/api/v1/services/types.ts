@@ -96,5 +96,3 @@ export interface SetGlitchTipSettings extends OnlyId {
         emailSmtpUseTls: boolean
     }
 }
-
-

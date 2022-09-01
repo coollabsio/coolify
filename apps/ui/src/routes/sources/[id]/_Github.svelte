@@ -3,12 +3,11 @@
 	export let settings: any;
 	import { page } from '$app/stores';
 	import { getAPIUrl, getWebhookUrl, post } from '$lib/api';
-	import Explainer from '$lib/components/Explainer.svelte';
 	import { t } from '$lib/translations';
 	import { dashify, errorNotification, getDomain } from '$lib/common';
 	import { addToast, appSession } from '$lib/store';
 	import { dev } from '$app/env';
-import DocLink from '$lib/components/DocLink.svelte';
+	import DocLink from '$lib/components/DocLink.svelte';
 
 	const { id } = $page.params;
 
@@ -116,9 +115,11 @@ import DocLink from '$lib/components/DocLink.svelte';
 					<input name="apiUrl" id="apiUrl" required bind:value={source.apiUrl} />
 				</div>
 				<div class="grid lg:grid-cols-2 items-center">
-					<label for="customPort" class="text-base font-bold text-stone-100">Custom SSH Port <DocLink
-						explanation={"If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."}
-					/></label>
+					<label for="customPort" class="text-base font-bold text-stone-100"
+						>Custom SSH Port <DocLink
+							explanation={'If you use a self-hosted version of Git, you can provide custom port for all the Git related actions.'}
+						/></label
+					>
 					<input
 						name="customPort"
 						id="customPort"
@@ -133,8 +134,8 @@ import DocLink from '$lib/components/DocLink.svelte';
 						<label for="organization" class="pt-2 text-base font-bold text-stone-100"
 							>Organization
 							<DocLink
-						explanation={"Fill it if you would like to use an organization's as your Git Source. Otherwise your user will be used."}
-					/></label
+								explanation={"Fill it if you would like to use an organization's as your Git Source. Otherwise your user will be used."}
+							/></label
 						>
 					</div>
 					<input
@@ -150,7 +151,7 @@ import DocLink from '$lib/components/DocLink.svelte';
 		<form on:submit|preventDefault={handleSubmit} class="py-4">
 			<div class="flex md:flex-row space-y-2 md:space-y-0 space-x-0 md:space-x-2 flex-col pb-5">
 				<div class="title">{$t('general')}</div>
-			
+
 				{#if $appSession.isAdmin}
 					<button class="btn btn-sm bg-sources" type="submit" disabled={loading}
 						>{loading ? 'Saving...' : 'Save'}</button
@@ -196,7 +197,9 @@ import DocLink from '$lib/components/DocLink.svelte';
 				{#if selfHosted}
 					<div class="grid lg:grid-cols-2 items-center">
 						<label for="customPort" class="text-base font-bold text-stone-100"
-							>Custom SSH Port</label
+							>Custom SSH Port <DocLink
+								explanation="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
+							/></label
 						>
 						<input
 							name="customPort"
@@ -205,9 +208,6 @@ import DocLink from '$lib/components/DocLink.svelte';
 							readonly={!selfHosted}
 							required
 							value={source.customPort}
-						/>
-						<Explainer
-							text="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
 						/>
 					</div>
 				{/if}

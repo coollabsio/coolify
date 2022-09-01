@@ -4,7 +4,6 @@
 	import { page } from '$app/stores';
 
 	import Select from 'svelte-select';
-	import Explainer from '$lib/components/Explainer.svelte';
 	import { goto } from '$app/navigation';
 	import { errorNotification } from '$lib/common';
 
