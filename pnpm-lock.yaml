@@ -131,9 +131,9 @@ importers:
 
   apps/ui:
     specifiers:
-      '@floating-ui/dom': ^1.0.1
+      '@floating-ui/dom': 1.0.1
       '@playwright/test': 1.25.1
-      '@popperjs/core': ^2.11.6
+      '@popperjs/core': 2.11.6
       '@sveltejs/adapter-static': 1.0.0-next.39
       '@sveltejs/kit': 1.0.0-next.405
       '@tailwindcss/typography': ^0.5.4
@@ -141,14 +141,14 @@ importers:
       '@typescript-eslint/eslint-plugin': 5.35.1
       '@typescript-eslint/parser': 5.35.1
       autoprefixer: 10.4.8
-      classnames: ^2.3.1
+      classnames: 2.3.1
       cuid: 2.1.8
       daisyui: 2.24.0
       eslint: 8.22.0
       eslint-config-prettier: 8.5.0
       eslint-plugin-svelte3: 4.0.0
-      flowbite: ^1.5.2
-      flowbite-svelte: ^0.26.2
+      flowbite: 1.5.2
+      flowbite-svelte: 0.26.2
       js-cookie: 3.0.1
       p-limit: 4.0.0
       postcss: 8.4.16
