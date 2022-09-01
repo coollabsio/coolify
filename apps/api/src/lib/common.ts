@@ -139,10 +139,10 @@ export const prisma = new PrismaClient({
 });
 
 // prisma.$on('query', (e) => {
-	// console.log({e})
-	// console.log('Query: ' + e.query)
-	// console.log('Params: ' + e.params)
-	// console.log('Duration: ' + e.duration + 'ms')
+// console.log({e})
+// console.log('Query: ' + e.query)
+// console.log('Params: ' + e.params)
+// console.log('Duration: ' + e.duration + 'ms')
 //   })
 export const base64Encode = (text: string): string => {
 	return Buffer.from(text).toString('base64');
@@ -1089,7 +1089,6 @@ export async function checkExposedPort({ id, configuredPort, exposePort, dockerI
 	if (exposePort < 1024 || exposePort > 65535) {
 		throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
 	}
-
 	if (configuredPort) {
 		if (configuredPort !== exposePort) {
 			const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
@@ -1311,7 +1310,7 @@ export function saveUpdateableFields(type: string, data: any) {
 			}
 			if (k.isNumber && temp === '') {
 				temp = null
-			} 
+			}
 			update[k.name] = temp
 		});
 	}
@@ -1518,26 +1517,26 @@ export function defaultComposeConfiguration(network: string): any {
 	}
 }
 export function decryptApplication(application: any) {
-    if (application) {
-        if (application?.gitSource?.githubApp?.clientSecret) {
-            application.gitSource.githubApp.clientSecret = decrypt(application.gitSource.githubApp.clientSecret) || null;
-        }
-        if (application?.gitSource?.githubApp?.webhookSecret) {
-            application.gitSource.githubApp.webhookSecret = decrypt(application.gitSource.githubApp.webhookSecret) || null;
-        }
-        if (application?.gitSource?.githubApp?.privateKey) {
-            application.gitSource.githubApp.privateKey = decrypt(application.gitSource.githubApp.privateKey) || null;
-        }
-        if (application?.gitSource?.gitlabApp?.appSecret) {
-            application.gitSource.gitlabApp.appSecret = decrypt(application.gitSource.gitlabApp.appSecret) || null;
-        }
-        if (application?.secrets.length > 0) {
-            application.secrets = application.secrets.map((s: any) => {
-                s.value = decrypt(s.value) || null
-                return s;
-            });
-        }
+	if (application) {
+		if (application?.gitSource?.githubApp?.clientSecret) {
+			application.gitSource.githubApp.clientSecret = decrypt(application.gitSource.githubApp.clientSecret) || null;
+		}
+		if (application?.gitSource?.githubApp?.webhookSecret) {
+			application.gitSource.githubApp.webhookSecret = decrypt(application.gitSource.githubApp.webhookSecret) || null;
+		}
+		if (application?.gitSource?.githubApp?.privateKey) {
+			application.gitSource.githubApp.privateKey = decrypt(application.gitSource.githubApp.privateKey) || null;
+		}
+		if (application?.gitSource?.gitlabApp?.appSecret) {
+			application.gitSource.gitlabApp.appSecret = decrypt(application.gitSource.gitlabApp.appSecret) || null;
+		}
+		if (application?.secrets.length > 0) {
+			application.secrets = application.secrets.map((s: any) => {
+				s.value = decrypt(s.value) || null
+				return s;
+			});
+		}
 
-        return application;
-    }
+		return application;
+	}
 }
