@@ -28,7 +28,7 @@ function configureMiddleware(
 		if (type === 'appwrite') {
 			traefik.http.routers[`${id}-realtime`] = {
 				entrypoints: ['websecure'],
-				rule: `PathPrefix(\`/v1/realtime\`)`,
+				rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`) && PathPrefix(\`/v1/realtime\`)`,
 				service: `${`${id}-realtime`}`,
 				tls: {
 					domains: {
@@ -138,7 +138,7 @@ function configureMiddleware(
 		if (type === 'appwrite') {
 			traefik.http.routers[`${id}-realtime`] = {
 				entrypoints: ['web'],
-				rule: `PathPrefix(\`/v1/realtime\`)`,
+				rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`) && PathPrefix(\`/v1/realtime\`)`,
 				service: `${id}-realtime`,
 				middlewares: []
 			};
