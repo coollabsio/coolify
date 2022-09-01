@@ -3,7 +3,7 @@
 	import { status } from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { t } from '$lib/translations';
-	import DocLink from '$lib/components/DocLink.svelte';
+	import Explaner from '$lib/components/Explainer.svelte';
 </script>
 
 <div class="flex space-x-1 py-5 font-bold">
@@ -26,7 +26,7 @@
 	</div>
 	<div class="grid grid-cols-2 items-center">
 		<label for="rootUser" class="text-base font-bold text-stone-100"
-			>Postgres User Password <DocLink
+			>Postgres User Password <Explaner
 				explanation="Could be changed while the database is running."
 			/></label
 		>
@@ -54,7 +54,7 @@
 	<div class="grid grid-cols-2 items-center">
 		<label for="dbUserPassword" class="text-base font-bold text-stone-100"
 			>{$t('forms.password')}
-			<DocLink explanation="Could be changed while the database is running." /></label
+			<Explaner explanation="Could be changed while the database is running." /></label
 		>
 		<CopyPasswordField
 			disabled={!$status.database.isRunning}

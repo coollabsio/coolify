@@ -1,6 +1,6 @@
 <script lang="ts">
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-	import DocLink from '$lib/components/DocLink.svelte';
+	import Explaner from '$lib/components/Explainer.svelte';
 	import { t } from '$lib/translations';
 	export let readOnly: any;
 	export let service: any;
@@ -8,7 +8,7 @@
 
 <div class="flex space-x-1 py-5">
 	<div class="title">
-		Ghost <DocLink explanation="You can change these values in the Ghost admin panel." />
+		Ghost <Explaner explanation="You can change these values in the Ghost admin panel." />
 	</div>
 </div>
 <div class="grid grid-cols-2 items-center px-10">

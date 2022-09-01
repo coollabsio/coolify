@@ -1,37 +1,32 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-
 	import Tooltip from './Tooltip.svelte';
-	export let isLink = false;
-	export let explanation = '';
-	let id: any;
-	let self: any;
-	onMount(() => {
-		id = `info-${self.offsetLeft}-${self.offsetTop}`;
-
-	});
+	export let url = 'https://docs.coollabs.io';
+	let id =
+		'cool-' +
+		url
+			.split('')
+			.map((c) => c.charCodeAt(0).toString(16).padStart(2, '0'))
+			.join('')
+			.slice(-16);
 </script>
 
-<div {id} class="inline-block mx-2 text-pink-500 cursor-pointer" bind:this={self}>
+<a {id} href={url} target="_blank" class="icons inline-block text-pink-500 cursor-pointer text-xs">
 	<svg
-		fill="none"
-		height="18"
-		shape-rendering="geometricPrecision"
+		xmlns="http://www.w3.org/2000/svg"
+		class="w-6 h-6"
+		viewBox="0 0 24 24"
+		stroke-width="1.5"
 		stroke="currentColor"
+		fill="none"
 		stroke-linecap="round"
 		stroke-linejoin="round"
-		stroke-width="1.5"
-		viewBox="0 0 24 24"
-		width="18"
-		><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" /><path
-			d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"
-		/><circle cx="12" cy="17" r=".5" />
+	>
+		<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+		<path
+			d="M6 4h11a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-11a1 1 0 0 1 -1 -1v-14a1 1 0 0 1 1 -1m3 0v18"
+		/>
+		<line x1="13" y1="8" x2="15" y2="8" />
+		<line x1="13" y1="12" x2="15" y2="12" />
 	</svg>
-</div>
-{#if id}
-	{#if isLink}
-		LINK
-	{:else}
-		<Tooltip triggeredBy={`#${id}`}>{@html explanation}</Tooltip>
-	{/if}
-{/if}
+</a>
+<Tooltip triggeredBy={`#${id}`}>See details in the documentation</Tooltip>

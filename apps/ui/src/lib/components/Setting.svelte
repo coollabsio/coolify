@@ -1,5 +1,5 @@
 <script lang="ts">
-	import DocLink from './DocLink.svelte';
+	import Explaner from './Explainer.svelte';
 	import Tooltip from './Tooltip.svelte';
 
 	export let id: any;
@@ -16,7 +16,7 @@
 <div class="flex items-center py-4 pr-8">
 	<div class="flex w-96 flex-col">
 		<div class="text-xs font-bold text-stone-100 md:text-base">
-			{title}<DocLink explanation={description} />
+			{title}<Explaner explanation={description} />
 		</div>
 	</div>
 </div>

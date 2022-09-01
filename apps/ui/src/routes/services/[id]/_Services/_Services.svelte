@@ -30,7 +30,7 @@
 	import Moodle from './_Moodle.svelte';
 	import Searxng from './_Searxng.svelte';
 	import Weblate from './_Weblate.svelte';
-	import DocLink from '$lib/components/DocLink.svelte';
+	import Explaner from '$lib/components/Explainer.svelte';
 
 	const { id } = $page.params;
 	$: isDisabled =
@@ -284,7 +284,7 @@
 				<div class="grid grid-cols-2 px-10">
 					<div class="flex-col ">
 						<label for="apiFqdn" class="pt-2 text-base font-bold text-stone-100"
-							>API URL <DocLink explanation={$t('application.https_explainer')} /></label
+							>API URL <Explaner explanation={$t('application.https_explainer')} /></label
 						>
 					</div>
 
@@ -304,7 +304,7 @@
 					<div class="flex-col ">
 						<label for="fqdn" class="pt-2 text-base font-bold text-stone-100"
 							>{$t('application.url_fqdn')}
-							<DocLink explanation={$t('application.https_explainer')} />
+							<Explaner explanation={$t('application.https_explainer')} />
 						</label>
 					</div>
 
@@ -366,7 +366,7 @@
 			</div>
 			<div class="grid grid-cols-2 items-center px-10">
 				<label for="exposePort" class="text-base font-bold text-stone-100"
-					>Exposed Port <DocLink
+					>Exposed Port <Explaner
 						explanation={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
 					/></label
 				>

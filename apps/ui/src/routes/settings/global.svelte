@@ -26,7 +26,7 @@
 	import { addToast, appSession, features } from '$lib/store';
 	import { errorNotification, getDomain } from '$lib/common';
 	import Menu from './_Menu.svelte';
-	import DocLink from '$lib/components/DocLink.svelte';
+	import Explaner from '$lib/components/Explainer.svelte';
 
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
 	let dualCerts = settings.dualCerts;
@@ -196,7 +196,7 @@
 						<div class="flex-col">
 							<div class="pt-2 text-base font-bold text-stone-100">
 								{$t('application.url_fqdn')}
-								<DocLink explanation={$t('setting.ssl_explainer')} />
+								<Explaner explanation={$t('setting.ssl_explainer')} />
 							</div>
 						</div>
 						<div class="justify-start text-left">
@@ -251,7 +251,7 @@
 						<div class="flex-col">
 							<div class="pt-2 text-base font-bold text-stone-100">
 								{$t('forms.public_port_range')}
-								<DocLink explanation={$t('forms.public_port_range_explainer')} />
+								<Explaner explanation={$t('forms.public_port_range_explainer')} />
 							</div>
 						</div>
 						<div class="mx-auto flex-row items-center justify-center space-y-2">
@@ -283,7 +283,7 @@
 					</div>
 					<div class="grid grid-cols-2 items-center">
 						<div class="text-base font-bold text-stone-100">
-							Custom DNS servers <DocLink
+							Custom DNS servers <Explaner
 								explanation="You can specify a custom DNS server to verify your domains all over Coolify.<br><br>By default, the OS defined DNS servers are used."
 							/>
 						</div>
