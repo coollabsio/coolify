@@ -183,7 +183,7 @@ export async function getApplicationFromDB(id: string, teamId: string) {
 }
 export async function getApplicationFromDBWebhook(projectId: number, branch: string) {
     try {
-        let application = await prisma.application.findFirst({
+        let applications = await prisma.application.findMany({
             where: { projectId, branch, settings: { autodeploy: true } },
             include: {
                 destinationDocker: true,
@@ -193,22 +193,28 @@ export async function getApplicationFromDBWebhook(projectId: number, branch: str
                 persistentStorage: true
             }
         });
-        if (!application) {
+        if (applications.length === 0) {
             throw { status: 500, message: 'Application not configured.' }
         }
-        application = decryptApplication(application);
-        const { baseImage, baseBuildImage, baseBuildImages, baseImages } = setDefaultBaseImage(
-            application.buildPack
-        );
+        applications = applications.map((application: any) => {
+            application = decryptApplication(application);
+            const { baseImage, baseBuildImage, baseBuildImages, baseImages } = setDefaultBaseImage(
+                application.buildPack
+            );
 
-        // Set default build images
-        if (!application.baseImage) {
-            application.baseImage = baseImage;
-        }
-        if (!application.baseBuildImage) {
-            application.baseBuildImage = baseBuildImage;
-        }
-        return { ...application, baseBuildImages, baseImages };
+            // Set default build images
+            if (!application.baseImage) {
+                application.baseImage = baseImage;
+            }
+            if (!application.baseBuildImage) {
+                application.baseBuildImage = baseBuildImage;
+            }
+            application.baseBuildImages = baseBuildImages;
+            application.baseImages = baseImages;
+            return application
+        })
+
+        return applications;
 
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -284,11 +290,11 @@ export async function saveApplicationSettings(request: FastifyRequest<SaveApplic
     try {
         const { id } = request.params
         const { debug, previews, dualCerts, autodeploy, branch, projectId, isBot } = request.body
-        const isDouble = await checkDoubleBranch(branch, projectId);
-        if (isDouble && autodeploy) {
-            await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false } })
-            throw { status: 500, message: 'Cannot activate automatic deployments until only one application is defined for this repository / branch.' }
-        }
+        // const isDouble = await checkDoubleBranch(branch, projectId);
+        // if (isDouble && autodeploy) {
+        //     await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false } })
+        //     throw { status: 500, message: 'Cannot activate automatic deployments until only one application is defined for this repository / branch.' }
+        // }
         await prisma.application.update({
             where: { id },
             data: { fqdn: isBot ? null : undefined, settings: { update: { debug, previews, dualCerts, autodeploy, isBot } } },
@@ -672,12 +678,12 @@ export async function saveRepository(request, reply) {
                 data: { repository, branch, projectId, settings: { update: { autodeploy, isPublicRepository } } }
             });
         }
-        if (!isPublicRepository) {
-            const isDouble = await checkDoubleBranch(branch, projectId);
-            if (isDouble) {
-                await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false, isPublicRepository } })
-            }
-        }
+        // if (!isPublicRepository) {
+        //     const isDouble = await checkDoubleBranch(branch, projectId);
+        //     if (isDouble) {
+        //         await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false, isPublicRepository } })
+        //     }
+        // }
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -974,9 +980,12 @@ export async function getBuildIdLogs(request: FastifyRequest<GetBuildIdLogs>) {
             where: { buildId, time: { gt: sequence } },
             orderBy: { time: 'asc' }
         });
+
         const data = await prisma.build.findFirst({ where: { id: buildId } });
+        const createdAt = day(data.createdAt).utc();
         return {
             logs,
+            took: day().diff(createdAt) / 1000,
             status: data?.status || 'queued'
         }
     } catch ({ status, message }) {

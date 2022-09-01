@@ -67,7 +67,7 @@ export async function configureGitHubApp(request, reply) {
 }
 export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promise<any> {
     try {
-        const buildId = cuid();
+
         const allowedGithubEvents = ['push', 'pull_request'];
         const allowedActions = ['opened', 'reopened', 'synchronize', 'closed'];
         const githubEvent = request.headers['x-github-event']?.toString().toLowerCase();
@@ -87,126 +87,124 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
         if (!projectId || !branch) {
             throw { status: 500, message: 'Cannot parse projectId or branch from the webhook?!' }
         }
-        const applicationFound = await getApplicationFromDBWebhook(projectId, branch);
-        if (applicationFound) {
-            const webhookSecret = applicationFound.gitSource.githubApp.webhookSecret || null;
-            //@ts-ignore
-            const hmac = crypto.createHmac('sha256', webhookSecret);
-            const digest = Buffer.from(
-                'sha256=' + hmac.update(JSON.stringify(body)).digest('hex'),
-                'utf8'
-            );
-            if (!isDev) {
-                const checksum = Buffer.from(githubSignature, 'utf8');
+        const applicationsFound = await getApplicationFromDBWebhook(projectId, branch);
+        if (applicationsFound && applicationsFound.length > 0) {
+            for (const application of applicationsFound) {
+                const buildId = cuid();
+                const webhookSecret = application.gitSource.githubApp.webhookSecret || null;
                 //@ts-ignore
-                if (checksum.length !== digest.length || !crypto.timingSafeEqual(digest, checksum)) {
-                    throw { status: 500, message: 'SHA256 checksum failed. Are you doing something fishy?' }
-                };
-            }
-
-
-            if (githubEvent === 'push') {
-                if (!applicationFound.configHash) {
-                    const configHash = crypto
-                        //@ts-ignore
-                        .createHash('sha256')
-                        .update(
-                            JSON.stringify({
-                                buildPack: applicationFound.buildPack,
-                                port: applicationFound.port,
-                                exposePort: applicationFound.exposePort,
-                                installCommand: applicationFound.installCommand,
-                                buildCommand: applicationFound.buildCommand,
-                                startCommand: applicationFound.startCommand
-                            })
-                        )
-                        .digest('hex');
-                    await prisma.application.updateMany({
-                        where: { branch, projectId },
-                        data: { configHash }
-                    });
-                }
-                await prisma.application.update({
-                    where: { id: applicationFound.id },
-                    data: { updatedAt: new Date() }
-                });
-                await prisma.build.create({
-                    data: {
-                        id: buildId,
-                        applicationId: applicationFound.id,
-                        destinationDockerId: applicationFound.destinationDocker.id,
-                        gitSourceId: applicationFound.gitSource.id,
-                        githubAppId: applicationFound.gitSource.githubApp?.id,
-                        gitlabAppId: applicationFound.gitSource.gitlabApp?.id,
-                        status: 'queued',
-                        type: 'webhook_commit'
-                    }
-                });
-                return {
-                    message: 'Queued. Thank you!'
-                };
-            } else if (githubEvent === 'pull_request') {
-                const pullmergeRequestId = body.number.toString();
-                const pullmergeRequestAction = body.action;
-                const sourceBranch = body.pull_request.head.ref.includes('/') ? body.pull_request.head.ref.split('/')[2] : body.pull_request.head.ref;
-                if (!allowedActions.includes(pullmergeRequestAction)) {
-                    throw { status: 500, message: 'Action not allowed.' }
+                const hmac = crypto.createHmac('sha256', webhookSecret);
+                const digest = Buffer.from(
+                    'sha256=' + hmac.update(JSON.stringify(body)).digest('hex'),
+                    'utf8'
+                );
+                if (!isDev) {
+                    const checksum = Buffer.from(githubSignature, 'utf8');
+                    //@ts-ignore
+                    if (checksum.length !== digest.length || !crypto.timingSafeEqual(digest, checksum)) {
+                        console.log('SHA256 checksum failed. Are you doing something fishy?')
+                        // throw { status: 500, message: 'SHA256 checksum failed. Are you doing something fishy?' 
+                    };
                 }
 
-                if (applicationFound.settings.previews) {
-                    if (applicationFound.destinationDockerId) {
-                        const isRunning = await checkContainer(
-                            {
-                                dockerId: applicationFound.destinationDocker.id,
-                                container: applicationFound.id
-                            }
-                        );
-                        if (!isRunning) {
-                            throw { status: 500, message: 'Application not running.' }
-                        }
-                    }
-                    if (
-                        pullmergeRequestAction === 'opened' ||
-                        pullmergeRequestAction === 'reopened' ||
-                        pullmergeRequestAction === 'synchronize'
-                    ) {
+                if (githubEvent === 'push') {
+                    if (!application.configHash) {
+                        const configHash = crypto
+                            //@ts-ignore
+                            .createHash('sha256')
+                            .update(
+                                JSON.stringify({
+                                    buildPack: application.buildPack,
+                                    port: application.port,
+                                    exposePort: application.exposePort,
+                                    installCommand: application.installCommand,
+                                    buildCommand: application.buildCommand,
+                                    startCommand: application.startCommand
+                                })
+                            )
+                            .digest('hex');
                         await prisma.application.update({
-                            where: { id: applicationFound.id },
-                            data: { updatedAt: new Date() }
+                            where: { id: application.id },
+                            data: { configHash }
                         });
-                        await prisma.build.create({
-                            data: {
-                                id: buildId,
-                                pullmergeRequestId,
-                                sourceBranch,
-                                applicationId: applicationFound.id,
-                                destinationDockerId: applicationFound.destinationDocker.id,
-                                gitSourceId: applicationFound.gitSource.id,
-                                githubAppId: applicationFound.gitSource.githubApp?.id,
-                                gitlabAppId: applicationFound.gitSource.gitlabApp?.id,
-                                status: 'queued',
-                                type: 'webhook_pr'
-                            }
-                        });
-                    
-                        return {
-                            message: 'Queued. Thank you!'
-                        };
-                    } else if (pullmergeRequestAction === 'closed') {
-                        if (applicationFound.destinationDockerId) {
-                            const id = `${applicationFound.id}-${pullmergeRequestId}`;
-                            await removeContainer({ id, dockerId: applicationFound.destinationDocker.id });
-                        }
-                        return {
-                            message: 'Removed preview. Thank you!'
-                        };
                     }
-                } else {
-                    throw { status: 500, message: 'Pull request previews are not enabled.' }
+
+                    await prisma.application.update({
+                        where: { id: application.id },
+                        data: { updatedAt: new Date() }
+                    });
+                    console.log(application.id)
+
+                    await prisma.build.create({
+                        data: {
+                            id: buildId,
+                            applicationId: application.id,
+                            destinationDockerId: application.destinationDocker.id,
+                            gitSourceId: application.gitSource.id,
+                            githubAppId: application.gitSource.githubApp?.id,
+                            gitlabAppId: application.gitSource.gitlabApp?.id,
+                            status: 'queued',
+                            type: 'webhook_commit'
+                        }
+                    });
+                    console.log(`Webhook for ${application.name} queued.`)
+
+                } else if (githubEvent === 'pull_request') {
+                    const pullmergeRequestId = body.number.toString();
+                    const pullmergeRequestAction = body.action;
+                    const sourceBranch = body.pull_request.head.ref.includes('/') ? body.pull_request.head.ref.split('/')[2] : body.pull_request.head.ref;
+                    if (!allowedActions.includes(pullmergeRequestAction)) {
+                        throw { status: 500, message: 'Action not allowed.' }
+                    }
+
+                    if (application.settings.previews) {
+                        if (application.destinationDockerId) {
+                            const isRunning = await checkContainer(
+                                {
+                                    dockerId: application.destinationDocker.id,
+                                    container: application.id
+                                }
+                            );
+                            if (!isRunning) {
+                                throw { status: 500, message: 'Application not running.' }
+                            }
+                        }
+                        if (
+                            pullmergeRequestAction === 'opened' ||
+                            pullmergeRequestAction === 'reopened' ||
+                            pullmergeRequestAction === 'synchronize'
+                        ) {
+                            await prisma.application.update({
+                                where: { id: application.id },
+                                data: { updatedAt: new Date() }
+                            });
+                            await prisma.build.create({
+                                data: {
+                                    id: buildId,
+                                    pullmergeRequestId,
+                                    sourceBranch,
+                                    applicationId: application.id,
+                                    destinationDockerId: application.destinationDocker.id,
+                                    gitSourceId: application.gitSource.id,
+                                    githubAppId: application.gitSource.githubApp?.id,
+                                    gitlabAppId: application.gitSource.gitlabApp?.id,
+                                    status: 'queued',
+                                    type: 'webhook_pr'
+                                }
+                            });
+
+
+                        } else if (pullmergeRequestAction === 'closed') {
+                            if (application.destinationDockerId) {
+                                const id = `${application.id}-${pullmergeRequestId}`;
+                                await removeContainer({ id, dockerId: application.destinationDocker.id });
+                            }
+
+                        }
+                    }
                 }
             }
         }
-        throw { status: 500, message: 'Not handled event.' }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
