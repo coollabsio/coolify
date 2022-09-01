@@ -2,7 +2,7 @@ import axios from "axios";
 import cuid from "cuid";
 import crypto from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { errorHandler, getAPIUrl, isDev, listSettings, prisma } from "../../../lib/common";
+import { errorHandler, getAPIUrl, getUIUrl, isDev, listSettings, prisma } from "../../../lib/common";
 import { checkContainer, removeContainer } from "../../../lib/docker";
 import { getApplicationFromDB, getApplicationFromDBWebhook } from "../../api/v1/applications/handlers";
 
@@ -29,7 +29,7 @@ export async function configureGitLabApp(request: FastifyRequest<ConfigureGitLab
         });
         const { data } = await axios.post(`${htmlUrl}/oauth/token`, params)
         if (isDev) {
-            return reply.redirect(`${getAPIUrl()}/webhooks/success?token=${data.access_token}`)
+            return reply.redirect(`${getUIUrl()}/webhooks/success?token=${data.access_token}`)
         }
         return reply.redirect(`/webhooks/success?token=${data.access_token}`)
     } catch ({ status, message, ...other }) {
@@ -43,7 +43,7 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
         const allowedActions = ['opened', 'reopen', 'close', 'open', 'update'];
 
         const webhookToken = request.headers['x-gitlab-token'];
-        if (!webhookToken) {
+        if (!webhookToken && !isDev) {
             throw { status: 500, message: 'Invalid webhookToken.' }
         }
         if (objectKind === 'push') {
