@@ -2298,13 +2298,17 @@ async function startTaigaService(request: FastifyRequest<ServiceStartStop>) {
         
         exec "$@"`;
 
-        const Dockerfile = `
+        const DockerfileBack = `
         FROM taigaio/taiga-back:latest
         COPY ./entrypoint_superuser.sh /taiga-back/docker/entrypoint_superuser.sh
         COPY ./entrypoint_coolify.sh /taiga-back/docker/entrypoint_coolify.sh
         RUN ["chmod", "+x", "/taiga-back/docker/entrypoint_superuser.sh"]
         RUN ["chmod", "+x", "/taiga-back/docker/entrypoint_coolify.sh"]
         RUN ["chmod", "+x", "/taiga-back/docker/entrypoint.sh"]`;
+
+        const DockerfileGateway = `
+        FROM nginx:1.19-alpine
+        COPY ./nginx.conf /etc/nginx/conf.d/default.conf`;
 
         const nginxConf = `server {
             listen 80 default_server;
@@ -2383,10 +2387,14 @@ async function startTaigaService(request: FastifyRequest<ServiceStartStop>) {
         }`
         await fs.writeFile(`${workdir}/entrypoint_superuser.sh`, superUserEntrypoint);
         await fs.writeFile(`${workdir}/entrypoint_coolify.sh`, entrypoint);
-        await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile);
+        await fs.writeFile(`${workdir}/DockerfileBack`, DockerfileBack);
+        await fs.writeFile(`${workdir}/DockerfileGateway`, DockerfileGateway);
         await fs.writeFile(`${workdir}/nginx.conf`, nginxConf);
 
         const config = {
+            ['taiga-gateway']: {
+                volumes: [`${id}-static-data:/taiga-back/static`, `${id}-media-data:/taiga-back/media`],
+            },
             ['taiga-front']: {
                 image: `${image}:${version}`,
                 environmentVariables: {
@@ -2467,10 +2475,7 @@ async function startTaigaService(request: FastifyRequest<ServiceStartStop>) {
                     TAIGA_SECRET_KEY: secretKey,
                 }
             },
-            ['taiga-gateway']: {
-                image: `nginx:1.19-alpine`,
-                volumes: [`${id}-static-data:/taiga-back/static`, `${id}-media-data:/taiga-back/media`],
-            },
+        
             postgresql: {
                 image: `postgres:12.3`,
                 volumes: [`${id}-postgresql-data:/var/lib/postgresql/data`],
@@ -2493,9 +2498,11 @@ async function startTaigaService(request: FastifyRequest<ServiceStartStop>) {
             version: '3.8',
             services: {
                 [id]: {
-                    container_name: id,
-                    image: config['taiga-gateway'].image,
-                    volumes: [...config['taiga-gateway'].volumes, `./nginx.conf:/etc/nginx/conf.d/default.conf`],
+                    build: {
+                        context: '.',
+                        dockerfile: 'DockerfileGateway',
+                    },
+                    volumes: config['taiga-gateway'].volumes,
                     labels: makeLabelForServices('taiga'),
                     ...defaultComposeConfiguration(network),
                 },
@@ -2507,7 +2514,10 @@ async function startTaigaService(request: FastifyRequest<ServiceStartStop>) {
                     ...defaultComposeConfiguration(network),
                 },
                 [`${id}-taiga-back`]: {
-                    build: workdir,
+                    build: {
+                        context: '.',
+                        dockerfile: 'DockerfileBack',
+                    },
                     entrypoint: '/taiga-back/docker/entrypoint_coolify.sh',
                     container_name: `${id}-taiga-back`,
                     environment: config['taiga-back'].environmentVariables,
