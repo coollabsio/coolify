@@ -1,7 +1,6 @@
 <script lang="ts">
 	export let source: any;
 	export let settings: any;
-	import Explainer from '$lib/components/Explainer.svelte';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { getAPIUrl, post } from '$lib/api';
