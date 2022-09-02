@@ -1,6 +1,6 @@
 <script lang="ts">
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-	import Explaner from '$lib/components/Explainer.svelte';
+	import Explainer from '$lib/components/Explainer.svelte';
 	import { appSession, status } from '$lib/store';
 	import { t } from '$lib/translations';
 	export let service: any;
@@ -12,7 +12,7 @@
 </div>
 <div class="grid grid-cols-2 items-center px-10">
 	<label for="scriptName"
-		>Script Name <Explaner
+		>Script Name <Explainer
 			explanation="Useful if you would like to rename the collector script to prevent it blocked by AdBlockers."
 		/></label
 	>

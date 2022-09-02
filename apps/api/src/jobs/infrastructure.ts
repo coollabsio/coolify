@@ -3,9 +3,6 @@ import axios from 'axios';
 import { compareVersions } from 'compare-versions';
 import { asyncExecShell, cleanupDockerStorage, executeDockerCmd, isDev, prisma, startTraefikTCPProxy, generateDatabaseConfiguration, startTraefikProxy, listSettings, version } from '../lib/common';
 
-async function disconnect() {
-    await prisma.$disconnect();
-}
 async function autoUpdater() {
     try {
         const currentVersion = version;

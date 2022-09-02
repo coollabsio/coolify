@@ -3,7 +3,7 @@
 	import { status } from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { t } from '$lib/translations';
-	import Explaner from '$lib/components/Explainer.svelte';
+	import Explainer from '$lib/components/Explainer.svelte';
 </script>
 
 <div class="flex space-x-1 py-5 font-bold">
@@ -38,7 +38,7 @@
 	<div class="grid grid-cols-2 items-center">
 		<label for="dbUserPassword" class="text-base font-bold text-stone-100"
 			>{$t('forms.password')}
-			<Explaner explanation="Could be changed while the database is running." /></label
+			<Explainer explanation="Could be changed while the database is running." /></label
 		>
 		<CopyPasswordField
 			disabled={!$status.database.isRunning}
@@ -63,7 +63,7 @@
 	</div>
 	<div class="grid grid-cols-2 items-center">
 		<label for="rootUserPassword" class="text-base font-bold text-stone-100"
-			>{$t('forms.roots_password')} <Explaner explanation="Could be changed while the database is running." /></label
+			>{$t('forms.roots_password')} <Explainer explanation="Could be changed while the database is running." /></label
 		>
 		<CopyPasswordField
 			disabled={!$status.database.isRunning}

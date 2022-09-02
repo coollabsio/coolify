@@ -19,14 +19,13 @@
 <script lang="ts">
 	export let settings: any;
 	import Setting from '$lib/components/Setting.svelte';
-	import Explainer from '$lib/components/Explainer.svelte';
 	import { del, get, post } from '$lib/api';
 	import { browser } from '$app/env';
 	import { t } from '$lib/translations';
 	import { addToast, appSession, features } from '$lib/store';
 	import { errorNotification, getDomain } from '$lib/common';
 	import Menu from './_Menu.svelte';
-	import Explaner from '$lib/components/Explainer.svelte';
+	import Explainer from '$lib/components/Explainer.svelte';
 
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
 	let dualCerts = settings.dualCerts;
@@ -196,7 +195,7 @@
 						<div class="flex-col">
 							<div class="pt-2 text-base font-bold text-stone-100">
 								{$t('application.url_fqdn')}
-								<Explaner explanation={$t('setting.ssl_explainer')} />
+								<Explainer explanation={$t('setting.ssl_explainer')} />
 							</div>
 						</div>
 						<div class="justify-start text-left">
@@ -251,7 +250,7 @@
 						<div class="flex-col">
 							<div class="pt-2 text-base font-bold text-stone-100">
 								{$t('forms.public_port_range')}
-								<Explaner explanation={$t('forms.public_port_range_explainer')} />
+								<Explainer explanation={$t('forms.public_port_range_explainer')} />
 							</div>
 						</div>
 						<div class="mx-auto flex-row items-center justify-center space-y-2">
@@ -283,7 +282,7 @@
 					</div>
 					<div class="grid grid-cols-2 items-center">
 						<div class="text-base font-bold text-stone-100">
-							Custom DNS servers <Explaner
+							Custom DNS servers <Explainer
 								explanation="You can specify a custom DNS server to verify your domains all over Coolify.<br><br>By default, the OS defined DNS servers are used."
 							/>
 						</div>

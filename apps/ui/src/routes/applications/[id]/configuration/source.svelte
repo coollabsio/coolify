@@ -32,7 +32,6 @@
 	import { errorNotification } from '$lib/common';
 	import { appSession } from '$lib/store';
 	import PublicRepository from './_PublicRepository.svelte';
-	import Explaner from '$lib/components/Explainer.svelte';
 	import DocLink from '$lib/components/DocLink.svelte';
 
 	const { id } = $page.params;

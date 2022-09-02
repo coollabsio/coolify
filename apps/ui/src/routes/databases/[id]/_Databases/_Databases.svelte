@@ -16,7 +16,7 @@
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import { addToast, appSession, status } from '$lib/store';
-	import Explaner from '$lib/components/Explainer.svelte';
+	import Explainer from '$lib/components/Explainer.svelte';
 
 	const { id } = $page.params;
 
@@ -211,7 +211,7 @@
 					<label for="url" class="text-base font-bold text-stone-100"
 						>{$t('database.connection_string')}
 						{#if !isPublic && database.destinationDocker.remoteEngine}
-							<Explaner
+							<Explainer
 								explanation="You can only access the database with this URL if your application is deployed to the same Destination."
 							/>
 						{/if}</label

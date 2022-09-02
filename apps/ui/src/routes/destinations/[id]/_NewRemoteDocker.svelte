@@ -5,7 +5,7 @@
 
 	import { post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
-	import Explainer from '$lib/components/Explainer.svelte';
+	import SimpleExplainer from '$lib/components/SimpleExplainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 	import { t } from '$lib/translations';
 
@@ -29,7 +29,7 @@
 </script>
 
 <div class="text-center flex justify-center">
-	<Explainer
+	<SimpleExplainer
 		customClass="max-w-[32rem]"
 		text="Remote Docker Engines are using <span class='text-white font-bold'>SSH</span> to communicate with the remote docker engine. 
         You need to setup an <span class='text-white font-bold'>SSH key</span> in advance on the server and install Docker. 

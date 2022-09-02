@@ -11,7 +11,7 @@
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import { addToast, appSession } from '$lib/store';
-	import Explaner from '$lib/components/Explainer.svelte';
+	import Explainer from '$lib/components/Explainer.svelte';
 	const { id } = $page.params;
 
 	let url = settings.fqdn ? settings.fqdn : window.location.origin;
@@ -241,7 +241,7 @@
 			{#if selfHosted}
 				<div class="grid grid-cols-2 items-center">
 					<label for="customPort" class="text-base font-bold text-stone-100"
-						>Custom SSH Port <Explaner
+						>Custom SSH Port <Explainer
 							explanation={'If you use a self-hosted version of Git, you can provide custom port for all the Git related actions.'}
 						/></label
 					>
@@ -260,7 +260,7 @@
 					<label for="oauthId" class="pt-2 text-base font-bold text-stone-100"
 						>{$t('source.oauth_id')}
 						{#if !source.gitlabAppId}
-							<Explaner explanation={$t('source.oauth_id_explainer')} />
+							<Explainer explanation={$t('source.oauth_id_explainer')} />
 						{/if}</label
 					>
 				</div>

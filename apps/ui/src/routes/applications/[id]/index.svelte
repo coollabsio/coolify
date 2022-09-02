@@ -32,16 +32,15 @@
 	import { onDestroy, onMount } from 'svelte';
 	import Select from 'svelte-select';
 
-	import Explainer from '$lib/components/Explainer.svelte';
 	import { get, post } from '$lib/api';
 	import cuid from 'cuid';
-	import { browser } from '$app/env';
 	import { addToast, appSession, disabledButton, setLocation, status } from '$lib/store';
 	import { t } from '$lib/translations';
 	import { errorNotification, getDomain, notNodeDeployments, staticDeployments } from '$lib/common';
 	import Setting from '$lib/components/Setting.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
-	import Explaner from '$lib/components/Explainer.svelte';
+	import Explainer from '$lib/components/Explainer.svelte';
+	
 	const { id } = $page.params;
 
 	$: isDisabled =
@@ -447,7 +446,7 @@
 				<div class="grid grid-cols-2 items-center">
 					<label for="baseBuildImage" class="text-base font-bold text-stone-100"
 						>{$t('application.base_build_image')}
-						<Explaner
+						<Explainer
 							explanation={application.buildPack === 'laravel'
 								? 'For building frontend assets with webpack.'
 								: 'Image that will be used during the build process.'}
@@ -472,7 +471,7 @@
 				<div class="grid grid-cols-2 items-center">
 					<label for="baseImage" class="text-base font-bold text-stone-100"
 						>{$t('application.base_image')}
-						<Explaner explanation={'Image that will be used for the deployment.'} /></label
+						<Explainer explanation={'Image that will be used for the deployment.'} /></label
 					>
 					<div class="custom-select-wrapper">
 						<Select
@@ -492,7 +491,7 @@
 				<div class="grid grid-cols-2 items-center pb-8">
 					<label for="deploymentType" class="text-base font-bold text-stone-100"
 						>Deployment Type
-						<Explaner
+						<Explainer
 							explanation={"Defines how to deploy your application. <br><br><span class='text-green-500 font-bold'>Static</span> is for static websites, <span class='text-green-500 font-bold'>node</span> is for server-side applications."}
 						/></label
 					>
@@ -542,7 +541,7 @@
 				<div class="grid grid-cols-2 items-center">
 					<label for="fqdn" class="text-base font-bold text-stone-100"
 						>{$t('application.url_fqdn')}
-						<Explaner
+						<Explainer
 							explanation={"If you specify <span class='text-settings font-bold'>https</span>, the application will be accessible only over https.<br>SSL certificate will be generated automatically.<br><br>If you specify <span class='text-settings font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application.<br><br><span class='text-settings font-bold'>You must set your DNS to point to the server IP in advance.</span>"}
 						/>
 					</label>
@@ -550,7 +549,6 @@
 						<input
 							readonly={isDisabled}
 							disabled={isDisabled}
-							bind:this={domainEl}
 							name="fqdn"
 							id="fqdn"
 							required
@@ -648,7 +646,7 @@
 				<div class="grid grid-cols-2 items-center">
 					<label for="port" class="text-base font-bold text-stone-100"
 						>{$t('forms.port')}
-						<Explaner explanation={'The port your application listens on.'} /></label
+						<Explainer explanation={'The port your application listens on.'} /></label
 					>
 					<input
 						disabled={isDisabled}
@@ -662,7 +660,7 @@
 			{/if}
 			<div class="grid grid-cols-2 items-center">
 				<label for="exposePort" class="text-base font-bold text-stone-100"
-					>Exposed Port <Explaner
+					>Exposed Port <Explainer
 						explanation={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
 					/></label
 				>
@@ -719,7 +717,7 @@
 			{#if application.buildPack === 'docker'}
 				<div class="grid grid-cols-2 items-center pt-4">
 					<label for="dockerFileLocation" class="text-base font-bold text-stone-100"
-						>Dockerfile Location <Explaner
+						>Dockerfile Location <Explainer
 							explanation={"Should be absolute path, like <span class='text-settings font-bold'>/data/Dockerfile</span> or <span class='text-settings font-bold'>/Dockerfile.</span>"}
 						/></label
 					>
@@ -747,7 +745,7 @@
 				</div>
 				<div class="grid grid-cols-2 items-center">
 					<label for="denoOptions" class="text-base font-bold text-stone-100"
-						>Arguments <Explaner
+						>Arguments <Explainer
 							explanation={"List of arguments to pass to <span class='text-settings font-bold'>deno run</span> command. Could include permissions, configurations files, etc."}
 						/></label
 					>
@@ -766,7 +764,7 @@
 					<div class="flex-col">
 						<label for="baseDirectory" class="pt-2 text-base font-bold text-stone-100"
 							>{$t('forms.base_directory')}
-							<Explaner
+							<Explainer
 								explanation={"Directory to use as the base for all commands.<br>Could be useful with <span class='text-settings font-bold'>monorepos</span>."}
 							/></label
 						>
@@ -786,7 +784,7 @@
 					<div class="flex-col">
 						<label for="publishDirectory" class="pt-2 text-base font-bold text-stone-100"
 							>{$t('forms.publish_directory')}
-							<Explaner
+							<Explainer
 								explanation={"Directory containing all the assets for deployment. <br> For example: <span class='text-settings font-bold'>dist</span>,<span class='text-settings font-bold'>_site</span> or <span class='text-settings font-bold'>public</span>."}
 							/></label
 						>
