@@ -201,15 +201,15 @@ export const supportedServiceTypesAndVersions = [
 			main: 8080
 		}
 	},
-	{
-		name: 'taiga',
-		fancyName: 'Taiga',
-		baseImage: 'taigaio/taiga-front',
-		images: ['postgres:12.3', 'rabbitmq:3.8-management-alpine', 'taigaio/taiga-back', 'taigaio/taiga-events', 'taigaio/taiga-protected'],
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 80
-		}
-	},
+	// {
+	// 	name: 'taiga',
+	// 	fancyName: 'Taiga',
+	// 	baseImage: 'taigaio/taiga-front',
+	// 	images: ['postgres:12.3', 'rabbitmq:3.8-management-alpine', 'taigaio/taiga-back', 'taigaio/taiga-events', 'taigaio/taiga-protected'],
+	// 	versions: ['latest'],
+	// 	recommendedVersion: 'latest',
+	// 	ports: {
+	// 		main: 80
+	// 	}
+	// },
 ];
