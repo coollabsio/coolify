@@ -18,9 +18,13 @@
 	let logsEl: any;
 	let position = 0;
 	let loadingLogs = false;
-	let database: any = {};
+	let database = {
+		name: null
+	};
 
 	onMount(async () => {
+		const response = await get(`/databases/${id}`);
+		database = response.database;
 		const { logs: firstLogs } = await get(`/databases/${id}/logs`);
 		logs = firstLogs;
 		loadAllLogs();
@@ -95,29 +99,6 @@
 		</div>
 		<span class="text-xs">{database.name}</span>
 	</div>
-
-	{#if database.fqdn}
-		<a
-			href={database.fqdn}
-			target="_blank"
-			class="icons tooltip-bottom flex items-center bg-transparent text-sm"
-			><svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="h-6 w-6"
-				viewBox="0 0 24 24"
-				stroke-width="1.5"
-				stroke="currentColor"
-				fill="none"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			>
-				<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-				<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
-				<line x1="10" y1="14" x2="20" y2="4" />
-				<polyline points="15 4 20 4 20 9" />
-			</svg></a
-		>
-	{/if}
 </div>
 <div class="flex flex-row justify-center space-x-2 px-10 pt-6">
 	{#if logs.length === 0}

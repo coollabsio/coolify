@@ -5,7 +5,7 @@
 	import { errorNotification } from '$lib/common';
 	import LoadingLogs from '$lib/components/LoadingLogs.svelte';
 	import { onMount, onDestroy } from 'svelte';
-import Tooltip from '$lib/components/Tooltip.svelte';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 
 	let application: any = {};
 	let logsLoading = false;
