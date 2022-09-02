@@ -2,7 +2,7 @@ name: production-release
 
 on:
   release:
-    types: [published]
+    types: [released]
 
 jobs:
   making-something-cool:
