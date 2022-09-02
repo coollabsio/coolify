@@ -96,14 +96,12 @@
 		const sure = confirm($t('database.confirm_stop', { name: service.name }));
 		if (sure) {
 			$status.service.initialLoading = true;
-			$status.service.loading = true;
 			try {
 				await post(`/services/${service.id}/${service.type}/stop`, {});
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
 				$status.service.initialLoading = false;
-				$status.service.loading = false;
 			}
 		}
 	}
@@ -131,6 +129,9 @@
 	}
 	onDestroy(() => {
 		$status.service.initialLoading = true;
+		$status.service.isRunning = false;
+		$status.service.isExited = false;
+		$status.service.loading = false;
 		$location = null;
 		clearInterval(statusInterval);
 	});
@@ -150,7 +151,7 @@
 </script>
 
 <nav class="nav-side">
-	{#if service.type && service.destinationDockerId && service.version}
+	{#if service.type && service.destinationDockerId && service.version && service.fqdn}
 		{#if $location}
 			<a
 				id="open"

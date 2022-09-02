@@ -1353,9 +1353,9 @@ export const getServiceMainPort = (service: string) => {
 export function makeLabelForServices(type) {
 	return [
 		'coolify.managed=true',
-		`coolify.version = ${version}`,
-		`coolify.type = service`,
-		`coolify.service.type = ${type}`
+		`coolify.version=${version}`,
+		`coolify.type=service`,
+		`coolify.service.type=${type}`
 	];
 }
 export function errorHandler({ status = 500, message = 'Unknown error.' }: { status: number, message: string | any }) {
@@ -1475,14 +1475,25 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 }
 
 export function persistentVolumes(id, persistentStorage, config) {
+	let volumeSet = new Set();
+	if (Object.keys(config).length > 0) {
+		for (const [key, value] of Object.entries(config)) {
+			if (value.volumes) {
+				for (const volume of value.volumes) {
+					volumeSet.add(volume);
+				}
+			}
+
+		}
+	}
+	const volumesArray = Array.from(volumeSet);
 	const persistentVolume =
 		persistentStorage?.map((storage) => {
 			return `${id}${storage.path.replace(/\//gi, '-')}:${storage.path}`;
 		}) || [];
 
 	let volumes = [...persistentVolume]
-	if (config.volume) volumes = [config.volume, ...volumes]
-
+	if (volumesArray) volumes = [...volumesArray, ...volumes]
 	const composeVolumes = volumes.length > 0 && volumes.map((volume) => {
 		return {
 			[`${volume.split(':')[0]}`]: {
@@ -1491,16 +1502,11 @@ export function persistentVolumes(id, persistentStorage, config) {
 		};
 	}) || []
 
-	const volumeMounts = config.volume && Object.assign(
+	const volumeMounts = Object.assign(
 		{},
-		{
-			[config.volume.split(':')[0]]: {
-				name: config.volume.split(':')[0]
-			}
-		},
 		...composeVolumes
 	) || {}
-	return { volumes, volumeMounts }
+	return { volumeMounts }
 }
 export function defaultComposeConfiguration(network: string): any {
 	return {

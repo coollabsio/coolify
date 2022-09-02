@@ -119,6 +119,9 @@
 	}
 	onDestroy(() => {
 		$status.database.initialLoading = true;
+		$status.database.isRunning = false;
+		$status.database.isExited = false;
+		$status.database.loading = false;
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {

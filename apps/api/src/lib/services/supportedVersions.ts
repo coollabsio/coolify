@@ -194,11 +194,22 @@ export const supportedServiceTypesAndVersions = [
 		name: 'weblate',
 		fancyName: 'Weblate',
 		baseImage: 'weblate/weblate',
-		images: ['postgres:14-alpine','redis:6-alpine'],
+		images: ['postgres:14-alpine', 'redis:6-alpine'],
 		versions: ['latest'],
 		recommendedVersion: 'latest',
 		ports: {
 			main: 8080
+		}
+	},
+	{
+		name: 'taiga',
+		fancyName: 'Taiga',
+		baseImage: 'taigaio/taiga-front',
+		images: ['postgres:12.3', 'rabbitmq:3.8-management-alpine', 'taigaio/taiga-back', 'taigaio/taiga-events', 'taigaio/taiga-protected'],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 80
 		}
 	},
 ];

@@ -19,7 +19,8 @@ export const includeServices: any = {
 	appwrite: true,
 	glitchTip: true,
 	searxng: true,
-	weblate: true
+	weblate: true,
+	taiga: true
 };
 export async function configureServiceType({
 	id,
@@ -297,7 +298,7 @@ export async function configureServiceType({
 				}
 			}
 		});
-	}else if (type === 'weblate') {
+	} else if (type === 'weblate') {
 		const adminPassword = encrypt(generatePassword({}))
 		const postgresqlUser = cuid();
 		const postgresqlPassword = encrypt(generatePassword({}));
@@ -309,6 +310,37 @@ export async function configureServiceType({
 				weblate: {
 					create: {
 						adminPassword,
+						postgresqlHost: `${id}-postgresql`,
+						postgresqlPort: 5432,
+						postgresqlUser,
+						postgresqlPassword,
+						postgresqlDatabase,
+					}
+				}
+			}
+		});
+	} else if (type === 'taiga') {
+		const secretKey = encrypt(generatePassword({}))
+		const erlangSecret = encrypt(generatePassword({}))
+		const rabbitMQUser = cuid();
+		const djangoAdminUser = cuid();
+		const djangoAdminPassword = encrypt(generatePassword({}))
+		const rabbitMQPassword = encrypt(generatePassword({}))
+		const postgresqlUser = cuid();
+		const postgresqlPassword = encrypt(generatePassword({}));
+		const postgresqlDatabase = 'taiga';
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				taiga: {
+					create: {
+						secretKey,
+						erlangSecret,
+						djangoAdminUser,
+						djangoAdminPassword,
+						rabbitMQUser,
+						rabbitMQPassword,
 						postgresqlHost: `${id}-postgresql`,
 						postgresqlPort: 5432,
 						postgresqlUser,
@@ -345,6 +377,7 @@ export async function removeService({ id }: { id: string }): Promise<void> {
 	await prisma.appwrite.deleteMany({ where: { serviceId: id } });
 	await prisma.searxng.deleteMany({ where: { serviceId: id } });
 	await prisma.weblate.deleteMany({ where: { serviceId: id } });
+	await prisma.taiga.deleteMany({ where: { serviceId: id } });
 	
 	await prisma.service.delete({ where: { id } });
 }

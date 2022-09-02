@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
 import { ServiceStartStop } from '../../routes/api/v1/services/types';
-import { asyncSleep, ComposeFile, createDirectories, defaultComposeConfiguration, errorHandler, executeDockerCmd, getDomain, getFreePublicPort, getServiceFromDB, getServiceImage, getServiceMainPort, isARM, makeLabelForServices, persistentVolumes, prisma } from '../common';
+import { asyncSleep, ComposeFile, createDirectories, defaultComposeConfiguration, errorHandler, executeDockerCmd, getDomain, getFreePublicPort, getServiceFromDB, getServiceImage, getServiceMainPort, isARM, isDev, makeLabelForServices, persistentVolumes, prisma } from '../common';
 import { defaultServiceConfigurations } from '../services';
 
 export async function startService(request: FastifyRequest<ServiceStartStop>) {
@@ -66,6 +66,9 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         if (type === 'weblate') {
             return await startWeblateService(request)
         }
+        if (type === 'taiga') {
+            return await startTaigaService(request)
+        }
         throw `Service type ${type} not supported.`
     } catch (error) {
         throw { status: 500, message: error?.message || error }
@@ -122,7 +125,7 @@ async function startPlausibleAnalyticsService(request: FastifyRequest<ServiceSta
                 }
             },
             postgresql: {
-                volume: `${plausibleDbId}-postgresql-data:/bitnami/postgresql/`,
+                volumes: [`${plausibleDbId}-postgresql-data:/bitnami/postgresql/`],
                 image: 'bitnami/postgresql:13.2.0',
                 environmentVariables: {
                     POSTGRESQL_PASSWORD: postgresqlPassword,
@@ -131,7 +134,7 @@ async function startPlausibleAnalyticsService(request: FastifyRequest<ServiceSta
                 }
             },
             clickhouse: {
-                volume: `${plausibleDbId}-clickhouse-data:/var/lib/clickhouse`,
+                volumes: [`${plausibleDbId}-clickhouse-data:/var/lib/clickhouse`],
                 image: 'yandex/clickhouse-server:21.3.2.5',
                 environmentVariables: {},
                 ulimits: {
@@ -195,7 +198,7 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 
         await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile);
 
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.plausibleAnalytics)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config.plausibleAnalytics)
 
         const composeFile: ComposeFile = {
             version: '3.8',
@@ -203,7 +206,6 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
                 [id]: {
                     container_name: id,
                     image: config.plausibleAnalytics.image,
-                    volumes,
                     command:
                         'sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh db init-admin && /entrypoint.sh run"',
                     environment: config.plausibleAnalytics.environmentVariables,
@@ -216,14 +218,14 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
                     container_name: `${id}-postgresql`,
                     image: config.postgresql.image,
                     environment: config.postgresql.environmentVariables,
-                    volumes: [config.postgresql.volume],
+                    volumes: config.postgresql.volumes,
                     ...defaultComposeConfiguration(network),
                 },
                 [`${id}-clickhouse`]: {
                     build: workdir,
                     container_name: `${id}-clickhouse`,
                     environment: config.clickhouse.environmentVariables,
-                    volumes: [config.clickhouse.volume],
+                    volumes: config.clickhouse.volumes,
                     ...defaultComposeConfiguration(network),
                 }
             },
@@ -232,15 +234,7 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
                     external: true
                 }
             },
-            volumes: {
-                ...volumeMounts,
-                [config.postgresql.volume.split(':')[0]]: {
-                    name: config.postgresql.volume.split(':')[0]
-                },
-                [config.clickhouse.volume.split(':')[0]]: {
-                    name: config.clickhouse.volume.split(':')[0]
-                }
-            }
+            volumes: volumeMounts
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
@@ -265,24 +259,27 @@ async function startNocodbService(request: FastifyRequest<ServiceStartStop>) {
         const image = getServiceImage(type);
 
         const config = {
-            image: `${image}:${version}`,
-            volume: `${id}-nc:/usr/app/data`,
-            environmentVariables: {}
+            nocodb: {
+                image: `${image}:${version}`,
+                volumes: [`${id}-nc:/usr/app/data`],
+                environmentVariables: {}
+            }
+
         };
         if (serviceSecret.length > 0) {
             serviceSecret.forEach((secret) => {
-                config.environmentVariables[secret.name] = secret.value;
+                config.nocodb.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
                 [id]: {
                     container_name: id,
-                    image: config.image,
-                    volumes,
-                    environment: config.environmentVariables,
+                    image: config.nocodb.image,
+                    volumes: config.nocodb.volumes,
+                    environment: config.nocodb.environmentVariables,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('nocodb'),
                     ...defaultComposeConfiguration(network),
@@ -332,29 +329,32 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
         const image = getServiceImage(type);
 
         const config = {
-            image: `${image}:${version}`,
-            volume: `${id}-minio-data:/data`,
-            environmentVariables: {
-                MINIO_ROOT_USER: rootUser,
-                MINIO_ROOT_PASSWORD: rootUserPassword,
-                MINIO_BROWSER_REDIRECT_URL: fqdn
+            minio: {
+                image: `${image}:${version}`,
+                volumes: [`${id}-minio-data:/data`],
+                environmentVariables: {
+                    MINIO_ROOT_USER: rootUser,
+                    MINIO_ROOT_PASSWORD: rootUserPassword,
+                    MINIO_BROWSER_REDIRECT_URL: fqdn
+                }
             }
+
         };
         if (serviceSecret.length > 0) {
             serviceSecret.forEach((secret) => {
-                config.environmentVariables[secret.name] = secret.value;
+                config.minio.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
                 [id]: {
                     container_name: id,
-                    image: config.image,
+                    image: config.minio.image,
                     command: `server /data --console-address ":${consolePort}"`,
-                    environment: config.environmentVariables,
-                    volumes,
+                    environment: config.minio.environmentVariables,
+                    volumes: config.minio.volumes,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('minio'),
                     ...defaultComposeConfiguration(network),
@@ -400,27 +400,30 @@ async function startVscodeService(request: FastifyRequest<ServiceStartStop>) {
         const image = getServiceImage(type);
 
         const config = {
-            image: `${image}:${version}`,
-            volume: `${id}-vscodeserver-data:/home/coder`,
-            environmentVariables: {
-                PASSWORD: password
+            vscodeserver: {
+                image: `${image}:${version}`,
+                volumes: [`${id}-vscodeserver-data:/home/coder`],
+                environmentVariables: {
+                    PASSWORD: password
+                }
             }
+
         };
         if (serviceSecret.length > 0) {
             serviceSecret.forEach((secret) => {
-                config.environmentVariables[secret.name] = secret.value;
+                config.vscodeserver.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
 
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
                 [id]: {
                     container_name: id,
-                    image: config.image,
-                    environment: config.environmentVariables,
-                    volumes,
+                    image: config.vscodeserver.image,
+                    environment: config.vscodeserver.environmentVariables,
+                    volumes: config.vscodeserver.volumes,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('vscodeServer'),
                     ...defaultComposeConfiguration(network),
@@ -435,7 +438,6 @@ async function startVscodeService(request: FastifyRequest<ServiceStartStop>) {
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-
         await startServiceContainers(destinationDocker.id, composeFileDestination)
 
         const changePermissionOn = persistentStorage.map((p) => p.path);
@@ -487,7 +489,7 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
         const config = {
             wordpress: {
                 image: `${image}:${version}`,
-                volume: `${id}-wordpress-data:/var/www/html`,
+                volumes: [`${id}-wordpress-data:/var/www/html`],
                 environmentVariables: {
                     WORDPRESS_DB_HOST: ownMysql ? `${mysqlHost}:${mysqlPort}` : `${id}-mysql`,
                     WORDPRESS_DB_USER: mysqlUser,
@@ -498,7 +500,7 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
             },
             mysql: {
                 image: `bitnami/mysql:5.7`,
-                volume: `${id}-mysql-data:/bitnami/mysql/data`,
+                volumes: [`${id}-mysql-data:/bitnami/mysql/data`],
                 environmentVariables: {
                     MYSQL_ROOT_PASSWORD: mysqlRootUserPassword,
                     MYSQL_ROOT_USER: mysqlRootUser,
@@ -510,7 +512,7 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
         };
         if (isARM(arch)) {
             config.mysql.image = 'mysql:5.7'
-            config.mysql.volume = `${id}-mysql-data:/var/lib/mysql`
+            config.mysql.volumes = [`${id}-mysql-data:/var/lib/mysql`]
         }
         if (serviceSecret.length > 0) {
             serviceSecret.forEach((secret) => {
@@ -518,7 +520,7 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
             });
         }
 
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.wordpress)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
 
         const composeFile: ComposeFile = {
             version: '3.8',
@@ -527,7 +529,7 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
                     container_name: id,
                     image: config.wordpress.image,
                     environment: config.wordpress.environmentVariables,
-                    volumes,
+                    volumes: config.wordpress.volumes,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('wordpress'),
                     ...defaultComposeConfiguration(network),
@@ -545,20 +547,14 @@ async function startWordpressService(request: FastifyRequest<ServiceStartStop>) 
             composeFile.services[`${id}-mysql`] = {
                 container_name: `${id}-mysql`,
                 image: config.mysql.image,
-                volumes: [config.mysql.volume],
+                volumes: config.mysql.volumes,
                 environment: config.mysql.environmentVariables,
                 ...defaultComposeConfiguration(network),
-            };
-
-            composeFile.volumes[config.mysql.volume.split(':')[0]] = {
-                name: config.mysql.volume.split(':')[0]
             };
         }
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-
         await startServiceContainers(destinationDocker.id, composeFileDestination)
-
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -580,24 +576,27 @@ async function startVaultwardenService(request: FastifyRequest<ServiceStartStop>
         const image = getServiceImage(type);
 
         const config = {
-            image: `${image}:${version}`,
-            volume: `${id}-vaultwarden-data:/data/`,
-            environmentVariables: {}
+            vaultwarden: {
+                image: `${image}:${version}`,
+                volumes: [`${id}-vaultwarden-data:/data/`],
+                environmentVariables: {}
+            }
+
         };
         if (serviceSecret.length > 0) {
             serviceSecret.forEach((secret) => {
-                config.environmentVariables[secret.name] = secret.value;
+                config.vaultwarden.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
                 [id]: {
                     container_name: id,
-                    image: config.image,
-                    environment: config.environmentVariables,
-                    volumes,
+                    image: config.vaultwarden.image,
+                    environment: config.vaultwarden.environmentVariables,
+                    volumes: config.vaultwarden.volumes,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('vaultWarden'),
                     ...defaultComposeConfiguration(network),
@@ -612,9 +611,7 @@ async function startVaultwardenService(request: FastifyRequest<ServiceStartStop>
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-
         await startServiceContainers(destinationDocker.id, composeFileDestination)
-
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -635,26 +632,28 @@ async function startLanguageToolService(request: FastifyRequest<ServiceStartStop
         const image = getServiceImage(type);
 
         const config = {
-            image: `${image}:${version}`,
-            volume: `${id}-ngrams:/ngrams`,
-            environmentVariables: {}
+            languagetool: {
+                image: `${image}:${version}`,
+                volumes: [`${id}-ngrams:/ngrams`],
+                environmentVariables: {}
+            }
         };
 
         if (serviceSecret.length > 0) {
             serviceSecret.forEach((secret) => {
-                config.environmentVariables[secret.name] = secret.value;
+                config.languagetool.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
                 [id]: {
                     container_name: id,
-                    image: config.image,
-                    environment: config.environmentVariables,
+                    image: config.languagetool.image,
+                    environment: config.languagetool.environmentVariables,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    volumes,
+                    volumes: config.languagetool,
                     labels: makeLabelForServices('languagetool'),
                     ...defaultComposeConfiguration(network),
                 }
@@ -668,9 +667,7 @@ async function startLanguageToolService(request: FastifyRequest<ServiceStartStop
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-
         await startServiceContainers(destinationDocker.id, composeFileDestination)
-
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -691,26 +688,28 @@ async function startN8nService(request: FastifyRequest<ServiceStartStop>) {
         const image = getServiceImage(type);
 
         const config = {
-            image: `${image}:${version}`,
-            volume: `${id}-n8n:/root/.n8n`,
-            environmentVariables: {
-                WEBHOOK_URL: `${service.fqdn}`
+            n8n: {
+                image: `${image}:${version}`,
+                volumes: [`${id}-n8n:/root/.n8n`],
+                environmentVariables: {
+                    WEBHOOK_URL: `${service.fqdn}`
+                }
             }
         };
         if (serviceSecret.length > 0) {
             serviceSecret.forEach((secret) => {
-                config.environmentVariables[secret.name] = secret.value;
+                config.n8n.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
                 [id]: {
                     container_name: id,
-                    image: config.image,
-                    volumes,
-                    environment: config.environmentVariables,
+                    image: config.n8n.image,
+                    volumes: config.n8n,
+                    environment: config.n8n.environmentVariables,
                     labels: makeLabelForServices('n8n'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     ...defaultComposeConfiguration(network),
@@ -725,9 +724,7 @@ async function startN8nService(request: FastifyRequest<ServiceStartStop>) {
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-
         await startServiceContainers(destinationDocker.id, composeFileDestination)
-
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -748,24 +745,26 @@ async function startUptimekumaService(request: FastifyRequest<ServiceStartStop>)
         const image = getServiceImage(type);
 
         const config = {
-            image: `${image}:${version}`,
-            volume: `${id}-uptimekuma:/app/data`,
-            environmentVariables: {}
+            uptimekuma: {
+                image: `${image}:${version}`,
+                volumes: [`${id}-uptimekuma:/app/data`],
+                environmentVariables: {}
+            }
         };
         if (serviceSecret.length > 0) {
             serviceSecret.forEach((secret) => {
-                config.environmentVariables[secret.name] = secret.value;
+                config.uptimekuma.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
                 [id]: {
                     container_name: id,
-                    image: config.image,
-                    volumes,
-                    environment: config.environmentVariables,
+                    image: config.uptimekuma.image,
+                    volumes: config.uptimekuma.volumes,
+                    environment: config.uptimekuma.environmentVariables,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('uptimekuma'),
                     ...defaultComposeConfiguration(network),
@@ -780,9 +779,7 @@ async function startUptimekumaService(request: FastifyRequest<ServiceStartStop>)
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-
         await startServiceContainers(destinationDocker.id, composeFileDestination)
-
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -823,7 +820,7 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
         const config = {
             ghost: {
                 image: `${image}:${version}`,
-                volume: `${id}-ghost:/bitnami/ghost`,
+                volumes: [`${id}-ghost:/bitnami/ghost`],
                 environmentVariables: {
                     url: fqdn,
                     GHOST_HOST: domain,
@@ -839,7 +836,7 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
             },
             mariadb: {
                 image: `bitnami/mariadb:latest`,
-                volume: `${id}-mariadb:/bitnami/mariadb`,
+                volumes: [`${id}-mariadb:/bitnami/mariadb`],
                 environmentVariables: {
                     MARIADB_USER: mariadbUser,
                     MARIADB_PASSWORD: mariadbPassword,
@@ -855,14 +852,14 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
             });
         }
 
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.ghost)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config.ghost)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
                 [id]: {
                     container_name: id,
                     image: config.ghost.image,
-                    volumes,
+                    volumes: config.ghost.volumes,
                     environment: config.ghost.environmentVariables,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('ghost'),
@@ -872,7 +869,7 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
                 [`${id}-mariadb`]: {
                     container_name: `${id}-mariadb`,
                     image: config.mariadb.image,
-                    volumes: [config.mariadb.volume],
+                    volumes: config.mariadb.volumes,
                     environment: config.mariadb.environmentVariables,
                     ...defaultComposeConfiguration(network),
                 }
@@ -882,18 +879,11 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
                     external: true
                 }
             },
-            volumes: {
-                ...volumeMounts,
-                [config.mariadb.volume.split(':')[0]]: {
-                    name: config.mariadb.volume.split(':')[0]
-                }
-            }
+            volumes: volumeMounts
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-
         await startServiceContainers(destinationDocker.id, composeFileDestination)
-
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -917,28 +907,30 @@ async function startMeilisearchService(request: FastifyRequest<ServiceStartStop>
         const image = getServiceImage(type);
 
         const config = {
-            image: `${image}:${version}`,
-            volume: `${id}-datams:/data.ms`,
-            environmentVariables: {
-                MEILI_MASTER_KEY: masterKey
+            meilisearch: {
+                image: `${image}:${version}`,
+                volumes: [`${id}-datams:/data.ms`],
+                environmentVariables: {
+                    MEILI_MASTER_KEY: masterKey
+                }
             }
         };
 
         if (serviceSecret.length > 0) {
             serviceSecret.forEach((secret) => {
-                config.environmentVariables[secret.name] = secret.value;
+                config.meilisearch.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
                 [id]: {
                     container_name: id,
-                    image: config.image,
-                    environment: config.environmentVariables,
+                    image: config.meilisearch.image,
+                    environment: config.meilisearch.environmentVariables,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    volumes,
+                    volumes: config.meilisearch.volumes,
                     labels: makeLabelForServices('meilisearch'),
                     ...defaultComposeConfiguration(network),
                 }
@@ -997,7 +989,7 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
             },
             postgresql: {
                 image: 'postgres:12-alpine',
-                volume: `${id}-postgresql-data:/var/lib/postgresql/data`,
+                volumes: [`${id}-postgresql-data:/var/lib/postgresql/data`],
                 environmentVariables: {
                     POSTGRES_USER: postgresqlUser,
                     POSTGRES_PASSWORD: postgresqlPassword,
@@ -1094,7 +1086,7 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
 	  FROM ${config.postgresql.image}
 	  COPY ./schema.postgresql.sql /docker-entrypoint-initdb.d/schema.postgresql.sql`;
         await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile);
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.umami)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config.umami)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1102,7 +1094,6 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
                     container_name: id,
                     image: config.umami.image,
                     environment: config.umami.environmentVariables,
-                    volumes,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('umami'),
                     depends_on: [`${id}-postgresql`],
@@ -1112,7 +1103,7 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
                     build: workdir,
                     container_name: `${id}-postgresql`,
                     environment: config.postgresql.environmentVariables,
-                    volumes: [config.postgresql.volume],
+                    volumes: config.postgresql.volumes,
                     ...defaultComposeConfiguration(network),
                 }
             },
@@ -1121,12 +1112,7 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
                     external: true
                 }
             },
-            volumes: {
-                ...volumeMounts,
-                [config.postgresql.volume.split(':')[0]]: {
-                    name: config.postgresql.volume.split(':')[0]
-                }
-            }
+            volumes: volumeMounts
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
@@ -1167,7 +1153,7 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
             },
             postgresql: {
                 image: 'postgres:12-alpine',
-                volume: `${id}-postgresql-data:/var/lib/postgresql/data`,
+                volumes: [`${id}-postgresql-data:/var/lib/postgresql/data`],
                 environmentVariables: {
                     POSTGRES_USER: postgresqlUser,
                     POSTGRES_PASSWORD: postgresqlPassword,
@@ -1181,7 +1167,7 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
             });
         }
 
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.hasura)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config.hasura)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1189,7 +1175,6 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
                     container_name: id,
                     image: config.hasura.image,
                     environment: config.hasura.environmentVariables,
-                    volumes,
                     labels: makeLabelForServices('hasura'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     depends_on: [`${id}-postgresql`],
@@ -1199,7 +1184,7 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
                     image: config.postgresql.image,
                     container_name: `${id}-postgresql`,
                     environment: config.postgresql.environmentVariables,
-                    volumes: [config.postgresql.volume],
+                    volumes: config.postgresql.volumes,
                     ...defaultComposeConfiguration(network),
                 }
             },
@@ -1208,18 +1193,11 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
                     external: true
                 }
             },
-            volumes: {
-                ...volumeMounts,
-                [config.postgresql.volume.split(':')[0]]: {
-                    name: config.postgresql.volume.split(':')[0]
-                }
-            }
+            volumes: volumeMounts
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-
         await startServiceContainers(destinationDocker.id, composeFileDestination)
-
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1281,7 +1259,7 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
             },
             postgresql: {
                 image: 'postgres:12-alpine',
-                volume: `${id}-postgresql-data:/var/lib/postgresql/data`,
+                volumes: [`${id}-postgresql-data:/var/lib/postgresql/data`],
                 environmentVariables: {
                     POSTGRES_USER: postgresqlUser,
                     POSTGRES_PASSWORD: postgresqlPassword,
@@ -1294,7 +1272,7 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
                 config.fider.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.fider)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config.fider)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1302,7 +1280,6 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
                     container_name: id,
                     image: config.fider.image,
                     environment: config.fider.environmentVariables,
-                    volumes,
                     labels: makeLabelForServices('fider'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     depends_on: [`${id}-postgresql`],
@@ -1312,7 +1289,7 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
                     image: config.postgresql.image,
                     container_name: `${id}-postgresql`,
                     environment: config.postgresql.environmentVariables,
-                    volumes: [config.postgresql.volume],
+                    volumes: config.postgresql.volumes,
                     ...defaultComposeConfiguration(network),
                 }
             },
@@ -1321,18 +1298,11 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
                     external: true
                 }
             },
-            volumes: {
-                ...volumeMounts,
-                [config.postgresql.volume.split(':')[0]]: {
-                    name: config.postgresql.volume.split(':')[0]
-                }
-            }
+            volumes: volumeMounts
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-
         await startServiceContainers(destinationDocker.id, composeFileDestination)
-
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1367,18 +1337,18 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 container_name: id,
                 labels: makeLabelForServices('appwrite'),
                 ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                "volumes": [
+                volumes: [
                     `${id}-uploads:/storage/uploads:rw`,
                     `${id}-cache:/storage/cache:rw`,
                     `${id}-config:/storage/config:rw`,
                     `${id}-certificates:/storage/certificates:rw`,
                     `${id}-functions:/storage/functions:rw`
                 ],
-                "depends_on": [
+                depends_on: [
                     `${id}-mariadb`,
                     `${id}-redis`,
                 ],
-                "environment": [
+                environment: [
                     "_APP_ENV=production",
                     "_APP_LOCALE=en",
                     `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
@@ -1406,11 +1376,11 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 container_name: `${id}-realtime`,
                 entrypoint: "realtime",
                 labels: makeLabelForServices('appwrite'),
-                "depends_on": [
+                depends_on: [
                     `${id}-mariadb`,
                     `${id}-redis`,
                 ],
-                "environment": [
+                environment: [
                     "_APP_ENV=production",
                     `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
                     `_APP_REDIS_HOST=${id}-redis`,
@@ -1425,16 +1395,15 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 ...defaultComposeConfiguration(network),
             },
             [`${id}-worker-audits`]: {
-
                 image: `${image}:${version}`,
                 container_name: `${id}-worker-audits`,
                 labels: makeLabelForServices('appwrite'),
-                "entrypoint": "worker-audits",
-                "depends_on": [
+                entrypoint: "worker-audits",
+                depends_on: [
                     `${id}-mariadb`,
                     `${id}-redis`,
                 ],
-                "environment": [
+                environment: [
                     "_APP_ENV=production",
                     `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
                     `_APP_REDIS_HOST=${id}-redis`,
@@ -1452,12 +1421,12 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 container_name: `${id}-worker-webhooks`,
                 labels: makeLabelForServices('appwrite'),
-                "entrypoint": "worker-webhooks",
-                "depends_on": [
+                entrypoint: "worker-webhooks",
+                depends_on: [
                     `${id}-mariadb`,
                     `${id}-redis`,
                 ],
-                "environment": [
+                environment: [
                     "_APP_ENV=production",
                     `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
                     `_APP_REDIS_HOST=${id}-redis`,
@@ -1470,12 +1439,12 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 container_name: `${id}-worker-deletes`,
                 labels: makeLabelForServices('appwrite'),
-                "entrypoint": "worker-deletes",
-                "depends_on": [
+                entrypoint: "worker-deletes",
+                depends_on: [
                     `${id}-mariadb`,
                     `${id}-redis`,
                 ],
-                "volumes": [
+                volumes: [
                     `${id}-uploads:/storage/uploads:rw`,
                     `${id}-cache:/storage/cache:rw`,
                     `${id}-config:/storage/config:rw`,
@@ -1503,12 +1472,12 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 container_name: `${id}-worker-databases`,
                 labels: makeLabelForServices('appwrite'),
-                "entrypoint": "worker-databases",
-                "depends_on": [
+                entrypoint: "worker-databases",
+                depends_on: [
                     `${id}-mariadb`,
                     `${id}-redis`,
                 ],
-                "environment": [
+                environment: [
                     "_APP_ENV=production",
                     `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
                     `_APP_REDIS_HOST=${id}-redis`,
@@ -1526,12 +1495,12 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 container_name: `${id}-worker-builds`,
                 labels: makeLabelForServices('appwrite'),
-                "entrypoint": "worker-builds",
-                "depends_on": [
+                entrypoint: "worker-builds",
+                depends_on: [
                     `${id}-mariadb`,
                     `${id}-redis`,
                 ],
-                "environment": [
+                environment: [
                     "_APP_ENV=production",
                     `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
                     `_APP_EXECUTOR_SECRET=${executorSecret}`,
@@ -1551,16 +1520,16 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 container_name: `${id}-worker-certificates`,
                 labels: makeLabelForServices('appwrite'),
-                "entrypoint": "worker-certificates",
-                "depends_on": [
+                entrypoint: "worker-certificates",
+                depends_on: [
                     `${id}-mariadb`,
                     `${id}-redis`,
                 ],
-                "volumes": [
+                volumes: [
                     `${id}-config:/storage/config:rw`,
                     `${id}-certificates:/storage/certificates:rw`,
                 ],
-                "environment": [
+                environment: [
                     "_APP_ENV=production",
                     `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
                     `_APP_DOMAIN=${fqdn}`,
@@ -1580,13 +1549,13 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 container_name: `${id}-worker-functions`,
                 labels: makeLabelForServices('appwrite'),
-                "entrypoint": "worker-functions",
-                "depends_on": [
+                entrypoint: "worker-functions",
+                depends_on: [
                     `${id}-mariadb`,
                     `${id}-redis`,
                     `${id}-executor`
                 ],
-                "environment": [
+                environment: [
                     "_APP_ENV=production",
                     `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
                     `_APP_REDIS_HOST=${id}-redis`,
@@ -1606,20 +1575,20 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 container_name: `${id}-executor`,
                 labels: makeLabelForServices('appwrite'),
-                "entrypoint": "executor",
-                "stop_signal": "SIGINT",
-                "volumes": [
+                entrypoint: "executor",
+                stop_signal: "SIGINT",
+                volumes: [
                     `${id}-functions:/storage/functions:rw`,
                     `${id}-builds:/storage/builds:rw`,
                     "/var/run/docker.sock:/var/run/docker.sock",
                     "/tmp:/tmp:rw"
                 ],
-                "depends_on": [
+                depends_on: [
                     `${id}-mariadb`,
                     `${id}-redis`,
                     `${id}`
                 ],
-                "environment": [
+                environment: [
                     "_APP_ENV=production",
                     `_APP_EXECUTOR_SECRET=${executorSecret}`,
                     ...secrets
@@ -1630,11 +1599,11 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 container_name: `${id}-worker-mails`,
                 labels: makeLabelForServices('appwrite'),
-                "entrypoint": "worker-mails",
-                "depends_on": [
+                entrypoint: "worker-mails",
+                depends_on: [
                     `${id}-redis`,
                 ],
-                "environment": [
+                environment: [
                     "_APP_ENV=production",
                     `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
                     `_APP_REDIS_HOST=${id}-redis`,
@@ -1647,11 +1616,11 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 container_name: `${id}-worker-messaging`,
                 labels: makeLabelForServices('appwrite'),
-                "entrypoint": "worker-messaging",
-                "depends_on": [
+                entrypoint: "worker-messaging",
+                depends_on: [
                     `${id}-redis`,
                 ],
-                "environment": [
+                environment: [
                     "_APP_ENV=production",
                     `_APP_REDIS_HOST=${id}-redis`,
                     "_APP_REDIS_PORT=6379",
@@ -1663,11 +1632,11 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 container_name: `${id}-maintenance`,
                 labels: makeLabelForServices('appwrite'),
-                "entrypoint": "maintenance",
-                "depends_on": [
+                entrypoint: "maintenance",
+                depends_on: [
                     `${id}-redis`,
                 ],
-                "environment": [
+                environment: [
                     "_APP_ENV=production",
                     `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
                     `_APP_DOMAIN=${fqdn}`,
@@ -1687,11 +1656,11 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 container_name: `${id}-schedule`,
                 labels: makeLabelForServices('appwrite'),
-                "entrypoint": "schedule",
-                "depends_on": [
+                entrypoint: "schedule",
+                depends_on: [
                     `${id}-redis`,
                 ],
-                "environment": [
+                environment: [
                     "_APP_ENV=production",
                     `_APP_REDIS_HOST=${id}-redis`,
                     "_APP_REDIS_PORT=6379",
@@ -1700,27 +1669,27 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 ...defaultComposeConfiguration(network),
             },
             [`${id}-mariadb`]: {
-                "image": "mariadb:10.7",
+                image: "mariadb:10.7",
                 container_name: `${id}-mariadb`,
                 labels: makeLabelForServices('appwrite'),
-                "volumes": [
+                volumes: [
                     `${id}-mariadb:/var/lib/mysql:rw`
                 ],
-                "environment": [
+                environment: [
                     `MYSQL_ROOT_USER=${mariadbRootUser}`,
                     `MYSQL_ROOT_PASSWORD=${mariadbRootUserPassword}`,
                     `MYSQL_USER=${mariadbUser}`,
                     `MYSQL_PASSWORD=${mariadbPassword}`,
                     `MYSQL_DATABASE=${mariadbDatabase}`
                 ],
-                "command": "mysqld --innodb-flush-method=fsync",
+                command: "mysqld --innodb-flush-method=fsync",
                 ...defaultComposeConfiguration(network),
             },
             [`${id}-redis`]: {
-                "image": "redis:6.2-alpine",
+                image: "redis:6.2-alpine",
                 container_name: `${id}-redis`,
-                "command": `redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru --maxmemory-samples 5\n`,
-                "volumes": [
+                command: `redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru --maxmemory-samples 5\n`,
+                volumes: [
                     `${id}-redis:/data:rw`
                 ],
                 ...defaultComposeConfiguration(network),
@@ -1733,12 +1702,12 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 container_name: `${id}-usage`,
                 labels: makeLabelForServices('appwrite'),
-                "entrypoint": "usage",
-                "depends_on": [
+                entrypoint: "usage",
+                depends_on: [
                     `${id}-mariadb`,
                     `${id}-influxdb`,
                 ],
-                "environment": [
+                environment: [
                     "_APP_ENV=production",
                     `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
                     `_APP_DB_HOST=${mariadbHost}`,
@@ -1755,17 +1724,17 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 ...defaultComposeConfiguration(network),
             }
             dockerCompose[`${id}-influxdb`] = {
-                "image": "appwrite/influxdb:1.5.0",
+                image: "appwrite/influxdb:1.5.0",
                 container_name: `${id}-influxdb`,
-                "volumes": [
+                volumes: [
                     `${id}-influxdb:/var/lib/influxdb:rw`
                 ],
                 ...defaultComposeConfiguration(network),
             }
             dockerCompose[`${id}-telegraf`] = {
-                "image": "appwrite/telegraf:1.4.0",
+                image: "appwrite/telegraf:1.4.0",
                 container_name: `${id}-telegraf`,
-                "environment": [
+                environment: [
                     `_APP_INFLUXDB_HOST=${id}-influxdb`,
                     "_APP_INFLUXDB_PORT=8086",
                 ],
@@ -1814,9 +1783,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-
         await startServiceContainers(destinationDocker.id, composeFileDestination)
-
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -1884,7 +1851,7 @@ async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
         const config = {
             moodle: {
                 image: `${image}:${version}`,
-                volume: `${id}-data:/bitnami/moodle`,
+                volumes: [`${id}-data:/bitnami/moodle`],
                 environmentVariables: {
                     MOODLE_USERNAME: defaultUsername,
                     MOODLE_PASSWORD: defaultPassword,
@@ -1898,7 +1865,7 @@ async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
             },
             mariadb: {
                 image: 'bitnami/mariadb:latest',
-                volume: `${id}-mariadb-data:/bitnami/mariadb`,
+                volumes: [`${id}-mariadb-data:/bitnami/mariadb`],
                 environmentVariables: {
                     MARIADB_USER: mariadbUser,
                     MARIADB_PASSWORD: mariadbPassword,
@@ -1913,7 +1880,7 @@ async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
                 config.moodle.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.moodle)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config.moodle)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1921,36 +1888,18 @@ async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
                     container_name: id,
                     image: config.moodle.image,
                     environment: config.moodle.environmentVariables,
-                    networks: [network],
-                    volumes,
-                    restart: 'always',
+                    volumes: config.moodle.volumes,
                     labels: makeLabelForServices('moodle'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    },
-                    depends_on: [`${id}-mariadb`]
+                    depends_on: [`${id}-mariadb`],
+                    ...defaultComposeConfiguration(network),
                 },
                 [`${id}-mariadb`]: {
                     container_name: `${id}-mariadb`,
                     image: config.mariadb.image,
                     environment: config.mariadb.environmentVariables,
-                    networks: [network],
-                    volumes: [],
-                    restart: 'always',
-                    deploy: {
-                        restart_policy: {
-                            condition: 'on-failure',
-                            delay: '5s',
-                            max_attempts: 3,
-                            window: '120s'
-                        }
-                    },
+                    volumes: config.mariadb.volumes,
+                    ...defaultComposeConfiguration(network),
                     depends_on: []
                 }
 
@@ -1960,19 +1909,12 @@ async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
                     external: true
                 }
             },
-            volumes: {
-                ...volumeMounts,
-                [config.mariadb.volume.split(':')[0]]: {
-                    name: config.mariadb.volume.split(':')[0]
-                }
-            }
+            volumes: volumeMounts
 
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-
         await startServiceContainers(destinationDocker.id, composeFileDestination)
-
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -2047,7 +1989,7 @@ async function startGlitchTipService(request: FastifyRequest<ServiceStartStop>) 
             },
             postgresql: {
                 image: 'postgres:14-alpine',
-                volume: `${id}-postgresql-data:/var/lib/postgresql/data`,
+                volumes: [`${id}-postgresql-data:/var/lib/postgresql/data`],
                 environmentVariables: {
                     POSTGRES_USER: postgresqlUser,
                     POSTGRES_PASSWORD: postgresqlPassword,
@@ -2056,7 +1998,7 @@ async function startGlitchTipService(request: FastifyRequest<ServiceStartStop>) 
             },
             redis: {
                 image: 'redis:7-alpine',
-                volume: `${id}-redis-data:/data`,
+                volumes: [`${id}-redis-data:/data`],
             }
         };
         if (serviceSecret.length > 0) {
@@ -2064,7 +2006,7 @@ async function startGlitchTipService(request: FastifyRequest<ServiceStartStop>) 
                 config.glitchTip.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config.glitchTip)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config.glitchTip)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -2072,7 +2014,6 @@ async function startGlitchTipService(request: FastifyRequest<ServiceStartStop>) 
                     container_name: id,
                     image: config.glitchTip.image,
                     environment: config.glitchTip.environmentVariables,
-                    volumes,
                     labels: makeLabelForServices('glitchTip'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     depends_on: [`${id}-postgresql`, `${id}-redis`],
@@ -2099,13 +2040,13 @@ async function startGlitchTipService(request: FastifyRequest<ServiceStartStop>) 
                     image: config.postgresql.image,
                     container_name: `${id}-postgresql`,
                     environment: config.postgresql.environmentVariables,
-                    volumes: [config.postgresql.volume],
+                    volumes: config.postgresql.volumes,
                     ...defaultComposeConfiguration(network),
                 },
                 [`${id}-redis`]: {
                     image: config.redis.image,
                     container_name: `${id}-redis`,
-                    volumes: [config.redis.volume],
+                    volumes: config.redis.volumes,
                     ...defaultComposeConfiguration(network),
                 }
             },
@@ -2114,22 +2055,12 @@ async function startGlitchTipService(request: FastifyRequest<ServiceStartStop>) 
                     external: true
                 }
             },
-            volumes: {
-                ...volumeMounts,
-                [config.postgresql.volume.split(':')[0]]: {
-                    name: config.postgresql.volume.split(':')[0]
-                },
-                [config.redis.volume.split(':')[0]]: {
-                    name: config.redis.volume.split(':')[0]
-                }
-            }
+            volumes: volumeMounts
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} pull` })
         await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up --build -d` })
-
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -2152,7 +2083,7 @@ async function startSearXNGService(request: FastifyRequest<ServiceStartStop>) {
         const config = {
             searxng: {
                 image: `${image}:${version}`,
-                volume: `${id}-searxng:/etc/searxng`,
+                volumes: [`${id}-searxng:/etc/searxng`],
                 environmentVariables: {
                     SEARXNG_BASE_URL: `${fqdn}`
                 },
@@ -2183,14 +2114,14 @@ async function startSearXNGService(request: FastifyRequest<ServiceStartStop>) {
                 config.searxng.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
                 [id]: {
                     build: workdir,
                     container_name: id,
-                    volumes,
+                    volumes: config.searxng.volumes,
                     environment: config.searxng.environmentVariables,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     labels: makeLabelForServices('searxng'),
@@ -2220,7 +2151,6 @@ async function startSearXNGService(request: FastifyRequest<ServiceStartStop>) {
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile);
         await fs.writeFile(`${workdir}/settings.yml`, settingsYml);
-
         await startServiceContainers(destinationDocker.id, composeFileDestination)
         return {}
     } catch ({ status, message }) {
@@ -2248,7 +2178,7 @@ async function startWeblateService(request: FastifyRequest<ServiceStartStop>) {
         const config = {
             weblate: {
                 image: `${image}:${version}`,
-                volume: `${id}-data:/app/data`,
+                volumes: [`${id}-data:/app/data`],
                 environmentVariables: {
                     WEBLATE_SITE_DOMAIN: getDomain(fqdn),
                     WEBLATE_ADMIN_PASSWORD: adminPassword,
@@ -2262,7 +2192,7 @@ async function startWeblateService(request: FastifyRequest<ServiceStartStop>) {
             },
             postgresql: {
                 image: `postgres:14-alpine`,
-                volume: `${id}-postgresql-data:/var/lib/postgresql/data`,
+                volumes: [`${id}-postgresql-data:/var/lib/postgresql/data`],
                 environmentVariables: {
                     POSTGRES_PASSWORD: postgresqlPassword,
                     POSTGRES_USER: postgresqlUser,
@@ -2273,7 +2203,7 @@ async function startWeblateService(request: FastifyRequest<ServiceStartStop>) {
             },
             redis: {
                 image: `redis:6-alpine`,
-                volume: `${id}-redis-data:/data`,
+                volumes: [`${id}-redis-data:/data`],
             }
 
         };
@@ -2283,7 +2213,7 @@ async function startWeblateService(request: FastifyRequest<ServiceStartStop>) {
                 config.weblate.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumes, volumeMounts } = persistentVolumes(id, persistentStorage, config)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -2292,7 +2222,7 @@ async function startWeblateService(request: FastifyRequest<ServiceStartStop>) {
                     image: config.weblate.image,
                     environment: config.weblate.environmentVariables,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    volumes,
+                    volumes: config.weblate.volumes,
                     labels: makeLabelForServices('weblate'),
                     ...defaultComposeConfiguration(network),
                 },
@@ -2301,7 +2231,7 @@ async function startWeblateService(request: FastifyRequest<ServiceStartStop>) {
                     image: config.postgresql.image,
                     environment: config.postgresql.environmentVariables,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    volumes,
+                    volumes: config.postgresql.volumes,
                     labels: makeLabelForServices('weblate'),
                     ...defaultComposeConfiguration(network),
                 },
@@ -2309,7 +2239,7 @@ async function startWeblateService(request: FastifyRequest<ServiceStartStop>) {
                     container_name: `${id}-redis`,
                     image: config.redis.image,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    volumes,
+                    volumes: config.redis.volumes,
                     labels: makeLabelForServices('weblate'),
                     ...defaultComposeConfiguration(network),
                 }
@@ -2323,6 +2253,322 @@ async function startWeblateService(request: FastifyRequest<ServiceStartStop>) {
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
+        return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
+async function startTaigaService(request: FastifyRequest<ServiceStartStop>) {
+    try {
+        const { id } = request.params;
+        const teamId = request.user.teamId;
+        const service = await getServiceFromDB({ id, teamId });
+        const {
+            taiga: { secretKey, djangoAdminUser, djangoAdminPassword, erlangSecret, rabbitMQUser, rabbitMQPassword, postgresqlHost, postgresqlPort, postgresqlUser, postgresqlPassword, postgresqlDatabase }
+        } = service;
+        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort, persistentStorage, fqdn } =
+            service;
+        const network = destinationDockerId && destinationDocker.network;
+        const port = getServiceMainPort('taiga');
+
+        const { workdir } = await createDirectories({ repository: type, buildId: id });
+        const image = getServiceImage(type);
+
+        const isHttps = fqdn.startsWith('https://');
+        const superUserEntrypoint = `#!/bin/sh
+        set -e
+        python manage.py makemigrations
+        python manage.py migrate
+
+        if [ "$DJANGO_SUPERUSER_USERNAME" ]
+        then
+            python manage.py createsuperuser \
+                --noinput \
+                --username $DJANGO_SUPERUSER_USERNAME \
+                --email $DJANGO_SUPERUSER_EMAIL
+        fi
+        exec "$@"`;
+        const entrypoint = `#!/bin/sh
+        set -e
+
+        /taiga-back/docker/entrypoint_superuser.sh || echo "Superuser creation failed, but continue"
+        /taiga-back/docker/entrypoint.sh
+        
+        exec "$@"`;
+
+        const Dockerfile = `
+        FROM taigaio/taiga-back:latest
+        COPY ./entrypoint_superuser.sh /taiga-back/docker/entrypoint_superuser.sh
+        COPY ./entrypoint_coolify.sh /taiga-back/docker/entrypoint_coolify.sh
+        RUN ["chmod", "+x", "/taiga-back/docker/entrypoint_superuser.sh"]
+        RUN ["chmod", "+x", "/taiga-back/docker/entrypoint_coolify.sh"]
+        RUN ["chmod", "+x", "/taiga-back/docker/entrypoint.sh"]`;
+
+        const nginxConf = `server {
+            listen 80 default_server;
+        
+            client_max_body_size 100M;
+            charset utf-8;
+        
+            # Frontend
+            location / {
+                proxy_pass http://${id}-taiga-front/;
+                proxy_pass_header Server;
+                proxy_set_header Host $http_host;
+                proxy_redirect off;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Scheme $scheme;
+            }
+        
+            # API
+            location /api/ {
+                proxy_pass http://${id}-taiga-back:8000/api/;
+                proxy_pass_header Server;
+                proxy_set_header Host $http_host;
+                proxy_redirect off;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Scheme $scheme;
+            }
+        
+            # Admin
+            location /admin/ {
+                proxy_pass http://${id}-taiga-back:8000/admin/;
+                proxy_pass_header Server;
+                proxy_set_header Host $http_host;
+                proxy_redirect off;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Scheme $scheme;
+            }
+        
+            # Static
+            location /static/ {
+                alias /taiga/static/;
+            }
+        
+            # Media
+            location /_protected/ {
+                internal;
+                alias /taiga/media/;
+                add_header Content-disposition "attachment";
+            }
+        
+            # Unprotected section
+            location /media/exports/ {
+                alias /taiga/media/exports/;
+                add_header Content-disposition "attachment";
+            }
+        
+            location /media/ {
+                proxy_set_header Host $http_host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Scheme $scheme;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_pass http://${id}-taiga-protected:8003/;
+                proxy_redirect off;
+            }
+        
+            # Events
+            location /events {
+                proxy_pass http://${id}-taiga-events:8888/events;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_connect_timeout 7d;
+                proxy_send_timeout 7d;
+                proxy_read_timeout 7d;
+            }
+        }`
+        await fs.writeFile(`${workdir}/entrypoint_superuser.sh`, superUserEntrypoint);
+        await fs.writeFile(`${workdir}/entrypoint_coolify.sh`, entrypoint);
+        await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile);
+        await fs.writeFile(`${workdir}/nginx.conf`, nginxConf);
+
+        const config = {
+            ['taiga-front']: {
+                image: `${image}:${version}`,
+                environmentVariables: {
+                    TAIGA_URL: fqdn,
+                    TAIGA_WEBSOCKETS_URL: `ws://${getDomain(fqdn)}`,
+                    TAIGA_SUBPATH: "",
+                    PUBLIC_REGISTER_ENABLED: isDev ? "true" : "false",
+                }
+            },
+            ['taiga-back']: {
+                volumes: [`${id}-static-data:/taiga-back/static`, `${id}-media-data:/taiga-back/media`],
+                environmentVariables: {
+                    POSTGRES_DB: postgresqlDatabase,
+                    POSTGRES_HOST: postgresqlHost,
+                    POSTGRES_PORT: postgresqlPort,
+                    POSTGRES_USER: postgresqlUser,
+                    POSTGRES_PASSWORD: postgresqlPassword,
+                    TAIGA_SECRET_KEY: secretKey,
+                    TAIGA_SITES_SCHEME: isHttps ? 'https' : 'http',
+                    TAIGA_SITES_DOMAIN: getDomain(fqdn),
+                    TAIGA_SUBPATH: "",
+                    EVENTS_PUSH_BACKEND_URL: `amqp://${rabbitMQUser}:${rabbitMQPassword}@${id}-taiga-rabbitmq:5672/taiga`,
+                    CELERY_BROKER_URL: `amqp://${rabbitMQUser}:${rabbitMQPassword}@${id}-taiga-rabbitmq:5672/taiga`,
+                    RABBITMQ_USER: rabbitMQUser,
+                    RABBITMQ_PASS: rabbitMQPassword,
+                    ENABLE_TELEMETRY: "False",
+                    DJANGO_SUPERUSER_EMAIL: `admin@${getDomain(fqdn)}`,
+                    DJANGO_SUPERUSER_PASSWORD: djangoAdminPassword,
+                    DJANGO_SUPERUSER_USERNAME: djangoAdminUser,
+                    PUBLIC_REGISTER_ENABLED: isDev ? "True" : "False",
+                    SESSION_COOKIE_SECURE: isDev ? "False" : "True",
+                    CSRF_COOKIE_SECURE: isDev ? "False" : "True",
+
+                }
+            },
+            ['taiga-async']: {
+                image: `taigaio/taiga-back:latest`,
+                volumes: [`${id}-static-data:/taiga-back/static`, `${id}-media-data:/taiga-back/media`],
+                environmentVariables: {
+                    POSTGRES_DB: postgresqlDatabase,
+                    POSTGRES_HOST: postgresqlHost,
+                    POSTGRES_PORT: postgresqlPort,
+                    POSTGRES_USER: postgresqlUser,
+                    POSTGRES_PASSWORD: postgresqlPassword,
+                    TAIGA_SECRET_KEY: secretKey,
+                    TAIGA_SITES_SCHEME: isHttps ? 'https' : 'http',
+                    TAIGA_SITES_DOMAIN: getDomain(fqdn),
+                    TAIGA_SUBPATH: "",
+                    RABBITMQ_USER: rabbitMQUser,
+                    RABBITMQ_PASS: rabbitMQPassword,
+                    ENABLE_TELEMETRY: "False",
+                }
+            },
+            ['taiga-rabbitmq']: {
+                image: `rabbitmq:3.8-management-alpine`,
+                volumes: [`${id}-events:/var/lib/rabbitmq`],
+                environmentVariables: {
+                    RABBITMQ_ERLANG_COOKIE: erlangSecret,
+                    RABBITMQ_DEFAULT_USER: rabbitMQUser,
+                    RABBITMQ_DEFAULT_PASS: rabbitMQPassword,
+                    RABBITMQ_DEFAULT_VHOST: 'taiga'
+                }
+            },
+            ['taiga-protected']: {
+                image: `taigaio/taiga-protected:latest`,
+                environmentVariables: {
+                    MAX_AGE: 360,
+                    SECRET_KEY: secretKey,
+                    TAIGA_URL: fqdn
+                }
+            },
+            ['taiga-events']: {
+                image: `taigaio/taiga-events:latest`,
+                environmentVariables: {
+                    RABBITMQ_URL: `amqp://${rabbitMQUser}:${rabbitMQPassword}@${id}-taiga-rabbitmq:5672/taiga`,
+                    RABBITMQ_USER: rabbitMQUser,
+                    RABBITMQ_PASS: rabbitMQPassword,
+                    TAIGA_SECRET_KEY: secretKey,
+                }
+            },
+            ['taiga-gateway']: {
+                image: `nginx:1.19-alpine`,
+                volumes: [`${id}-static-data:/taiga-back/static`, `${id}-media-data:/taiga-back/media`],
+            },
+            postgresql: {
+                image: `postgres:12.3`,
+                volumes: [`${id}-postgresql-data:/var/lib/postgresql/data`],
+                environmentVariables: {
+                    POSTGRES_PASSWORD: postgresqlPassword,
+                    POSTGRES_USER: postgresqlUser,
+                    POSTGRES_DB: postgresqlDatabase
+                }
+            }
+        };
+
+        if (serviceSecret.length > 0) {
+            serviceSecret.forEach((secret) => {
+                config['taiga-back'].environmentVariables[secret.name] = secret.value;
+            });
+        }
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
+
+        const composeFile: ComposeFile = {
+            version: '3.8',
+            services: {
+                [id]: {
+                    container_name: id,
+                    image: config['taiga-gateway'].image,
+                    volumes: [...config['taiga-gateway'].volumes, `./nginx.conf:/etc/nginx/conf.d/default.conf`],
+                    labels: makeLabelForServices('taiga'),
+                    ...defaultComposeConfiguration(network),
+                },
+                [`${id}-taiga-front`]: {
+                    container_name: `${id}-taiga-front`,
+                    image: config['taiga-front'].image,
+                    environment: config['taiga-front'].environmentVariables,
+                    labels: makeLabelForServices('taiga'),
+                    ...defaultComposeConfiguration(network),
+                },
+                [`${id}-taiga-back`]: {
+                    build: workdir,
+                    entrypoint: '/taiga-back/docker/entrypoint_coolify.sh',
+                    container_name: `${id}-taiga-back`,
+                    environment: config['taiga-back'].environmentVariables,
+                    ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                    volumes: config['taiga-back'].volumes,
+                    labels: makeLabelForServices('taiga'),
+                    ...defaultComposeConfiguration(network),
+                },
+
+                [`${id}-async`]: {
+                    container_name: `${id}-taiga-async`,
+                    image: config['taiga-async'].image,
+                    entrypoint: ["/taiga-back/docker/async_entrypoint.sh"],
+                    environment: config['taiga-async'].environmentVariables,
+                    volumes: config['taiga-async'].volumes,
+                    labels: makeLabelForServices('taiga'),
+                    ...defaultComposeConfiguration(network),
+                },
+                [`${id}-taiga-rabbitmq`]: {
+                    container_name: `${id}-taiga-rabbitmq`,
+                    image: config['taiga-rabbitmq'].image,
+                    volumes: config['taiga-rabbitmq'].volumes,
+                    environment: config['taiga-rabbitmq'].environmentVariables,
+                    labels: makeLabelForServices('taiga'),
+                    ...defaultComposeConfiguration(network),
+                },
+                [`${id}-taiga-protected`]: {
+                    container_name: `${id}-taiga-protected`,
+                    image: config['taiga-protected'].image,
+                    environment: config['taiga-protected'].environmentVariables,
+                    labels: makeLabelForServices('taiga'),
+                    ...defaultComposeConfiguration(network),
+                },
+                [`${id}-taiga-events`]: {
+                    container_name: `${id}-taiga-events`,
+                    image: config['taiga-events'].image,
+                    environment: config['taiga-events'].environmentVariables,
+                    labels: makeLabelForServices('taiga'),
+                    ...defaultComposeConfiguration(network),
+                },
+                [`${id}-postgresql`]: {
+                    container_name: `${id}-postgresql`,
+                    image: config.postgresql.image,
+                    environment: config.postgresql.environmentVariables,
+                    ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                    volumes: config.postgresql.volumes,
+                    labels: makeLabelForServices('taiga'),
+                    ...defaultComposeConfiguration(network),
+                },
+
+            },
+            networks: {
+                [network]: {
+                    external: true
+                }
+            },
+            volumes: volumeMounts
+        };
+        const composeFileDestination = `${workdir}/docker-compose.yaml`;
+        await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
+
         await startServiceContainers(destinationDocker.id, composeFileDestination)
         return {}
     } catch ({ status, message }) {

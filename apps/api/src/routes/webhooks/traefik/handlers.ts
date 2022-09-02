@@ -3,6 +3,7 @@ import { errorHandler, getDomain, isDev, prisma, executeDockerCmd } from "../../
 import { supportedServiceTypesAndVersions } from "../../../lib/services/supportedVersions";
 import { includeServices } from "../../../lib/services/common";
 import { TraefikOtherConfiguration } from "./types";
+import { OnlyId } from "../../../types";
 
 function configureMiddleware(
 	{ id, container, port, domain, nakedDomain, isHttps, isWWW, isDualCerts, scriptName, type },
@@ -530,7 +531,7 @@ export async function traefikOtherConfiguration(request: FastifyRequest<TraefikO
 	}
 }
 
-export async function remoteTraefikConfiguration(request: FastifyRequest) {
+export async function remoteTraefikConfiguration(request: FastifyRequest<OnlyId>) {
 	const { id } = request.params
 	try {
 		const traefik = {

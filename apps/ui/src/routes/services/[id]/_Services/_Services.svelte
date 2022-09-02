@@ -31,6 +31,7 @@
 	import Searxng from './_Searxng.svelte';
 	import Weblate from './_Weblate.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
+	import Taiga from './_Taiga.svelte';
 
 	const { id } = $page.params;
 	$: isDisabled =
@@ -411,6 +412,8 @@
 				<Searxng bind:service />
 			{:else if service.type === 'weblate'}
 				<Weblate bind:service />
+			{:else if service.type === 'taiga'}
+				<Taiga bind:service />
 			{/if}
 		</div>
 	</form>

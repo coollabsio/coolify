@@ -208,8 +208,7 @@ export const umami = [{
 
 4. Add service deletion query to `removeService` function in [apps/api/src/lib/services/common.ts](apps/api/src/lib/services/common.ts)
 
-
-5. Add start process for the new service in [apps/api/src/routes/api/v1/services/handlers.ts](apps/api/src/routes/api/v1/services/handlers.ts)
+5. Add start process for the new service in [apps/api/src/lib/services/handlers.ts](apps/api/src/lib/services/handlers.ts)
 
 > See startUmamiService() function as example.
 

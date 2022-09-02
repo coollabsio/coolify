@@ -1,15 +1,13 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
-import bcrypt from 'bcryptjs';
-import { prisma, uniqueName, asyncExecShell, getServiceImage, getServiceFromDB, getContainerUsage, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, getServiceMainPort, createDirectories, ComposeFile, makeLabelForServices, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, executeDockerCmd, checkDomainsIsValidInDNS, persistentVolumes, asyncSleep, isARM, defaultComposeConfiguration, checkExposedPort } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceFromDB, getContainerUsage, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, ComposeFile, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, executeDockerCmd, checkDomainsIsValidInDNS, checkExposedPort } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
-import { checkContainer, isContainerExited, removeContainer } from '../../../../lib/docker';
+import { checkContainer, isContainerExited } from '../../../../lib/docker';
 import cuid from 'cuid';
 
 import type { OnlyId } from '../../../../types';
 import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetGlitchTipSettings, SetWordpressSettings } from './types';
-import { defaultServiceConfigurations } from '../../../../lib/services';
 import { supportedServiceTypesAndVersions } from '../../../../lib/services/supportedVersions';
 import { configureServiceType, removeService } from '../../../../lib/services/common';
 

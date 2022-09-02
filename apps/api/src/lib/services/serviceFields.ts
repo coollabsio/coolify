@@ -785,3 +785,83 @@ export const weblate = [{
 	isBoolean: false,
 	isEncrypted: false
 }]
+export const taiga = [{
+	name: 'secretKey',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'djangoAdminUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'djangoAdminPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'rabbitMQUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'rabbitMQPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'postgresqlHost',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlPort',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'postgresqlDatabase',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+}]

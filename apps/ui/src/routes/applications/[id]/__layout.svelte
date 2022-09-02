@@ -135,13 +135,13 @@
 	async function stopApplication() {
 		try {
 			$status.application.initialLoading = true;
-			$status.application.loading = true;
+			// $status.application.loading = true;
 			await post(`/applications/${id}/stop`, {});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
 			$status.application.initialLoading = false;
-			$status.application.loading = false;
+			// $status.application.loading = false;
 			await getStatus();
 		}
 	}
@@ -157,6 +157,9 @@
 
 	onDestroy(() => {
 		$status.application.initialLoading = true;
+		$status.application.isRunning = false;
+		$status.application.isExited = false;
+		$status.application.loading = false;
 		$location = null;
 		clearInterval(statusInterval);
 	});
