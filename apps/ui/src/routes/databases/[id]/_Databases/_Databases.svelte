@@ -236,6 +236,7 @@
 	<div class="px-10 pb-10">
 		<div class="grid grid-cols-2 items-center">
 			<Setting
+				id="isPublic"
 				loading={publicLoading}
 				bind:setting={isPublic}
 				on:click={() => changeSettings('isPublic')}
@@ -247,6 +248,7 @@
 		{#if database.type === 'redis'}
 			<div class="grid grid-cols-2 items-center">
 				<Setting
+					id="appendOnly"
 					loading={publicLoading}
 					bind:setting={appendOnly}
 					on:click={() => changeSettings('appendOnly')}

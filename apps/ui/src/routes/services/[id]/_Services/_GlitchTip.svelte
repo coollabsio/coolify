@@ -39,7 +39,7 @@
 			service.glitchTip.enableOpenUserRegistration = enableOpenUserRegistration;
 			return addToast({
 				message: 'Settings updated.',
-				type: 'success',
+				type: 'success'
 			});
 		} catch (error) {
 			return errorNotification(error);
@@ -55,6 +55,7 @@
 
 <div class="grid grid-cols-2 items-center px-10">
 	<Setting
+		id="enableOpenUserRegistration"
 		bind:setting={service.glitchTip.enableOpenUserRegistration}
 		{loading}
 		disabled={$status.service.isRunning}
@@ -75,6 +76,7 @@
 </div>
 <div class="grid grid-cols-2 items-center px-10">
 	<Setting
+		id="emailSmtpUseTls"
 		bind:setting={service.glitchTip.emailSmtpUseTls}
 		{loading}
 		disabled={$status.service.isRunning}
@@ -86,6 +88,7 @@
 
 <div class="grid grid-cols-2 items-center px-10">
 	<Setting
+		id="emailSmtpUseSsl"
 		bind:setting={service.glitchTip.emailSmtpUseSsl}
 		{loading}
 		disabled={$status.service.isRunning}

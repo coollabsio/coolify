@@ -356,6 +356,7 @@
 			{/if}
 			<div class="grid grid-cols-2 items-center px-10">
 				<Setting
+					id="dualCerts"
 					disabled={$status.service.isRunning}
 					dataTooltip={$t('forms.must_be_stopped_to_modify')}
 					bind:setting={dualCerts}

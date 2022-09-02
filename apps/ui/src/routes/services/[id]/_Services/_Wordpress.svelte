@@ -93,6 +93,7 @@ define('SUBDOMAIN_INSTALL', false);`
 </div>
 <div class="grid grid-cols-2 items-center px-10">
 	<Setting
+		id="ftpEnabled"
 		bind:setting={service.wordpress.ftpEnabled}
 		loading={ftpLoading}
 		disabled={!$status.service.isRunning}
@@ -127,6 +128,7 @@ define('SUBDOMAIN_INSTALL', false);`
 </div>
 <div class="grid grid-cols-2 items-center px-10">
 	<Setting
+		id="ownMysql"
 		dataTooltip={$t('forms.must_be_stopped_to_modify')}
 		bind:setting={service.wordpress.ownMysql}
 		disabled={$status.service.isRunning}

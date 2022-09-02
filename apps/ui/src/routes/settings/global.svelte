@@ -305,6 +305,7 @@
 					</div>
 					<div class="grid grid-cols-2 items-center">
 						<Setting
+							id="isRegistrationEnabled"
 							bind:setting={isRegistrationEnabled}
 							title={$t('setting.registration_allowed')}
 							description={$t('setting.registration_allowed_explainer')}
@@ -314,6 +315,7 @@
 					{#if browser && $features.beta}
 						<div class="grid grid-cols-2 items-center">
 							<Setting
+								id="isAutoUpdateEnabled"
 								bind:setting={isAutoUpdateEnabled}
 								title={$t('setting.auto_update_enabled')}
 								description={$t('setting.auto_update_enabled_explainer')}
