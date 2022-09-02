@@ -2399,7 +2399,7 @@ async function startTaigaService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 environmentVariables: {
                     TAIGA_URL: fqdn,
-                    TAIGA_WEBSOCKETS_URL: `ws://${getDomain(fqdn)}`,
+                    TAIGA_WEBSOCKETS_URL: isHttps ? `wss://${getDomain(fqdn)}` : `ws://${getDomain(fqdn)}`,
                     TAIGA_SUBPATH: "",
                     PUBLIC_REGISTER_ENABLED: isDev ? "true" : "false",
                 }
