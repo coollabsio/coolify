@@ -14,14 +14,14 @@ WORKDIR /app
 ENV NODE_ENV production
 ARG TARGETPLATFORM
 
-ENV PRISMA_QUERY_ENGINE_BINARY=/app/prisma-engines/query-engine \
-  PRISMA_MIGRATION_ENGINE_BINARY=/app/prisma-engines/migration-engine \
-  PRISMA_INTROSPECTION_ENGINE_BINARY=/app/prisma-engines/introspection-engine \
-  PRISMA_FMT_BINARY=/app/prisma-engines/prisma-fmt \
-  PRISMA_CLI_QUERY_ENGINE_TYPE=binary \
-  PRISMA_CLIENT_ENGINE_TYPE=binary
+# ENV PRISMA_QUERY_ENGINE_BINARY=/app/prisma-engines/query-engine \
+#   PRISMA_MIGRATION_ENGINE_BINARY=/app/prisma-engines/migration-engine \
+#   PRISMA_INTROSPECTION_ENGINE_BINARY=/app/prisma-engines/introspection-engine \
+#   PRISMA_FMT_BINARY=/app/prisma-engines/prisma-fmt \
+#   PRISMA_CLI_QUERY_ENGINE_TYPE=binary \
+#   PRISMA_CLIENT_ENGINE_TYPE=binary
 
-COPY --from=coollabsio/prisma-engine:3.15 /prisma-engines/query-engine /prisma-engines/migration-engine /prisma-engines/introspection-engine /prisma-engines/prisma-fmt /app/prisma-engines/
+# COPY --from=coollabsio/prisma-engine:3.15 /prisma-engines/query-engine /prisma-engines/migration-engine /prisma-engines/introspection-engine /prisma-engines/prisma-fmt /app/prisma-engines/
 
 RUN apk add --no-cache git git-lfs openssh-client curl jq cmake sqlite openssl psmisc
 RUN curl -sL https://unpkg.com/@pnpm/self-installer | node
