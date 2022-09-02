@@ -2502,6 +2502,7 @@ async function startTaigaService(request: FastifyRequest<ServiceStartStop>) {
                         context: '.',
                         dockerfile: 'DockerfileGateway',
                     },
+                    container_name: id,
                     volumes: config['taiga-gateway'].volumes,
                     labels: makeLabelForServices('taiga'),
                     ...defaultComposeConfiguration(network),
