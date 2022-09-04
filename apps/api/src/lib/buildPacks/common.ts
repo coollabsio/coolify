@@ -348,7 +348,7 @@ export const setDefaultConfiguration = async (data: any) => {
 	if (!startCommand && buildPack !== 'static' && buildPack !== 'laravel')
 		startCommand = template?.startCommand || 'yarn start';
 	if (!buildCommand && buildPack !== 'static' && buildPack !== 'laravel')
-		buildCommand = template?.buildCommand || null;
+		buildCommand = template?.buildCommand || 'yarn build';
 	if (!publishDirectory) publishDirectory = template?.publishDirectory || null;
 	if (baseDirectory) {
 		if (!baseDirectory.startsWith('/')) baseDirectory = `/${baseDirectory}`;
