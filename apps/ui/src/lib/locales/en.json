@@ -306,7 +306,7 @@
 		"change_language": "Change Language",
 		"permission_denied": "You do not have permission to do this. \\nAsk an admin to modify your permissions.",
 		"domain_removed": "Domain removed",
-		"ssl_explainer": "If you specify <span class='text-settings font-bold'>https</span>, Coolify will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-settings font-bold'>www</span>, Coolify will be redirected (302) from non-www and vice versa.<br><br><span class='text-settings font-bold'>WARNING:</span> If you change an already set domain, it will brake webhooks and other integrations! You need to manually update them.",
+		"ssl_explainer": "If you specify <span class='text-settings font-bold'>https</span>, Coolify will be accessible only over https. SSL certificate will be generated for you.<br>If you specify <span class='text-settings font-bold'>www</span>, Coolify will be redirected (302) from non-www and vice versa.<br><br><span class='text-settings font-bold'>WARNING:</span> If you change an already set domain, it will break webhooks and other integrations! You need to manually update them.",
 		"must_remove_domain_before_changing": "Must remove the domain before you can change this setting.",
 		"registration_allowed": "Registration allowed?",
 		"registration_allowed_explainer": "Allow further registrations to the application. <br>It's turned off after the first registration.",
