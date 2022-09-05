@@ -538,7 +538,7 @@
 				/>
 			</div>
 			{#if !isBot}
-				<div class="grid grid-cols-2 items-center">
+				<div class="grid grid-cols-2 items-center pb-8">
 					<label for="fqdn" class="text-base font-bold text-stone-100"
 						>{$t('application.url_fqdn')}
 						<Explainer
@@ -658,7 +658,7 @@
 					/>
 				</div>
 			{/if}
-			<div class="grid grid-cols-2 items-center">
+			<div class="grid grid-cols-2 items-center pb-8">
 				<label for="exposePort" class="text-base font-bold text-stone-100"
 					>Exposed Port <Explainer
 						explanation={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
@@ -700,7 +700,7 @@
 						placeholder="{$t('forms.default')}: yarn build"
 					/>
 				</div>
-				<div class="grid grid-cols-2 items-center">
+				<div class="grid grid-cols-2 items-center pb-8">
 					<label for="startCommand" class="text-base font-bold text-stone-100"
 						>{$t('application.start_command')}</label
 					>
