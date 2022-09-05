@@ -459,13 +459,7 @@ export async function createRemoteEngineConfiguration(id: string) {
 	// Needed for remote docker compose
 	const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(`ps ax | grep [s]sh-agent | grep coolify-ssh-agent.pid | grep -v grep | wc -l`)
 	if (numberOfSSHAgentsRunning !== '' && Number(numberOfSSHAgentsRunning.trim()) == 0) {
-		try {
-			const {stdout, stderr } = await asyncExecShell(`eval $(ssh-agent -sa /tmp/coolify-ssh-agent.pid)`)
-			console.log({stdout,stderr})
-
-		} catch(error) {
-			console.log({error})
-		}
+		await asyncExecShell(`eval $(ssh-agent -sa /tmp/coolify-ssh-agent.pid)`)
 	}
 	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh-add -q ${sshKeyFile}`)
 
@@ -1365,6 +1359,7 @@ export function makeLabelForServices(type) {
 }
 export function errorHandler({ status = 500, message = 'Unknown error.' }: { status: number, message: string | any }) {
 	if (message.message) message = message.message
+	console.log({ status, message })
 	throw { status, message };
 }
 export async function generateSshKeyPair(): Promise<{ publicKey: string; privateKey: string }> {

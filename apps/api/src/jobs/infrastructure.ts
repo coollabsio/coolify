@@ -45,18 +45,30 @@ async function checkProxies() {
         let portReachable;
 
         const { arch, ipv4, ipv6 } = await listSettings();
+        
         // Coolify Proxy local
         const engine = '/var/run/docker.sock';
         const localDocker = await prisma.destinationDocker.findFirst({
-            where: { engine, network: 'coolify' }
+            where: { engine, network: 'coolify', isCoolifyProxyUsed: true }
         });
-        if (localDocker && localDocker.isCoolifyProxyUsed) {
+        if (localDocker) {
             portReachable = await isReachable(80, { host: ipv4 || ipv6 })
             if (!portReachable) {
                 await startTraefikProxy(localDocker.id);
             }
         }
-
+        // Coolify Proxy remote
+        const remoteDocker = await prisma.destinationDocker.findMany({
+            where: { engine, isCoolifyProxyUsed: true, remoteEngine: true }
+        });
+        if (remoteDocker.length > 0) {
+            for (const docker of remoteDocker) {
+                portReachable = await isReachable(80, { host: docker.remoteIpAddress })
+                if (!portReachable) {
+                    await startTraefikProxy(docker.id);
+                }
+            }
+        }
         // TCP Proxies
         const databasesWithPublicPort = await prisma.database.findMany({
             where: { publicPort: { not: null } },
