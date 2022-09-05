@@ -106,7 +106,7 @@
 				await del(`/applications/${id}`, { id, force });
 				return await goto(`/applications`);
 			} catch (error) {
-				if (error.message.startsWith(`Command failed: SSH_AUTH_SOCK=/tmp/ssh-agent.pid`)) {
+				if (error.message.startsWith(`Command failed: SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid`)) {
 					forceDelete = true;
 				}
 				return errorNotification(error);

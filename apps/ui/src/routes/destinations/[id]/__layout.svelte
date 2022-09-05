@@ -58,11 +58,11 @@
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 
-	const { id } = $page.params;
 	const isDestinationDeletable =
-		destination?.application.length === 0 &&
-		destination?.database.length === 0 &&
-		destination?.service.length === 0;
+		(destination?.application.length === 0 &&
+			destination?.database.length === 0 &&
+			destination?.service.length === 0) ||
+		true;
 
 	async function deleteDestination(destination: any) {
 		if (!isDestinationDeletable) return;
@@ -88,7 +88,7 @@
 	}
 </script>
 
-{#if id !== 'new'}
+{#if $page.params.id !== 'new'}
 	<nav class="nav-side">
 		<button
 			id="delete"
