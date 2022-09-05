@@ -45,6 +45,17 @@ export const appSession: Writable<AppSession> = writable({
     supportedServiceTypesAndVersions: []
 });
 export const disabledButton: Writable<boolean> = writable(false);
+export const isDeploymentEnabled: Writable<boolean> = writable(false);
+export function checkIfDeploymentEnabledApplications(isAdmin: boolean, application: any) {
+    return (
+        isAdmin &&
+        (application.fqdn || (application.settings.isBot && application.exposePort)) &&
+        application.gitSource &&
+        application.repository &&
+        application.destinationDocker &&
+        application.buildPack
+    );
+}
 export const status: Writable<any> = writable({
     application: {
         isRunning: false,

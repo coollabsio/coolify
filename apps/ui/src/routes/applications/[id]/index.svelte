@@ -34,13 +34,20 @@
 
 	import { get, post } from '$lib/api';
 	import cuid from 'cuid';
-	import { addToast, appSession, disabledButton, setLocation, status } from '$lib/store';
+	import {
+		addToast,
+		appSession,
+		checkIfDeploymentEnabledApplications,
+		setLocation,
+		status,
+		isDeploymentEnabled
+	} from '$lib/store';
 	import { t } from '$lib/translations';
 	import { errorNotification, getDomain, notNodeDeployments, staticDeployments } from '$lib/common';
 	import Setting from '$lib/components/Setting.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
-	
+
 	const { id } = $page.params;
 
 	$: isDisabled =
@@ -64,6 +71,7 @@
 	let dualCerts = application.settings.dualCerts;
 	let autodeploy = application.settings.autodeploy;
 	let isBot = application.settings.isBot;
+	let isDBBranching = application.settings.isDBBranching;
 
 	let nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
 	let isNonWWWDomainOK = false;
@@ -162,6 +170,10 @@
 			application.settings.isBot = isBot;
 			setLocation(application, settings);
 		}
+		if (name === 'isDBBranching') {
+			isDBBranching = !isDBBranching;
+			application.settings.isDBBranching = isDBBranching;
+		}
 		try {
 			await post(`/applications/${id}/settings`, {
 				previews,
@@ -193,13 +205,15 @@
 				isBot = !isBot;
 			}
 			return errorNotification(error);
+		} finally {
+			$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
 		}
 	}
 	async function handleSubmit() {
-		if (loading || (!application.fqdn && !isBot)) return;
+		if (loading) return;
 		loading = true;
 		try {
-			nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
+			nonWWWDomain = application.fqdn != null && getDomain(application.fqdn).replace(/^www\./, '');
 			if (application.deploymentType)
 				application.deploymentType = application.deploymentType.toLowerCase();
 			!isBot &&
@@ -211,8 +225,10 @@
 				}));
 			await post(`/applications/${id}`, { ...application });
 			setLocation(application, settings);
-			$disabledButton = false;
+			$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
+
 			forceSave = false;
+
 			addToast({
 				message: 'Configuration saved.',
 				type: 'success'
@@ -551,7 +567,6 @@
 							disabled={isDisabled}
 							name="fqdn"
 							id="fqdn"
-							required
 							bind:value={application.fqdn}
 							pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 							placeholder="eg: https://coollabs.io"
@@ -831,6 +846,16 @@
 				/>
 			</div>
 		{/if}
+		<div class="grid grid-cols-2 items-center">
+			<Setting
+				id="isDBBranching"
+				isCenter={false}
+				bind:setting={isDBBranching}
+				on:click={() => changeSettings('isDBBranching')}
+				title="Enable DB Branching"
+				description="Enable DB Branching"
+			/>
+		</div>
 		<div class="grid grid-cols-2 items-center">
 			<Setting
 				id="debug"

@@ -60,23 +60,26 @@
 	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
 	import { t } from '$lib/translations';
-	import { appSession, disabledButton, status, location, setLocation, addToast } from '$lib/store';
+	import {
+		appSession,
+		status,
+		location,
+		setLocation,
+		addToast,
+		isDeploymentEnabled,
+		checkIfDeploymentEnabledApplications
+	} from '$lib/store';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 
 	let statusInterval: any;
 	let forceDelete = false;
-	$disabledButton =
-		!$appSession.isAdmin ||
-		(!application.fqdn && !application.settings.isBot) ||
-		!application.gitSource ||
-		!application.repository ||
-		!application.destinationDocker ||
-		!application.buildPack;
-
 	const { id } = $page.params;
 
+	$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
+
 	async function handleDeploySubmit(forceRebuild = false) {
+		if (!$isDeploymentEnabled) return;
 		try {
 			const { buildId } = await post(`/applications/${id}/deploy`, {
 				...application,
@@ -214,7 +217,7 @@
 	{#if $status.application.isExited}
 		<a
 			id="applicationerror"
-			href={!$disabledButton ? `/applications/${id}/logs` : null}
+			href={$isDeploymentEnabled ? `/applications/${id}/logs` : null}
 			class="icons bg-transparent text-sm flex items-center text-error"
 			sveltekit:prefetch
 		>
@@ -266,7 +269,7 @@
 			id="stop"
 			on:click={stopApplication}
 			type="submit"
-			disabled={$disabledButton}
+			disabled={!$isDeploymentEnabled}
 			class="icons bg-transparent text-sm flex items-center space-x-2 text-error"
 		>
 			<svg
@@ -290,7 +293,7 @@
 			id="restart"
 			on:click={restartApplication}
 			type="submit"
-			disabled={$disabledButton}
+			disabled={!$isDeploymentEnabled}
 			class="icons bg-transparent text-sm flex items-center space-x-2"
 		>
 			<svg
@@ -314,7 +317,7 @@
 			<button
 				id="forceredeploy"
 				type="submit"
-				disabled={$disabledButton}
+				disabled={!$isDeploymentEnabled}
 				class="icons bg-transparent text-sm flex items-center space-x-2"
 			>
 				<svg
@@ -341,7 +344,7 @@
 			<button
 				id="deploy"
 				type="submit"
-				disabled={$disabledButton}
+				disabled={!$isDeploymentEnabled}
 				class="icons bg-transparent text-sm flex items-center space-x-2 text-success"
 			>
 				<svg
@@ -364,14 +367,17 @@
 
 	<div class="border border-coolgray-500 h-8" />
 	<a
-		id="configurations"
-		href={!$disabledButton ? `/applications/${id}` : null}
+		href={$isDeploymentEnabled ? `/applications/${id}` : null}
 		sveltekit:prefetch
 		class="hover:text-yellow-500 rounded"
 		class:text-yellow-500={$page.url.pathname === `/applications/${id}`}
 		class:bg-coolgray-500={$page.url.pathname === `/applications/${id}`}
 	>
-		<button disabled={$disabledButton} class="icons bg-transparent text-sm">
+		<button
+			disabled={!$isDeploymentEnabled}
+			id="configurations"
+			class="icons bg-transparent text-sm"
+		>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				class="h-6 w-6"
@@ -396,14 +402,13 @@
 		></a
 	>
 	<a
-		id="secrets"
-		href={!$disabledButton ? `/applications/${id}/secrets` : null}
+		href={$isDeploymentEnabled ? `/applications/${id}/secrets` : null}
 		sveltekit:prefetch
 		class="hover:text-pink-500 rounded"
 		class:text-pink-500={$page.url.pathname === `/applications/${id}/secrets`}
 		class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/secrets`}
 	>
-		<button disabled={$disabledButton} class="icons bg-transparent text-sm">
+		<button id="secrets" disabled={!$isDeploymentEnabled} class="icons bg-transparent text-sm">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				class="w-6 h-6"
@@ -424,14 +429,17 @@
 		></a
 	>
 	<a
-		id="persistentstorages"
-		href={!$disabledButton ? `/applications/${id}/storages` : null}
+		href={$isDeploymentEnabled ? `/applications/${id}/storages` : null}
 		sveltekit:prefetch
 		class="hover:text-pink-500 rounded"
 		class:text-pink-500={$page.url.pathname === `/applications/${id}/storages`}
 		class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/storages`}
 	>
-		<button disabled={$disabledButton} class="icons bg-transparent text-sm">
+		<button
+			id="persistentstorages"
+			disabled={!$isDeploymentEnabled}
+			class="icons bg-transparent text-sm"
+		>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				class="w-6 h-6"
@@ -451,14 +459,13 @@
 	>
 	{#if !application.settings.isBot}
 		<a
-			id="previews"
-			href={!$disabledButton ? `/applications/${id}/previews` : null}
+			href={$isDeploymentEnabled ? `/applications/${id}/previews` : null}
 			sveltekit:prefetch
 			class="hover:text-orange-500 rounded"
 			class:text-orange-500={$page.url.pathname === `/applications/${id}/previews`}
 			class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/previews`}
 		>
-			<button disabled={$disabledButton} class="icons bg-transparent text-sm">
+			<button id="previews" disabled={!$isDeploymentEnabled} class="icons bg-transparent text-sm">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="w-6 h-6"
@@ -481,15 +488,15 @@
 	{/if}
 	<div class="border border-coolgray-500 h-8" />
 	<a
-		id="applicationlogs"
-		href={!$disabledButton && $status.application.isRunning ? `/applications/${id}/logs` : null}
+		href={$isDeploymentEnabled && $status.application.isRunning ? `/applications/${id}/logs` : null}
 		sveltekit:prefetch
 		class="hover:text-sky-500 rounded"
 		class:text-sky-500={$page.url.pathname === `/applications/${id}/logs`}
 		class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs`}
 	>
 		<button
-			disabled={$disabledButton || !$status.application.isRunning}
+			id="applicationlogs"
+			disabled={!$isDeploymentEnabled || !$status.application.isRunning}
 			class="icons bg-transparent text-sm"
 		>
 			<svg
@@ -512,14 +519,13 @@
 		</button></a
 	>
 	<a
-		id="buildlogs"
-		href={!$disabledButton ? `/applications/${id}/logs/build` : null}
+		href={$isDeploymentEnabled ? `/applications/${id}/logs/build` : null}
 		sveltekit:prefetch
 		class="hover:text-red-500 rounded"
 		class:text-red-500={$page.url.pathname === `/applications/${id}/logs/build`}
 		class:bg-coolgray-500={$page.url.pathname === `/applications/${id}/logs/build`}
 	>
-		<button disabled={$disabledButton} class="icons bg-transparent text-sm">
+		<button id="buildlogs" disabled={!$isDeploymentEnabled} class="icons bg-transparent text-sm">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				class="h-6 w-6"
