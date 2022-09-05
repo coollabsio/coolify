@@ -49,7 +49,7 @@ export const isDeploymentEnabled: Writable<boolean> = writable(false);
 export function checkIfDeploymentEnabledApplications(isAdmin: boolean, application: any) {
     return (
         isAdmin &&
-        (application.fqdn || (application.settings.isBot && application.exposePort)) &&
+        (application.fqdn || application.settings.isBot) &&
         application.gitSource &&
         application.repository &&
         application.destinationDocker &&
