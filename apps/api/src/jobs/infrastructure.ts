@@ -1,7 +1,7 @@
 import { parentPort } from 'node:worker_threads';
 import axios from 'axios';
 import { compareVersions } from 'compare-versions';
-import { asyncExecShell, cleanupDockerStorage, executeDockerCmd, isDev, prisma, startTraefikTCPProxy, generateDatabaseConfiguration, startTraefikProxy, listSettings, version } from '../lib/common';
+import { asyncExecShell, cleanupDockerStorage, executeDockerCmd, isDev, prisma, startTraefikTCPProxy, generateDatabaseConfiguration, startTraefikProxy, listSettings, version, createRemoteEngineConfiguration } from '../lib/common';
 
 async function autoUpdater() {
     try {
@@ -45,7 +45,7 @@ async function checkProxies() {
         let portReachable;
 
         const { arch, ipv4, ipv6 } = await listSettings();
-        
+
         // Coolify Proxy local
         const engine = '/var/run/docker.sock';
         const localDocker = await prisma.destinationDocker.findFirst({
@@ -59,13 +59,20 @@ async function checkProxies() {
         }
         // Coolify Proxy remote
         const remoteDocker = await prisma.destinationDocker.findMany({
-            where: { engine, isCoolifyProxyUsed: true, remoteEngine: true }
+            where: { remoteEngine: true, remoteVerified: true }
         });
         if (remoteDocker.length > 0) {
             for (const docker of remoteDocker) {
-                portReachable = await isReachable(80, { host: docker.remoteIpAddress })
-                if (!portReachable) {
-                    await startTraefikProxy(docker.id);
+                if (docker.isCoolifyProxyUsed) {
+                    portReachable = await isReachable(80, { host: docker.remoteIpAddress })
+                    if (!portReachable) {
+                        await startTraefikProxy(docker.id);
+                    }
+                }
+                try {
+                    await createRemoteEngineConfiguration(docker.id)
+                } catch (error) {
+                    console.log({ error })
                 }
             }
         }
