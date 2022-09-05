@@ -1446,11 +1446,11 @@ export function convertTolOldVolumeNames(type) {
 export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 	// Cleanup old coolify images
 	try {
-		let { stdout: images } = await executeDockerCmd({ dockerId, command: `docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs` })
+		let { stdout: images } = await executeDockerCmd({ dockerId, command: `docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs -r` })
 
 		images = images.trim();
 		if (images) {
-			await executeDockerCmd({ dockerId, command: `docker rmi -f ${images}" -q | xargs` })
+			await executeDockerCmd({ dockerId, command: `docker rmi -f ${images}" -q | xargs -r` })
 		}
 	} catch (error) {
 		//console.log(error);

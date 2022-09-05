@@ -42,6 +42,7 @@
 			loading.restart = true;
 			try {
 				await post(`/internal/restart`, {});
+				await asyncSleep(10000);
 				let reachable = false;
 				let tries = 0;
 				do {
