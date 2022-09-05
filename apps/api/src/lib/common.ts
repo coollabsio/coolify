@@ -21,7 +21,7 @@ import { scheduler } from './scheduler';
 import { supportedServiceTypesAndVersions } from './services/supportedVersions';
 import { includeServices } from './services/common';
 
-export const version = '3.9.0-rc.1';
+export const version = '3.9.0-rc.2';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -439,7 +439,6 @@ export async function getFreeSSHLocalPort(id: string): Promise<number | boolean>
 		return Number(alreadyConfigured.sshLocalPort)
 	}
 	const range = generateRangeArray(minPort, maxPort)
-	console.log({ ports })
 	const availablePorts = range.filter(port => !ports.map(p => p.sshLocalPort).includes(port))
 	for (const port of availablePorts) {
 		const found = await isReachable(port, { host: 'localhost' })
@@ -458,16 +457,22 @@ export async function createRemoteEngineConfiguration(id: string) {
 	const { sshKey: { privateKey }, remoteIpAddress, remotePort, remoteUser } = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } })
 	await fs.writeFile(sshKeyFile, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 })
 	// Needed for remote docker compose
-	const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(`ps ax | grep [s]sh-agent | grep ssh-agent.pid | grep -v grep | wc -l`)
+	const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(`ps ax | grep [s]sh-agent | grep coolify-ssh-agent.pid | grep -v grep | wc -l`)
 	if (numberOfSSHAgentsRunning !== '' && Number(numberOfSSHAgentsRunning.trim()) == 0) {
-		await asyncExecShell(`eval $(ssh-agent -sa /tmp/ssh-agent.pid)`)
+		try {
+			const {stdout, stderr } = await asyncExecShell(`eval $(ssh-agent -sa /tmp/coolify-ssh-agent.pid)`)
+			console.log({stdout,stderr})
+
+		} catch(error) {
+			console.log({error})
+		}
 	}
-	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh-add -q ${sshKeyFile}`)
+	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh-add -q ${sshKeyFile}`)
 
 	const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(`ps ax | grep 'ssh -F /dev/null -o StrictHostKeyChecking no -fNL ${localPort}:localhost:${remotePort}' | grep -v grep | wc -l`)
 	if (numberOfSSHTunnelsRunning !== '' && Number(numberOfSSHTunnelsRunning.trim()) == 0) {
 		try {
-			await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh -F /dev/null -o "StrictHostKeyChecking no" -fNL ${localPort}:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`)
+			await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh -F /dev/null -o "StrictHostKeyChecking no" -fNL ${localPort}:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`)
 
 		} catch (error) {
 			console.log(error)
