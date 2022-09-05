@@ -3,6 +3,7 @@ import cuid from 'cuid';
 import { writable, readable, type Writable } from 'svelte/store';
 
 interface AppSession {
+    registrationEnabled: boolean;
     ipv4: string | null,
     ipv6: string | null,
     version: string | null,

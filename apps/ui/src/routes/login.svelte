@@ -69,7 +69,7 @@
 				required
 				bind:this={emailEl}
 				bind:value={email}
-				class="w-56 md:w-96"
+				class="w-full"
 			/>
 			<input
 				type="password"
@@ -77,22 +77,27 @@
 				placeholder={$t('forms.password')}
 				bind:value={password}
 				required
-				class="w-56 md:w-96"
+				class="w-full"
 			/>
 
-			<div class="flex space-x-2 h-8 items-center justify-center pt-8">
+			<div class="flex flex-col space-y-2 items-center justify-center pt-8">
 				<button
 					type="submit"
 					disabled={loading}
-					class="btn btn-sm"
+					class="btn btn-sm w-full hover:bg-coollabs-100"
 					class:loading
 					class:bg-coollabs={!loading}
 					>{loading ? $t('login.authenticating') : $t('login.login')}</button
 				>
-
-				<button on:click|preventDefault={gotoRegister} class="btn btn-sm"
-					>{$t('register.register')}</button
-				>
+				{#if $appSession.registrationEnabled}
+					<button on:click|preventDefault={gotoRegister} class="btn w-full"
+						>{$t('register.register')}</button
+					>
+				{:else}
+					<div class="text-stone-600 text-xs">
+						Registration is disabled. Please ask an admin to activate it.
+					</div>
+				{/if}
 			</div>
 		</form>
 	</div>

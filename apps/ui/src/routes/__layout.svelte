@@ -66,6 +66,7 @@
 <script lang="ts">
 	export let baseSettings: any;
 	export let supportedServiceTypesAndVersions: any;
+	$appSession.registrationEnabled = baseSettings.registrationEnabled;
 	$appSession.ipv4 = baseSettings.ipv4;
 	$appSession.ipv6 = baseSettings.ipv6;
 	$appSession.version = baseSettings.version;
@@ -142,7 +143,7 @@
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
+						class="h-9 w-9"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -172,7 +173,7 @@
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
+						class="h-9 w-9"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentcolor"
@@ -202,7 +203,7 @@
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
+						class="h-9 w-9"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -232,7 +233,7 @@
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
+						class="h-9 w-9"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -268,7 +269,7 @@
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
+						class="h-9 w-9"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -295,7 +296,7 @@
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
+						class="h-9 w-9"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -319,11 +320,10 @@
 					class="icons bg-coolgray-200"
 					class:text-iam={$page.url.pathname.startsWith('/iam')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/iam')}
-					data-tip="IAM"
 					><svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
 						viewBox="0 0 24 24"
+						class="h-9 w-9"
 						stroke-width="1.5"
 						stroke="currentColor"
 						fill="none"
@@ -344,12 +344,11 @@
 					class="icons bg-coolgray-200"
 					class:text-settings={$page.url.pathname.startsWith('/settings')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
-					data-tip="Settings"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
 						viewBox="0 0 24 24"
+						class="h-9 w-9"
 						stroke-width="1.5"
 						stroke="currentColor"
 						fill="none"
@@ -367,12 +366,11 @@
 				<div
 					id="logout"
 					class="icons bg-coolgray-200 hover:text-error"
-					data-tip="Logout"
 					on:click={logout}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="ml-1 h-7 w-7"
+						class="ml-1 h-8 w-8"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
