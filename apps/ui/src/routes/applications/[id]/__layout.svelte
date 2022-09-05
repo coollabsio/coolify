@@ -402,6 +402,8 @@
 			</svg></button
 		></a
 	>
+
+	<Tooltip triggeredBy="#configurations">Configurations</Tooltip>
 	<a
 		href={$isDeploymentEnabled ? `/applications/${id}/secrets` : null}
 		sveltekit:prefetch
@@ -429,6 +431,7 @@
 			</svg></button
 		></a
 	>
+	<Tooltip triggeredBy="#secrets">Secrets</Tooltip>
 	<a
 		href={$isDeploymentEnabled ? `/applications/${id}/storages` : null}
 		sveltekit:prefetch
@@ -458,6 +461,7 @@
 			</svg>
 		</button></a
 	>
+	<Tooltip triggeredBy="#persistentstorages">Persistent Storages</Tooltip>
 	{#if !application.settings.isBot}
 		<a
 			href={$isDeploymentEnabled ? `/applications/${id}/previews` : null}
@@ -486,6 +490,7 @@
 				</svg></button
 			></a
 		>
+		<Tooltip triggeredBy="#previews">Previews</Tooltip>
 	{/if}
 	<div class="border border-coolgray-500 h-8" />
 	<a
@@ -519,6 +524,7 @@
 			</svg>
 		</button></a
 	>
+	<Tooltip triggeredBy="#applicationlogs">Application Logs</Tooltip>
 	<a
 		href={$isDeploymentEnabled ? `/applications/${id}/logs/build` : null}
 		sveltekit:prefetch
@@ -549,10 +555,12 @@
 			</svg>
 		</button></a
 	>
+	<Tooltip triggeredBy="#buildlogs">Build Logs</Tooltip>
 	<div class="border border-coolgray-500 h-8" />
 
 	{#if forceDelete}
 		<button
+			id="forcedelete"
 			on:click={() => deleteApplication(application.name, true)}
 			type="submit"
 			disabled={!$appSession.isAdmin}
@@ -562,6 +570,7 @@
 		>
 			Force Delete
 		</button>
+		<Tooltip triggeredBy="#forcedelete">Force Delete</Tooltip>
 	{:else}
 		<button
 			id="delete"
@@ -573,14 +582,7 @@
 		>
 			<DeleteIcon />
 		</button>
+		<Tooltip triggeredBy="#delete">Delete</Tooltip>
 	{/if}
 </nav>
 <slot />
-
-<Tooltip triggeredBy="#configurations">Configurations</Tooltip>
-<Tooltip triggeredBy="#secrets">Secrets</Tooltip>
-<Tooltip triggeredBy="#persistentstorages">Persistent Storages</Tooltip>
-<Tooltip triggeredBy="#previews">Previews</Tooltip>
-<Tooltip triggeredBy="#applicationlogs">Application Logs</Tooltip>
-<Tooltip triggeredBy="#buildlogs">Build Logs</Tooltip>
-<Tooltip triggeredBy="#delete">Delete</Tooltip>

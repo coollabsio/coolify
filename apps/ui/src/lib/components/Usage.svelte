@@ -26,7 +26,7 @@
 	import { addToast, appSession } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
 	import { get, post } from '$lib/api';
-	import { errorNotification } from '$lib/common';
+	import { asyncSleep, errorNotification } from '$lib/common';
 	async function getStatus() {
 		if (loading.usage) return;
 		loading.usage = true;
@@ -42,6 +42,25 @@
 			loading.restart = true;
 			try {
 				await post(`/internal/restart`, {});
+				let reachable = false;
+				let tries = 0;
+				do {
+					await asyncSleep(4000);
+					try {
+						await get(`/undead`);
+						reachable = true;
+					} catch (error) {
+						reachable = false;
+					}
+					if (reachable) break;
+					tries++;
+				} while (!reachable || tries < 120);
+				addToast({
+					message: 'New version reachable. Reloading...',
+					type: 'success'
+				});
+				await asyncSleep(3000);
+				return window.location.reload();
 				addToast({
 					type: 'success',
 					message: 'Coolify restarted successfully. It will take a moment.'
@@ -89,10 +108,8 @@
 		<h1 class="title lg:text-3xl">Hardware Details</h1>
 		<div class="flex lg:flex-row flex-col space-x-0 lg:space-x-2 space-y-2 lg:space-y-0">
 			{#if $appSession.teamId === '0'}
-				<button
-					on:click={manuallyCleanupStorage}
-					class:loading={loading.cleanup}
-					class="btn btn-sm">Cleanup Storage</button
+				<button on:click={manuallyCleanupStorage} class:loading={loading.cleanup} class="btn btn-sm"
+					>Cleanup Storage</button
 				>
 				<button
 					on:click={restartCoolify}
