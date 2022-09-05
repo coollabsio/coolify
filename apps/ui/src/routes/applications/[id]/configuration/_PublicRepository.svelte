@@ -22,7 +22,7 @@
 	async function loadBranches() {
 		try {
 			loading.branches = true;
-
+			publicRepositoryLink = publicRepositoryLink.trim();
 			const protocol = publicRepositoryLink.split(':')[0];
 			const gitUrl = publicRepositoryLink.replace('http://', '').replace('https://', '');
 
