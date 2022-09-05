@@ -164,6 +164,7 @@
 		$status.application.isExited = false;
 		$status.application.loading = false;
 		$location = null;
+		$isDeploymentEnabled = false;
 		clearInterval(statusInterval);
 	});
 	onMount(async () => {

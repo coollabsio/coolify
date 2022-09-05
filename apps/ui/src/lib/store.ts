@@ -56,6 +56,15 @@ export function checkIfDeploymentEnabledApplications(isAdmin: boolean, applicati
         application.buildPack
     );
 }
+export function checkIfDeploymentEnabledServices(isAdmin: boolean, service: any) {
+    return (
+        isAdmin &&
+        service.fqdn &&
+        service.destinationDocker &&
+        service.version &&
+        service.type
+    );
+}
 export const status: Writable<any> = writable({
     application: {
         isRunning: false,
