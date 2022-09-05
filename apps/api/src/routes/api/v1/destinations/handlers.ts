@@ -209,28 +209,21 @@ export async function verifyRemoteDockerEngine(request: FastifyRequest<OnlyId>, 
     try {
         const { id } = request.params;
         await createRemoteEngineConfiguration(id);
-
         const { remoteIpAddress, remoteUser, network, isCoolifyProxyUsed } = await prisma.destinationDocker.findFirst({ where: { id } })
         const host = `ssh://${remoteUser}@${remoteIpAddress}`
-        console.log({ host })
         const { stdout } = await asyncExecShell(`DOCKER_HOST=${host} docker network ls --filter 'name=${network}' --no-trunc --format "{{json .}}"`);
-        console.log({ stdout })
         if (!stdout) {
             await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable ${network}`);
         }
         const { stdout: coolifyNetwork } = await asyncExecShell(`DOCKER_HOST=${host} docker network ls --filter 'name=coolify-infra' --no-trunc --format "{{json .}}"`);
-        console.log({ coolifyNetwork })
-
         if (!coolifyNetwork) {
             await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable coolify-infra`);
         }
-        console.log({ isCoolifyProxyUsed })
         if (isCoolifyProxyUsed) await startTraefikProxy(id);
         await prisma.destinationDocker.update({ where: { id }, data: { remoteVerified: true } })
         return reply.code(201).send()
 
     } catch ({ status, message }) {
-        console.log({ status, message })
         return errorHandler({ status, message })
     }
 }

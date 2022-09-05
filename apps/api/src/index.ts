@@ -143,7 +143,6 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 	])
 });
 async function getIPAddress() {
-	console.log('getIPAddress')
 	const { publicIpv4, publicIpv6 } = await import('public-ip')
 	try {
 		const settings = await listSettings();
@@ -171,7 +170,6 @@ async function initServer() {
 	} catch (error) { }
 }
 async function getArch() {
-	console.log('getArch')
 	try {
 		const settings = await prisma.setting.findFirst({})
 		if (settings && !settings.arch) {
@@ -180,10 +178,7 @@ async function getArch() {
 	} catch (error) { }
 }
 
-
-
 async function configureRemoteDockers() {
-	console.log('configureRemoteDockers')
 	try {
 		const remoteDocker = await prisma.destinationDocker.findMany({
 			where: { remoteVerified: true, remoteEngine: true }
@@ -193,7 +188,5 @@ async function configureRemoteDockers() {
 				await createRemoteEngineConfiguration(docker.id)
 			}
 		}
-	} catch (error) {
-		console.log(error)
-	}
+	} catch (error) { }
 }

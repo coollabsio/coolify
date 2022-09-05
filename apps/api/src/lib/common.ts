@@ -451,17 +451,13 @@ export async function getFreeSSHLocalPort(id: string): Promise<number | boolean>
 }
 
 export async function createRemoteEngineConfiguration(id: string) {
-
 	const homedir = os.homedir();
 	const sshKeyFile = `/tmp/id_rsa-${id}`
-	console.log(sshKeyFile)
 	const localPort = await getFreeSSHLocalPort(id);
-	console.log(localPort)
 	const { sshKey: { privateKey }, remoteIpAddress, remotePort, remoteUser } = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } })
 	await fs.writeFile(sshKeyFile, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 })
 	// Needed for remote docker compose
 	const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(`ps ax | grep [s]sh-agent | grep coolify-ssh-agent.pid | grep -v grep | wc -l`)
-	console.log({ numberOfSSHAgentsRunning })
 	if (numberOfSSHAgentsRunning !== '' && Number(numberOfSSHAgentsRunning.trim()) == 0) {
 		try {
 			await fs.stat(`/tmp/coolify-ssh-agent.pid`)
@@ -472,11 +468,9 @@ export async function createRemoteEngineConfiguration(id: string) {
 	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh-add -q ${sshKeyFile}`)
 
 	const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(`ps ax | grep 'ssh -F /dev/null -o StrictHostKeyChecking no -fNL ${localPort}:localhost:${remotePort}' | grep -v grep | wc -l`)
-	console.log({ numberOfSSHTunnelsRunning })
 	if (numberOfSSHTunnelsRunning !== '' && Number(numberOfSSHTunnelsRunning.trim()) == 0) {
 		try {
 			await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh -F /dev/null -o "StrictHostKeyChecking no" -fNL ${localPort}:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`)
-
 		} catch (error) {
 			console.log(error)
 		}
@@ -499,7 +493,6 @@ export async function createRemoteEngineConfiguration(id: string) {
 	} catch (error) {
 		await fs.mkdir(`${homedir}/.ssh/`)
 	}
-	console.log(config.toString())
 	return await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config))
 }
 export async function executeDockerCmd({ debug, buildId, applicationId, dockerId, command }: { debug?: boolean, buildId?: string, applicationId?: string, dockerId: string, command: string }): Promise<any> {
@@ -1369,7 +1362,6 @@ export function makeLabelForServices(type) {
 }
 export function errorHandler({ status = 500, message = 'Unknown error.' }: { status: number, message: string | any }) {
 	if (message.message) message = message.message
-	console.log({ status, message })
 	throw { status, message };
 }
 export async function generateSshKeyPair(): Promise<{ publicKey: string; privateKey: string }> {
