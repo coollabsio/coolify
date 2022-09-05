@@ -222,7 +222,7 @@ export async function verifyRemoteDockerEngine(request: FastifyRequest<OnlyId>, 
         if (!coolifyNetwork) {
             await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable coolify-infra`);
         }
-
+        if (isCoolifyProxyUsed) await startTraefikProxy(id);
         await prisma.destinationDocker.update({ where: { id }, data: { remoteVerified: true } })
         return reply.code(201).send()
 
@@ -235,7 +235,7 @@ export async function getDestinationStatus(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         const destination = await prisma.destinationDocker.findUnique({ where: { id } })
-        const isRunning = await checkContainer({ dockerId: destination.id, container: 'coolify-proxy' })
+        const isRunning = await checkContainer({ dockerId: destination.id, container: 'coolify-proxy', remove: true })
         return {
             isRunning
         }

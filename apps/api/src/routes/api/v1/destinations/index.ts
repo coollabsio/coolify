@@ -23,7 +23,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 
     fastify.post('/:id/configuration/sshKey', async (request) => await assignSSHKey(request));
 
-    fastify.post('/:id/verify', async (request, reply) => await verifyRemoteDockerEngine(request, reply));
+    fastify.post<OnlyId>('/:id/verify', async (request, reply) => await verifyRemoteDockerEngine(request, reply));
 };
 
 export default root;
