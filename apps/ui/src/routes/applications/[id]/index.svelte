@@ -31,7 +31,6 @@
 	import { page } from '$app/stores';
 	import { onDestroy, onMount } from 'svelte';
 	import Select from 'svelte-select';
-
 	import { get, post } from '$lib/api';
 	import cuid from 'cuid';
 	import {
@@ -40,13 +39,15 @@
 		checkIfDeploymentEnabledApplications,
 		setLocation,
 		status,
-		isDeploymentEnabled
+		isDeploymentEnabled,
+		features
 	} from '$lib/store';
 	import { t } from '$lib/translations';
 	import { errorNotification, getDomain, notNodeDeployments, staticDeployments } from '$lib/common';
 	import Setting from '$lib/components/Setting.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
+	import { goto } from '$app/navigation';
 
 	const { id } = $page.params;
 
@@ -73,6 +74,7 @@
 	let isBot = application.settings.isBot;
 	let isDBBranching = application.settings.isDBBranching;
 
+	let baseDatabaseBranch: any = application?.connectedDatabase?.hostedDatabaseDBName || null;
 	let nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
 	let isNonWWWDomainOK = false;
 	let isWWWDomainOK = false;
@@ -172,7 +174,6 @@
 		}
 		if (name === 'isDBBranching') {
 			isDBBranching = !isDBBranching;
-			application.settings.isDBBranching = isDBBranching;
 		}
 		try {
 			await post(`/applications/${id}/settings`, {
@@ -181,6 +182,7 @@
 				dualCerts,
 				isBot,
 				autodeploy,
+				isDBBranching,
 				branch: application.branch,
 				projectId: application.projectId
 			});
@@ -204,6 +206,9 @@
 			if (name === 'isBot') {
 				isBot = !isBot;
 			}
+			if (name === 'isDBBranching') {
+				isDBBranching = !isDBBranching;
+			}
 			return errorNotification(error);
 		} finally {
 			$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
@@ -223,7 +228,7 @@
 					dualCerts,
 					exposePort: application.exposePort
 				}));
-			await post(`/applications/${id}`, { ...application });
+			await post(`/applications/${id}`, { ...application, baseDatabaseBranch });
 			setLocation(application, settings);
 			$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
 
@@ -524,6 +529,46 @@
 						/>
 					</div>
 				</div>
+			{/if}
+			{#if $features.beta}
+				{#if !application.settings.isBot && !application.settings.isPublicRepository}
+					<div class="grid grid-cols-2 items-center">
+						<Setting
+							id="isDBBranching"
+							isCenter={false}
+							bind:setting={isDBBranching}
+							on:click={() => changeSettings('isDBBranching')}
+							title="Enable DB Branching"
+							description="Enable DB Branching"
+						/>
+					</div>
+					{#if isDBBranching}
+						<button
+							on:click|stopPropagation|preventDefault={() =>
+								goto(`/applications/${id}/configuration/database`)}
+							class="btn btn-sm">Configure Connected Database</button
+						>
+						{#if application.connectedDatabase}
+							<div class="grid grid-cols-2 items-center">
+								<label for="baseImage" class="text-base font-bold text-stone-100"
+									>Base Database
+									<Explainer
+										explanation={'The name of the database that will be used as base when branching.'}
+									/></label
+								>
+								<input
+									name="baseDatabaseBranch"
+									required
+									id="baseDatabaseBranch"
+									bind:value={baseDatabaseBranch}
+								/>
+							</div>
+							<div class="text-center bg-green-600 rounded">
+								Connected to {application.connectedDatabase.databaseId}
+							</div>
+						{/if}
+					{/if}
+				{/if}
 			{/if}
 		</div>
 		<div class="flex space-x-1 py-5 font-bold">
@@ -846,16 +891,6 @@
 				/>
 			</div>
 		{/if}
-		<div class="grid grid-cols-2 items-center">
-			<Setting
-				id="isDBBranching"
-				isCenter={false}
-				bind:setting={isDBBranching}
-				on:click={() => changeSettings('isDBBranching')}
-				title="Enable DB Branching"
-				description="Enable DB Branching"
-			/>
-		</div>
 		<div class="grid grid-cols-2 items-center">
 			<Setting
 				id="debug"

@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@breejs/ts-worker": "2.0.0",
-    "@fastify/autoload": "5.2.0",
+    "@fastify/autoload": "5.3.1",
     "@fastify/cookie": "8.1.0",
     "@fastify/cors": "8.1.0",
     "@fastify/env": "4.1.0",
@@ -23,7 +23,7 @@
     "@fastify/static": "6.5.0",
     "@iarna/toml": "2.2.5",
     "@ladjs/graceful": "3.0.2",
-    "@prisma/client": "3.15.2",
+    "@prisma/client": "4.3.1",
     "axios": "0.27.2",
     "bcryptjs": "2.4.3",
     "bree": "9.1.2",
@@ -37,7 +37,7 @@
     "fastify": "4.5.3",
     "fastify-plugin": "4.2.1",
     "generate-password": "1.7.0",
-    "got": "12.3.1",
+    "got": "12.4.1",
     "is-ip": "5.0.0",
     "is-port-reachable": "4.0.0",
     "js-yaml": "4.1.0",
@@ -52,20 +52,20 @@
     "unique-names-generator": "4.7.1"
   },
   "devDependencies": {
-    "@types/node": "18.7.13",
+    "@types/node": "18.7.15",
     "@types/node-os-utils": "1.3.0",
-    "@typescript-eslint/eslint-plugin": "5.35.1",
-    "@typescript-eslint/parser": "5.35.1",
-    "esbuild": "0.15.5",
+    "@typescript-eslint/eslint-plugin": "5.36.1",
+    "@typescript-eslint/parser": "5.36.1",
+    "esbuild": "0.15.7",
     "eslint": "8.23.0",
     "eslint-config-prettier": "8.5.0",
     "eslint-plugin-prettier": "4.2.1",
     "nodemon": "2.0.19",
     "prettier": "2.7.1",
-    "prisma": "3.15.2",
+    "prisma": "4.3.1",
     "rimraf": "3.0.2",
     "tsconfig-paths": "4.1.0",
-    "typescript": "4.7.4"
+    "typescript": "4.8.2"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

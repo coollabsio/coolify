@@ -156,7 +156,8 @@ export async function getApplicationFromDB(id: string, teamId: string) {
                 settings: true,
                 gitSource: { include: { githubApp: true, gitlabApp: true } },
                 secrets: true,
-                persistentStorage: true
+                persistentStorage: true,
+                connectedDatabase: true
             }
         });
         if (!application) {
@@ -190,7 +191,8 @@ export async function getApplicationFromDBWebhook(projectId: number, branch: str
                 settings: true,
                 gitSource: { include: { githubApp: true, gitlabApp: true } },
                 secrets: true,
-                persistentStorage: true
+                persistentStorage: true,
+                connectedDatabase: true
             }
         });
         if (applications.length === 0) {
@@ -242,7 +244,8 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             denoOptions,
             baseImage,
             baseBuildImage,
-            deploymentType
+            deploymentType,
+            baseDatabaseBranch
         } = request.body
         if (port) port = Number(port);
         if (exposePort) {
@@ -263,22 +266,43 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             dockerFileLocation,
             denoMainFile
         });
-        await prisma.application.update({
-            where: { id },
-            data: {
-                name,
-                fqdn,
-                exposePort,
-                pythonWSGI,
-                pythonModule,
-                pythonVariable,
-                denoOptions,
-                baseImage,
-                baseBuildImage,
-                deploymentType,
-                ...defaultConfiguration
-            }
-        });
+        if (baseDatabaseBranch) {
+            await prisma.application.update({
+                where: { id },
+                data: {
+                    name,
+                    fqdn,
+                    exposePort,
+                    pythonWSGI,
+                    pythonModule,
+                    pythonVariable,
+                    denoOptions,
+                    baseImage,
+                    baseBuildImage,
+                    deploymentType,
+                    ...defaultConfiguration,
+                    connectedDatabase: { update: { hostedDatabaseDBName: baseDatabaseBranch } }
+                }
+            });
+        } else {
+            await prisma.application.update({
+                where: { id },
+                data: {
+                    name,
+                    fqdn,
+                    exposePort,
+                    pythonWSGI,
+                    pythonModule,
+                    pythonVariable,
+                    denoOptions,
+                    baseImage,
+                    baseBuildImage,
+                    deploymentType,
+                    ...defaultConfiguration
+                }
+            });
+        }
+
         return reply.code(201).send();
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -289,7 +313,7 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
 export async function saveApplicationSettings(request: FastifyRequest<SaveApplicationSettings>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        const { debug, previews, dualCerts, autodeploy, branch, projectId, isBot } = request.body
+        const { debug, previews, dualCerts, autodeploy, branch, projectId, isBot, isDBBranching } = request.body
         // const isDouble = await checkDoubleBranch(branch, projectId);
         // if (isDouble && autodeploy) {
         //     await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false } })
@@ -297,7 +321,7 @@ export async function saveApplicationSettings(request: FastifyRequest<SaveApplic
         // }
         await prisma.application.update({
             where: { id },
-            data: { fqdn: isBot ? null : undefined, settings: { update: { debug, previews, dualCerts, autodeploy, isBot } } },
+            data: { fqdn: isBot ? null : undefined, settings: { update: { debug, previews, dualCerts, autodeploy, isBot, isDBBranching } } },
             include: { destinationDocker: true }
         });
         return reply.code(201).send();
@@ -478,6 +502,7 @@ export async function deleteApplication(request: FastifyRequest<DeleteApplicatio
         await prisma.build.deleteMany({ where: { applicationId: id } });
         await prisma.secret.deleteMany({ where: { applicationId: id } });
         await prisma.applicationPersistentStorage.deleteMany({ where: { applicationId: id } });
+        await prisma.applicationConnectedDatabase.deleteMany({ where: { applicationId: id } });
         if (teamId === '0') {
             await prisma.application.deleteMany({ where: { id } });
         } else {
@@ -738,6 +763,17 @@ export async function saveBuildPack(request, reply) {
         return errorHandler({ status, message })
     }
 }
+export async function saveConnectedDatabase(request, reply) {
+    try {
+        const { id } = request.params
+        const { databaseId, type } = request.body
+        console.log({ databaseId, type })
+        await prisma.application.update({ where: { id }, data: { connectedDatabase: { upsert: { create: { database: { connect: { id: databaseId } }, hostedDatabaseType: type }, update: { database: { connect: { id: databaseId } }, hostedDatabaseType: type } } } } })
+        return reply.code(201).send()
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 
 export async function getSecrets(request: FastifyRequest<OnlyId>) {
     try {
@@ -986,11 +1022,13 @@ export async function getBuildIdLogs(request: FastifyRequest<GetBuildIdLogs>) {
             where: { buildId, time: { gt: sequence } },
             orderBy: { time: 'asc' }
         });
-
         const data = await prisma.build.findFirst({ where: { id: buildId } });
         const createdAt = day(data.createdAt).utc();
         return {
-            logs,
+            logs: logs.map(log => {
+                log.time = Number(log.time)
+                return log
+            }),
             took: day().diff(createdAt) / 1000,
             status: data?.status || 'queued'
         }
@@ -1063,6 +1101,61 @@ export async function cancelDeployment(request: FastifyRequest<CancelDeployment>
         }
         await stopBuild(buildId, applicationId);
         return reply.code(201).send()
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
+
+export async function createdBranchDatabase(database: any, baseDatabaseBranch: string, pullmergeRequestId: string) {
+    try {
+        if (!baseDatabaseBranch) return
+        const { id, type, destinationDockerId, rootUser, rootUserPassword, dbUser } = database;
+        if (destinationDockerId) {
+            if (type === 'postgresql') {
+                const decryptedRootUserPassword = decrypt(rootUserPassword);
+                await executeDockerCmd({
+                    dockerId: destinationDockerId,
+                    command: `docker exec ${id} pg_dump -d "postgresql://postgres:${decryptedRootUserPassword}@${id}:5432/${baseDatabaseBranch}" --encoding=UTF8 --schema-only -f /tmp/${baseDatabaseBranch}.dump`
+                })
+                await executeDockerCmd({
+                    dockerId: destinationDockerId,
+                    command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "CREATE DATABASE branch_${pullmergeRequestId}"`
+                })
+                await executeDockerCmd({
+                    dockerId: destinationDockerId,
+                    command: `docker exec ${id} psql -d "postgresql://postgres:${decryptedRootUserPassword}@${id}:5432/branch_${pullmergeRequestId}" -f /tmp/${baseDatabaseBranch}.dump`
+                })
+                await executeDockerCmd({
+                    dockerId: destinationDockerId,
+                    command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "ALTER DATABASE branch_${pullmergeRequestId} OWNER TO ${dbUser}"`
+                })
+            }
+        }
+
+
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+export async function removeBranchDatabase(database: any, pullmergeRequestId: string) {
+    try {
+        const { id, type, destinationDockerId, rootUser, rootUserPassword } = database;
+        if (destinationDockerId) {
+            if (type === 'postgresql') {
+                const decryptedRootUserPassword = decrypt(rootUserPassword);
+                // Terminate all connections to the database
+                await executeDockerCmd({
+                    dockerId: destinationDockerId,
+                    command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = 'branch_${pullmergeRequestId}' AND pid <> pg_backend_pid();"`
+                })
+
+                await executeDockerCmd({
+                    dockerId: destinationDockerId,
+                    command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "DROP DATABASE branch_${pullmergeRequestId}"`
+                })
+            }
+        }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }

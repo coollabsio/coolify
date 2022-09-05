@@ -117,6 +117,24 @@ model Application {
   settings            ApplicationSettings?
   secrets             Secret[]
   teams               Team[]
+  connectedDatabase   ApplicationConnectedDatabase?
+}
+
+model ApplicationConnectedDatabase {
+  id                     String      @id @default(cuid())
+  applicationId          String      @unique
+  databaseId             String?
+  hostedDatabaseType     String?
+  hostedDatabaseHost     String?
+  hostedDatabasePort     Int?
+  hostedDatabaseName     String?
+  hostedDatabaseUser     String?
+  hostedDatabasePassword String?
+  hostedDatabaseDBName   String?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+  database               Database?   @relation(fields: [databaseId], references: [id])
+  application            Application @relation(fields: [applicationId], references: [id])
 }
 
 model ApplicationSettings {
@@ -187,7 +205,7 @@ model BuildLog {
   applicationId String?
   buildId       String
   line          String
-  time          Int
+  time          BigInt
 }
 
 model Build {
@@ -292,22 +310,23 @@ model GitlabApp {
 }
 
 model Database {
-  id                  String             @id @default(cuid())
-  name                String
-  publicPort          Int?
-  defaultDatabase     String?
-  type                String?
-  version             String?
-  dbUser              String?
-  dbUserPassword      String?
-  rootUser            String?
-  rootUserPassword    String?
-  destinationDockerId String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  destinationDocker   DestinationDocker? @relation(fields: [destinationDockerId], references: [id])
-  settings            DatabaseSettings?
-  teams               Team[]
+  id                           String                         @id @default(cuid())
+  name                         String
+  publicPort                   Int?
+  defaultDatabase              String?
+  type                         String?
+  version                      String?
+  dbUser                       String?
+  dbUserPassword               String?
+  rootUser                     String?
+  rootUserPassword             String?
+  destinationDockerId          String?
+  createdAt                    DateTime                       @default(now())
+  updatedAt                    DateTime                       @updatedAt
+  destinationDocker            DestinationDocker?             @relation(fields: [destinationDockerId], references: [id])
+  settings                     DatabaseSettings?
+  teams                        Team[]
+  applicationConnectedDatabase ApplicationConnectedDatabase[]
 }
 
 model DatabaseSettings {

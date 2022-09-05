@@ -3,8 +3,7 @@ import cuid from "cuid";
 import crypto from "crypto";
 import { encrypt, errorHandler, getUIUrl, isDev, prisma } from "../../../lib/common";
 import { checkContainer, removeContainer } from "../../../lib/docker";
-import { scheduler } from "../../../lib/scheduler";
-import { getApplicationFromDBWebhook } from "../../api/v1/applications/handlers";
+import { createdBranchDatabase, getApplicationFromDBWebhook, removeBranchDatabase } from "../../api/v1/applications/handlers";
 
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { GitHubEvents, InstallGithub } from "./types";
@@ -67,7 +66,6 @@ export async function configureGitHubApp(request, reply) {
 }
 export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promise<any> {
     try {
-
         const allowedGithubEvents = ['push', 'pull_request'];
         const allowedActions = ['opened', 'reopened', 'synchronize', 'closed'];
         const githubEvent = request.headers['x-github-event']?.toString().toLowerCase();
@@ -133,8 +131,6 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                         where: { id: application.id },
                         data: { updatedAt: new Date() }
                     });
-                    console.log(application.id)
-
                     await prisma.build.create({
                         data: {
                             id: buildId,
@@ -178,6 +174,16 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                                 where: { id: application.id },
                                 data: { updatedAt: new Date() }
                             });
+                            if (application.connectedDatabase && pullmergeRequestAction === 'opened' || pullmergeRequestAction === 'reopened') {
+                                // Coolify hosted database
+                                if (application.connectedDatabase.databaseId) {
+                                    const databaseId = application.connectedDatabase.databaseId;
+                                    const database = await prisma.database.findUnique({ where: { id: databaseId } });
+                                    if (database) {
+                                        await createdBranchDatabase(database, application.connectedDatabase.hostedDatabaseDBName, pullmergeRequestId);
+                                    }
+                                }
+                            }
                             await prisma.build.create({
                                 data: {
                                     id: buildId,
@@ -197,9 +203,17 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                         } else if (pullmergeRequestAction === 'closed') {
                             if (application.destinationDockerId) {
                                 const id = `${application.id}-${pullmergeRequestId}`;
-                                await removeContainer({ id, dockerId: application.destinationDocker.id });
+                                try {
+                                    await removeContainer({ id, dockerId: application.destinationDocker.id });
+                                } catch (error) { }
                             }
-
+                            if (application.connectedDatabase.databaseId) {
+                                const databaseId = application.connectedDatabase.databaseId;
+                                const database = await prisma.database.findUnique({ where: { id: databaseId } });
+                                if (database) {
+                                    await removeBranchDatabase(database, pullmergeRequestId);
+                                }
+                            }
                         }
                     }
                 }
