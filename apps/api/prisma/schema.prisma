@@ -128,6 +128,7 @@ model ApplicationSettings {
   autodeploy         Boolean     @default(true)
   isBot              Boolean     @default(false)
   isPublicRepository Boolean     @default(false)
+  isDBBranching      Boolean     @default(false)
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
   application        Application @relation(fields: [applicationId], references: [id])
