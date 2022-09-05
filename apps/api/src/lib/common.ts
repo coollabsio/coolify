@@ -463,6 +463,10 @@ export async function createRemoteEngineConfiguration(id: string) {
 	const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(`ps ax | grep [s]sh-agent | grep coolify-ssh-agent.pid | grep -v grep | wc -l`)
 	console.log({ numberOfSSHAgentsRunning })
 	if (numberOfSSHAgentsRunning !== '' && Number(numberOfSSHAgentsRunning.trim()) == 0) {
+		try {
+			await fs.stat(`/tmp/coolify-ssh-agent.pid`)
+			await fs.rm(`/tmp/coolify-ssh-agent.pid`)
+		} catch (error) { }
 		await asyncExecShell(`eval $(ssh-agent -sa /tmp/coolify-ssh-agent.pid)`)
 	}
 	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh-add -q ${sshKeyFile}`)
