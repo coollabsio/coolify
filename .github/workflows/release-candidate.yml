@@ -4,7 +4,7 @@ on:
     types: [prereleased]
 
 jobs:
-  making-something-cool-arm64:
+  arm64-making-something-cool:
     runs-on: self-hosted
     steps:
       - name: Checkout
@@ -36,7 +36,7 @@ jobs:
         if: always()
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL }}
-  making-something-cool-amd64:
+  amd64-making-something-cool:
     runs-on: self-hosted
     steps:
       - name: Checkout
@@ -68,8 +68,9 @@ jobs:
         if: always()
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL }}
-  merge-manifest:
+  merge-manifest-to-be-cool:
     runs-on: self-hosted
+    needs: [arm64-making-something-cool, amd64-making-something-cool]
     steps:
       - name: Create and push manifest images
         uses: Noelware/docker-manifest-action@master
