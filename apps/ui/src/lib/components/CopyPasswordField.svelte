@@ -14,7 +14,7 @@
 	export let name: string;
 	export let placeholder = '';
 
-	let disabledClass = 'bg-coolback disabled:bg-coolblack';
+	let disabledClass = 'bg-coolback disabled:bg-coolblack w-full';
 	let isHttps = browser && window.location.protocol === 'https:';
 
 	function copyToClipboard() {

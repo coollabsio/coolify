@@ -96,23 +96,25 @@
 			<div class="grid gap-1 lg:grid-flow-col pb-7">
 				<div class="title">General</div>
 				{#if !source.githubAppId}
-					<button class="btn btn-sm bg-sources" type="submit">Save & Redirect to GitHub</button>
+					<div class="w-full flex flex-rpw justify-end">
+						<button class="btn btn-sm bg-sources mt-5 w-full lg:w-fit" type="submit">Save & Redirect to GitHub</button>
+					</div>
 				{/if}
 			</div>
-			<div class="grid grid-flow-row gap-2 px-10">
+			<div class="grid grid-flow-row gap-2 lg:px-10">
 				<div class="grid grid-flow-row gap-2">
 					<div class="mt-2 grid lg:grid-cols-2 items-center">
 						<label for="name" class="text-base font-bold text-stone-100">Name</label>
-						<input name="name" id="name" required bind:value={source.name} />
+						<input class="w-full" name="name" id="name" required bind:value={source.name} />
 					</div>
 				</div>
 				<div class="grid lg:grid-cols-2 items-center">
 					<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
-					<input name="htmlUrl" id="htmlUrl" required bind:value={source.htmlUrl} />
+					<input class="w-full" name="htmlUrl" id="htmlUrl" required bind:value={source.htmlUrl} />
 				</div>
 				<div class="grid lg:grid-cols-2 items-center">
 					<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
-					<input name="apiUrl" id="apiUrl" required bind:value={source.apiUrl} />
+					<input class="w-full" name="apiUrl" id="apiUrl" required bind:value={source.apiUrl} />
 				</div>
 				<div class="grid lg:grid-cols-2 items-center">
 					<label for="customPort" class="text-base font-bold text-stone-100"
@@ -121,6 +123,7 @@
 						/></label
 					>
 					<input
+						class="w-full"
 						name="customPort"
 						id="customPort"
 						disabled={!selfHosted || source.githubAppId}
@@ -139,6 +142,7 @@
 						>
 					</div>
 					<input
+						class="w-full"
 						name="organization"
 						id="organization"
 						placeholder="eg: coollabsio"
