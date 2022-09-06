@@ -65,7 +65,6 @@ export async function update(request: FastifyRequest<Update>) {
 			);
 			return {};
 		} else {
-			console.log(latestVersion);
 			await asyncSleep(2000);
 			return {};
 		}
@@ -81,7 +80,6 @@ export async function restartCoolify(request: FastifyRequest<any>) {
 				asyncExecShell(`docker restart coolify`);
 				return {};
 			} else {
-				console.log('Restarting Coolify')
 				return {};
 			}
 		}

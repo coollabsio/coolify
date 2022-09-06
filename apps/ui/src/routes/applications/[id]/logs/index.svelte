@@ -39,7 +39,6 @@
 				logs = data.logs;
 			}
 		} catch (error) {
-			console.log(error);
 			return errorNotification(error);
 		} finally {
 			logsLoading = false;

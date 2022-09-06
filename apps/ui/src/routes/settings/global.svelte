@@ -129,7 +129,6 @@
 					}
 				}
 			}
-			console.log(error);
 			return errorNotification(error);
 		} finally {
 			loading.save = false;

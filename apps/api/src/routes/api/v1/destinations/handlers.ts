@@ -30,7 +30,6 @@ export async function listDestinations(request: FastifyRequest<ListDestinations>
             destinations
         }
     } catch ({ status, message }) {
-        console.log({ status, message })
         return errorHandler({ status, message })
     }
 }
@@ -114,7 +113,6 @@ export async function newDestination(request: FastifyRequest<NewDestination>, re
         }
 
     } catch ({ status, message }) {
-        console.log({ status, message })
         return errorHandler({ status, message })
     }
 }
@@ -162,7 +160,6 @@ export async function startProxy(request: FastifyRequest<Proxy>) {
         await startTraefikProxy(id);
         return {}
     } catch ({ status, message }) {
-        console.log({ status, message })
         await stopTraefikProxy(id);
         return errorHandler({ status, message })
     }

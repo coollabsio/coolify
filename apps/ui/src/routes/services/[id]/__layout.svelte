@@ -47,7 +47,6 @@
 				}
 			};
 		} catch (error) {
-			console.log(error);
 			return handlerNotFoundLoad(error, url);
 		}
 	};

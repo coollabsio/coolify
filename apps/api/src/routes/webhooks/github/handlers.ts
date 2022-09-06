@@ -100,8 +100,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                     const checksum = Buffer.from(githubSignature, 'utf8');
                     //@ts-ignore
                     if (checksum.length !== digest.length || !crypto.timingSafeEqual(digest, checksum)) {
-                        console.log('SHA256 checksum failed. Are you doing something fishy?')
-                        // throw { status: 500, message: 'SHA256 checksum failed. Are you doing something fishy?' 
+                        throw { status: 500, message: 'SHA256 checksum failed. Are you doing something fishy?' }
                     };
                 }
 

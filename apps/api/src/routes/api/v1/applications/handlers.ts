@@ -767,7 +767,6 @@ export async function saveConnectedDatabase(request, reply) {
     try {
         const { id } = request.params
         const { databaseId, type } = request.body
-        console.log({ databaseId, type })
         await prisma.application.update({ where: { id }, data: { connectedDatabase: { upsert: { create: { database: { connect: { id: databaseId } }, hostedDatabaseType: type }, update: { database: { connect: { id: databaseId } }, hostedDatabaseType: type } } } } })
         return reply.code(201).send()
     } catch ({ status, message }) {
@@ -930,7 +929,6 @@ export async function getPreviews(request: FastifyRequest<OnlyId>) {
             })
         }
     } catch ({ status, message }) {
-        console.log({ status, message })
         return errorHandler({ status, message })
     }
 }

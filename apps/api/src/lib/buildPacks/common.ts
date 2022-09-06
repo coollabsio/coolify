@@ -512,7 +512,6 @@ export async function copyBaseConfigurationFiles(
 			);
 		}
 	} catch (error) {
-		console.log(error);
 		throw new Error(error);
 	}
 }

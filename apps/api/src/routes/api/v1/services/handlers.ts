@@ -560,10 +560,7 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
                             command: `docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`
                         })
                     }
-                } catch (error) {
-                    console.log(error);
-                    //
-                }
+                } catch (error) { }
                 const volumes = [
                     `${id}-wordpress-data:/home/${ftpUser}/wordpress`,
                     `${isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
@@ -642,9 +639,7 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
             await asyncExecShell(
                 `rm -fr ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub ${hostkeyDir}/${id}.sh`
             );
-        } catch (error) {
-            console.log(error)
-        }
+        } catch (error) { }
 
     }
 

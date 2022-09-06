@@ -239,7 +239,6 @@
 				type: 'success'
 			});
 		} catch (error) {
-			console.log(error);
 			//@ts-ignore
 			if (error?.message.startsWith($t('application.dns_not_set_partial_error'))) {
 				forceSave = true;

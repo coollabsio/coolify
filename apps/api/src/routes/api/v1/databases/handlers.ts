@@ -280,15 +280,12 @@ export async function startDatabase(request: FastifyRequest<OnlyId>) {
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         try {
             await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker volume create ${volumeName}` })
-        } catch (error) {
-            console.log(error);
-        }
+        } catch (error) { }
         try {
             await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up -d` })
             if (isPublic) await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
             return {};
         } catch (error) {
-            console.log(error)
             throw {
                 error
             };

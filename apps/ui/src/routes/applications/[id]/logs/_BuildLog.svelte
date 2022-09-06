@@ -67,7 +67,6 @@
 				}
 			}, 1000);
 		} catch (error) {
-			console.log(error);
 			return errorNotification(error);
 		}
 	}
@@ -80,7 +79,6 @@
 				applicationId: id
 			});
 		} catch (error) {
-			console.log(error);
 			return errorNotification(error);
 		}
 	}

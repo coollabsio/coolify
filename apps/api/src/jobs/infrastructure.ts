@@ -21,7 +21,6 @@ async function autoUpdater() {
             const activeCount = 0
             if (activeCount === 0) {
                 if (!isDev) {
-                    console.log(`Updating Coolify to ${latestVersion}.`);
                     await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
                     await asyncExecShell(`env | grep COOLIFY > .env`);
                     await asyncExecShell(
@@ -35,9 +34,7 @@ async function autoUpdater() {
                 }
             }
         }
-    } catch (error) {
-        console.log(error);
-    }
+    } catch (error) { }
 }
 async function checkProxies() {
     try {
@@ -71,9 +68,7 @@ async function checkProxies() {
                 }
                 try {
                     await createRemoteEngineConfiguration(docker.id)
-                } catch (error) {
-                    console.log({ error })
-                }
+                } catch (error) { }
             }
         }
         // TCP Proxies
@@ -132,9 +127,7 @@ async function cleanupPrismaEngines() {
             if (stdout.trim() != null && stdout.trim() != '' && Number(stdout.trim()) > 1) {
                 await asyncExecShell(`killall -q -e /app/prisma-engines/query-engine -o 1m`)
             }
-        } catch (error) {
-            console.log(error);
-        }
+        } catch (error) { }
     }
 }
 async function cleanupStorage() {
@@ -185,9 +178,7 @@ async function cleanupStorage() {
                     lowDiskSpace = true;
                 }
             }
-        } catch (error) {
-            console.log(error);
-        }
+        } catch (error) { }
         await cleanupDockerStorage(destination.id, lowDiskSpace, false)
     }
 }

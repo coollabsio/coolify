@@ -471,9 +471,7 @@ export async function createRemoteEngineConfiguration(id: string) {
 	if (numberOfSSHTunnelsRunning !== '' && Number(numberOfSSHTunnelsRunning.trim()) == 0) {
 		try {
 			await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh -F /dev/null -o "StrictHostKeyChecking no" -fNL ${localPort}:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`)
-		} catch (error) {
-			console.log(error)
-		}
+		} catch (error) { }
 
 	}
 	const config = sshConfig.parse('')
@@ -1250,7 +1248,6 @@ export async function startTraefikTCPProxy(
 			})
 		}
 	} catch (error) {
-		console.log(error);
 		return error;
 	}
 }
@@ -1444,9 +1441,7 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 		if (images) {
 			await executeDockerCmd({ dockerId, command: `docker rmi -f ${images}" -q | xargs -r` })
 		}
-	} catch (error) {
-		//console.log(error);
-	}
+	} catch (error) { }
 	if (lowDiskSpace || force) {
 		if (isDev) {
 			if (!force) console.log(`[DEV MODE] Low disk space: ${lowDiskSpace}`);
@@ -1454,25 +1449,17 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 		}
 		try {
 			await executeDockerCmd({ dockerId, command: `docker container prune -f --filter "label=coolify.managed=true"` })
-		} catch (error) {
-			//console.log(error);
-		}
+		} catch (error) { }
 		try {
 			await executeDockerCmd({ dockerId, command: `docker image prune -f` })
-		} catch (error) {
-			//console.log(error);
-		}
+		} catch (error) { }
 		try {
 			await executeDockerCmd({ dockerId, command: `docker image prune -a -f` })
-		} catch (error) {
-			//console.log(error);
-		}
+		} catch (error) { }
 		// Cleanup build caches
 		try {
 			await executeDockerCmd({ dockerId, command: `docker builder prune -a -f` })
-		} catch (error) {
-			//console.log(error);
-		}
+		} catch (error) { }
 	}
 }
 
