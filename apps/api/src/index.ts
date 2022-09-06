@@ -5,7 +5,7 @@ import env from '@fastify/env';
 import cookie from '@fastify/cookie';
 import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
-import { asyncExecShell, createRemoteEngineConfiguration, isDev, listSettings, prisma, version } from './lib/common';
+import { asyncExecShell, createRemoteEngineConfiguration, getDomain, isDev, listSettings, prisma, version } from './lib/common';
 import { scheduler } from './lib/scheduler';
 import { compareVersions } from 'compare-versions';
 import Graceful from '@ladjs/graceful'
@@ -100,9 +100,9 @@ fastify.addHook('onRequest', async (request, reply) => {
 	let allowedList = ['coolify:3000'];
 	const { ipv4, ipv6, fqdn } = await prisma.setting.findFirst({})
 
-	ipv4 && allowedList.push(ipv4);
+	ipv4 && allowedList.push(`${ipv4}:3000`);
 	ipv6 && allowedList.push(ipv6);
-	fqdn && allowedList.push(fqdn);
+	fqdn && allowedList.push(getDomain(fqdn));
 
 	const remotes = await prisma.destinationDocker.findMany({ where: { remoteEngine: true, remoteVerified: true } })
 	if (remotes.length > 0) {
