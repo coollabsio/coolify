@@ -110,10 +110,8 @@ fastify.addHook('onRequest', async (request, reply) => {
 			allowedList.push(`${remote.remoteIpAddress}:3000`);
 		})
 	}
-	console.log({ allowedList })
-	console.log({ host: request.headers.host, origin: request.headers.origin })
-	if (!request.headers.origin && !request.headers.host.startsWith('host.docker.internal')) {
-
+	if (!allowedList.includes(request.headers.host)) {
+		console.log('not allowed', request.headers.host)
 	}
 })
 fastify.listen({ port, host }, async (err: any, address: any) => {
