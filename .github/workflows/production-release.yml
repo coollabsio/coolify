@@ -72,6 +72,9 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Get current package version
+        uses: martinbeentjes/npm-get-version-action@v1.2.3
+        id: package-version
       - name: Create & publish manifest
         run: |
           docker manifest create coollabsio/coolify:${{steps.package-version.outputs.current-version}} --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-amd64 --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-arm64
