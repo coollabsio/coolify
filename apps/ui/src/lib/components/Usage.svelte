@@ -20,13 +20,12 @@
 	let usageInterval: any;
 	let loading = {
 		usage: false,
-		cleanup: false,
-		restart: false
+		cleanup: false
 	};
 	import { addToast, appSession } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
 	import { get, post } from '$lib/api';
-	import { asyncSleep, errorNotification } from '$lib/common';
+	import { errorNotification } from '$lib/common';
 	async function getStatus() {
 		if (loading.usage) return;
 		loading.usage = true;
@@ -34,45 +33,7 @@
 		usage = data.usage;
 		loading.usage = false;
 	}
-	async function restartCoolify() {
-		const sure = confirm(
-			'Are you sure you would like to restart Coolify? Currently running deployments will be stopped and restarted.'
-		);
-		if (sure) {
-			loading.restart = true;
-			try {
-				await post(`/internal/restart`, {});
-				await asyncSleep(10000);
-				let reachable = false;
-				let tries = 0;
-				do {
-					await asyncSleep(4000);
-					try {
-						await get(`/undead`);
-						reachable = true;
-					} catch (error) {
-						reachable = false;
-					}
-					if (reachable) break;
-					tries++;
-				} while (!reachable || tries < 120);
-				addToast({
-					message: 'New version reachable. Reloading...',
-					type: 'success'
-				});
-				await asyncSleep(3000);
-				return window.location.reload();
-				addToast({
-					type: 'success',
-					message: 'Coolify restarted successfully. It will take a moment.'
-				});
-			} catch (error) {
-				return errorNotification(error);
-			} finally {
-				loading.restart = false;
-			}
-		}
-	}
+
 	onDestroy(() => {
 		clearInterval(usageInterval);
 	});
@@ -111,11 +72,6 @@
 			{#if $appSession.teamId === '0'}
 				<button on:click={manuallyCleanupStorage} class:loading={loading.cleanup} class="btn btn-sm"
 					>Cleanup Storage</button
-				>
-				<button
-					on:click={restartCoolify}
-					class:loading={loading.restart}
-					class="btn btn-sm bg-red-600 hover:bg-red-500">Restart Coolify</button
 				>
 			{/if}
 		</div>

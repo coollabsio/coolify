@@ -23,7 +23,7 @@
 	import { browser } from '$app/env';
 	import { t } from '$lib/translations';
 	import { addToast, appSession, features } from '$lib/store';
-	import { errorNotification, getDomain } from '$lib/common';
+	import { asyncSleep, errorNotification, getDomain } from '$lib/common';
 	import Menu from './_Menu.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 
@@ -45,7 +45,8 @@
 	let loading = {
 		save: false,
 		remove: false,
-		proxyMigration: false
+		proxyMigration: false,
+		restart: false
 	};
 
 	async function removeFqdn() {
@@ -156,6 +157,41 @@
 	function resetView() {
 		forceSave = false;
 	}
+	async function restartCoolify() {
+		const sure = confirm(
+			'Are you sure you would like to restart Coolify? Currently running deployments will be stopped and restarted.'
+		);
+		if (sure) {
+			loading.restart = true;
+			try {
+				await post(`/internal/restart`, {});
+				await asyncSleep(10000);
+				let reachable = false;
+				let tries = 0;
+				do {
+					await asyncSleep(4000);
+					try {
+						await get(`/undead`);
+						reachable = true;
+					} catch (error) {
+						reachable = false;
+					}
+					if (reachable) break;
+					tries++;
+				} while (!reachable || tries < 120);
+				addToast({
+					message: 'New version reachable. Reloading...',
+					type: 'success'
+				});
+				await asyncSleep(3000);
+				return window.location.reload();
+			} catch (error) {
+				return errorNotification(error);
+			} finally {
+				loading.restart = false;
+			}
+		}
+	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -186,11 +222,14 @@
 							on:click|preventDefault={removeFqdn}
 							disabled={loading.remove}
 							class="btn btn-sm"
-							class:bg-red-600={!loading.remove}
-							class:hover:bg-red-500={!loading.remove}
 							>{loading.remove ? $t('forms.removing') : $t('forms.remove_domain')}</button
 						>
 					{/if}
+					<button
+						on:click={restartCoolify}
+						class:loading={loading.restart}
+						class="btn btn-sm bg-red-600 hover:bg-red-500">Restart Coolify</button
+					>
 				</div>
 				<div class="grid grid-flow-row gap-2 px-10">
 					<!-- <Language /> -->
@@ -319,7 +358,7 @@
 							id="isAPIDebuggingEnabled"
 							bind:setting={isAPIDebuggingEnabled}
 							title="API Debugging"
-							description="Enable API debugging. This will log all API requests and responses.<br><br>You need to restart the Coolify (button on dashboard) for this to take effect."
+							description="Enable API debugging. This will log all API requests and responses.<br><br>You need to restart the Coolify for this to take effect."
 							on:click={() => changeSettings('isAPIDebuggingEnabled')}
 						/>
 					</div>
