@@ -27,6 +27,7 @@
 	import Menu from './_Menu.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 
+	let isAPIDebuggingEnabled = settings.isAPIDebuggingEnabled;
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
 	let dualCerts = settings.dualCerts;
 	let isAutoUpdateEnabled = settings.isAutoUpdateEnabled;
@@ -75,8 +76,11 @@
 			if (name === 'isDNSCheckEnabled') {
 				isDNSCheckEnabled = !isDNSCheckEnabled;
 			}
-
+			if (name === 'isAPIDebuggingEnabled') {
+				isAPIDebuggingEnabled = !isAPIDebuggingEnabled;
+			}
 			await post(`/settings`, {
+				isAPIDebuggingEnabled,
 				isRegistrationEnabled,
 				dualCerts,
 				isAutoUpdateEnabled,
@@ -308,6 +312,15 @@
 							title={$t('setting.registration_allowed')}
 							description={$t('setting.registration_allowed_explainer')}
 							on:click={() => changeSettings('isRegistrationEnabled')}
+						/>
+					</div>
+					<div class="grid grid-cols-2 items-center">
+						<Setting
+							id="isAPIDebuggingEnabled"
+							bind:setting={isAPIDebuggingEnabled}
+							title="API Debugging"
+							description="Enable API debugging. This will log all API requests and responses.<br><br>You need to restart the Coolify (button on dashboard) for this to take effect."
+							on:click={() => changeSettings('isAPIDebuggingEnabled')}
 						/>
 					</div>
 					{#if browser && $features.beta}

@@ -85,6 +85,6 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Create & publish manifest
         run: |
-          docker manifest create coollabsio/coolify:v3.9.1-rc.1 --amend coollabsio/coolify:v3.9.1-rc.1-amd64 --amend coollabsio/coolify:v3.9.1-rc.1-arm64
-          docker manifest push coollabsio/coolify:v3.9.1-rc.1
+          docker manifest create coollabsio/coolify:${{github.event.release.name}} --amend coollabsio/coolify:${{github.event.release.name}}-amd64 --amend coollabsio/coolify:${{github.event.release.name}}-arm64
+          docker manifest push coollabsio/coolify:${{github.event.release.name}}
           
