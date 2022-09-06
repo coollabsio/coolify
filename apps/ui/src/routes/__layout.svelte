@@ -120,26 +120,329 @@
 		<PageLoader />
 	</div>
 {/if}
-{#if $appSession.userId}
-	<nav class="nav-main">
-		<div class="flex h-screen w-full flex-col items-center transition-all duration-100">
-			{#if !$appSession.whiteLabeled}
-				<div class="mb-2 mt-4 h-10 w-10">
-					<img src="/favicon.png" alt="coolLabs logo" />
+<div class="drawer">
+	<input id="main-drawer" type="checkbox" class="drawer-toggle" />
+	<div class="drawer-content">
+		{#if $appSession.userId}
+			<nav class="nav-main hidden lg:block">
+				<div class="flex h-screen w-full flex-col items-center transition-all duration-100">
+					{#if !$appSession.whiteLabeled}
+						<div class="mb-2 mt-4 h-10 w-10">
+							<img src="/favicon.png" alt="coolLabs logo" />
+						</div>
+					{:else if $appSession.whiteLabeledDetails.icon}
+						<div class="mb-2 mt-4 h-10 w-10">
+							<img src={$appSession.whiteLabeledDetails.icon} alt="White labeled logo" />
+						</div>
+					{/if}
+					<div class="flex flex-col space-y-2 py-2" class:mt-2={$appSession.whiteLabeled}>
+						<a
+							id="dashboard"
+							sveltekit:prefetch
+							href="/"
+							class="icons bg-coolgray-200 hover:text-white"
+							class:text-white={$page.url.pathname === '/'}
+							class:bg-coolgray-500={$page.url.pathname === '/'}
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-9 w-9"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<path
+									d="M19 8.71l-5.333 -4.148a2.666 2.666 0 0 0 -3.274 0l-5.334 4.148a2.665 2.665 0 0 0 -1.029 2.105v7.2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-7.2c0 -.823 -.38 -1.6 -1.03 -2.105"
+								/>
+								<path d="M16 15c-2.21 1.333 -5.792 1.333 -8 0" />
+							</svg>
+						</a>
+
+						<div class="border-t border-stone-700" />
+						<a
+							id="applications"
+							sveltekit:prefetch
+							href="/applications"
+							class="icons bg-coolgray-200"
+							class:text-applications={$page.url.pathname.startsWith('/applications') ||
+								$page.url.pathname.startsWith('/new/application')}
+							class:bg-coolgray-500={$page.url.pathname.startsWith('/applications') ||
+								$page.url.pathname.startsWith('/new/application')}
+							data-tip="Applications"
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-9 w-9"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentcolor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<rect x="4" y="4" width="6" height="6" rx="1" />
+								<rect x="4" y="14" width="6" height="6" rx="1" />
+								<rect x="14" y="14" width="6" height="6" rx="1" />
+								<line x1="14" y1="7" x2="20" y2="7" />
+								<line x1="17" y1="4" x2="17" y2="10" />
+							</svg>
+						</a>
+
+						<a
+							id="sources"
+							sveltekit:prefetch
+							href="/sources"
+							class="icons bg-coolgray-200"
+							class:text-sources={$page.url.pathname.startsWith('/sources') ||
+								$page.url.pathname.startsWith('/new/source')}
+							class:bg-coolgray-500={$page.url.pathname.startsWith('/sources') ||
+								$page.url.pathname.startsWith('/new/source')}
+							data-tip="Git Sources"
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-9 w-9"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<circle cx="6" cy="6" r="2" />
+								<circle cx="18" cy="18" r="2" />
+								<path d="M11 6h5a2 2 0 0 1 2 2v8" />
+								<polyline points="14 9 11 6 14 3" />
+								<path d="M13 18h-5a2 2 0 0 1 -2 -2v-8" />
+								<polyline points="10 15 13 18 10 21" />
+							</svg>
+						</a>
+						<a
+							id="destinations"
+							sveltekit:prefetch
+							href="/destinations"
+							class="icons bg-coolgray-200"
+							class:text-destinations={$page.url.pathname.startsWith('/destinations') ||
+								$page.url.pathname.startsWith('/new/destination')}
+							class:bg-coolgray-500={$page.url.pathname.startsWith('/destinations') ||
+								$page.url.pathname.startsWith('/new/destination')}
+							data-tip="Destinations"
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-9 w-9"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<path
+									d="M22 12.54c-1.804 -.345 -2.701 -1.08 -3.523 -2.94c-.487 .696 -1.102 1.568 -.92 2.4c.028 .238 -.32 1.002 -.557 1h-14c0 5.208 3.164 7 6.196 7c4.124 .022 7.828 -1.376 9.854 -5c1.146 -.101 2.296 -1.505 2.95 -2.46z"
+								/>
+								<path d="M5 10h3v3h-3z" />
+								<path d="M8 10h3v3h-3z" />
+								<path d="M11 10h3v3h-3z" />
+								<path d="M8 7h3v3h-3z" />
+								<path d="M11 7h3v3h-3z" />
+								<path d="M11 4h3v3h-3z" />
+								<path d="M4.571 18c1.5 0 2.047 -.074 2.958 -.78" />
+								<line x1="10" y1="16" x2="10" y2="16.01" />
+							</svg>
+						</a>
+						<div class="border-t border-stone-700" />
+						<a
+							id="databases"
+							sveltekit:prefetch
+							href="/databases"
+							class="icons  bg-coolgray-200"
+							class:text-databases={$page.url.pathname.startsWith('/databases') ||
+								$page.url.pathname.startsWith('/new/database')}
+							class:bg-coolgray-500={$page.url.pathname.startsWith('/databases') ||
+								$page.url.pathname.startsWith('/new/database')}
+							data-tip="Databases"
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-9 w-9"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<ellipse cx="12" cy="6" rx="8" ry="3" />
+								<path d="M4 6v6a8 3 0 0 0 16 0v-6" />
+								<path d="M4 12v6a8 3 0 0 0 16 0v-6" />
+							</svg>
+						</a>
+						<a
+							id="services"
+							sveltekit:prefetch
+							href="/services"
+							class="icons bg-coolgray-200"
+							class:text-services={$page.url.pathname.startsWith('/services') ||
+								$page.url.pathname.startsWith('/new/service')}
+							class:bg-coolgray-500={$page.url.pathname.startsWith('/services') ||
+								$page.url.pathname.startsWith('/new/service')}
+							data-tip="Services"
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-9 w-9"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-12" />
+							</svg>
+						</a>
+					</div>
+					<div class="flex-1" />
+
+					<UpdateAvailable />
+					<div class="flex flex-col space-y-2 py-2">
+						<a
+							id="iam"
+							sveltekit:prefetch
+							href="/iam"
+							class="icons bg-coolgray-200"
+							class:text-iam={$page.url.pathname.startsWith('/iam')}
+							class:bg-coolgray-500={$page.url.pathname.startsWith('/iam')}
+							><svg
+								xmlns="http://www.w3.org/2000/svg"
+								viewBox="0 0 24 24"
+								class="h-9 w-9"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<circle cx="9" cy="7" r="4" />
+								<path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+								<path d="M16 3.13a4 4 0 0 1 0 7.75" />
+								<path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
+							</svg>
+						</a>
+						<a
+							id="settings"
+							sveltekit:prefetch
+							href={$appSession.teamId === '0' ? '/settings/global' : '/settings/ssh-keys'}
+							class="icons bg-coolgray-200"
+							class:text-settings={$page.url.pathname.startsWith('/settings')}
+							class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								viewBox="0 0 24 24"
+								class="h-9 w-9"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<path
+									d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"
+								/>
+								<circle cx="12" cy="12" r="3" />
+							</svg>
+						</a>
+
+						<div id="logout" class="icons bg-coolgray-200 hover:text-error" on:click={logout}>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="ml-1 h-8 w-8"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								fill="none"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+								<path
+									d="M14 8v-2a2 2 0 0 0 -2 -2h-7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2 -2v-2"
+								/>
+								<path d="M7 12h14l-3 -3m0 6l3 -3" />
+							</svg>
+						</div>
+						<div
+							class="w-full text-center font-bold text-stone-400 hover:bg-coolgray-200 hover:text-white"
+						>
+							<a
+								class="text-[10px] no-underline"
+								href={`https://github.com/coollabsio/coolify/releases/tag/v${$appSession.version}`}
+								target="_blank">v{$appSession.version}</a
+							>
+						</div>
+					</div>
 				</div>
-			{:else if $appSession.whiteLabeledDetails.icon}
-				<div class="mb-2 mt-4 h-10 w-10">
-					<img src={$appSession.whiteLabeledDetails.icon} alt="White labeled logo" />
-				</div>
+			</nav>
+			{#if $appSession.whiteLabeled}
+				<span class="fixed bottom-0 left-[50px] z-50 m-2 px-4 text-xs text-stone-700"
+					>Powered by <a href="https://coolify.io" target="_blank">Coolify</a></span
+				>
 			{/if}
-			<div class="flex flex-col space-y-2 py-2" class:mt-2={$appSession.whiteLabeled}>
+		{/if}
+		<div
+			class="navbar bg-neutral lg:hidden space-x-2 flex flex-row items-center"
+			class:hidden={!$appSession.userId}
+		>
+			<label for="main-drawer" class="drawer-button btn btn-square btn-ghost">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					fill="none"
+					viewBox="0 0 24 24"
+					class="inline-block w-5 h-5 stroke-current"
+					><path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M4 6h16M4 12h16M4 18h16"
+					/></svg
+				>
+			</label>
+			<div class="prose flex flex-row justify-between space-x-1 w-full items-center pr-3">
+				<h3 class="mb-0">Coolify</h3>
+				<UpdateAvailable />
+			</div>
+		</div>
+		<main>
+			<div class={$appSession.userId ? 'lg:px-20' : null}>
+				<slot />
+			</div>
+		</main>
+	</div>
+	<div class="drawer-side">
+		<label for="main-drawer" class="drawer-overlay w-full" />
+		<ul class="menu bg-base-100 w-80 p-2 rounded-r-lg space-y-3">
+			<li class="menu-title">
+				<span>Main</span>
+			</li>
+			<li>
 				<a
-					id="dashboard"
+					class="no-underline"
 					sveltekit:prefetch
 					href="/"
-					class="icons bg-coolgray-200 hover:text-white"
-					class:text-white={$page.url.pathname === '/'}
-					class:bg-coolgray-500={$page.url.pathname === '/'}
+					class:bg-primary={$page.url.pathname === '/'}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -157,19 +460,19 @@
 						/>
 						<path d="M16 15c-2.21 1.333 -5.792 1.333 -8 0" />
 					</svg>
+					Dashboard
 				</a>
-
-				<div class="border-t border-stone-700" />
+			</li>
+			<li class="menu-title">
+				<span>Manage</span>
+			</li>
+			<li>
 				<a
-					id="applications"
+					class="no-underline"
 					sveltekit:prefetch
 					href="/applications"
-					class="icons bg-coolgray-200"
-					class:text-applications={$page.url.pathname.startsWith('/applications') ||
+					class:bg-applications={$page.url.pathname.startsWith('/applications') ||
 						$page.url.pathname.startsWith('/new/application')}
-					class:bg-coolgray-500={$page.url.pathname.startsWith('/applications') ||
-						$page.url.pathname.startsWith('/new/application')}
-					data-tip="Applications"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -188,18 +491,16 @@
 						<line x1="14" y1="7" x2="20" y2="7" />
 						<line x1="17" y1="4" x2="17" y2="10" />
 					</svg>
+					Applications
 				</a>
-
+			</li>
+			<li>
 				<a
-					id="sources"
+					class="no-underline"
 					sveltekit:prefetch
 					href="/sources"
-					class="icons bg-coolgray-200"
-					class:text-sources={$page.url.pathname.startsWith('/sources') ||
+					class:bg-sources={$page.url.pathname.startsWith('/sources') ||
 						$page.url.pathname.startsWith('/new/source')}
-					class:bg-coolgray-500={$page.url.pathname.startsWith('/sources') ||
-						$page.url.pathname.startsWith('/new/source')}
-					data-tip="Git Sources"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -219,17 +520,16 @@
 						<path d="M13 18h-5a2 2 0 0 1 -2 -2v-8" />
 						<polyline points="10 15 13 18 10 21" />
 					</svg>
+					Sources
 				</a>
+			</li>
+			<li>
 				<a
-					id="destinations"
+					class="no-underline"
 					sveltekit:prefetch
 					href="/destinations"
-					class="icons bg-coolgray-200"
-					class:text-destinations={$page.url.pathname.startsWith('/destinations') ||
+					class:bg-destinations={$page.url.pathname.startsWith('/destinations') ||
 						$page.url.pathname.startsWith('/new/destination')}
-					class:bg-coolgray-500={$page.url.pathname.startsWith('/destinations') ||
-						$page.url.pathname.startsWith('/new/destination')}
-					data-tip="Destinations"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -254,18 +554,19 @@
 						<path d="M4.571 18c1.5 0 2.047 -.074 2.958 -.78" />
 						<line x1="10" y1="16" x2="10" y2="16.01" />
 					</svg>
+					Destinations
 				</a>
-				<div class="border-t border-stone-700" />
+			</li>
+			<li class="menu-title">
+				<span>Data</span>
+			</li>
+			<li>
 				<a
-					id="databases"
+					class="no-underline"
 					sveltekit:prefetch
 					href="/databases"
-					class="icons  bg-coolgray-200"
-					class:text-databases={$page.url.pathname.startsWith('/databases') ||
+					class:bg-databases={$page.url.pathname.startsWith('/databases') ||
 						$page.url.pathname.startsWith('/new/database')}
-					class:bg-coolgray-500={$page.url.pathname.startsWith('/databases') ||
-						$page.url.pathname.startsWith('/new/database')}
-					data-tip="Databases"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -282,17 +583,15 @@
 						<path d="M4 6v6a8 3 0 0 0 16 0v-6" />
 						<path d="M4 12v6a8 3 0 0 0 16 0v-6" />
 					</svg>
+					Databases
 				</a>
+			</li>
+			<li>
 				<a
-					id="services"
-					sveltekit:prefetch
+					class="no-underline"
 					href="/services"
-					class="icons bg-coolgray-200"
-					class:text-services={$page.url.pathname.startsWith('/services') ||
+					class:bg-services={$page.url.pathname.startsWith('/services') ||
 						$page.url.pathname.startsWith('/new/service')}
-					class:bg-coolgray-500={$page.url.pathname.startsWith('/services') ||
-						$page.url.pathname.startsWith('/new/service')}
-					data-tip="Services"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -307,19 +606,14 @@
 						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 						<path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-12" />
 					</svg>
+					Services
 				</a>
-			</div>
-			<div class="flex-1" />
-
-			<UpdateAvailable />
-			<div class="flex flex-col space-y-2 py-2">
-				<a
-					id="iam"
-					sveltekit:prefetch
-					href="/iam"
-					class="icons bg-coolgray-200"
-					class:text-iam={$page.url.pathname.startsWith('/iam')}
-					class:bg-coolgray-500={$page.url.pathname.startsWith('/iam')}
+			</li>
+			<li class="menu-title">
+				<span>Dashboard settings</span>
+			</li>
+			<li>
+				<a class="no-underline" href="/iam" class:bg-iam={$page.url.pathname.startsWith('/iam')}
 					><svg
 						xmlns="http://www.w3.org/2000/svg"
 						viewBox="0 0 24 24"
@@ -336,14 +630,15 @@
 						<path d="M16 3.13a4 4 0 0 1 0 7.75" />
 						<path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
 					</svg>
+					IAM
 				</a>
+			</li>
+			<li>
 				<a
-					id="settings"
-					sveltekit:prefetch
+					class="no-underline"
 					href={$appSession.teamId === '0' ? '/settings/global' : '/settings/ssh-keys'}
-					class="icons bg-coolgray-200"
-					class:text-settings={$page.url.pathname.startsWith('/settings')}
-					class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
+					class:bg-settings={$page.url.pathname.startsWith('/settings')}
+					class:text-black={$page.url.pathname.startsWith('/settings')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -361,13 +656,11 @@
 						/>
 						<circle cx="12" cy="12" r="3" />
 					</svg>
+					Settings
 				</a>
-
-				<div
-					id="logout"
-					class="icons bg-coolgray-200 hover:text-error"
-					on:click={logout}
-				>
+			</li>
+			<li>
+				<div class="no-underline hover:bg-error" on:click={logout} class:bg-iam={$page.url.pathname.startsWith('/iam')}>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="ml-1 h-8 w-8"
@@ -384,30 +677,12 @@
 						/>
 						<path d="M7 12h14l-3 -3m0 6l3 -3" />
 					</svg>
+					Logout
 				</div>
-				<div
-					class="w-full text-center font-bold text-stone-400 hover:bg-coolgray-200 hover:text-white"
-				>
-					<a
-						class="text-[10px] no-underline"
-						href={`https://github.com/coollabsio/coolify/releases/tag/v${$appSession.version}`}
-						target="_blank">v{$appSession.version}</a
-					>
-				</div>
-			</div>
-		</div>
-	</nav>
-	{#if $appSession.whiteLabeled}
-		<span class="fixed bottom-0 left-[50px] z-50 m-2 px-4 text-xs text-stone-700"
-			>Powered by <a href="https://coolify.io" target="_blank">Coolify</a></span
-		>
-	{/if}
-{/if}
-<main>
-	<div class={$appSession.userId ? 'pl-14 lg:px-20' : null}>
-		<slot />
+			</li>
+		</ul>
 	</div>
-</main>
+</div>
 
 <Tooltip triggeredBy="#dashboard" placement="right">Dashboard</Tooltip>
 <Tooltip triggeredBy="#applications" placement="right" color="bg-applications">Applications</Tooltip
