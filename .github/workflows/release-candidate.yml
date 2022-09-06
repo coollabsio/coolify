@@ -1,12 +1,11 @@
 name: release-candidate
-runs-on: self-hosted
 on:
   release:
     types: [prereleased]
 
 jobs:
   making-something-cool:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout
         uses: actions/checkout@v3
