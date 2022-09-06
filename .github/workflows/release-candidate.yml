@@ -77,7 +77,11 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Create manifest
-        run: bash docker manifest create coollabsio/coolify:${{github.event.release.name}} --amend coollabsio/coolify:${{github.event.release.name}}-amd64 --amend coollabsio/coolify:${{github.event.release.name}}-arm64
-      - name: Push Manifest
-        run: bash docker manifest push coollabsio/coolify:${{github.event.release.name}}
+      - name: Create & push manifest
+        uses: addnab/docker-run-action@v3
+        with:
+          image: docker:latest
+          shell: bash
+          run: |
+            docker manifest create coollabsio/coolify:${{github.event.release.name}} --amend coollabsio/coolify:${{github.event.release.name}}-amd64 --amend coollabsio/coolify:${{github.event.release.name}}-arm64
+            docker manifest push coollabsio/coolify:${{github.event.release.name}}
