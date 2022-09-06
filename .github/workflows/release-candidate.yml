@@ -74,21 +74,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Login to docker hub
-        if: success()
-        uses: actions-hub/docker/login@v1.0.3
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Create manifest
-        uses: actions-hub/docker/cli@v1.0.3
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
-      - run: docker manifest create coollabsio/coolify:${{github.event.release.name}} --amend coollabsio/coolify:${{github.event.release.name}}-amd64 --amend coollabsio/coolify:${{github.event.release.name}}-arm64
-      - name: Push manifest
-        uses: actions-hub/docker/cli@v1.0.3
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
-      - run: docker manifest push coollabsio/coolify:${{github.event.release.name}}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Create & publish manifest
+        run: |
+          docker manifest create coollabsio/coolify:v3.9.1-rc.1 --amend coollabsio/coolify:v3.9.1-rc.1-amd64 --amend coollabsio/coolify:v3.9.1-rc.1-arm64
+          docker manifest push coollabsio/coolify:v3.9.1-rc.1
+          

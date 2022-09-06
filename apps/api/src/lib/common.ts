@@ -974,9 +974,13 @@ export const createDirectories = async ({
 }): Promise<{ workdir: string; repodir: string }> => {
 	const repodir = `/tmp/build-sources/${repository}/`;
 	const workdir = `/tmp/build-sources/${repository}/${buildId}`;
-
-	await asyncExecShell(`mkdir -p ${workdir}`);
-
+	try {
+		await fs.stat(workdir);
+		await asyncExecShell(`rm -fr ${workdir}`);
+		await asyncExecShell(`mkdir -p ${workdir}`);
+	} catch(error) {
+		await asyncExecShell(`mkdir -p ${workdir}`);
+	}
 	return {
 		workdir,
 		repodir
