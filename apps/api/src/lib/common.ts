@@ -21,7 +21,7 @@ import { scheduler } from './scheduler';
 import { supportedServiceTypesAndVersions } from './services/supportedVersions';
 import { includeServices } from './services/common';
 
-export const version = '3.9.0';
+export const version = '3.9.1';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -974,9 +974,14 @@ export const createDirectories = async ({
 }): Promise<{ workdir: string; repodir: string }> => {
 	const repodir = `/tmp/build-sources/${repository}/`;
 	const workdir = `/tmp/build-sources/${repository}/${buildId}`;
-
+	let workdirFound = false;
+	try {
+		workdirFound = !!(await fs.stat(workdir));
+	} catch (error) { }
+	if (workdirFound) {
+		await asyncExecShell(`rm -fr ${workdir}`);
+	}
 	await asyncExecShell(`mkdir -p ${workdir}`);
-
 	return {
 		workdir,
 		repodir

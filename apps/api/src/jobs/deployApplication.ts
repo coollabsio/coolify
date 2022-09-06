@@ -357,21 +357,15 @@ import * as buildpacks from '../lib/buildPacks';
 								await saveBuildLog({ line: error, buildId, applicationId: application.id });
 							}
 						});
-
 					}
-
 					await pAll.default(actions, { concurrency })
 				}
 			} catch (error) {
 				console.log(error)
-			} finally {
 			}
 		})
-
 		while (true) {
 			await th()
 		}
-
-
 	} else process.exit(0);
 })();
