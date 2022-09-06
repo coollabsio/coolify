@@ -124,7 +124,7 @@
 	<input id="main-drawer" type="checkbox" class="drawer-toggle" />
 	<div class="drawer-content">
 		{#if $appSession.userId}
-			<nav class="nav-main hidden lg:block">
+			<nav class="nav-main hidden lg:block z-20">
 				<div class="flex h-screen w-full flex-col items-center transition-all duration-100">
 					{#if !$appSession.whiteLabeled}
 						<div class="mb-2 mt-4 h-10 w-10">
@@ -403,7 +403,7 @@
 			{/if}
 		{/if}
 		<div
-			class="navbar bg-neutral lg:hidden space-x-2 flex flex-row items-center"
+			class="navbar bg-neutral-focus lg:hidden space-x-2 flex flex-row items-center"
 			class:hidden={!$appSession.userId}
 		>
 			<label for="main-drawer" class="drawer-button btn btn-square btn-ghost">
@@ -426,7 +426,7 @@
 			</div>
 		</div>
 		<main>
-			<div class={$appSession.userId ? 'lg:px-20' : null}>
+			<div class={$appSession.userId ? 'lg:pl-16' : null}>
 				<slot />
 			</div>
 		</main>
