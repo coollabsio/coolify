@@ -141,40 +141,37 @@
 	}
 </script>
 
-<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
-	<div class="flex md:flex-row space-y-2 md:space-y-0 space-x-0 md:space-x-2 flex-col pb-5">
-		<div class="title">{$t('forms.configuration')}</div>
-		{#if $appSession.isAdmin}
-			<button
-				type="submit"
-				class="btn btn-sm"
-				class:bg-destinations={!loading.save}
-				class:loading={loading.save}
-				disabled={loading.save}
-				>{$t('forms.save')}
-			</button>
-			<button
-				class="btn btn-sm"
-				class:loading={loading.restart}
-				class:bg-error={!loading.restart}
-				disabled={loading.restart}
-				on:click|preventDefault={forceRestartProxy}>{$t('destination.force_restart_proxy')}</button
-			>
-		{/if}
+<form on:submit|preventDefault={handleSubmit} class="py-4">
+	<div class="grid gap-4 grid-cols-2 grid-rows-1">
+		<button
+			type="submit"
+			class="btn btn-sm w-full"
+			class:bg-destinations={!loading.save}
+			class:loading={loading.save}
+			disabled={loading.save}
+			>{$t('forms.save')}
+		</button>
+		<button
+			class="btn btn-sm w-full"
+			class:loading={loading.restart}
+			class:bg-error={!loading.restart}
+			disabled={loading.restart}
+			on:click|preventDefault={forceRestartProxy}>{$t('destination.force_restart_proxy')}</button
+		>
 	</div>
-	<div class="grid lg:grid-cols-2 items-center px-10 ">
-		<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
+	<div class="grid gap-4 grid-cols-2 auto-rows-max mt-10 items-center">
+		<label for="name" class="text-base font-bold text-stone-100 w-full">{$t('forms.name')}</label>
 		<input
+			class="w-full"
 			name="name"
 			placeholder={$t('forms.name')}
 			disabled={!$appSession.isAdmin}
 			readonly={!$appSession.isAdmin}
 			bind:value={destination.name}
 		/>
-	</div>
-
-	<div class="grid lg:grid-cols-2 items-center px-10">
-		<label for="engine" class="text-base font-bold text-stone-100">{$t('forms.engine')}</label>
+		<label for="engine" class="text-base font-bold text-stone-100 w-full"
+			>{$t('forms.engine')}</label
+		>
 		<CopyPasswordField
 			id="engine"
 			readonly
@@ -183,8 +180,6 @@
 			placeholder="{$t('forms.eg')}: /var/run/docker.sock"
 			value={destination.engine}
 		/>
-	</div>
-	<div class="grid lg:grid-cols-2 items-center px-10">
 		<label for="network" class="text-base font-bold text-stone-100">{$t('forms.network')}</label>
 		<CopyPasswordField
 			id="network"
@@ -194,9 +189,7 @@
 			placeholder="{$t('forms.default')}: coolify"
 			value={destination.network}
 		/>
-	</div>
-	{#if $appSession.teamId === '0'}
-		<div class="grid lg:grid-cols-2 items-center px-10">
+		{#if $appSession.teamId === '0'}
 			<Setting
 				id="changeProxySetting"
 				loading={loading.proxy}
@@ -210,6 +203,6 @@
 						: ''
 				}`}
 			/>
-		</div>
-	{/if}
+		{/if}
+	</div>
 </form>
