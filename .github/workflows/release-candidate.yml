@@ -74,13 +74,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Login to docker hub
-        if: success()
-        uses: actions-hub/docker/login@v1.0.3
+      - name: Create & push manifest
+        uses: actions-hub/docker/cli@v1.0.3
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Create & push manifest
         run: |
             docker manifest create coollabsio/coolify:${{github.event.release.name}} --amend coollabsio/coolify:${{github.event.release.name}}-amd64 --amend coollabsio/coolify:${{github.event.release.name}}-arm64
             docker manifest push coollabsio/coolify:${{github.event.release.name}}
