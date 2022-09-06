@@ -94,14 +94,14 @@
 	{#if !source.githubAppId}
 		<form on:submit|preventDefault={newGithubApp} class="py-4">
 			<div class="grid gap-1 lg:grid-flow-col pb-7">
-				<div class="title">General</div>
+				<h1 class="title">General</h1>
 				{#if !source.githubAppId}
 					<div class="w-full flex flex-rpw justify-end">
 						<button class="btn btn-sm bg-sources mt-5 w-full lg:w-fit" type="submit">Save & Redirect to GitHub</button>
 					</div>
 				{/if}
 			</div>
-			<div class="grid grid-flow-row gap-2 lg:px-10">
+			<div class="grid grid-flow-row gap-2">
 				<div class="grid grid-flow-row gap-2">
 					<div class="mt-2 grid lg:grid-cols-2 items-center">
 						<label for="name" class="text-base font-bold text-stone-100">Name</label>
