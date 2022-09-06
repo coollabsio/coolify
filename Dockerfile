@@ -1,8 +1,10 @@
 FROM node:18-slim as build
 WORKDIR /app
 
+ARG PNPM_VERSION=7.11.0
+
 RUN apt update && apt -y install curl
-RUN curl -sL https://unpkg.com/@pnpm/self-installer | node
+RUN npm --no-update-notifier --no-fund --global install pnpm@${PNPM_VERSION}
 
 COPY . .
 RUN pnpm install
@@ -12,10 +14,14 @@ RUN pnpm build
 FROM node:18-slim
 WORKDIR /app
 ENV NODE_ENV production
+ARG NPM_VERSION=8.19.1
+ARG PNPM_VERSION=7.11.0
 ARG TARGETPLATFORM
 
-RUN apt update && apt -y install git git-lfs openssh-client curl jq cmake sqlite3 openssl psmisc python3 && apt-get clean autoclean && apt-get autoremove --yes && rm -rf /var/lib/{apt,dpkg,cache,log}/
-RUN curl -sL https://unpkg.com/@pnpm/self-installer | node
+RUN apt update && apt -y install --no-install-recommends ca-certificates git git-lfs openssh-client curl jq cmake sqlite3 openssl psmisc python3
+RUN apt-get clean autoclean && apt-get autoremove --yes && rm -rf /var/lib/{apt,dpkg,cache,log}/
+RUN npm --no-update-notifier --no-fund --global install pnpm@${PNPM_VERSION}
+RUN npm install -g npm@${PNPM_VERSION}
 
 RUN mkdir -p ~/.docker/cli-plugins/
 # https://download.docker.com/linux/static/stable/
