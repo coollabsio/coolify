@@ -40,4 +40,6 @@
 	<Icons.GlitchTip {isAbsolute} />
 {:else if type === 'searxng'}
 	<Icons.Searxng {isAbsolute} />
+{:else if type === 'weblate'}
+	<Icons.Weblate {isAbsolute} />
 {/if}

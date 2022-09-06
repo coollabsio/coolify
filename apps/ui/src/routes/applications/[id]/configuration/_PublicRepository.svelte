@@ -4,7 +4,6 @@
 	import { page } from '$app/stores';
 
 	import Select from 'svelte-select';
-	import Explainer from '$lib/components/Explainer.svelte';
 	import { goto } from '$app/navigation';
 	import { errorNotification } from '$lib/common';
 
@@ -23,7 +22,7 @@
 	async function loadBranches() {
 		try {
 			loading.branches = true;
-
+			publicRepositoryLink = publicRepositoryLink.trim();
 			const protocol = publicRepositoryLink.split(':')[0];
 			const gitUrl = publicRepositoryLink.replace('http://', '').replace('https://', '');
 
@@ -164,7 +163,6 @@
 				<div class="space-y-4">
 					<input
 						placeholder="eg: https://github.com/coollabsio/nodejs-example/tree/main"
-						class="text-xs"
 						bind:value={publicRepositoryLink}
 					/>
 					{#if branchSelectOptions.length > 0}
@@ -193,7 +191,5 @@
 			</form>
 		</div>
 	</div>
-	<Explainer
-		text="Examples:<br><br>https://github.com/coollabsio/nodejs-example<br>https://github.com/coollabsio/nodejs-example/tree/main<br>https://gitlab.com/aleveha/fastify-example<br>https://gitlab.com/aleveha/fastify-example/-/tree/master<br><br>Only works with Github.com and Gitlab.com."
-	/>
+	
 </div>

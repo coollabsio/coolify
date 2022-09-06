@@ -65,7 +65,6 @@ export async function update(request: FastifyRequest<Update>) {
 			);
 			return {};
 		} else {
-			console.log(latestVersion);
 			await asyncSleep(2000);
 			return {};
 		}
@@ -78,10 +77,9 @@ export async function restartCoolify(request: FastifyRequest<any>) {
 		const teamId = request.user.teamId;
 		if (teamId === '0') {
 			if (!isDev) {
-				await asyncExecShell(`docker restart coolify`);
+				asyncExecShell(`docker restart coolify`);
 				return {};
 			} else {
-				console.log('Restarting Coolify')
 				return {};
 			}
 		}

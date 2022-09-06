@@ -108,24 +108,21 @@
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">Identity and Access Management</div>
-	<button
-			on:click={newTeam}
-			class="btn btn-square btn-sm bg-iam"
+	<button on:click={newTeam} class="btn btn-square btn-sm bg-iam">
+		<svg
+			class="h-6 w-6"
+			xmlns="http://www.w3.org/2000/svg"
+			fill="none"
+			viewBox="0 0 24 24"
+			stroke="currentColor"
+			><path
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				stroke-width="2"
+				d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+			/></svg
 		>
-			<svg
-				class="h-6 w-6"
-				xmlns="http://www.w3.org/2000/svg"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke="currentColor"
-				><path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					stroke-width="2"
-					d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-				/></svg
-			>
-		</button>
+	</button>
 </div>
 
 {#if invitations.length > 0}
@@ -170,14 +167,11 @@
 
 			<tbody>
 				{#each accounts as account}
-					<tr>
+					<tr class="grid items-center justify-center gap-2 lg:grid-flow-col">
 						<td class="px-2">{account.email}</td>
 						<td class="flex space-x-2">
 							<form on:submit|preventDefault={() => resetPassword(account.id)}>
-								<button
-									class="my-4 btn btn-sm bg-iam"
-									>Reset Password</button
-								>
+								<button class="my-4 btn btn-sm bg-iam">Reset Password</button>
 							</form>
 							<form on:submit|preventDefault={() => deleteUser(account.id)}>
 								<button

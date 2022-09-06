@@ -1,6 +1,6 @@
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl"]
+  binaryTargets = ["native"]
 }
 
 datasource db {
@@ -117,6 +117,24 @@ model Application {
   settings            ApplicationSettings?
   secrets             Secret[]
   teams               Team[]
+  connectedDatabase   ApplicationConnectedDatabase?
+}
+
+model ApplicationConnectedDatabase {
+  id                     String      @id @default(cuid())
+  applicationId          String      @unique
+  databaseId             String?
+  hostedDatabaseType     String?
+  hostedDatabaseHost     String?
+  hostedDatabasePort     Int?
+  hostedDatabaseName     String?
+  hostedDatabaseUser     String?
+  hostedDatabasePassword String?
+  hostedDatabaseDBName   String?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+  database               Database?   @relation(fields: [databaseId], references: [id])
+  application            Application @relation(fields: [applicationId], references: [id])
 }
 
 model ApplicationSettings {
@@ -128,6 +146,7 @@ model ApplicationSettings {
   autodeploy         Boolean     @default(true)
   isBot              Boolean     @default(false)
   isPublicRepository Boolean     @default(false)
+  isDBBranching      Boolean     @default(false)
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
   application        Application @relation(fields: [applicationId], references: [id])
@@ -186,7 +205,7 @@ model BuildLog {
   applicationId String?
   buildId       String
   line          String
-  time          Int
+  time          BigInt
 }
 
 model Build {
@@ -200,7 +219,7 @@ model Build {
   commit              String?
   pullmergeRequestId  String?
   forceRebuild        Boolean  @default(false)
-  sourceBranch        String?  
+  sourceBranch        String?
   branch              String?
   status              String?  @default("queued")
   createdAt           DateTime @default(now())
@@ -291,22 +310,23 @@ model GitlabApp {
 }
 
 model Database {
-  id                  String             @id @default(cuid())
-  name                String
-  publicPort          Int?
-  defaultDatabase     String?
-  type                String?
-  version             String?
-  dbUser              String?
-  dbUserPassword      String?
-  rootUser            String?
-  rootUserPassword    String?
-  destinationDockerId String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  destinationDocker   DestinationDocker? @relation(fields: [destinationDockerId], references: [id])
-  settings            DatabaseSettings?
-  teams               Team[]
+  id                           String                         @id @default(cuid())
+  name                         String
+  publicPort                   Int?
+  defaultDatabase              String?
+  type                         String?
+  version                      String?
+  dbUser                       String?
+  dbUserPassword               String?
+  rootUser                     String?
+  rootUserPassword             String?
+  destinationDockerId          String?
+  createdAt                    DateTime                       @default(now())
+  updatedAt                    DateTime                       @updatedAt
+  destinationDocker            DestinationDocker?             @relation(fields: [destinationDockerId], references: [id])
+  settings                     DatabaseSettings?
+  teams                        Team[]
+  applicationConnectedDatabase ApplicationConnectedDatabase[]
 }
 
 model DatabaseSettings {
@@ -348,6 +368,8 @@ model Service {
   wordpress          Wordpress?
   appwrite           Appwrite?
   searxng            Searxng?
+  weblate            Weblate?
+  taiga              Taiga?
 }
 
 model PlausibleAnalytics {
@@ -558,4 +580,39 @@ model Searxng {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   service       Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Weblate {
+  id                   String   @id @default(cuid())
+  adminPassword        String
+  postgresqlHost       String
+  postgresqlPort       Int
+  postgresqlUser       String
+  postgresqlPassword   String
+  postgresqlDatabase   String
+  postgresqlPublicPort Int?
+  serviceId            String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  service              Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Taiga {
+  id                   String   @id @default(cuid())
+  secretKey            String
+  erlangSecret         String
+  djangoAdminPassword  String
+  djangoAdminUser      String
+  rabbitMQUser         String
+  rabbitMQPassword     String
+  postgresqlHost       String
+  postgresqlPort       Int
+  postgresqlUser       String
+  postgresqlPassword   String
+  postgresqlDatabase   String
+  postgresqlPublicPort Int?
+  serviceId            String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  service              Service  @relation(fields: [serviceId], references: [id])
 }

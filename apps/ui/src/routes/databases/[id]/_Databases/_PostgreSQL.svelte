@@ -2,8 +2,8 @@
 	export let database: any;
 	import { status } from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-	import Explainer from '$lib/components/Explainer.svelte';
 	import { t } from '$lib/translations';
+	import Explainer from '$lib/components/Explainer.svelte';
 </script>
 
 <div class="flex space-x-1 py-5 font-bold">
@@ -26,7 +26,9 @@
 	</div>
 	<div class="grid grid-cols-2 items-center">
 		<label for="rootUser" class="text-base font-bold text-stone-100"
-			>Root (postgres) User Password</label
+			>Postgres User Password <Explainer
+				explanation="Could be changed while the database is running."
+			/></label
 		>
 		<CopyPasswordField
 			disabled={!$status.database.isRunning}
@@ -37,7 +39,6 @@
 			name="rootUserPassword"
 			bind:value={database.rootUserPassword}
 		/>
-		<Explainer text="Could be changed while the database is running." />
 	</div>
 	<div class="grid grid-cols-2 items-center">
 		<label for="dbUser" class="text-base font-bold text-stone-100">{$t('forms.user')}</label>
@@ -52,7 +53,8 @@
 	</div>
 	<div class="grid grid-cols-2 items-center">
 		<label for="dbUserPassword" class="text-base font-bold text-stone-100"
-			>{$t('forms.password')}</label
+			>{$t('forms.password')}
+			<Explainer explanation="Could be changed while the database is running." /></label
 		>
 		<CopyPasswordField
 			disabled={!$status.database.isRunning}
@@ -63,6 +65,5 @@
 			name="dbUserPassword"
 			bind:value={database.dbUserPassword}
 		/>
-		<Explainer text="Could be changed while the database is running." />
 	</div>
 </div>

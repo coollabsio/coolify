@@ -11,7 +11,11 @@
 	<div class="title">Plausible Analytics</div>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="scriptName">Script Name</label>
+	<label for="scriptName"
+		>Script Name <Explainer
+			explanation="Useful if you would like to rename the collector script to prevent it blocked by AdBlockers."
+		/></label
+	>
 	<input
 		name="scriptName"
 		id="scriptName"
@@ -20,9 +24,6 @@
 		placeholder="plausible.js"
 		bind:value={service.plausibleAnalytics.scriptName}
 		required
-	/>
-	<Explainer
-		text="Useful if you would like to rename the collector script to prevent it blocked by AdBlockers."
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">

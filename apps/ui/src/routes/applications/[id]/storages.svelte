@@ -24,7 +24,7 @@
 	import { page } from '$app/stores';
 	import Storage from './_Storage.svelte';
 	import { get } from '$lib/api';
-	import Explainer from '$lib/components/Explainer.svelte';
+	import SimpleExplainer from '$lib/components/SimpleExplainer.svelte';
 	import { t } from '$lib/translations';
 
 	const { id } = $page.params;
@@ -87,7 +87,9 @@
 </div>
 
 <div class="mx-auto max-w-6xl rounded-xl px-6 pt-4">
-	
+	<div class="flex justify-center py-4 text-center">
+		<SimpleExplainer customClass="w-full" text={$t('application.storage.persistent_storage_explainer')} />
+	</div>
 	<table class="mx-auto border-separate text-left">
 		<thead>
 			<tr class="h-12">
@@ -107,7 +109,4 @@
 			</tr>
 		</tbody>
 	</table>
-	<div class="flex justify-center py-4 text-center">
-		<Explainer customClass="w-full" text={$t('application.storage.persistent_storage_explainer')} />
-	</div>
 </div>

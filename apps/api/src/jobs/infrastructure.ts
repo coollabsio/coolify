@@ -1,11 +1,8 @@
 import { parentPort } from 'node:worker_threads';
 import axios from 'axios';
 import { compareVersions } from 'compare-versions';
-import { asyncExecShell, cleanupDockerStorage, executeDockerCmd, isDev, prisma, startTraefikTCPProxy, generateDatabaseConfiguration, startTraefikProxy, listSettings, version } from '../lib/common';
+import { asyncExecShell, cleanupDockerStorage, executeDockerCmd, isDev, prisma, startTraefikTCPProxy, generateDatabaseConfiguration, startTraefikProxy, listSettings, version, createRemoteEngineConfiguration } from '../lib/common';
 
-async function disconnect() {
-    await prisma.$disconnect();
-}
 async function autoUpdater() {
     try {
         const currentVersion = version;
@@ -24,9 +21,11 @@ async function autoUpdater() {
             const activeCount = 0
             if (activeCount === 0) {
                 if (!isDev) {
-                    console.log(`Updating Coolify to ${latestVersion}.`);
                     await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
                     await asyncExecShell(`env | grep COOLIFY > .env`);
+                    await asyncExecShell(
+                        `sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=true' .env`
+                    );
                     await asyncExecShell(
                         `docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify && docker rm coolify && docker compose up -d --force-recreate"`
                     );
@@ -35,9 +34,7 @@ async function autoUpdater() {
                 }
             }
         }
-    } catch (error) {
-        console.log(error);
-    }
+    } catch (error) { }
 }
 async function checkProxies() {
     try {
@@ -45,18 +42,35 @@ async function checkProxies() {
         let portReachable;
 
         const { arch, ipv4, ipv6 } = await listSettings();
+
         // Coolify Proxy local
         const engine = '/var/run/docker.sock';
         const localDocker = await prisma.destinationDocker.findFirst({
-            where: { engine, network: 'coolify' }
+            where: { engine, network: 'coolify', isCoolifyProxyUsed: true }
         });
-        if (localDocker && localDocker.isCoolifyProxyUsed) {
+        if (localDocker) {
             portReachable = await isReachable(80, { host: ipv4 || ipv6 })
             if (!portReachable) {
                 await startTraefikProxy(localDocker.id);
             }
         }
-
+        // Coolify Proxy remote
+        const remoteDocker = await prisma.destinationDocker.findMany({
+            where: { remoteEngine: true, remoteVerified: true }
+        });
+        if (remoteDocker.length > 0) {
+            for (const docker of remoteDocker) {
+                if (docker.isCoolifyProxyUsed) {
+                    portReachable = await isReachable(80, { host: docker.remoteIpAddress })
+                    if (!portReachable) {
+                        await startTraefikProxy(docker.id);
+                    }
+                }
+                try {
+                    await createRemoteEngineConfiguration(docker.id)
+                } catch (error) { }
+            }
+        }
         // TCP Proxies
         const databasesWithPublicPort = await prisma.database.findMany({
             where: { publicPort: { not: null } },
@@ -113,9 +127,7 @@ async function cleanupPrismaEngines() {
             if (stdout.trim() != null && stdout.trim() != '' && Number(stdout.trim()) > 1) {
                 await asyncExecShell(`killall -q -e /app/prisma-engines/query-engine -o 1m`)
             }
-        } catch (error) {
-            console.log(error);
-        }
+        } catch (error) { }
     }
 }
 async function cleanupStorage() {
@@ -166,9 +178,7 @@ async function cleanupStorage() {
                     lowDiskSpace = true;
                 }
             }
-        } catch (error) {
-            console.log(error);
-        }
+        } catch (error) { }
         await cleanupDockerStorage(destination.id, lowDiskSpace, false)
     }
 }

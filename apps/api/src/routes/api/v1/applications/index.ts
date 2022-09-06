@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { OnlyId } from '../../../../types';
-import { cancelDeployment, checkDNS, checkDomain, checkRepository, deleteApplication, deleteSecret, deleteStorage, deployApplication, getApplication, getApplicationLogs, getApplicationStatus, getBuildIdLogs, getBuildLogs, getBuildPack, getGitHubToken, getGitLabSSHKey, getImages, getPreviews, getSecrets, getStorages, getUsage, listApplications, newApplication, saveApplication, saveApplicationSettings, saveApplicationSource, saveBuildPack, saveDeployKey, saveDestination, saveGitLabSSHKey, saveRepository, saveSecret, saveStorage, stopApplication, stopPreviewApplication } from './handlers';
+import { cancelDeployment, checkDNS, checkDomain, checkRepository, deleteApplication, deleteSecret, deleteStorage, deployApplication, getApplication, getApplicationLogs, getApplicationStatus, getBuildIdLogs, getBuildLogs, getBuildPack, getGitHubToken, getGitLabSSHKey, getImages, getPreviews, getSecrets, getStorages, getUsage, listApplications, newApplication, restartApplication, saveApplication, saveApplicationSettings, saveApplicationSource, saveBuildPack, saveConnectedDatabase, saveDeployKey, saveDestination, saveGitLabSSHKey, saveRepository, saveSecret, saveStorage, stopApplication, stopPreviewApplication } from './handlers';
 
 import type { CancelDeployment, CheckDNS, CheckDomain, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, DeployApplication, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, GetImages, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, StopPreviewApplication } from './types';
 
@@ -19,6 +19,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 
     fastify.get<OnlyId>('/:id/status', async (request) => await getApplicationStatus(request));
 
+    fastify.post<OnlyId>('/:id/restart', async (request, reply) => await restartApplication(request, reply));
     fastify.post<OnlyId>('/:id/stop', async (request, reply) => await stopApplication(request, reply));
     fastify.post<StopPreviewApplication>('/:id/stop/preview', async (request, reply) => await stopPreviewApplication(request, reply));
 
@@ -53,6 +54,8 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.post<SaveDestination>('/:id/configuration/destination', async (request, reply) => await saveDestination(request, reply));
     fastify.get('/:id/configuration/buildpack', async (request) => await getBuildPack(request));
     fastify.post('/:id/configuration/buildpack', async (request, reply) => await saveBuildPack(request, reply));
+
+    fastify.post('/:id/configuration/database', async (request, reply) => await saveConnectedDatabase(request, reply));
 
     fastify.get<OnlyId>('/:id/configuration/sshkey', async (request) => await getGitLabSSHKey(request));
     fastify.post<OnlyId>('/:id/configuration/sshkey', async (request, reply) => await saveGitLabSSHKey(request, reply));

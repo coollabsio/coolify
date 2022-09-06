@@ -76,7 +76,6 @@ export async function removeContainer({
 			await executeDockerCmd({ dockerId, command: `docker rm ${id}` })
 		}
 	} catch (error) {
-		console.log(error);
 		throw error;
 	}
 }

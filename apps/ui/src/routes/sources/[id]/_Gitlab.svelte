@@ -1,7 +1,6 @@
 <script lang="ts">
 	export let source: any;
 	export let settings: any;
-	import Explainer from '$lib/components/Explainer.svelte';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { getAPIUrl, post } from '$lib/api';
@@ -11,6 +10,7 @@
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import { addToast, appSession } from '$lib/store';
+	import Explainer from '$lib/components/Explainer.svelte';
 	const { id } = $page.params;
 
 	let url = settings.fqdn ? settings.fqdn : window.location.origin;
@@ -148,10 +148,8 @@
 		<div class="flex space-x-1 pb-7">
 			<div class="title">General</div>
 			{#if $appSession.isAdmin}
-				<button
-					type="submit"
-					class="btn btn-sm bg-sources"
-					disabled={loading}>{loading ? $t('forms.saving') : $t('forms.save')}</button
+				<button type="submit" class="btn btn-sm bg-sources" disabled={loading}
+					>{loading ? $t('forms.saving') : $t('forms.save')}</button
 				>
 				{#if source.gitlabAppId}
 					<button class="btn btn-sm" on:click|preventDefault={changeSettings}
@@ -166,16 +164,12 @@
 		</div>
 		<div class="grid grid-flow-row gap-2 px-10">
 			{#if !source.gitlabAppId}
-				<Explainer
-					customClass="w-full"
-					text="<span class='font-bold text-base text-white'>Scopes required:</span> 	
-<br>- <span class='text-sources font-bold'>api</span> (Access the authenticated user's API)
-<br>- <span class='text-sources font-bold'>read_repository</span> (Allows read-only access to the repository)
-<br>- <span class='text-sources font-bold'>email</span> (Allows read-only access to the user's primary email address using OpenID Connect)
-<br>
-<br>For extra security, you can set <span class='text-sources font-bold'>Expire Access Tokens</span>
-<br><br>Webhook URL: <span class='text-sources font-bold'>{url}/webhooks/gitlab</span>"
-				/>
+				<a
+					href="https://docs.coollabs.io/coolify/sources#how-to-integrate-with-gitlab"
+					class="font-bold "
+					target="_blank"
+					rel="noopener noreferrer">Documentation and detailed instructions.</a
+				>
 				<div class="grid grid-cols-2 items-center">
 					<label for="type" class="text-base font-bold text-stone-100">Application Type</label>
 					<select name="type" id="type" class="w-96" bind:value={applicationType}>
@@ -245,7 +239,11 @@
 			</div>
 			{#if selfHosted}
 				<div class="grid grid-cols-2 items-center">
-					<label for="customPort" class="text-base font-bold text-stone-100">Custom SSH Port</label>
+					<label for="customPort" class="text-base font-bold text-stone-100"
+						>Custom SSH Port <Explainer
+							explanation={'If you use a self-hosted version of Git, you can provide custom port for all the Git related actions.'}
+						/></label
+					>
 					<input
 						name="customPort"
 						id="customPort"
@@ -254,19 +252,16 @@
 						required
 						bind:value={source.customPort}
 					/>
-					<Explainer
-						text="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
-					/>
 				</div>
 			{/if}
 			<div class="grid grid-cols-2 items-start">
 				<div class="flex-col">
 					<label for="oauthId" class="pt-2 text-base font-bold text-stone-100"
-						>{$t('source.oauth_id')}</label
+						>{$t('source.oauth_id')}
+						{#if !source.gitlabAppId}
+							<Explainer explanation={$t('source.oauth_id_explainer')} />
+						{/if}</label
 					>
-					{#if !source.gitlabAppId}
-						<Explainer text={$t('source.oauth_id_explainer')} />
-					{/if}
 				</div>
 				<input
 					disabled={source.gitlabAppId}

@@ -169,10 +169,6 @@
 			}
 		}
 	}
-	function selectBranch(event: any) {
-		selected.branch = event.detail;
-		isBranchAlreadyUsed();
-	}
 	async function loadBranches(page: number = 1) {
 		let perPage = 100;
 		//@ts-ignore
@@ -199,21 +195,22 @@
 		}
 	}
 
-	async function isBranchAlreadyUsed() {
+	async function isBranchAlreadyUsed(event) {
+		selected.branch = event.detail;
 		try {
-			const data = await get(
-				`/applications/${id}/configuration/repository?repository=${selected.project.path_with_namespace}&branch=${selected.branch.name}`
-			);
-			if (data.used) {
-				const sure = confirm($t('application.configuration.branch_already_in_use'));
-				if (sure) {
-					autodeploy = false;
-					showSave = true;
-					return true;
-				}
-				showSave = false;
-				return true;
-			}
+			// const data = await get(
+			// 	`/applications/${id}/configuration/repository?repository=${selected.project.path_with_namespace}&branch=${selected.branch.name}`
+			// );
+			// if (data.used) {
+			// 	const sure = confirm($t('application.configuration.branch_already_in_use'));
+			// 	if (sure) {
+			// 		autodeploy = false;
+			// 		showSave = true;
+			// 		return true;
+			// 	}
+			// 	showSave = false;
+			// 	return true;
+			// }
 			showSave = true;
 		} catch (error) {
 			return errorNotification(error);
@@ -227,9 +224,7 @@
 		}
 	}
 	async function setWebhook(url: any, webhookToken: any) {
-		const host = dev
-			? getWebhookUrl('gitlab')
-			: `${window.location.origin}/webhooks/gitlab/events`;
+		const host = dev ? getWebhookUrl('gitlab') : `${window.location.origin}/webhooks/gitlab/events`;
 		try {
 			await post(
 				url,
@@ -294,17 +289,15 @@
 			);
 			await post(updateDeployKeyIdUrl, { deployKeyId: id });
 		} catch (error) {
-			return errorNotification(error);
-		} finally {
 			loading.save = false;
+			return errorNotification(error);
 		}
 
 		try {
 			await setWebhook(webhookUrl, webhookToken);
 		} catch (error) {
-			return errorNotification(error);
-		} finally {
 			loading.save = false;
+			return errorNotification(error);
 		}
 
 		const url = `/applications/${id}/configuration/repository`;
@@ -317,11 +310,11 @@
 				autodeploy,
 				webhookToken
 			});
+			loading.save = false;
 			return await goto(from || `/applications/${id}/configuration/buildpack`);
 		} catch (error) {
-			return errorNotification(error);
-		} finally {
 			loading.save = false;
+			return errorNotification(error);
 		}
 	}
 	async function handleSubmit() {
@@ -396,7 +389,7 @@
 				showIndicator={!loading.branches}
 				isWaiting={loading.branches}
 				isDisabled={loading.branches || !selected.project}
-				on:select={selectBranch}
+				on:select={isBranchAlreadyUsed}
 				on:clear={() => {
 					showSave = false;
 					selected.branch = null;
@@ -425,7 +418,7 @@
 				configuration <a href={`/sources/${application.gitSource.id}`}>here.</a>
 			</div>
 			<button
-				class="w-40 bg-green-600"
+				class="btn btn-sm w-40 bg-green-600"
 				on:click|stopPropagation|preventDefault={() => window.location.reload()}
 			>
 				Try again

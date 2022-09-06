@@ -1,22 +1,6 @@
-import { exec } from 'node:child_process'
-import util from 'util';
-import fs from 'fs/promises';
-import yaml from 'js-yaml';
-import forge from 'node-forge';
-import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-generator';
-import type { Config } from 'unique-names-generator';
-import generator from 'generate-password';
-import crypto from 'crypto';
-import { promises as dns } from 'dns';
-import { PrismaClient } from '@prisma/client';
+
 import cuid from 'cuid';
-import os from 'os';
-import sshConfig from 'ssh-config'
 import { encrypt, generatePassword, prisma } from '../common';
-
-
-export const version = '3.8.2';
-export const isDev = process.env.NODE_ENV === 'development';
 
 export const includeServices: any = {
 	destinationDocker: true,
@@ -34,7 +18,9 @@ export const includeServices: any = {
 	moodle: true,
 	appwrite: true,
 	glitchTip: true,
-	searxng: true
+	searxng: true,
+	weblate: true,
+	taiga: true
 };
 export async function configureServiceType({
 	id,
@@ -312,6 +298,58 @@ export async function configureServiceType({
 				}
 			}
 		});
+	} else if (type === 'weblate') {
+		const adminPassword = encrypt(generatePassword({}))
+		const postgresqlUser = cuid();
+		const postgresqlPassword = encrypt(generatePassword({}));
+		const postgresqlDatabase = 'weblate';
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				weblate: {
+					create: {
+						adminPassword,
+						postgresqlHost: `${id}-postgresql`,
+						postgresqlPort: 5432,
+						postgresqlUser,
+						postgresqlPassword,
+						postgresqlDatabase,
+					}
+				}
+			}
+		});
+	} else if (type === 'taiga') {
+		const secretKey = encrypt(generatePassword({}))
+		const erlangSecret = encrypt(generatePassword({}))
+		const rabbitMQUser = cuid();
+		const djangoAdminUser = cuid();
+		const djangoAdminPassword = encrypt(generatePassword({}))
+		const rabbitMQPassword = encrypt(generatePassword({}))
+		const postgresqlUser = cuid();
+		const postgresqlPassword = encrypt(generatePassword({}));
+		const postgresqlDatabase = 'taiga';
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				taiga: {
+					create: {
+						secretKey,
+						erlangSecret,
+						djangoAdminUser,
+						djangoAdminPassword,
+						rabbitMQUser,
+						rabbitMQPassword,
+						postgresqlHost: `${id}-postgresql`,
+						postgresqlPort: 5432,
+						postgresqlUser,
+						postgresqlPassword,
+						postgresqlDatabase,
+					}
+				}
+			}
+		});
 	} else {
 		await prisma.service.update({
 			where: { id },
@@ -338,7 +376,8 @@ export async function removeService({ id }: { id: string }): Promise<void> {
 	await prisma.moodle.deleteMany({ where: { serviceId: id } });
 	await prisma.appwrite.deleteMany({ where: { serviceId: id } });
 	await prisma.searxng.deleteMany({ where: { serviceId: id } });
-
+	await prisma.weblate.deleteMany({ where: { serviceId: id } });
+	await prisma.taiga.deleteMany({ where: { serviceId: id } });
 	
 	await prisma.service.delete({ where: { id } });
 }

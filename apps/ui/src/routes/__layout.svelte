@@ -66,12 +66,13 @@
 <script lang="ts">
 	export let baseSettings: any;
 	export let supportedServiceTypesAndVersions: any;
+	$appSession.registrationEnabled = baseSettings.registrationEnabled;
 	$appSession.ipv4 = baseSettings.ipv4;
 	$appSession.ipv6 = baseSettings.ipv6;
 	$appSession.version = baseSettings.version;
 	$appSession.whiteLabeled = baseSettings.whiteLabeled;
 	$appSession.whiteLabeledDetails.icon = baseSettings.whiteLabeledIcon;
-	$appSession.supportedServiceTypesAndVersions = supportedServiceTypesAndVersions
+	$appSession.supportedServiceTypesAndVersions = supportedServiceTypesAndVersions;
 
 	export let userId: string;
 	export let teamId: string;
@@ -88,6 +89,7 @@
 	import { errorNotification } from '$lib/common';
 	import { appSession } from '$lib/store';
 	import Toasts from '$lib/components/Toasts.svelte';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 
 	if (userId) $appSession.userId = userId;
 	if (teamId) $appSession.teamId = teamId;
@@ -132,16 +134,16 @@
 			{/if}
 			<div class="flex flex-col space-y-2 py-2" class:mt-2={$appSession.whiteLabeled}>
 				<a
+					id="dashboard"
 					sveltekit:prefetch
 					href="/"
-					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200 hover:text-white"
+					class="icons bg-coolgray-200 hover:text-white"
 					class:text-white={$page.url.pathname === '/'}
 					class:bg-coolgray-500={$page.url.pathname === '/'}
-					data-tip="Dashboard"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
+						class="h-9 w-9"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -156,12 +158,13 @@
 						<path d="M16 15c-2.21 1.333 -5.792 1.333 -8 0" />
 					</svg>
 				</a>
-				<div class="border-t border-stone-700" />
 
+				<div class="border-t border-stone-700" />
 				<a
+					id="applications"
 					sveltekit:prefetch
 					href="/applications"
-					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
+					class="icons bg-coolgray-200"
 					class:text-applications={$page.url.pathname.startsWith('/applications') ||
 						$page.url.pathname.startsWith('/new/application')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/applications') ||
@@ -170,7 +173,7 @@
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
+						class="h-9 w-9"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentcolor"
@@ -186,10 +189,12 @@
 						<line x1="17" y1="4" x2="17" y2="10" />
 					</svg>
 				</a>
+
 				<a
+					id="sources"
 					sveltekit:prefetch
 					href="/sources"
-					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
+					class="icons bg-coolgray-200"
 					class:text-sources={$page.url.pathname.startsWith('/sources') ||
 						$page.url.pathname.startsWith('/new/source')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/sources') ||
@@ -198,7 +203,7 @@
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
+						class="h-9 w-9"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -216,9 +221,10 @@
 					</svg>
 				</a>
 				<a
+					id="destinations"
 					sveltekit:prefetch
 					href="/destinations"
-					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
+					class="icons bg-coolgray-200"
 					class:text-destinations={$page.url.pathname.startsWith('/destinations') ||
 						$page.url.pathname.startsWith('/new/destination')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/destinations') ||
@@ -227,7 +233,7 @@
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
+						class="h-9 w-9"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -251,9 +257,10 @@
 				</a>
 				<div class="border-t border-stone-700" />
 				<a
+					id="databases"
 					sveltekit:prefetch
 					href="/databases"
-					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
+					class="icons  bg-coolgray-200"
 					class:text-databases={$page.url.pathname.startsWith('/databases') ||
 						$page.url.pathname.startsWith('/new/database')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/databases') ||
@@ -262,7 +269,7 @@
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
+						class="h-9 w-9"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -277,9 +284,10 @@
 					</svg>
 				</a>
 				<a
+					id="services"
 					sveltekit:prefetch
 					href="/services"
-					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
+					class="icons bg-coolgray-200"
 					class:text-services={$page.url.pathname.startsWith('/services') ||
 						$page.url.pathname.startsWith('/new/service')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/services') ||
@@ -288,7 +296,7 @@
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
+						class="h-9 w-9"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -306,16 +314,16 @@
 			<UpdateAvailable />
 			<div class="flex flex-col space-y-2 py-2">
 				<a
+					id="iam"
 					sveltekit:prefetch
 					href="/iam"
-					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
+					class="icons bg-coolgray-200"
 					class:text-iam={$page.url.pathname.startsWith('/iam')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/iam')}
-					data-tip="IAM"
 					><svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
 						viewBox="0 0 24 24"
+						class="h-9 w-9"
 						stroke-width="1.5"
 						stroke="currentColor"
 						fill="none"
@@ -330,17 +338,17 @@
 					</svg>
 				</a>
 				<a
+					id="settings"
 					sveltekit:prefetch
 					href={$appSession.teamId === '0' ? '/settings/global' : '/settings/ssh-keys'}
-					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200"
+					class="icons bg-coolgray-200"
 					class:text-settings={$page.url.pathname.startsWith('/settings')}
 					class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
-					data-tip="Settings"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
 						viewBox="0 0 24 24"
+						class="h-9 w-9"
 						stroke-width="1.5"
 						stroke="currentColor"
 						fill="none"
@@ -356,13 +364,13 @@
 				</a>
 
 				<div
-					class="icons tooltip tooltip-primary tooltip-right bg-coolgray-200 hover:text-error"
-					data-tip="Logout"
+					id="logout"
+					class="icons bg-coolgray-200 hover:text-error"
 					on:click={logout}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="ml-1 h-7 w-7"
+						class="ml-1 h-8 w-8"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -396,7 +404,20 @@
 	{/if}
 {/if}
 <main>
-	<div class="px-20">
+	<div class={$appSession.userId ? 'pl-14 lg:px-20' : null}>
 		<slot />
 	</div>
 </main>
+
+<Tooltip triggeredBy="#dashboard" placement="right">Dashboard</Tooltip>
+<Tooltip triggeredBy="#applications" placement="right" color="bg-applications">Applications</Tooltip
+>
+<Tooltip triggeredBy="#sources" placement="right" color="bg-sources">Git Sources</Tooltip>
+<Tooltip triggeredBy="#destinations" placement="right" color="bg-destinations">Destinations</Tooltip
+>
+<Tooltip triggeredBy="#databases" placement="right" color="bg-databases">Databases</Tooltip>
+<Tooltip triggeredBy="#services" placement="right" color="bg-services">Services</Tooltip>
+<Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
+<Tooltip triggeredBy="#settings" placement="right" color="bg-settings  text-black">Settings</Tooltip
+>
+<Tooltip triggeredBy="#logout" placement="right" color="bg-red-600">Logout</Tooltip>

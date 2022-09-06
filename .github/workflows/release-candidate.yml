@@ -1,0 +1,39 @@
+name: release-candidate
+
+on:
+  release:
+    types: [prereleased]
+
+jobs:
+  making-something-cool:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: 'next'
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Get current package version
+        uses: martinbeentjes/npm-get-version-action@v1.2.3
+        id: package-version
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: coollabsio/coolify:${{github.event.release.name}}
+          cache-from: type=registry,ref=coollabsio/coolify:buildcache-rc
+          cache-to: type=registry,ref=coollabsio/coolify:buildcache-rc,mode=max
+      - uses: sarisia/actions-status-discord@v1
+        if: always()
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL }}

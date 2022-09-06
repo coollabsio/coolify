@@ -21,7 +21,7 @@ import { scheduler } from './scheduler';
 import { supportedServiceTypesAndVersions } from './services/supportedVersions';
 import { includeServices } from './services/common';
 
-export const version = '3.8.9';
+export const version = '3.9.0';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -139,10 +139,10 @@ export const prisma = new PrismaClient({
 });
 
 // prisma.$on('query', (e) => {
-	// console.log({e})
-	// console.log('Query: ' + e.query)
-	// console.log('Params: ' + e.params)
-	// console.log('Duration: ' + e.duration + 'ms')
+// console.log({e})
+// console.log('Query: ' + e.query)
+// console.log('Params: ' + e.params)
+// console.log('Duration: ' + e.duration + 'ms')
 //   })
 export const base64Encode = (text: string): string => {
 	return Buffer.from(text).toString('base64');
@@ -439,7 +439,6 @@ export async function getFreeSSHLocalPort(id: string): Promise<number | boolean>
 		return Number(alreadyConfigured.sshLocalPort)
 	}
 	const range = generateRangeArray(minPort, maxPort)
-	console.log({ ports })
 	const availablePorts = range.filter(port => !ports.map(p => p.sshLocalPort).includes(port))
 	for (const port of availablePorts) {
 		const found = await isReachable(port, { host: 'localhost' })
@@ -458,20 +457,21 @@ export async function createRemoteEngineConfiguration(id: string) {
 	const { sshKey: { privateKey }, remoteIpAddress, remotePort, remoteUser } = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } })
 	await fs.writeFile(sshKeyFile, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 })
 	// Needed for remote docker compose
-	const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(`ps ax | grep [s]sh-agent | grep ssh-agent.pid | grep -v grep | wc -l`)
+	const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(`ps ax | grep [s]sh-agent | grep coolify-ssh-agent.pid | grep -v grep | wc -l`)
 	if (numberOfSSHAgentsRunning !== '' && Number(numberOfSSHAgentsRunning.trim()) == 0) {
-		await asyncExecShell(`eval $(ssh-agent -sa /tmp/ssh-agent.pid)`)
+		try {
+			await fs.stat(`/tmp/coolify-ssh-agent.pid`)
+			await fs.rm(`/tmp/coolify-ssh-agent.pid`)
+		} catch (error) { }
+		await asyncExecShell(`eval $(ssh-agent -sa /tmp/coolify-ssh-agent.pid)`)
 	}
-	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh-add -q ${sshKeyFile}`)
+	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh-add -q ${sshKeyFile}`)
 
 	const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(`ps ax | grep 'ssh -F /dev/null -o StrictHostKeyChecking no -fNL ${localPort}:localhost:${remotePort}' | grep -v grep | wc -l`)
 	if (numberOfSSHTunnelsRunning !== '' && Number(numberOfSSHTunnelsRunning.trim()) == 0) {
 		try {
-			await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh -F /dev/null -o "StrictHostKeyChecking no" -fNL ${localPort}:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`)
-
-		} catch (error) {
-			console.log(error)
-		}
+			await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh -F /dev/null -o "StrictHostKeyChecking no" -fNL ${localPort}:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`)
+		} catch (error) { }
 
 	}
 	const config = sshConfig.parse('')
@@ -1089,7 +1089,6 @@ export async function checkExposedPort({ id, configuredPort, exposePort, dockerI
 	if (exposePort < 1024 || exposePort > 65535) {
 		throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
 	}
-
 	if (configuredPort) {
 		if (configuredPort !== exposePort) {
 			const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
@@ -1249,7 +1248,6 @@ export async function startTraefikTCPProxy(
 			})
 		}
 	} catch (error) {
-		console.log(error);
 		return error;
 	}
 }
@@ -1309,6 +1307,9 @@ export function saveUpdateableFields(type: string, data: any) {
 					temp = Boolean(temp)
 				}
 			}
+			if (k.isNumber && temp === '') {
+				temp = null
+			}
 			update[k.name] = temp
 		});
 	}
@@ -1351,9 +1352,9 @@ export const getServiceMainPort = (service: string) => {
 export function makeLabelForServices(type) {
 	return [
 		'coolify.managed=true',
-		`coolify.version = ${version}`,
-		`coolify.type = service`,
-		`coolify.service.type = ${type}`
+		`coolify.version=${version}`,
+		`coolify.type=service`,
+		`coolify.service.type=${type}`
 	];
 }
 export function errorHandler({ status = 500, message = 'Unknown error.' }: { status: number, message: string | any }) {
@@ -1434,15 +1435,13 @@ export function convertTolOldVolumeNames(type) {
 export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 	// Cleanup old coolify images
 	try {
-		let { stdout: images } = await executeDockerCmd({ dockerId, command: `docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs` })
+		let { stdout: images } = await executeDockerCmd({ dockerId, command: `docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs -r` })
 
 		images = images.trim();
 		if (images) {
-			await executeDockerCmd({ dockerId, command: `docker rmi -f ${images}" -q | xargs` })
+			await executeDockerCmd({ dockerId, command: `docker rmi -f ${images}" -q | xargs -r` })
 		}
-	} catch (error) {
-		//console.log(error);
-	}
+	} catch (error) { }
 	if (lowDiskSpace || force) {
 		if (isDev) {
 			if (!force) console.log(`[DEV MODE] Low disk space: ${lowDiskSpace}`);
@@ -1450,37 +1449,40 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 		}
 		try {
 			await executeDockerCmd({ dockerId, command: `docker container prune -f --filter "label=coolify.managed=true"` })
-		} catch (error) {
-			//console.log(error);
-		}
+		} catch (error) { }
 		try {
 			await executeDockerCmd({ dockerId, command: `docker image prune -f` })
-		} catch (error) {
-			//console.log(error);
-		}
+		} catch (error) { }
 		try {
 			await executeDockerCmd({ dockerId, command: `docker image prune -a -f` })
-		} catch (error) {
-			//console.log(error);
-		}
+		} catch (error) { }
 		// Cleanup build caches
 		try {
 			await executeDockerCmd({ dockerId, command: `docker builder prune -a -f` })
-		} catch (error) {
-			//console.log(error);
-		}
+		} catch (error) { }
 	}
 }
 
 export function persistentVolumes(id, persistentStorage, config) {
+	let volumeSet = new Set();
+	if (Object.keys(config).length > 0) {
+		for (const [key, value] of Object.entries(config)) {
+			if (value.volumes) {
+				for (const volume of value.volumes) {
+					volumeSet.add(volume);
+				}
+			}
+
+		}
+	}
+	const volumesArray = Array.from(volumeSet);
 	const persistentVolume =
 		persistentStorage?.map((storage) => {
 			return `${id}${storage.path.replace(/\//gi, '-')}:${storage.path}`;
 		}) || [];
 
 	let volumes = [...persistentVolume]
-	if (config.volume) volumes = [config.volume, ...volumes]
-
+	if (volumesArray) volumes = [...volumesArray, ...volumes]
 	const composeVolumes = volumes.length > 0 && volumes.map((volume) => {
 		return {
 			[`${volume.split(':')[0]}`]: {
@@ -1489,16 +1491,11 @@ export function persistentVolumes(id, persistentStorage, config) {
 		};
 	}) || []
 
-	const volumeMounts = config.volume && Object.assign(
+	const volumeMounts = Object.assign(
 		{},
-		{
-			[config.volume.split(':')[0]]: {
-				name: config.volume.split(':')[0]
-			}
-		},
 		...composeVolumes
 	) || {}
-	return { volumes, volumeMounts }
+	return { volumeMounts }
 }
 export function defaultComposeConfiguration(network: string): any {
 	return {
@@ -1515,26 +1512,26 @@ export function defaultComposeConfiguration(network: string): any {
 	}
 }
 export function decryptApplication(application: any) {
-    if (application) {
-        if (application?.gitSource?.githubApp?.clientSecret) {
-            application.gitSource.githubApp.clientSecret = decrypt(application.gitSource.githubApp.clientSecret) || null;
-        }
-        if (application?.gitSource?.githubApp?.webhookSecret) {
-            application.gitSource.githubApp.webhookSecret = decrypt(application.gitSource.githubApp.webhookSecret) || null;
-        }
-        if (application?.gitSource?.githubApp?.privateKey) {
-            application.gitSource.githubApp.privateKey = decrypt(application.gitSource.githubApp.privateKey) || null;
-        }
-        if (application?.gitSource?.gitlabApp?.appSecret) {
-            application.gitSource.gitlabApp.appSecret = decrypt(application.gitSource.gitlabApp.appSecret) || null;
-        }
-        if (application?.secrets.length > 0) {
-            application.secrets = application.secrets.map((s: any) => {
-                s.value = decrypt(s.value) || null
-                return s;
-            });
-        }
+	if (application) {
+		if (application?.gitSource?.githubApp?.clientSecret) {
+			application.gitSource.githubApp.clientSecret = decrypt(application.gitSource.githubApp.clientSecret) || null;
+		}
+		if (application?.gitSource?.githubApp?.webhookSecret) {
+			application.gitSource.githubApp.webhookSecret = decrypt(application.gitSource.githubApp.webhookSecret) || null;
+		}
+		if (application?.gitSource?.githubApp?.privateKey) {
+			application.gitSource.githubApp.privateKey = decrypt(application.gitSource.githubApp.privateKey) || null;
+		}
+		if (application?.gitSource?.gitlabApp?.appSecret) {
+			application.gitSource.gitlabApp.appSecret = decrypt(application.gitSource.gitlabApp.appSecret) || null;
+		}
+		if (application?.secrets.length > 0) {
+			application.secrets = application.secrets.map((s: any) => {
+				s.value = decrypt(s.value) || null
+				return s;
+			});
+		}
 
-        return application;
-    }
+		return application;
+	}
 }

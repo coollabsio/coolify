@@ -20,15 +20,17 @@ export interface SaveApplication extends OnlyId {
         denoOptions: string,
         baseImage: string,
         baseBuildImage: string,
-        deploymentType: string
+        deploymentType: string,
+        baseDatabaseBranch: string
     }
 }
 export interface SaveApplicationSettings extends OnlyId {
     Querystring: { domain: string; };
-    Body: { debug: boolean; previews: boolean; dualCerts: boolean; autodeploy: boolean; branch: string; projectId: number; isBot: boolean; };
+    Body: { debug: boolean; previews: boolean; dualCerts: boolean; autodeploy: boolean; branch: string; projectId: number; isBot: boolean; isDBBranching: boolean };
 }
 export interface DeleteApplication extends OnlyId {
     Querystring: { domain: string; };
+    Body: { force: boolean }
 }
 export interface CheckDomain extends OnlyId {
     Querystring: { domain: string; };

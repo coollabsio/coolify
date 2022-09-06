@@ -16,7 +16,6 @@
 		updateStatus.loading = true;
 		try {
 			if (dev) {
-				console.log(`updating to ${latestVersion}`);
 				await asyncSleep(4000);
 				return window.location.reload();
 			} else {

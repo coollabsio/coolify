@@ -1,7 +1,7 @@
-FROM node:18-alpine3.16 as build
+FROM node:18-slim as build
 WORKDIR /app
 
-RUN apk add --no-cache curl
+RUN apt update && apt -y install curl
 RUN curl -sL https://unpkg.com/@pnpm/self-installer | node
 
 COPY . .
@@ -9,21 +9,12 @@ RUN pnpm install
 RUN pnpm build
 
 # Production build
-FROM node:18-alpine3.16
+FROM node:18-slim
 WORKDIR /app
 ENV NODE_ENV production
 ARG TARGETPLATFORM
 
-ENV PRISMA_QUERY_ENGINE_BINARY=/app/prisma-engines/query-engine \
-  PRISMA_MIGRATION_ENGINE_BINARY=/app/prisma-engines/migration-engine \
-  PRISMA_INTROSPECTION_ENGINE_BINARY=/app/prisma-engines/introspection-engine \
-  PRISMA_FMT_BINARY=/app/prisma-engines/prisma-fmt \
-  PRISMA_CLI_QUERY_ENGINE_TYPE=binary \
-  PRISMA_CLIENT_ENGINE_TYPE=binary
-
-COPY --from=coollabsio/prisma-engine:3.15 /prisma-engines/query-engine /prisma-engines/migration-engine /prisma-engines/introspection-engine /prisma-engines/prisma-fmt /app/prisma-engines/
-
-RUN apk add --no-cache git git-lfs openssh-client curl jq cmake sqlite openssl psmisc
+RUN apt update && apt -y install git git-lfs openssh-client curl jq cmake sqlite3 openssl psmisc python3 && apt-get clean autoclean && apt-get autoremove --yes && rm -rf /var/lib/{apt,dpkg,cache,log}/
 RUN curl -sL https://unpkg.com/@pnpm/self-installer | node
 
 RUN mkdir -p ~/.docker/cli-plugins/

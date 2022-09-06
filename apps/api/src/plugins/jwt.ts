@@ -21,7 +21,6 @@ export default fp<FastifyJWTOptions>(async (fastify, opts) => {
         try {
             await request.jwtVerify()
         } catch (err) {
-            console.log(err)
             reply.send(err)
         }
     })

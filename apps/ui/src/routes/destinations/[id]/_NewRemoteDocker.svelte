@@ -5,7 +5,7 @@
 
 	import { post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
-	import Explainer from '$lib/components/Explainer.svelte';
+	import SimpleExplainer from '$lib/components/SimpleExplainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 	import { t } from '$lib/translations';
 
@@ -29,22 +29,18 @@
 </script>
 
 <div class="text-center flex justify-center">
-	<Explainer
+	<SimpleExplainer
 		customClass="max-w-[32rem]"
 		text="Remote Docker Engines are using <span class='text-white font-bold'>SSH</span> to communicate with the remote docker engine. 
         You need to setup an <span class='text-white font-bold'>SSH key</span> in advance on the server and install Docker. 
-        <br>See <a class='text-white' href='https://docs.coollabs.io/coolify/destinations#remote-docker-engine'>docs</a> for more details."
+        <br>See <a class='text-white' href='https://docs.coollabs.io/coolify/destinations#remote-docker-engine' target='blank'>docs</a> for more details."
 	/>
 </div>
 <div class="flex justify-center px-6 pb-8">
 	<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
 		<div class="flex items-center space-x-2 pb-5">
 			<div class="title font-bold">{$t('forms.configuration')}</div>
-			<button
-				type="submit"
-				class="btn btn-sm bg-destinations"
-				class:loading={loading}
-				disabled={loading}
+			<button type="submit" class="btn btn-sm bg-destinations" class:loading disabled={loading}
 				>{loading
 					? payload.isCoolifyProxyUsed
 						? $t('destination.new.saving_and_configuring_proxy')
@@ -97,12 +93,13 @@
 				bind:value={payload.network}
 			/>
 		</div>
-		<div class="grid grid-cols-2 items-center">
+		<div class="grid grid-cols-2 items-center px-10">
 			<Setting
+				id="isCoolifyProxyUsed"
 				bind:setting={payload.isCoolifyProxyUsed}
 				on:click={() => (payload.isCoolifyProxyUsed = !payload.isCoolifyProxyUsed)}
 				title={$t('destination.use_coolify_proxy')}
-				description={$t('destination.new.install_proxy')}
+				description={'This will install a proxy on the destination to allow you to access your applications and services without any manual configuration.'}
 			/>
 		</div>
 	</form>

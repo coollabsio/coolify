@@ -21,13 +21,13 @@
 	import Secret from './_Secret.svelte';
 	import { get, post } from '$lib/api';
 	import { page } from '$app/stores';
-	import Explainer from '$lib/components/Explainer.svelte';
 	import { t } from '$lib/translations';
 	import { goto } from '$app/navigation';
 	import { errorNotification, getDomain } from '$lib/common';
 	import { onMount } from 'svelte';
 	import Loading from '$lib/components/Loading.svelte';
 	import { addToast } from '$lib/store';
+	import SimpleExplainer from '$lib/components/SimpleExplainer.svelte';
 
 	const { id } = $page.params;
 
@@ -145,7 +145,7 @@
 {:else}
 	<div class="mx-auto max-w-6xl px-6 pt-4">
 		<div class="flex justify-center py-4 text-center">
-			<Explainer
+			<SimpleExplainer
 				customClass="w-full"
 				text={applicationSecrets.length === 0
 					? "You can add secrets to PR/MR deployments. Please add secrets to the application first. <br>Useful for creating <span class='text-green-500 font-bold'>staging</span> environments."
@@ -194,8 +194,9 @@
 						</div>
 					</a>
 					<div class="flex items-center justify-center">
-						<button class="btn btn-sm bg-coollabs hover:bg-coollabs-100" on:click={() => redeploy(container)}
-							>{$t('application.preview.redeploy')}</button
+						<button
+							class="btn btn-sm bg-coollabs hover:bg-coollabs-100"
+							on:click={() => redeploy(container)}>{$t('application.preview.redeploy')}</button
 						>
 					</div>
 					<div class="flex items-center justify-center">

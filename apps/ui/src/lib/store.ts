@@ -3,6 +3,7 @@ import cuid from 'cuid';
 import { writable, readable, type Writable } from 'svelte/store';
 
 interface AppSession {
+    registrationEnabled: boolean;
     ipv4: string | null,
     ipv6: string | null,
     version: string | null,
@@ -45,6 +46,26 @@ export const appSession: Writable<AppSession> = writable({
     supportedServiceTypesAndVersions: []
 });
 export const disabledButton: Writable<boolean> = writable(false);
+export const isDeploymentEnabled: Writable<boolean> = writable(false);
+export function checkIfDeploymentEnabledApplications(isAdmin: boolean, application: any) {
+    return (
+        isAdmin &&
+        (application.fqdn || application.settings.isBot) &&
+        application.gitSource &&
+        application.repository &&
+        application.destinationDocker &&
+        application.buildPack
+    );
+}
+export function checkIfDeploymentEnabledServices(isAdmin: boolean, service: any) {
+    return (
+        isAdmin &&
+        service.fqdn &&
+        service.destinationDocker &&
+        service.version &&
+        service.type
+    );
+}
 export const status: Writable<any> = writable({
     application: {
         isRunning: false,

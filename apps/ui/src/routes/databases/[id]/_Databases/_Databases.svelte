@@ -209,13 +209,13 @@
 			<div class="grid grid-cols-2 items-center px-10 pb-8">
 				<div>
 					<label for="url" class="text-base font-bold text-stone-100"
-						>{$t('database.connection_string')}</label
+						>{$t('database.connection_string')}
+						{#if !isPublic && database.destinationDocker.remoteEngine}
+							<Explainer
+								explanation="You can only access the database with this URL if your application is deployed to the same Destination."
+							/>
+						{/if}</label
 					>
-					{#if !isPublic && database.destinationDocker.remoteEngine}
-						<Explainer
-							text="You can only access the database with this URL if your application is deployed to the same Destination."
-						/>
-					{/if}
 				</div>
 				<CopyPasswordField
 					textarea={true}
@@ -236,6 +236,7 @@
 	<div class="px-10 pb-10">
 		<div class="grid grid-cols-2 items-center">
 			<Setting
+				id="isPublic"
 				loading={publicLoading}
 				bind:setting={isPublic}
 				on:click={() => changeSettings('isPublic')}
@@ -247,6 +248,7 @@
 		{#if database.type === 'redis'}
 			<div class="grid grid-cols-2 items-center">
 				<Setting
+					id="appendOnly"
 					loading={publicLoading}
 					bind:setting={appendOnly}
 					on:click={() => changeSettings('appendOnly')}

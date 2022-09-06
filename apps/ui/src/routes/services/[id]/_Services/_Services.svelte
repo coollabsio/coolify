@@ -14,7 +14,6 @@
 	import { t } from '$lib/translations';
 	import { appSession, disabledButton, status, location, setLocation, addToast } from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 
 	import Fider from './_Fider.svelte';
@@ -30,6 +29,9 @@
 	import Appwrite from './_Appwrite.svelte';
 	import Moodle from './_Moodle.svelte';
 	import Searxng from './_Searxng.svelte';
+	import Weblate from './_Weblate.svelte';
+	import Explainer from '$lib/components/Explainer.svelte';
+	import Taiga from './_Taiga.svelte';
 
 	const { id } = $page.params;
 	$: isDisabled =
@@ -282,8 +284,9 @@
 				</div>
 				<div class="grid grid-cols-2 px-10">
 					<div class="flex-col ">
-						<label for="apiFqdn" class="pt-2 text-base font-bold text-stone-100">API URL</label>
-						<Explainer text={$t('application.https_explainer')} />
+						<label for="apiFqdn" class="pt-2 text-base font-bold text-stone-100"
+							>API URL <Explainer explanation={$t('application.https_explainer')} /></label
+						>
 					</div>
 
 					<CopyPasswordField
@@ -301,9 +304,9 @@
 				<div class="grid grid-cols-2 px-10">
 					<div class="flex-col ">
 						<label for="fqdn" class="pt-2 text-base font-bold text-stone-100"
-							>{$t('application.url_fqdn')}</label
-						>
-						<Explainer text={$t('application.https_explainer')} />
+							>{$t('application.url_fqdn')}
+							<Explainer explanation={$t('application.https_explainer')} />
+						</label>
 					</div>
 
 					<CopyPasswordField
@@ -354,6 +357,7 @@
 			{/if}
 			<div class="grid grid-cols-2 items-center px-10">
 				<Setting
+					id="dualCerts"
 					disabled={$status.service.isRunning}
 					dataTooltip={$t('forms.must_be_stopped_to_modify')}
 					bind:setting={dualCerts}
@@ -363,7 +367,11 @@
 				/>
 			</div>
 			<div class="grid grid-cols-2 items-center px-10">
-				<label for="exposePort" class="text-base font-bold text-stone-100">Exposed Port</label>
+				<label for="exposePort" class="text-base font-bold text-stone-100"
+					>Exposed Port <Explainer
+						explanation={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
+					/></label
+				>
 				<input
 					readonly={!$appSession.isAdmin && !$status.service.isRunning}
 					disabled={!$appSession.isAdmin ||
@@ -373,9 +381,6 @@
 					id="exposePort"
 					bind:value={service.exposePort}
 					placeholder="12345"
-				/>
-				<Explainer
-					text={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
 				/>
 			</div>
 
@@ -405,6 +410,10 @@
 				<GlitchTip bind:service />
 			{:else if service.type === 'searxng'}
 				<Searxng bind:service />
+			{:else if service.type === 'weblate'}
+				<Weblate bind:service />
+			{:else if service.type === 'taiga'}
+				<Taiga bind:service />
 			{/if}
 		</div>
 	</form>

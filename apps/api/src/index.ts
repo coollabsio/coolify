@@ -5,7 +5,7 @@ import env from '@fastify/env';
 import cookie from '@fastify/cookie';
 import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
-import { asyncExecShell, isDev, listSettings, prisma, version } from './lib/common';
+import { asyncExecShell, createRemoteEngineConfiguration, isDev, listSettings, prisma, version } from './lib/common';
 import { scheduler } from './lib/scheduler';
 import { compareVersions } from 'compare-versions';
 import Graceful from '@ladjs/graceful'
@@ -136,8 +136,11 @@ fastify.listen({ port, host }, async (err: any, address: any) => {
 	// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupPrismaEngines")
 	// }, 60000)
 
-	await getArch();
-	await getIPAddress();
+	await Promise.all([
+		getArch(),
+		getIPAddress(),
+		// configureRemoteDockers(),
+	])
 });
 async function getIPAddress() {
 	const { publicIpv4, publicIpv6 } = await import('public-ip')
@@ -175,4 +178,15 @@ async function getArch() {
 	} catch (error) { }
 }
 
-
+async function configureRemoteDockers() {
+	try {
+		const remoteDocker = await prisma.destinationDocker.findMany({
+			where: { remoteVerified: true, remoteEngine: true }
+		});
+		if (remoteDocker.length > 0) {
+			for (const docker of remoteDocker) {
+				await createRemoteEngineConfiguration(docker.id)
+			}
+		}
+	} catch (error) { }
+}

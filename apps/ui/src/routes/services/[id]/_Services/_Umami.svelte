@@ -1,7 +1,6 @@
 <script lang="ts">
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
-
 	export let service: any;
 </script>
 
@@ -13,7 +12,11 @@
 	<input name="adminUser" id="adminUser" placeholder="admin" value="admin" disabled readonly />
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="umamiAdminPassword">Initial Admin Password</label>
+	<label for="umamiAdminPassword"
+		>Initial Admin Password <Explainer
+			explanation="It could be changed in Umami. <br>This is just the password set initially after the first start."
+		/></label
+	>
 	<CopyPasswordField
 		isPasswordField
 		name="umamiAdminPassword"
@@ -22,8 +25,5 @@
 		value={service.umami.umamiAdminPassword}
 		disabled
 		readonly
-	/>
-	<Explainer
-		text="It could be changed in Umami. <br>This is just the password set initially after the first start."
 	/>
 </div>

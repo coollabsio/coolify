@@ -1,15 +1,15 @@
 const defaultTheme = require('tailwindcss/defaultTheme');
 
 module.exports = {
-	content: ['./**/*.html', './src/**/*.{js,jsx,ts,tsx,svelte}'],
-	important: true, 
+	content: ['./**/*.html', './src/**/*.{js,jsx,ts,tsx,svelte}', "./node_modules/flowbite-svelte/**/*.{html,js,svelte,ts}",],
+	important: true,
 	daisyui: {
 		themes: [
 			{
 				coollabs: {
-					"base-100":"#323232",
-					"base-200":"#242424",
-					"base-300":"#181818",
+					"base-100": "#323232",
+					"base-200": "#242424",
+					"base-300": "#181818",
 					"primary": "#6d28d9",
 					"primary-content": "#fff",
 					"secondary": "#343232",
@@ -40,13 +40,13 @@ module.exports = {
 				sans: ['Poppins', ...defaultTheme.fontFamily.sans]
 			},
 			colors: {
-				"applications":"#16A34A",
-				"databases":"#9333EA",
-				"destinations":"#0284C7",
-				"sources":"#EA580C",
-				"services":"#DB2777",
-				"settings":"#FEE440",
-				"iam":"#C026D3",
+				"applications": "#16A34A",
+				"databases": "#9333EA",
+				"destinations": "#0284C7",
+				"sources": "#EA580C",
+				"services": "#DB2777",
+				"settings": "#FEE440",
+				"iam": "#C026D3",
 				coollabs: '#6B16ED',
 				'coollabs-100': '#7317FF',
 				coolblack: '#161616',
@@ -62,5 +62,6 @@ module.exports = {
 		scrollbar: ['dark'],
 		extend: {}
 	},
+	darkMode: 'class',
 	plugins: [require('tailwindcss-scrollbar'), require('daisyui'), require("@tailwindcss/typography")]
 };

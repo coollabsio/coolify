@@ -177,9 +177,7 @@ import * as buildpacks from '../lib/buildPacks';
 
 									try {
 										await prisma.build.update({ where: { id: buildId }, data: { commit } });
-									} catch (err) {
-										console.log(err);
-									}
+									} catch (err) { }
 
 									if (!pullmergeRequestId) {
 										if (configHash !== currentHash) {

@@ -95,19 +95,19 @@
 	async function isBranchAlreadyUsed(event: any) {
 		selected.branch = event.detail.value;
 		try {
-			const data = await get(
-				`/applications/${id}/configuration/repository?repository=${selected.repository}&branch=${selected.branch}`
-			);
-			if (data.used) {
-				const sure = confirm($t('application.configuration.branch_already_in_use'));
-				if (sure) {
-					selected.autodeploy = false;
-					showSave = true;
-					return true;
-				}
-				showSave = false;
-				return true;
-			}
+			// const data = await get(
+			// 	`/applications/${id}/configuration/repository?repository=${selected.repository}&branch=${selected.branch}`
+			// );
+			// if (data.used) {
+			// 	const sure = confirm($t('application.configuration.branch_already_in_use'));
+			// 	if (sure) {
+			// 		selected.autodeploy = false;
+			// 		showSave = true;
+			// 		return true;
+			// 	}
+			// 	showSave = false;
+			// 	return true;
+			// }
 			showSave = true;
 		} catch (error) {
 			showSave = false;

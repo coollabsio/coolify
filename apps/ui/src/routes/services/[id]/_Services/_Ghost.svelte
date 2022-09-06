@@ -7,8 +7,9 @@
 </script>
 
 <div class="flex space-x-1 py-5">
-	<div class="title">Ghost</div>
-	<Explainer text={'You can change these values in the Ghost admin panel.'} />
+	<div class="title">
+		Ghost <Explainer explanation="You can change these values in the Ghost admin panel." />
+	</div>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
 	<label for="email">{$t('forms.default_email_address')}</label>

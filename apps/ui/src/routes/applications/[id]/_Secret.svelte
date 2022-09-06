@@ -65,7 +65,6 @@
 			}
 			dispatch('refresh');
 		} catch (error) {
-			console.log(error);
 			return errorNotification(error);
 		}
 	}

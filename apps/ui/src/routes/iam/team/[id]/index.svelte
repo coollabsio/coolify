@@ -12,7 +12,7 @@
 	export let team: any;
 	export let invitations: any[];
 	import { page } from '$app/stores';
-	import Explainer from '$lib/components/Explainer.svelte';
+	import SimpleExplainer from '$lib/components/SimpleExplainer.svelte';
 	import { post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
@@ -98,7 +98,7 @@
 				<div class="flex-col">
 					<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 					{#if team.id === '0'}
-						<Explainer customClass="w-full" text={$t('team.root_team_explainer')} />
+						<SimpleExplainer customClass="w-full" text={$t('team.root_team_explainer')} />
 					{/if}
 				</div>
 				<input id="name" name="name" placeholder="name" bind:value={team.name} />
@@ -179,7 +179,7 @@
 					>
 				</div>
 			</div>
-			<Explainer text={$t('team.invite_only_register_explainer')} />
+			<SimpleExplainer text={$t('team.invite_only_register_explainer')} />
 			<div class="flex-col space-y-2 px-4 pt-5 sm:px-6">
 				<div class="flex space-x-0">
 					<input
