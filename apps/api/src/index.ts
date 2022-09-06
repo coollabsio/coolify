@@ -97,9 +97,23 @@ fastify.register(autoLoad, {
 fastify.register(cookie)
 fastify.register(cors);
 fastify.addHook('onRequest', async (request, reply) => {
+	let allowedList = ['coolify:3000'];
+	const { ipv4, ipv6, fqdn } = await prisma.setting.findFirst({})
+
+	ipv4 && allowedList.push(ipv4);
+	ipv6 && allowedList.push(ipv6);
+	fqdn && allowedList.push(fqdn);
+
+	const remotes = await prisma.destinationDocker.findMany({ where: { remoteEngine: true, remoteVerified: true } })
+	if (remotes.length > 0) {
+		remotes.forEach(remote => {
+			allowedList.push(`${remote.remoteIpAddress}:3000`);
+		})
+	}
+	console.log({ allowedList })
 	console.log({ host: request.headers.host, origin: request.headers.origin })
 	if (!request.headers.origin && !request.headers.host.startsWith('host.docker.internal')) {
-		
+
 	}
 })
 fastify.listen({ port, host }, async (err: any, address: any) => {
