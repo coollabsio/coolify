@@ -37,7 +37,7 @@ jobs:
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL }}
   amd64-making-something-cool:
-    runs-on: [self-hosted, x64]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -69,12 +69,15 @@ jobs:
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL }}
   merge-manifest-to-be-cool:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: [arm64-making-something-cool, amd64-making-something-cool]
     steps:
-      - name: Create and push manifest images
-        uses: Noelware/docker-manifest-action@master
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
         with:
-          base-image: coollabsio/coolify:${{github.event.release.name}}
-          extra-images: coollabsio/coolify:${{github.event.release.name}}-amd64,coollabsio/coolify:${{github.event.release.name}}-arm64
-          push: true
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Create manifest
+        run: bash docker manifest create coollabsio/coolify:${{github.event.release.name}} --amend coollabsio/coolify:${{github.event.release.name}}-amd64 --amend coollabsio/coolify:${{github.event.release.name}}-arm64
+      - name: Push Manifest
+        run: bash docker manifest push coollabsio/coolify:${{github.event.release.name}}
