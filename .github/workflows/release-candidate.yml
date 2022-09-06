@@ -5,7 +5,7 @@ on:
 
 jobs:
   arm64-making-something-cool:
-    runs-on: self-hosted
+    runs-on: [self-hosted, arm64]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -37,7 +37,7 @@ jobs:
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL }}
   amd64-making-something-cool:
-    runs-on: self-hosted
+    runs-on: [self-hosted, x64]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
