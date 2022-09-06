@@ -96,6 +96,12 @@ fastify.register(autoLoad, {
 
 fastify.register(cookie)
 fastify.register(cors);
+fastify.addHook('onRequest', async (request, reply) => {
+	console.log({ host: request.headers.host, origin: request.headers.origin })
+	if (!request.headers.origin && !request.headers.host.startsWith('host.docker.internal')) {
+		throw new Error('Invalid origin');
+	}
+})
 fastify.listen({ port, host }, async (err: any, address: any) => {
 	if (err) {
 		console.error(err);
