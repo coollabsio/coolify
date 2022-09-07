@@ -87,12 +87,15 @@
 		const sure = confirm($t('database.confirm_stop', { name: database.name }));
 		if (sure) {
 			$status.database.initialLoading = true;
+			$status.database.loading = true;
 			try {
 				await post(`/databases/${database.id}/stop`, {});
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
 				$status.database.initialLoading = false;
+				$status.database.loading = false;
+				await getStatus();
 			}
 		}
 	}

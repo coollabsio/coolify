@@ -97,12 +97,15 @@
 		const sure = confirm($t('database.confirm_stop', { name: service.name }));
 		if (sure) {
 			$status.service.initialLoading = true;
+			$status.service.loading = true;
 			try {
 				await post(`/services/${service.id}/${service.type}/stop`, {});
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
 				$status.service.initialLoading = false;
+				$status.service.loading = false;
+				await getStatus();
 			}
 		}
 	}
@@ -207,7 +210,7 @@
 	{/if}
 	{#if $status.service.initialLoading}
 		<button
-			class="icons flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out hover:bg-transparent"
+			class="icons flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"
 		>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
