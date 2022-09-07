@@ -44,8 +44,10 @@
 	}
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl">{$t('index.applications')}</div>
+<nav
+	class="flex flex-row px-4 justify-between items-center bg-neutral-focus lg:fixed w-full z-10 lg:-ml-16 lg:pl-20 p-5"
+>
+	<h1 class="mr-4 text-2xl font-bold">{$t('index.applications')}</h1>
 	{#if $appSession.isAdmin}
 		<button on:click={newApplication} class="btn btn-square btn-sm bg-applications">
 			<svg
@@ -63,8 +65,9 @@
 			>
 		</button>
 	{/if}
-</div>
-<div class="flex-col justify-center mt-10 pb-12 sm:pb-16">
+</nav>
+<br />
+<div class="flex flex-col justify-center mt-10 pb-12 lg:pt-16 sm:pb-16">
 	{#if !applications || ownApplications.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">{$t('application.no_applications_found')}</div>
