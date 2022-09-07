@@ -12,7 +12,14 @@
 	import { get, post } from '$lib/api';
 	import { errorNotification, getDomain } from '$lib/common';
 	import { t } from '$lib/translations';
-	import { appSession, disabledButton, status, location, setLocation, addToast } from '$lib/store';
+	import {
+		appSession,
+		status,
+		setLocation,
+		addToast,
+		checkIfDeploymentEnabledServices,
+		isDeploymentEnabled
+	} from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 
@@ -78,8 +85,8 @@
 			});
 			await post(`/services/${id}`, { ...service });
 			setLocation(service);
-			$disabledButton = false;
 			forceSave = false;
+			$isDeploymentEnabled = checkIfDeploymentEnabledServices($appSession.isAdmin, service);
 			return addToast({
 				message: 'Configuration saved.',
 				type: 'success'
