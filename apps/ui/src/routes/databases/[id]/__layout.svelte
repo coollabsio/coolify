@@ -75,7 +75,7 @@
 			$status.database.initialLoading = true;
 			try {
 				await del(`/databases/${database.id}`, { id: database.id, force });
-				return await goto('/databases');
+				return await goto('/', { replaceState: true });
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
@@ -246,99 +246,100 @@
 				</button>
 				<Tooltip triggeredBy="#start">{'Start'}</Tooltip>
 			{/if}
+			<div class="border border-stone-700 h-8" />
+			<a
+				id="configuration"
+				href="/databases/{id}"
+				sveltekit:prefetch
+				class="hover:text-yellow-500 rounded"
+				class:text-yellow-500={$page.url.pathname === `/databases/${id}`}
+				class:bg-coolgray-500={$page.url.pathname === `/databases/${id}`}
+			>
+				<button class="icons bg-transparent m text-sm disabled:text-red-500">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-6 w-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<rect x="4" y="8" width="4" height="4" />
+						<line x1="6" y1="4" x2="6" y2="8" />
+						<line x1="6" y1="12" x2="6" y2="20" />
+						<rect x="10" y="14" width="4" height="4" />
+						<line x1="12" y1="4" x2="12" y2="14" />
+						<line x1="12" y1="18" x2="12" y2="20" />
+						<rect x="16" y="5" width="4" height="4" />
+						<line x1="18" y1="4" x2="18" y2="5" />
+						<line x1="18" y1="9" x2="18" y2="20" />
+					</svg></button
+				></a
+			>
+			<Tooltip triggeredBy="#configuration">{'Configuration'}</Tooltip>
+			<a
+				href="/databases/{id}/secrets"
+				sveltekit:prefetch
+				class="hover:text-pink-500 rounded"
+				class:text-pink-500={$page.url.pathname === `/databases/${id}/secrets`}
+				class:bg-coolgray-500={$page.url.pathname === `/databases/${id}/secrets`}
+			>
+				<button id="secrets" disabled={$isDeploymentEnabled} class="icons bg-transparent text-sm ">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path
+							d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"
+						/>
+						<circle cx="12" cy="11" r="1" />
+						<line x1="12" y1="12" x2="12" y2="14.5" />
+					</svg></button
+				></a
+			>
+			<Tooltip triggeredBy="#secrets">Secrets</Tooltip>
+			<div class="border border-stone-700 h-8" />
+			<a
+				id="databaselogs"
+				href={$status.database.isRunning ? `/databases/${id}/logs` : null}
+				sveltekit:prefetch
+				class="hover:text-pink-500 rounded"
+				class:text-pink-500={$page.url.pathname === `/databases/${id}/logs`}
+				class:bg-coolgray-500={$page.url.pathname === `/databases/${id}/logs`}
+			>
+				<button disabled={!$status.database.isRunning} class="icons bg-transparent text-sm">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-6 w-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
+						<path d="M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
+						<line x1="3" y1="6" x2="3" y2="19" />
+						<line x1="12" y1="6" x2="12" y2="19" />
+						<line x1="21" y1="6" x2="21" y2="19" />
+					</svg></button
+				></a
+			>
+			<Tooltip triggeredBy="#databaselogs">{'Logs'}</Tooltip>
 		{/if}
-		<div class="border border-stone-700 h-8" />
-		<a
-			id="configuration"
-			href="/databases/{id}"
-			sveltekit:prefetch
-			class="hover:text-yellow-500 rounded"
-			class:text-yellow-500={$page.url.pathname === `/databases/${id}`}
-			class:bg-coolgray-500={$page.url.pathname === `/databases/${id}`}
-		>
-			<button class="icons bg-transparent m text-sm disabled:text-red-500">
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="h-6 w-6"
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<rect x="4" y="8" width="4" height="4" />
-					<line x1="6" y1="4" x2="6" y2="8" />
-					<line x1="6" y1="12" x2="6" y2="20" />
-					<rect x="10" y="14" width="4" height="4" />
-					<line x1="12" y1="4" x2="12" y2="14" />
-					<line x1="12" y1="18" x2="12" y2="20" />
-					<rect x="16" y="5" width="4" height="4" />
-					<line x1="18" y1="4" x2="18" y2="5" />
-					<line x1="18" y1="9" x2="18" y2="20" />
-				</svg></button
-			></a
-		>
-		<Tooltip triggeredBy="#configuration">{'Configuration'}</Tooltip>
-		<a
-			href="/databases/{id}/secrets"
-			sveltekit:prefetch
-			class="hover:text-pink-500 rounded"
-			class:text-pink-500={$page.url.pathname === `/databases/${id}/secrets`}
-			class:bg-coolgray-500={$page.url.pathname === `/databases/${id}/secrets`}
-		>
-			<button id="secrets" disabled={$isDeploymentEnabled} class="icons bg-transparent text-sm ">
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6"
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<path
-						d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"
-					/>
-					<circle cx="12" cy="11" r="1" />
-					<line x1="12" y1="12" x2="12" y2="14.5" />
-				</svg></button
-			></a
-		>
-		<Tooltip triggeredBy="#secrets">Secrets</Tooltip>
-		<div class="border border-stone-700 h-8" />
-		<a
-			id="databaselogs"
-			href={$status.database.isRunning ? `/databases/${id}/logs` : null}
-			sveltekit:prefetch
-			class="hover:text-pink-500 rounded"
-			class:text-pink-500={$page.url.pathname === `/databases/${id}/logs`}
-			class:bg-coolgray-500={$page.url.pathname === `/databases/${id}/logs`}
-		>
-			<button disabled={!$status.database.isRunning} class="icons bg-transparent text-sm">
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="h-6 w-6"
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
-					<path d="M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0" />
-					<line x1="3" y1="6" x2="3" y2="19" />
-					<line x1="12" y1="6" x2="12" y2="19" />
-					<line x1="21" y1="6" x2="21" y2="19" />
-				</svg></button
-			></a
-		>
-		<Tooltip triggeredBy="#databaselogs">{'Logs'}</Tooltip>
+
 		{#if forceDelete}
 			<button
 				on:click={() => deleteDatabase(true)}

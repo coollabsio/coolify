@@ -1,6 +1,6 @@
 <script context="module" lang="ts">
 	import type { Load } from '@sveltejs/kit';
-	export const load: Load = async ({ fetch, params, stuff }) => {
+	export const load: Load = async ({ stuff }) => {
 		return {
 			props: { ...stuff }
 		};
@@ -9,7 +9,6 @@
 
 <script lang="ts">
 	export let userCount: number;
-
 	import { goto } from '$app/navigation';
 	import { post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
@@ -17,7 +16,9 @@
 	import { t } from '$lib/translations';
 	import { onMount } from 'svelte';
 	import Cookies from 'js-cookie';
-
+	if (!$appSession.isRegistrationEnabled) {
+		window.location.assign('/');
+	}
 	let loading = false;
 	let emailEl: HTMLInputElement;
 	let passwordEl: HTMLInputElement;

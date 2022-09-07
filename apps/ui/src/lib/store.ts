@@ -3,7 +3,7 @@ import cuid from 'cuid';
 import { writable, readable, type Writable } from 'svelte/store';
 
 interface AppSession {
-    registrationEnabled: boolean;
+    isRegistrationEnabled: boolean;
     ipv4: string | null,
     ipv6: string | null,
     version: string | null,
@@ -28,6 +28,7 @@ interface AddToast {
 }
 export const loginEmail: Writable<string | undefined> = writable()
 export const appSession: Writable<AppSession> = writable({
+    isRegistrationEnabled: false,
     ipv4: null,
     ipv6: null,
     version: null,

@@ -61,16 +61,18 @@ export async function getDatabaseStatus(request: FastifyRequest<OnlyId>) {
             where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
             include: { destinationDocker: true, settings: true }
         });
-        const { destinationDockerId, destinationDocker } = database;
-        if (destinationDockerId) {
-            try {
-                const { stdout } = await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker inspect --format '{{json .State}}' ${id}` })
+        if (database) {
+            const { destinationDockerId, destinationDocker } = database;
+            if (destinationDockerId) {
+                try {
+                    const { stdout } = await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker inspect --format '{{json .State}}' ${id}` })
 
-                if (JSON.parse(stdout).Running) {
-                    isRunning = true;
+                    if (JSON.parse(stdout).Running) {
+                        isRunning = true;
+                    }
+                } catch (error) {
+                    //
                 }
-            } catch (error) {
-                //
             }
         }
         return {
@@ -363,6 +365,7 @@ export async function deleteDatabase(request: FastifyRequest<DeleteDatabase>) {
             }
         }
         await prisma.databaseSettings.deleteMany({ where: { databaseId: id } });
+        await prisma.databaseSecret.deleteMany({ where: { databaseId: id } });
         await prisma.database.delete({ where: { id } });
         return {}
     } catch ({ status, message }) {

@@ -66,7 +66,7 @@
 <script lang="ts">
 	export let baseSettings: any;
 	export let supportedServiceTypesAndVersions: any;
-	$appSession.registrationEnabled = baseSettings.registrationEnabled;
+	$appSession.isRegistrationEnabled = baseSettings.isRegistrationEnabled;
 	$appSession.ipv4 = baseSettings.ipv4;
 	$appSession.ipv6 = baseSettings.ipv6;
 	$appSession.version = baseSettings.version;
@@ -137,9 +137,10 @@
 					id="dashboard"
 					sveltekit:prefetch
 					href="/"
-					class="icons bg-coolgray-200 hover:text-white"
+					class="icons  hover:text-white"
 					class:text-white={$page.url.pathname === '/'}
 					class:bg-coolgray-500={$page.url.pathname === '/'}
+					class:bg-coolgray-200={!($page.url.pathname === '/')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -158,7 +159,7 @@
 						<path d="M16 15c-2.21 1.333 -5.792 1.333 -8 0" />
 					</svg>
 				</a>
-
+<!-- 
 				<div class="border-t border-stone-700" />
 				<a
 					id="applications"
@@ -307,7 +308,7 @@
 						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 						<path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-12" />
 					</svg>
-				</a>
+				</a> -->
 			</div>
 			<div class="flex-1" />
 
@@ -319,7 +320,8 @@
 					href="/iam"
 					class="icons bg-coolgray-200"
 					class:text-iam={$page.url.pathname.startsWith('/iam')}
-					class:bg-coolgray-500={$page.url.pathname.startsWith('/iam')}
+					class:bg-coolgray-500={$page.url.pathname === '/iam'}
+					class:bg-coolgray-200={!($page.url.pathname === '/iam')}
 					><svg
 						xmlns="http://www.w3.org/2000/svg"
 						viewBox="0 0 24 24"
@@ -343,7 +345,8 @@
 					href={$appSession.teamId === '0' ? '/settings/global' : '/settings/ssh-keys'}
 					class="icons bg-coolgray-200"
 					class:text-settings={$page.url.pathname.startsWith('/settings')}
-					class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
+					class:bg-coolgray-500={$page.url.pathname === '/settings'}
+					class:bg-coolgray-200={!($page.url.pathname === '/settings')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -363,11 +366,7 @@
 					</svg>
 				</a>
 
-				<div
-					id="logout"
-					class="icons bg-coolgray-200 hover:text-error"
-					on:click={logout}
-				>
+				<div id="logout" class="icons bg-coolgray-200 hover:text-error" on:click={logout}>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="ml-1 h-8 w-8"

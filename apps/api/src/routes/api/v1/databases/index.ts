@@ -1,8 +1,9 @@
 import { FastifyPluginAsync } from 'fastify';
 import { deleteDatabase, deleteDatabaseSecret, getDatabase, getDatabaseLogs, getDatabaseSecrets, getDatabaseStatus, getDatabaseTypes, getDatabaseUsage, getVersions, listDatabases, newDatabase, saveDatabase, saveDatabaseDestination, saveDatabaseSecret, saveDatabaseSettings, saveDatabaseType, saveVersion, startDatabase, stopDatabase } from './handlers';
 
-import type { DeleteDatabase, DeleteDatabaseSecret, GetDatabaseLogs, OnlyId, SaveDatabase, SaveDatabaseDestination, SaveDatabaseSecret, SaveDatabaseSettings, SaveVersion } from '../../../../types';
-import type { SaveDatabaseType } from './types';
+import type { OnlyId } from '../../../../types';
+
+import type { DeleteDatabase, SaveDatabaseType, DeleteDatabaseSecret, GetDatabaseLogs, SaveDatabase, SaveDatabaseDestination, SaveDatabaseSecret, SaveDatabaseSettings, SaveVersion } from './types';
 
 const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.addHook('onRequest', async (request) => {
