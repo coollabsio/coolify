@@ -26,7 +26,7 @@
 		<PostgreSql />
 	{:else if database.type === 'redis'}
 		<Redis />
-	{:else if database.type === 'redis'}
+	{:else if database.type === 'edgedb'}
 		<EdgeDb />
 	{/if}
 </span>
