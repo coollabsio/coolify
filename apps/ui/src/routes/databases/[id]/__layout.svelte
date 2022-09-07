@@ -175,7 +175,7 @@
 			{/if}
 			{#if $status.database.initialLoading}
 				<button
-					class="icons flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"
+					class="icons flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out hover:bg-transparent"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
