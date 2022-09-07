@@ -193,7 +193,7 @@ export async function isDNSValid(hostname: any, domain: string): Promise<any> {
 	const { isIP } = await import('is-ip');
 	const { DNSServers } = await listSettings();
 	if (DNSServers) {
-		dns.setServers([DNSServers]);
+		dns.setServers([...DNSServers.split(',')]);
 	}
 	let resolves = [];
 	try {
@@ -302,7 +302,7 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 
 	const { DNSServers } = await listSettings();
 	if (DNSServers) {
-		dns.setServers([DNSServers]);
+		dns.setServers([...DNSServers.split(',')]);
 	}
 
 	let resolves = [];
