@@ -58,7 +58,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
-	import { appSession, status, disabledButton } from '$lib/store';
+	import { appSession, status, isDeploymentEnabled } from '$lib/store';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import { onDestroy, onMount } from 'svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
@@ -68,7 +68,7 @@ import DatabaseLinks from './_DatabaseLinks.svelte';
 	let statusInterval: any = false;
 	let forceDelete = false;
 
-	$disabledButton = !$appSession.isAdmin;
+	$isDeploymentEnabled = !$appSession.isAdmin;
 
 	async function deleteDatabase(force: boolean) {
 		const sure = confirm(`Are you sure you would like to delete '${database.name}'?`);
@@ -76,7 +76,7 @@ import DatabaseLinks from './_DatabaseLinks.svelte';
 			$status.database.initialLoading = true;
 			try {
 				await del(`/databases/${database.id}`, { id: database.id, force });
-				return await goto('/databases');
+				return await goto('/', { replaceState: true });
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
@@ -88,12 +88,15 @@ import DatabaseLinks from './_DatabaseLinks.svelte';
 		const sure = confirm($t('database.confirm_stop', { name: database.name }));
 		if (sure) {
 			$status.database.initialLoading = true;
+			$status.database.loading = true;
 			try {
 				await post(`/databases/${database.id}/stop`, {});
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
 				$status.database.initialLoading = false;
+				$status.database.loading = false;
+				await getStatus();
 			}
 		}
 	}

@@ -17,7 +17,6 @@ const algorithm = 'aes-256-ctr';
 
 async function main() {
 	// Enable registration for the first user
-	// Set initial HAProxy password
 	const settingsFound = await prisma.setting.findFirst({});
 	if (!settingsFound) {
 		await prisma.setting.create({
@@ -25,7 +24,8 @@ async function main() {
 				isRegistrationEnabled: true,
 				proxyPassword: encrypt(generatePassword()),
 				proxyUser: cuid(),
-				arch: process.arch
+				arch: process.arch,
+				DNSServers: '1.1.1.1,8.8.8.8'
 			}
 		});
 	} else {

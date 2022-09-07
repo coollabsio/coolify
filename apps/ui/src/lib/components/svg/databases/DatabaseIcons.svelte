@@ -16,4 +16,6 @@
 	<Icons.Redis {isAbsolute} />
 {:else if type === 'couchdb'}
 	<Icons.CouchDB {isAbsolute} />
+{:else if type === 'edgedb'}
+	<Icons.EdgeDB {isAbsolute} />
 {/if}

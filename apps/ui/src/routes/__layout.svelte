@@ -66,7 +66,7 @@
 <script lang="ts">
 	export let baseSettings: any;
 	export let supportedServiceTypesAndVersions: any;
-	$appSession.registrationEnabled = baseSettings.registrationEnabled;
+	$appSession.isRegistrationEnabled = baseSettings.isRegistrationEnabled;
 	$appSession.ipv4 = baseSettings.ipv4;
 	$appSession.ipv6 = baseSettings.ipv6;
 	$appSession.version = baseSettings.version;

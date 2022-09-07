@@ -12,7 +12,7 @@
 	export let readOnly: any;
 	export let settings: any;
 	const { id } = $page.params;
-
+	const { ipv4, ipv6 } = settings;
 	let ftpUrl = generateUrl(service.wordpress.ftpPublicPort);
 	let ftpUser = service.wordpress.ftpUser;
 	let ftpPassword = service.wordpress.ftpPassword;
@@ -22,7 +22,7 @@
 	function generateUrl(publicPort: any) {
 		return browser
 			? `sftp://${
-					settings?.fqdn ? getDomain(settings.fqdn) : window.location.hostname
+					settings?.fqdn ? getDomain(settings.fqdn) : ipv4 || ipv6
 			  }:${publicPort}`
 			: 'Loading...';
 	}

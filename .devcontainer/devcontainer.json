@@ -20,7 +20,8 @@
 		"svelte.svelte-vscode",
 		"ardenivanov.svelte-intellisense",
 		"Prisma.prisma",
-		"bradlc.vscode-tailwindcss"
+		"bradlc.vscode-tailwindcss",
+		"waderyan.gitblame"
 	],
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	"forwardPorts": [3000, 3001],

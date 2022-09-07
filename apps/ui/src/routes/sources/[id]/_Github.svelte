@@ -46,8 +46,8 @@
 				customPort: source.customPort
 			});
 			const { organization, htmlUrl } = source;
-			const { fqdn } = settings;
-			const host = dev ? getAPIUrl() : fqdn ? fqdn : `http://${window.location.host}` || '';
+			const { fqdn, ipv4, ipv6 } = settings;
+			const host = dev ? getAPIUrl() : fqdn ? fqdn : `http://${ipv4 || ipv6}` || '';
 			const domain = getDomain(fqdn);
 
 			let url = 'settings/apps/new';

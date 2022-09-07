@@ -86,7 +86,7 @@ import ServiceLinks from './_ServiceLinks.svelte';
 				if (service.type && $status.service.isRunning)
 					await post(`/services/${service.id}/${service.type}/stop`, {});
 				await del(`/services/${service.id}`, { id: service.id });
-				return await goto(`/services`);
+				return await goto(`/`, { replaceState: true });
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
@@ -98,12 +98,15 @@ import ServiceLinks from './_ServiceLinks.svelte';
 		const sure = confirm($t('database.confirm_stop', { name: service.name }));
 		if (sure) {
 			$status.service.initialLoading = true;
+			$status.service.loading = true;
 			try {
 				await post(`/services/${service.id}/${service.type}/stop`, {});
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
 				$status.service.initialLoading = false;
+				$status.service.loading = false;
+				await getStatus();
 			}
 		}
 	}

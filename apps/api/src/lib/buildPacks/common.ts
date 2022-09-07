@@ -90,6 +90,22 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 	];
 	const phpVersions = [
 		{
+			value: 'webdevops/php-apache:8.2',
+			label: 'webdevops/php-apache:8.2'
+		},
+		{
+			value: 'webdevops/php-nginx:8.2',
+			label: 'webdevops/php-nginx:8.2'
+		},
+		{
+			value: 'webdevops/php-apache:8.1',
+			label: 'webdevops/php-apache:8.1'
+		},
+		{
+			value: 'webdevops/php-nginx:8.1',
+			label: 'webdevops/php-nginx:8.1'
+		},
+		{
 			value: 'webdevops/php-apache:8.0',
 			label: 'webdevops/php-apache:8.0'
 		},
@@ -144,6 +160,22 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 		{
 			value: 'webdevops/php-nginx:5.6',
 			label: 'webdevops/php-nginx:5.6'
+		},
+		{
+			value: 'webdevops/php-apache:8.2-alpine',
+			label: 'webdevops/php-apache:8.2-alpine'
+		},
+		{
+			value: 'webdevops/php-nginx:8.2-alpine',
+			label: 'webdevops/php-nginx:8.2-alpine'
+		},
+		{
+			value: 'webdevops/php-apache:8.1-alpine',
+			label: 'webdevops/php-apache:8.1-alpine'
+		},
+		{
+			value: 'webdevops/php-nginx:8.1-alpine',
+			label: 'webdevops/php-nginx:8.1-alpine'
 		},
 		{
 			value: 'webdevops/php-apache:8.0-alpine',
@@ -305,11 +337,11 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 		payload.baseImage = 'denoland/deno:latest';
 	}
 	if (buildPack === 'php') {
-		payload.baseImage = 'webdevops/php-apache:8.0-alpine';
+		payload.baseImage = 'webdevops/php-apache:8.2-alpine';
 		payload.baseImages = phpVersions;
 	}
 	if (buildPack === 'laravel') {
-		payload.baseImage = 'webdevops/php-apache:8.0-alpine';
+		payload.baseImage = 'webdevops/php-apache:8.2-alpine';
 		payload.baseBuildImage = 'node:18';
 		payload.baseBuildImages = nodeVersions;
 	}
