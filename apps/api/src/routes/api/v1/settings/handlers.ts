@@ -58,7 +58,7 @@ export async function deleteDomain(request: FastifyRequest<DeleteDomain>, reply:
         const { fqdn } = request.body
         const { DNSServers } = await listSettings();
         if (DNSServers) {
-            dns.setServers([DNSServers]);
+            dns.setServers([...DNSServers.split(',')]);
         }
         let ip;
         try {

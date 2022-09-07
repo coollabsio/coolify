@@ -21,7 +21,7 @@ import { scheduler } from './scheduler';
 import { supportedServiceTypesAndVersions } from './services/supportedVersions';
 import { includeServices } from './services/common';
 
-export const version = '3.9.3';
+export const version = '3.9.4';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -193,7 +193,7 @@ export async function isDNSValid(hostname: any, domain: string): Promise<any> {
 	const { isIP } = await import('is-ip');
 	const { DNSServers } = await listSettings();
 	if (DNSServers) {
-		dns.setServers([DNSServers]);
+		dns.setServers([...DNSServers.split(',')]);
 	}
 	let resolves = [];
 	try {
@@ -302,7 +302,7 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 
 	const { DNSServers } = await listSettings();
 	if (DNSServers) {
-		dns.setServers([DNSServers]);
+		dns.setServers([...DNSServers.split(',')]);
 	}
 
 	let resolves = [];
