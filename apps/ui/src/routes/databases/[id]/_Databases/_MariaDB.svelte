@@ -7,9 +7,9 @@
 </script>
 
 <div class="flex space-x-1 py-5 font-bold">
-	<div class="title">MariaDB</div>
+	<h1 class="title">MariaDB</h1>
 </div>
-<div class="space-y-2 px-10">
+<div class="space-y-2">
 	<div class="grid grid-cols-2 items-center">
 		<label for="defaultDatabase" class="text-base font-bold text-stone-100"
 			>{$t('database.default_database')}</label
@@ -63,7 +63,8 @@
 	</div>
 	<div class="grid grid-cols-2 items-center">
 		<label for="rootUserPassword" class="text-base font-bold text-stone-100"
-			>{$t('forms.roots_password')} <Explainer explanation="Could be changed while the database is running." /></label
+			>{$t('forms.roots_password')}
+			<Explainer explanation="Could be changed while the database is running." /></label
 		>
 		<CopyPasswordField
 			disabled={!$status.database.isRunning}
