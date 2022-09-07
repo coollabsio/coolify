@@ -737,7 +737,7 @@ type DatabaseConfiguration = {
 			EDGEDB_SERVER_PASSWORD: string;
 			EDGEDB_SERVER_USER: string;
 			EDGEDB_SERVER_DATABASE: string;
-			EDGEDB_SERVER_SECURITY: string;
+			EDGEDB_SERVER_TLS_CERT_MODE: string;
 		};
 	}
 export function generateDatabaseConfiguration(database: any, arch: string): DatabaseConfiguration {
@@ -869,7 +869,7 @@ export function generateDatabaseConfiguration(database: any, arch: string): Data
 				EDGEDB_SERVER_PASSWORD: rootUserPassword,
 				EDGEDB_SERVER_USER: rootUser,
 				EDGEDB_SERVER_DATABASE: defaultDatabase,
-				EDGEDB_SERVER_SECURITY: 'insecure_dev_mode'
+				EDGEDB_SERVER_TLS_CERT_MODE: 'generate_self_signed'
 			},
 			image: `${baseImage}:${version}`,
 			volume: `${id}-${type}-data:/var/lib/edgedb/data`,

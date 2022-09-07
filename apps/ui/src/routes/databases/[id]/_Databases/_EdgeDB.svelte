@@ -42,13 +42,13 @@
 			/></label
 		>
 		<CopyPasswordField
-			disabled={!$status.database.isRunning}
-			readonly={!$status.database.isRunning}
+			readonly
+			disabled
 			placeholder="Generated automatically after start"
 			isPasswordField
 			id="rootUserPassword"
 			name="rootUserPassword"
-			bind:value={database.rootUserPassword}
+			value={database.rootUserPassword}
 		/>
 	</div>
 </div>
