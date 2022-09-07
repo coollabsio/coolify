@@ -198,7 +198,7 @@ COPY ./init-db.sh /docker-entrypoint-initdb.d/init-db.sh`;
 
         await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile);
 
-        const { volumeMounts } = persistentVolumes(id, persistentStorage, config.plausibleAnalytics)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
 
         const composeFile: ComposeFile = {
             version: '3.8',
@@ -852,7 +852,7 @@ async function startGhostService(request: FastifyRequest<ServiceStartStop>) {
             });
         }
 
-        const { volumeMounts } = persistentVolumes(id, persistentStorage, config.ghost)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1086,7 +1086,7 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
 	  FROM ${config.postgresql.image}
 	  COPY ./schema.postgresql.sql /docker-entrypoint-initdb.d/schema.postgresql.sql`;
         await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile);
-        const { volumeMounts } = persistentVolumes(id, persistentStorage, config.umami)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1114,6 +1114,7 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
             },
             volumes: volumeMounts
         };
+        console.log(composeFile)
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         await startServiceContainers(destinationDocker.id, composeFileDestination)
@@ -1167,7 +1168,7 @@ async function startHasuraService(request: FastifyRequest<ServiceStartStop>) {
             });
         }
 
-        const { volumeMounts } = persistentVolumes(id, persistentStorage, config.hasura)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1272,7 +1273,7 @@ async function startFiderService(request: FastifyRequest<ServiceStartStop>) {
                 config.fider.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumeMounts } = persistentVolumes(id, persistentStorage, config.fider)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -1880,7 +1881,7 @@ async function startMoodleService(request: FastifyRequest<ServiceStartStop>) {
                 config.moodle.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumeMounts } = persistentVolumes(id, persistentStorage, config.moodle)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
@@ -2006,7 +2007,7 @@ async function startGlitchTipService(request: FastifyRequest<ServiceStartStop>) 
                 config.glitchTip.environmentVariables[secret.name] = secret.value;
             });
         }
-        const { volumeMounts } = persistentVolumes(id, persistentStorage, config.glitchTip)
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
             services: {
