@@ -525,9 +525,7 @@ export async function checkDomain(request: FastifyRequest<CheckDomain>) {
 }
 export async function checkDNS(request: FastifyRequest<CheckDNS>) {
     try {
-
         const { id } = request.params
-
         let { exposePort, fqdn, forceSave, dualCerts } = request.body
         if (!fqdn) {
             return {}

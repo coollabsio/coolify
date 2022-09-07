@@ -100,7 +100,7 @@
 						</div>
 					</div>
 					<div class="prose">
-						<h4>Coolify dashboard</h4>
+						<h4>Coolify</h4>
 					</div>
 				{/if}
 			</div>

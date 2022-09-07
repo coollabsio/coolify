@@ -87,12 +87,15 @@
 		const sure = confirm($t('database.confirm_stop', { name: database.name }));
 		if (sure) {
 			$status.database.initialLoading = true;
+			$status.database.loading = true;
 			try {
 				await post(`/databases/${database.id}/stop`, {});
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
 				$status.database.initialLoading = false;
+				$status.database.loading = false;
+				await getStatus();
 			}
 		}
 	}
@@ -175,7 +178,7 @@
 			{/if}
 			{#if $status.database.initialLoading}
 				<button
-					class="icons flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"
+					class="icons flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out hover:bg-transparent"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"

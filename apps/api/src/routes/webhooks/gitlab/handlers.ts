@@ -133,7 +133,7 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                             await prisma.build.create({
                                 data: {
                                     id: buildId,
-                                    pullmergeRequestId,
+                                    pullmergeRequestId: pullmergeRequestId.toString(),
                                     sourceBranch,
                                     applicationId: application.id,
                                     destinationDockerId: application.destinationDocker.id,
