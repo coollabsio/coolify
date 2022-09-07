@@ -415,12 +415,12 @@ export const supportedDatabaseTypesAndVersions = [
 		versions: ['3.2.2', '3.1.2', '2.3.1'],
 		versionsARM: ['3.2.2', '3.1.2', '2.3.1']
 	},
-  {
+	{
 		name: 'edgedb',
 		fancyName: 'EdgeDB',
 		baseImage: 'edgedb/edgedb',
-		versions: ['2.0', '1.4']
-   }
+		versions: ['latest', '2.1', '2.0', '1.4']
+	}
 ];
 
 export async function getFreeSSHLocalPort(id: string): Promise<number | boolean> {
@@ -648,21 +648,20 @@ export function generatePassword({ length = 24, symbols = false, isHex = false }
 	return password;
 }
 
-export function generateDatabaseConfiguration(database: any, arch: string):
-	| {
-		volume: string;
-		image: string;
-		command?: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			MYSQL_DATABASE: string;
-			MYSQL_PASSWORD: string;
-			MYSQL_ROOT_USER: string;
-			MYSQL_USER: string;
-			MYSQL_ROOT_PASSWORD: string;
-		};
-	}
+type DatabaseConfiguration = {
+	volume: string;
+	image: string;
+	command?: string;
+	ulimits: Record<string, unknown>;
+	privatePort: number;
+	environmentVariables: {
+		MYSQL_DATABASE: string;
+		MYSQL_PASSWORD: string;
+		MYSQL_ROOT_USER: string;
+		MYSQL_USER: string;
+		MYSQL_ROOT_PASSWORD: string;
+	};
+}
 	| {
 		volume: string;
 		image: string;
@@ -697,22 +696,13 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 		ulimits: Record<string, unknown>;
 		privatePort: number;
 		environmentVariables: {
-			POSTGRESQL_POSTGRES_PASSWORD: string;
-			POSTGRESQL_USERNAME: string;
-			POSTGRESQL_PASSWORD: string;
-			POSTGRESQL_DATABASE: string;
-		};
-	}
-	| {
-		volume: string;
-		image: string;
-		command?: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			POSTGRES_USER: string;
-			POSTGRES_PASSWORD: string;
-			POSTGRES_DB: string;
+			POSTGRES_PASSWORD?: string;
+			POSTGRES_USER?: string;
+			POSTGRES_DB?: string;
+			POSTGRESQL_POSTGRES_PASSWORD?: string;
+			POSTGRESQL_USERNAME?: string;
+			POSTGRESQL_PASSWORD?: string;
+			POSTGRESQL_DATABASE?: string;
 		};
 	}
 	| {
@@ -736,19 +726,21 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 			COUCHDB_PASSWORD: string;
 			COUCHDB_USER: string;
 		};
-	} 
+	}
 	| {
 		volume: string;
 		image: string;
+		command?: string;
 		ulimits: Record<string, unknown>;
 		privatePort: number;
 		environmentVariables: {
-		  EDGEDB_SERVER_PASSWORD: string;
-		  EDGEDB_SERVER_USER: string;
-		  EDGEDB_SERVER_DATABASE: string;
-		  EDGEDB_SERVER_SECURITY: string;
+			EDGEDB_SERVER_PASSWORD: string;
+			EDGEDB_SERVER_USER: string;
+			EDGEDB_SERVER_DATABASE: string;
+			EDGEDB_SERVER_SECURITY: string;
 		};
-	} {
+	}
+export function generateDatabaseConfiguration(database: any, arch: string): DatabaseConfiguration {
 	const {
 		id,
 		dbUser,
@@ -780,7 +772,7 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 		}
 		return configuration
 	} else if (type === 'mariadb') {
-		const configuration = {
+		const configuration: DatabaseConfiguration = {
 			privatePort: 3306,
 			environmentVariables: {
 				MARIADB_ROOT_USER: rootUser,
@@ -798,7 +790,7 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 		}
 		return configuration
 	} else if (type === 'mongodb') {
-		const configuration = {
+		const configuration: DatabaseConfiguration = {
 			privatePort: 27017,
 			environmentVariables: {
 				MONGODB_ROOT_USER: rootUser,
@@ -817,7 +809,7 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 		}
 		return configuration
 	} else if (type === 'postgresql') {
-		const configuration = {
+		const configuration: DatabaseConfiguration = {
 			privatePort: 5432,
 			environmentVariables: {
 				POSTGRESQL_POSTGRES_PASSWORD: rootUserPassword,
@@ -839,7 +831,7 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 		}
 		return configuration
 	} else if (type === 'redis') {
-		const configuration = {
+		const configuration: DatabaseConfiguration = {
 			privatePort: 6379,
 			command: undefined,
 			environmentVariables: {
@@ -856,7 +848,7 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 		}
 		return configuration
 	} else if (type === 'couchdb') {
-		const configuration = {
+		const configuration: DatabaseConfiguration = {
 			privatePort: 5984,
 			environmentVariables: {
 				COUCHDB_PASSWORD: dbUserPassword,
@@ -866,23 +858,24 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 			volume: `${id}-${type}-data:/bitnami/couchdb`,
 			ulimits: {}
 		};
-    if (isARM(arch)) {
+		if (isARM(arch)) {
 			configuration.volume = `${id}-${type}-data:/opt/couchdb/data`;
 		}
 		return configuration
 	} else if (type === 'edgedb') {
-		return {
-		  privatePort: 5656,
-		  environmentVariables: {
-        EDGEDB_SERVER_PASSWORD: rootUserPassword,
-        EDGEDB_SERVER_USER: rootUser,
-        EDGEDB_SERVER_DATABASE: defaultDatabase,
-        EDGEDB_SERVER_SECURITY: 'insecure_dev_mode'
-		  },
-		  image: `${baseImage}:${version}`,
-		  volume: `${id}-${type}-data:/edgedb/edgedb`,
-		  ulimits: {}
+		const configuration: DatabaseConfiguration = {
+			privatePort: 5656,
+			environmentVariables: {
+				EDGEDB_SERVER_PASSWORD: rootUserPassword,
+				EDGEDB_SERVER_USER: rootUser,
+				EDGEDB_SERVER_DATABASE: defaultDatabase,
+				EDGEDB_SERVER_SECURITY: 'insecure_dev_mode'
+			},
+			image: `${baseImage}:${version}`,
+			volume: `${id}-${type}-data:/var/lib/edgedb/data`,
+			ulimits: {}
 		};
+		return configuration
 	}
 }
 export function isARM(arch: string) {
