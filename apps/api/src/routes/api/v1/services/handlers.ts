@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
-import { prisma, uniqueName, asyncExecShell, getServiceFromDB, getContainerUsage, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, ComposeFile, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, executeDockerCmd, checkDomainsIsValidInDNS, checkExposedPort } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceFromDB, getContainerUsage, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, ComposeFile, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, executeDockerCmd, checkDomainsIsValidInDNS, checkExposedPort, listSettings } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, isContainerExited } from '../../../../lib/docker';
 import cuid from 'cuid';
@@ -70,6 +70,7 @@ export async function getService(request: FastifyRequest<OnlyId>) {
             throw { status: 404, message: 'Service not found.' }
         }
         return {
+            settings: await listSettings(),
             service
         }
     } catch ({ status, message }) {
