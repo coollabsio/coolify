@@ -354,13 +354,16 @@
 	}
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">{$t('index.dashboard')}</div>
+<nav
+	class="flex flex-row px-4 justify-between items-center bg-neutral-focus lg:fixed w-full z-10 lg:-ml-16 lg:pl-20 p-5"
+>
+	<h1 class="mr-4 text-2xl font-bold">{$t('index.dashboard')}</h1>
 	{#if $appSession.isAdmin && (applications.length !== 0 || destinations.length !== 0 || databases.length !== 0 || services.length !== 0 || gitSources.length !== 0 || destinations.length !== 0)}
 		<NewResource />
 	{/if}
-</div>
-<div class="container lg:mx-auto lg:p-0 px-8 p-5">
+</nav>
+<br/>
+<div class="container lg:mx-auto lg:p-0 px-8 lg:mt-24">
 	<!-- {#if $appSession.teamId === '0'}
 		<Usage />
 	{/if} -->
@@ -394,11 +397,11 @@
 			</div>
 			<label for="search" class="label w-full">
 				<span
-					class="label-text text-xs flex flex-wrap space-x-2 space-y-2 lg:space-y-0 items-center"
+					class="label-text text-xs flex flex-row space-x-3 space-y-3 flex-wrap items-center justify-center lg:justify-start mt-4"
 				>
 					<button
 						class:bg-coollabs={search === '!app'}
-						class="badge badge-lg text-white text-xs"
+						class="badge badge-lg text-white text-xs -mb-3"
 						on:click={() => doSearch('!app')}>Applications</button
 					>
 					<button
