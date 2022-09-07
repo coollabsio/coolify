@@ -3,9 +3,9 @@
 </script>
 
 <svg
-	class={isAbsolute ? 'absolute top-0 left-0 -m-4 h-16 w-16' : 'mx-auto w-12 h-12'}
+	class={isAbsolute ? 'absolute top-0 left-0 -m-8 h-16 w-16' : 'mx-auto w-12 h-12'}
 	width="88"
-	fill="#b3b3b3"
+	fill="#1F8AED"
 	height="101"
 	viewBox="0 -15 88 101"
 	><path
