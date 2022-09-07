@@ -362,17 +362,15 @@
 							on:click={() => changeSettings('isAPIDebuggingEnabled')}
 						/>
 					</div>
-					{#if browser && $features.beta}
-						<div class="grid grid-cols-2 items-center">
-							<Setting
-								id="isAutoUpdateEnabled"
-								bind:setting={isAutoUpdateEnabled}
-								title={$t('setting.auto_update_enabled')}
-								description={$t('setting.auto_update_enabled_explainer')}
-								on:click={() => changeSettings('isAutoUpdateEnabled')}
-							/>
-						</div>
-					{/if}
+					<div class="grid grid-cols-2 items-center">
+						<Setting
+							id="isAutoUpdateEnabled"
+							bind:setting={isAutoUpdateEnabled}
+							title={$t('setting.auto_update_enabled')}
+							description={$t('setting.auto_update_enabled_explainer')}
+							on:click={() => changeSettings('isAutoUpdateEnabled')}
+						/>
+					</div>
 				</div>
 			</form>
 		</div>
