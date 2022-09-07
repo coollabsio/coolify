@@ -145,9 +145,9 @@
 
 <div class="mx-auto max-w-4xl px-6">
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
-		<div class="flex space-x-1 pb-7 flex-col lg:items-center lg:flex-row">
-			<div class="title">General</div>
-			<div class="w-full flex flex-rpw lg:justify-end space-x-2 mt-5 lg:mt-0">
+		<div class="flex lg:flex-row lg:justify-between flex-col space-y-3 w-full lg:items-center">
+			<h1 class="title">General</h1>
+			<div class="flex flex-col lg:flex-row lg:space-x-4 lg:w-fit space-y-4 lg:space-y-0 w-full">
 				{#if $appSession.isAdmin}
 					<button type="submit" class="btn btn-sm bg-sources" disabled={loading}
 						>{loading ? $t('forms.saving') : $t('forms.save')}</button

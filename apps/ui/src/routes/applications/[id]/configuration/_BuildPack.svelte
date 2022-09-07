@@ -37,7 +37,7 @@
 	}
 </script>
 
-<form on:submit|preventDefault={() => handleSubmit(buildPack.name)}>
+<form class="lg:pt-32" on:submit|preventDefault={() => handleSubmit(buildPack.name)}>
 	<button
 		type="submit"
 		class="box-selection relative flex text-xl font-bold {buildPack.hoverColor} {foundConfig?.name ===

@@ -327,7 +327,7 @@
 	}
 </script>
 
-<form on:submit={handleSubmit}>
+<form on:submit={handleSubmit} lg:pt-32>
 	<div class="flex flex-col space-y-2 px-4 xl:flex-row xl:space-y-0 xl:space-x-2 ">
 		<div class="custom-select-wrapper">
 			<Select
