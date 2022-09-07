@@ -119,7 +119,7 @@
 				>
 			{/if}
 		</div>
-		<div class="grid gap-4 grid-cols-2 auto-rows-max">
+		<div class="grid gap-4 grid-cols-2 auto-rows-max lg:px-10">
 			<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 			<input
 				class="w-full"
@@ -202,22 +202,24 @@
 					{/if}</label
 				>
 			</div>
-			<CopyPasswordField
-				textarea={true}
-				placeholder={$t('forms.generated_automatically_after_start')}
-				isPasswordField={false}
-				id="url"
-				name="url"
-				readonly
-				disabled
-				value={publicLoading || loading ? 'Loading...' : generateUrl()}
-			/>
+			<div class="lg:px-10">
+				<CopyPasswordField
+					textarea={true}
+					placeholder={$t('forms.generated_automatically_after_start')}
+					isPasswordField={false}
+					id="url"
+					name="url"
+					readonly
+					disabled
+					value={publicLoading || loading ? 'Loading...' : generateUrl()}
+				/>
+			</div>
 		</div>
 	</form>
 	<div class="flex space-x-1 pb-5 font-bold">
 		<h1 class="title">{$t('application.features')}</h1>
 	</div>
-	<div class="grid gap-4 grid-cols-2 auto-rows-max">
+	<div class="grid gap-4 grid-cols-2 auto-rows-max lg:px-10">
 		<Setting
 			id="isPublic"
 			loading={publicLoading}

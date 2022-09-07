@@ -9,7 +9,7 @@
 <div class="flex space-x-1 py-5 font-bold">
 	<h1 class="title">Redis</h1>
 </div>
-<div class="space-y-2">
+<div class="space-y-2 lg:px-10">
 	<div class="grid grid-cols-2 items-center">
 		<label for="dbUserPassword" class="text-base font-bold text-stone-100"
 			>{$t('forms.password')}
