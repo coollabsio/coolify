@@ -19,7 +19,6 @@
 <script lang="ts">
 	export let sshKeys: any;
 	import { del, post } from '$lib/api';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import Menu from './_Menu.svelte';
@@ -69,8 +68,7 @@
 				<div class="title font-bold">SSH Keys</div>
 				<button
 					on:click={() => (isModalActive = true)}
-					class:bg-yellow-500={!loading.save}
-					class:hover:bg-yellow-400={!loading.save}
+					class="btn btn-sm bg-settings text-black"
 					disabled={loading.save}>New SSH Key</button
 				>
 			</div>
@@ -82,7 +80,9 @@
 						<div class="box-selection group relative">
 							<div class="text-xl font-bold">{key.name}</div>
 							<div class="py-3 text-stone-600">Added on {key.createdAt}</div>
-							<button on:click={() => deleteSSHKey(key.id)} class="bg-red-500">Delete</button>
+							<button on:click={() => deleteSSHKey(key.id)} class="btn btn-sm bg-error"
+								>Delete</button
+							>
 						</div>
 					{/each}
 				{/if}
@@ -140,8 +140,10 @@
 						</div>
 					</div>
 					<div class="mt-5 flex space-x-4 justify-end">
-						<button type="submit" class="bg-green-600 hover:bg-green-500">Save</button>
-						<button on:click={() => (isModalActive = false)} type="button" class="">Cancel</button>
+						<button type="submit" class="btn btn-sm bg-success">Save</button>
+						<button on:click={() => (isModalActive = false)} type="button" class="btn btn-sm"
+							>Cancel</button
+						>
 					</div>
 				</form>
 			</div>

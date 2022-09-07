@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { checkUpdate, login, showDashboard, update, showUsage, getCurrentUser, cleanupManually } from './handlers';
+import { checkUpdate, login, showDashboard, update, showUsage, getCurrentUser, cleanupManually, restartCoolify } from './handlers';
 import { GetCurrentUser } from './types';
 
 export interface Update {
@@ -46,6 +46,10 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 	fastify.get('/usage', {
 		onRequest: [fastify.authenticate]
 	}, async () => await showUsage());
+
+	fastify.post('/internal/restart', {
+		onRequest: [fastify.authenticate]
+	}, async (request) => await restartCoolify(request));
 
 	fastify.post('/internal/cleanup', {
 		onRequest: [fastify.authenticate]

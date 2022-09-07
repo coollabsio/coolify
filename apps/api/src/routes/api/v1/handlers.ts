@@ -1,11 +1,11 @@
 import os from 'node:os';
 import osu from 'node-os-utils';
 import axios from 'axios';
-import compare from 'compare-versions';
+import { compareVersions } from 'compare-versions';
 import cuid from 'cuid';
 import bcrypt from 'bcryptjs';
-import { asyncExecShell, asyncSleep, cleanupDockerStorage, errorHandler, isDev, prisma, uniqueName, version } from '../../../lib/common';
-
+import { asyncExecShell, asyncSleep, cleanupDockerStorage, errorHandler, isDev, listSettings, prisma, uniqueName, version } from '../../../lib/common';
+import { supportedServiceTypesAndVersions } from '../../../lib/services/supportedVersions';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Login, Update } from '.';
 import type { GetCurrentUser } from './types';
@@ -31,11 +31,14 @@ export async function checkUpdate(request: FastifyRequest) {
 		const { data: versions } = await axios.get(
 			`https://get.coollabs.io/versions.json?appId=${process.env['COOLIFY_APP_ID']}&version=${currentVersion}`
 		);
-		const latestVersion =
-			isStaging
-				? versions['coolify'].next.version
-				: versions['coolify'].main.version;
-		const isUpdateAvailable = compare(latestVersion, currentVersion);
+		const latestVersion = versions['coolify'].main.version
+		const isUpdateAvailable = compareVersions(latestVersion, currentVersion);
+		if (isStaging) {
+			return {
+				isUpdateAvailable: true,
+				latestVersion: 'next'
+			}
+		}
 		return {
 			isUpdateAvailable: isStaging ? true : isUpdateAvailable === 1,
 			latestVersion
@@ -62,10 +65,25 @@ export async function update(request: FastifyRequest<Update>) {
 			);
 			return {};
 		} else {
-			console.log(latestVersion);
 			await asyncSleep(2000);
 			return {};
 		}
+	} catch ({ status, message }) {
+		return errorHandler({ status, message })
+	}
+}
+export async function restartCoolify(request: FastifyRequest<any>) {
+	try {
+		const teamId = request.user.teamId;
+		if (teamId === '0') {
+			if (!isDev) {
+				asyncExecShell(`docker restart coolify`);
+				return {};
+			} else {
+				return {};
+			}
+		}
+		throw { status: 500, message: 'You are not authorized to restart Coolify.' };
 	} catch ({ status, message }) {
 		return errorHandler({ status, message })
 	}
@@ -93,34 +111,23 @@ export async function showDashboard(request: FastifyRequest) {
 	try {
 		const userId = request.user.userId;
 		const teamId = request.user.teamId;
-		const applicationsCount = await prisma.application.count({
+		const applications = await prisma.application.findMany({
+			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+			include: { settings: true }
+		});
+		const databases = await prisma.database.findMany({
+			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+			include: { settings: true }
+		});
+		const services = await prisma.service.findMany({
 			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
 		});
-		const sourcesCount = await prisma.gitSource.count({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
-		});
-		const destinationsCount = await prisma.destinationDocker.count({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
-		});
-		const teamsCount = await prisma.permission.count({ where: { userId } });
-		const databasesCount = await prisma.database.count({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
-		});
-		const servicesCount = await prisma.service.count({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
-		});
-		const teams = await prisma.permission.findMany({
-			where: { userId },
-			include: { team: { include: { _count: { select: { users: true } } } } }
-		});
+		const settings = await listSettings();
 		return {
-			teams,
-			applicationsCount,
-			sourcesCount,
-			destinationsCount,
-			teamsCount,
-			databasesCount,
-			servicesCount,
+			applications,
+			databases,
+			services,
+			settings,
 		};
 	} catch ({ status, message }) {
 		return errorHandler({ status, message })
@@ -291,6 +298,7 @@ export async function getCurrentUser(request: FastifyRequest<GetCurrentUser>, fa
 	}
 	return {
 		settings: await prisma.setting.findFirst(),
+		supportedServiceTypesAndVersions,
 		token,
 		...request.user
 	}

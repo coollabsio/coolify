@@ -26,24 +26,8 @@
 	import { t } from '$lib/translations';
 	import { getDomain } from '$lib/common';
 	import { appSession } from '$lib/store';
+	import ApplicationsIcons from '$lib/components/svg/applications/ApplicationIcons.svelte';
 
-	import Rust from '$lib/components/svg/applications/Rust.svelte';
-	import Nodejs from '$lib/components/svg/applications/Nodejs.svelte';
-	import React from '$lib/components/svg/applications/React.svelte';
-	import Svelte from '$lib/components/svg/applications/Svelte.svelte';
-	import Vuejs from '$lib/components/svg/applications/Vuejs.svelte';
-	import PHP from '$lib/components/svg/applications/PHP.svelte';
-	import Python from '$lib/components/svg/applications/Python.svelte';
-	import Static from '$lib/components/svg/applications/Static.svelte';
-	import Nestjs from '$lib/components/svg/applications/Nestjs.svelte';
-	import Nuxtjs from '$lib/components/svg/applications/Nuxtjs.svelte';
-	import Nextjs from '$lib/components/svg/applications/Nextjs.svelte';
-	import Gatsby from '$lib/components/svg/applications/Gatsby.svelte';
-	import Docker from '$lib/components/svg/applications/Docker.svelte';
-	import Astro from '$lib/components/svg/applications/Astro.svelte';
-	import Eleventy from '$lib/components/svg/applications/Eleventy.svelte';
-	import Deno from '$lib/components/svg/applications/Deno.svelte';
-	import Laravel from '$lib/components/svg/applications/Laravel.svelte';
 	ownApplications = applications.filter((application) => {
 		if (application.teams[0].id === $appSession.teamId) {
 			return application;
@@ -61,14 +45,11 @@
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl ">{$t('index.applications')}</div>
+	<div class="mr-4 text-2xl">{$t('index.applications')}</div>
 	{#if $appSession.isAdmin}
-		<button
-			on:click={newApplication}
-			class="add-icon cursor-pointer bg-green-600 hover:bg-green-500"
-		>
+		<button on:click={newApplication} class="btn btn-square btn-sm bg-applications">
 			<svg
-				class="w-6"
+				class="h-6 w-6"
 				xmlns="http://www.w3.org/2000/svg"
 				fill="none"
 				viewBox="0 0 24 24"
@@ -83,7 +64,7 @@
 		</button>
 	{/if}
 </div>
-<div class="flex-col justify-center">
+<div class="flex-col justify-center mt-10 pb-12 sm:pb-16">
 	{#if !applications || ownApplications.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">{$t('application.no_applications_found')}</div>
@@ -96,41 +77,7 @@
 					<a href="/applications/{application.id}" class="p-2 no-underline">
 						<div class="box-selection group relative hover:bg-green-600">
 							{#if application.buildPack}
-								{#if application.buildPack.toLowerCase() === 'rust'}
-									<Rust />
-								{:else if application.buildPack.toLowerCase() === 'node'}
-									<Nodejs />
-								{:else if application.buildPack.toLowerCase() === 'react'}
-									<React />
-								{:else if application.buildPack.toLowerCase() === 'svelte'}
-									<Svelte />
-								{:else if application.buildPack.toLowerCase() === 'vuejs'}
-									<Vuejs />
-								{:else if application.buildPack.toLowerCase() === 'php'}
-									<PHP />
-								{:else if application.buildPack.toLowerCase() === 'python'}
-									<Python />
-								{:else if application.buildPack.toLowerCase() === 'static'}
-									<Static />
-								{:else if application.buildPack.toLowerCase() === 'nestjs'}
-									<Nestjs />
-								{:else if application.buildPack.toLowerCase() === 'nuxtjs'}
-									<Nuxtjs />
-								{:else if application.buildPack.toLowerCase() === 'nextjs'}
-									<Nextjs />
-								{:else if application.buildPack.toLowerCase() === 'gatsby'}
-									<Gatsby />
-								{:else if application.buildPack.toLowerCase() === 'docker'}
-									<Docker />
-								{:else if application.buildPack.toLowerCase() === 'astro'}
-									<Astro />
-								{:else if application.buildPack.toLowerCase() === 'eleventy'}
-									<Eleventy />
-								{:else if application.buildPack.toLowerCase() === 'deno'}
-									<Deno />
-								{:else if application.buildPack.toLowerCase() === 'laravel'}
-									<Laravel />
-								{/if}
+								<ApplicationsIcons {application} />
 							{/if}
 
 							<div class="truncate text-center text-xl font-bold">{application.name}</div>
@@ -139,6 +86,9 @@
 							{/if}
 							{#if application.fqdn}
 								<div class="truncate text-center">{getDomain(application.fqdn) || ''}</div>
+							{/if}
+							{#if application.settings.isBot}
+								<div class="truncate text-center">BOT</div>
 							{/if}
 							{#if application.destinationDocker?.name}
 								<div class="truncate text-center">{application.destinationDocker.name}</div>
@@ -151,7 +101,7 @@
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									Destination Missing
 								</div>
-							{:else if !application.fqdn}
+							{:else if !application.fqdn && !application.settings.isBot}
 								<div class="truncate text-center font-bold text-red-500 group-hover:text-white">
 									URL Missing
 								</div>
@@ -167,41 +117,7 @@
 						<a href="/applications/{application.id}" class="p-2 no-underline">
 							<div class="box-selection group relative hover:bg-green-600">
 								{#if application.buildPack}
-									{#if application.buildPack.toLowerCase() === 'rust'}
-										<Rust />
-									{:else if application.buildPack.toLowerCase() === 'node'}
-										<Nodejs />
-									{:else if application.buildPack.toLowerCase() === 'react'}
-										<React />
-									{:else if application.buildPack.toLowerCase() === 'svelte'}
-										<Svelte />
-									{:else if application.buildPack.toLowerCase() === 'vuejs'}
-										<Vuejs />
-									{:else if application.buildPack.toLowerCase() === 'php'}
-										<PHP />
-									{:else if application.buildPack.toLowerCase() === 'python'}
-										<Python />
-									{:else if application.buildPack.toLowerCase() === 'static'}
-										<Static />
-									{:else if application.buildPack.toLowerCase() === 'nestjs'}
-										<Nestjs />
-									{:else if application.buildPack.toLowerCase() === 'nuxtjs'}
-										<Nuxtjs />
-									{:else if application.buildPack.toLowerCase() === 'nextjs'}
-										<Nextjs />
-									{:else if application.buildPack.toLowerCase() === 'gatsby'}
-										<Gatsby />
-									{:else if application.buildPack.toLowerCase() === 'docker'}
-										<Docker />
-									{:else if application.buildPack.toLowerCase() === 'astro'}
-										<Astro />
-									{:else if application.buildPack.toLowerCase() === 'eleventy'}
-										<Eleventy />
-									{:else if application.buildPack.toLowerCase() === 'deno'}
-										<Deno />
-									{:else if application.buildPack.toLowerCase() === 'laravel'}
-										<Laravel />
-									{/if}
+									<ApplicationsIcons {application} />
 								{/if}
 
 								<div class="truncate text-center text-xl font-bold">{application.name}</div>

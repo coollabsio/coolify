@@ -95,19 +95,19 @@
 	async function isBranchAlreadyUsed(event: any) {
 		selected.branch = event.detail.value;
 		try {
-			const data = await get(
-				`/applications/${id}/configuration/repository?repository=${selected.repository}&branch=${selected.branch}`
-			);
-			if (data.used) {
-				const sure = confirm($t('application.configuration.branch_already_in_use'));
-				if (sure) {
-					selected.autodeploy = false;
-					showSave = true;
-					return true;
-				}
-				showSave = false;
-				return true;
-			}
+			// const data = await get(
+			// 	`/applications/${id}/configuration/repository?repository=${selected.repository}&branch=${selected.branch}`
+			// );
+			// if (data.used) {
+			// 	const sure = confirm($t('application.configuration.branch_already_in_use'));
+			// 	if (sure) {
+			// 		selected.autodeploy = false;
+			// 		showSave = true;
+			// 		return true;
+			// 	}
+			// 	showSave = false;
+			// 	return true;
+			// }
 			showSave = true;
 		} catch (error) {
 			showSave = false;
@@ -190,11 +190,11 @@
 		</div>
 		<div class="pt-5 flex-col flex justify-center items-center space-y-4">
 			<button
-				class="w-40"
+				class="btn btn-wide"
 				type="submit"
 				disabled={!showSave}
-				class:bg-orange-600={showSave}
-				class:hover:bg-orange-500={showSave}>{$t('forms.save')}</button
+				class:bg-applications={showSave}
+				>{$t('forms.save')}</button
 			>
 		</div>
 	</form>

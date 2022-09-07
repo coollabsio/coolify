@@ -3,7 +3,7 @@
 </script>
 
 <svg
-	class={isAbsolute ? 'w-12 h-12 absolute top-0 left-0 -m-5' : 'w-8 mx-auto'}
+	class={isAbsolute ? 'w-12 h-12 absolute top-0 left-0 -m-5' : 'w-8 h-8 mx-auto'}
 	viewBox="0 0 220 105"
 >
 	<g>

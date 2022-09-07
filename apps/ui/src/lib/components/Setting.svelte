@@ -1,6 +1,8 @@
 <script lang="ts">
-	import Explainer from '$lib/components/Explainer.svelte';
+	import Explaner from './Explainer.svelte';
+	import Tooltip from './Tooltip.svelte';
 
+	export let id: any;
 	export let setting: any;
 	export let title: any;
 	export let description: any;
@@ -8,22 +10,18 @@
 	export let disabled = false;
 	export let dataTooltip: any = null;
 	export let loading = false;
+	let triggeredBy = `#${id}`;
 </script>
 
 <div class="flex items-center py-4 pr-8">
 	<div class="flex w-96 flex-col">
-		<div class="text-xs font-bold text-stone-100 md:text-base">{title}</div>
-		<Explainer text={description} />
+		<div class="text-xs font-bold text-stone-100 md:text-base">
+			{title}<Explaner explanation={description} />
+		</div>
 	</div>
 </div>
-<div
-	class:tooltip={dataTooltip}
-	class:text-center={isCenter}
-	data-tooltip={dataTooltip}
-	class="flex justify-center"
->
+<div class:text-center={isCenter} class="flex justify-center">
 	<div
-		type="button"
 		on:click
 		aria-pressed="false"
 		class="relative mx-20 inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
@@ -31,6 +29,7 @@
 		class:bg-green-600={!loading && setting}
 		class:bg-stone-700={!loading && !setting}
 		class:bg-yellow-500={loading}
+		{id}
 	>
 		<span class="sr-only">Use setting</span>
 		<span
@@ -71,3 +70,7 @@
 		</span>
 	</div>
 </div>
+
+{#if dataTooltip}
+	<Tooltip {triggeredBy} placement="top">{dataTooltip}</Tooltip>
+{/if}

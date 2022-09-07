@@ -28,17 +28,20 @@
 	import { get } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { changeQueryParams, dateOptions, errorNotification } from '$lib/common';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 
 	let buildId: any;
 
 	let skip = 0;
 	let noMoreBuilds = buildCount < 5 || buildCount <= skip;
+
+	let buildTook = 0;
 	const { id } = $page.params;
 	let preselectedBuildId = $page.url.searchParams.get('buildId');
 	if (preselectedBuildId) buildId = preselectedBuildId;
 
 	async function updateBuildStatus({ detail }: { detail: any }) {
-		const { status } = detail;
+		const { status, took } = detail;
 		if (status !== 'running') {
 			try {
 				const data = await get(`/applications/${id}/logs/build?buildId=${buildId}`);
@@ -58,6 +61,7 @@
 				if (build.id === buildId) build.status = status;
 				return build;
 			});
+			buildTook = took;
 		}
 	}
 	async function loadMoreBuilds() {
@@ -137,19 +141,18 @@
 		<div class="top-4 md:sticky">
 			{#each builds as build, index (build.id)}
 				<div
-					data-tooltip={new Intl.DateTimeFormat('default', dateOptions).format(
-						new Date(build.createdAt)
-					) + `\n${build.status}`}
+					id={`building-${build.id}`}
 					on:click={() => loadBuild(build.id)}
 					class:rounded-tr={index === 0}
 					class:rounded-br={index === builds.length - 1}
-					class="tooltip-top flex cursor-pointer items-center justify-center border-l-2  py-4 no-underline transition-all duration-100 hover:bg-coolgray-400 hover:shadow-xl "
+					class="flex cursor-pointer items-center justify-center border-l-2 py-4 no-underline transition-all duration-100 hover:bg-coolgray-400 hover:shadow-xl"
 					class:bg-coolgray-400={buildId === build.id}
 					class:border-red-500={build.status === 'failed'}
+					class:border-orange-500={build.status === 'canceled'}
 					class:border-green-500={build.status === 'success'}
 					class:border-yellow-500={build.status === 'running'}
 				>
-					<div class="flex-col px-2">
+					<div class="flex-col px-2 text-center min-w-[10rem]">
 						<div class="text-sm font-bold">
 							{build.branch || application.branch}
 						</div>
@@ -157,11 +160,14 @@
 							{build.type}
 						</div>
 					</div>
-					<div class="flex-1" />
 
 					<div class="w-48 text-center text-xs">
 						{#if build.status === 'running'}
 							<div class="font-bold">{$t('application.build.running')}</div>
+							<div>
+								Elapsed
+								<span class="font-bold">{buildTook}s</span>
+							</div>
 						{:else if build.status === 'queued'}
 							<div class="font-bold">{$t('application.build.queued')}</div>
 						{:else}
@@ -172,12 +178,16 @@
 						{/if}
 					</div>
 				</div>
+				<Tooltip triggeredBy={`#building-${build.id}`}
+					>{new Intl.DateTimeFormat('default', dateOptions).format(new Date(build.createdAt)) +
+						`\n${build.status}`}</Tooltip
+				>
 			{/each}
 		</div>
 		{#if !noMoreBuilds}
 			{#if buildCount > 5}
 				<div class="flex space-x-2">
-					<button disabled={noMoreBuilds} class="w-full" on:click={loadMoreBuilds}
+					<button disabled={noMoreBuilds} class=" btn btn-sm w-full" on:click={loadMoreBuilds}
 						>{$t('application.build.load_more')}</button
 					>
 				</div>

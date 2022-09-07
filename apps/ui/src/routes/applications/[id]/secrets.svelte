@@ -27,7 +27,7 @@
 	import { t } from '$lib/translations';
 	import { get } from '$lib/api';
 	import { saveSecret } from './utils';
-	import { toast } from '@zerodevx/svelte-toast';
+	import { addToast } from '$lib/store';
 
 	const limit = pLimit(1);
 	const { id } = $page.params;
@@ -43,7 +43,8 @@
 		const batchSecretsPairs = eachValuePair
 			.filter((secret) => !secret.startsWith('#') && secret)
 			.map((secret) => {
-				const [name, value] = secret.split('=');
+				const [name, ...rest] = secret.split('=');
+				const value = rest.join('=');
 				const cleanValue = value?.replaceAll('"', '') || '';
 				return {
 					name,
@@ -59,7 +60,10 @@
 		);
 		batchSecrets = '';
 		await refreshSecrets();
-		toast.push('Secrets saved.');
+		addToast({
+			message: 'Secrets saved.',
+			type: 'success'
+		});
 	}
 </script>
 
@@ -147,9 +151,6 @@
 	<h2 class="title my-6 font-bold">Paste .env file</h2>
 	<form on:submit|preventDefault={getValues} class="mb-12 w-full">
 		<textarea bind:value={batchSecrets} class="mb-2 min-h-[200px] w-full" />
-		<button
-			class="bg-green-600 hover:bg-green-500 disabled:text-white disabled:opacity-40"
-			type="submit">Batch add secrets</button
-		>
+		<button class="btn btn-sm bg-applications" type="submit">Batch add secrets</button>
 	</form>
 </div>

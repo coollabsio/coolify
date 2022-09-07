@@ -19,13 +19,13 @@
 	};
 	let usageInterval: any;
 	let loading = {
-		usage: false
+		usage: false,
+		cleanup: false
 	};
-	import { appSession } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
 	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
-	import Trend from './Trend.svelte';
 	async function getStatus() {
 		if (loading.usage) return;
 		loading.usage = true;
@@ -33,6 +33,7 @@
 		usage = data.usage;
 		loading.usage = false;
 	}
+
 	onDestroy(() => {
 		clearInterval(usageInterval);
 	});
@@ -48,107 +49,99 @@
 			return errorNotification(error);
 		}
 	});
-
-	let warning = {
-		memory: false,
-		cpu: false,
-		disk: false
-	};
-	let trends = {
-		memory: 'stable',
-		cpu: 'stable',
-		disk: 'stable'
-	};
 	async function manuallyCleanupStorage() {
-		return await post('/internal/cleanup', {});
+		try {
+			loading.cleanup = true;
+			await post('/internal/cleanup', {});
+			return addToast({
+				message: 'Cleanup done.',
+				type: 'success'
+			});
+		} catch (error) {
+			return errorNotification(error);
+		} finally {
+			loading.cleanup = false;
+		}
 	}
 </script>
 
-{#if $appSession.teamId === '0'}
-	<div class="px-6 text-2xl font-bold">Server Usage</div>
-	<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-		<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
-			<dt class="truncate text-sm font-medium text-white">Total Memory</dt>
-			<dd class="mt-1 text-3xl font-semibold text-white">
-				{(usage?.memory.totalMemMb).toFixed(0)}<span class="text-sm">MB</span>
-			</dd>
+<div class="w-full">
+	<div class="flex lg:flex-row flex-col gap-4">
+		<h1 class="title lg:text-3xl">Hardware Details</h1>
+		<div class="flex lg:flex-row flex-col space-x-0 lg:space-x-2 space-y-2 lg:space-y-0">
+			{#if $appSession.teamId === '0'}
+				<button on:click={manuallyCleanupStorage} class:loading={loading.cleanup} class="btn btn-sm"
+					>Cleanup Storage</button
+				>
+			{/if}
+		</div>
+	</div>
+	<div class="divider" />
+	<div class="grid grid-flow-col gap-4 grid-rows-3 justify-start lg:justify-center lg:grid-rows-1">
+		<div class="stats stats-vertical min-w-[16rem] mb-5 rounded bg-transparent">
+			<div class="stat">
+				<div class="stat-title">Total Memory</div>
+				<div class="stat-value text-2xl">
+					{(usage?.memory.totalMemMb).toFixed(0)}<span class="text-sm">MB</span>
+				</div>
+			</div>
+
+			<div class="stat">
+				<div class="stat-title">Used Memory</div>
+				<div class="stat-value text-2xl">
+					{(usage?.memory.usedMemMb).toFixed(0)}<span class="text-sm">MB</span>
+				</div>
+			</div>
+
+			<div class="stat">
+				<div class="stat-title">Free Memory</div>
+				<div class="stat-value text-2xl">
+					{usage?.memory.freeMemPercentage}<span class="text-sm">%</span>
+				</div>
+			</div>
 		</div>
 
-		<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
-			<dt class="truncate text-sm font-medium text-white">Used Memory</dt>
-			<dd class="mt-1 text-3xl font-semibold text-white ">
-				{(usage?.memory.usedMemMb).toFixed(0)}<span class="text-sm">MB</span>
-			</dd>
-		</div>
+		<div class="stats stats-vertical min-w-[20rem] mb-5 bg-transparent rounded">
+			<div class="stat">
+				<div class="stat-title">Total CPU</div>
+				<div class="stat-value text-2xl">
+					{usage?.cpu.count}
+				</div>
+			</div>
 
-		<div
-			class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left"
-			class:bg-red-500={warning.memory}
-		>
-			<dt class="truncate text-sm font-medium text-white">Free Memory</dt>
-			<dd class="mt-1 text-3xl font-semibold text-white">
-				{usage?.memory.freeMemPercentage}<span class="text-sm">%</span>
-				{#if !warning.memory}
-					<Trend trend={trends.memory} />
-				{/if}
-			</dd>
-		</div>
-	</dl>
-	<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-		<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
-			<dt class="truncate text-sm font-medium text-white">Total CPUs</dt>
-			<dd class="mt-1 text-3xl font-semibold text-white">
-				{usage?.cpu.count}
-			</dd>
-		</div>
-		<div
-			class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left"
-			class:bg-red-500={warning.cpu}
-		>
-			<dt class="truncate text-sm font-medium text-white">CPU Usage</dt>
-			<dd class="mt-1 text-3xl font-semibold text-white">
-				{usage?.cpu.usage}<span class="text-sm">%</span>
-				{#if !warning.cpu}
-					<Trend trend={trends.cpu} />
-				{/if}
-			</dd>
-		</div>
-		<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
-			<dt class="truncate text-sm font-medium text-white">Load Average (5/10/30mins)</dt>
-			<dd class="mt-1 text-3xl font-semibold text-white">
-				{usage?.cpu.load.join('/')}
-			</dd>
-		</div>
-	</dl>
-	<dl class="relative mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-		<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
-			<dt class="truncate text-sm font-medium text-white">Total Disk</dt>
-			<dd class="mt-1 text-3xl font-semibold text-white">
-				{usage?.disk.totalGb}<span class="text-sm">GB</span>
-			</dd>
-		</div>
-		<div class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left">
-			<dt class="truncate text-sm font-medium text-white">Used Disk</dt>
-			<dd class="mt-1 text-3xl font-semibold text-white">
-				{usage?.disk.usedGb}<span class="text-sm">GB</span>
-			</dd>
-			<button on:click={manuallyCleanupStorage} class="bg-coollabs hover:bg-coollabs-100"
-				>Cleanup Storage</button
-			>
-		</div>
-		<div
-			class="overflow-hidden rounded px-4 py-5 text-center sm:p-6 sm:text-left"
-			class:bg-red-500={warning.disk}
-		>
-			<dt class="truncate text-sm font-medium text-white">Free Disk</dt>
-			<dd class="mt-1 text-3xl font-semibold text-white">
-				{usage?.disk.freePercentage}<span class="text-sm">%</span>
-				{#if !warning.disk}
-					<Trend trend={trends.disk} />
-				{/if}
-			</dd>
-		</div>
-	</dl>
+			<div class="stat">
+				<div class="stat-title">CPU Usage</div>
+				<div class="stat-value text-2xl">
+					{usage?.cpu.usage}<span class="text-sm">%</span>
+				</div>
+			</div>
 
-	<div class="px-6 pt-20 text-2xl font-bold">Resources</div>
-{/if}
+			<div class="stat">
+				<div class="stat-title">Load Average (5,10,30mins)</div>
+				<div class="stat-value text-2xl">{usage?.cpu.load}</div>
+			</div>
+		</div>
+		<div class="stats stats-vertical min-w-[16rem] mb-5 bg-transparent rounded">
+			<div class="stat">
+				<div class="stat-title">Total Disk</div>
+				<div class="stat-value text-2xl">
+					{usage?.disk.totalGb}<span class="text-sm">GB</span>
+				</div>
+			</div>
+
+			<div class="stat">
+				<div class="stat-title">Used Disk</div>
+				<div class="stat-value text-2xl">
+					{usage?.disk.usedGb}<span class="text-sm">GB</span>
+				</div>
+			</div>
+
+			<div class="stat">
+				<div class="stat-title">Free Disk</div>
+				<div class="stat-value text-2xl">
+					{usage?.disk.freePercentage}<span class="text-sm">%</span>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>

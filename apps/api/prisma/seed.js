@@ -17,7 +17,6 @@ const algorithm = 'aes-256-ctr';
 
 async function main() {
 	// Enable registration for the first user
-	// Set initial HAProxy password
 	const settingsFound = await prisma.setting.findFirst({});
 	if (!settingsFound) {
 		await prisma.setting.create({
@@ -25,7 +24,8 @@ async function main() {
 				isRegistrationEnabled: true,
 				proxyPassword: encrypt(generatePassword()),
 				proxyUser: cuid(),
-				arch: process.arch
+				arch: process.arch,
+				DNSServers: '1.1.1.1,8.8.8.8'
 			}
 		});
 	} else {
@@ -63,6 +63,34 @@ async function main() {
 			},
 			data: {
 				isAutoUpdateEnabled
+			}
+		});
+	}
+	const github = await prisma.gitSource.findFirst({
+		where: { htmlUrl: 'https://github.com', forPublic: true }
+	});
+	const gitlab = await prisma.gitSource.findFirst({
+		where: { htmlUrl: 'https://gitlab.com', forPublic: true }
+	});
+	if (!github) {
+		await prisma.gitSource.create({
+			data: {
+				apiUrl: 'https://api.github.com',
+				htmlUrl: 'https://github.com',
+				forPublic: true,
+				name: 'Github Public',
+				type: 'github'
+			}
+		});
+	}
+	if (!gitlab) {
+		await prisma.gitSource.create({
+			data: {
+				apiUrl: 'https://gitlab.com/api/v4',
+				htmlUrl: 'https://gitlab.com',
+				forPublic: true,
+				name: 'Gitlab Public',
+				type: 'gitlab'
 			}
 		});
 	}

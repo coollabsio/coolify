@@ -2,14 +2,14 @@ name: production-release
 
 on:
   release:
-    types: [published]
+    types: [released]
 
 jobs:
-  making-something-cool:
-    runs-on: ubuntu-latest
+  arm64-build:
+    runs-on: [self-hosted, arm64]
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
@@ -26,12 +26,60 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
           push: true
-          tags: coollabsio/coolify:latest,coollabsio/coolify:${{steps.package-version.outputs.current-version}}
-          cache-from: type=registry,ref=coollabsio/coolify:buildcache
-          cache-to: type=registry,ref=coollabsio/coolify:buildcache,mode=max
+          tags: coollabsio/coolify:${{steps.package-version.outputs.current-version}}-arm64
+          cache-from: type=registry,ref=coollabsio/coolify:buildcache-arm64
+          cache-to: type=registry,ref=coollabsio/coolify:buildcache-arm64,mode=max
+  amd64-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Get current package version
+        uses: martinbeentjes/npm-get-version-action@v1.2.3
+        id: package-version
+      - name: Build and push
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: coollabsio/coolify:${{steps.package-version.outputs.current-version}}-amd64
+          cache-from: type=registry,ref=coollabsio/coolify:buildcache-amd64
+          cache-to: type=registry,ref=coollabsio/coolify:buildcache-amd64,mode=max
+  merge-manifest:
+    runs-on: ubuntu-latest
+    needs: [amd64-build, arm64-build]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Get current package version
+        uses: martinbeentjes/npm-get-version-action@v1.2.3
+        id: package-version
+      - name: Create & publish manifest
+        run: |
+          docker manifest create coollabsio/coolify:${{steps.package-version.outputs.current-version}} --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-amd64 --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-arm64
+          docker manifest push coollabsio/coolify:${{steps.package-version.outputs.current-version}}
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_CHANNEL }}
+          webhook: ${{ secrets.DISCORD_WEBHOOK_PROD_RELEASE_CHANNEL }}

@@ -24,9 +24,8 @@
 	import { t } from '$lib/translations';
 	import { appSession } from '$lib/store';
 
-	import * as Icons from '$lib/components/svg/services';
 	import { getDomain } from '$lib/common';
-	import Services from './[id]/_Services.svelte';
+	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
 
 	async function newService() {
 		const { id } = await post('/services/new', {});
@@ -46,9 +45,9 @@
 
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">{$t('index.services')}</div>
-	<div on:click={newService} class="add-icon cursor-pointer bg-pink-600 hover:bg-pink-500">
+	<button on:click={newService} class="btn btn-square btn-sm bg-services">
 		<svg
-			class="w-6"
+			class="h-6 w-6"
 			xmlns="http://www.w3.org/2000/svg"
 			fill="none"
 			viewBox="0 0 24 24"
@@ -60,10 +59,10 @@
 				d="M12 6v6m0 0v6m0-6h6m-6 0H6"
 			/></svg
 		>
-	</div>
+	</button>
 </div>
 
-<div class="flex-col justify-center">
+<div class="flex-col justify-center mt-10 pb-12 sm:pb-16">
 	{#if !services || ownServices.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">{$t('service.no_service')}</div>
@@ -75,7 +74,7 @@
 				{#each ownServices as service}
 					<a href="/services/{service.id}" class=" p-2 no-underline">
 						<div class="box-selection group relative hover:bg-pink-600">
-							<Services type={service.type} />
+							<ServiceIcons type={service.type} />
 							<div class="truncate text-center text-xl font-bold">
 								{service.name}
 							</div>
@@ -103,7 +102,7 @@
 					{#each otherServices as service}
 						<a href="/services/{service.id}" class="p-2 no-underline">
 							<div class="box-selection group relative hover:bg-pink-600">
-								<Services type={service.type} />
+								<ServiceIcons type={service.type} />
 								<div class="truncate text-center text-xl font-bold">
 									{service.name}
 								</div>

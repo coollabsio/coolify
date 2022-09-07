@@ -14,10 +14,9 @@
 	import CouchDb from './_CouchDb.svelte';
 	import EdgeDB from './_EdgeDB.svelte';
 	import { post } from '$lib/api';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
-	import { appSession, status } from '$lib/store';
+	import { addToast, appSession, status } from '$lib/store';
 	import Explainer from '$lib/components/Explainer.svelte';
 
 	const { id } = $page.params;
@@ -62,7 +61,9 @@
 	}
 
 	async function changeSettings(name: any) {
-		if (publicLoading || !$status.database.isRunning) return;
+		if (name !== 'appendOnly') {
+			if (publicLoading || !$status.database.isRunning) return;
+		}
 		publicLoading = true;
 		let data = {
 			isPublic,
@@ -95,7 +96,10 @@
 			loading = true;
 			await post(`/databases/${id}`, { ...database, isRunning: $status.database.isRunning });
 			generateDbDetails();
-			toast.push('Configuration saved.');
+			addToast({
+				message: 'Configuration saved.',
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
@@ -111,9 +115,10 @@
 			{#if $appSession.isAdmin}
 				<button
 					type="submit"
-					class:bg-purple-600={!loading}
-					class:hover:bg-purple-500={!loading}
-					disabled={loading}>{loading ? $t('forms.saving') : $t('forms.save')}</button
+					class="btn btn-sm"
+					class:loading
+					class:bg-databases={!loading}
+					disabled={loading}>{$t('forms.save')}</button
 				>
 			{/if}
 		</div>
@@ -209,13 +214,13 @@
 			<div class="grid grid-cols-2 items-center px-10 pb-8">
 				<div>
 					<label for="url" class="text-base font-bold text-stone-100"
-						>{$t('database.connection_string')}</label
+						>{$t('database.connection_string')}
+						{#if !isPublic && database.destinationDocker.remoteEngine}
+							<Explainer
+								explanation="You can only access the database with this URL if your application is deployed to the same Destination."
+							/>
+						{/if}</label
 					>
-					{#if !isPublic && database.destinationDocker.remoteEngine}
-						<Explainer
-							text="You can only access the database with this URL if your application is deployed to the same Destination."
-						/>
-					{/if}
 				</div>
 				<CopyPasswordField
 					textarea={true}
@@ -236,6 +241,7 @@
 	<div class="px-10 pb-10">
 		<div class="grid grid-cols-2 items-center">
 			<Setting
+				id="isPublic"
 				loading={publicLoading}
 				bind:setting={isPublic}
 				on:click={() => changeSettings('isPublic')}
@@ -247,6 +253,8 @@
 		{#if database.type === 'redis'}
 			<div class="grid grid-cols-2 items-center">
 				<Setting
+					id="appendOnly"
+					loading={publicLoading}
 					bind:setting={appendOnly}
 					on:click={() => changeSettings('appendOnly')}
 					title={$t('database.change_append_only_mode')}

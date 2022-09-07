@@ -37,6 +37,7 @@
 	import { appSession } from '$lib/store';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import { goto } from '$app/navigation';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 	const { id } = $page.params;
 
 	async function deleteSource(name: string) {
@@ -55,16 +56,14 @@
 {#if id !== 'new'}
 	<nav class="nav-side">
 		<button
+			id="delete"
 			on:click={() => deleteSource(source.name)}
-			title={$t('source.delete_git_source')}
 			type="submit"
 			disabled={!$appSession.isAdmin}
 			class:hover:text-red-500={$appSession.isAdmin}
-			class="icons tooltip-bottom bg-transparent text-sm"
-			data-tooltip={$appSession.isAdmin
-				? $t('source.delete_git_source')
-				: $t('source.permission_denied')}><DeleteIcon /></button
+			class="icons bg-transparent text-sm"><DeleteIcon /></button
 		>
 	</nav>
+	<Tooltip triggeredBy="#delete">Delete</Tooltip>
 {/if}
 <slot />

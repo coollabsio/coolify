@@ -1,4 +1,4 @@
-import child from 'child_process';
+import { exec } from 'node:child_process'
 import util from 'util';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
@@ -15,9 +15,13 @@ import sshConfig from 'ssh-config'
 
 import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
-import * as serviceFields from './serviceFields'
+import * as serviceFields from './services/serviceFields'
+import { saveBuildLog } from './buildPacks/common';
+import { scheduler } from './scheduler';
+import { supportedServiceTypesAndVersions } from './services/supportedVersions';
+import { includeServices } from './services/common';
 
-export const version = '3.2.0';
+export const version = '3.9.2';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -38,13 +42,20 @@ export function getAPIUrl() {
 		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '')
 		return newURL
 	}
+	if (process.env.CODESANDBOX_HOST) {
+		return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/, '3001')}`
+	}
 	return isDev ? 'http://localhost:3001' : 'http://localhost:3000';
 }
+
 export function getUIUrl() {
 	if (process.env.GITPOD_WORKSPACE_URL) {
 		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL)
 		const newURL = href.replace('https://', 'https://3000-').replace(/\/$/, '')
 		return newURL
+	}
+	if (process.env.CODESANDBOX_HOST) {
+		return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/, '3000')}`
 	}
 	return 'http://localhost:3000';
 }
@@ -58,29 +69,81 @@ const otherTraefikEndpoint = isDev
 	: 'http://coolify:3000/webhooks/traefik/other.json';
 
 
-export const include: any = {
-	destinationDocker: true,
-	persistentStorage: true,
-	serviceSecret: true,
-	minio: true,
-	plausibleAnalytics: true,
-	vscodeserver: true,
-	wordpress: true,
-	ghost: true,
-	meiliSearch: true,
-	umami: true,
-	hasura: true,
-	fider: true,
-};
-
 export const uniqueName = (): string => uniqueNamesGenerator(customConfig);
-export const asyncExecShell = util.promisify(child.exec);
+export const asyncExecShell = util.promisify(exec);
+export const asyncExecShellStream = async ({ debug, buildId, applicationId, command, engine }: { debug: boolean, buildId: string, applicationId: string, command: string, engine: string }) => {
+	return await new Promise(async (resolve, reject) => {
+		const { execaCommand } = await import('execa')
+		const subprocess = execaCommand(command, { env: { DOCKER_BUILDKIT: "1", DOCKER_HOST: engine } })
+		if (debug) {
+			subprocess.stdout.on('data', async (data) => {
+				const stdout = data.toString();
+				const array = stdout.split('\n')
+				for (const line of array) {
+					if (line !== '\n' && line !== '') {
+						await saveBuildLog({
+							line: `${line.replace('\n', '')}`,
+							buildId,
+							applicationId
+						});
+					}
+				}
+			})
+			subprocess.stderr.on('data', async (data) => {
+				const stderr = data.toString();
+				const array = stderr.split('\n')
+				for (const line of array) {
+					if (line !== '\n' && line !== '') {
+						await saveBuildLog({
+							line: `${line.replace('\n', '')}`,
+							buildId,
+							applicationId
+						});
+					}
+				}
+			})
+		}
+		subprocess.on('exit', async (code) => {
+			await asyncSleep(1000);
+			if (code === 0) {
+				resolve(code)
+			} else {
+				reject(code)
+			}
+		})
+	})
+}
+
 export const asyncSleep = (delay: number): Promise<unknown> =>
 	new Promise((resolve) => setTimeout(resolve, delay));
 export const prisma = new PrismaClient({
-	errorFormat: 'minimal'
+	errorFormat: 'minimal',
+	// log: [
+	// 	{
+	// 	  emit: 'event',
+	// 	  level: 'query',
+	// 	},
+	// 	{
+	// 	  emit: 'stdout',
+	// 	  level: 'error',
+	// 	},
+	// 	{
+	// 	  emit: 'stdout',
+	// 	  level: 'info',
+	// 	},
+	// 	{
+	// 	  emit: 'stdout',
+	// 	  level: 'warn',
+	// 	},
+	//   ],
 });
 
+// prisma.$on('query', (e) => {
+// console.log({e})
+// console.log('Query: ' + e.query)
+// console.log('Params: ' + e.params)
+// console.log('Duration: ' + e.duration + 'ms')
+//   })
 export const base64Encode = (text: string): string => {
 	return Buffer.from(text).toString('base64');
 };
@@ -89,17 +152,23 @@ export const base64Decode = (text: string): string => {
 };
 export const decrypt = (hashString: string) => {
 	if (hashString) {
-		const hash = JSON.parse(hashString);
-		const decipher = crypto.createDecipheriv(
-			algorithm,
-			process.env['COOLIFY_SECRET_KEY'],
-			Buffer.from(hash.iv, 'hex')
-		);
-		const decrpyted = Buffer.concat([
-			decipher.update(Buffer.from(hash.content, 'hex')),
-			decipher.final()
-		]);
-		return decrpyted.toString();
+		try {
+			const hash = JSON.parse(hashString);
+			const decipher = crypto.createDecipheriv(
+				algorithm,
+				process.env['COOLIFY_SECRET_KEY'],
+				Buffer.from(hash.iv, 'hex')
+			);
+			const decrpyted = Buffer.concat([
+				decipher.update(Buffer.from(hash.content, 'hex')),
+				decipher.final()
+			]);
+			return decrpyted.toString();
+		} catch (error) {
+			console.log({ decryptionError: error.message })
+			return hashString
+		}
+
 	}
 };
 export const encrypt = (text: string) => {
@@ -114,166 +183,7 @@ export const encrypt = (text: string) => {
 	}
 };
 
-export const supportedServiceTypesAndVersions = [
-	{
-		name: 'plausibleanalytics',
-		fancyName: 'Plausible Analytics',
-		baseImage: 'plausible/analytics',
-		images: ['bitnami/postgresql:13.2.0', 'yandex/clickhouse-server:21.3.2.5'],
-		versions: ['latest', 'stable'],
-		recommendedVersion: 'stable',
-		ports: {
-			main: 8000
-		}
-	},
-	{
-		name: 'nocodb',
-		fancyName: 'NocoDB',
-		baseImage: 'nocodb/nocodb',
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 8080
-		}
-	},
-	{
-		name: 'minio',
-		fancyName: 'MinIO',
-		baseImage: 'minio/minio',
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 9001
-		}
-	},
-	{
-		name: 'vscodeserver',
-		fancyName: 'VSCode Server',
-		baseImage: 'codercom/code-server',
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 8080
-		}
-	},
-	{
-		name: 'wordpress',
-		fancyName: 'Wordpress',
-		baseImage: 'wordpress',
-		images: ['bitnami/mysql:5.7'],
-		versions: ['latest', 'php8.1', 'php8.0', 'php7.4', 'php7.3'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 80
-		}
-	},
-	{
-		name: 'vaultwarden',
-		fancyName: 'Vaultwarden',
-		baseImage: 'vaultwarden/server',
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 80
-		}
-	},
-	{
-		name: 'languagetool',
-		fancyName: 'LanguageTool',
-		baseImage: 'silviof/docker-languagetool',
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 8010
-		}
-	},
-	{
-		name: 'n8n',
-		fancyName: 'n8n',
-		baseImage: 'n8nio/n8n',
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 5678
-		}
-	},
-	{
-		name: 'uptimekuma',
-		fancyName: 'Uptime Kuma',
-		baseImage: 'louislam/uptime-kuma',
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 3001
-		}
-	},
-	{
-		name: 'ghost',
-		fancyName: 'Ghost',
-		baseImage: 'bitnami/ghost',
-		images: ['bitnami/mariadb'],
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 2368
-		}
-	},
-	{
-		name: 'meilisearch',
-		fancyName: 'Meilisearch',
-		baseImage: 'getmeili/meilisearch',
-		images: [],
-		versions: ['latest'],
-		recommendedVersion: 'latest',
-		ports: {
-			main: 7700
-		}
-	},
-	{
-		name: 'umami',
-		fancyName: 'Umami',
-		baseImage: 'ghcr.io/mikecao/umami',
-		images: ['postgres:12-alpine'],
-		versions: ['postgresql-latest'],
-		recommendedVersion: 'postgresql-latest',
-		ports: {
-			main: 3000
-		}
-	},
-	{
-		name: 'hasura',
-		fancyName: 'Hasura',
-		baseImage: 'hasura/graphql-engine',
-		images: ['postgres:12-alpine'],
-		versions: ['latest', 'v2.8.4', 'v2.5.1'],
-		recommendedVersion: 'v2.8.4',
-		ports: {
-			main: 8080
-		}
-	},
-	{
-		name: 'fider',
-		fancyName: 'Fider',
-		baseImage: 'getfider/fider',
-		images: ['postgres:12-alpine'],
-		versions: ['stable'],
-		recommendedVersion: 'stable',
-		ports: {
-			main: 3000
-		}
-	},
-	// {
-	//     name: 'moodle',
-	//     fancyName: 'Moodle',
-	//     baseImage: 'bitnami/moodle',
-	//     images: [],
-	//     versions: ['latest', 'v4.0.2'],
-	//     recommendedVersion: 'latest',
-	//     ports: {
-	//         main: 8080
-	//     }
-	// }
-];
+
 
 export async function checkDoubleBranch(branch: string, projectId: number): Promise<boolean> {
 	const applications = await prisma.application.findMany({ where: { branch, projectId } });
@@ -281,6 +191,10 @@ export async function checkDoubleBranch(branch: string, projectId: number): Prom
 }
 export async function isDNSValid(hostname: any, domain: string): Promise<any> {
 	const { isIP } = await import('is-ip');
+	const { DNSServers } = await listSettings();
+	if (DNSServers) {
+		dns.setServers([DNSServers]);
+	}
 	let resolves = [];
 	try {
 		if (isIP(hostname)) {
@@ -294,7 +208,6 @@ export async function isDNSValid(hostname: any, domain: string): Promise<any> {
 
 	try {
 		let ipDomainFound = false;
-		dns.setServers(['1.1.1.1', '8.8.8.8']);
 		const dnsResolve = await dns.resolve4(domain);
 		if (dnsResolve.length > 0) {
 			for (const ip of dnsResolve) {
@@ -318,12 +231,12 @@ export async function isDomainConfigured({
 	id,
 	fqdn,
 	checkOwn = false,
-	dockerId = undefined
+	remoteIpAddress = undefined
 }: {
 	id: string;
 	fqdn: string;
 	checkOwn?: boolean;
-	dockerId?: string;
+	remoteIpAddress?: string;
 }): Promise<boolean> {
 	const domain = getDomain(fqdn);
 	const nakedDomain = domain.replace('www.', '');
@@ -335,7 +248,7 @@ export async function isDomainConfigured({
 			],
 			id: { not: id },
 			destinationDocker: {
-				id: dockerId
+				remoteIpAddress,
 			}
 		},
 		select: { fqdn: true }
@@ -350,7 +263,7 @@ export async function isDomainConfigured({
 			],
 			id: { not: checkOwn ? undefined : id },
 			destinationDocker: {
-				id: dockerId
+				remoteIpAddress
 			}
 		},
 		select: { fqdn: true }
@@ -386,7 +299,12 @@ export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): P
 	const { isIP } = await import('is-ip');
 	const domain = getDomain(fqdn);
 	const domainDualCert = domain.includes('www.') ? domain.replace('www.', '') : `www.${domain}`;
-	dns.setServers(['1.1.1.1', '8.8.8.8']);
+
+	const { DNSServers } = await listSettings();
+	if (DNSServers) {
+		dns.setServers([DNSServers]);
+	}
+
 	let resolves = [];
 	try {
 		if (isIP(hostname)) {
@@ -443,7 +361,7 @@ export function generateTimestamp(): string {
 
 export async function listServicesWithIncludes(): Promise<any> {
 	return await prisma.service.findMany({
-		include,
+		include: includeServices,
 		orderBy: { createdAt: 'desc' }
 	});
 }
@@ -453,67 +371,122 @@ export const supportedDatabaseTypesAndVersions = [
 		name: 'mongodb',
 		fancyName: 'MongoDB',
 		baseImage: 'bitnami/mongodb',
-		versions: ['5.0', '4.4', '4.2']
+		baseImageARM: 'mongo',
+		versions: ['5.0', '4.4', '4.2'],
+		versionsARM: ['5.0', '4.4', '4.2']
 	},
-	{ name: 'mysql', fancyName: 'MySQL', baseImage: 'bitnami/mysql', versions: ['8.0', '5.7'] },
+	{
+		name: 'mysql',
+		fancyName: 'MySQL',
+		baseImage: 'bitnami/mysql',
+		baseImageARM: 'mysql',
+		versions: ['8.0', '5.7'],
+		versionsARM: ['8.0', '5.7']
+	},
 	{
 		name: 'mariadb',
 		fancyName: 'MariaDB',
 		baseImage: 'bitnami/mariadb',
-		versions: ['10.8', '10.7', '10.6', '10.5', '10.4', '10.3', '10.2']
+		baseImageARM: 'mariadb',
+		versions: ['10.8', '10.7', '10.6', '10.5', '10.4', '10.3', '10.2'],
+		versionsARM: ['10.8', '10.7', '10.6', '10.5', '10.4', '10.3', '10.2']
 	},
 	{
 		name: 'postgresql',
 		fancyName: 'PostgreSQL',
 		baseImage: 'bitnami/postgresql',
-		versions: ['14.4.0', '13.6.0', '12.10.0', '11.15.0', '10.20.0']
+		baseImageARM: 'postgres',
+		versions: ['14.5.0', '13.8.0', '12.12.0', '11.17.0', '10.22.0'],
+		versionsARM: ['14.5', '13.8', '12.12', '11.17', '10.22']
 	},
 	{
 		name: 'redis',
 		fancyName: 'Redis',
 		baseImage: 'bitnami/redis',
-		versions: ['7.0', '6.2', '6.0', '5.0']
+		baseImageARM: 'redis',
+		versions: ['7.0', '6.2', '6.0', '5.0'],
+		versionsARM: ['7.0', '6.2', '6.0', '5.0']
 	},
-	{ name: 'couchdb', fancyName: 'CouchDB', baseImage: 'bitnami/couchdb', versions: ['3.2.1'] },
 	{
+		name: 'couchdb',
+		fancyName: 'CouchDB',
+		baseImage: 'bitnami/couchdb',
+		baseImageARM: 'couchdb',
+		versions: ['3.2.2', '3.1.2', '2.3.1'],
+		versionsARM: ['3.2.2', '3.1.2', '2.3.1']
+	},
+  {
 		name: 'edgedb',
 		fancyName: 'EdgeDB',
 		baseImage: 'edgedb/edgedb',
 		versions: ['2.0', '1.4']
-	}
+   }
 ];
+
+export async function getFreeSSHLocalPort(id: string): Promise<number | boolean> {
+	const { default: isReachable } = await import('is-port-reachable');
+	const { remoteIpAddress, sshLocalPort } = await prisma.destinationDocker.findUnique({ where: { id } })
+	if (sshLocalPort) {
+		return Number(sshLocalPort)
+	}
+
+	const data = await prisma.setting.findFirst();
+	const { minPort, maxPort } = data;
+
+	const ports = await prisma.destinationDocker.findMany({ where: { sshLocalPort: { not: null }, remoteIpAddress: { not: remoteIpAddress } } })
+
+	const alreadyConfigured = await prisma.destinationDocker.findFirst({
+		where: {
+			remoteIpAddress, id: { not: id }, sshLocalPort: { not: null }
+		}
+	})
+	if (alreadyConfigured?.sshLocalPort) {
+		await prisma.destinationDocker.update({ where: { id }, data: { sshLocalPort: alreadyConfigured.sshLocalPort } })
+		return Number(alreadyConfigured.sshLocalPort)
+	}
+	const range = generateRangeArray(minPort, maxPort)
+	const availablePorts = range.filter(port => !ports.map(p => p.sshLocalPort).includes(port))
+	for (const port of availablePorts) {
+		const found = await isReachable(port, { host: 'localhost' })
+		if (!found) {
+			await prisma.destinationDocker.update({ where: { id }, data: { sshLocalPort: Number(port) } })
+			return Number(port)
+		}
+	}
+	return false
+}
+
 export async function createRemoteEngineConfiguration(id: string) {
 	const homedir = os.homedir();
 	const sshKeyFile = `/tmp/id_rsa-${id}`
+	const localPort = await getFreeSSHLocalPort(id);
 	const { sshKey: { privateKey }, remoteIpAddress, remotePort, remoteUser } = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } })
 	await fs.writeFile(sshKeyFile, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 })
 	// Needed for remote docker compose
-	const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(`ps ax | grep [s]sh-agent | grep ssh-agent.pid | grep -v grep | wc -l`)
+	const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(`ps ax | grep [s]sh-agent | grep coolify-ssh-agent.pid | grep -v grep | wc -l`)
 	if (numberOfSSHAgentsRunning !== '' && Number(numberOfSSHAgentsRunning.trim()) == 0) {
-		await asyncExecShell(`eval $(ssh-agent -sa /tmp/ssh-agent.pid)`)
+		try {
+			await fs.stat(`/tmp/coolify-ssh-agent.pid`)
+			await fs.rm(`/tmp/coolify-ssh-agent.pid`)
+		} catch (error) { }
+		await asyncExecShell(`eval $(ssh-agent -sa /tmp/coolify-ssh-agent.pid)`)
 	}
-	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh-add -q ${sshKeyFile}`)
+	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh-add -q ${sshKeyFile}`)
 
-	const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(`ps ax | grep 'ssh -fNL 11122:localhost:22' | grep -v grep | wc -l`)
-	console.log(numberOfSSHTunnelsRunning)
+	const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(`ps ax | grep 'ssh -F /dev/null -o StrictHostKeyChecking no -fNL ${localPort}:localhost:${remotePort}' | grep -v grep | wc -l`)
 	if (numberOfSSHTunnelsRunning !== '' && Number(numberOfSSHTunnelsRunning.trim()) == 0) {
 		try {
-			await asyncExecShell(`SSH_AUTH_SOCK=/tmp/ssh-agent.pid ssh -fNL 11122:localhost:22 ${remoteIpAddress}`)
-
-		} catch(error){
-			console.log(error)
-		}
+			await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh -F /dev/null -o "StrictHostKeyChecking no" -fNL ${localPort}:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`)
+		} catch (error) { }
 
 	}
-	
-
 	const config = sshConfig.parse('')
 	const found = config.find({ Host: remoteIpAddress })
 	if (!found) {
 		config.append({
 			Host: remoteIpAddress,
 			Hostname: 'localhost',
-			Port: '11122',
+			Port: localPort.toString(),
 			User: remoteUser,
 			IdentityFile: sshKeyFile,
 			StrictHostKeyChecking: 'no'
@@ -524,19 +497,23 @@ export async function createRemoteEngineConfiguration(id: string) {
 	} catch (error) {
 		await fs.mkdir(`${homedir}/.ssh/`)
 	}
-
-	await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config))
-	
-	return
-
+	return await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config))
 }
-export async function executeDockerCmd({ dockerId, command }: { dockerId: string, command: string }) {
+export async function executeDockerCmd({ debug, buildId, applicationId, dockerId, command }: { debug?: boolean, buildId?: string, applicationId?: string, dockerId: string, command: string }): Promise<any> {
 	let { remoteEngine, remoteIpAddress, engine } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
 	if (remoteEngine) {
 		await createRemoteEngineConfiguration(dockerId)
 		engine = `ssh://${remoteIpAddress}`
 	} else {
 		engine = 'unix:///var/run/docker.sock'
+	}
+	if (process.env.CODESANDBOX_HOST) {
+		if (command.startsWith('docker compose')) {
+			command = command.replace(/docker compose/gi, 'docker-compose')
+		}
+	}
+	if (command.startsWith(`docker build --progress plain`)) {
+		return await asyncExecShellStream({ debug, buildId, applicationId, command, engine });
 	}
 	return await asyncExecShell(
 		`DOCKER_BUILDKIT=1 DOCKER_HOST="${engine}" ${command}`
@@ -549,6 +526,11 @@ export async function startTraefikProxy(id: string): Promise<void> {
 	const { id: settingsId, ipv4, ipv6 } = await listSettings();
 
 	if (!found) {
+		const { stdout: coolifyNetwork } = await executeDockerCmd({ dockerId: id, command: `docker network ls --filter 'name=coolify-infra' --no-trunc --format "{{json .}}"` })
+
+		if (!coolifyNetwork) {
+			await executeDockerCmd({ dockerId: id, command: `docker network create --attachable coolify-infra` })
+		}
 		const { stdout: Config } = await executeDockerCmd({ dockerId: id, command: `docker network inspect ${network} --format '{{json .IPAM.Config }}'` })
 		const ip = JSON.parse(Config)[0].Gateway;
 		let traefikUrl = mainTraefikEndpoint
@@ -652,19 +634,25 @@ export async function listSettings(): Promise<any> {
 }
 
 
-export function generatePassword(length = 24, symbols = false): string {
-	return generator.generate({
+export function generatePassword({ length = 24, symbols = false, isHex = false }: { length?: number, symbols?: boolean, isHex?: boolean } | null): string {
+	if (isHex) {
+		return crypto.randomBytes(length).toString("hex");
+	}
+	const password = generator.generate({
 		length,
 		numbers: true,
 		strict: true,
 		symbols
 	});
+
+	return password;
 }
 
-export function generateDatabaseConfiguration(database: any):
+export function generateDatabaseConfiguration(database: any, arch: string):
 	| {
 		volume: string;
 		image: string;
+		command?: string;
 		ulimits: Record<string, unknown>;
 		privatePort: number;
 		environmentVariables: {
@@ -678,16 +666,20 @@ export function generateDatabaseConfiguration(database: any):
 	| {
 		volume: string;
 		image: string;
+		command?: string;
 		ulimits: Record<string, unknown>;
 		privatePort: number;
 		environmentVariables: {
-			MONGODB_ROOT_USER: string;
-			MONGODB_ROOT_PASSWORD: string;
+			MONGO_INITDB_ROOT_USERNAME?: string;
+			MONGO_INITDB_ROOT_PASSWORD?: string;
+			MONGODB_ROOT_USER?: string;
+			MONGODB_ROOT_PASSWORD?: string;
 		};
 	}
 	| {
 		volume: string;
 		image: string;
+		command?: string;
 		ulimits: Record<string, unknown>;
 		privatePort: number;
 		environmentVariables: {
@@ -701,6 +693,7 @@ export function generateDatabaseConfiguration(database: any):
 	| {
 		volume: string;
 		image: string;
+		command?: string;
 		ulimits: Record<string, unknown>;
 		privatePort: number;
 		environmentVariables: {
@@ -713,6 +706,19 @@ export function generateDatabaseConfiguration(database: any):
 	| {
 		volume: string;
 		image: string;
+		command?: string;
+		ulimits: Record<string, unknown>;
+		privatePort: number;
+		environmentVariables: {
+			POSTGRES_USER: string;
+			POSTGRES_PASSWORD: string;
+			POSTGRES_DB: string;
+		};
+	}
+	| {
+		volume: string;
+		image: string;
+		command?: string;
 		ulimits: Record<string, unknown>;
 		privatePort: number;
 		environmentVariables: {
@@ -723,6 +729,7 @@ export function generateDatabaseConfiguration(database: any):
 	| {
 		volume: string;
 		image: string;
+		command?: string;
 		ulimits: Record<string, unknown>;
 		privatePort: number;
 		environmentVariables: {
@@ -753,9 +760,9 @@ export function generateDatabaseConfiguration(database: any):
 		type,
 		settings: { appendOnly }
 	} = database;
-	const baseImage = getDatabaseImage(type);
+	const baseImage = getDatabaseImage(type, arch);
 	if (type === 'mysql') {
-		return {
+		const configuration = {
 			privatePort: 3306,
 			environmentVariables: {
 				MYSQL_USER: dbUser,
@@ -767,9 +774,13 @@ export function generateDatabaseConfiguration(database: any):
 			image: `${baseImage}:${version}`,
 			volume: `${id}-${type}-data:/bitnami/mysql/data`,
 			ulimits: {}
-		};
+		}
+		if (isARM(arch)) {
+			configuration.volume = `${id}-${type}-data:/var/lib/mysql`;
+		}
+		return configuration
 	} else if (type === 'mariadb') {
-		return {
+		const configuration = {
 			privatePort: 3306,
 			environmentVariables: {
 				MARIADB_ROOT_USER: rootUser,
@@ -782,8 +793,12 @@ export function generateDatabaseConfiguration(database: any):
 			volume: `${id}-${type}-data:/bitnami/mariadb`,
 			ulimits: {}
 		};
+		if (isARM(arch)) {
+			configuration.volume = `${id}-${type}-data:/var/lib/mysql`;
+		}
+		return configuration
 	} else if (type === 'mongodb') {
-		return {
+		const configuration = {
 			privatePort: 27017,
 			environmentVariables: {
 				MONGODB_ROOT_USER: rootUser,
@@ -793,8 +808,16 @@ export function generateDatabaseConfiguration(database: any):
 			volume: `${id}-${type}-data:/bitnami/mongodb`,
 			ulimits: {}
 		};
+		if (isARM(arch)) {
+			configuration.environmentVariables = {
+				MONGO_INITDB_ROOT_USERNAME: rootUser,
+				MONGO_INITDB_ROOT_PASSWORD: rootUserPassword
+			}
+			configuration.volume = `${id}-${type}-data:/data/db`;
+		}
+		return configuration
 	} else if (type === 'postgresql') {
-		return {
+		const configuration = {
 			privatePort: 5432,
 			environmentVariables: {
 				POSTGRESQL_POSTGRES_PASSWORD: rootUserPassword,
@@ -805,10 +828,20 @@ export function generateDatabaseConfiguration(database: any):
 			image: `${baseImage}:${version}`,
 			volume: `${id}-${type}-data:/bitnami/postgresql`,
 			ulimits: {}
-		};
+		}
+		if (isARM(arch)) {
+			configuration.volume = `${id}-${type}-data:/var/lib/postgresql`;
+			configuration.environmentVariables = {
+				POSTGRES_PASSWORD: dbUserPassword,
+				POSTGRES_USER: dbUser,
+				POSTGRES_DB: defaultDatabase
+			}
+		}
+		return configuration
 	} else if (type === 'redis') {
-		return {
+		const configuration = {
 			privatePort: 6379,
+			command: undefined,
 			environmentVariables: {
 				REDIS_PASSWORD: dbUserPassword,
 				REDIS_AOF_ENABLED: appendOnly ? 'yes' : 'no'
@@ -817,8 +850,13 @@ export function generateDatabaseConfiguration(database: any):
 			volume: `${id}-${type}-data:/bitnami/redis/data`,
 			ulimits: {}
 		};
+		if (isARM(arch)) {
+			configuration.volume = `${id}-${type}-data:/data`;
+			configuration.command = `/usr/local/bin/redis-server --appendonly ${appendOnly ? 'yes' : 'no'} --requirepass ${dbUserPassword}`;
+		}
+		return configuration
 	} else if (type === 'couchdb') {
-		return {
+		const configuration = {
 			privatePort: 5984,
 			environmentVariables: {
 				COUCHDB_PASSWORD: dbUserPassword,
@@ -828,14 +866,18 @@ export function generateDatabaseConfiguration(database: any):
 			volume: `${id}-${type}-data:/bitnami/couchdb`,
 			ulimits: {}
 		};
+    if (isARM(arch)) {
+			configuration.volume = `${id}-${type}-data:/opt/couchdb/data`;
+		}
+		return configuration
 	} else if (type === 'edgedb') {
 		return {
 		  privatePort: 5656,
 		  environmentVariables: {
-			EDGEDB_SERVER_PASSWORD: rootUserPassword,
-			EDGEDB_SERVER_USER: rootUser,
-			EDGEDB_SERVER_DATABASE: defaultDatabase,
-			EDGEDB_SERVER_SECURITY: 'insecure_dev_mode'
+        EDGEDB_SERVER_PASSWORD: rootUserPassword,
+        EDGEDB_SERVER_USER: rootUser,
+        EDGEDB_SERVER_DATABASE: defaultDatabase,
+        EDGEDB_SERVER_SECURITY: 'insecure_dev_mode'
 		  },
 		  image: `${baseImage}:${version}`,
 		  volume: `${id}-${type}-data:/edgedb/edgedb`,
@@ -843,18 +885,29 @@ export function generateDatabaseConfiguration(database: any):
 		};
 	}
 }
-
-export function getDatabaseImage(type: string): string {
+export function isARM(arch: string) {
+	if (arch === 'arm' || arch === 'arm64') {
+		return true
+	}
+	return false
+}
+export function getDatabaseImage(type: string, arch: string): string {
 	const found = supportedDatabaseTypesAndVersions.find((t) => t.name === type);
 	if (found) {
+		if (isARM(arch)) {
+			return found.baseImageARM || found.baseImage
+		}
 		return found.baseImage;
 	}
 	return '';
 }
 
-export function getDatabaseVersions(type: string): string[] {
+export function getDatabaseVersions(type: string, arch: string): string[] {
 	const found = supportedDatabaseTypesAndVersions.find((t) => t.name === type);
 	if (found) {
+		if (isARM(arch)) {
+			return found.versionsARM || found.versions
+		}
 		return found.versions;
 	}
 	return [];
@@ -952,9 +1005,14 @@ export const createDirectories = async ({
 }): Promise<{ workdir: string; repodir: string }> => {
 	const repodir = `/tmp/build-sources/${repository}/`;
 	const workdir = `/tmp/build-sources/${repository}/${buildId}`;
-
+	let workdirFound = false;
+	try {
+		workdirFound = !!(await fs.stat(workdir));
+	} catch (error) { }
+	if (workdirFound) {
+		await asyncExecShell(`rm -fr ${workdir}`);
+	}
 	await asyncExecShell(`mkdir -p ${workdir}`);
-
 	return {
 		workdir,
 		repodir
@@ -1063,8 +1121,26 @@ export async function updatePasswordInDb(database, user, newPassword, isRoot) {
 		}
 	}
 }
+export async function checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress }: { id: string, configuredPort?: number, exposePort: number, dockerId: string, remoteIpAddress?: string }) {
+	if (exposePort < 1024 || exposePort > 65535) {
+		throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
+	}
+	if (configuredPort) {
+		if (configuredPort !== exposePort) {
+			const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
+			if (availablePort.toString() !== exposePort.toString()) {
+				throw { status: 500, message: `Port ${exposePort} is already in use.` }
+			}
+		}
+	} else {
+		const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
+		if (availablePort.toString() !== exposePort.toString()) {
+			throw { status: 500, message: `Port ${exposePort} is already in use.` }
+		}
+	}
+}
 export async function getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress) {
-	const { default: getPort } = await import('get-port');
+	const { default: checkPort } = await import('is-port-reachable');
 	const applicationUsed = await (
 		await prisma.application.findMany({
 			where: { exposePort: { not: null }, id: { not: id }, destinationDockerId: dockerId },
@@ -1078,22 +1154,23 @@ export async function getFreeExposedPort(id, exposePort, dockerId, remoteIpAddre
 		})
 	).map((a) => a.exposePort);
 	const usedPorts = [...applicationUsed, ...serviceUsed];
-	if (remoteIpAddress) {
-		const { default: checkPort } = await import('is-port-reachable');
-		const found = await checkPort(exposePort, { host: remoteIpAddress });
-		if (!found) {
-			return exposePort
-		}
+	if (usedPorts.includes(exposePort)) {
 		return false
 	}
-	return await getPort({ port: Number(exposePort), exclude: usedPorts });
+	const found = await checkPort(exposePort, { host: remoteIpAddress || 'localhost' });
+	if (!found) {
+		return exposePort
+	}
+	return false
 
 }
+export function generateRangeArray(start, end) {
+	return Array.from({ length: (end - start) }, (v, k) => k + start);
+}
 export async function getFreePublicPort(id, dockerId) {
-	const { default: getPort, portNumbers } = await import('get-port');
+	const { default: isReachable } = await import('is-port-reachable');
 	const data = await prisma.setting.findFirst();
 	const { minPort, maxPort } = data;
-
 	const dbUsed = await (
 		await prisma.database.findMany({
 			where: { publicPort: { not: null }, id: { not: id }, destinationDockerId: dockerId },
@@ -1119,7 +1196,15 @@ export async function getFreePublicPort(id, dockerId) {
 		})
 	).map((a) => a.publicPort);
 	const usedPorts = [...dbUsed, ...wpFtpUsed, ...wpUsed, ...minioUsed];
-	return await getPort({ port: portNumbers(minPort, maxPort), exclude: usedPorts });
+	const range = generateRangeArray(minPort, maxPort)
+	const availablePorts = range.filter(port => !usedPorts.includes(port))
+	for (const port of availablePorts) {
+		const found = await isReachable(port, { host: 'localhost' })
+		if (!found) {
+			return port
+		}
+	}
+	return false
 }
 
 export async function startTraefikTCPProxy(
@@ -1155,7 +1240,6 @@ export async function startTraefikTCPProxy(
 				}
 				traefikUrl = `${ip}/webhooks/traefik/other.json`
 			}
-			console.log(traefikUrl)
 			const tcpProxy = {
 				version: '3.8',
 				services: {
@@ -1200,7 +1284,6 @@ export async function startTraefikTCPProxy(
 			})
 		}
 	} catch (error) {
-		console.log(error);
 		return error;
 	}
 }
@@ -1209,7 +1292,7 @@ export async function getServiceFromDB({ id, teamId }: { id: string; teamId: str
 	const settings = await prisma.setting.findFirst();
 	const body = await prisma.service.findFirst({
 		where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-		include
+		include: includeServices
 	});
 	let { type } = body
 	type = fixType(type)
@@ -1220,6 +1303,7 @@ export async function getServiceFromDB({ id, teamId }: { id: string; teamId: str
 			return s;
 		});
 	}
+
 	body[type] = { ...body[type], ...getUpdateableFields(type, body[type]) }
 	return { ...body, settings };
 }
@@ -1240,240 +1324,8 @@ export function getServiceImages(type: string): string[] {
 	return [];
 }
 
-export async function configureServiceType({
-	id,
-	type
-}: {
-	id: string;
-	type: string;
-}): Promise<void> {
-	if (type === 'plausibleanalytics') {
-		const password = encrypt(generatePassword());
-		const postgresqlUser = cuid();
-		const postgresqlPassword = encrypt(generatePassword());
-		const postgresqlDatabase = 'plausibleanalytics';
-		const secretKeyBase = encrypt(generatePassword(64));
-
-		await prisma.service.update({
-			where: { id },
-			data: {
-				type,
-				plausibleAnalytics: {
-					create: {
-						postgresqlDatabase,
-						postgresqlUser,
-						postgresqlPassword,
-						password,
-						secretKeyBase
-					}
-				}
-			}
-		});
-	} else if (type === 'nocodb') {
-		await prisma.service.update({
-			where: { id },
-			data: { type }
-		});
-	} else if (type === 'minio') {
-		const rootUser = cuid();
-		const rootUserPassword = encrypt(generatePassword());
-		await prisma.service.update({
-			where: { id },
-			data: { type, minio: { create: { rootUser, rootUserPassword } } }
-		});
-	} else if (type === 'vscodeserver') {
-		const password = encrypt(generatePassword());
-		await prisma.service.update({
-			where: { id },
-			data: { type, vscodeserver: { create: { password } } }
-		});
-	} else if (type === 'wordpress') {
-		const mysqlUser = cuid();
-		const mysqlPassword = encrypt(generatePassword());
-		const mysqlRootUser = cuid();
-		const mysqlRootUserPassword = encrypt(generatePassword());
-		await prisma.service.update({
-			where: { id },
-			data: {
-				type,
-				wordpress: { create: { mysqlPassword, mysqlRootUserPassword, mysqlRootUser, mysqlUser } }
-			}
-		});
-	} else if (type === 'vaultwarden') {
-		await prisma.service.update({
-			where: { id },
-			data: {
-				type
-			}
-		});
-	} else if (type === 'languagetool') {
-		await prisma.service.update({
-			where: { id },
-			data: {
-				type
-			}
-		});
-	} else if (type === 'n8n') {
-		await prisma.service.update({
-			where: { id },
-			data: {
-				type
-			}
-		});
-	} else if (type === 'uptimekuma') {
-		await prisma.service.update({
-			where: { id },
-			data: {
-				type
-			}
-		});
-	} else if (type === 'ghost') {
-		const defaultEmail = `${cuid()}@example.com`;
-		const defaultPassword = encrypt(generatePassword());
-		const mariadbUser = cuid();
-		const mariadbPassword = encrypt(generatePassword());
-		const mariadbRootUser = cuid();
-		const mariadbRootUserPassword = encrypt(generatePassword());
-
-		await prisma.service.update({
-			where: { id },
-			data: {
-				type,
-				ghost: {
-					create: {
-						defaultEmail,
-						defaultPassword,
-						mariadbUser,
-						mariadbPassword,
-						mariadbRootUser,
-						mariadbRootUserPassword
-					}
-				}
-			}
-		});
-	} else if (type === 'meilisearch') {
-		const masterKey = encrypt(generatePassword(32));
-		await prisma.service.update({
-			where: { id },
-			data: {
-				type,
-				meiliSearch: { create: { masterKey } }
-			}
-		});
-	} else if (type === 'umami') {
-		const umamiAdminPassword = encrypt(generatePassword());
-		const postgresqlUser = cuid();
-		const postgresqlPassword = encrypt(generatePassword());
-		const postgresqlDatabase = 'umami';
-		const hashSalt = encrypt(generatePassword(64));
-		await prisma.service.update({
-			where: { id },
-			data: {
-				type,
-				umami: {
-					create: {
-						umamiAdminPassword,
-						postgresqlDatabase,
-						postgresqlPassword,
-						postgresqlUser,
-						hashSalt
-					}
-				}
-			}
-		});
-	} else if (type === 'hasura') {
-		const postgresqlUser = cuid();
-		const postgresqlPassword = encrypt(generatePassword());
-		const postgresqlDatabase = 'hasura';
-		const graphQLAdminPassword = encrypt(generatePassword());
-		await prisma.service.update({
-			where: { id },
-			data: {
-				type,
-				hasura: {
-					create: {
-						postgresqlDatabase,
-						postgresqlPassword,
-						postgresqlUser,
-						graphQLAdminPassword
-					}
-				}
-			}
-		});
-	} else if (type === 'fider') {
-		const postgresqlUser = cuid();
-		const postgresqlPassword = encrypt(generatePassword());
-		const postgresqlDatabase = 'fider';
-		const jwtSecret = encrypt(generatePassword(64, true));
-		await prisma.service.update({
-			where: { id },
-			data: {
-				type,
-				fider: {
-					create: {
-						postgresqlDatabase,
-						postgresqlPassword,
-						postgresqlUser,
-						jwtSecret
-					}
-				}
-			}
-		});
-	} else if (type === 'moodle') {
-		const defaultUsername = cuid();
-		const defaultPassword = encrypt(generatePassword());
-		const defaultEmail = `${cuid()} @example.com`;
-		const mariadbUser = cuid();
-		const mariadbPassword = encrypt(generatePassword());
-		const mariadbDatabase = 'moodle_db';
-		const mariadbRootUser = cuid();
-		const mariadbRootUserPassword = encrypt(generatePassword());
-		await prisma.service.update({
-			where: { id },
-			data: {
-				type,
-				moodle: {
-					create: {
-						defaultUsername,
-						defaultPassword,
-						defaultEmail,
-						mariadbUser,
-						mariadbPassword,
-						mariadbDatabase,
-						mariadbRootUser,
-						mariadbRootUserPassword
-					}
-				}
-			}
-		});
-	} else {
-		await prisma.service.update({
-			where: { id },
-			data: {
-				type
-			}
-		});
-	}
-}
-
-export async function removeService({ id }: { id: string }): Promise<void> {
-	await prisma.servicePersistentStorage.deleteMany({ where: { serviceId: id } });
-	await prisma.meiliSearch.deleteMany({ where: { serviceId: id } });
-	await prisma.fider.deleteMany({ where: { serviceId: id } });
-	await prisma.ghost.deleteMany({ where: { serviceId: id } });
-	await prisma.umami.deleteMany({ where: { serviceId: id } });
-	await prisma.hasura.deleteMany({ where: { serviceId: id } });
-	await prisma.plausibleAnalytics.deleteMany({ where: { serviceId: id } });
-	await prisma.minio.deleteMany({ where: { serviceId: id } });
-	await prisma.vscodeserver.deleteMany({ where: { serviceId: id } });
-	await prisma.wordpress.deleteMany({ where: { serviceId: id } });
-	await prisma.serviceSecret.deleteMany({ where: { serviceId: id } });
-
-	await prisma.service.delete({ where: { id } });
-}
-
 export function saveUpdateableFields(type: string, data: any) {
-	let update = {};
+	const update = {};
 	if (type && serviceFields[type]) {
 		serviceFields[type].map((k) => {
 			let temp = data[k.name]
@@ -1491,6 +1343,9 @@ export function saveUpdateableFields(type: string, data: any) {
 					temp = Boolean(temp)
 				}
 			}
+			if (k.isNumber && temp === '') {
+				temp = null
+			}
 			update[k.name] = temp
 		});
 	}
@@ -1498,7 +1353,7 @@ export function saveUpdateableFields(type: string, data: any) {
 }
 
 export function getUpdateableFields(type: string, data: any) {
-	let update = {};
+	const update = {};
 	if (type && serviceFields[type]) {
 		serviceFields[type].map((k) => {
 			let temp = data[k.name]
@@ -1533,9 +1388,9 @@ export const getServiceMainPort = (service: string) => {
 export function makeLabelForServices(type) {
 	return [
 		'coolify.managed=true',
-		`coolify.version = ${version} `,
-		`coolify.type = service`,
-		`coolify.service.type = ${type} `
+		`coolify.version=${version}`,
+		`coolify.type=service`,
+		`coolify.service.type=${type}`
 	];
 }
 export function errorHandler({ status = 500, message = 'Unknown error.' }: { status: number, message: string | any }) {
@@ -1561,18 +1416,22 @@ export async function stopBuild(buildId, applicationId) {
 	let count = 0;
 	await new Promise<void>(async (resolve, reject) => {
 		const { destinationDockerId, status } = await prisma.build.findFirst({ where: { id: buildId } });
-		const { engine, id: dockerId } = await prisma.destinationDocker.findFirst({ where: { id: destinationDockerId } });
-		let interval = setInterval(async () => {
+		const { id: dockerId } = await prisma.destinationDocker.findFirst({ where: { id: destinationDockerId } });
+		const interval = setInterval(async () => {
 			try {
-				if (status === 'failed') {
+				if (status === 'failed' || status === 'canceled') {
 					clearInterval(interval);
 					return resolve();
 				}
-				if (count > 100) {
+				if (count > 15) {
 					clearInterval(interval);
-					return reject(new Error('Build canceled'));
+					if (scheduler.workers.has('deployApplication')) {
+						scheduler.workers.get('deployApplication').postMessage('cancel')
+					}
+					await cleanupDB(buildId, applicationId);
+					return reject(new Error('Deployment canceled.'));
 				}
-				const { stdout: buildContainers } = await executeDockerCmd({ dockerId, command: `docker container ls--filter "label=coolify.buildId=${buildId}" --format '{{json .}}'` })
+				const { stdout: buildContainers } = await executeDockerCmd({ dockerId, command: `docker container ls --filter "label=coolify.buildId=${buildId}" --format '{{json .}}'` })
 				if (buildContainers) {
 					const containersArray = buildContainers.trim().split('\n');
 					for (const container of containersArray) {
@@ -1580,8 +1439,11 @@ export async function stopBuild(buildId, applicationId) {
 						const id = containerObj.ID;
 						if (!containerObj.Names.startsWith(`${applicationId} `)) {
 							await removeContainer({ id, dockerId });
-							await cleanupDB(buildId);
 							clearInterval(interval);
+							if (scheduler.workers.has('deployApplication')) {
+								scheduler.workers.get('deployApplication').postMessage('cancel')
+							}
+							await cleanupDB(buildId, applicationId);
 							return resolve();
 						}
 					}
@@ -1592,11 +1454,12 @@ export async function stopBuild(buildId, applicationId) {
 	});
 }
 
-async function cleanupDB(buildId: string) {
+async function cleanupDB(buildId: string, applicationId: string) {
 	const data = await prisma.build.findUnique({ where: { id: buildId } });
 	if (data?.status === 'queued' || data?.status === 'running') {
-		await prisma.build.update({ where: { id: buildId }, data: { status: 'failed' } });
+		await prisma.build.update({ where: { id: buildId }, data: { status: 'canceled' } });
 	}
+	await saveBuildLog({ line: 'Deployment canceled.', buildId, applicationId });
 }
 
 export function convertTolOldVolumeNames(type) {
@@ -1604,41 +1467,107 @@ export function convertTolOldVolumeNames(type) {
 		return 'nc'
 	}
 }
-// export async function getAvailableServices(): Promise<any> {
-// 	const { data } = await axios.get(`https://gist.githubusercontent.com/andrasbacsai/4aac36d8d6214dbfc34fa78110554a50/raw/5b27e6c37d78aaeedc1148d797112c827a2f43cf/availableServices.json`)
-// 	return data
-// 
+
 export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 	// Cleanup old coolify images
 	try {
-		let { stdout: images } = await executeDockerCmd({ dockerId, command: `docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs` })
+		let { stdout: images } = await executeDockerCmd({ dockerId, command: `docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs -r` })
 
 		images = images.trim();
 		if (images) {
-			await executeDockerCmd({ dockerId, command: `docker rmi -f ${images}" -q | xargs` })
+			await executeDockerCmd({ dockerId, command: `docker rmi -f ${images}" -q | xargs -r` })
 		}
-	} catch (error) {
-		//console.log(error);
-	}
+	} catch (error) { }
 	if (lowDiskSpace || force) {
 		if (isDev) {
 			if (!force) console.log(`[DEV MODE] Low disk space: ${lowDiskSpace}`);
 			return
 		}
 		try {
-			await executeDockerCmd({ dockerId, command: `docker container prune -f` })
-		} catch (error) {
-			//console.log(error);
-		}
+			await executeDockerCmd({ dockerId, command: `docker container prune -f --filter "label=coolify.managed=true"` })
+		} catch (error) { }
 		try {
 			await executeDockerCmd({ dockerId, command: `docker image prune -f` })
-		} catch (error) {
-			//console.log(error);
-		}
+		} catch (error) { }
 		try {
 			await executeDockerCmd({ dockerId, command: `docker image prune -a -f` })
-		} catch (error) {
-			//console.log(error);
+		} catch (error) { }
+		// Cleanup build caches
+		try {
+			await executeDockerCmd({ dockerId, command: `docker builder prune -a -f` })
+		} catch (error) { }
+	}
+}
+
+export function persistentVolumes(id, persistentStorage, config) {
+	let volumeSet = new Set();
+	if (Object.keys(config).length > 0) {
+		for (const [key, value] of Object.entries(config)) {
+			if (value.volumes) {
+				for (const volume of value.volumes) {
+					volumeSet.add(volume);
+				}
+			}
+
 		}
+	}
+	const volumesArray = Array.from(volumeSet);
+	const persistentVolume =
+		persistentStorage?.map((storage) => {
+			return `${id}${storage.path.replace(/\//gi, '-')}:${storage.path}`;
+		}) || [];
+
+	let volumes = [...persistentVolume]
+	if (volumesArray) volumes = [...volumesArray, ...volumes]
+	const composeVolumes = volumes.length > 0 && volumes.map((volume) => {
+		return {
+			[`${volume.split(':')[0]}`]: {
+				name: volume.split(':')[0]
+			}
+		};
+	}) || []
+
+	const volumeMounts = Object.assign(
+		{},
+		...composeVolumes
+	) || {}
+	return { volumeMounts }
+}
+export function defaultComposeConfiguration(network: string): any {
+	return {
+		networks: [network],
+		restart: 'on-failure',
+		deploy: {
+			restart_policy: {
+				condition: 'on-failure',
+				delay: '5s',
+				max_attempts: 10,
+				window: '120s'
+			}
+		}
+	}
+}
+export function decryptApplication(application: any) {
+	if (application) {
+		if (application?.gitSource?.githubApp?.clientSecret) {
+			application.gitSource.githubApp.clientSecret = decrypt(application.gitSource.githubApp.clientSecret) || null;
+		}
+		if (application?.gitSource?.githubApp?.webhookSecret) {
+			application.gitSource.githubApp.webhookSecret = decrypt(application.gitSource.githubApp.webhookSecret) || null;
+		}
+		if (application?.gitSource?.githubApp?.privateKey) {
+			application.gitSource.githubApp.privateKey = decrypt(application.gitSource.githubApp.privateKey) || null;
+		}
+		if (application?.gitSource?.gitlabApp?.appSecret) {
+			application.gitSource.gitlabApp.appSecret = decrypt(application.gitSource.gitlabApp.appSecret) || null;
+		}
+		if (application?.secrets.length > 0) {
+			application.secrets = application.secrets.map((s: any) => {
+				s.value = decrypt(s.value) || null
+				return s;
+			});
+		}
+
+		return application;
 	}
 }

@@ -3,12 +3,14 @@ import { OnlyId } from "../../../../types"
 export interface SaveSettings {
     Body: {
         fqdn: string,
+        isAPIDebuggingEnabled: boolean,
         isRegistrationEnabled: boolean,
         dualCerts: boolean,
         minPort: number,
         maxPort: number,
         isAutoUpdateEnabled: boolean,
-        isDNSCheckEnabled: boolean
+        isDNSCheckEnabled: boolean,
+        DNSServers: string
     }
 }
 export interface DeleteDomain {

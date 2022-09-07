@@ -12,7 +12,7 @@
 	export let readOnly: any;
 	export let settings: any;
 	const { id } = $page.params;
-
+	const { ipv4, ipv6 } = settings;
 	let ftpUrl = generateUrl(service.wordpress.ftpPublicPort);
 	let ftpUser = service.wordpress.ftpUser;
 	let ftpPassword = service.wordpress.ftpPassword;
@@ -22,7 +22,7 @@
 	function generateUrl(publicPort: any) {
 		return browser
 			? `sftp://${
-					settings.fqdn ? getDomain(settings.fqdn) : window.location.hostname
+					settings?.fqdn ? getDomain(settings.fqdn) : ipv4 || ipv6
 			  }:${publicPort}`
 			: 'Loading...';
 	}
@@ -93,6 +93,7 @@ define('SUBDOMAIN_INSTALL', false);`
 </div>
 <div class="grid grid-cols-2 items-center px-10">
 	<Setting
+		id="ftpEnabled"
 		bind:setting={service.wordpress.ftpEnabled}
 		loading={ftpLoading}
 		disabled={!$status.service.isRunning}
@@ -127,6 +128,7 @@ define('SUBDOMAIN_INSTALL', false);`
 </div>
 <div class="grid grid-cols-2 items-center px-10">
 	<Setting
+		id="ownMysql"
 		dataTooltip={$t('forms.must_be_stopped_to_modify')}
 		bind:setting={service.wordpress.ownMysql}
 		disabled={$status.service.isRunning}

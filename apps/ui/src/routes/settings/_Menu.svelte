@@ -3,7 +3,7 @@
 	import { appSession } from '$lib/store';
 </script>
 
-<div class="flex flex-col pt-4 space-y-6 w-96 px-20">
+<div class="flex flex-col pt-4 space-y-6 px-10">
 	{#if $appSession.teamId === '0'}
 		<a
 			href="/settings/global"

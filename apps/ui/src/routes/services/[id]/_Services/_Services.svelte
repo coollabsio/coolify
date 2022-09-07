@@ -8,18 +8,24 @@
 
 	import { browser } from '$app/env';
 	import { page } from '$app/stores';
-	import { toast } from '@zerodevx/svelte-toast';
 
 	import { get, post } from '$lib/api';
 	import { errorNotification, getDomain } from '$lib/common';
 	import { t } from '$lib/translations';
-	import { appSession, disabledButton, status, location, setLocation } from '$lib/store';
+	import {
+		appSession,
+		status,
+		setLocation,
+		addToast,
+		checkIfDeploymentEnabledServices,
+		isDeploymentEnabled
+	} from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 
 	import Fider from './_Fider.svelte';
 	import Ghost from './_Ghost.svelte';
+	import GlitchTip from './_GlitchTip.svelte';
 	import Hasura from './_Hasura.svelte';
 	import MeiliSearch from './_MeiliSearch.svelte';
 	import MinIo from './_MinIO.svelte';
@@ -27,15 +33,23 @@
 	import Umami from './_Umami.svelte';
 	import VsCodeServer from './_VSCodeServer.svelte';
 	import Wordpress from './_Wordpress.svelte';
+	import Appwrite from './_Appwrite.svelte';
 	import Moodle from './_Moodle.svelte';
+	import Searxng from './_Searxng.svelte';
+	import Weblate from './_Weblate.svelte';
+	import Explainer from '$lib/components/Explainer.svelte';
+	import Taiga from './_Taiga.svelte';
 
 	const { id } = $page.params;
 	$: isDisabled =
 		!$appSession.isAdmin || $status.service.isRunning || $status.service.initialLoading;
 
 	let forceSave = false;
-	let loading = false;
-	let loadingVerification = false;
+	let loading = {
+		save: false,
+		verification: false,
+		cleanup: false
+	};
 	let dualCerts = service.dualCerts;
 
 	let nonWWWDomain = service.fqdn && getDomain(service.fqdn).replace(/^www\./, '');
@@ -45,7 +59,10 @@
 	async function isDNSValid(domain: any, isWWW: any) {
 		try {
 			await get(`/services/${id}/check?domain=${domain}`);
-			toast.push('DNS configuration is valid.');
+			addToast({
+				message: 'DNS configuration is valid.',
+				type: 'success'
+			});
 			isWWW ? (isWWWDomainOK = true) : (isNonWWWDomainOK = true);
 			return true;
 		} catch (error) {
@@ -56,8 +73,8 @@
 	}
 
 	async function handleSubmit() {
-		if (loading) return;
-		loading = true;
+		if (loading.save) return;
+		loading.save = true;
 		try {
 			await post(`/services/${id}/check`, {
 				fqdn: service.fqdn,
@@ -68,9 +85,12 @@
 			});
 			await post(`/services/${id}`, { ...service });
 			setLocation(service);
-			$disabledButton = false;
 			forceSave = false;
-			toast.push('Configuration saved.');
+			$isDeploymentEnabled = checkIfDeploymentEnabledServices($appSession.isAdmin, service);
+			return addToast({
+				message: 'Configuration saved.',
+				type: 'success'
+			});
 		} catch (error) {
 			//@ts-ignore
 			if (error?.message.startsWith($t('application.dns_not_set_partial_error'))) {
@@ -89,18 +109,21 @@
 			}
 			return errorNotification(error);
 		} finally {
-			loading = false;
+			loading.save = false;
 		}
 	}
 	async function setEmailsToVerified() {
-		loadingVerification = true;
+		loading.verification = true;
 		try {
 			await post(`/services/${id}/${service.type}/activate`, { id: service.id });
-			toast.push(t.get('services.all_email_verified'));
+			return addToast({
+				message: t.get('services.all_email_verified'),
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
-			loadingVerification = false;
+			loading.verification = false;
 		}
 	}
 	async function changeSettings(name: any) {
@@ -109,9 +132,26 @@
 				dualCerts = !dualCerts;
 			}
 			await post(`/services/${id}/settings`, { dualCerts });
-			return toast.push(t.get('application.settings_saved'));
+			return addToast({
+				message: t.get('application.settings_saved'),
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
+		}
+	}
+	async function cleanupLogs() {
+		loading.cleanup = true;
+		try {
+			await post(`/services/${id}/${service.type}/cleanup`, { id: service.id });
+			return addToast({
+				message: 'Cleared DB Logs',
+				type: 'success'
+			});
+		} catch (error) {
+			return errorNotification(error);
+		} finally {
+			loading.cleanup = false;
 		}
 	}
 	onMount(async () => {
@@ -145,23 +185,34 @@
 			{#if $appSession.isAdmin}
 				<button
 					type="submit"
-					class:bg-pink-600={!loading}
+					class="btn btn-sm"
 					class:bg-orange-600={forceSave}
-					class:hover:bg-pink-500={!loading}
 					class:hover:bg-orange-400={forceSave}
-					disabled={loading}
-					>{loading
-						? $t('forms.saving')
+					class:loading={loading.save}
+					class:bg-services={!loading.save}
+					disabled={loading.save}
+					>{loading.save
+						? $t('forms.save')
 						: forceSave
 						? $t('forms.confirm_continue')
 						: $t('forms.save')}</button
 				>
 			{/if}
 			{#if service.type === 'plausibleanalytics' && $status.service.isRunning}
-				<button on:click|preventDefault={setEmailsToVerified} disabled={loadingVerification}
-					>{loadingVerification
+				<button
+					class="btn btn-sm"
+					on:click|preventDefault={setEmailsToVerified}
+					disabled={loading.verification}
+					class:loading={loading.verification}
+					>{loading.verification
 						? $t('forms.verifying')
 						: $t('forms.verify_emails_without_smtp')}</button
+				>
+				<button
+					class="btn btn-sm"
+					on:click|preventDefault={cleanupLogs}
+					disabled={loading.cleanup}
+					class:loading={loading.cleanup}>Cleanup Unnecessary Database Logs</button
 				>
 			{/if}
 		</div>
@@ -240,8 +291,9 @@
 				</div>
 				<div class="grid grid-cols-2 px-10">
 					<div class="flex-col ">
-						<label for="apiFqdn" class="pt-2 text-base font-bold text-stone-100">API URL</label>
-						<Explainer text={$t('application.https_explainer')} />
+						<label for="apiFqdn" class="pt-2 text-base font-bold text-stone-100"
+							>API URL <Explainer explanation={$t('application.https_explainer')} /></label
+						>
 					</div>
 
 					<CopyPasswordField
@@ -259,9 +311,9 @@
 				<div class="grid grid-cols-2 px-10">
 					<div class="flex-col ">
 						<label for="fqdn" class="pt-2 text-base font-bold text-stone-100"
-							>{$t('application.url_fqdn')}</label
-						>
-						<Explainer text={$t('application.https_explainer')} />
+							>{$t('application.url_fqdn')}
+							<Explainer explanation={$t('application.https_explainer')} />
+						</label>
 					</div>
 
 					<CopyPasswordField
@@ -282,13 +334,13 @@
 				<div class="flex-col space-y-2 pt-4 text-center">
 					{#if isNonWWWDomainOK}
 						<button
-							class="bg-green-600 hover:bg-green-500"
+							class="btn btn-sm bg-green-600 hover:bg-green-500"
 							on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
 							>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
 						>
 					{:else}
 						<button
-							class="bg-red-600 hover:bg-red-500"
+							class="btn btn-sm bg-red-600 hover:bg-red-500"
 							on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
 							>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
 						>
@@ -296,13 +348,13 @@
 					{#if dualCerts}
 						{#if isWWWDomainOK}
 							<button
-								class="bg-green-600 hover:bg-green-500"
+								class="btn btn-sm bg-green-600 hover:bg-green-500"
 								on:click|preventDefault={() => isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
 								>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
 							>
 						{:else}
 							<button
-								class="bg-red-600 hover:bg-red-500"
+								class="btn btn-sm bg-red-600 hover:bg-red-500"
 								on:click|preventDefault={() => isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
 								>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
 							>
@@ -312,6 +364,7 @@
 			{/if}
 			<div class="grid grid-cols-2 items-center px-10">
 				<Setting
+					id="dualCerts"
 					disabled={$status.service.isRunning}
 					dataTooltip={$t('forms.must_be_stopped_to_modify')}
 					bind:setting={dualCerts}
@@ -321,7 +374,11 @@
 				/>
 			</div>
 			<div class="grid grid-cols-2 items-center px-10">
-				<label for="exposePort" class="text-base font-bold text-stone-100">Exposed Port</label>
+				<label for="exposePort" class="text-base font-bold text-stone-100"
+					>Exposed Port <Explainer
+						explanation={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
+					/></label
+				>
 				<input
 					readonly={!$appSession.isAdmin && !$status.service.isRunning}
 					disabled={!$appSession.isAdmin ||
@@ -331,9 +388,6 @@
 					id="exposePort"
 					bind:value={service.exposePort}
 					placeholder="12345"
-				/>
-				<Explainer
-					text={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
 				/>
 			</div>
 
@@ -355,8 +409,18 @@
 				<Hasura bind:service />
 			{:else if service.type === 'fider'}
 				<Fider bind:service {readOnly} />
+			{:else if service.type === 'appwrite'}
+				<Appwrite bind:service {readOnly} />
 			{:else if service.type === 'moodle'}
 				<Moodle bind:service {readOnly} />
+			{:else if service.type === 'glitchTip'}
+				<GlitchTip bind:service />
+			{:else if service.type === 'searxng'}
+				<Searxng bind:service />
+			{:else if service.type === 'weblate'}
+				<Weblate bind:service />
+			{:else if service.type === 'taiga'}
+				<Taiga bind:service />
 			{/if}
 		</div>
 	</form>

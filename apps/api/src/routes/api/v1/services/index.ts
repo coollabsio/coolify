@@ -4,6 +4,7 @@ import {
     activateWordpressFtp,
     checkService,
     checkServiceDomain,
+    cleanupPlausibleLogs,
     deleteService,
     deleteServiceSecret,
     deleteServiceStorage,
@@ -25,12 +26,11 @@ import {
     saveServiceType,
     saveServiceVersion,
     setSettingsService,
-    startService,
-    stopService
 } from './handlers';
 
 import type { OnlyId } from '../../../../types';
-import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetWordpressSettings } from './types';
+import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetGlitchTipSettings, SetWordpressSettings } from './types';
+import { startService, stopService } from '../../../../lib/services/handlers';
 
 const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.addHook('onRequest', async (request) => {
@@ -71,9 +71,10 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 
     fastify.post<ServiceStartStop>('/:id/:type/start', async (request) => await startService(request));
     fastify.post<ServiceStartStop>('/:id/:type/stop', async (request) => await stopService(request));
-    fastify.post<ServiceStartStop & SetWordpressSettings>('/:id/:type/settings', async (request, reply) => await setSettingsService(request, reply));
+    fastify.post<ServiceStartStop & SetWordpressSettings & SetGlitchTipSettings>('/:id/:type/settings', async (request, reply) => await setSettingsService(request, reply));
 
     fastify.post<OnlyId>('/:id/plausibleanalytics/activate', async (request, reply) => await activatePlausibleUsers(request, reply));
+    fastify.post<OnlyId>('/:id/plausibleanalytics/cleanup', async (request, reply) => await cleanupPlausibleLogs(request, reply));
     fastify.post<ActivateWordpressFtp>('/:id/wordpress/ftp', async (request, reply) => await activateWordpressFtp(request, reply));
 };
 

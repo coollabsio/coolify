@@ -55,9 +55,24 @@
 	<a href="https://fider.io" target="_blank">
 		<Icons.Fider />
 	</a>
+{:else if service.type === 'appwrite'}
+	<a href="https://appwrite.io" target="_blank">
+		<Icons.Appwrite />
+	</a>
 {:else if service.type === 'moodle'}
 	<a href="https://moodle.org" target="_blank">
 		<Icons.Moodle />
 	</a>
+{:else if service.type === 'glitchTip'}
+	<a href="https://glitchtip.com" target="_blank">
+		<Icons.GlitchTip />
+	</a>
+{:else if service.type === 'searxng'}
+	<a href="https://searxng.org" target="_blank">
+		<Icons.Searxng />
+	</a>
+{:else if service.type === 'weblate'}
+	<a href="https://weblate.org" target="_blank">
+		<Icons.Weblate />
+	</a>
 {/if}
-

@@ -2,7 +2,6 @@
 
 First of all, thank you for considering contributing to my project! It means a lot 💜.
 
-Contribution guide is for v2, not applicable for v3
 
 ## 🙋 Want to help?
 
@@ -17,13 +16,17 @@ This is a little list of what you can do to help the project:
 
 ## 👋 Introduction
 
-### Setup with github codespaces
+### Setup with Github codespaces
 
 If you have github codespaces enabled then you can just create a codespace and run `pnpm dev` to run your the dev environment. All the required dependencies and packages has been configured for you already.
 
+### Setup with Gitpod
+
+If you have a [Gitpod](https://gitpod.io), you can just create a workspace from this repository, run `pnpm install && pnpm db:push && pnpm db:seed` and then `pnpm dev`. All the required dependencies and packages has been configured for you already.
+
 ### Setup locally in your machine
 
-> 🔴 At the moment, Coolify **doesn't support Windows**. You must use Linux or MacOS. 💡 Although windows users can use github codespaces for development
+> 🔴 At the moment, Coolify **doesn't support Windows**. You must use Linux or MacOS. Consider using Gitpod or Github Codespaces.
 
 #### Recommended Pull Request Guideline
 
@@ -31,21 +34,38 @@ If you have github codespaces enabled then you can just create a codespace and r
 - Clone your fork repo to local
 - Create a new branch
 - Push to your fork repo
-- Create a pull request: https://github.com/coollabsio/compare
+- Create a pull request: https://github.com/coollabsio/coolify/compare
 - Write a proper description
 - Open the pull request to review against `next` branch
 
 ---
 
-# How to start after you set up your local fork?
+# 🧑‍💻 Developer contribution
+## Technical skills required
 
-Due to the lock file, this repository is best with [pnpm](https://pnpm.io). I recommend you try and use `pnpm` because it is cool and efficient!
+- **Languages**: Node.js / Javascript / Typescript
+- **Framework JS/TS**: [SvelteKit](https://kit.svelte.dev/) & [Fastify](https://www.fastify.io/)
+- **Database ORM**: [Prisma.io](https://www.prisma.io/)
+- **Docker Engine API**
 
-You need to have [Docker Engine](https://docs.docker.com/engine/install/) installed locally.
+---
 
-#### Steps for local setup
+## How to start after you set up your local fork?
 
-1. Copy `.env.template` to `.env` and set the `COOLIFY_APP_ID` environment variable to something cool.
+### Prerequisites
+1. Due to the lock file, this repository is best with [pnpm](https://pnpm.io). I recommend you try and use `pnpm` because it is cool and efficient!
+
+2. You need to have [Docker Engine](https://docs.docker.com/engine/install/) installed locally.
+3. You need to have [Docker Compose Plugin](https://docs.docker.com/compose/install/compose-plugin/) installed locally.
+4. You need to have [GIT LFS Support](https://git-lfs.github.com/) installed locally.
+
+Optional:
+
+4. To test Heroku buildpacks, you need [pack](https://github.com/buildpacks/pack) binary installed locally.
+
+### Steps for local setup
+
+1. Copy `apps/api/.env.template` to `apps/api/.env.template` and set the `COOLIFY_APP_ID` environment variable to something cool.
 2. Install dependencies with `pnpm install`.
 3. Need to create a local SQlite database with `pnpm db:push`.
 
@@ -54,28 +74,17 @@ You need to have [Docker Engine](https://docs.docker.com/engine/install/) instal
 4. Seed the database with base entities with `pnpm db:seed`
 5. You can start coding after starting `pnpm dev`.
 
-## 🧑‍💻 Developer contribution
+---
 
-### Technical skills required
-
-- **Languages**: Node.js / Javascript / Typescript
-- **Framework JS/TS**: Svelte / SvelteKit
-- **Database ORM**: Prisma.io
-- **Docker Engine**
-
-### Database migrations
+## Database migrations
 
 During development, if you change the database layout, you need to run `pnpm db:push` to migrate the database and create types for Prisma. You also need to restart the development process.
 
 If the schema is finalized, you need to create a migration file with `pnpm db:migrate <nameOfMigration>` where `nameOfMigration` is given by you. Make it sense. :)
 
-### Tricky parts
-
-- BullMQ, the queue system Coolify uses, cannot be hot reloaded. So if you change anything in the files related to it, you need to restart the development process. I'm actively looking for a different queue/scheduler library. I'm open to discussion!
-
 ---
 
-# How to add new services
+## How to add new services
 
 You can add any open-source and self-hostable software (service/application) to Coolify if the following statements are true:
 
@@ -95,14 +104,14 @@ There are 5 steps you should make on the backend side.
 
 > I will use [Umami](https://umami.is/) as an example service.
 
-### Create Prisma / database schema for the new service.
+### Create Prisma / Database schema for the new service.
 
 You only need to do this if you store passwords or any persistent configuration. Mostly it is required by all services, but there are some exceptions, like NocoDB.
 
 Update Prisma schema in [prisma/schema.prisma](prisma/schema.prisma).
 
 - Add new model with the new service name.
-- Make a relationshup with `Service` model.
+- Make a relationship with `Service` model.
 - In the `Service` model, the name of the new field should be with low-capital.
 - If the service needs a database, define a `publicPort` field to be able to make it's database public, example field name in case of PostgreSQL: `postgresqlPublicPort`. It should be a optional field.
 
@@ -110,13 +119,13 @@ If you are finished with the Prisma schema, you should update the database schem
 
 > You must restart the running development environment to be able to use the new model
 
-> If you use VSCode, you probably need to restart the `Typescript Language Server` to get the new types loaded in the running VSCode.
+> If you use VSCode/TLS, you probably need to restart the `Typescript Language Server` to get the new types loaded in the running environment.
 
 ### Add supported versions
 
 Supported versions are hardcoded into Coolify (for now).
 
-You need to update `supportedServiceTypesAndVersions` function at [src/lib/components/common.ts](src/lib/components/common.ts). Example JSON:
+You need to update `supportedServiceTypesAndVersions` function at [apps/api/src/lib/services/supportedVersions.ts](apps/api/src/lib/services/supportedVersions.ts). Example JSON:
 
 ```js
      {
@@ -139,12 +148,12 @@ You need to update `supportedServiceTypesAndVersions` function at [src/lib/compo
      }
 ```
 
-### Update global functions
+### Add required functions/properties
 
-1. Add the new service to the `include` variable in [src/lib/database/services.ts](src/lib/database/services.ts), so it will be included in all places in the database queries where it is required.
+1. Add the new service to the `includeServices` variable in [apps/api/src/lib/services/common.ts](apps/api/src/lib/services/common.ts), so it will be included in all places in the database queries where it is required.
 
 ```js
-const include: Prisma.ServiceInclude = {
+const include: any = {
 	destinationDocker: true,
 	persistentStorage: true,
 	serviceSecret: true,
@@ -158,7 +167,7 @@ const include: Prisma.ServiceInclude = {
 };
 ```
 
-2. Update the database update query with the new service type to `configureServiceType` function in [src/lib/database/services.ts](src/lib/database/services.ts). This function defines the automatically generated variables (passwords, users, etc.) and it's encryption process (if applicable).
+2. Update the database update query with the new service type to `configureServiceType` function in [apps/api/src/lib/services/common.ts](apps/api/src/lib/services/common.ts). This function defines the automatically generated variables (passwords, users, etc.) and it's encryption process (if applicable).
 
 ```js
 [...]
@@ -184,80 +193,46 @@ else if (type === 'umami') {
 	}
 ```
 
-3. Add decryption process for configurations and passwords to `getService` function in [src/lib/database/services.ts](src/lib/database/services.ts)
+3. Add field details to [apps/api/src/lib/services/serviceFields.ts](apps/api/src/lib/services/serviceFields.ts), so every component will know what to do with the values (decrypt/show it by default/readonly)
 
 ```js
-if (body.umami?.postgresqlPassword)
-	body.umami.postgresqlPassword = decrypt(body.umami.postgresqlPassword);
-
-if (body.umami?.hashSalt) body.umami.hashSalt = decrypt(body.umami.hashSalt);
+export const umami = [{
+	name: 'postgresqlUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+}]
 ```
 
-4. Add service deletion query to `removeService` function in [src/lib/database/services.ts](src/lib/database/services.ts)
+4. Add service deletion query to `removeService` function in [apps/api/src/lib/services/common.ts](apps/api/src/lib/services/common.ts)
 
-### Create API endpoints.
+5. Add start process for the new service in [apps/api/src/lib/services/handlers.ts](apps/api/src/lib/services/handlers.ts)
 
-You need to add a new folder under [src/routes/services/[id]](src/routes/services/[id]) with the low-capital name of the service. You need 3 default files in that folder.
+> See startUmamiService() function as example.
 
-#### `index.json.ts`:
+6. Add the newly added start process to `startService` in [apps/api/src/routes/api/v1/services/handlers.ts](apps/api/src/routes/api/v1/services/handlers.ts)
 
-It has a POST endpoint that updates the service details in Coolify's database, such as name, url, other configurations, like passwords. It should look something like this:
-
-```js
-import { getUserDetails } from '$lib/common';
-import * as db from '$lib/database';
-import { ErrorHandler } from '$lib/database';
-import type { RequestHandler } from '@sveltejs/kit';
-
-export const post: RequestHandler = async (event) => {
-	const { status, body } = await getUserDetails(event);
-	if (status === 401) return { status, body };
-
-	const { id } = event.params;
-
-	let { name, fqdn } = await event.request.json();
-	if (fqdn) fqdn = fqdn.toLowerCase();
-
-	try {
-		await db.updateService({ id, fqdn, name });
-		return { status: 201 };
-	} catch (error) {
-		return ErrorHandler(error);
-	}
-};
-```
-
-If it's necessary, you can create your own database update function, specifically for the new service.
-
-#### `start.json.ts`
-
-It has a POST endpoint that sets all the required secrets, persistent volumes, `docker-compose.yaml` file and sends a request to the specified docker engine.
-
-You could also define an `HTTP` or `TCP` proxy for every other port that should be proxied to your server. (See `startHttpProxy` and `startTcpProxy` functions in [src/lib/haproxy/index.ts](src/lib/haproxy/index.ts))
-
-#### `stop.json.ts`
-
-It has a POST endpoint that stops the service and all dependent (TCP/HTTP proxies) containers. If publicPort is specified it also needs to cleanup it from the database.
-
-## Frontend
-
-1. You need to add a custom logo at [src/lib/components/svg/services/](src/lib/components/svg/services/) as a svelte component.
+7. You need to add a custom logo at [apps/ui/src/lib/components/svg/services](apps/ui/src/lib/components/svg/services) as a svelte component and export it in [apps/ui/src/lib/components/svg/services/index.ts](apps/ui/src/lib/components/svg/services/index.ts)
 
    SVG is recommended, but you can use PNG as well. It should have the `isAbsolute` variable with the suitable CSS classes, primarily for sizing and positioning.
 
-2. You need to include it the logo at
+8. You need to include it the logo at:
 
-- [src/routes/services/index.svelte](src/routes/services/index.svelte) with `isAbsolute` in two places,
-- [src/lib/components/ServiceLinks.svelte](src/lib/components/ServiceLinks.svelte) with `isAbsolute` and a link to the docs/main site of the service
-- [src/routes/services/[id]/configuration/type.svelte](src/routes/services/[id]/configuration/type.svelte) with `isAbsolute`.
+- [apps/ui/src/lib/components/svg/services/ServiceIcons.svelte](apps/ui/src/lib/components/svg/services/ServiceIcons.svelte) with `isAbsolute`.
+- [apps/ui/src/routes/services/[id]/_ServiceLinks.svelte](apps/ui/src/routes/services/[id]/_ServiceLinks.svelte) with the link to the docs/main site of the service
 
-3. By default the URL and the name frontend forms are included in [src/routes/services/[id]/\_Services/\_Services.svelte](src/routes/services/[id]/_Services/_Services.svelte).
+9. By default the URL and the name frontend forms are included in [apps/ui/src/routes/services/[id]/_Services/_Services.svelte](apps/ui/src/routes/services/[id]/_Services/_Services.svelte).
 
-   If you need to show more details on the frontend, such as users/passwords, you need to add Svelte component to [src/routes/services/[id]/\_Services](src/routes/services/[id]/_Services) with an underscore. For example, see other files in that folder.
+   If you need to show more details on the frontend, such as users/passwords, you need to add Svelte component to [apps/ui/src/routes/services/[id]/_Services](apps/ui/src/routes/services/[id]/_Services) with an underscore. 
+   
+   > For example, see other [here](apps/ui/src/routes/services/[id]/_Services/_Umami.svelte).
 
-   You also need to add the new inputs to the `index.json.ts` file of the specific service, like for MinIO here: [src/routes/services/[id]/minio/index.json.ts](src/routes/services/[id]/minio/index.json.ts)
 
-## 🌐 Translate the project
+Good job! 👏
+
+<!-- # 🌐 Translate the project
 
 The project use [sveltekit-i18n](https://github.com/sveltekit-i18n/lib) to translate the project.
 It follows the [ISO 639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) to name languages.
@@ -278,4 +253,4 @@ If your language doesn't appear in the [locales folder list](src/lib/locales/), 
 
 1.  In `src/lib/locales/`, Copy paste `en.json` and rename it with your language (eg: `cz.json`).
 2.  In the [lang.json](src/lib/lang.json) file, add a line after the first bracket (`{`) with `"ISO of your language": "Language",` (eg: `"cz": "Czech",`).
-3.  Have fun translating!
+3.  Have fun translating! -->

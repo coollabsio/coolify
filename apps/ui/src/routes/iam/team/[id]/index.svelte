@@ -12,7 +12,7 @@
 	export let team: any;
 	export let invitations: any[];
 	import { page } from '$app/stores';
-	import Explainer from '$lib/components/Explainer.svelte';
+	import SimpleExplainer from '$lib/components/SimpleExplainer.svelte';
 	import { post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
@@ -91,14 +91,14 @@
 	<form on:submit|preventDefault={handleSubmit} class=" py-4">
 		<div class="flex space-x-1 pb-5">
 			<div class="title font-bold">{$t('index.settings')}</div>
-			<button class="bg-fuchsia-600 hover:bg-fuchsia-500" type="submit">{$t('forms.save')}</button>
+			<button class="btn btn-sm bg-iam" type="submit">{$t('forms.save')}</button>
 		</div>
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="mt-2 grid grid-cols-2">
 				<div class="flex-col">
 					<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 					{#if team.id === '0'}
-						<Explainer customClass="w-full" text={$t('team.root_team_explainer')} />
+						<SimpleExplainer customClass="w-full" text={$t('team.root_team_explainer')} />
 					{/if}
 				</div>
 				<input id="name" name="name" placeholder="name" bind:value={team.name} />
@@ -130,11 +130,11 @@
 					{#if $appSession.isAdmin && permission.user.id !== $appSession.userId && permission.permission !== 'owner'}
 						<td class="flex flex-col items-center justify-center space-y-2 py-4 text-center">
 							<button
-								class="w-52 bg-red-600 hover:bg-red-500"
+								class="btn btn-sm btn-error"
 								on:click={() => removeFromTeam(permission.user.id)}>{$t('forms.remove')}</button
 							>
 							<button
-								class="w-52"
+								class="btn btn-sm"
 								on:click={() =>
 									changePermission(permission.user.id, permission.id, permission.permission)}
 								>{$t('team.promote_to', {
@@ -157,7 +157,7 @@
 					{#if isAdmin(team.permissions[0].permission)}
 						<td class="flex-col space-y-2 py-4 text-center">
 							<button
-								class="w-52 bg-red-600 hover:bg-red-500"
+								class="btn btn-sm btn-error"
 								on:click={() => revokeInvitation(invitation.id)}
 								>{$t('team.revoke_invitation')}</button
 							>
@@ -174,12 +174,12 @@
 			<div class="flex space-x-1">
 				<div class="flex space-x-1">
 					<div class="title font-bold">{$t('team.invite_new_member')}</div>
-					<button class="bg-fuchsia-600 hover:bg-fuchsia-500" type="submit"
+					<button class="btn btn-sm bg-iam" type="submit"
 						>{$t('team.send_invitation')}</button
 					>
 				</div>
 			</div>
-			<Explainer text={$t('team.invite_only_register_explainer')} />
+			<SimpleExplainer text={$t('team.invite_only_register_explainer')} />
 			<div class="flex-col space-y-2 px-4 pt-5 sm:px-6">
 				<div class="flex space-x-0">
 					<input
@@ -191,14 +191,14 @@
 					<div class="flex-1" />
 					<button
 						on:click={() => (invitation.permission = 'read')}
-						class="rounded-none rounded-l border border-dashed border-transparent"
+						class="px-2 rounded-none rounded-l border border-dashed border-transparent"
 						type="button"
 						class:border-coolgray-300={invitation.permission !== 'read'}
 						class:bg-fuchsia-500={invitation.permission === 'read'}>{$t('team.read')}</button
 					>
 					<button
 						on:click={() => (invitation.permission = 'admin')}
-						class="rounded-none rounded-r border border-dashed border-transparent"
+						class="px-2 rounded-none rounded-r border border-dashed border-transparent"
 						type="button"
 						class:border-coolgray-300={invitation.permission !== 'admin'}
 						class:bg-red-500={invitation.permission === 'admin'}>{$t('team.admin')}</button

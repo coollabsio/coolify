@@ -326,7 +326,7 @@ export const fider = [{
 	isBoolean: false,
 	isEncrypted: true
 }, {
-	name: 'postgreslUser',
+	name: 'postgresqlUser',
 	isEditable: false,
 	isLowerCase: false,
 	isNumber: false,
@@ -344,7 +344,7 @@ export const fider = [{
 {
 	name: 'emailNoreply',
 	isEditable: true,
-	isLowerCase: true,
+	isLowerCase: false,
 	isNumber: false,
 	isBoolean: false,
 	isEncrypted: false
@@ -352,7 +352,7 @@ export const fider = [{
 {
 	name: 'emailSmtpHost',
 	isEditable: true,
-	isLowerCase: true,
+	isLowerCase: false,
 	isNumber: false,
 	isBoolean: false,
 	isEncrypted: false
@@ -376,7 +376,7 @@ export const fider = [{
 {
 	name: 'emailSmtpUser',
 	isEditable: true,
-	isLowerCase: true,
+	isLowerCase: false,
 	isNumber: false,
 	isBoolean: false,
 	isEncrypted: false
@@ -472,6 +472,394 @@ export const moodle = [{
 {
 	name: 'mariadbDatabase',
 	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+}]
+
+export const appwrite = [{
+	name: 'opensslKeyV1',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'executorSecret',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'redisPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'mariadbHost',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'mariadbPort',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'mariadbUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'mariadbPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'mariadbRootUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'mariadbRootUserPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'mariadbDatabase',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+}]
+
+export const glitchTip = [{
+	name: 'postgresqlUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'postgresqlDatabase',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlPublicPort',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: true,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'secretKeyBase',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'emailSmtpHost',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'emailSmtpPassword',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'emailSmtpUseSsl',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: true,
+	isEncrypted: false
+},
+{
+	name: 'emailSmtpUseSsl',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: true,
+	isEncrypted: false
+},
+{
+	name: 'emailSmtpPort',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: true,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'emailSmtpUser',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'defaultEmail',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'defaultUsername',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'defaultPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'defaultEmailFrom',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'emailUrl',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'emailBackend',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'mailgunApiKey',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'sendgridApiKey',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'enableOpenUserRegistration',
+	isEditable: true,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: true,
+	isEncrypted: false
+}]
+
+export const searxng = [{
+	name: 'secretKey',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'redisPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+}]
+
+export const weblate = [{
+	name: 'adminPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'postgresqlHost',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlPort',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'postgresqlDatabase',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+}]
+export const taiga = [{
+	name: 'secretKey',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'djangoAdminUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'djangoAdminPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'rabbitMQUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'rabbitMQPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'postgresqlHost',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlPort',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlUser',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: false
+},
+{
+	name: 'postgresqlPassword',
+	isEditable: false,
+	isLowerCase: false,
+	isNumber: false,
+	isBoolean: false,
+	isEncrypted: true
+},
+{
+	name: 'postgresqlDatabase',
+	isEditable: false,
 	isLowerCase: false,
 	isNumber: false,
 	isBoolean: false,

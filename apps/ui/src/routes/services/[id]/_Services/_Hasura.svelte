@@ -1,6 +1,5 @@
 <script lang="ts">
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-	import Explainer from '$lib/components/Explainer.svelte';
 	import { t } from '$lib/translations';
 	export let service: any;
 </script>

@@ -71,13 +71,11 @@ export async function removeContainer({
 }): Promise<void> {
 	try {
 		const { stdout } = await executeDockerCmd({ dockerId, command: `docker inspect --format '{{json .State}}' ${id}` })
-
 		if (JSON.parse(stdout).Running) {
 			await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}` })
 			await executeDockerCmd({ dockerId, command: `docker rm ${id}` })
 		}
 	} catch (error) {
-		console.log(error);
 		throw error;
 	}
 }

@@ -61,38 +61,58 @@
 	}
 </script>
 
-<div class="icons fixed top-0 left-0 m-3 cursor-pointer" on:click={() => goto('/')}>
-	<svg
-		xmlns="http://www.w3.org/2000/svg"
-		class="h-6 w-6"
-		viewBox="0 0 24 24"
-		stroke-width="1.5"
-		stroke="currentColor"
-		fill="none"
-		stroke-linecap="round"
-		stroke-linejoin="round"
-	>
-		<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-		<line x1="5" y1="12" x2="19" y2="12" />
-		<line x1="5" y1="12" x2="11" y2="18" />
-		<line x1="5" y1="12" x2="11" y2="6" />
-	</svg>
-</div>
-<div class="flex h-screen flex-col items-center justify-center">
-	{#if $appSession.userId}
-		<div class="flex justify-center px-4 text-xl font-bold">{$t('login.already_logged_in')}</div>
-	{:else}
-		<div class="flex justify-center px-4">
-			<form on:submit|preventDefault={handleSubmit} class="flex flex-col py-4 space-y-2">
+<div class="flex lg:flex-row flex-col h-screen">
+	<div class="bg-neutral-focus h-screen lg:flex hidden flex-col justify-end p-20 flex-1">
+		<h1 class="title lg:text-6xl mb-5 border-gradient">Coolify</h1>
+		<h3 class="title">Made self-hosting simple.</h3>
+	</div>
+	<div class="flex flex-1 flex-col lg:max-w-2xl">
+		<div class="flex flex-row p-8 items-center space-x-3 justify-between">
+			<div class="icons cursor-pointer" on:click={() => goto('/')}>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-6 w-6"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<line x1="5" y1="12" x2="19" y2="12" />
+					<line x1="5" y1="12" x2="11" y2="18" />
+					<line x1="5" y1="12" x2="11" y2="6" />
+				</svg>
+			</div>
+			<div class="flex flex-row items-center space-x-3">
 				{#if $appSession.whiteLabeledDetails.icon}
-					<img
-						class="w-32 mx-auto pb-8"
-						src={$appSession.whiteLabeledDetails.icon}
-						alt="Icon for white labeled version of Coolify"
-					/>
+					<div class="avatar" style="width: 40px; height: 40px">
+						<img
+							src={$appSession.whiteLabeledDetails.icon}
+							alt="Icon for white labeled version of Coolify"
+						/>
+					</div>
 				{:else}
-					<div class="text-6xl font-bold border-gradient w-48 mx-auto border-b-4 mb-8">Coolify</div>
+					<div>
+						<div class="avatar" style="width: 40px; height: 40px">
+							<img src="favicon.png" alt="Coolify icon" />
+						</div>
+					</div>
+					<div class="prose">
+						<h4>Coolify</h4>
+					</div>
 				{/if}
+			</div>
+		</div>
+		<div
+			class="w-full md:px-20 lg:px-10 xl:px-20 p-6 flex flex-col h-full justify-center items-center"
+		>
+			<div class="mb-5 w-full prose prose-neutral">
+				<h1 class="m-0 white">Get started</h1>
+				<h5>Enter the required fields to complete the registration.</h5>
+			</div>
+			<form on:submit|preventDefault={handleSubmit} class="flex flex-col py-4 space-y-3 w-full">
 				<input
 					type="email"
 					name="email"
@@ -101,6 +121,7 @@
 					required
 					bind:this={emailEl}
 					bind:value={email}
+					class="w-full"
 				/>
 				<input
 					type="password"
@@ -109,6 +130,7 @@
 					bind:this={passwordEl}
 					bind:value={password}
 					required
+					class="w-full"
 				/>
 				<input
 					type="password"
@@ -116,25 +138,25 @@
 					placeholder={$t('forms.password_again')}
 					bind:value={passwordCheck}
 					required
+					class="w-full"
 				/>
 
-				<div class="flex space-x-2 h-8 items-center justify-center pt-8">
+				<div class="flex space-y-3 flex-col pt-3">
 					<button
 						type="submit"
-						class="text-white"
+						class="btn"
 						disabled={loading}
-						class:hover:bg-coollabs-100={!loading}
 						class:bg-transparent={loading}
 						class:bg-coollabs={!loading}
-						>{loading ? $t('register.registering') : $t('register.register')}</button
+						class:loading>{loading ? $t('register.registering') : $t('register.register')}</button
 					>
 				</div>
 			</form>
+			{#if userCount === 0}
+				<div class="pt-5">
+					{$t('register.first_user')}
+				</div>
+			{/if}
 		</div>
-		{#if userCount === 0}
-			<div class="pt-5">
-				{$t('register.first_user')}
-			</div>
-		{/if}
-	{/if}
+	</div>
 </div>

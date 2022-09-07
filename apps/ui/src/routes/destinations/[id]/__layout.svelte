@@ -40,7 +40,6 @@
 				}
 			};
 		} catch (error) {
-			console.log(error)
 			return handlerNotFoundLoad(error, url);
 		}
 	};
@@ -56,10 +55,16 @@
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
 	import { appSession } from '$lib/store';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 
-	const { id } = $page.params;
+	const isDestinationDeletable =
+		(destination?.application.length === 0 &&
+			destination?.database.length === 0 &&
+			destination?.service.length === 0) ||
+		true;
 
 	async function deleteDestination(destination: any) {
+		if (!isDestinationDeletable) return;
 		const sure = confirm($t('application.confirm_to_delete', { name: destination.name }));
 		if (sure) {
 			try {
@@ -70,21 +75,30 @@
 			}
 		}
 	}
+	function deletable() {
+		if (!isDestinationDeletable) {
+			return 'Please delete all resources before deleting this.';
+		}
+		if ($appSession.isAdmin) {
+			return $t('destination.delete_destination');
+		} else {
+			return $t('destination.permission_denied_delete_destination');
+		}
+	}
 </script>
 
-{#if id !== 'new'}
+{#if $page.params.id !== 'new'}
 	<nav class="nav-side">
 		<button
+			id="delete"
 			on:click={() => deleteDestination(destination)}
-			title={$t('source.delete_git_source')}
 			type="submit"
-			disabled={!$appSession.isAdmin}
-			class:hover:text-red-500={$appSession.isAdmin}
-			class="icons tooltip-bottom bg-transparent text-sm"
-			data-tooltip={$appSession.isAdmin
-				? $t('destination.delete_destination')
-				: $t('destination.permission_denied_delete_destination')}><DeleteIcon /></button
+			disabled={!$appSession.isAdmin && isDestinationDeletable}
+			class:hover:text-red-500={$appSession.isAdmin && isDestinationDeletable}
+			class="icons bg-transparent text-sm"
+			class:text-stone-600={!isDestinationDeletable}><DeleteIcon /></button
 		>
 	</nav>
+	<Tooltip triggeredBy="#delete">{deletable()}</Tooltip>
 {/if}
 <slot />

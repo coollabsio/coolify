@@ -1,5 +1,9 @@
+<script lang="ts">
+	export let isAbsolute = true;
+</script>
+
 <svg
-	class="absolute top-0 left-0 -m-6 h-14 w-14"
+	class={isAbsolute ? 'absolute top-0 left-0 -m-6 h-14 w-14' : 'mx-auto w-8 h-8'}
 	viewBox="0 0 256 256"
 	fill="none"
 	xmlns="http://www.w3.org/2000/svg"

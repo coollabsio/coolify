@@ -1,6 +1,6 @@
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl"]
+  binaryTargets = ["native"]
 }
 
 datasource db {
@@ -11,6 +11,7 @@ datasource db {
 model Setting {
   id                    String   @id @default(cuid())
   fqdn                  String?  @unique
+  isAPIDebuggingEnabled Boolean? @default(false)
   isRegistrationEnabled Boolean  @default(false)
   dualCerts             Boolean  @default(false)
   minPort               Int      @default(9000)
@@ -20,12 +21,14 @@ model Setting {
   proxyHash             String?
   isAutoUpdateEnabled   Boolean  @default(false)
   isDNSCheckEnabled     Boolean  @default(true)
+  DNSServers            String?
   isTraefikUsed         Boolean  @default(true)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   ipv4                  String?
   ipv6                  String?
   arch                  String?
+  concurrentBuilds      Int      @default(1)
 }
 
 model User {
@@ -82,7 +85,7 @@ model TeamInvitation {
 model Application {
   id                  String                         @id @default(cuid())
   name                String
-  fqdn                String?                        @unique
+  fqdn                String?
   repository          String?
   configHash          String?
   branch              String?
@@ -115,18 +118,39 @@ model Application {
   settings            ApplicationSettings?
   secrets             Secret[]
   teams               Team[]
+  connectedDatabase   ApplicationConnectedDatabase?
+}
+
+model ApplicationConnectedDatabase {
+  id                     String      @id @default(cuid())
+  applicationId          String      @unique
+  databaseId             String?
+  hostedDatabaseType     String?
+  hostedDatabaseHost     String?
+  hostedDatabasePort     Int?
+  hostedDatabaseName     String?
+  hostedDatabaseUser     String?
+  hostedDatabasePassword String?
+  hostedDatabaseDBName   String?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+  database               Database?   @relation(fields: [databaseId], references: [id])
+  application            Application @relation(fields: [applicationId], references: [id])
 }
 
 model ApplicationSettings {
-  id            String      @id @default(cuid())
-  applicationId String      @unique
-  dualCerts     Boolean     @default(false)
-  debug         Boolean     @default(false)
-  previews      Boolean     @default(false)
-  autodeploy    Boolean     @default(true)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  application   Application @relation(fields: [applicationId], references: [id])
+  id                 String      @id @default(cuid())
+  applicationId      String      @unique
+  dualCerts          Boolean     @default(false)
+  debug              Boolean     @default(false)
+  previews           Boolean     @default(false)
+  autodeploy         Boolean     @default(true)
+  isBot              Boolean     @default(false)
+  isPublicRepository Boolean     @default(false)
+  isDBBranching      Boolean     @default(false)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  application        Application @relation(fields: [applicationId], references: [id])
 }
 
 model ApplicationPersistentStorage {
@@ -182,7 +206,7 @@ model BuildLog {
   applicationId String?
   buildId       String
   line          String
-  time          Int
+  time          BigInt
 }
 
 model Build {
@@ -194,6 +218,9 @@ model Build {
   githubAppId         String?
   gitlabAppId         String?
   commit              String?
+  pullmergeRequestId  String?
+  forceRebuild        Boolean  @default(false)
+  sourceBranch        String?
   branch              String?
   status              String?  @default("queued")
   createdAt           DateTime @default(now())
@@ -215,6 +242,7 @@ model DestinationDocker {
   updatedAt          DateTime      @updatedAt
   sshKeyId           String?
   sshKey             SshKey?       @relation(fields: [sshKeyId], references: [id])
+  sshLocalPort       Int?
   application        Application[]
   database           Database[]
   service            Service[]
@@ -235,6 +263,7 @@ model SshKey {
 model GitSource {
   id           String        @id @default(cuid())
   name         String
+  forPublic    Boolean       @default(false)
   type         String?
   apiUrl       String?
   htmlUrl      String?
@@ -282,22 +311,23 @@ model GitlabApp {
 }
 
 model Database {
-  id                  String             @id @default(cuid())
-  name                String
-  publicPort          Int?
-  defaultDatabase     String?
-  type                String?
-  version             String?
-  dbUser              String?
-  dbUserPassword      String?
-  rootUser            String?
-  rootUserPassword    String?
-  destinationDockerId String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  destinationDocker   DestinationDocker? @relation(fields: [destinationDockerId], references: [id])
-  settings            DatabaseSettings?
-  teams               Team[]
+  id                           String                         @id @default(cuid())
+  name                         String
+  publicPort                   Int?
+  defaultDatabase              String?
+  type                         String?
+  version                      String?
+  dbUser                       String?
+  dbUserPassword               String?
+  rootUser                     String?
+  rootUserPassword             String?
+  destinationDockerId          String?
+  createdAt                    DateTime                       @default(now())
+  updatedAt                    DateTime                       @updatedAt
+  destinationDocker            DestinationDocker?             @relation(fields: [destinationDockerId], references: [id])
+  settings                     DatabaseSettings?
+  teams                        Team[]
+  applicationConnectedDatabase ApplicationConnectedDatabase[]
 }
 
 model DatabaseSettings {
@@ -322,19 +352,25 @@ model Service {
   createdAt           DateTime                   @default(now())
   updatedAt           DateTime                   @updatedAt
   destinationDocker   DestinationDocker?         @relation(fields: [destinationDockerId], references: [id])
-  fider               Fider?
-  ghost               Ghost?
-  hasura              Hasura?
-  meiliSearch         MeiliSearch?
-  minio               Minio?
-  moodle              Moodle?
-  plausibleAnalytics  PlausibleAnalytics?
   persistentStorage   ServicePersistentStorage[]
   serviceSecret       ServiceSecret[]
-  umami               Umami?
-  vscodeserver        Vscodeserver?
-  wordpress           Wordpress?
   teams               Team[]
+
+  fider              Fider?
+  ghost              Ghost?
+  glitchTip          GlitchTip?
+  hasura             Hasura?
+  meiliSearch        MeiliSearch?
+  minio              Minio?
+  moodle             Moodle?
+  plausibleAnalytics PlausibleAnalytics?
+  umami              Umami?
+  vscodeserver       Vscodeserver?
+  wordpress          Wordpress?
+  appwrite           Appwrite?
+  searxng            Searxng?
+  weblate            Weblate?
+  taiga              Taiga?
 }
 
 model PlausibleAnalytics {
@@ -489,4 +525,95 @@ model Moodle {
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
   service                 Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Appwrite {
+  id                      String   @id @default(cuid())
+  serviceId               String   @unique
+  opensslKeyV1            String
+  executorSecret          String
+  redisPassword           String
+  mariadbHost             String?
+  mariadbPort             Int      @default(3306)
+  mariadbUser             String
+  mariadbPassword         String
+  mariadbRootUser         String
+  mariadbRootUserPassword String
+  mariadbDatabase         String
+  mariadbPublicPort       Int?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  service                 Service  @relation(fields: [serviceId], references: [id])
+}
+
+model GlitchTip {
+  id                         String   @id @default(cuid())
+  postgresqlUser             String
+  postgresqlPassword         String
+  postgresqlDatabase         String
+  postgresqlPublicPort       Int?
+  secretKeyBase              String?
+  defaultEmail               String
+  defaultUsername            String
+  defaultPassword            String
+  defaultEmailFrom           String   @default("glitchtip@domain.tdl")
+  emailSmtpHost              String?  @default("domain.tdl")
+  emailSmtpPort              Int?     @default(25)
+  emailSmtpUser              String?
+  emailSmtpPassword          String?
+  emailSmtpUseTls            Boolean? @default(false)
+  emailSmtpUseSsl            Boolean? @default(false)
+  emailBackend               String?
+  mailgunApiKey              String?
+  sendgridApiKey             String?
+  enableOpenUserRegistration Boolean  @default(true)
+  serviceId                  String   @unique
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+  service                    Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Searxng {
+  id            String   @id @default(cuid())
+  secretKey     String
+  redisPassword String
+  serviceId     String   @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  service       Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Weblate {
+  id                   String   @id @default(cuid())
+  adminPassword        String
+  postgresqlHost       String
+  postgresqlPort       Int
+  postgresqlUser       String
+  postgresqlPassword   String
+  postgresqlDatabase   String
+  postgresqlPublicPort Int?
+  serviceId            String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  service              Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Taiga {
+  id                   String   @id @default(cuid())
+  secretKey            String
+  erlangSecret         String
+  djangoAdminPassword  String
+  djangoAdminUser      String
+  rabbitMQUser         String
+  rabbitMQPassword     String
+  postgresqlHost       String
+  postgresqlPort       Int
+  postgresqlUser       String
+  postgresqlPassword   String
+  postgresqlDatabase   String
+  postgresqlPublicPort Int?
+  serviceId            String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  service              Service  @relation(fields: [serviceId], references: [id])
 }

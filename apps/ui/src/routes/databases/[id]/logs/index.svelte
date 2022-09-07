@@ -6,6 +6,7 @@
 	import { get } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 
 	const { id } = $page.params;
 
@@ -17,9 +18,13 @@
 	let logsEl: any;
 	let position = 0;
 	let loadingLogs = false;
-	let database: any = {};
+	let database = {
+		name: null
+	};
 
 	onMount(async () => {
+		const response = await get(`/databases/${id}`);
+		database = response.database;
 		const { logs: firstLogs } = await get(`/databases/${id}/logs`);
 		logs = firstLogs;
 		loadAllLogs();
@@ -40,7 +45,6 @@
 				logs = data.logs;
 			}
 		} catch (error) {
-			console.log(error);
 			return errorNotification(error);
 		} finally {
 			loadingLogs = false;
@@ -94,29 +98,6 @@
 		</div>
 		<span class="text-xs">{database.name}</span>
 	</div>
-
-	{#if database.fqdn}
-		<a
-			href={database.fqdn}
-			target="_blank"
-			class="icons tooltip-bottom flex items-center bg-transparent text-sm"
-			><svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="h-6 w-6"
-				viewBox="0 0 24 24"
-				stroke-width="1.5"
-				stroke="currentColor"
-				fill="none"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			>
-				<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-				<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
-				<line x1="10" y1="14" x2="20" y2="4" />
-				<polyline points="15 4 20 4 20 9" />
-			</svg></a
-		>
-	{/if}
 </div>
 <div class="flex flex-row justify-center space-x-2 px-10 pt-6">
 	{#if logs.length === 0}
@@ -129,9 +110,9 @@
 			{/if}
 			<div class="flex justify-end sticky top-0 p-1 mx-1">
 				<button
+					id="follow"
 					on:click={followBuild}
-					class="bg-transparent"
-					data-tooltip="Follow logs"
+					class="bg-transparent btn btn-sm"
 					class:text-green-500={followingLogs}
 				>
 					<svg
@@ -151,6 +132,7 @@
 						<line x1="16" y1="12" x2="12" y2="16" />
 					</svg>
 				</button>
+				<Tooltip triggeredBy="#follow">Follow Logs</Tooltip>
 			</div>
 			<div
 				class="font-mono w-full leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"

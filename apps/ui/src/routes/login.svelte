@@ -49,61 +49,83 @@
 	<title>{$t('login.login')}</title>
 </svelt:head>
 
-<div class="flex h-screen flex-col items-center justify-center">
-	<div class="flex justify-center px-4">
-		<form on:submit|preventDefault={handleSubmit} class="flex flex-col py-4 space-y-2">
-			{#if $appSession.whiteLabeledDetails.icon}
-				<img
-					class="w-32 mx-auto pb-8"
-					src={$appSession.whiteLabeledDetails.icon}
-					alt="Icon for white labeled version of Coolify"
-				/>
-			{:else}
-				<div class="text-6xl font-bold border-gradient w-48 mx-auto border-b-4 mb-8">Coolify</div>
-			{/if}
-			<input
-				type="email"
-				name="email"
-				placeholder={$t('forms.email')}
-				autocomplete="off"
-				required
-				bind:this={emailEl}
-				bind:value={email}
-			/>
-			<input
-				type="password"
-				name="password"
-				placeholder={$t('forms.password')}
-				bind:value={password}
-				required
-			/>
-
-			<div class="flex space-x-2 h-8 items-center justify-center pt-8">
-				<button
-					type="submit"
-					disabled={loading}
-					class="hover:opacity-90 text-white"
-					class:bg-transparent={loading}
-					class:text-stone-600={loading}
-					class:bg-coollabs={!loading}
-					>{loading ? $t('login.authenticating') : $t('login.login')}</button
-				>
-
-				<button
-					on:click|preventDefault={gotoRegister}
-					class="bg-transparent hover:bg-coolgray-300	text-white ">{$t('register.register')}</button
-				>
-			</div>
-		</form>
+<div class="flex lg:flex-row flex-col h-screen">
+	<div class="bg-neutral-focus h-screen lg:flex hidden flex-col justify-end p-20 flex-1">
+		<h1 class="title lg:text-6xl mb-5 border-gradient">Coolify</h1>
+		<h3 class="title">Made self-hosting simple.</h3>
 	</div>
-	{#if browser && window.location.host === 'demo.coolify.io'}
-		<div class="pt-5 font-bold">
-			Registration is <span class="text-pink-500">open</span>, just fill in an email (does not need
-			to be live email address for the demo instance) and a password.
+	<div class="flex flex-1 flex-col lg:max-w-2xl">
+		<div class="flex flex-row p-8 items-center space-x-3">
+			{#if $appSession.whiteLabeledDetails.icon}
+				<div class="avatar" style="width: 40px; height: 40px">
+					<img
+						src={$appSession.whiteLabeledDetails.icon}
+						alt="Icon for white labeled version of Coolify"
+					/>
+				</div>
+			{:else}
+				<div>
+					<div class="avatar" style="width: 40px; height: 40px">
+						<img src="favicon.png" alt="Coolify icon" />
+					</div>
+				</div>
+				<div class="prose">
+					<h4>Coolify</h4>
+				</div>
+			{/if}
 		</div>
-		<div class="pt-5 font-bold">
-			All users gets an <span class="text-pink-500">own namespace</span>, so you won't be able to
-			access other users data.
+		<div
+			class="w-full md:px-20 lg:px-10 xl:px-20 p-6 flex flex-col h-full justify-center items-center"
+		>
+			<div class="mb-5 w-full prose prose-neutral">
+				<h1 class="m-0 white">Welcome back</h1>
+				<h5>Please login to continue.</h5>
+			</div>
+			<form on:submit|preventDefault={handleSubmit} class="flex flex-col py-4 space-y-3 w-full">
+				<input
+					type="email"
+					name="email"
+					placeholder={$t('forms.email')}
+					autocomplete="off"
+					required
+					bind:this={emailEl}
+					bind:value={email}
+					class="w-full"
+				/>
+				<input
+					type="password"
+					name="password"
+					placeholder={$t('forms.password')}
+					bind:value={password}
+					required
+					class="w-full"
+				/>
+
+				<div class="flex space-y-3 flex-col pt-3">
+					<button
+						type="submit"
+						disabled={loading}
+						class="btn"
+						class:loading
+						class:bg-coollabs={!loading}
+						>{loading ? $t('login.authenticating') : $t('login.login')}</button
+					>
+
+					<button on:click|preventDefault={gotoRegister} class="btn btn-ghost"
+						>{$t('register.register')}</button
+					>
+				</div>
+			</form>
+			{#if browser && window.location.host === 'demo.coolify.io'}
+				<div class="pt-5 font-bold">
+					Registration is <span class="text-pink-500">open</span>, just fill in an email (does not
+					need to be live email address for the demo instance) and a password.
+				</div>
+				<div class="pt-5 font-bold">
+					All users gets an <span class="text-pink-500">own namespace</span>, so you won't be able
+					to access other users data.
+				</div>
+			{/if}
 		</div>
-	{/if}
+	</div>
 </div>

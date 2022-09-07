@@ -170,6 +170,16 @@ export function findBuildPack(pack: string, packageManager = 'npm') {
 			port: 80
 		};
 	}
+	if (pack === 'heroku') {
+		return {
+			...metaData,
+			installCommand: null,
+			buildCommand: null,
+			startCommand: null,
+			publishDirectory: null,
+			port: 5000
+		};
+	}
 	return {
 		name: 'node',
 		fancyName: 'Node.js',
@@ -187,112 +197,137 @@ export const buildPacks = [
 		name: 'node',
 		fancyName: 'Node.js',
 		hoverColor: 'hover:bg-green-700',
-		color: 'bg-green-700'
+		color: 'bg-green-700',
+		isCoolifyBuildPack: true,
 	},
 	{
 		name: 'static',
 		fancyName: 'Static',
 		hoverColor: 'hover:bg-orange-700',
-		color: 'bg-orange-700'
+		color: 'bg-orange-700',
+		isCoolifyBuildPack: true,
 	},
 
 	{
 		name: 'php',
 		fancyName: 'PHP',
 		hoverColor: 'hover:bg-indigo-700',
-		color: 'bg-indigo-700'
+		color: 'bg-indigo-700',
+		isCoolifyBuildPack: true,
 	},
 	{
 		name: 'laravel',
 		fancyName: 'Laravel',
 		hoverColor: 'hover:bg-indigo-700',
-		color: 'bg-indigo-700'
+		color: 'bg-indigo-700',
+		isCoolifyBuildPack: true,
 	},
 	{
 		name: 'docker',
 		fancyName: 'Docker',
 		hoverColor: 'hover:bg-sky-700',
-		color: 'bg-sky-700'
+		color: 'bg-sky-700',
+		isCoolifyBuildPack: true,
 	},
 	{
 		name: 'svelte',
 		fancyName: 'Svelte',
 		hoverColor: 'hover:bg-orange-700',
-		color: 'bg-orange-700'
+		color: 'bg-orange-700',
+		isCoolifyBuildPack: true,
 	},
 	{
 		name: 'vuejs',
 		fancyName: 'VueJS',
 		hoverColor: 'hover:bg-green-700',
-		color: 'bg-green-700'
+		color: 'bg-green-700',
+		isCoolifyBuildPack: true,
 	},
 	{
 		name: 'nuxtjs',
 		fancyName: 'NuxtJS',
 		hoverColor: 'hover:bg-green-700',
-		color: 'bg-green-700'
+		color: 'bg-green-700',
+		isCoolifyBuildPack: true,
 	},
 	{
 		name: 'gatsby',
 		fancyName: 'Gatsby',
 		hoverColor: 'hover:bg-blue-700',
-		color: 'bg-blue-700'
+		color: 'bg-blue-700',
+		isCoolifyBuildPack: true,
 	},
 	{
 		name: 'astro',
 		fancyName: 'Astro',
 		hoverColor: 'hover:bg-pink-700',
-		color: 'bg-pink-700'
+		color: 'bg-pink-700',
+		isCoolifyBuildPack: true,
 	},
 	{
 		name: 'eleventy',
 		fancyName: 'Eleventy',
 		hoverColor: 'hover:bg-red-700',
-		color: 'bg-red-700'
+		color: 'bg-red-700',
+		isCoolifyBuildPack: true,
 	},
 
 	{
 		name: 'react',
 		fancyName: 'React',
 		hoverColor: 'hover:bg-blue-700',
-		color: 'bg-blue-700'
+		color: 'bg-blue-700',
+		isCoolifyBuildPack: true,
 	},
 	{
 		name: 'preact',
 		fancyName: 'Preact',
 		hoverColor: 'hover:bg-blue-700',
-		color: 'bg-blue-700'
+		color: 'bg-blue-700',
+		isCoolifyBuildPack: true,
 	},
 	{
 		name: 'nextjs',
 		fancyName: 'NextJS',
 		hoverColor: 'hover:bg-blue-700',
-		color: 'bg-blue-700'
+		color: 'bg-blue-700',
+		isCoolifyBuildPack: true,
 	},
 	{
 		name: 'nestjs',
 		fancyName: 'NestJS',
 		hoverColor: 'hover:bg-red-700',
-		color: 'bg-red-700'
+		color: 'bg-red-700',
+		isCoolifyBuildPack: true,
 	},
 	{
 		name: 'rust',
 		fancyName: 'Rust',
 		hoverColor: 'hover:bg-pink-700',
-		color: 'bg-pink-700'
+		color: 'bg-pink-700',
+		isCoolifyBuildPack: true,
 	},
 	{
 		name: 'python',
 		fancyName: 'Python',
 		hoverColor: 'hover:bg-green-700',
-		color: 'bg-green-700'
+		color: 'bg-green-700',
+		isCoolifyBuildPack: true,
 	},
 	{
 		name: 'deno',
 		fancyName: 'Deno',
 		hoverColor: 'hover:bg-green-700',
-		color: 'bg-green-700'
-	}
+		color: 'bg-green-700',
+		isCoolifyBuildPack: true,
+	},
+    {
+        name: 'heroku',
+		fancyName: 'Heroku',
+		hoverColor: 'hover:bg-purple-700',
+		color: 'bg-purple-700',
+		isHerokuBuildPack: true,
+    }
 ];
 export const scanningTemplates = {
 	'@sveltejs/kit': {

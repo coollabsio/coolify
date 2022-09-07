@@ -39,9 +39,9 @@
 <div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">{$t('index.destinations')}</div>
 	{#if $appSession.isAdmin}
-		<a href="/destinations/new" class="add-icon bg-sky-600 hover:bg-sky-500">
+		<a href="/destinations/new" class="btn btn-square btn-sm bg-destinations">
 			<svg
-				class="w-6"
+				class="h-6 w-6"
 				xmlns="http://www.w3.org/2000/svg"
 				fill="none"
 				viewBox="0 0 24 24"
@@ -56,7 +56,7 @@
 		</a>
 	{/if}
 </div>
-<div class="flex-col justify-center">
+<div class="flex-col justify-center mt-10 pb-12 sm:pb-16">
 	{#if !destinations || ownDestinations.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">{$t('destination.no_destination_found')}</div>

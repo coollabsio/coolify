@@ -3,22 +3,29 @@ import crypto from 'node:crypto'
 import jsonwebtoken from 'jsonwebtoken';
 import axios from 'axios';
 import { FastifyReply } from 'fastify';
+import fs from 'fs/promises';
+import yaml from 'js-yaml';
+
 import { day } from '../../../../lib/dayjs';
-import { setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
-import { checkDomainsIsValidInDNS, checkDoubleBranch, decrypt, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, getFreeExposedPort, isDev, isDomainConfigured, prisma, stopBuild, uniqueName } from '../../../../lib/common';
+import { makeLabelForStandaloneApplication, setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
+import { checkDomainsIsValidInDNS, checkDoubleBranch, checkExposedPort, createDirectories, decrypt, defaultComposeConfiguration, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, isDev, isDomainConfigured, listSettings, prisma, stopBuild, uniqueName } from '../../../../lib/common';
 import { checkContainer, formatLabelsOnDocker, isContainerExited, removeContainer } from '../../../../lib/docker';
-import { scheduler } from '../../../../lib/scheduler';
 
 import type { FastifyRequest } from 'fastify';
 import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain, StopPreviewApplication } from './types';
 import { OnlyId } from '../../../../types';
+
+function filterObject(obj, callback) {
+    return Object.fromEntries(Object.entries(obj).
+        filter(([key, val]) => callback(val, key)));
+}
 
 export async function listApplications(request: FastifyRequest) {
     try {
         const { teamId } = request.user
         const applications = await prisma.application.findMany({
             where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-            include: { teams: true, destinationDocker: true }
+            include: { teams: true, destinationDocker: true, settings: true }
         });
         const settings = await prisma.setting.findFirst()
         return {
@@ -34,7 +41,7 @@ export async function getImages(request: FastifyRequest<GetImages>) {
         const { buildPack, deploymentType } = request.body
         let publishDirectory = undefined;
         let port = undefined
-        const { baseImage, baseBuildImage, baseBuildImages, baseImages, } = setDefaultBaseImage(
+        const { baseImage, baseBuildImage, baseBuildImages, baseImages } = setDefaultBaseImage(
             buildPack, deploymentType
         );
         if (buildPack === 'nextjs') {
@@ -56,8 +63,7 @@ export async function getImages(request: FastifyRequest<GetImages>) {
             }
         }
 
-
-        return { baseBuildImage, baseBuildImages, publishDirectory, port }
+        return { baseImage, baseImages, baseBuildImage, baseBuildImages, publishDirectory, port }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
@@ -75,7 +81,6 @@ export async function getApplicationStatus(request: FastifyRequest<OnlyId>) {
             isExited = await isContainerExited(application.destinationDocker.id, id);
         }
         return {
-            isQueueActive: scheduler.workers.has('deployApplication'),
             isRunning,
             isExited,
         };
@@ -90,10 +95,11 @@ export async function getApplication(request: FastifyRequest<OnlyId>) {
         const { teamId } = request.user
         const appId = process.env['COOLIFY_APP_ID'];
         const application: any = await getApplicationFromDB(id, teamId);
-
+        const settings = await listSettings();
         return {
             application,
-            appId
+            appId,
+            settings
         };
 
     } catch ({ status, message }) {
@@ -150,7 +156,8 @@ export async function getApplicationFromDB(id: string, teamId: string) {
                 settings: true,
                 gitSource: { include: { githubApp: true, gitlabApp: true } },
                 secrets: true,
-                persistentStorage: true
+                persistentStorage: true,
+                connectedDatabase: true
             }
         });
         if (!application) {
@@ -177,32 +184,39 @@ export async function getApplicationFromDB(id: string, teamId: string) {
 }
 export async function getApplicationFromDBWebhook(projectId: number, branch: string) {
     try {
-        let application = await prisma.application.findFirst({
+        let applications = await prisma.application.findMany({
             where: { projectId, branch, settings: { autodeploy: true } },
             include: {
                 destinationDocker: true,
                 settings: true,
                 gitSource: { include: { githubApp: true, gitlabApp: true } },
                 secrets: true,
-                persistentStorage: true
+                persistentStorage: true,
+                connectedDatabase: true
             }
         });
-        if (!application) {
+        if (applications.length === 0) {
             throw { status: 500, message: 'Application not configured.' }
         }
-        application = decryptApplication(application);
-        const { baseImage, baseBuildImage, baseBuildImages, baseImages } = setDefaultBaseImage(
-            application.buildPack
-        );
+        applications = applications.map((application: any) => {
+            application = decryptApplication(application);
+            const { baseImage, baseBuildImage, baseBuildImages, baseImages } = setDefaultBaseImage(
+                application.buildPack
+            );
 
-        // Set default build images
-        if (!application.baseImage) {
-            application.baseImage = baseImage;
-        }
-        if (!application.baseBuildImage) {
-            application.baseBuildImage = baseBuildImage;
-        }
-        return { ...application, baseBuildImages, baseImages };
+            // Set default build images
+            if (!application.baseImage) {
+                application.baseImage = baseImage;
+            }
+            if (!application.baseBuildImage) {
+                application.baseBuildImage = baseBuildImage;
+            }
+            application.baseBuildImages = baseBuildImages;
+            application.baseImages = baseImages;
+            return application
+        })
+
+        return applications;
 
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -230,13 +244,16 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             denoOptions,
             baseImage,
             baseBuildImage,
-            deploymentType
+            deploymentType,
+            baseDatabaseBranch
         } = request.body
-
         if (port) port = Number(port);
         if (exposePort) {
             exposePort = Number(exposePort);
         }
+
+        const { destinationDocker: { id: dockerId, remoteIpAddress }, exposePort: configuredPort } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
+        if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress })
         if (denoOptions) denoOptions = denoOptions.trim();
         const defaultConfiguration = await setDefaultConfiguration({
             buildPack,
@@ -249,22 +266,43 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             dockerFileLocation,
             denoMainFile
         });
-        await prisma.application.update({
-            where: { id },
-            data: {
-                name,
-                fqdn,
-                exposePort,
-                pythonWSGI,
-                pythonModule,
-                pythonVariable,
-                denoOptions,
-                baseImage,
-                baseBuildImage,
-                deploymentType,
-                ...defaultConfiguration
-            }
-        });
+        if (baseDatabaseBranch) {
+            await prisma.application.update({
+                where: { id },
+                data: {
+                    name,
+                    fqdn,
+                    exposePort,
+                    pythonWSGI,
+                    pythonModule,
+                    pythonVariable,
+                    denoOptions,
+                    baseImage,
+                    baseBuildImage,
+                    deploymentType,
+                    ...defaultConfiguration,
+                    connectedDatabase: { update: { hostedDatabaseDBName: baseDatabaseBranch } }
+                }
+            });
+        } else {
+            await prisma.application.update({
+                where: { id },
+                data: {
+                    name,
+                    fqdn,
+                    exposePort,
+                    pythonWSGI,
+                    pythonModule,
+                    pythonVariable,
+                    denoOptions,
+                    baseImage,
+                    baseBuildImage,
+                    deploymentType,
+                    ...defaultConfiguration
+                }
+            });
+        }
+
         return reply.code(201).send();
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -275,15 +313,15 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
 export async function saveApplicationSettings(request: FastifyRequest<SaveApplicationSettings>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        const { debug, previews, dualCerts, autodeploy, branch, projectId } = request.body
-        const isDouble = await checkDoubleBranch(branch, projectId);
-        if (isDouble && autodeploy) {
-            await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false } })
-            throw { status: 500, message: 'Cannot activate automatic deployments until only one application is defined for this repository / branch.' }
-        }
+        const { debug, previews, dualCerts, autodeploy, branch, projectId, isBot, isDBBranching } = request.body
+        // const isDouble = await checkDoubleBranch(branch, projectId);
+        // if (isDouble && autodeploy) {
+        //     await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false } })
+        //     throw { status: 500, message: 'Cannot activate automatic deployments until only one application is defined for this repository / branch.' }
+        // }
         await prisma.application.update({
             where: { id },
-            data: { settings: { update: { debug, previews, dualCerts, autodeploy } } },
+            data: { fqdn: isBot ? null : undefined, settings: { update: { debug, previews, dualCerts, autodeploy, isBot, isDBBranching } } },
             include: { destinationDocker: true }
         });
         return reply.code(201).send();
@@ -311,6 +349,113 @@ export async function stopPreviewApplication(request: FastifyRequest<StopPreview
         return errorHandler({ status, message })
     }
 }
+
+export async function restartApplication(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
+    try {
+        const { id } = request.params
+        const { teamId } = request.user
+        let application: any = await getApplicationFromDB(id, teamId);
+        if (application?.destinationDockerId) {
+            const buildId = cuid();
+            const { id: dockerId, network } = application.destinationDocker;
+            const { secrets, pullmergeRequestId, port, repository, persistentStorage, id: applicationId, buildPack, exposePort } = application;
+
+            const envs = [
+                `PORT=${port}`
+            ];
+            if (secrets.length > 0) {
+                secrets.forEach((secret) => {
+                    if (pullmergeRequestId) {
+                        if (secret.isPRMRSecret) {
+                            envs.push(`${secret.name}=${secret.value}`);
+                        }
+                    } else {
+                        if (!secret.isPRMRSecret) {
+                            envs.push(`${secret.name}=${secret.value}`);
+                        }
+                    }
+                });
+            }
+            const { workdir } = await createDirectories({ repository, buildId });
+            const labels = []
+            let image = null
+            const { stdout: container } = await executeDockerCmd({ dockerId, command: `docker container ls --filter 'label=com.docker.compose.service=${id}' --format '{{json .}}'` })
+            const containersArray = container.trim().split('\n');
+            for (const container of containersArray) {
+                const containerObj = formatLabelsOnDocker(container);
+                image = containerObj[0].Image
+                Object.keys(containerObj[0].Labels).forEach(function (key) {
+                    if (key.startsWith('coolify')) {
+                        labels.push(`${key}=${containerObj[0].Labels[key]}`)
+                    }
+                })
+            }
+            let imageFound = false;
+            try {
+                await executeDockerCmd({
+                    dockerId,
+                    command: `docker image inspect ${image}`
+                })
+                imageFound = true;
+            } catch (error) {
+                //
+            }
+            if (!imageFound) {
+                throw { status: 500, message: 'Image not found, cannot restart application.' }
+            }
+            await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
+
+            let envFound = false;
+            try {
+                envFound = !!(await fs.stat(`${workdir}/.env`));
+            } catch (error) {
+                //
+            }
+            const volumes =
+                persistentStorage?.map((storage) => {
+                    return `${applicationId}${storage.path.replace(/\//gi, '-')}:${buildPack !== 'docker' ? '/app' : ''
+                        }${storage.path}`;
+                }) || [];
+            const composeVolumes = volumes.map((volume) => {
+                return {
+                    [`${volume.split(':')[0]}`]: {
+                        name: volume.split(':')[0]
+                    }
+                };
+            });
+            const composeFile = {
+                version: '3.8',
+                services: {
+                    [applicationId]: {
+                        image,
+                        container_name: applicationId,
+                        volumes,
+                        env_file: envFound ? [`${workdir}/.env`] : [],
+                        labels,
+                        depends_on: [],
+                        expose: [port],
+                        ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                        ...defaultComposeConfiguration(network),
+                    }
+                },
+                networks: {
+                    [network]: {
+                        external: true
+                    }
+                },
+                volumes: Object.assign({}, ...composeVolumes)
+            };
+            await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
+            await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}` })
+            await executeDockerCmd({ dockerId, command: `docker rm ${id}` })
+            await executeDockerCmd({ dockerId, command: `docker compose --project-directory ${workdir} up -d` })
+            return reply.code(201).send();
+        }
+        throw { status: 500, message: 'Application cannot be restarted.' }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function stopApplication(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
     try {
         const { id } = request.params
@@ -331,12 +476,14 @@ export async function stopApplication(request: FastifyRequest<OnlyId>, reply: Fa
 export async function deleteApplication(request: FastifyRequest<DeleteApplication>, reply: FastifyReply) {
     try {
         const { id } = request.params
+        const { force } = request.body
+
         const { teamId } = request.user
         const application = await prisma.application.findUnique({
             where: { id },
             include: { destinationDocker: true }
         });
-        if (application?.destinationDockerId && application.destinationDocker?.network) {
+        if (!force && application?.destinationDockerId && application.destinationDocker?.network) {
             const { stdout: containers } = await executeDockerCmd({
                 dockerId: application.destinationDocker.id,
                 command: `docker ps -a --filter network=${application.destinationDocker.network} --filter name=${id} --format '{{json .}}'`
@@ -355,6 +502,7 @@ export async function deleteApplication(request: FastifyRequest<DeleteApplicatio
         await prisma.build.deleteMany({ where: { applicationId: id } });
         await prisma.secret.deleteMany({ where: { applicationId: id } });
         await prisma.applicationPersistentStorage.deleteMany({ where: { applicationId: id } });
+        await prisma.applicationConnectedDatabase.deleteMany({ where: { applicationId: id } });
         if (teamId === '0') {
             await prisma.application.deleteMany({ where: { id } });
         } else {
@@ -378,31 +526,22 @@ export async function checkDomain(request: FastifyRequest<CheckDomain>) {
 export async function checkDNS(request: FastifyRequest<CheckDNS>) {
     try {
         const { id } = request.params
-
         let { exposePort, fqdn, forceSave, dualCerts } = request.body
-
-        if (fqdn) fqdn = fqdn.toLowerCase();
+        if (!fqdn) {
+            return {}
+        } else {
+            fqdn = fqdn.toLowerCase();
+        }
         if (exposePort) exposePort = Number(exposePort);
 
         const { destinationDocker: { id: dockerId, remoteIpAddress, remoteEngine }, exposePort: configuredPort } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
         const { isDNSCheckEnabled } = await prisma.setting.findFirst({});
 
-        const found = await isDomainConfigured({ id, fqdn, dockerId });
+        const found = await isDomainConfigured({ id, fqdn, remoteIpAddress });
         if (found) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
-        if (exposePort) {
-            if (exposePort < 1024 || exposePort > 65535) {
-                throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
-            }
-
-            if (configuredPort !== exposePort) {
-                const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
-                if (availablePort.toString() !== exposePort.toString()) {
-                    throw { status: 500, message: `Port ${exposePort} is already in use.` }
-                }
-            }
-        }
+        if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress })
         if (isDNSCheckEnabled && !isDev && !forceSave) {
             let hostname = request.hostname.split(':')[0];
             if (remoteEngine) hostname = remoteIpAddress;
@@ -435,7 +574,7 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
     try {
         const { id } = request.params
         const teamId = request.user?.teamId;
-        const { pullmergeRequestId = null, branch } = request.body
+        const { pullmergeRequestId = null, branch, forceRebuild } = request.body
         const buildId = cuid();
         const application = await getApplicationFromDB(id, teamId);
         if (application) {
@@ -459,7 +598,10 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
                 data: {
                     id: buildId,
                     applicationId: id,
+                    sourceBranch: branch,
                     branch: application.branch,
+                    pullmergeRequestId: pullmergeRequestId?.toString(),
+                    forceRebuild,
                     destinationDockerId: application.destinationDocker?.id,
                     gitSourceId: application.gitSource?.id,
                     githubAppId: application.gitSource?.githubApp?.id,
@@ -468,22 +610,6 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
                     type: 'manual'
                 }
             });
-            if (pullmergeRequestId) {
-                scheduler.workers.get('deployApplication').postMessage({
-                    build_id: buildId,
-                    type: 'manual',
-                    ...application,
-                    sourceBranch: branch,
-                    pullmergeRequestId
-                });
-            } else {
-                scheduler.workers.get('deployApplication').postMessage({
-                    build_id: buildId,
-                    type: 'manual',
-                    ...application
-                });
-
-            }
             return {
                 buildId
             };
@@ -498,11 +624,20 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
 export async function saveApplicationSource(request: FastifyRequest<SaveApplicationSource>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        const { gitSourceId } = request.body
-        await prisma.application.update({
-            where: { id },
-            data: { gitSource: { connect: { id: gitSourceId } } }
-        });
+        const { gitSourceId, forPublic, type } = request.body
+        if (forPublic) {
+            const publicGit = await prisma.gitSource.findFirst({ where: { type, forPublic } });
+            await prisma.application.update({
+                where: { id },
+                data: { gitSource: { connect: { id: publicGit.id } } }
+            });
+        } else {
+            await prisma.application.update({
+                where: { id },
+                data: { gitSource: { connect: { id: gitSourceId } } }
+            });
+        }
+
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -556,7 +691,7 @@ export async function checkRepository(request: FastifyRequest<CheckRepository>) 
 export async function saveRepository(request, reply) {
     try {
         const { id } = request.params
-        let { repository, branch, projectId, autodeploy, webhookToken } = request.body
+        let { repository, branch, projectId, autodeploy, webhookToken, isPublicRepository = false } = request.body
 
         repository = repository.toLowerCase();
         branch = branch.toLowerCase();
@@ -564,18 +699,20 @@ export async function saveRepository(request, reply) {
         if (webhookToken) {
             await prisma.application.update({
                 where: { id },
-                data: { repository, branch, projectId, gitSource: { update: { gitlabApp: { update: { webhookToken: webhookToken ? webhookToken : undefined } } } }, settings: { update: { autodeploy } } }
+                data: { repository, branch, projectId, gitSource: { update: { gitlabApp: { update: { webhookToken: webhookToken ? webhookToken : undefined } } } }, settings: { update: { autodeploy, isPublicRepository } } }
             });
         } else {
             await prisma.application.update({
                 where: { id },
-                data: { repository, branch, projectId, settings: { update: { autodeploy } } }
+                data: { repository, branch, projectId, settings: { update: { autodeploy, isPublicRepository } } }
             });
         }
-        const isDouble = await checkDoubleBranch(branch, projectId);
-        if (isDouble) {
-            await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false } })
-        }
+        // if (!isPublicRepository) {
+        //     const isDouble = await checkDoubleBranch(branch, projectId);
+        //     if (isDouble) {
+        //         await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false, isPublicRepository } })
+        //     }
+        // }
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -606,7 +743,8 @@ export async function getBuildPack(request) {
             projectId: application.projectId,
             repository: application.repository,
             branch: application.branch,
-            apiUrl: application.gitSource.apiUrl
+            apiUrl: application.gitSource.apiUrl,
+            isPublicRepository: application.settings.isPublicRepository
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -618,6 +756,16 @@ export async function saveBuildPack(request, reply) {
         const { id } = request.params
         const { buildPack } = request.body
         await prisma.application.update({ where: { id }, data: { buildPack } });
+        return reply.code(201).send()
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+export async function saveConnectedDatabase(request, reply) {
+    try {
+        const { id } = request.params
+        const { databaseId, type } = request.body
+        await prisma.application.update({ where: { id }, data: { connectedDatabase: { upsert: { create: { database: { connect: { id: databaseId } }, hostedDatabaseType: type }, update: { database: { connect: { id: databaseId } }, hostedDatabaseType: type } } } } })
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -656,13 +804,13 @@ export async function saveSecret(request: FastifyRequest<SaveSecret>, reply: Fas
             if (found) {
                 throw { status: 500, message: `Secret ${name} already exists.` }
             } else {
-                value = encrypt(value);
+                value = encrypt(value.trim());
                 await prisma.secret.create({
                     data: { name, value, isBuildSecret, isPRMRSecret, application: { connect: { id } } }
                 });
             }
         } else {
-            value = encrypt(value);
+            value = encrypt(value.trim());
             const found = await prisma.secret.findFirst({ where: { applicationId: id, name, isPRMRSecret } });
 
             if (found) {
@@ -779,7 +927,6 @@ export async function getPreviews(request: FastifyRequest<OnlyId>) {
             })
         }
     } catch ({ status, message }) {
-        console.log({ status, message })
         return errorHandler({ status, message })
     }
 }
@@ -872,8 +1019,13 @@ export async function getBuildIdLogs(request: FastifyRequest<GetBuildIdLogs>) {
             orderBy: { time: 'asc' }
         });
         const data = await prisma.build.findFirst({ where: { id: buildId } });
+        const createdAt = day(data.createdAt).utc();
         return {
-            logs,
+            logs: logs.map(log => {
+                log.time = Number(log.time)
+                return log
+            }),
+            took: day().diff(createdAt) / 1000,
             status: data?.status || 'queued'
         }
     } catch ({ status, message }) {
@@ -945,6 +1097,61 @@ export async function cancelDeployment(request: FastifyRequest<CancelDeployment>
         }
         await stopBuild(buildId, applicationId);
         return reply.code(201).send()
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
+
+export async function createdBranchDatabase(database: any, baseDatabaseBranch: string, pullmergeRequestId: string) {
+    try {
+        if (!baseDatabaseBranch) return
+        const { id, type, destinationDockerId, rootUser, rootUserPassword, dbUser } = database;
+        if (destinationDockerId) {
+            if (type === 'postgresql') {
+                const decryptedRootUserPassword = decrypt(rootUserPassword);
+                await executeDockerCmd({
+                    dockerId: destinationDockerId,
+                    command: `docker exec ${id} pg_dump -d "postgresql://postgres:${decryptedRootUserPassword}@${id}:5432/${baseDatabaseBranch}" --encoding=UTF8 --schema-only -f /tmp/${baseDatabaseBranch}.dump`
+                })
+                await executeDockerCmd({
+                    dockerId: destinationDockerId,
+                    command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "CREATE DATABASE branch_${pullmergeRequestId}"`
+                })
+                await executeDockerCmd({
+                    dockerId: destinationDockerId,
+                    command: `docker exec ${id} psql -d "postgresql://postgres:${decryptedRootUserPassword}@${id}:5432/branch_${pullmergeRequestId}" -f /tmp/${baseDatabaseBranch}.dump`
+                })
+                await executeDockerCmd({
+                    dockerId: destinationDockerId,
+                    command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "ALTER DATABASE branch_${pullmergeRequestId} OWNER TO ${dbUser}"`
+                })
+            }
+        }
+
+
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+export async function removeBranchDatabase(database: any, pullmergeRequestId: string) {
+    try {
+        const { id, type, destinationDockerId, rootUser, rootUserPassword } = database;
+        if (destinationDockerId) {
+            if (type === 'postgresql') {
+                const decryptedRootUserPassword = decrypt(rootUserPassword);
+                // Terminate all connections to the database
+                await executeDockerCmd({
+                    dockerId: destinationDockerId,
+                    command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = 'branch_${pullmergeRequestId}' AND pid <> pg_backend_pid();"`
+                })
+
+                await executeDockerCmd({
+                    dockerId: destinationDockerId,
+                    command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "DROP DATABASE branch_${pullmergeRequestId}"`
+                })
+            }
+        }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }

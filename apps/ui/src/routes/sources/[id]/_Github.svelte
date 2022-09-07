@@ -3,12 +3,11 @@
 	export let settings: any;
 	import { page } from '$app/stores';
 	import { getAPIUrl, getWebhookUrl, post } from '$lib/api';
-	import Explainer from '$lib/components/Explainer.svelte';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
 	import { dashify, errorNotification, getDomain } from '$lib/common';
-	import { appSession } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	import { dev } from '$app/env';
+	import Explainer from '$lib/components/Explainer.svelte';
 
 	const { id } = $page.params;
 
@@ -24,33 +23,15 @@
 				htmlUrl: source.htmlUrl.replace(/\/$/, ''),
 				apiUrl: source.apiUrl.replace(/\/$/, '')
 			});
-			toast.push('Configuration saved.');
+			return addToast({
+				message: 'Configuration saved.',
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
 			loading = false;
 		}
-	}
-
-	async function installRepositories(source: any) {
-		const { htmlUrl } = source;
-		const left = screen.width / 2 - 1020 / 2;
-		const top = screen.height / 2 - 1000 / 2;
-		const newWindow = open(
-			`${htmlUrl}/apps/${source.githubApp.name}/installations/new`,
-			'GitHub',
-			'resizable=1, scrollbars=1, fullscreen=0, height=1000, width=1020,top=' +
-				top +
-				', left=' +
-				left +
-				', toolbar=0, menubar=0, status=0'
-		);
-		const timer = setInterval(() => {
-			if (newWindow?.closed) {
-				clearInterval(timer);
-				window.location.reload();
-			}
-		}, 100);
 	}
 
 	async function newGithubApp() {
@@ -65,8 +46,8 @@
 				customPort: source.customPort
 			});
 			const { organization, htmlUrl } = source;
-			const { fqdn } = settings;
-			const host = dev ? getAPIUrl() : fqdn ? fqdn : `http://${window.location.host}` || '';
+			const { fqdn, ipv4, ipv6 } = settings;
+			const host = dev ? getAPIUrl() : fqdn ? fqdn : `http://${ipv4 || ipv6}` || '';
 			const domain = getDomain(fqdn);
 
 			let url = 'settings/apps/new';
@@ -112,29 +93,33 @@
 <div class="mx-auto max-w-4xl px-6">
 	{#if !source.githubAppId}
 		<form on:submit|preventDefault={newGithubApp} class="py-4">
-			<div class="flex space-x-1 pb-7">
+			<div class="grid gap-1 lg:grid-flow-col pb-7">
 				<div class="title">General</div>
 				{#if !source.githubAppId}
-					<button class="bg-orange-600 font-normal" type="submit">Save</button>
+					<button class="btn btn-sm bg-sources" type="submit">Save & Redirect to GitHub</button>
 				{/if}
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
 				<div class="grid grid-flow-row gap-2">
-					<div class="mt-2 grid grid-cols-2 items-center">
+					<div class="mt-2 grid lg:grid-cols-2 items-center">
 						<label for="name" class="text-base font-bold text-stone-100">Name</label>
 						<input name="name" id="name" required bind:value={source.name} />
 					</div>
 				</div>
-				<div class="grid grid-cols-2 items-center">
+				<div class="grid lg:grid-cols-2 items-center">
 					<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
 					<input name="htmlUrl" id="htmlUrl" required bind:value={source.htmlUrl} />
 				</div>
-				<div class="grid grid-cols-2 items-center">
+				<div class="grid lg:grid-cols-2 items-center">
 					<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
 					<input name="apiUrl" id="apiUrl" required bind:value={source.apiUrl} />
 				</div>
-				<div class="grid grid-cols-2 items-center">
-					<label for="customPort" class="text-base font-bold text-stone-100">Custom SSH Port</label>
+				<div class="grid lg:grid-cols-2 items-center">
+					<label for="customPort" class="text-base font-bold text-stone-100"
+						>Custom SSH Port <Explainer
+							explanation={'If you use a self-hosted version of Git, you can provide custom port for all the Git related actions.'}
+						/></label
+					>
 					<input
 						name="customPort"
 						id="customPort"
@@ -143,18 +128,15 @@
 						required
 						value={source.customPort}
 					/>
-					<Explainer
-						text="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
-					/>
 				</div>
-				<div class="grid grid-cols-2">
+				<div class="grid lg:grid-cols-2">
 					<div class="flex flex-col">
 						<label for="organization" class="pt-2 text-base font-bold text-stone-100"
-							>Organization</label
+							>Organization
+							<Explainer
+								explanation={"Fill it if you would like to use an organization's as your Git Source. Otherwise your user will be used."}
+							/></label
 						>
-						<Explainer
-							text="Fill it if you would like to use an organization's as your Git Source. Otherwise your user will be used."
-						/>
 					</div>
 					<input
 						name="organization"
@@ -167,30 +149,30 @@
 		</form>
 	{:else if source.githubApp?.installationId}
 		<form on:submit|preventDefault={handleSubmit} class="py-4">
-			<div class="flex space-x-1 pb-5 ">
+			<div class="flex md:flex-row space-y-2 md:space-y-0 space-x-0 md:space-x-2 flex-col pb-5">
 				<div class="title">{$t('general')}</div>
+
 				{#if $appSession.isAdmin}
-					<button
-						type="submit"
-						class:bg-orange-600={!loading}
-						class:hover:bg-orange-500={!loading}
-						disabled={loading}>{loading ? 'Saving...' : 'Save'}</button
+					<button class="btn btn-sm bg-sources" type="submit" disabled={loading}
+						>{loading ? 'Saving...' : 'Save'}</button
 					>
 					<a
-						class="no-underline button justify-center flex items-center"
-						href={`${source.htmlUrl}/apps/${source.githubApp.name}/installations/new`}
+						class="btn btn-sm"
+						href={`${source.htmlUrl}/${
+							source.htmlUrl === 'https://github.com' ? 'apps' : 'github-apps'
+						}/${source.githubApp.name}/installations/new`}
 						>{$t('source.change_app_settings', { name: 'GitHub' })}</a
 					>
 				{/if}
 			</div>
 			<div class="grid grid-flow-row gap-2 px-10">
 				<div class="grid grid-flow-row gap-2">
-					<div class="mt-2 grid grid-cols-2 items-center">
+					<div class="mt-2 grid lg:grid-cols-2 items-center">
 						<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 						<input name="name" id="name" required bind:value={source.name} />
 					</div>
 				</div>
-				<div class="grid grid-cols-2 items-center">
+				<div class="grid lg:grid-cols-2 items-center">
 					<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
 					<input
 						name="htmlUrl"
@@ -201,7 +183,7 @@
 						bind:value={source.htmlUrl}
 					/>
 				</div>
-				<div class="grid grid-cols-2 items-center">
+				<div class="grid lg:grid-cols-2 items-center">
 					<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
 					<input
 						name="apiUrl"
@@ -213,9 +195,11 @@
 					/>
 				</div>
 				{#if selfHosted}
-					<div class="grid grid-cols-2 items-center">
+					<div class="grid lg:grid-cols-2 items-center">
 						<label for="customPort" class="text-base font-bold text-stone-100"
-							>Custom SSH Port</label
+							>Custom SSH Port <Explainer
+								explanation="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
+							/></label
 						>
 						<input
 							name="customPort"
@@ -225,12 +209,9 @@
 							required
 							value={source.customPort}
 						/>
-						<Explainer
-							text="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
-						/>
 					</div>
 				{/if}
-				<div class="grid grid-cols-2">
+				<div class="grid lg:grid-cols-2">
 					<div class="flex flex-col">
 						<label for="organization" class="pt-2 text-base font-bold text-stone-100"
 							>Organization</label
@@ -249,10 +230,12 @@
 		</form>
 	{:else}
 		<div class="text-center">
-			<a href={`${source.htmlUrl}/apps/${source.githubApp.name}/installations/new`}>
-				<button class="box-selection bg-orange-600 hover:bg-orange-500 text-xl"
-					>Install Repositories</button
-				></a
+			<a
+				href={`${source.htmlUrl}/${
+					source.htmlUrl === 'https://github.com' ? 'apps' : 'github-apps'
+				}/${source.githubApp.name}/installations/new`}
+			>
+				<button class="box-selection bg-sources text-xl font-bold">Install Repositories</button></a
 			>
 		</div>
 	{/if}

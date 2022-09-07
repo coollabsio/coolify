@@ -90,6 +90,22 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 	];
 	const phpVersions = [
 		{
+			value: 'webdevops/php-apache:8.2',
+			label: 'webdevops/php-apache:8.2'
+		},
+		{
+			value: 'webdevops/php-nginx:8.2',
+			label: 'webdevops/php-nginx:8.2'
+		},
+		{
+			value: 'webdevops/php-apache:8.1',
+			label: 'webdevops/php-apache:8.1'
+		},
+		{
+			value: 'webdevops/php-nginx:8.1',
+			label: 'webdevops/php-nginx:8.1'
+		},
+		{
 			value: 'webdevops/php-apache:8.0',
 			label: 'webdevops/php-apache:8.0'
 		},
@@ -144,6 +160,22 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 		{
 			value: 'webdevops/php-nginx:5.6',
 			label: 'webdevops/php-nginx:5.6'
+		},
+		{
+			value: 'webdevops/php-apache:8.2-alpine',
+			label: 'webdevops/php-apache:8.2-alpine'
+		},
+		{
+			value: 'webdevops/php-nginx:8.2-alpine',
+			label: 'webdevops/php-nginx:8.2-alpine'
+		},
+		{
+			value: 'webdevops/php-apache:8.1-alpine',
+			label: 'webdevops/php-apache:8.1-alpine'
+		},
+		{
+			value: 'webdevops/php-nginx:8.1-alpine',
+			label: 'webdevops/php-nginx:8.1-alpine'
 		},
 		{
 			value: 'webdevops/php-apache:8.0-alpine',
@@ -252,6 +284,20 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 			label: 'python:3.7-slim-bullseye'
 		}
 	];
+	const herokuVersions = [
+		{
+			value: 'heroku/builder:22',
+			label: 'heroku/builder:22'
+		},
+		{
+			value: 'heroku/buildpacks:20',
+			label: 'heroku/buildpacks:20'
+		},
+		{
+			value: 'heroku/builder-classic:22',
+			label: 'heroku/builder-classic:22'
+		},
+	]
 	let payload: any = {
 		baseImage: null,
 		baseBuildImage: null,
@@ -291,13 +337,18 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 		payload.baseImage = 'denoland/deno:latest';
 	}
 	if (buildPack === 'php') {
-		payload.baseImage = 'webdevops/php-apache:8.0-alpine';
+		payload.baseImage = 'webdevops/php-apache:8.2-alpine';
 		payload.baseImages = phpVersions;
 	}
 	if (buildPack === 'laravel') {
-		payload.baseImage = 'webdevops/php-apache:8.0-alpine';
+		payload.baseImage = 'webdevops/php-apache:8.2-alpine';
 		payload.baseBuildImage = 'node:18';
 		payload.baseBuildImages = nodeVersions;
+	}
+	if (buildPack === 'heroku') {
+		payload.baseImage = 'heroku/buildpacks:20';
+		payload.baseImages = herokuVersions;
+
 	}
 	return payload;
 }
@@ -493,7 +544,6 @@ export async function copyBaseConfigurationFiles(
 			);
 		}
 	} catch (error) {
-		console.log(error);
 		throw new Error(error);
 	}
 }
@@ -522,9 +572,6 @@ export async function buildImage({
 	} else {
 		await saveBuildLog({ line: `Building image started.`, buildId, applicationId });
 	}
-	if (debug) {
-		await saveBuildLog({ line: `\n###############\nIMPORTANT: Due to some issues during implementing Remote Docker Engine, the builds logs are not streamed at the moment. You will see the full build log when the build is finished!\n###############`, buildId, applicationId });
-	}
 	if (!debug && isCache) {
 		await saveBuildLog({
 			line: `Debug turned off. To see more details, allow it in the configuration.`,
@@ -534,54 +581,11 @@ export async function buildImage({
 	}
 	const dockerFile = isCache ? `${dockerFileLocation}-cache` : `${dockerFileLocation}`
 	const cache = `${applicationId}:${tag}${isCache ? '-cache' : ''}`
-	const { stderr } = await executeDockerCmd({ dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} ${workdir}` })
-	if (debug) {
-		const array = stderr.split('\n')
-		for (const line of array) {
-			if (line !== '\n') {
-				await saveBuildLog({
-					line: `${line.replace('\n', '')}`,
-					buildId,
-					applicationId
-				});
-			}
-		}
+	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} ${workdir}` })
+	const { status } = await prisma.build.findUnique({ where: { id: buildId } })
+	if (status === 'canceled') {
+		throw new Error('Deployment canceled.')
 	}
-
-
-	// await new Promise((resolve, reject) => {
-	// 	const command = spawn(`docker`, ['build', '-f', `${workdir}${dockerFile}`, '-t', `${cache}`,`${workdir}`], {
-	// 		env: {
-	// 			DOCKER_HOST: 'ssh://root@95.217.178.202',
-	// 			DOCKER_BUILDKIT: '1'
-	// 		}
-	// 	});
-	// 	command.stdout.on('data', function (data) {
-	// 		console.log('stdout: ' + data);
-	// 	});
-	// 	command.stderr.on('data', function (data) {
-	// 		console.log('stderr: ' + data);
-	// 	});
-	// 	command.on('error', function (error) {
-	// 		console.log(error)
-	// 		reject(error)
-	// 	})
-	// 	command.on('exit', function (code) {
-	// 		console.log('exit code: ' + code);
-	// 		resolve(code)
-	// 	});
-	// })
-
-
-	// console.log({ stdout, stderr })
-	// const stream = await docker.engine.buildImage(
-	// 	{ src: ['.'], context: workdir },
-	// 	{
-	// 		dockerfile: isCache ? `${dockerFileLocation}-cache` : dockerFileLocation,
-	// 		t: `${applicationId}:${tag}${isCache ? '-cache' : ''}`
-	// 	}
-	// );
-	// await streamEvents({ stream, docker, buildId, applicationId, debug });
 	if (isCache) {
 		await saveBuildLog({ line: `Building cache image successful.`, buildId, applicationId });
 	} else {
@@ -698,11 +702,10 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 	if (isPnpm) {
 		Dockerfile.push('RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7');
 	}
+	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	if (installCommand) {
-		Dockerfile.push(`COPY .${baseDirectory || ''}/package.json ./`);
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
-	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	Dockerfile.push(`RUN ${buildCommand}`);
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
 	await buildImage({ ...data, isCache: true });

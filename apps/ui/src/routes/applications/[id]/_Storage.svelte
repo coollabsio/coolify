@@ -8,9 +8,9 @@
 	import { page } from '$app/stores';
 	import { createEventDispatcher } from 'svelte';
 
-	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
+	import { addToast } from '$lib/store';
 	const { id } = $page.params;
 
 	const dispatch = createEventDispatcher();
@@ -30,8 +30,17 @@
 				storage.path = null;
 				storage.id = null;
 			}
-			if (newStorage) toast.push($t('application.storage.storage_saved'));
-			else toast.push($t('application.storage.storage_updated'));
+			if (newStorage) {
+				addToast({
+					message: $t('application.storage.storage_saved'),
+					type: 'success'
+				});
+			} else {
+				addToast({
+					message: $t('application.storage.storage_updated'),
+					type: 'success'
+				});
+			}
 		} catch (error) {
 			return errorNotification(error);
 		}
@@ -40,7 +49,10 @@
 		try {
 			await del(`/applications/${id}/storages`, { path: storage.path });
 			dispatch('refresh');
-			toast.push($t('application.storage.storage_deleted'));
+			addToast({
+				message: $t('application.storage.storage_deleted'),
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		}
@@ -52,23 +64,24 @@
 		bind:value={storage.path}
 		required
 		placeholder="eg: /sqlite.db"
-		class=" border border-dashed border-coolgray-300"
 	/>
 </td>
 <td>
 	{#if isNew}
 		<div class="flex items-center justify-center">
-			<button class="bg-green-600 hover:bg-green-500" on:click={() => saveStorage(true)}
+			<button class="btn btn-sm bg-applications" on:click={() => saveStorage(true)}
 				>{$t('forms.add')}</button
 			>
 		</div>
 	{:else}
 		<div class="flex flex-row justify-center space-x-2">
 			<div class="flex items-center justify-center">
-				<button class="" on:click={() => saveStorage(false)}>{$t('forms.set')}</button>
+				<button class="btn btn-sm bg-applications" on:click={() => saveStorage(false)}
+					>{$t('forms.set')}</button
+				>
 			</div>
 			<div class="flex justify-center items-end">
-				<button class="bg-red-600 hover:bg-red-500" on:click={removeStorage}
+				<button class="btn btn-sm bg-red-600 hover:bg-red-500" on:click={removeStorage}
 					>{$t('forms.remove')}</button
 				>
 			</div>

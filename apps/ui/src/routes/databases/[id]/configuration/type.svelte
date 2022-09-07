@@ -31,19 +31,12 @@
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
-
-	import Clickhouse from '$lib/components/svg/databases/Clickhouse.svelte';
-	import CouchDB from '$lib/components/svg/databases/CouchDB.svelte';
-	import MongoDB from '$lib/components/svg/databases/MongoDB.svelte';
-	import MariaDB from '$lib/components/svg/databases/MariaDB.svelte';
-	import MySQL from '$lib/components/svg/databases/MySQL.svelte';
-	import PostgreSQL from '$lib/components/svg/databases/PostgreSQL.svelte';
-	import Redis from '$lib/components/svg/databases/Redis.svelte';
-	import EdgeDb from '$lib/components/svg/databases/EdgeDB.svelte';
+  
 	import { goto } from '$app/navigation';
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
+	import DatabaseIcons from '$lib/components/svg/databases/DatabaseIcons.svelte';
 	async function handleSubmit(type: any) {
 		try {
 			await post(`/databases/${id}/configuration/type`, { type });
@@ -63,23 +56,8 @@
 		<div class="p-2">
 			<form on:submit|preventDefault={() => handleSubmit(type.name)}>
 				<button type="submit" class="box-selection relative text-xl font-bold hover:bg-purple-700">
-					{#if type.name === 'clickhouse'}
-						<Clickhouse isAbsolute />
-					{:else if type.name === 'couchdb'}
-						<CouchDB isAbsolute />
-					{:else if type.name === 'mongodb'}
-						<MongoDB isAbsolute />
-					{:else if type.name === 'mariadb'}
-						<MariaDB isAbsolute />
-					{:else if type.name === 'mysql'}
-						<MySQL isAbsolute />
-					{:else if type.name === 'postgresql'}
-						<PostgreSQL isAbsolute />
-					{:else if type.name === 'redis'}
-						<Redis isAbsolute />
-					{:else if type.name === 'edgedb'}
-						<EdgeDb isAbsolute />
-					{/if}{type.fancyName}
+          <DatabaseIcons type={type.name} isAbsolute={true} />
+					{type.fancyName}
 				</button>
 			</form>
 		</div>

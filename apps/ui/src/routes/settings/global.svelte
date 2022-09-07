@@ -19,20 +19,20 @@
 <script lang="ts">
 	export let settings: any;
 	import Setting from '$lib/components/Setting.svelte';
-	import Explainer from '$lib/components/Explainer.svelte';
 	import { del, get, post } from '$lib/api';
 	import { browser } from '$app/env';
-	import { toast } from '@zerodevx/svelte-toast';
 	import { t } from '$lib/translations';
-	import { appSession, features } from '$lib/store';
-	import { errorNotification, getDomain } from '$lib/common';
+	import { addToast, appSession, features } from '$lib/store';
+	import { asyncSleep, errorNotification, getDomain } from '$lib/common';
 	import Menu from './_Menu.svelte';
+	import Explainer from '$lib/components/Explainer.svelte';
 
+	let isAPIDebuggingEnabled = settings.isAPIDebuggingEnabled;
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
 	let dualCerts = settings.dualCerts;
 	let isAutoUpdateEnabled = settings.isAutoUpdateEnabled;
 	let isDNSCheckEnabled = settings.isDNSCheckEnabled;
-
+	let DNSServers = settings.DNSServers;
 	let minPort = settings.minPort;
 	let maxPort = settings.maxPort;
 
@@ -45,7 +45,8 @@
 	let loading = {
 		save: false,
 		remove: false,
-		proxyMigration: false
+		proxyMigration: false,
+		restart: false
 	};
 
 	async function removeFqdn() {
@@ -76,14 +77,20 @@
 			if (name === 'isDNSCheckEnabled') {
 				isDNSCheckEnabled = !isDNSCheckEnabled;
 			}
-
+			if (name === 'isAPIDebuggingEnabled') {
+				isAPIDebuggingEnabled = !isAPIDebuggingEnabled;
+			}
 			await post(`/settings`, {
+				isAPIDebuggingEnabled,
 				isRegistrationEnabled,
 				dualCerts,
 				isAutoUpdateEnabled,
 				isDNSCheckEnabled
 			});
-			return toast.push(t.get('application.settings_saved'));
+			return addToast({
+				message: t.get('application.settings_saved'),
+				type: 'success'
+			});
 		} catch (error) {
 			return errorNotification(error);
 		}
@@ -103,9 +110,16 @@
 				settings.minPort = minPort;
 				settings.maxPort = maxPort;
 			}
+			if (DNSServers !== settings.DNSServers) {
+				await post(`/settings`, { DNSServers });
+				settings.DNSServers = DNSServers;
+			}
 			forceSave = false;
-			toast.push('Configuration saved.');
-		} catch (error) {
+			return addToast({
+				message: 'Configuration saved.',
+				type: 'success'
+			});
+		} catch (error: any) {
 			if (error.message?.startsWith($t('application.dns_not_set_partial_error'))) {
 				forceSave = true;
 				if (dualCerts) {
@@ -120,7 +134,6 @@
 					}
 				}
 			}
-			console.log(error);
 			return errorNotification(error);
 		} finally {
 			loading.save = false;
@@ -129,7 +142,10 @@
 	async function isDNSValid(domain: any, isWWW: any) {
 		try {
 			await get(`/settings/check?domain=${domain}`);
-			toast.push('DNS configuration is valid.');
+			addToast({
+				message: 'DNS configuration is valid.',
+				type: 'success'
+			});
 			isWWW ? (isWWWDomainOK = true) : (isNonWWWDomainOK = true);
 			return true;
 		} catch (error) {
@@ -140,6 +156,41 @@
 	}
 	function resetView() {
 		forceSave = false;
+	}
+	async function restartCoolify() {
+		const sure = confirm(
+			'Are you sure you would like to restart Coolify? Currently running deployments will be stopped and restarted.'
+		);
+		if (sure) {
+			loading.restart = true;
+			try {
+				await post(`/internal/restart`, {});
+				await asyncSleep(10000);
+				let reachable = false;
+				let tries = 0;
+				do {
+					await asyncSleep(4000);
+					try {
+						await get(`/undead`);
+						reachable = true;
+					} catch (error) {
+						reachable = false;
+					}
+					if (reachable) break;
+					tries++;
+				} while (!reachable || tries < 120);
+				addToast({
+					message: 'New version reachable. Reloading...',
+					type: 'success'
+				});
+				await asyncSleep(3000);
+				return window.location.reload();
+			} catch (error) {
+				return errorNotification(error);
+			} finally {
+				loading.restart = false;
+			}
+		}
 	}
 </script>
 
@@ -154,10 +205,9 @@
 				<div class="flex space-x-1 pb-6">
 					<div class="title font-bold">{$t('index.global_settings')}</div>
 					<button
+						class="btn btn-sm bg-settings text-black"
 						type="submit"
-						class:bg-yellow-500={!loading.save}
 						class:bg-orange-600={forceSave}
-						class:hover:bg-yellow-500={!loading.save}
 						class:hover:bg-orange-400={forceSave}
 						disabled={loading.save}
 						>{loading.save
@@ -171,11 +221,15 @@
 						<button
 							on:click|preventDefault={removeFqdn}
 							disabled={loading.remove}
-							class:bg-red-600={!loading.remove}
-							class:hover:bg-red-500={!loading.remove}
+							class="btn btn-sm"
 							>{loading.remove ? $t('forms.removing') : $t('forms.remove_domain')}</button
 						>
 					{/if}
+					<button
+						on:click={restartCoolify}
+						class:loading={loading.restart}
+						class="btn btn-sm bg-red-600 hover:bg-red-500">Restart Coolify</button
+					>
 				</div>
 				<div class="grid grid-flow-row gap-2 px-10">
 					<!-- <Language /> -->
@@ -183,8 +237,8 @@
 						<div class="flex-col">
 							<div class="pt-2 text-base font-bold text-stone-100">
 								{$t('application.url_fqdn')}
+								<Explainer explanation={$t('setting.ssl_explainer')} />
 							</div>
-							<Explainer text={$t('setting.ssl_explainer')} />
 						</div>
 						<div class="justify-start text-left">
 							<input
@@ -202,13 +256,13 @@
 								<div class="flex-col space-y-2 pt-4 text-center">
 									{#if isNonWWWDomainOK}
 										<button
-											class="bg-green-600 hover:bg-green-500"
+											class="btn btn-sm bg-success"
 											on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
 											>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
 										>
 									{:else}
 										<button
-											class="bg-red-600 hover:bg-red-500"
+											class="btn btn-sm bg-error"
 											on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
 											>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
 										>
@@ -216,14 +270,14 @@
 									{#if dualCerts}
 										{#if isWWWDomainOK}
 											<button
-												class="bg-green-600 hover:bg-green-500"
+												class="btn btn-sm bg-success"
 												on:click|preventDefault={() =>
 													isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
 												>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
 											>
 										{:else}
 											<button
-												class="bg-red-600 hover:bg-red-500"
+												class="btn btn-sm bg-error"
 												on:click|preventDefault={() =>
 													isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
 												>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
@@ -238,8 +292,8 @@
 						<div class="flex-col">
 							<div class="pt-2 text-base font-bold text-stone-100">
 								{$t('forms.public_port_range')}
+								<Explainer explanation={$t('forms.public_port_range_explainer')} />
 							</div>
-							<Explainer text={$t('forms.public_port_range_explainer')} />
 						</div>
 						<div class="mx-auto flex-row items-center justify-center space-y-2">
 							<input
@@ -261,6 +315,7 @@
 					</div>
 					<div class="grid grid-cols-2 items-center">
 						<Setting
+							id="isDNSCheckEnabled"
 							bind:setting={isDNSCheckEnabled}
 							title={$t('setting.is_dns_check_enabled')}
 							description={$t('setting.is_dns_check_enabled_explainer')}
@@ -268,7 +323,19 @@
 						/>
 					</div>
 					<div class="grid grid-cols-2 items-center">
+						<div class="text-base font-bold text-stone-100">
+							Custom DNS servers <Explainer
+								explanation="You can specify a custom DNS server to verify your domains all over Coolify.<br><br>By default, the OS defined DNS servers are used."
+							/>
+						</div>
+
+						<div class="flex-row items-center justify-center">
+							<input placeholder="1.1.1.1,8.8.8.8" bind:value={DNSServers} />
+						</div>
+					</div>
+					<div class="grid grid-cols-2 items-center">
 						<Setting
+							id="dualCerts"
 							dataTooltip={$t('setting.must_remove_domain_before_changing')}
 							disabled={isFqdnSet}
 							bind:setting={dualCerts}
@@ -279,22 +346,31 @@
 					</div>
 					<div class="grid grid-cols-2 items-center">
 						<Setting
+							id="isRegistrationEnabled"
 							bind:setting={isRegistrationEnabled}
 							title={$t('setting.registration_allowed')}
 							description={$t('setting.registration_allowed_explainer')}
 							on:click={() => changeSettings('isRegistrationEnabled')}
 						/>
 					</div>
-					{#if browser && $features.beta}
-						<div class="grid grid-cols-2 items-center">
-							<Setting
-								bind:setting={isAutoUpdateEnabled}
-								title={$t('setting.auto_update_enabled')}
-								description={$t('setting.auto_update_enabled_explainer')}
-								on:click={() => changeSettings('isAutoUpdateEnabled')}
-							/>
-						</div>
-					{/if}
+					<div class="grid grid-cols-2 items-center">
+						<Setting
+							id="isAPIDebuggingEnabled"
+							bind:setting={isAPIDebuggingEnabled}
+							title="API Debugging"
+							description="Enable API debugging. This will log all API requests and responses.<br><br>You need to restart the Coolify for this to take effect."
+							on:click={() => changeSettings('isAPIDebuggingEnabled')}
+						/>
+					</div>
+					<div class="grid grid-cols-2 items-center">
+						<Setting
+							id="isAutoUpdateEnabled"
+							bind:setting={isAutoUpdateEnabled}
+							title={$t('setting.auto_update_enabled')}
+							description={$t('setting.auto_update_enabled_explainer')}
+							on:click={() => changeSettings('isAutoUpdateEnabled')}
+						/>
+					</div>
 				</div>
 			</form>
 		</div>

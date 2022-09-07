@@ -50,7 +50,7 @@
 		"delete_application": "Supprimer l'application",
 		"deployment_queued": "Déploiement en file d'attente.",
 		"destination": "Destination",
-		"directory_to_use_explainer": "Répertoire à utiliser comme base pour toutes les commandes.<br>Pourrait être utile avec <span class='text-green-500 font-bold'>monorepos</span>.",
+		"directory_to_use_explainer": "Répertoire à utiliser comme base pour toutes les commandes.<br>Pourrait être utile avec <span class='text-applications font-bold'>monorepos</span>.",
 		"dns_not_set_error": "DNS non défini ou propagé pour {{domain}}.<br><br>Veuillez vérifier vos paramètres DNS.",
 		"dns_not_set_partial_error": "DNS non défini",
 		"domain_already_in_use": "Le domaine {{domain}} est déjà utilisé.",
@@ -181,7 +181,7 @@
 		"path": "Chemin",
 		"port": "Port",
 		"public_port_range": "Gamme de ports publics",
-		"public_port_range_explainer": "Ports utilisés pour exposer les bases de données/services/services internes.<br> Ajoutez-les à votre pare-feu (le cas échéant).<br><br>Vous pouvez spécifier une plage de ports, par exemple : <span class='text-yellow-500 \nfont-bold'>9000-9100</span>",
+		"public_port_range_explainer": "Ports utilisés pour exposer les bases de données/services/services internes.<br> Ajoutez-les à votre pare-feu (le cas échéant).<br><br>Vous pouvez spécifier une plage de ports, par exemple : <span class='text-settings \nfont-bold'>9000-9100</span>",
 		"publish_directory": "Publier le répertoire",
 		"remove": "Retirer",
 		"remove_domain": "Supprimer le domaine",
@@ -266,7 +266,7 @@
 		"permission_denied": "Vous n'avez pas la permission de faire cela. \n\\nDemandez à un administrateur de modifier vos autorisations.",
 		"registration_allowed": "Inscription autorisée ?",
 		"registration_allowed_explainer": "Autoriser d'autres inscriptions à l'application. \n<br>Il est désactivé après la première inscription.",
-		"ssl_explainer": "Si vous spécifiez <span class='text-yellow-500 font-bold'>https</span>, Coolify sera accessible uniquement via https. \nUn certificat SSL sera généré pour vous.<br>Si vous spécifiez <span class='text-yellow-500 font-bold'>www</span>, Coolify sera redirigé (302) à partir de non-www et vice versa."
+		"ssl_explainer": "Si vous spécifiez <span class='text-settings font-bold'>https</span>, Coolify sera accessible uniquement via https. \nUn certificat SSL sera généré pour vous.<br>Si vous spécifiez <span class='text-settings font-bold'>www</span>, Coolify sera redirigé (302) à partir de non-www et vice versa."
 	},
 	"source": {
 		"application_id": "ID d'application",

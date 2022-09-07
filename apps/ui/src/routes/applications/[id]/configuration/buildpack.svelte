@@ -30,7 +30,6 @@
 	import { page } from '$app/stores';
 	import { get } from '$lib/api';
 	import { appSession } from '$lib/store';
-	import { browser } from '$app/env';
 	import { t } from '$lib/translations';
 	import { buildPacks, findBuildPack, scanningTemplates } from '$lib/templates';
 	import { errorNotification } from '$lib/common';
@@ -48,6 +47,7 @@
 	export let branch: any;
 	export let type: any;
 	export let application: any;
+	export let isPublicRepository: boolean;
 
 	function checkPackageJSONContents({ key, json }: { key: any; json: any }) {
 		return json?.dependencies?.hasOwnProperty(key) || json?.devDependencies?.hasOwnProperty(key);
@@ -237,7 +237,7 @@
 			if (error.message === 'Bad credentials') {
 				const { token } = await get(`/applications/${id}/configuration/githubToken`);
 				$appSession.tokens.github = token;
-				return await scanRepository()
+				return await scanRepository();
 			}
 			return errorNotification(error);
 		} finally {
@@ -246,7 +246,11 @@
 		}
 	}
 	onMount(async () => {
-		await scanRepository();
+		if (!isPublicRepository) {
+			await scanRepository();
+		} else {
+			scanning = false;
+		}
 	});
 </script>
 
@@ -263,11 +267,25 @@
 		</div>
 	</div>
 {:else}
-	<div class="max-w-7xl mx-auto flex flex-wrap justify-center">
-		{#each buildPacks as buildPack}
-			<div class="p-2">
-				<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
-			</div>
-		{/each}
+	<div class="max-w-5xl mx-auto ">
+		<div class="title pb-2">Coolify</div>
+		<div class="flex flex-wrap justify-center">
+			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true) as buildPack}
+				<div class="p-2">
+					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
+				</div>
+			{/each}
+		</div>
+	</div>
+
+	<div class="max-w-5xl mx-auto ">
+		<div class="title pb-2">Other</div>
+		<div class="flex flex-wrap justify-center">
+			{#each buildPacks.filter((bp) => bp.isHerokuBuildPack === true) as buildPack}
+				<div class="p-2">
+					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
+				</div>
+			{/each}
+		</div>
 	</div>
 {/if}

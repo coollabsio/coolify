@@ -20,15 +20,17 @@ export interface SaveApplication extends OnlyId {
         denoOptions: string,
         baseImage: string,
         baseBuildImage: string,
-        deploymentType: string
+        deploymentType: string,
+        baseDatabaseBranch: string
     }
 }
 export interface SaveApplicationSettings extends OnlyId {
     Querystring: { domain: string; };
-    Body: { debug: boolean; previews: boolean; dualCerts: boolean; autodeploy: boolean; branch: string; projectId: number; };
+    Body: { debug: boolean; previews: boolean; dualCerts: boolean; autodeploy: boolean; branch: string; projectId: number; isBot: boolean; isDBBranching: boolean };
 }
 export interface DeleteApplication extends OnlyId {
     Querystring: { domain: string; };
+    Body: { force: boolean }
 }
 export interface CheckDomain extends OnlyId {
     Querystring: { domain: string; };
@@ -44,13 +46,13 @@ export interface CheckDNS extends OnlyId {
 }
 export interface DeployApplication {
     Querystring: { domain: string }
-    Body: { pullmergeRequestId: string | null, branch: string }
+    Body: { pullmergeRequestId: string | null, branch: string, forceRebuild?: boolean }
 }
 export interface GetImages {
     Body: { buildPack: string, deploymentType: string }
 }
 export interface SaveApplicationSource extends OnlyId {
-    Body: { gitSourceId: string }
+    Body: { gitSourceId?: string | null, forPublic?: boolean, type?: string }
 }
 export interface CheckRepository extends OnlyId {
     Querystring: { repository: string, branch: string }
@@ -115,7 +117,8 @@ export interface CancelDeployment {
 export interface DeployApplication extends OnlyId {
     Body: {
         pullmergeRequestId: string | null,
-        branch: string
+        branch: string,
+        forceRebuild?: boolean
     }
 }
 

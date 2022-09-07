@@ -30,6 +30,7 @@
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
+	import { onMount } from 'svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -45,6 +46,11 @@
 			return errorNotification(error);
 		}
 	}
+	onMount(async () => {
+		if (destinations.length === 1) {
+			await handleSubmit(destinations[0].id);
+		}
+	});
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -55,9 +61,11 @@
 <div class="flex justify-center">
 	{#if !destinations || destinations.length === 0}
 		<div class="flex-col">
-			<div class="pb-2 text-center font-bold">{$t('application.configuration.no_configurable_destination')}</div>
+			<div class="pb-2 text-center font-bold">
+				{$t('application.configuration.no_configurable_destination')}
+			</div>
 			<div class="flex justify-center">
-				<a href="/new/destination" sveltekit:prefetch class="add-icon bg-sky-600 hover:bg-sky-500">
+				<a href="/destinations/new" sveltekit:prefetch class="add-icon bg-sky-600 hover:bg-sky-500">
 					<svg
 						class="w-6"
 						xmlns="http://www.w3.org/2000/svg"
