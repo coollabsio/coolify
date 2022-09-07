@@ -222,7 +222,7 @@
 		{/if}
 
 		<div class="grid gap-4 grid-cols-2 grid-rows-1 lg:px-10">
-			<label class="text-base font-bold text-stone-100" for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
+			<label class="text-base font-bold text-stone-100" for="name" >{$t('forms.name')}</label>
 			<div>
 				<input
 					readonly={!$appSession.isAdmin}
@@ -232,7 +232,7 @@
 					required
 				/>
 			</div>
-			<label class="text-base font-bold text-stone-100" for="version" class="text-base font-bold text-stone-100">Version / Tag</label>
+			<label class="text-base font-bold text-stone-100" for="version">Version / Tag</label>
 			<a
 				href={$appSession.isAdmin && !$status.service.isRunning && !$status.service.initialLoading
 					? `/services/${id}/configuration/version?from=/services/${id}`
@@ -247,7 +247,7 @@
 					class:cursor-pointer={!$status.service.isRunning}
 				/></a
 			>
-			<label class="text-base font-bold text-stone-100" for="destination" class="text-base font-bold text-stone-100"
+			<label class="text-base font-bold text-stone-100" for="destination"
 				>{$t('application.destination')}</label
 			>
 			<div>
@@ -264,7 +264,7 @@
 			</div>
 
 			{#if service.type === 'minio'}
-				<label class="text-base font-bold text-stone-100" for="fqdn" class="pt-2 text-base font-bold text-stone-100">Console URL</label>
+				<label class="text-base font-bold text-stone-100" for="fqdn">Console URL</label>
 
 				<CopyPasswordField
 					placeholder="eg: https://console.min.io"
@@ -276,7 +276,7 @@
 					bind:value={service.fqdn}
 					required
 				/>
-				<label class="text-base font-bold text-stone-100" for="apiFqdn" class="pt-2 text-base font-bold text-stone-100"
+				<label class="text-base font-bold text-stone-100" for="apiFqdn" 
 					>API URL <Explainer explanation={$t('application.https_explainer')} /></label
 				>
 				<CopyPasswordField
@@ -290,7 +290,7 @@
 					required
 				/>
 			{:else}
-				<label class="text-base font-bold text-stone-100" for="fqdn" class="pt-2 text-base font-bold text-stone-100"
+				<label class="text-base font-bold text-stone-100" for="fqdn" 
 					>{$t('application.url_fqdn')}
 					<Explainer explanation={$t('application.https_explainer')} />
 				</label>
@@ -351,7 +351,7 @@
 				description={$t('services.generate_www_non_www_ssl')}
 				on:click={() => !$status.service.isRunning && changeSettings('dualCerts')}
 			/>
-			<label class="text-base font-bold text-stone-100" for="exposePort" class="text-base font-bold text-stone-100"
+			<label class="text-base font-bold text-stone-100" for="exposePort"
 				>Exposed Port <Explainer
 					explanation={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
 				/></label
