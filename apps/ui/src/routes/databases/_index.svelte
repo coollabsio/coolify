@@ -42,28 +42,30 @@
 	});
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">{$t('index.databases')}</div>
+<nav
+	class="flex flex-row px-4 justify-between items-center bg-neutral-focus lg:fixed w-full z-10 lg:-ml-16 lg:pl-20 p-5"
+>
+	<h1 class="mr-4 text-2xl font-bold">{$t('index.databases')}</h1>
 	{#if $appSession.isAdmin}
-		<button on:click={newDatabase} class="btn btn-square btn-sm bg-databases">
-			<svg
-				class="h-6 w-6"
-				xmlns="http://www.w3.org/2000/svg"
-				fill="none"
-				viewBox="0 0 24 24"
-				stroke="currentColor"
-				><path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					stroke-width="2"
-					d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-				/></svg
-			>
-		</button>
+	<button on:click={newDatabase} class="btn btn-square btn-sm bg-databases">
+		<svg
+			class="h-6 w-6"
+			xmlns="http://www.w3.org/2000/svg"
+			fill="none"
+			viewBox="0 0 24 24"
+			stroke="currentColor"
+			><path
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				stroke-width="2"
+				d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+			/></svg
+		>
+	</button>
 	{/if}
-</div>
-
-<div class="flex-col justify-center mt-10 pb-12 sm:pb-16">
+</nav>
+<br />
+<div class="flex-col justify-center mt-10 pb-12 sm:pb-16 lg:pt-16">
 	{#if !databases || ownDatabases.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">{$t('database.no_databases_found')}</div>
