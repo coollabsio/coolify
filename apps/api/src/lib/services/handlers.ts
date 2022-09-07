@@ -333,6 +333,8 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 volumes: [`${id}-minio-data:/data`],
                 environmentVariables: {
+                    MINIO_SERVER_URL: fqdn,
+                    MINIO_DOMAIN: getDomain(fqdn),
                     MINIO_ROOT_USER: rootUser,
                     MINIO_ROOT_PASSWORD: rootUserPassword,
                     MINIO_BROWSER_REDIRECT_URL: fqdn
@@ -2476,7 +2478,7 @@ async function startTaigaService(request: FastifyRequest<ServiceStartStop>) {
                     TAIGA_SECRET_KEY: secretKey,
                 }
             },
-        
+
             postgresql: {
                 image: `postgres:12.3`,
                 volumes: [`${id}-postgresql-data:/var/lib/postgresql/data`],
