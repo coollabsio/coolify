@@ -173,16 +173,16 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                                 where: { id: application.id },
                                 data: { updatedAt: new Date() }
                             });
-                            if (application.connectedDatabase && pullmergeRequestAction === 'opened' || pullmergeRequestAction === 'reopened') {
-                                // Coolify hosted database
-                                if (application.connectedDatabase.databaseId) {
-                                    const databaseId = application.connectedDatabase.databaseId;
-                                    const database = await prisma.database.findUnique({ where: { id: databaseId } });
-                                    if (database) {
-                                        await createdBranchDatabase(database, application.connectedDatabase.hostedDatabaseDBName, pullmergeRequestId);
-                                    }
-                                }
-                            }
+                            // if (application.connectedDatabase && pullmergeRequestAction === 'opened' || pullmergeRequestAction === 'reopened') {
+                            //     // Coolify hosted database
+                            //     if (application.connectedDatabase.databaseId) {
+                            //         const databaseId = application.connectedDatabase.databaseId;
+                            //         const database = await prisma.database.findUnique({ where: { id: databaseId } });
+                            //         if (database) {
+                            //             await createdBranchDatabase(database, application.connectedDatabase.hostedDatabaseDBName, pullmergeRequestId);
+                            //         }
+                            //     }
+                            // }
                             await prisma.build.create({
                                 data: {
                                     id: buildId,
