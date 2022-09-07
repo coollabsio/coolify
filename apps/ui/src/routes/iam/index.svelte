@@ -106,8 +106,10 @@
 	}
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Identity and Access Management</div>
+<nav
+	class="flex flex-row px-4 justify-between items-center bg-neutral-focus lg:fixed w-full z-10 lg:-ml-16 lg:pl-20 p-5"
+>
+	<h1 class="mr-4 text-2xl tracking-tight font-bold">Identity and Access Management</h1>
 	<button on:click={newTeam} class="btn btn-square btn-sm bg-iam">
 		<svg
 			class="h-6 w-6"
@@ -123,7 +125,8 @@
 			/></svg
 		>
 	</button>
-</div>
+</nav>
+<br />
 
 {#if invitations.length > 0}
 	<div class="mx-auto max-w-4xl px-6 py-4">
