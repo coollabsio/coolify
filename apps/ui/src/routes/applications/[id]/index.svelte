@@ -218,7 +218,7 @@
 		if (loading) return;
 		loading = true;
 		try {
-			nonWWWDomain = application.fqdn != null && getDomain(application.fqdn).replace(/^www\./, '');
+			nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
 			if (application.deploymentType)
 				application.deploymentType = application.deploymentType.toLowerCase();
 			!isBot &&
