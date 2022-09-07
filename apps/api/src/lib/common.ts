@@ -414,7 +414,13 @@ export const supportedDatabaseTypesAndVersions = [
 		baseImageARM: 'couchdb',
 		versions: ['3.2.2', '3.1.2', '2.3.1'],
 		versionsARM: ['3.2.2', '3.1.2', '2.3.1']
-	}
+	},
+  {
+		name: 'edgedb',
+		fancyName: 'EdgeDB',
+		baseImage: 'edgedb/edgedb',
+		versions: ['2.0', '1.4']
+   }
 ];
 
 export async function getFreeSSHLocalPort(id: string): Promise<number | boolean> {
@@ -730,6 +736,18 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 			COUCHDB_PASSWORD: string;
 			COUCHDB_USER: string;
 		};
+	} 
+	| {
+		volume: string;
+		image: string;
+		ulimits: Record<string, unknown>;
+		privatePort: number;
+		environmentVariables: {
+		  EDGEDB_SERVER_PASSWORD: string;
+		  EDGEDB_SERVER_USER: string;
+		  EDGEDB_SERVER_DATABASE: string;
+		  EDGEDB_SERVER_SECURITY: string;
+		};
 	} {
 	const {
 		id,
@@ -848,10 +866,23 @@ export function generateDatabaseConfiguration(database: any, arch: string):
 			volume: `${id}-${type}-data:/bitnami/couchdb`,
 			ulimits: {}
 		};
-		if (isARM(arch)) {
+    if (isARM(arch)) {
 			configuration.volume = `${id}-${type}-data:/opt/couchdb/data`;
 		}
 		return configuration
+	} else if (type === 'edgedb') {
+		return {
+		  privatePort: 5656,
+		  environmentVariables: {
+        EDGEDB_SERVER_PASSWORD: rootUserPassword,
+        EDGEDB_SERVER_USER: rootUser,
+        EDGEDB_SERVER_DATABASE: defaultDatabase,
+        EDGEDB_SERVER_SECURITY: 'insecure_dev_mode'
+		  },
+		  image: `${baseImage}:${version}`,
+		  volume: `${id}-${type}-data:/edgedb/edgedb`,
+		  ulimits: {}
+		};
 	}
 }
 export function isARM(arch: string) {

@@ -73,7 +73,7 @@
 				{#each ownDatabases as database}
 					<a href="/databases/{database.id}" class="p-2 no-underline">
 						<div class="box-selection group relative hover:bg-purple-600">
-							<DatabaseIcons type={database.type} isAbsolute={true} />
+              <DatabaseIcons type={database.type} isAbsolute={true} />
 							<div class="truncate text-center text-xl font-bold">
 								{database.name}
 							</div>
@@ -98,7 +98,7 @@
 					{#each otherDatabases as database}
 						<a href="/databases/{database.id}" class="p-2 no-underline">
 							<div class="box-selection group relative hover:bg-purple-600">
-								<DatabaseIcons type={database.type} isAbsolute={true} />
+                <DatabaseIcons type={database.type} isAbsolute={true} />
 								<div class="truncate text-center text-xl font-bold">
 									{database.name}
 								</div>
