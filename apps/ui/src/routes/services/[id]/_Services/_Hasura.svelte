@@ -8,8 +8,8 @@
 	<div class="title">Hasura</div>
 </div>
 
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="graphQLAdminPassword">GraphQL Admin Password</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="graphQLAdminPassword">GraphQL Admin Password</label>
 	<CopyPasswordField
 		name="graphQLAdminPassword"
 		id="graphQLAdminPassword"
@@ -24,8 +24,8 @@
 	<div class="title">PostgreSQL</div>
 </div>
 
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlUser">{$t('forms.username')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="postgresqlUser">{$t('forms.username')}</label>
 	<CopyPasswordField
 		name="postgresqlUser"
 		id="postgresqlUser"
@@ -34,8 +34,8 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlPassword">{$t('forms.password')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="postgresqlPassword">{$t('forms.password')}</label>
 	<CopyPasswordField
 		id="postgresqlPassword"
 		isPasswordField
@@ -45,8 +45,8 @@
 		value={service.hasura.postgresqlPassword}
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlDatabase">{$t('index.database')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="postgresqlDatabase">{$t('index.database')}</label>
 	<CopyPasswordField
 		name="postgresqlDatabase"
 		id="postgresqlDatabase"

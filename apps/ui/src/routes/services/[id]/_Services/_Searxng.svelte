@@ -8,8 +8,8 @@
 	<div class="title">SearXNG</div>
 </div>
 
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="secretKey">Secret Key</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="secretKey">Secret Key</label>
 	<CopyPasswordField
 		name="secretKey"
 		id="secretKey"
@@ -23,8 +23,8 @@
 	<div class="title">Redis</div>
 </div>
 
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="redisPassword">{$t('forms.password')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="redisPassword">{$t('forms.password')}</label>
 	<CopyPasswordField
 		name="redisPassword"
 		id="redisPassword"

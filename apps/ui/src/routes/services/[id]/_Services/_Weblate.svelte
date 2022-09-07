@@ -7,8 +7,8 @@
 	<div class="title">Weblate</div>
 </div>
 
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="adminPassword">Admin password</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="adminPassword">Admin password</label>
 	<CopyPasswordField
 		name="adminPassword"
 		id="adminPassword"
@@ -23,8 +23,8 @@
 	<div class="title">PostgreSQL</div>
 </div>
 
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlHost">PostgreSQL Host</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="postgresqlHost">PostgreSQL Host</label>
 	<CopyPasswordField
 		name="postgresqlHost"
 		id="postgresqlHost"
@@ -33,8 +33,8 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlPort">PostgreSQL Port</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="postgresqlPort">PostgreSQL Port</label>
 	<CopyPasswordField
 		name="postgresqlPort"
 		id="postgresqlPort"
@@ -43,8 +43,8 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlUser">PostgreSQL User</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="postgresqlUser">PostgreSQL User</label>
 	<CopyPasswordField
 		name="postgresqlUser"
 		id="postgresqlUser"
@@ -53,8 +53,8 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlPassword">PostgreSQL Password</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="postgresqlPassword">PostgreSQL Password</label>
 	<CopyPasswordField
 		name="postgresqlPassword"
 		id="postgresqlPassword"

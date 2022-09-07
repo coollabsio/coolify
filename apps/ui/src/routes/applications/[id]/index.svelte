@@ -370,7 +370,7 @@
 	<!-- svelte-ignore missing-declaration -->
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
 		<div class="flex space-x-1 pb-5 justify-between items-center">
-			<div class="title">{$t('general')}</div>
+			<h1 class="title">{$t('general')}</h1>
 			{#if $appSession.isAdmin}
 				<button
 					class="btn btn-sm"
@@ -383,6 +383,7 @@
 				>
 			{/if}
 		</div>
+
 		<div class="grid grid-flow-row gap-2 lg:px-10">
 			<div class="mt-2 grid grid-cols-2 items-center">
 				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
@@ -474,7 +475,7 @@
 					</label>
 					<Select
 						{isDisabled}
-						containerClasses={isDisabled && containerClass() || 'bg-neutral border-0'}
+						containerClasses={(isDisabled && containerClass()) || 'bg-neutral border-0'}
 						id="baseBuildImages"
 						showIndicator={!$status.application.isRunning}
 						items={application.baseBuildImages}
@@ -491,15 +492,15 @@
 						<Explainer explanation={'Image that will be used for the deployment.'} /></label
 					>
 					<Select
-							{isDisabled}
-							containerClasses={isDisabled && containerClass() || 'bg-neutral border-0'}
-							id="baseImages"
-							showIndicator={!$status.application.isRunning}
-							items={application.baseImages}
-							on:select={selectBaseImage}
-							value={application.baseImage}
-							isClearable={false}
-						/>
+						{isDisabled}
+						containerClasses={(isDisabled && containerClass()) || 'bg-neutral border-0'}
+						id="baseImages"
+						showIndicator={!$status.application.isRunning}
+						items={application.baseImages}
+						on:select={selectBaseImage}
+						value={application.baseImage}
+						isClearable={false}
+					/>
 				</div>
 			{/if}
 			{#if application.buildPack !== 'docker' && (application.buildPack === 'nextjs' || application.buildPack === 'nuxtjs')}

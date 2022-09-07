@@ -8,8 +8,8 @@
 <div class="flex space-x-1 py-5 font-bold">
 	<div class="title">VSCode Server</div>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="password">{$t('forms.password')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="password">{$t('forms.password')}</label>
 	<CopyPasswordField
 		id="password"
 		isPasswordField
