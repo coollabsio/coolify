@@ -660,7 +660,7 @@
 				</a>
 			</li>
 			<li>
-				<div class="no-underline hover:bg-error" on:click={logout} class:bg-iam={$page.url.pathname.startsWith('/iam')}>
+				<div class="no-underline hover:bg-error" on:click={logout}>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="ml-1 h-8 w-8"
