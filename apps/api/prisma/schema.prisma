@@ -328,6 +328,19 @@ model Database {
   settings                     DatabaseSettings?
   teams                        Team[]
   applicationConnectedDatabase ApplicationConnectedDatabase[]
+  databaseSecret               DatabaseSecret[]
+}
+
+model DatabaseSecret {
+  id         String   @id @default(cuid())
+  name       String
+  value      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  databaseId String
+  database   Database @relation(fields: [databaseId], references: [id])
+
+  @@unique([name, databaseId])
 }
 
 model DatabaseSettings {

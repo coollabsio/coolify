@@ -73,12 +73,12 @@
 <td>
 	{#if isNewSecret}
 		<div class="flex items-center justify-center">
-			<button class="btn btn-sm bg-success" on:click={() => saveSecret(true)}>Add</button>
+			<button class="btn btn-sm bg-services" on:click={() => saveSecret(true)}>Add</button>
 		</div>
 	{:else}
 		<div class="flex flex-row justify-center space-x-2">
 			<div class="flex items-center justify-center">
-				<button class="btn btn-sm bg-success" on:click={() => saveSecret(false)}>Set</button>
+				<button class="btn btn-sm bg-services" on:click={() => saveSecret(false)}>Set</button>
 			</div>
 			<div class="flex justify-center items-end">
 				<button class="btn btn-sm bg-error" on:click={removeSecret}>Remove</button>

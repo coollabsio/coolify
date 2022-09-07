@@ -58,7 +58,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
-	import { appSession, status, disabledButton } from '$lib/store';
+	import { appSession, status, isDeploymentEnabled } from '$lib/store';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import { onDestroy, onMount } from 'svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
@@ -67,7 +67,7 @@
 	let statusInterval: any = false;
 	let forceDelete = false;
 
-	$disabledButton = !$appSession.isAdmin;
+	$isDeploymentEnabled = !$appSession.isAdmin;
 
 	async function deleteDatabase(force: boolean) {
 		const sure = confirm(`Are you sure you would like to delete '${database.name}'?`);
@@ -148,11 +148,11 @@
 
 {#if id !== 'new'}
 	<nav class="nav-side">
-		{#if database.type && database.destinationDockerId && database.version && database.defaultDatabase}
+		{#if database.type && database.destinationDockerId && database.version}
 			{#if $status.database.isExited}
 				<a
 					id="exited"
-					href={!$disabledButton ? `/databases/${id}/logs` : null}
+					href={!$status.database.isRunning ? `/databases/${id}/logs` : null}
 					class="icons bg-transparent text-sm flex items-center text-red-500 tooltip-error"
 					sveltekit:prefetch
 				>
@@ -281,6 +281,34 @@
 			></a
 		>
 		<Tooltip triggeredBy="#configuration">{'Configuration'}</Tooltip>
+		<a
+			href="/databases/{id}/secrets"
+			sveltekit:prefetch
+			class="hover:text-pink-500 rounded"
+			class:text-pink-500={$page.url.pathname === `/databases/${id}/secrets`}
+			class:bg-coolgray-500={$page.url.pathname === `/databases/${id}/secrets`}
+		>
+			<button id="secrets" disabled={$isDeploymentEnabled} class="icons bg-transparent text-sm ">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="w-6 h-6"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<path
+						d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"
+					/>
+					<circle cx="12" cy="11" r="1" />
+					<line x1="12" y1="12" x2="12" y2="14.5" />
+				</svg></button
+			></a
+		>
+		<Tooltip triggeredBy="#secrets">Secrets</Tooltip>
 		<div class="border border-stone-700 h-8" />
 		<a
 			id="databaselogs"

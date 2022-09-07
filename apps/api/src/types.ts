@@ -35,4 +35,17 @@ export interface SaveDatabaseSettings extends OnlyId {
     }
 }
 
+export interface SaveDatabaseSecret extends OnlyId {
+    Body: {
+        name: string,
+        value: string,
+        isNew: string,
+    }
+}
+export interface DeleteDatabaseSecret extends OnlyId {
+    Body: {
+        name: string,
+    }
+}
+
 
