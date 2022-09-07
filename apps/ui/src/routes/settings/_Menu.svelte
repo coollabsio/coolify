@@ -7,7 +7,7 @@
 	{#if $appSession.teamId === '0'}
 		<a
 			href="/settings/global"
-			class="sub-menu no-underline"
+			class="sub-menu no-underline w-full"
 			class:sub-menu-active={$page.routeId === 'settings/global'}
 		>
 			Global Settings
@@ -15,7 +15,7 @@
 	{/if}
 	<a
 		href="/settings/ssh-keys"
-		class="sub-menu no-underline"
+		class="sub-menu no-underline w-full"
 		class:sub-menu-active={$page.routeId === 'settings/ssh-keys'}>SSH Keys</a
 	>
 </div>
