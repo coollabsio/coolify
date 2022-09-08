@@ -86,7 +86,8 @@ export const status: Writable<any> = writable({
         isRunning: false,
         isExited: false,
         loading: false,
-        initialLoading: true
+        initialLoading: true,
+        isPublic: false
     }
 
 });

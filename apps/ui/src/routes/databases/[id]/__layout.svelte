@@ -64,6 +64,7 @@
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	const { id } = $page.params;
 
+	$status.database.isPublic = database.settings.isPublic || false;
 	let statusInterval: any = false;
 	let forceDelete = false;
 
@@ -90,6 +91,7 @@
 			$status.database.loading = true;
 			try {
 				await post(`/databases/${database.id}/stop`, {});
+				$status.database.isPublic = false;
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
