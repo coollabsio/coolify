@@ -32,7 +32,7 @@
 	import Usage from '$lib/components/Usage.svelte';
 	import { t } from '$lib/translations';
 	import { asyncSleep } from '$lib/common';
-	import { appSession } from '$lib/store';
+	import { appSession, search } from '$lib/store';
 
 	import ApplicationsIcons from '$lib/components/svg/applications/ApplicationIcons.svelte';
 	import DatabaseIcons from '$lib/components/svg/databases/DatabaseIcons.svelte';
@@ -41,9 +41,8 @@
 	import NewResource from './_NewResource.svelte';
 
 	let numberOfGetStatus = 0;
-	let search = '';
 	let status: any = {};
-
+	doSearch();
 	function setInitials(onlyOthers: boolean = false) {
 		return {
 			applications:
@@ -164,72 +163,72 @@
 	}
 	function applicationFilters(application: any) {
 		return (
-			(application.name && application.name.toLowerCase().includes(search.toLowerCase())) ||
-			(application.fqdn && application.fqdn.toLowerCase().includes(search.toLowerCase())) ||
+			(application.name && application.name.toLowerCase().includes($search.toLowerCase())) ||
+			(application.fqdn && application.fqdn.toLowerCase().includes($search.toLowerCase())) ||
 			(application.repository &&
-				application.repository.toLowerCase().includes(search.toLowerCase())) ||
+				application.repository.toLowerCase().includes($search.toLowerCase())) ||
 			(application.buildpack &&
-				application.buildpack.toLowerCase().includes(search.toLowerCase())) ||
-			(application.branch && application.branch.toLowerCase().includes(search.toLowerCase())) ||
+				application.buildpack.toLowerCase().includes($search.toLowerCase())) ||
+			(application.branch && application.branch.toLowerCase().includes($search.toLowerCase())) ||
 			(application.destinationDockerId &&
-				application.destinationDocker.name.toLowerCase().includes(search.toLowerCase())) ||
-			('bot'.includes(search) && application.settings.isBot)
+				application.destinationDocker.name.toLowerCase().includes($search.toLowerCase())) ||
+			('bot'.includes($search) && application.settings.isBot)
 		);
 	}
 	function databaseFilters(database: any) {
 		return (
-			(database.name && database.name.toLowerCase().includes(search.toLowerCase())) ||
-			(database.type && database.type.toLowerCase().includes(search.toLowerCase())) ||
-			(database.version && database.version.toLowerCase().includes(search.toLowerCase())) ||
+			(database.name && database.name.toLowerCase().includes($search.toLowerCase())) ||
+			(database.type && database.type.toLowerCase().includes($search.toLowerCase())) ||
+			(database.version && database.version.toLowerCase().includes($search.toLowerCase())) ||
 			(database.destinationDockerId &&
-				database.destinationDocker.name.toLowerCase().includes(search.toLowerCase()))
+				database.destinationDocker.name.toLowerCase().includes($search.toLowerCase()))
 		);
 	}
 	function serviceFilters(service: any) {
 		return (
-			(service.name && service.name.toLowerCase().includes(search.toLowerCase())) ||
-			(service.type && service.type.toLowerCase().includes(search.toLowerCase())) ||
-			(service.version && service.version.toLowerCase().includes(search.toLowerCase())) ||
+			(service.name && service.name.toLowerCase().includes($search.toLowerCase())) ||
+			(service.type && service.type.toLowerCase().includes($search.toLowerCase())) ||
+			(service.version && service.version.toLowerCase().includes($search.toLowerCase())) ||
 			(service.destinationDockerId &&
-				service.destinationDocker.name.toLowerCase().includes(search.toLowerCase()))
+				service.destinationDocker.name.toLowerCase().includes($search.toLowerCase()))
 		);
 	}
 	function gitSourceFilters(source: any) {
 		return (
-			(source.name && source.name.toLowerCase().includes(search.toLowerCase())) ||
-			(source.type && source.type.toLowerCase().includes(search.toLowerCase())) ||
-			(source.htmlUrl && source.htmlUrl.toLowerCase().includes(search.toLowerCase())) ||
-			(source.apiUrl && source.apiUrl.toLowerCase().includes(search.toLowerCase()))
+			(source.name && source.name.toLowerCase().includes($search.toLowerCase())) ||
+			(source.type && source.type.toLowerCase().includes($search.toLowerCase())) ||
+			(source.htmlUrl && source.htmlUrl.toLowerCase().includes($search.toLowerCase())) ||
+			(source.apiUrl && source.apiUrl.toLowerCase().includes($search.toLowerCase()))
 		);
 	}
 	function destinationFilters(destination: any) {
 		return (
-			(destination.name && destination.name.toLowerCase().includes(search.toLowerCase())) ||
-			(destination.type && destination.type.toLowerCase().includes(search.toLowerCase()))
+			(destination.name && destination.name.toLowerCase().includes($search.toLowerCase())) ||
+			(destination.type && destination.type.toLowerCase().includes($search.toLowerCase()))
 		);
 	}
 	function doSearch(bang?: string) {
-		if (bang || bang === '') search = bang;
-		if (search) {
+		if (bang || bang === '') $search = bang;
+		if ($search) {
 			filtered = setInitials();
-			if (search.startsWith('!')) {
-				if (search === '!running') {
+			if ($search.startsWith('!')) {
+				if ($search === '!running') {
 					filterState('running');
-				} else if (search === '!stopped') {
+				} else if ($search === '!stopped') {
 					filterState('stopped');
-				} else if (search === '!error') {
+				} else if ($search === '!error') {
 					filterState('error');
-				} else if (search === '!app') {
+				} else if ($search === '!app') {
 					filterSpecific('applications');
-				} else if (search === '!db') {
+				} else if ($search === '!db') {
 					filterSpecific('databases');
-				} else if (search === '!service') {
+				} else if ($search === '!service') {
 					filterSpecific('services');
-				} else if (search === '!git') {
+				} else if ($search === '!git') {
 					filterSpecific('gitSources');
-				} else if (search === '!destination') {
+				} else if ($search === '!destination') {
 					filterSpecific('destinations');
-				} else if (search === '!bot') {
+				} else if ($search === '!bot') {
 					clearFiltered();
 					filtered.applications = applications.filter((application: any) => {
 						return application.settings.isBot;
@@ -237,7 +236,7 @@
 					filtered.otherApplications = applications.filter((application: any) => {
 						return application.settings.isBot && application.teams[0].id !== $appSession.teamId;
 					});
-				} else if (search === '!notmine') {
+				} else if ($search === '!notmine') {
 					clearFiltered();
 					filtered = setInitials(true);
 				}
@@ -313,59 +312,59 @@
 					type="text"
 					placeholder="Search: You can search for names, domains, types, database types, version, servers etc..."
 					class="w-full input input-bordered input-primary"
-					bind:value={search}
+					bind:value={$search}
 					on:input={() => doSearch()}
 				/>
 			</div>
 			<label for="search" class="label w-full">
 				<span class="label-text text-xs flex flex-wrap gap-2  items-center">
 					<button
-						class:bg-coollabs={search === '!notmine'}
+						class:bg-coollabs={$search === '!notmine'}
 						class="badge badge-lg text-white text-xs rounded"
 						on:click={() => doSearch('!notmine')}>Other Teams</button
 					>
 					<button
-						class:bg-coollabs={search === '!app'}
+						class:bg-coollabs={$search === '!app'}
 						class="badge badge-lg text-white text-xs rounded"
 						on:click={() => doSearch('!app')}>Applications</button
 					>
 					<button
-						class:bg-coollabs={search === '!bot'}
+						class:bg-coollabs={$search === '!bot'}
 						class="badge badge-lg text-white text-xs rounded"
 						on:click={() => doSearch('!bot')}>Bots</button
 					>
 					<button
-						class:bg-coollabs={search === '!service'}
+						class:bg-coollabs={$search === '!service'}
 						class="badge badge-lg text-white text-xs rounded"
 						on:click={() => doSearch('!service')}>Services</button
 					>
 					<button
-						class:bg-coollabs={search === '!db'}
+						class:bg-coollabs={$search === '!db'}
 						class="badge badge-lg text-white text-xs rounded"
 						on:click={() => doSearch('!db')}>Databases</button
 					>
 					<button
-						class:bg-coollabs={search === '!git'}
+						class:bg-coollabs={$search === '!git'}
 						class="badge badge-lg text-white text-xs rounded"
 						on:click={() => doSearch('!git')}>Git Sources</button
 					>
 					<button
-						class:bg-coollabs={search === '!destination'}
+						class:bg-coollabs={$search === '!destination'}
 						class="badge badge-lg text-white text-xs rounded"
 						on:click={() => doSearch('!destination')}>Destinations</button
 					>
 					<button
-						class:bg-coollabs={search === '!running'}
+						class:bg-coollabs={$search === '!running'}
 						class="badge badge-lg text-white text-xs rounded"
 						on:click={() => doSearch('!running')}>Running</button
 					>
 					<button
-						class:bg-coollabs={search === '!stopped'}
+						class:bg-coollabs={$search === '!stopped'}
 						class="badge badge-lg text-white text-xs rounded"
 						on:click={() => doSearch('!stopped')}>Stopped</button
 					>
 					<button
-						class:bg-coollabs={search === '!error'}
+						class:bg-coollabs={$search === '!error'}
 						class="badge badge-lg text-white text-xs rounded"
 						on:click={() => doSearch('!error')}>Error</button
 					>
@@ -1166,10 +1165,10 @@
 		</div>
 	{/if}
 
-	{#if filtered.applications.length === 0 && filtered.destinations.length === 0 && filtered.databases.length === 0 && filtered.services.length === 0 && filtered.gitSources.length === 0 && filtered.destinations.length === 0 && search}
+	{#if filtered.applications.length === 0 && filtered.destinations.length === 0 && filtered.databases.length === 0 && filtered.services.length === 0 && filtered.gitSources.length === 0 && filtered.destinations.length === 0 && $search}
 		<div class="flex flex-col items-center justify-center h-full pt-20">
 			<h1 class="text-2xl font-bold pb-4">
-				Nothing found with <span class="text-error font-bold">{search}</span>.
+				Nothing found with <span class="text-error font-bold">{$search}</span>.
 			</h1>
 		</div>
 	{/if}
