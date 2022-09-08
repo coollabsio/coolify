@@ -8,9 +8,11 @@ export async function listServers(request: FastifyRequest) {
     try {
         const userId = request.user.userId;
         const teamId = request.user.teamId;
-        const remoteServers = await prisma.destinationDocker.findMany({ where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }, distinct: ['remoteIpAddress', 'engine'] })
+        const servers = await prisma.destinationDocker.findMany({ where: { teams: { some: { id: teamId === '0' ? undefined : teamId } }, remoteEngine: false }, distinct: ['engine'] })
+        // const remoteServers = await prisma.destinationDocker.findMany({ where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }, distinct: ['remoteIpAddress', 'engine'] })
+
         return {
-            servers: remoteServers
+            servers
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
