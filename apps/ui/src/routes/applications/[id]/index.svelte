@@ -170,6 +170,7 @@
 			if ($status.application.isRunning) return;
 			isBot = !isBot;
 			application.settings.isBot = isBot;
+			application.fqdn = null;
 			setLocation(application, settings);
 		}
 		if (name === 'isDBBranching') {

@@ -38,13 +38,13 @@
 	<ul
 		id="new"
 		tabindex="0"
-		class="dropdown-content menu p-2 shadow bg-coolgray-300 rounded-box w-52"
+		class="dropdown-content menu p-2 shadow bg-coolgray-300 rounded w-52"
 	>
 		<li>
-			<button on:click={newApplication} class="no-underline hover:bg-applications">
+			<button on:click={newApplication} class="no-underline hover:bg-applications rounded-none ">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="h-8 w-8"
+					class="h-6 w-6"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentcolor"
@@ -62,10 +62,10 @@
 			>
 		</li>
 		<li>
-			<button on:click={newService} class="no-underline hover:bg-services">
+			<button on:click={newService} class="no-underline hover:bg-services rounded-none ">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="h-8 w-8"
+					class="h-6 w-6"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
@@ -79,10 +79,10 @@
 			>
 		</li>
 		<li>
-			<button on:click={newDatabase} class="no-underline hover:bg-databases">
+			<button on:click={newDatabase} class="no-underline hover:bg-databases rounded-none ">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="h-8 w-8"
+					class="h-6 w-6"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
@@ -98,10 +98,10 @@
 			>
 		</li>
 		<li>
-			<a href="/sources/new" class="no-underline hover:bg-sources">
+			<a href="/sources/new" class="no-underline hover:bg-sources rounded-none ">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="h-8 w-8"
+					class="h-6 w-6"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
@@ -120,10 +120,10 @@
 			>
 		</li>
 		<li>
-			<a href="/destinations/new" class="no-underline hover:bg-destinations">
+			<a href="/destinations/new" class="no-underline hover:bg-destinations rounded-none ">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="h-8 w-8"
+					class="h-6 w-6"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"

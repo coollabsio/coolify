@@ -400,7 +400,7 @@
 								<div class="w-full flex flex-col">
 									<h1 class="font-bold text-lg lg:text-xl truncate">
 										{application.name}
-										{#if application.settings.isBot}
+										{#if application.settings?.isBot}
 											<span class="text-xs badge bg-coolblack border-none text-applications"
 												>BOT</span
 											>
@@ -409,20 +409,20 @@
 									<div class="h-10 text-xs">
 										{#if application?.fqdn}
 											<h2>{application?.fqdn.replace('https://', '').replace('http://', '')}</h2>
-										{:else if !application.settings.isBot && !application?.fqdn}
+										{:else if !application.settings?.isBot && !application?.fqdn}
 											<h2 class="text-red-500">Not configured</h2>
 										{/if}
 										{#if application.destinationDocker?.name}
-											<div class="truncate">{application.destinationDocker.name}</div>
+											<div class="truncate">{application.destinationDocker?.name}</div>
 										{/if}
-										{#if application.teams.length > 0 && application.teams[0].name}
-											<div class="truncate">{application.teams[0].name}</div>
+										{#if application.teams.length > 0 && application.teams[0]?.name}
+											<div class="truncate">{application.teams[0]?.name}</div>
 										{/if}
 									</div>
 
 									<div class="flex justify-end items-end space-x-2 h-10">
-										{#if application.fqdn}
-											<a href={application.fqdn} target="_blank" class="icons hover:bg-green-500">
+										{#if application?.fqdn}
+											<a href={application?.fqdn} target="_blank" class="icons hover:bg-green-500">
 												<svg
 													xmlns="http://www.w3.org/2000/svg"
 													class="h-6 w-6"
@@ -441,7 +441,7 @@
 											</a>
 										{/if}
 
-										{#if application.settings.isBot && application.exposePort}
+										{#if application.settings?.isBot && application.exposePort}
 											<a
 												href={`http://${dev ? 'localhost' : settings.ipv4}:${
 													application.exposePort
@@ -506,7 +506,7 @@
 							<div class="w-full flex flex-col">
 								<h1 class="font-bold text-lg lg:text-xl truncate">
 									{application.name}
-									{#if application.settings.isBot}
+									{#if application.settings?.isBot}
 										<span class="text-xs badge bg-coolblack border-none text-applications">BOT</span
 										>
 									{/if}
@@ -514,20 +514,20 @@
 								<div class="h-10 text-xs">
 									{#if application?.fqdn}
 										<h2>{application?.fqdn.replace('https://', '').replace('http://', '')}</h2>
-									{:else if !application.settings.isBot && !application?.fqdn}
+									{:else if !application.settings?.isBot && !application?.fqdn}
 										<h2 class="text-red-500">Not configured</h2>
 									{/if}
 									{#if application.destinationDocker?.name}
-										<div class="truncate">{application.destinationDocker.name}</div>
+										<div class="truncate">{application.destinationDocker?.name}</div>
 									{/if}
-									{#if application.teams.length > 0 && application.teams[0].name}
-										<div class="truncate">{application.teams[0].name}</div>
+									{#if application.teams.length > 0 && application.teams[0]?.name}
+										<div class="truncate">{application.teams[0]?.name}</div>
 									{/if}
 								</div>
 
 								<div class="flex justify-end items-end space-x-2 h-10">
-									{#if application.fqdn}
-										<a href={application.fqdn} target="_blank" class="icons hover:bg-green-500">
+									{#if application?.fqdn}
+										<a href={application?.fqdn} target="_blank" class="icons hover:bg-green-500">
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
 												class="h-6 w-6"
@@ -546,7 +546,7 @@
 										</a>
 									{/if}
 
-									{#if application.settings.isBot && application.exposePort}
+									{#if application.settings?.isBot && application.exposePort}
 										<a
 											href={`http://${dev ? 'localhost' : settings.ipv4}:${application.exposePort}`}
 											target="_blank"
@@ -611,15 +611,15 @@
 											<h2 class="text-red-500">URL not configured</h2>
 										{/if}
 										{#if service.destinationDocker?.name}
-											<div class="truncate">{service.destinationDocker.name}</div>
+											<div class="truncate">{service.destinationDocker?.name}</div>
 										{/if}
-										{#if service.teams.length > 0 && service.teams[0].name}
-											<div class="truncate">{service.teams[0].name}</div>
+										{#if service.teams.length > 0 && service.teams[0]?.name}
+											<div class="truncate">{service.teams[0]?.name}</div>
 										{/if}
 									</div>
 									<div class="flex justify-end items-end space-x-2 h-10">
-										{#if service.fqdn}
-											<a href={service.fqdn} target="_blank" class="icons hover:bg-pink-500">
+										{#if service?.fqdn}
+											<a href={service?.fqdn} target="_blank" class="icons hover:bg-pink-500">
 												<svg
 													xmlns="http://www.w3.org/2000/svg"
 													class="h-6 w-6"
@@ -683,15 +683,15 @@
 										<h2 class="text-red-500">URL not configured</h2>
 									{/if}
 									{#if service.destinationDocker?.name}
-										<div class="truncate">{service.destinationDocker.name}</div>
+										<div class="truncate">{service.destinationDocker?.name}</div>
 									{/if}
-									{#if service.teams.length > 0 && service.teams[0].name}
-										<div class="truncate">{service.teams[0].name}</div>
+									{#if service.teams.length > 0 && service.teams[0]?.name}
+										<div class="truncate">{service.teams[0]?.name}</div>
 									{/if}
 								</div>
 								<div class="flex justify-end items-end space-x-2 h-10">
-									{#if service.fqdn}
-										<a href={service.fqdn} target="_blank" class="icons hover:bg-pink-500">
+									{#if service?.fqdn}
+										<a href={service?.fqdn} target="_blank" class="icons hover:bg-pink-500">
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
 												class="h-6 w-6"
@@ -752,15 +752,15 @@
 												<h2 class="text-red-500">Not version not configured</h2>
 											{/if}
 											{#if database.destinationDocker?.name}
-												<div class="truncate">{database.destinationDocker.name}</div>
+												<div class="truncate">{database.destinationDocker?.name}</div>
 											{/if}
-											{#if database.teams.length > 0 && database.teams[0].name}
-												<div class="truncate">{database.teams[0].name}</div>
+											{#if database.teams.length > 0 && database.teams[0]?.name}
+												<div class="truncate">{database.teams[0]?.name}</div>
 											{/if}
 										</div>
 									</div>
 									<div class="flex justify-end items-end space-x-2 h-10">
-										{#if database.settings.isPublic}
+										{#if database.settings?.isPublic}
 											<div title="Public">
 												<svg
 													xmlns="http://www.w3.org/2000/svg"
@@ -828,15 +828,15 @@
 											<h2 class="text-red-500">Not version not configured</h2>
 										{/if}
 										{#if database.destinationDocker?.name}
-											<div class="truncate">{database.destinationDocker.name}</div>
+											<div class="truncate">{database.destinationDocker?.name}</div>
 										{/if}
-										{#if database.teams.length > 0 && database.teams[0].name}
-											<div class="truncate">{database.teams[0].name}</div>
+										{#if database.teams.length > 0 && database.teams[0]?.name}
+											<div class="truncate">{database.teams[0]?.name}</div>
 										{/if}
 									</div>
 								</div>
 								<div class="flex justify-end items-end space-x-2 h-10">
-									{#if database.settings.isPublic}
+									{#if database.settings?.isPublic}
 										<div title="Public">
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
@@ -920,8 +920,8 @@
 								<div class="w-full flex flex-col">
 									<div class="h-10">
 										<h1 class="font-bold text-lg lg:text-xl truncate">{source.name}</h1>
-										{#if source.teams.length > 0 && source.teams[0].name}
-											<div class="truncate text-xs">{source.teams[0].name}</div>
+										{#if source.teams.length > 0 && source.teams[0]?.name}
+											<div class="truncate text-xs">{source.teams[0]?.name}</div>
 										{/if}
 									</div>
 
@@ -992,8 +992,8 @@
 							<div class="w-full flex flex-col">
 								<div class="h-10">
 									<h1 class="font-bold text-lg lg:text-xl truncate">{source.name}</h1>
-									{#if source.teams.length > 0 && source.teams[0].name}
-										<div class="truncate text-xs">{source.teams[0].name}</div>
+									{#if source.teams.length > 0 && source.teams[0]?.name}
+										<div class="truncate text-xs">{source.teams[0]?.name}</div>
 									{/if}
 								</div>
 								<div class="flex justify-end items-end space-x-2 h-10" />
@@ -1071,8 +1071,8 @@
 										{#if destination.remoteEngine && !destination.sshKeyId}
 											<h2 class="text-red-500">SSH key missing</h2>
 										{/if}
-										{#if destination.teams.length > 0 && destination.teams[0].name}
-											<div class="truncate">{destination.teams[0].name}</div>
+										{#if destination.teams.length > 0 && destination.teams[0]?.name}
+											<div class="truncate">{destination.teams[0]?.name}</div>
 										{/if}
 									</div>
 								</div>
@@ -1153,8 +1153,8 @@
 									{#if destination.remoteEngine && !destination.sshKeyId}
 										<h2 class="text-red-500">SSH key missing</h2>
 									{/if}
-									{#if destination.teams.length > 0 && destination.teams[0].name}
-										<div class="truncate">{destination.teams[0].name}</div>
+									{#if destination.teams.length > 0 && destination.teams[0]?.name}
+										<div class="truncate">{destination.teams[0]?.name}</div>
 									{/if}
 								</div>
 							</div>
