@@ -23,6 +23,10 @@
 <script lang="ts">
 	export let servers: any;
 	import { appSession } from '$lib/store';
+	import { goto } from '$app/navigation';
+	if ($appSession.teamId !== '0') {
+		goto('/');
+	}
 </script>
 
 <div class="flex space-x-1 p-6 font-bold">
@@ -42,7 +46,7 @@
 			{/each}
 		</div>
 	{:else}
-		<h1 class="">Nothing here.</h1>
+		<h1 class="text-center text-xs">Nothing here.</h1>
 	{/if}
 </div>
 <div class="text-xs text-center">Remote servers will be here soon</div>
