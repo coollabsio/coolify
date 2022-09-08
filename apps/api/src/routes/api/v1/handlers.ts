@@ -1,5 +1,4 @@
-import os from 'node:os';
-import osu from 'node-os-utils';
+
 import axios from 'axios';
 import { compareVersions } from 'compare-versions';
 import cuid from 'cuid';
@@ -15,9 +14,10 @@ export async function hashPassword(password: string): Promise<string> {
 	return bcrypt.hash(password, saltRounds);
 }
 
-export async function cleanupManually() {
+export async function cleanupManually(request: FastifyRequest) {
 	try {
-		const destination = await prisma.destinationDocker.findFirst({ where: { engine: '/var/run/docker.sock' } })
+		const { serverId } = request.body;
+		const destination = await prisma.destinationDocker.findUnique({ where: { id: serverId } })
 		await cleanupDockerStorage(destination.id, true, true)
 		return {}
 	} catch ({ status, message }) {
@@ -86,25 +86,7 @@ export async function restartCoolify(request: FastifyRequest<any>) {
 		return errorHandler({ status, message })
 	}
 }
-export async function showUsage() {
-	try {
-		return {
-			usage: {
-				uptime: os.uptime(),
-				memory: await osu.mem.info(),
-				cpu: {
-					load: os.loadavg(),
-					usage: await osu.cpu.usage(),
-					count: os.cpus().length
-				},
-				disk: await osu.drive.info('/')
-			}
 
-		};
-	} catch ({ status, message }) {
-		return errorHandler({ status, message })
-	}
-}
 export async function showDashboard(request: FastifyRequest) {
 	try {
 		const userId = request.user.userId;

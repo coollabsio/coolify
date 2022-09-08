@@ -43,17 +43,13 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 		onRequest: [fastify.authenticate]
 	}, async (request) => await showDashboard(request));
 
-	fastify.get('/usage', {
-		onRequest: [fastify.authenticate]
-	}, async () => await showUsage());
-
 	fastify.post('/internal/restart', {
 		onRequest: [fastify.authenticate]
 	}, async (request) => await restartCoolify(request));
 
 	fastify.post('/internal/cleanup', {
 		onRequest: [fastify.authenticate]
-	}, async () => await cleanupManually());
+	}, async (request) => await cleanupManually(request));
 };
 
 export default root;

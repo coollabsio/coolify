@@ -499,9 +499,26 @@ export async function createRemoteEngineConfiguration(id: string) {
 	}
 	return await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config))
 }
+export async function executeSSHCmd({ dockerId, command }) {
+	const { execaCommand } = await import('execa')
+	let { remoteEngine, remoteIpAddress, engine, remoteUser } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
+	if (remoteEngine) {
+		await createRemoteEngineConfiguration(dockerId)
+		engine = `ssh://${remoteIpAddress}`
+	} else {
+		engine = 'unix:///var/run/docker.sock'
+	}
+	if (process.env.CODESANDBOX_HOST) {
+		if (command.startsWith('docker compose')) {
+			command = command.replace(/docker compose/gi, 'docker-compose')
+		}
+	}
+	command = `ssh ${remoteIpAddress} ${command}`
+	return await execaCommand(command)
+}
 export async function executeDockerCmd({ debug, buildId, applicationId, dockerId, command }: { debug?: boolean, buildId?: string, applicationId?: string, dockerId: string, command: string }): Promise<any> {
 	const { execaCommand } = await import('execa')
-	let { remoteEngine, remoteIpAddress, engine } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
+	let { remoteEngine, remoteIpAddress, engine, remoteUser } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
 	if (remoteEngine) {
 		await createRemoteEngineConfiguration(dockerId)
 		engine = `ssh://${remoteIpAddress}`

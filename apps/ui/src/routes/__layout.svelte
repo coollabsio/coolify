@@ -132,9 +132,9 @@
 					<img src={$appSession.whiteLabeledDetails.icon} alt="White labeled logo" />
 				</div>
 			{/if}
-			<div class="flex flex-col space-y-2 py-2" id="dashboard" class:mt-2={$appSession.whiteLabeled}>
+			<div class="flex flex-col space-y-2 py-2" class:mt-2={$appSession.whiteLabeled}>
 				<a
-					
+					id="dashboard"
 					sveltekit:prefetch
 					href="/"
 					class="icons  hover:text-white"
@@ -159,8 +159,35 @@
 						<path d="M16 15c-2.21 1.333 -5.792 1.333 -8 0" />
 					</svg>
 				</a>
+				<a
+					id="servers"
+					sveltekit:prefetch
+					href="/servers"
+					class="icons hover:text-white"
+					class:text-white={$page.url.pathname === '/servers'}
+					class:bg-coolgray-500={$page.url.pathname === '/servers'}
+					class:bg-coolgray-200={!($page.url.pathname === '/servers')}
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-8 h-8 mx-auto"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<rect x="3" y="4" width="18" height="8" rx="3" />
+						<rect x="3" y="12" width="18" height="8" rx="3" />
+						<line x1="7" y1="8" x2="7" y2="8.01" />
+						<line x1="7" y1="16" x2="7" y2="16.01" />
+					</svg>
+				</a>
 			</div>
 			<Tooltip triggeredBy="#dashboard" placement="right">Dashboard</Tooltip>
+			<Tooltip triggeredBy="#servers" placement="right">Servers</Tooltip>
 			<div class="flex-1" />
 
 			<UpdateAvailable />
