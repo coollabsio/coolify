@@ -350,6 +350,13 @@ export async function configureServiceType({
 				}
 			}
 		});
+	} else if (type === 'grafana') {
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type
+			}
+		});
 	} else {
 		await prisma.service.update({
 			where: { id },

@@ -212,4 +212,15 @@ export const supportedServiceTypesAndVersions = [
 	// 		main: 80
 	// 	}
 	// },
+	{
+		name: 'grafana',
+		fancyName: 'Grafana Dashboard',
+		baseImage: 'grafana/grafana',
+		images: [],
+		versions: ['latest', '9.1.3', '9.1.2', '9.0.8', '8.3.11', '8.4.11', '8.5.11'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 3000
+		}
+	},
 ];
