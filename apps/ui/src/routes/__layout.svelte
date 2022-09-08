@@ -132,9 +132,9 @@
 					<img src={$appSession.whiteLabeledDetails.icon} alt="White labeled logo" />
 				</div>
 			{/if}
-			<div class="flex flex-col space-y-2 py-2" class:mt-2={$appSession.whiteLabeled}>
+			<div class="flex flex-col space-y-2 py-2" id="dashboard" class:mt-2={$appSession.whiteLabeled}>
 				<a
-					id="dashboard"
+					
 					sveltekit:prefetch
 					href="/"
 					class="icons  hover:text-white"
@@ -160,6 +160,7 @@
 					</svg>
 				</a>
 			</div>
+			<Tooltip triggeredBy="#dashboard" placement="right">Dashboard</Tooltip>
 			<div class="flex-1" />
 
 			<UpdateAvailable />
