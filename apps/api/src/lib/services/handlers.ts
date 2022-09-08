@@ -321,8 +321,8 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
         const network = destinationDockerId && destinationDocker.network;
         const port = getServiceMainPort('minio');
 
-        const { service: { destinationDocker: { id: dockerId } } } = await prisma.minio.findUnique({ where: { serviceId: id }, include: { service: { include: { destinationDocker: true } } } })
-        const publicPort = await getFreePublicPort(id, dockerId);
+        const { service: { destinationDocker: { remoteEngine, engine, remoteIpAddress } } } = await prisma.minio.findUnique({ where: { serviceId: id }, include: { service: { include: { destinationDocker: true } } } })
+        const publicPort = await getFreePublicPort({ id, remoteEngine, engine, remoteIpAddress });
 
         const consolePort = 9001;
         const { workdir } = await createDirectories({ repository: type, buildId: id });

@@ -748,7 +748,6 @@ export function generateDatabaseConfiguration(database: any, arch: string): Data
 		defaultDatabase,
 		version,
 		type,
-		settings: { appendOnly }
 	} = database;
 	const baseImage = getDatabaseImage(type, arch);
 	if (type === 'mysql') {
@@ -829,6 +828,7 @@ export function generateDatabaseConfiguration(database: any, arch: string): Data
 		}
 		return configuration
 	} else if (type === 'redis') {
+		const { settings: { appendOnly } } = database;
 		const configuration: DatabaseConfiguration = {
 			privatePort: 6379,
 			command: undefined,
@@ -1112,90 +1112,150 @@ export async function updatePasswordInDb(database, user, newPassword, isRoot) {
 		}
 	}
 }
-export async function checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress }: { id: string, configuredPort?: number, exposePort: number, dockerId: string, remoteIpAddress?: string }) {
+export async function checkExposedPort({ id, configuredPort, exposePort, engine, remoteEngine, remoteIpAddress }: { id: string, configuredPort?: number, exposePort: number, engine: string, remoteEngine: boolean, remoteIpAddress?: string }) {
 	if (exposePort < 1024 || exposePort > 65535) {
 		throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` }
 	}
 	if (configuredPort) {
 		if (configuredPort !== exposePort) {
-			const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
+			const availablePort = await getFreeExposedPort(id, exposePort, engine, remoteEngine, remoteIpAddress);
 			if (availablePort.toString() !== exposePort.toString()) {
 				throw { status: 500, message: `Port ${exposePort} is already in use.` }
 			}
 		}
 	} else {
-		const availablePort = await getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress);
+		const availablePort = await getFreeExposedPort(id, exposePort, engine, remoteEngine, remoteIpAddress);
 		if (availablePort.toString() !== exposePort.toString()) {
 			throw { status: 500, message: `Port ${exposePort} is already in use.` }
 		}
 	}
 }
-export async function getFreeExposedPort(id, exposePort, dockerId, remoteIpAddress) {
+export async function getFreeExposedPort(id, exposePort, engine, remoteEngine, remoteIpAddress) {
 	const { default: checkPort } = await import('is-port-reachable');
-	const applicationUsed = await (
-		await prisma.application.findMany({
-			where: { exposePort: { not: null }, id: { not: id }, destinationDockerId: dockerId },
-			select: { exposePort: true }
-		})
-	).map((a) => a.exposePort);
-	const serviceUsed = await (
-		await prisma.service.findMany({
-			where: { exposePort: { not: null }, id: { not: id }, destinationDockerId: dockerId },
-			select: { exposePort: true }
-		})
-	).map((a) => a.exposePort);
-	const usedPorts = [...applicationUsed, ...serviceUsed];
-	if (usedPorts.includes(exposePort)) {
+	if (remoteEngine) {
+		const applicationUsed = await (
+			await prisma.application.findMany({
+				where: { exposePort: { not: null }, id: { not: id }, destinationDocker: { remoteIpAddress } },
+				select: { exposePort: true }
+			})
+		).map((a) => a.exposePort);
+		const serviceUsed = await (
+			await prisma.service.findMany({
+				where: { exposePort: { not: null }, id: { not: id }, destinationDocker: { remoteIpAddress } },
+				select: { exposePort: true }
+			})
+		).map((a) => a.exposePort);
+		const usedPorts = [...applicationUsed, ...serviceUsed];
+		if (usedPorts.includes(exposePort)) {
+			return false
+		}
+		const found = await checkPort(exposePort, { host: remoteIpAddress });
+		if (!found) {
+			return exposePort
+		}
+		return false
+	} else {
+		const applicationUsed = await (
+			await prisma.application.findMany({
+				where: { exposePort: { not: null }, id: { not: id }, destinationDocker: { engine } },
+				select: { exposePort: true }
+			})
+		).map((a) => a.exposePort);
+		const serviceUsed = await (
+			await prisma.service.findMany({
+				where: { exposePort: { not: null }, id: { not: id }, destinationDocker: { engine } },
+				select: { exposePort: true }
+			})
+		).map((a) => a.exposePort);
+		const usedPorts = [...applicationUsed, ...serviceUsed];
+		if (usedPorts.includes(exposePort)) {
+			return false
+		}
+		const found = await checkPort(exposePort, { host: 'localhost' });
+		if (!found) {
+			return exposePort
+		}
 		return false
 	}
-	const found = await checkPort(exposePort, { host: remoteIpAddress || 'localhost' });
-	if (!found) {
-		return exposePort
-	}
-	return false
-
 }
 export function generateRangeArray(start, end) {
 	return Array.from({ length: (end - start) }, (v, k) => k + start);
 }
-export async function getFreePublicPort(id, dockerId) {
+export async function getFreePublicPort({ id, remoteEngine, engine, remoteIpAddress }) {
 	const { default: isReachable } = await import('is-port-reachable');
 	const data = await prisma.setting.findFirst();
 	const { minPort, maxPort } = data;
-	const dbUsed = await (
-		await prisma.database.findMany({
-			where: { publicPort: { not: null }, id: { not: id }, destinationDockerId: dockerId },
-			select: { publicPort: true }
-		})
-	).map((a) => a.publicPort);
-	const wpFtpUsed = await (
-		await prisma.wordpress.findMany({
-			where: { ftpPublicPort: { not: null }, id: { not: id }, service: { destinationDockerId: dockerId } },
-			select: { ftpPublicPort: true }
-		})
-	).map((a) => a.ftpPublicPort);
-	const wpUsed = await (
-		await prisma.wordpress.findMany({
-			where: { mysqlPublicPort: { not: null }, id: { not: id }, service: { destinationDockerId: dockerId } },
-			select: { mysqlPublicPort: true }
-		})
-	).map((a) => a.mysqlPublicPort);
-	const minioUsed = await (
-		await prisma.minio.findMany({
-			where: { publicPort: { not: null }, id: { not: id }, service: { destinationDockerId: dockerId } },
-			select: { publicPort: true }
-		})
-	).map((a) => a.publicPort);
-	const usedPorts = [...dbUsed, ...wpFtpUsed, ...wpUsed, ...minioUsed];
-	const range = generateRangeArray(minPort, maxPort)
-	const availablePorts = range.filter(port => !usedPorts.includes(port))
-	for (const port of availablePorts) {
-		const found = await isReachable(port, { host: 'localhost' })
-		if (!found) {
-			return port
+	if (remoteEngine) {
+		const dbUsed = await (
+			await prisma.database.findMany({
+				where: { publicPort: { not: null }, id: { not: id }, destinationDocker: { remoteIpAddress } },
+				select: { publicPort: true }
+			})
+		).map((a) => a.publicPort);
+		const wpFtpUsed = await (
+			await prisma.wordpress.findMany({
+				where: { ftpPublicPort: { not: null }, id: { not: id }, service: { destinationDocker: { remoteIpAddress } } },
+				select: { ftpPublicPort: true }
+			})
+		).map((a) => a.ftpPublicPort);
+		const wpUsed = await (
+			await prisma.wordpress.findMany({
+				where: { mysqlPublicPort: { not: null }, id: { not: id }, service: { destinationDocker: { remoteIpAddress } } },
+				select: { mysqlPublicPort: true }
+			})
+		).map((a) => a.mysqlPublicPort);
+		const minioUsed = await (
+			await prisma.minio.findMany({
+				where: { publicPort: { not: null }, id: { not: id }, service: { destinationDocker: { remoteIpAddress } } },
+				select: { publicPort: true }
+			})
+		).map((a) => a.publicPort);
+		const usedPorts = [...dbUsed, ...wpFtpUsed, ...wpUsed, ...minioUsed];
+		const range = generateRangeArray(minPort, maxPort)
+		const availablePorts = range.filter(port => !usedPorts.includes(port))
+		for (const port of availablePorts) {
+			const found = await isReachable(port, { host: remoteIpAddress })
+			if (!found) {
+				return port
+			}
 		}
+		return false
+	} else {
+		const dbUsed = await (
+			await prisma.database.findMany({
+				where: { publicPort: { not: null }, id: { not: id }, destinationDocker: { engine } },
+				select: { publicPort: true }
+			})
+		).map((a) => a.publicPort);
+		const wpFtpUsed = await (
+			await prisma.wordpress.findMany({
+				where: { ftpPublicPort: { not: null }, id: { not: id }, service: { destinationDocker: { engine } } },
+				select: { ftpPublicPort: true }
+			})
+		).map((a) => a.ftpPublicPort);
+		const wpUsed = await (
+			await prisma.wordpress.findMany({
+				where: { mysqlPublicPort: { not: null }, id: { not: id }, service: { destinationDocker: { engine } } },
+				select: { mysqlPublicPort: true }
+			})
+		).map((a) => a.mysqlPublicPort);
+		const minioUsed = await (
+			await prisma.minio.findMany({
+				where: { publicPort: { not: null }, id: { not: id }, service: { destinationDocker: { engine } } },
+				select: { publicPort: true }
+			})
+		).map((a) => a.publicPort);
+		const usedPorts = [...dbUsed, ...wpFtpUsed, ...wpUsed, ...minioUsed];
+		const range = generateRangeArray(minPort, maxPort)
+		const availablePorts = range.filter(port => !usedPorts.includes(port))
+		for (const port of availablePorts) {
+			const found = await isReachable(port, { host: 'localhost' })
+			if (!found) {
+				return port
+			}
+		}
+		return false
 	}
-	return false
 }
 
 export async function startTraefikTCPProxy(
