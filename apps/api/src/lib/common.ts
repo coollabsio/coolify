@@ -500,6 +500,7 @@ export async function createRemoteEngineConfiguration(id: string) {
 	return await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config))
 }
 export async function executeDockerCmd({ debug, buildId, applicationId, dockerId, command }: { debug?: boolean, buildId?: string, applicationId?: string, dockerId: string, command: string }): Promise<any> {
+	const { execaCommand } = await import('execa')
 	let { remoteEngine, remoteIpAddress, engine } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
 	if (remoteEngine) {
 		await createRemoteEngineConfiguration(dockerId)
@@ -515,10 +516,7 @@ export async function executeDockerCmd({ debug, buildId, applicationId, dockerId
 	if (command.startsWith(`docker build --progress plain`)) {
 		return await asyncExecShellStream({ debug, buildId, applicationId, command, engine });
 	}
-	return await asyncExecShell(
-		`DOCKER_BUILDKIT=1 DOCKER_HOST="${engine}" ${command}`
-	);
-
+	return await execaCommand(command, { env: { DOCKER_BUILDKIT: "1", DOCKER_HOST: engine }, shell: true })
 }
 export async function startTraefikProxy(id: string): Promise<void> {
 	const { engine, network, remoteEngine, remoteIpAddress } = await prisma.destinationDocker.findUnique({ where: { id } })
