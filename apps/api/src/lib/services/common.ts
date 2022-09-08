@@ -20,7 +20,7 @@ export const includeServices: any = {
 	glitchTip: true,
 	searxng: true,
 	weblate: true,
-	taiga: true
+	taiga: true,
 };
 export async function configureServiceType({
 	id,
@@ -348,6 +348,13 @@ export async function configureServiceType({
 						postgresqlDatabase,
 					}
 				}
+			}
+		});
+	} else if (type === 'trilium') {
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type
 			}
 		});
 	} else {
