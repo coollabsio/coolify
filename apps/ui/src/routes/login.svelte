@@ -110,10 +110,15 @@
 						class:bg-coollabs={!loading}
 						>{loading ? $t('login.authenticating') : $t('login.login')}</button
 					>
-
-					<button on:click|preventDefault={gotoRegister} class="btn btn-ghost"
-						>{$t('register.register')}</button
-					>
+					{#if $appSession.isRegistrationEnabled}
+						<button on:click|preventDefault={gotoRegister} class="btn btn-ghost"
+							>{$t('register.register')}</button
+						>
+					{:else}
+						<div class="text-stone-600 text-xs">
+							Registration is disabled. Please ask an admin to activate it.
+						</div>
+					{/if}
 				</div>
 			</form>
 			{#if browser && window.location.host === 'demo.coolify.io'}

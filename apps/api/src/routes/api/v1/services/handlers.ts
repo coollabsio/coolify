@@ -233,7 +233,7 @@ export async function checkService(request: FastifyRequest<CheckService>) {
         if (otherFqdns && otherFqdns.length > 0) otherFqdns = otherFqdns.map((f) => f.toLowerCase());
         if (exposePort) exposePort = Number(exposePort);
 
-        const { destinationDocker: { id: dockerId, remoteIpAddress, remoteEngine }, exposePort: configuredPort } = await prisma.service.findUnique({ where: { id }, include: { destinationDocker: true } })
+        const { destinationDocker: { remoteIpAddress, remoteEngine, engine }, exposePort: configuredPort } = await prisma.service.findUnique({ where: { id }, include: { destinationDocker: true } })
         const { isDNSCheckEnabled } = await prisma.setting.findFirst({});
 
         let found = await isDomainConfigured({ id, fqdn, remoteIpAddress });
@@ -248,7 +248,7 @@ export async function checkService(request: FastifyRequest<CheckService>) {
                 }
             }
         }
-        if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress })
+        if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, engine, remoteEngine, remoteIpAddress })
         if (isDNSCheckEnabled && !isDev && !forceSave) {
             let hostname = request.hostname.split(':')[0];
             if (remoteEngine) hostname = remoteIpAddress;
@@ -485,9 +485,9 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
     const { id } = request.params
     const { ftpEnabled } = request.body;
 
-    const { service: { destinationDocker: { id: dockerId } } } = await prisma.wordpress.findUnique({ where: { serviceId: id }, include: { service: { include: { destinationDocker: true } } } })
+    const { service: { destinationDocker: { engine, remoteEngine, remoteIpAddress } } } = await prisma.wordpress.findUnique({ where: { serviceId: id }, include: { service: { include: { destinationDocker: true } } } })
 
-    const publicPort = await getFreePublicPort(id, dockerId);
+    const publicPort = await getFreePublicPort({ id, remoteEngine, engine, remoteIpAddress });
 
     let ftpUser = cuid();
     let ftpPassword = generatePassword({});

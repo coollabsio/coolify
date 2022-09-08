@@ -1,8 +1,9 @@
 import { FastifyPluginAsync } from 'fastify';
-import { deleteDatabase, getDatabase, getDatabaseLogs, getDatabaseStatus, getDatabaseTypes, getDatabaseUsage, getVersions, listDatabases, newDatabase, saveDatabase, saveDatabaseDestination, saveDatabaseSettings, saveDatabaseType, saveVersion, startDatabase, stopDatabase } from './handlers';
+import { deleteDatabase, deleteDatabaseSecret, getDatabase, getDatabaseLogs, getDatabaseSecrets, getDatabaseStatus, getDatabaseTypes, getDatabaseUsage, getVersions, listDatabases, newDatabase, saveDatabase, saveDatabaseDestination, saveDatabaseSecret, saveDatabaseSettings, saveDatabaseType, saveVersion, startDatabase, stopDatabase } from './handlers';
 
-import type { DeleteDatabase, GetDatabaseLogs, OnlyId, SaveDatabase, SaveDatabaseDestination, SaveDatabaseSettings, SaveVersion } from '../../../../types';
-import type { SaveDatabaseType } from './types';
+import type { OnlyId } from '../../../../types';
+
+import type { DeleteDatabase, SaveDatabaseType, DeleteDatabaseSecret, GetDatabaseLogs, SaveDatabase, SaveDatabaseDestination, SaveDatabaseSecret, SaveDatabaseSettings, SaveVersion } from './types';
 
 const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.addHook('onRequest', async (request) => {
@@ -18,6 +19,10 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.get<OnlyId>('/:id/status', async (request) => await getDatabaseStatus(request));
 
     fastify.post<SaveDatabaseSettings>('/:id/settings', async (request) => await saveDatabaseSettings(request));
+
+    fastify.get<OnlyId>('/:id/secrets', async (request) => await getDatabaseSecrets(request));
+    fastify.post<SaveDatabaseSecret>('/:id/secrets', async (request, reply) => await saveDatabaseSecret(request, reply));
+    fastify.delete<DeleteDatabaseSecret>('/:id/secrets', async (request) => await deleteDatabaseSecret(request));
 
     fastify.get('/:id/configuration/type', async (request) => await getDatabaseTypes(request));
     fastify.post<SaveDatabaseType>('/:id/configuration/type', async (request, reply) => await saveDatabaseType(request, reply));

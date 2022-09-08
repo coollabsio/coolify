@@ -12,6 +12,7 @@
 	import PostgreSql from './_PostgreSQL.svelte';
 	import Redis from './_Redis.svelte';
 	import CouchDb from './_CouchDb.svelte';
+	import EdgeDB from './_EdgeDB.svelte';
 	import { post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
@@ -23,7 +24,6 @@
 	let loading = false;
 	let publicLoading = false;
 
-	let isPublic = database.settings.isPublic || false;
 	let appendOnly = database.settings.appendOnly;
 
 	let databaseDefault: any;
@@ -36,8 +36,10 @@
 		databaseDefault = database.defaultDatabase;
 		databaseDbUser = database.dbUser;
 		databaseDbUserPassword = database.dbUserPassword;
-		if (database.type === 'mongodb') {
-			databaseDefault = '?readPreference=primary&ssl=false';
+		if (database.type === 'mongodb' || database.type === 'edgedb') {
+			if (database.type === 'mongodb') {
+				databaseDefault = '?readPreference=primary&ssl=false';
+			}
 			databaseDbUser = database.rootUser;
 			databaseDbUserPassword = database.rootUserPassword;
 		} else if (database.type === 'redis') {
@@ -49,12 +51,12 @@
 		return `${database.type}://${
 			databaseDbUser ? databaseDbUser + ':' : ''
 		}${databaseDbUserPassword}@${
-			isPublic
+			$status.database.isPublic
 				? database.destinationDocker.remoteEngine
 					? database.destinationDocker.remoteIpAddress
 					: $appSession.ipv4
 				: database.id
-		}:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`;
+		}:${$status.database.isPublic ? database.publicPort : privatePort}/${databaseDefault}`;
 	}
 
 	async function changeSettings(name: any) {
@@ -63,11 +65,11 @@
 		}
 		publicLoading = true;
 		let data = {
-			isPublic,
+			isPublic: $status.database.isPublic,
 			appendOnly
 		};
 		if (name === 'isPublic') {
-			data.isPublic = !isPublic;
+			data.isPublic = !$status.database.isPublic;
 		}
 		if (name === 'appendOnly') {
 			data.appendOnly = !appendOnly;
@@ -77,9 +79,9 @@
 				isPublic: data.isPublic,
 				appendOnly: data.appendOnly
 			});
-			isPublic = data.isPublic;
+			$status.database.isPublic = data.isPublic;
 			appendOnly = data.appendOnly;
-			if (isPublic) {
+			if ($status.database.isPublic) {
 				database.publicPort = publicPort;
 			}
 		} catch (error) {
@@ -188,7 +190,7 @@
 					readonly
 					disabled
 					name="publicPort"
-					value={publicLoading ? 'Loading...' : isPublic ? database.publicPort : privatePort}
+					value={publicLoading ? 'Loading...' : $status.database.isPublic ? database.publicPort : privatePort}
 				/>
 			</div>
 		</div>
@@ -205,12 +207,14 @@
 				<Redis bind:database />
 			{:else if database.type === 'couchdb'}
 				<CouchDb {database} />
+			{:else if database.type === 'edgedb'}
+				<EdgeDB {database} />
 			{/if}
 			<div class="grid grid-cols-2 items-center px-10 pb-8">
 				<div>
 					<label for="url" class="text-base font-bold text-stone-100"
 						>{$t('database.connection_string')}
-						{#if !isPublic && database.destinationDocker.remoteEngine}
+						{#if !$status.database.isPublic && database.destinationDocker.remoteEngine}
 							<Explainer
 								explanation="You can only access the database with this URL if your application is deployed to the same Destination."
 							/>
@@ -238,7 +242,7 @@
 			<Setting
 				id="isPublic"
 				loading={publicLoading}
-				bind:setting={isPublic}
+				bind:setting={$status.database.isPublic}
 				on:click={() => changeSettings('isPublic')}
 				title={$t('database.set_public')}
 				description={$t('database.warning_database_public')}

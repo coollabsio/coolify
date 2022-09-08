@@ -31,6 +31,7 @@
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
+  
 	import { goto } from '$app/navigation';
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
@@ -55,7 +56,7 @@
 		<div class="p-2">
 			<form on:submit|preventDefault={() => handleSubmit(type.name)}>
 				<button type="submit" class="box-selection relative text-xl font-bold hover:bg-purple-700">
-					<DatabaseIcons type={type.name} isAbsolute={true} />
+          <DatabaseIcons type={type.name} isAbsolute={true} />
 					{type.fancyName}
 				</button>
 			</form>

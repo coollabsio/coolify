@@ -321,8 +321,8 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
         const network = destinationDockerId && destinationDocker.network;
         const port = getServiceMainPort('minio');
 
-        const { service: { destinationDocker: { id: dockerId } } } = await prisma.minio.findUnique({ where: { serviceId: id }, include: { service: { include: { destinationDocker: true } } } })
-        const publicPort = await getFreePublicPort(id, dockerId);
+        const { service: { destinationDocker: { remoteEngine, engine, remoteIpAddress } } } = await prisma.minio.findUnique({ where: { serviceId: id }, include: { service: { include: { destinationDocker: true } } } })
+        const publicPort = await getFreePublicPort({ id, remoteEngine, engine, remoteIpAddress });
 
         const consolePort = 9001;
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -1979,8 +1979,8 @@ async function startGlitchTipService(request: FastifyRequest<ServiceStartStop>) 
                     EMAIL_PORT: emailSmtpPort,
                     EMAIL_HOST_USER: emailSmtpUser,
                     EMAIL_HOST_PASSWORD: emailSmtpPassword,
-                    EMAIL_USE_TLS: emailSmtpUseTls,
-                    EMAIL_USE_SSL: emailSmtpUseSsl,
+                    EMAIL_USE_TLS: emailSmtpUseTls ? 'True' : 'False',
+                    EMAIL_USE_SSL: emailSmtpUseSsl ? 'True' : 'False',
                     EMAIL_BACKEND: emailBackend,
                     MAILGUN_API_KEY: mailgunApiKey,
                     SENDGRID_API_KEY: sendgridApiKey,

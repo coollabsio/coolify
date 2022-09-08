@@ -252,8 +252,8 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             exposePort = Number(exposePort);
         }
 
-        const { destinationDocker: { id: dockerId, remoteIpAddress }, exposePort: configuredPort } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
-        if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress })
+        const { destinationDocker: { engine, remoteEngine, remoteIpAddress }, exposePort: configuredPort } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
+        if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, engine, remoteEngine, remoteIpAddress })
         if (denoOptions) denoOptions = denoOptions.trim();
         const defaultConfiguration = await setDefaultConfiguration({
             buildPack,
@@ -534,14 +534,14 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
         }
         if (exposePort) exposePort = Number(exposePort);
 
-        const { destinationDocker: { id: dockerId, remoteIpAddress, remoteEngine }, exposePort: configuredPort } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
+        const { destinationDocker: { engine, remoteIpAddress, remoteEngine }, exposePort: configuredPort } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
         const { isDNSCheckEnabled } = await prisma.setting.findFirst({});
 
         const found = await isDomainConfigured({ id, fqdn, remoteIpAddress });
         if (found) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
-        if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, dockerId, remoteIpAddress })
+        if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, engine, remoteEngine, remoteIpAddress })
         if (isDNSCheckEnabled && !isDev && !forceSave) {
             let hostname = request.hostname.split(':')[0];
             if (remoteEngine) hostname = remoteIpAddress;

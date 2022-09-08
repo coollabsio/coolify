@@ -69,7 +69,7 @@
 		if (sure) {
 			try {
 				await del(`/destinations/${destination.id}`, { id: destination.id });
-				return await goto('/destinations');
+				return await goto('/', { replaceState: true });
 			} catch (error) {
 				return errorNotification(error);
 			}

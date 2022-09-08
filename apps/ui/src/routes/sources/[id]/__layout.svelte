@@ -45,7 +45,7 @@
 		if (sure) {
 			try {
 				await del(`/sources/${id}`, {});
-				await goto('/sources', { replaceState: true });
+				await goto('/', { replaceState: true });
 			} catch (error) {
 				errorNotification(error);
 			}

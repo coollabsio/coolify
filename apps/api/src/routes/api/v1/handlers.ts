@@ -1,5 +1,4 @@
-import os from 'node:os';
-import osu from 'node-os-utils';
+
 import axios from 'axios';
 import { compareVersions } from 'compare-versions';
 import cuid from 'cuid';
@@ -15,9 +14,10 @@ export async function hashPassword(password: string): Promise<string> {
 	return bcrypt.hash(password, saltRounds);
 }
 
-export async function cleanupManually() {
+export async function cleanupManually(request: FastifyRequest) {
 	try {
-		const destination = await prisma.destinationDocker.findFirst({ where: { engine: '/var/run/docker.sock' } })
+		const { serverId } = request.body;
+		const destination = await prisma.destinationDocker.findUnique({ where: { id: serverId } })
 		await cleanupDockerStorage(destination.id, true, true)
 		return {}
 	} catch ({ status, message }) {
@@ -52,9 +52,7 @@ export async function update(request: FastifyRequest<Update>) {
 	const { latestVersion } = request.body;
 	try {
 		if (!isDev) {
-			const { isAutoUpdateEnabled } = (await prisma.setting.findFirst()) || {
-				isAutoUpdateEnabled: false
-			};
+			const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
 			await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
 			await asyncExecShell(`env | grep COOLIFY > .env`);
 			await asyncExecShell(
@@ -88,45 +86,38 @@ export async function restartCoolify(request: FastifyRequest<any>) {
 		return errorHandler({ status, message })
 	}
 }
-export async function showUsage() {
-	try {
-		return {
-			usage: {
-				uptime: os.uptime(),
-				memory: await osu.mem.info(),
-				cpu: {
-					load: os.loadavg(),
-					usage: await osu.cpu.usage(),
-					count: os.cpus().length
-				},
-				disk: await osu.drive.info('/')
-			}
 
-		};
-	} catch ({ status, message }) {
-		return errorHandler({ status, message })
-	}
-}
 export async function showDashboard(request: FastifyRequest) {
 	try {
 		const userId = request.user.userId;
 		const teamId = request.user.teamId;
 		const applications = await prisma.application.findMany({
 			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-			include: { settings: true }
+			include: { settings: true, destinationDocker: true, teams: true }
 		});
 		const databases = await prisma.database.findMany({
 			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-			include: { settings: true }
+			include: { settings: true, destinationDocker: true, teams: true }
 		});
 		const services = await prisma.service.findMany({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }
+			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+			include: { destinationDocker: true, teams: true }
+		});
+		const gitSources = await prisma.gitSource.findMany({
+			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+			include: { teams: true }
+		});
+		const destinations = await prisma.destinationDocker.findMany({
+			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+			include: { teams: true }
 		});
 		const settings = await listSettings();
 		return {
 			applications,
 			databases,
 			services,
+			gitSources,
+			destinations,
 			settings,
 		};
 	} catch ({ status, message }) {
