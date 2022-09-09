@@ -10,7 +10,8 @@ export default async function ({
 	branch,
 	buildId,
 	privateSshKey,
-	customPort
+	customPort,
+	forPublic
 }: {
 	applicationId: string;
 	workdir: string;
@@ -21,11 +22,15 @@ export default async function ({
 	repodir: string;
 	privateSshKey: string;
 	customPort: number;
+	forPublic: boolean;
 }): Promise<string> {
 	const url = htmlUrl.replace('https://', '').replace('http://', '').replace(/\/$/, '');
 	await saveBuildLog({ line: 'GitLab importer started.', buildId, applicationId });
-	await asyncExecShell(`echo '${privateSshKey}' > ${repodir}/id.rsa`);
-	await asyncExecShell(`chmod 600 ${repodir}/id.rsa`);
+
+	if (!forPublic) {
+		await asyncExecShell(`echo '${privateSshKey}' > ${repodir}/id.rsa`);
+		await asyncExecShell(`chmod 600 ${repodir}/id.rsa`);
+	}
 
 	await saveBuildLog({
 		line: `Cloning ${repository}:${branch} branch.`,
@@ -33,9 +38,16 @@ export default async function ({
 		applicationId
 	});
 
-	await asyncExecShell(
-		`git clone -q -b ${branch} git@${url}:${repository}.git --config core.sshCommand="ssh -p ${customPort} -q -i ${repodir}id.rsa -o StrictHostKeyChecking=no" ${workdir}/ && cd ${workdir}/ && git submodule update --init --recursive && git lfs pull && cd .. `
-	);
+	if (forPublic) {
+		await asyncExecShell(
+			`git clone -q -b ${branch} git@${url}:${repository}.git --config core.sshCommand="ssh -p ${customPort} -q -o StrictHostKeyChecking=no" ${workdir}/ && cd ${workdir}/ && git submodule update --init --recursive && git lfs pull && cd .. `
+		);
+	} else {
+		await asyncExecShell(
+			`git clone -q -b ${branch} git@${url}:${repository}.git --config core.sshCommand="ssh -p ${customPort} -q -i ${repodir}id.rsa -o StrictHostKeyChecking=no" ${workdir}/ && cd ${workdir}/ && git submodule update --init --recursive && git lfs pull && cd .. `
+		);
+	}
+	
 	const { stdout: commit } = await asyncExecShell(`cd ${workdir}/ && git rev-parse HEAD`);
 	return commit.replace('\n', '');
 }

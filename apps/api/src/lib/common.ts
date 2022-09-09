@@ -537,7 +537,7 @@ export async function executeDockerCmd({ debug, buildId, applicationId, dockerId
 }
 export async function startTraefikProxy(id: string): Promise<void> {
 	const { engine, network, remoteEngine, remoteIpAddress } = await prisma.destinationDocker.findUnique({ where: { id } })
-	const found = await checkContainer({ dockerId: id, container: 'coolify-proxy', remove: true });
+	const { found } = await checkContainer({ dockerId: id, container: 'coolify-proxy', remove: true });
 	const { id: settingsId, ipv4, ipv6 } = await listSettings();
 
 	if (!found) {
@@ -621,7 +621,7 @@ export async function configureNetworkTraefikProxy(destination: any): Promise<vo
 export async function stopTraefikProxy(
 	id: string
 ): Promise<{ stdout: string; stderr: string } | Error> {
-	const found = await checkContainer({ dockerId: id, container: 'coolify-proxy' });
+	const { found } = await checkContainer({ dockerId: id, container: 'coolify-proxy' });
 	await prisma.destinationDocker.update({
 		where: { id },
 		data: { isCoolifyProxyUsed: false }
@@ -1062,7 +1062,7 @@ export async function stopTcpHttpProxy(
 	const { id: dockerId } = destinationDocker;
 	let container = `${id}-${publicPort}`;
 	if (forceName) container = forceName;
-	const found = await checkContainer({ dockerId, container });
+	const { found } = await checkContainer({ dockerId, container });
 	try {
 		if (found) {
 			return await executeDockerCmd({
@@ -1284,7 +1284,7 @@ export async function startTraefikTCPProxy(
 ): Promise<{ stdout: string; stderr: string } | Error> {
 	const { network, id: dockerId, remoteEngine } = destinationDocker;
 	const container = `${id}-${publicPort}`;
-	const found = await checkContainer({ dockerId, container, remove: true });
+	const { found } = await checkContainer({ dockerId, container, remove: true });
 	const { ipv4, ipv6 } = await listSettings();
 
 	let dependentId = id;

@@ -154,6 +154,7 @@
 		const data = await get(`/applications/${id}/status`);
 		$status.application.isRunning = data.isRunning;
 		$status.application.isExited = data.isExited;
+		$status.application.isRestarting = data.isRestarting;
 		$status.application.loading = false;
 		$status.application.initialLoading = false;
 	}
@@ -162,6 +163,7 @@
 		$status.application.initialLoading = true;
 		$status.application.isRunning = false;
 		$status.application.isExited = false;
+		$status.application.isRestarting = false;
 		$status.application.loading = false;
 		$location = null;
 		$isDeploymentEnabled = false;
@@ -171,6 +173,7 @@
 		setLocation(application, settings);
 		$status.application.isRunning = false;
 		$status.application.isExited = false;
+		$status.application.isRestarting = false;
 		$status.application.loading = false;
 		if (
 			application.gitSourceId &&
@@ -215,7 +218,7 @@
 		<div class="border border-coolgray-500 h-8" />
 	{/if}
 
-	{#if $status.application.isExited}
+	{#if $status.application.isExited || $status.application.isRestarting}
 		<a
 			id="applicationerror"
 			href={$isDeploymentEnabled ? `/applications/${id}/logs` : null}
@@ -240,7 +243,30 @@
 				<line x1="12" y1="16" x2="12.01" y2="16" />
 			</svg>
 		</a>
-		<Tooltip triggeredBy="#applicationerror">Application exited with an error!</Tooltip>
+		<Tooltip triggeredBy="#applicationerror">Application exited or restarting!</Tooltip>
+		<button
+			id="stop"
+			on:click={stopApplication}
+			type="submit"
+			disabled={!$isDeploymentEnabled}
+			class="icons bg-transparent text-sm flex items-center space-x-2 text-error"
+		>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				class="w-6 h-6"
+				viewBox="0 0 24 24"
+				stroke-width="1.5"
+				stroke="currentColor"
+				fill="none"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+				<rect x="6" y="5" width="4" height="14" rx="1" />
+				<rect x="14" y="5" width="4" height="14" rx="1" />
+			</svg>
+		</button>
+		<Tooltip triggeredBy="#stop">Stop</Tooltip>
 	{/if}
 	{#if $status.application.initialLoading}
 		<button

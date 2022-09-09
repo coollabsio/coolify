@@ -43,13 +43,17 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
 
         let isRunning = false;
         let isExited = false
-
+        let isRestarting = false;
         const service = await getServiceFromDB({ id, teamId });
         const { destinationDockerId, settings } = service;
 
         if (destinationDockerId) {
-            isRunning = await checkContainer({ dockerId: service.destinationDocker.id, container: id });
-            isExited = await isContainerExited(service.destinationDocker.id, id);
+            const status = await checkContainer({ dockerId: service.destinationDocker.id, container: id });
+            if (status?.found) {
+                isRunning = status.status.isRunning;
+                isExited = status.status.isExited;
+                isRestarting = status.status.isRestarting
+            }
         }
         return {
             isRunning,
@@ -554,7 +558,7 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
                 });
 
                 try {
-                    const isRunning = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-ftp` });
+                    const { found: isRunning } = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-ftp` });
                     if (isRunning) {
                         await executeDockerCmd({
                             dockerId: destinationDocker.id,
