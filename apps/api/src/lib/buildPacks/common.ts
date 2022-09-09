@@ -688,7 +688,10 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 		secrets.forEach((secret) => {
 			if (secret.isBuildSecret) {
 				if (pullmergeRequestId) {
-					if (secret.isPRMRSecret) {
+					const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
+					if (isSecretFound.length > 0) {
+						Dockerfile.push(`ARG ${secret.name}=${isSecretFound[0].value}`);
+					} else {
 						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
 					}
 				} else {
@@ -707,6 +710,7 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
 	Dockerfile.push(`RUN ${buildCommand}`);
+	console.log(Dockerfile.join('\n'))
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
 	await buildImage({ ...data, isCache: true });
 }
@@ -722,7 +726,10 @@ export async function buildCacheImageForLaravel(data, imageForBuild) {
 		secrets.forEach((secret) => {
 			if (secret.isBuildSecret) {
 				if (pullmergeRequestId) {
-					if (secret.isPRMRSecret) {
+					const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
+					if (isSecretFound.length > 0) {
+						Dockerfile.push(`ARG ${secret.name}=${isSecretFound[0].value}`);
+					} else {
 						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
 					}
 				} else {
