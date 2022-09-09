@@ -21,10 +21,9 @@ export async function checkContainer({ dockerId, container, remove = false }: { 
 			command:
 				`docker inspect --format '{{json .State}}' ${container}`
 		});
-
 		const parsedStdout = JSON.parse(stdout);
 		const status = parsedStdout.Status;
-		const isRunning = status === 'running';
+		const isRunning = status === 'running' || status === 'restarting';
 		if (status === 'created') {
 			await executeDockerCmd({
 				dockerId,
