@@ -24,7 +24,6 @@
 	let loading = false;
 	let publicLoading = false;
 
-	let isPublic = database.settings.isPublic || false;
 	let appendOnly = database.settings.appendOnly;
 
 	let databaseDefault: any;
@@ -52,12 +51,12 @@
 		return `${database.type}://${
 			databaseDbUser ? databaseDbUser + ':' : ''
 		}${databaseDbUserPassword}@${
-			isPublic
+			$status.database.isPublic
 				? database.destinationDocker.remoteEngine
 					? database.destinationDocker.remoteIpAddress
 					: $appSession.ipv4
 				: database.id
-		}:${isPublic ? database.publicPort : privatePort}/${databaseDefault}`;
+		}:${$status.database.isPublic ? database.publicPort : privatePort}/${databaseDefault}`;
 	}
 
 	async function changeSettings(name: any) {
@@ -66,11 +65,11 @@
 		}
 		publicLoading = true;
 		let data = {
-			isPublic,
+			isPublic: $status.database.isPublic,
 			appendOnly
 		};
 		if (name === 'isPublic') {
-			data.isPublic = !isPublic;
+			data.isPublic = !$status.database.isPublic;
 		}
 		if (name === 'appendOnly') {
 			data.appendOnly = !appendOnly;
@@ -80,9 +79,9 @@
 				isPublic: data.isPublic,
 				appendOnly: data.appendOnly
 			});
-			isPublic = data.isPublic;
+			$status.database.isPublic = data.isPublic;
 			appendOnly = data.appendOnly;
-			if (isPublic) {
+			if ($status.database.isPublic) {
 				database.publicPort = publicPort;
 			}
 		} catch (error) {
@@ -228,7 +227,7 @@
 		<Setting
 			id="isPublic"
 			loading={publicLoading}
-			bind:setting={isPublic}
+			bind:setting={$status.database.isPublic}
 			on:click={() => changeSettings('isPublic')}
 			title={$t('database.set_public')}
 			description={$t('database.warning_database_public')}

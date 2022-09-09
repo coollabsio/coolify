@@ -26,6 +26,8 @@ interface AddToast {
     message: string,
     timeout?: number | undefined
 }
+
+export const search: any = writable('')
 export const loginEmail: Writable<string | undefined> = writable()
 export const appSession: Writable<AppSession> = writable({
     isRegistrationEnabled: false,
@@ -84,7 +86,8 @@ export const status: Writable<any> = writable({
         isRunning: false,
         isExited: false,
         loading: false,
-        initialLoading: true
+        initialLoading: true,
+        isPublic: false
     }
 
 });

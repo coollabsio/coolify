@@ -4,6 +4,7 @@
 	import { addToast, appSession, features } from '$lib/store';
 	import { asyncSleep, errorNotification } from '$lib/common';
 	import { onMount } from 'svelte';
+	import Tooltip from './Tooltip.svelte';
 
 	let isUpdateAvailable = false;
 	let updateStatus: any = {
@@ -75,14 +76,14 @@
 	});
 </script>
 
-<div class="flex flex-col space-y-4 py-2">
+<div class="py-2">
 	{#if $appSession.teamId === '0'}
 		{#if isUpdateAvailable}
 			<button
+				id="update"
 				disabled={updateStatus.success === false}
 				on:click={update}
-				class="icons tooltip tooltip-right tooltip-primary bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white duration-75 hover:scale-105"
-				data-tip="Update Available!"
+				class="icons bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white duration-75 hover:scale-105"
 			>
 				{#if updateStatus.loading}
 					<svg
@@ -183,6 +184,7 @@
 					>
 				{/if}
 			</button>
+			<Tooltip triggeredBy="#update" placement="right" color="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500">New Version Available!</Tooltip>
 		{/if}
 	{/if}
 </div>
