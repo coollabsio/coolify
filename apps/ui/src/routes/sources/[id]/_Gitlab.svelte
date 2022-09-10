@@ -200,21 +200,6 @@
 					<input name="name" id="name" required bind:value={source.name} />
 				</div>
 			</div>
-			{#if source.gitlabApp.groupName}
-				<div class="grid grid-cols-2 items-center">
-					<label for="groupName" class="text-base font-bold text-stone-100"
-						>{$t('source.group_name')}</label
-					>
-					<input
-						name="groupName"
-						id="groupName"
-						disabled={source.gitlabAppId}
-						readonly={source.gitlabAppId}
-						required
-						bind:value={source.gitlabApp.groupName}
-					/>
-				</div>
-			{/if}
 			<div class="grid grid-cols-2 items-center">
 				<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
 				<input

@@ -85,7 +85,7 @@
 				if (service.type && $status.service.isRunning)
 					await post(`/services/${service.id}/${service.type}/stop`, {});
 				await del(`/services/${service.id}`, { id: service.id });
-				return await goto(`/`, { replaceState: true });
+				return await window.location.assign(`/`);
 			} catch (error) {
 				return errorNotification(error);
 			} finally {

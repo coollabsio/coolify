@@ -261,7 +261,10 @@ import * as buildpacks from '../lib/buildPacks';
 									if (secrets.length > 0) {
 										secrets.forEach((secret) => {
 											if (pullmergeRequestId) {
-												if (secret.isPRMRSecret) {
+												const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
+												if (isSecretFound.length > 0) {
+													envs.push(`${secret.name}=${isSecretFound[0].value}`);
+												} else {
 													envs.push(`${secret.name}=${secret.value}`);
 												}
 											} else {

@@ -74,14 +74,21 @@ export async function getApplicationStatus(request: FastifyRequest<OnlyId>) {
         const { teamId } = request.user
         let isRunning = false;
         let isExited = false;
-
+        let isRestarting = false;
         const application: any = await getApplicationFromDB(id, teamId);
         if (application?.destinationDockerId) {
-            isRunning = await checkContainer({ dockerId: application.destinationDocker.id, container: id });
-            isExited = await isContainerExited(application.destinationDocker.id, id);
+            const status = await checkContainer({ dockerId: application.destinationDocker.id, container: id });
+            if (status?.found) {
+                isRunning = status.status.isRunning;
+                isExited = status.status.isExited;
+                isRestarting = status.status.isRestarting
+            }
+
+            // isExited = await isContainerExited(application.destinationDocker.id, id);
         }
         return {
             isRunning,
+            isRestarting,
             isExited,
         };
     } catch ({ status, message }) {
@@ -339,7 +346,7 @@ export async function stopPreviewApplication(request: FastifyRequest<StopPreview
         if (application?.destinationDockerId) {
             const container = `${id}-${pullmergeRequestId}`
             const { id: dockerId } = application.destinationDocker;
-            const found = await checkContainer({ dockerId, container });
+            const { found } = await checkContainer({ dockerId, container });
             if (found) {
                 await removeContainer({ id: container, dockerId: application.destinationDocker.id });
             }
@@ -366,7 +373,10 @@ export async function restartApplication(request: FastifyRequest<OnlyId>, reply:
             if (secrets.length > 0) {
                 secrets.forEach((secret) => {
                     if (pullmergeRequestId) {
-                        if (secret.isPRMRSecret) {
+                        const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
+                        if (isSecretFound.length > 0) {
+                            envs.push(`${secret.name}=${isSecretFound[0].value}`);
+                        } else {
                             envs.push(`${secret.name}=${secret.value}`);
                         }
                     } else {
@@ -463,7 +473,7 @@ export async function stopApplication(request: FastifyRequest<OnlyId>, reply: Fa
         const application: any = await getApplicationFromDB(id, teamId);
         if (application?.destinationDockerId) {
             const { id: dockerId } = application.destinationDocker;
-            const found = await checkContainer({ dockerId, container: id });
+            const { found } = await checkContainer({ dockerId, container: id });
             if (found) {
                 await removeContainer({ id, dockerId: application.destinationDocker.id });
             }

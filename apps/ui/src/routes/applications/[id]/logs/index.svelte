@@ -6,7 +6,8 @@
 	import LoadingLogs from '$lib/components/LoadingLogs.svelte';
 	import { onMount, onDestroy } from 'svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
-
+	import { status } from '$lib/store';
+	import { goto } from '$app/navigation';
 	let application: any = {};
 	let logsLoading = false;
 	let loadLogsInterval: any = null;
@@ -16,7 +17,13 @@
 	let followingLogs: any;
 	let logsEl: any;
 	let position = 0;
-
+	if (
+		!$status.application.isExited &&
+		!$status.application.isRestarting &&
+		!$status.application.isRunning
+	) {
+		goto(`/applications/${$page.params.id}/`, { replaceState: true });
+	}
 	const { id } = $page.params;
 	onMount(async () => {
 		const response = await get(`/applications/${id}`);

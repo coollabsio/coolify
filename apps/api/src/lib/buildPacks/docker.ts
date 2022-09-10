@@ -28,6 +28,7 @@ export default async function (data) {
 		if (secrets.length > 0) {
 			secrets.forEach((secret) => {
 				if (secret.isBuildSecret) {
+					// TODO: fix secrets
 					if (
 						(pullmergeRequestId && secret.isPRMRSecret) ||
 						(!pullmergeRequestId && !secret.isPRMRSecret)

@@ -655,7 +655,7 @@ async function startLanguageToolService(request: FastifyRequest<ServiceStartStop
                     image: config.languagetool.image,
                     environment: config.languagetool.environmentVariables,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    volumes: config.languagetool,
+                    volumes: config.languagetool.volumes,
                     labels: makeLabelForServices('languagetool'),
                     ...defaultComposeConfiguration(network),
                 }
@@ -710,7 +710,7 @@ async function startN8nService(request: FastifyRequest<ServiceStartStop>) {
                 [id]: {
                     container_name: id,
                     image: config.n8n.image,
-                    volumes: config.n8n,
+                    volumes: config.n8n.volumes,
                     environment: config.n8n.environmentVariables,
                     labels: makeLabelForServices('n8n'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
@@ -1116,7 +1116,6 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
             },
             volumes: volumeMounts
         };
-        console.log(composeFile)
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         await startServiceContainers(destinationDocker.id, composeFileDestination)
