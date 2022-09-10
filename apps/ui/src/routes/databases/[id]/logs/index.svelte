@@ -112,7 +112,7 @@
 				<button
 					id="follow"
 					on:click={followBuild}
-					class="bg-transparent btn btn-sm"
+					class="bg-transparent btn btn-sm btn-link"
 					class:text-green-500={followingLogs}
 				>
 					<svg
