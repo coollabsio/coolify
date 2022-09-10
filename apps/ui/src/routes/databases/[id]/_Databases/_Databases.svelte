@@ -114,7 +114,7 @@
 			{#if $appSession.isAdmin}
 				<button
 					type="submit"
-					class="btn btn-sm w-full lg:fit-content"
+					class="btn btn-sm w-full lg:w-auto"
 					class:loading
 					class:bg-databases={!loading}
 					disabled={loading}>{$t('forms.save')}</button

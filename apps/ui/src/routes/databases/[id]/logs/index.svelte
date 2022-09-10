@@ -134,7 +134,12 @@
 				</button>
 				<Tooltip triggeredBy="#follow">Follow Logs</Tooltip>
 			</div>
-			<div
+			<div class="font-mono w-full rounder bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded-md mb-20 flex flex-col whitespace-nowrap -mt-12 scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1">
+				{#each logs as log}
+					<p>{log + '\n'}</p>
+				{/each}
+			</div>
+			<!-- <div
 				class="font-mono w-full leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
 				bind:this={logsEl}
 				on:scroll={detect}
@@ -144,7 +149,7 @@
 						{log + '\n'}
 					{/each}
 				</div>
-			</div>
+			</div> -->
 		</div>
 	{/if}
 </div>
