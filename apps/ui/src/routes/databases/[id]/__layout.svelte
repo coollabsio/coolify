@@ -150,7 +150,7 @@
 </script>
 
 {#if id !== 'new'}
-	<nav class="header p-5 pl-0 lg:p-0 lg:pl-20 justify-center lg:justify-between">
+	<nav class="header justify-center lg:justify-between">
 		<div class="hidden items-center space-x-2 p-5 px-6 font-bold lg:flex">
 			<div class="flex flex-col">
 				<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">

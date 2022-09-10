@@ -307,7 +307,9 @@
 			</div>
 		</div>
 		<main>
-			<slot />
+			<div class={$appSession.userId ? 'lg:pl-16' : null}>
+				<slot />
+			</div>
 		</main>
 	</div>
 	<div class="drawer-side">

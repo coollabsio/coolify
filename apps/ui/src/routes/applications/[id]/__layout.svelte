@@ -190,9 +190,7 @@
 	});
 </script>
 
-<nav
-	class="header p-5 pl-0 lg:p-0 lg:pl-20"
->
+<nav class="header">
 	<div class="hidden items-center space-x-2 p-5 px-6 font-bold lg:flex">
 		<div class="flex flex-col">
 			<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
@@ -246,7 +244,9 @@
 			<Tooltip triggeredBy="#git">Open on Git</Tooltip>
 		{/if}
 	</div>
-	<div class="flex flex-row flex-wrap space-x-4 space-y-3 justify-center lg:justify-start py-2 lg:py-0">
+	<div
+		class="flex flex-row flex-wrap space-x-4 space-y-3 justify-center lg:justify-start py-2 lg:py-0"
+	>
 		{#if $location}
 			<a
 				id="open"
