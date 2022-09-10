@@ -29,7 +29,7 @@
 	}
 </script>
 
-<div class="header p-5">
+<div class="header p-5 pl-0 lg:p-0 lg:pl-20">
 	<h1 class="text-2xl font-bold">Servers</h1>
 </div>
 <div class="container lg:mx-auto lg:p-0 px-8 p-5 lg:pt-20">

@@ -202,7 +202,8 @@ input {
 }
 
 .header {
-	@apply flex flex-row px-4 justify-between items-center lg:fixed w-full z-10;
+	@apply flex flex-row px-4 justify-between items-center lg:fixed p-5 pl-20 z-10;
 	background-color: rgba(31, 30, 30, 0.6);
 	backdrop-filter: blur(20px);
+	width: 100%;
 }

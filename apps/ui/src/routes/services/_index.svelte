@@ -43,7 +43,7 @@
 	});
 </script>
 
-<nav class="header">
+<nav class="header p-5 pl-0 lg:p-0 lg:pl-20">
 	<h1 class="mr-4 text-2xl font-bold">{$t('index.services')}</h1>
 	<button on:click={newService} class="btn btn-square btn-sm bg-services">
 		<svg
