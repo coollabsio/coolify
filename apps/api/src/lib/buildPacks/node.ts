@@ -22,6 +22,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {
 			if (secret.isBuildSecret) {
+				console.log(secret)
 				if (pullmergeRequestId) {
 					const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
 					if (isSecretFound.length > 0) {
