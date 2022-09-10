@@ -177,7 +177,7 @@
 				readonly
 				disabled
 				name="publicPort"
-				value={publicLoading ? 'Loading...' : isPublic ? database.publicPort : privatePort}
+				value={publicLoading ? 'Loading...' : $status.database.isPublic ? database.publicPort : privatePort}
 			/>
 		</div>
 		{#if database.type === 'mysql'}
@@ -199,7 +199,7 @@
 			<div>
 				<label for="url" class="text-base font-bold text-stone-100"
 					>{$t('database.connection_string')}
-					{#if !isPublic && database.destinationDocker.remoteEngine}
+					{#if !$status.database.isPublic && database.destinationDocker.remoteEngine}
 						<Explainer
 							explanation="You can only access the database with this URL if your application is deployed to the same Destination."
 						/>

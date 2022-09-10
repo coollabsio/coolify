@@ -62,7 +62,7 @@
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import { onDestroy, onMount } from 'svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
-import DatabaseLinks from './_DatabaseLinks.svelte';
+	import DatabaseLinks from './_DatabaseLinks.svelte';
 	const { id } = $page.params;
 
 	$status.database.isPublic = database.settings.isPublic || false;
@@ -165,11 +165,11 @@ import DatabaseLinks from './_DatabaseLinks.svelte';
 		<div
 			class="flex flex-row flex-wrap space-x-4 space-y-3 justify-center lg:justify-start py-2 lg:py-0"
 		>
-			{#if database.type && database.destinationDockerId && database.version && database.defaultDatabase}
+			{#if database.type && database.destinationDockerId && database.version}
 				{#if $status.database.isExited}
 					<a
 						id="exited"
-						href={!$disabledButton ? `/databases/${id}/logs` : null}
+						href={!$status.database.isRunning ? `/databases/${id}/logs` : null}
 						class="icons bg-transparent text-sm flex items-center text-red-500 tooltip-error"
 						sveltekit:prefetch
 					>
