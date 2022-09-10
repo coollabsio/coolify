@@ -220,7 +220,6 @@
 		loading = true;
 		try {
 			nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
-			console.log({debug: nonWWWDomain})
 			if (application.deploymentType)
 				application.deploymentType = application.deploymentType.toLowerCase();
 			!isBot &&

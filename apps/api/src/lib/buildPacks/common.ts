@@ -556,7 +556,6 @@ export function checkPnpm(installCommand = null, buildCommand = null, startComma
 	);
 }
 
-
 export async function buildImage({
 	applicationId,
 	tag,
@@ -677,8 +676,6 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 		secrets,
 		pullmergeRequestId
 	} = data;
-
-
 	const isPnpm = checkPnpm(installCommand, buildCommand);
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild}`);

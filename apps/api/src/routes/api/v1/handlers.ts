@@ -26,7 +26,7 @@ export async function cleanupManually(request: FastifyRequest) {
 }
 export async function checkUpdate(request: FastifyRequest) {
 	try {
-		const isStaging = request.hostname === 'staging.coolify.io'
+		const isStaging = request.hostname === 'staging.coolify.io' || request.hostname === 'arm.coolify.io'
 		const currentVersion = version;
 		const { data: versions } = await axios.get(
 			`https://get.coollabs.io/versions.json?appId=${process.env['COOLIFY_APP_ID']}&version=${currentVersion}`
