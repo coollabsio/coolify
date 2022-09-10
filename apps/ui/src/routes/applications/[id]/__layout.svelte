@@ -154,6 +154,7 @@
 		const data = await get(`/applications/${id}/status`);
 		$status.application.isRunning = data.isRunning;
 		$status.application.isExited = data.isExited;
+		$status.application.isRestarting = data.isRestarting;
 		$status.application.loading = false;
 		$status.application.initialLoading = false;
 	}
@@ -162,6 +163,7 @@
 		$status.application.initialLoading = true;
 		$status.application.isRunning = false;
 		$status.application.isExited = false;
+		$status.application.isRestarting = false;
 		$status.application.loading = false;
 		$location = null;
 		$isDeploymentEnabled = false;
@@ -171,6 +173,7 @@
 		setLocation(application, settings);
 		$status.application.isRunning = false;
 		$status.application.isExited = false;
+		$status.application.isRestarting = false;
 		$status.application.loading = false;
 		if (
 			application.gitSourceId &&
@@ -270,8 +273,7 @@
 
 			<div class="border border-coolgray-500 h-8" />
 		{/if}
-
-		{#if $status.application.isExited}
+		{#if $status.application.isExited || $status.application.isRestarting}
 			<a
 				id="applicationerror"
 				href={$isDeploymentEnabled ? `/applications/${id}/logs` : null}

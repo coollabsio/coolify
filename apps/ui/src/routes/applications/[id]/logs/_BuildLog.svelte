@@ -103,7 +103,7 @@
 			<button
 				id="follow"
 				on:click={followBuild}
-				class="bg-transparent btn btn-sm btn-linkhover:text-green-500 hover:bg-coolgray-500"
+				class="bg-transparent btn btn-sm btn-link hover:text-green-500 hover:bg-coolgray-500"
 				class:text-green-500={followingBuild}
 			>
 				<svg

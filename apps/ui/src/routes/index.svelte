@@ -188,6 +188,7 @@
 		return (
 			(service.name && service.name.toLowerCase().includes($search.toLowerCase())) ||
 			(service.type && service.type.toLowerCase().includes($search.toLowerCase())) ||
+			(service.fqdn && service.fqdn.toLowerCase().includes($search.toLowerCase())) ||
 			(service.version && service.version.toLowerCase().includes($search.toLowerCase())) ||
 			(service.destinationDockerId &&
 				service.destinationDocker.name.toLowerCase().includes($search.toLowerCase()))

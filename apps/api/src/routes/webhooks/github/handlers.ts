@@ -154,7 +154,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
 
                     if (application.settings.previews) {
                         if (application.destinationDockerId) {
-                            const isRunning = await checkContainer(
+                            const { found: isRunning } = await checkContainer(
                                 {
                                     dockerId: application.destinationDocker.id,
                                     container: application.id

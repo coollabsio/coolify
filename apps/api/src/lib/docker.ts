@@ -13,7 +13,7 @@ export function formatLabelsOnDocker(data) {
 		return container
 	})
 }
-export async function checkContainer({ dockerId, container, remove = false }: { dockerId: string, container: string, remove?: boolean }): Promise<boolean> {
+export async function checkContainer({ dockerId, container, remove = false }: { dockerId: string, container: string, remove?: boolean }): Promise<{ found: boolean, status?: { isExited: boolean, isRunning: boolean, isRestarting: boolean } }> {
 	let containerFound = false;
 	try {
 		const { stdout } = await executeDockerCmd({
@@ -21,10 +21,12 @@ export async function checkContainer({ dockerId, container, remove = false }: { 
 			command:
 				`docker inspect --format '{{json .State}}' ${container}`
 		});
-
+		containerFound = true
 		const parsedStdout = JSON.parse(stdout);
 		const status = parsedStdout.Status;
 		const isRunning = status === 'running';
+		const isRestarting = status === 'restarting'
+		const isExited = status === 'exited'
 		if (status === 'created') {
 			await executeDockerCmd({
 				dockerId,
@@ -39,13 +41,23 @@ export async function checkContainer({ dockerId, container, remove = false }: { 
 					`docker rm ${container}`
 			});
 		}
-		if (isRunning) {
-			containerFound = true;
-		}
+		
+		return {
+			found: containerFound,
+			status: {
+				isRunning,
+				isRestarting,
+				isExited
+
+			}
+		};
 	} catch (err) {
 		// Container not found
 	}
-	return containerFound;
+	return {
+		found: false
+	};
+
 }
 
 export async function isContainerExited(dockerId: string, containerName: string): Promise<boolean> {

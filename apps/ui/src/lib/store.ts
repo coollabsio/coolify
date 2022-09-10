@@ -73,6 +73,7 @@ export const status: Writable<any> = writable({
     application: {
         isRunning: false,
         isExited: false,
+        isRestarting: false,
         loading: false,
         initialLoading: true
     },

@@ -1116,7 +1116,6 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
             },
             volumes: volumeMounts
         };
-        console.log(composeFile)
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         await startServiceContainers(destinationDocker.id, composeFileDestination)
