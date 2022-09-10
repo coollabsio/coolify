@@ -107,7 +107,7 @@
 			$status.application.initialLoading = true;
 			try {
 				await del(`/applications/${id}`, { id, force });
-				return await goto(`/`, { replaceState: true });
+				return await window.location.assign(`/`);
 			} catch (error) {
 				if (error.message.startsWith(`Command failed: SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid`)) {
 					forceDelete = true;
