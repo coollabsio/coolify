@@ -106,9 +106,7 @@
 	}
 </script>
 
-<nav
-	class="flex flex-row px-4 justify-between items-center bg-neutral-focus lg:fixed w-full z-10 lg:-ml-16 lg:pl-20 p-5"
->
+<nav class="header">
 	<h1 class="mr-4 text-2xl tracking-tight font-bold">Identity and Access Management</h1>
 	<button on:click={newTeam} class="btn btn-square btn-sm bg-iam">
 		<svg

@@ -36,9 +36,7 @@
 	});
 </script>
 
-<nav
-	class="flex flex-row px-4 justify-between items-center bg-neutral-focus lg:fixed w-full z-10 lg:-ml-16 lg:pl-20 p-5"
->
+<nav class="header">
 	<h1 class="mr-4 text-2xl font-bold">{$t('index.git_sources')}</h1>
 	{#if $appSession.isAdmin}
 		<a href="/sources/new" class="btn btn-square btn-sm bg-sources">
@@ -160,4 +158,3 @@
 		</div>
 	{/if}
 </div>
-

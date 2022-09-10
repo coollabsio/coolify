@@ -36,26 +36,24 @@
 	});
 </script>
 
-<nav
-	class="flex flex-row px-4 justify-between items-center bg-neutral-focus lg:fixed w-full z-10 lg:-ml-16 lg:pl-20 p-5"
->
+<nav class="header">
 	<h1 class="mr-4 text-2xl font-bold">{$t('index.destinations')}</h1>
 	{#if $appSession.isAdmin}
-	<a href="/destinations/new" class="btn btn-square btn-sm bg-destinations">
-		<svg
-			class="h-6 w-6"
-			xmlns="http://www.w3.org/2000/svg"
-			fill="none"
-			viewBox="0 0 24 24"
-			stroke="currentColor"
-			><path
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				stroke-width="2"
-				d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-			/></svg
-		>
-	</a>
+		<a href="/destinations/new" class="btn btn-square btn-sm bg-destinations">
+			<svg
+				class="h-6 w-6"
+				xmlns="http://www.w3.org/2000/svg"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+				><path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+				/></svg
+			>
+		</a>
 	{/if}
 </nav>
 <br />

@@ -200,3 +200,8 @@ a {
 input {
 	@apply w-48 lg:w-96;
 }
+
+.header {
+	@apply flex flex-row px-4 justify-between items-center lg:fixed w-full z-10 lg:-ml-16 lg:pl-20 p-5;
+	background-color: rgba(31, 30, 30, 0.6);
+}

@@ -16,7 +16,7 @@
 	}
 </script>
 
-<div class="dropdown dropdown-hover">
+<div class="dropdown dropdown-left">
 	<slot>
 		<label for="new" tabindex="0" class="btn btn-square btn-sm bg-coollabs">
 			<svg

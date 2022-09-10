@@ -275,7 +275,7 @@
 </script>
 
 <nav
-	class="flex flex-row px-4 justify-between items-center bg-neutral-focus lg:fixed w-full z-10 lg:-ml-16 lg:pl-20 p-5"
+	class="header" style="backdrop-filter: blur(20px);"
 >
 	<h1 class="mr-4 text-2xl font-bold">{$t('index.dashboard')}</h1>
 	{#if $appSession.isAdmin && (applications.length !== 0 || destinations.length !== 0 || databases.length !== 0 || services.length !== 0 || gitSources.length !== 0 || destinations.length !== 0)}
@@ -319,8 +319,8 @@
 					on:input={() => doSearch()}
 				/>
 			</div>
-			<label for="search" class="label w-full">
-				<span class="label-text text-xs flex flex-wrap gap-2  items-center">
+			<label for="search" class="label w-full mt-3">
+				<span class="label-text text-xs flex flex-wrap gap-2 items-center">
 					<button
 						class:bg-coollabs={$search === '!notmine'}
 						class="badge badge-lg text-white text-xs rounded"
