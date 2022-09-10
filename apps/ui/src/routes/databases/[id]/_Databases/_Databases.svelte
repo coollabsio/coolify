@@ -109,12 +109,12 @@
 
 <div class="mx-auto max-w-4xl p-4">
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
-		<div class="flex flex-col lg:flex-row justify-between lg:space-x-1 space-y-3 pb-5 items-center">
+		<div class="flex flex-col lg:flex-row justify-between lg:space-x-1 space-y-3 pb-5 lg:items-center items-start">
 			<h1 class="title">{$t('general')}</h1>
 			{#if $appSession.isAdmin}
 				<button
 					type="submit"
-					class="btn btn-sm"
+					class="btn btn-sm w-full lg:fit-content"
 					class:loading
 					class:bg-databases={!loading}
 					disabled={loading}>{$t('forms.save')}</button
