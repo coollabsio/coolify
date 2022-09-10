@@ -69,7 +69,7 @@
 	} from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
-import ServiceLinks from './_ServiceLinks.svelte';
+	import ServiceLinks from './_ServiceLinks.svelte';
 	const { id } = $page.params;
 
 	export let service: any;
@@ -156,9 +156,7 @@ import ServiceLinks from './_ServiceLinks.svelte';
 	});
 </script>
 
-<nav
-	class="flex flex-row px-3 justify-center lg:justify-between items-center bg-neutral-focus lg:fixed w-full z-10 lg:-ml-16 lg:pl-16"
->
+<nav class="header">
 	<div class="hidden items-center space-x-2 p-5 px-6 font-bold lg:flex">
 		<div class="flex flex-col">
 			<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">

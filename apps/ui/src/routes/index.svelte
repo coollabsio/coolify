@@ -276,7 +276,7 @@
 </script>
 
 <nav
-	class="header" style="backdrop-filter: blur(20px);"
+	class="header p-5"
 >
 	<h1 class="mr-4 text-2xl font-bold">{$t('index.dashboard')}</h1>
 	{#if $appSession.isAdmin && (applications.length !== 0 || destinations.length !== 0 || databases.length !== 0 || services.length !== 0 || gitSources.length !== 0 || destinations.length !== 0)}
