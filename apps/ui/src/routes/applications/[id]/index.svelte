@@ -348,7 +348,7 @@
 	{/if}
 </div>
 
-<div class="mx-auto max-w-4xl px-6 pt-4 lg:pt-32">
+<div class="mx-auto max-w-4xl px-6 pt-4">
 	<div class="text-2xl font-bold">Application Usage</div>
 	<div class="text-center">
 		<div class="stat w-64">

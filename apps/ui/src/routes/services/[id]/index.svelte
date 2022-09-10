@@ -59,7 +59,7 @@
 	</div>
 	<ServiceLinks {service} />
 </div>
-<div class="mx-auto max-w-4xl px-6 py-4 lg:pt-32">
+<div class="mx-auto max-w-4xl px-6 py-4">
 	<div class="text-2xl font-bold">Service Usage</div>
 	<div class="text-center">
 		<div class="stat w-64">

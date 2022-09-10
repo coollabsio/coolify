@@ -281,7 +281,7 @@
 		<NewResource />
 	{/if}
 </nav>
-<div class="container lg:mx-auto lg:p-0 px-8 lg:pt-24 pt-5">
+<div class="container lg:mx-auto lg:p-0 px-8 pt-5">
 	<!-- {#if $appSession.teamId === '0'}
 		<Usage />
 	{/if} -->

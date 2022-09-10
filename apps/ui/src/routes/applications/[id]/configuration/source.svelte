@@ -68,7 +68,7 @@
 	}
 </script>
 
-<div class="flex space-x-1 p-6 font-bold lg:pt-32">
+<div class="flex space-x-1 p-6 font-bold">
 	<div class="mr-4 text-2xl tracking-tight">
 		{$t('application.configuration.select_a_git_source')}
 	</div>

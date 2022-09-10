@@ -13,6 +13,7 @@
 	export let id: string;
 	export let name: string;
 	export let placeholder = '';
+	export let inputStyle = '';
 
 	let disabledClass = 'bg-coolback disabled:bg-coolblack w-full';
 	let isHttps = browser && window.location.protocol === 'https:';
@@ -32,6 +33,7 @@
 	{#if !isPasswordField || showPassword}
 		{#if textarea}
 			<textarea
+				style={inputStyle}
 				rows="5"
 				class={disabledClass}
 				class:pr-10={true}
@@ -47,6 +49,7 @@
 			>
 		{:else}
 			<input
+				style={inputStyle}
 				class={disabledClass}
 				type="text"
 				class:pr-10={true}
@@ -63,6 +66,7 @@
 		{/if}
 	{:else}
 		<input
+			style={inputStyle}
 			class={disabledClass}
 			class:pr-10={true}
 			class:pr-20={value && isHttps}

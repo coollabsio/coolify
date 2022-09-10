@@ -145,14 +145,14 @@
 </script>
 
 {#if repositories.length === 0 && loading.repositories === false}
-	<div class="flex-col text-center lg:pt-32">
+	<div class="flex-col text-center">
 		<div class="pb-4">{$t('application.configuration.no_repositories_configured')}</div>
 		<a href={`/sources/${application.gitSource.id}`}
 			><button>{$t('application.configuration.configure_it_now')}</button></a
 		>
 	</div>
 {:else}
-	<form on:submit|preventDefault={handleSubmit} class="flex flex-col justify-center text-center lg:pt-32">
+	<form on:submit|preventDefault={handleSubmit} class="flex flex-col justify-center text-center">
 		<div class="flex-col space-y-3 md:space-y-0 space-x-1">
 			<div class="flex-row md:flex gap-4">
 				<div class="custom-select-wrapper">

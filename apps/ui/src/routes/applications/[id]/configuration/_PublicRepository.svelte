@@ -156,7 +156,7 @@
 	}
 </script>
 
-<div class="mx-auto max-w-5xl lg:pt-32">
+<div class="mx-auto max-w-5xl">
 	<form
 		class="flex flex-col lg:flex-row w-full lg:px-32 space-y-5 lg:space-y-0 lg:space-x-5 lg:items-center"
 		on:submit|preventDefault={loadBranches}
