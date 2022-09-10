@@ -1185,8 +1185,6 @@ export async function getFreeExposedPort(id, exposePort, engine, remoteEngine, r
 			})
 		).map((a) => a.exposePort);
 		const usedPorts = [...applicationUsed, ...serviceUsed];
-		console.log(usedPorts)
-		console.log(exposePort)
 		if (usedPorts.includes(exposePort)) {
 			return false
 		}
