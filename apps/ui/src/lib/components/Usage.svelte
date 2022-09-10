@@ -79,7 +79,7 @@
 			BETA
 		</div>
 	{/if}
-	<div class="w-full flex flex-row space-x-4">
+	<div class="w-full flex flex-col lg:flex-row space-y-4 lg:space-y-0">
 		<div class="flex flex-col">
 			<h1 class="font-bold text-lg lg:text-xl truncate">
 				{server.name}
