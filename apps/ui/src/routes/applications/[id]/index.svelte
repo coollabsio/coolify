@@ -94,7 +94,7 @@
 		}
 	];
 	function containerClass() {
-		return 'text-white bg-transparent font-thin px-0';
+		return 'text-white bg-transparent font-thin px-0 w-full';
 	}
 
 	async function getUsage() {
@@ -386,7 +386,7 @@
 			{/if}
 		</div>
 
-		<div class="grid grid-flow-row gap-2 lg:px-10">
+		<div class="grid grid-flow-row gap-2 lg:px-10 pr-5">
 			<div class="mt-2 grid grid-cols-2 items-center">
 				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 				<input name="name" id="name" bind:value={application.name} required />
@@ -461,7 +461,7 @@
 						value={application.destinationDocker.name}
 						id="destination"
 						disabled
-						class="bg-transparent"
+						class="bg-transparent w-full"
 					/>
 				</div>
 			</div>
@@ -477,7 +477,7 @@
 					</label>
 					<Select
 						{isDisabled}
-						containerClasses={(isDisabled && containerClass()) || 'bg-neutral border-0'}
+						containerClasses={(isDisabled && containerClass()) || 'bg-neutral border-0 w-full'}
 						id="baseBuildImages"
 						showIndicator={!$status.application.isRunning}
 						items={application.baseBuildImages}
@@ -571,7 +571,7 @@
 		<div class="flex space-x-1 py-5 font-bold">
 			<div class="title">{$t('application.application')}</div>
 		</div>
-		<div class="grid grid-flow-row gap-2 lg:px-10">
+		<div class="grid grid-flow-row gap-2 lg:px-10 pr-5">
 			<div class="grid grid-cols-2 items-center">
 				<Setting
 					id="isBot"

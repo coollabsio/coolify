@@ -351,41 +351,12 @@
 				<a
 					class="no-underline"
 					sveltekit:prefetch
-					href="/applications"
-					class:bg-applications={$page.url.pathname.startsWith('/applications') ||
-						$page.url.pathname.startsWith('/new/application')}
+					href="/servers"
+					class:bg-applications={$page.url.pathname.startsWith('/servers')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-9 w-9"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentcolor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<rect x="4" y="4" width="6" height="6" rx="1" />
-						<rect x="4" y="14" width="6" height="6" rx="1" />
-						<rect x="14" y="14" width="6" height="6" rx="1" />
-						<line x1="14" y1="7" x2="20" y2="7" />
-						<line x1="17" y1="4" x2="17" y2="10" />
-					</svg>
-					Applications
-				</a>
-			</li>
-			<li>
-				<a
-					class="no-underline"
-					sveltekit:prefetch
-					href="/sources"
-					class:bg-sources={$page.url.pathname.startsWith('/sources') ||
-						$page.url.pathname.startsWith('/new/source')}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-9 w-9"
+						class="w-8 h-8"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -394,100 +365,12 @@
 						stroke-linejoin="round"
 					>
 						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<circle cx="6" cy="6" r="2" />
-						<circle cx="18" cy="18" r="2" />
-						<path d="M11 6h5a2 2 0 0 1 2 2v8" />
-						<polyline points="14 9 11 6 14 3" />
-						<path d="M13 18h-5a2 2 0 0 1 -2 -2v-8" />
-						<polyline points="10 15 13 18 10 21" />
+						<rect x="3" y="4" width="18" height="8" rx="3" />
+						<rect x="3" y="12" width="18" height="8" rx="3" />
+						<line x1="7" y1="8" x2="7" y2="8.01" />
+						<line x1="7" y1="16" x2="7" y2="16.01" />
 					</svg>
-					Sources
-				</a>
-			</li>
-			<li>
-				<a
-					class="no-underline"
-					sveltekit:prefetch
-					href="/destinations"
-					class:bg-destinations={$page.url.pathname.startsWith('/destinations') ||
-						$page.url.pathname.startsWith('/new/destination')}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-9 w-9"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<path
-							d="M22 12.54c-1.804 -.345 -2.701 -1.08 -3.523 -2.94c-.487 .696 -1.102 1.568 -.92 2.4c.028 .238 -.32 1.002 -.557 1h-14c0 5.208 3.164 7 6.196 7c4.124 .022 7.828 -1.376 9.854 -5c1.146 -.101 2.296 -1.505 2.95 -2.46z"
-						/>
-						<path d="M5 10h3v3h-3z" />
-						<path d="M8 10h3v3h-3z" />
-						<path d="M11 10h3v3h-3z" />
-						<path d="M8 7h3v3h-3z" />
-						<path d="M11 7h3v3h-3z" />
-						<path d="M11 4h3v3h-3z" />
-						<path d="M4.571 18c1.5 0 2.047 -.074 2.958 -.78" />
-						<line x1="10" y1="16" x2="10" y2="16.01" />
-					</svg>
-					Destinations
-				</a>
-			</li>
-			<li class="menu-title">
-				<span>Data</span>
-			</li>
-			<li>
-				<a
-					class="no-underline"
-					sveltekit:prefetch
-					href="/databases"
-					class:bg-databases={$page.url.pathname.startsWith('/databases') ||
-						$page.url.pathname.startsWith('/new/database')}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-9 w-9"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<ellipse cx="12" cy="6" rx="8" ry="3" />
-						<path d="M4 6v6a8 3 0 0 0 16 0v-6" />
-						<path d="M4 12v6a8 3 0 0 0 16 0v-6" />
-					</svg>
-					Databases
-				</a>
-			</li>
-			<li>
-				<a
-					class="no-underline"
-					href="/services"
-					class:bg-services={$page.url.pathname.startsWith('/services') ||
-						$page.url.pathname.startsWith('/new/service')}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-9 w-9"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-12" />
-					</svg>
-					Services
+					Servers
 				</a>
 			</li>
 			<li class="menu-title">
