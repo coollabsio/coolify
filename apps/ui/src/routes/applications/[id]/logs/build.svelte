@@ -24,10 +24,11 @@
 	export let buildCount: any;
 	import { page } from '$app/stores';
 
+import {addToast} from '$lib/store';
 	import BuildLog from './_BuildLog.svelte';
-	import { get } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
-	import { changeQueryParams, dateOptions, errorNotification } from '$lib/common';
+	import { changeQueryParams, dateOptions, errorNotification, asyncSleep } from '$lib/common';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 
 	let buildId: any;
@@ -83,6 +84,23 @@
 		buildId = build;
 		return changeQueryParams(buildId);
 	}
+     async function resetQueue() {
+        const sure = confirm('It will reset all build queues for all applications. If something is queued, it will be canceled automatically. Are you sure? ');
+		if (sure) {
+            
+        try {
+			await post(`/internal/resetQueue`, {});
+            addToast({
+					message: 'Queue reset done.',
+					type: 'success'
+			});
+			await asyncSleep(500)
+			return window.location.reload()
+		} catch (error) {
+			return errorNotification(error);
+		}
+        }
+    }
 </script>
 
 <div class="flex items-center space-x-2 p-5 px-6 font-bold">
@@ -138,6 +156,7 @@
 </div>
 <div class="block flex-row justify-start space-x-2 px-5 pt-6 sm:px-10 md:flex">
 	<div class="mb-4 min-w-[16rem] space-y-2 md:mb-0 ">
+    <button class="btn btn-sm text-xs w-full bg-error" on:click={resetQueue}>Reset Build Queue</button>
 		<div class="top-4 md:sticky">
 			{#each builds as build, index (build.id)}
 				<div
@@ -145,12 +164,8 @@
 					on:click={() => loadBuild(build.id)}
 					class:rounded-tr={index === 0}
 					class:rounded-br={index === builds.length - 1}
-					class="flex cursor-pointer items-center justify-center border-l-2 py-4 no-underline transition-all duration-100 hover:bg-coolgray-400 hover:shadow-xl"
+					class="flex cursor-pointer items-center justify-center py-4 no-underline transition-all duration-100 hover:bg-coolgray-400 hover:shadow-xl"
 					class:bg-coolgray-400={buildId === build.id}
-					class:border-red-500={build.status === 'failed'}
-					class:border-orange-500={build.status === 'canceled'}
-					class:border-green-500={build.status === 'success'}
-					class:border-yellow-500={build.status === 'running'}
 				>
 					<div class="flex-col px-2 text-center min-w-[10rem]">
 						<div class="text-sm font-bold">
@@ -159,6 +174,11 @@
 						<div class="text-xs">
 							{build.type}
 						</div>
+						<div class="badge badge-sm text-xs text-white uppercase rounded bg-coolgray-300 border-none font-bold" 
+						class:text-red-500={build.status === 'failed'} 
+						class:text-orange-500={build.status === 'canceled'}
+						class:text-green-500={build.status === 'success'}
+						class:text-yellow-500={build.status === 'running'}>{build.status}</div>
 					</div>
 
 					<div class="w-48 text-center text-xs">
@@ -187,7 +207,7 @@
 		{#if !noMoreBuilds}
 			{#if buildCount > 5}
 				<div class="flex space-x-2">
-					<button disabled={noMoreBuilds} class=" btn btn-sm w-full" on:click={loadMoreBuilds}
+					<button disabled={noMoreBuilds} class=" btn btn-sm w-full text-xs" on:click={loadMoreBuilds}
 						>{$t('application.build.load_more')}</button
 					>
 				</div>
