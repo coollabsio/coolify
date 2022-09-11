@@ -24,8 +24,9 @@
 	export let buildCount: any;
 	import { page } from '$app/stores';
 
+import {addToast} from '$lib/store';
 	import BuildLog from './_BuildLog.svelte';
-	import { get } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { changeQueryParams, dateOptions, errorNotification } from '$lib/common';
 	import Tooltip from '$lib/components/Tooltip.svelte';
@@ -83,6 +84,21 @@
 		buildId = build;
 		return changeQueryParams(buildId);
 	}
+     async function resetQueue() {
+         const sure = confirm('It will reset all build queues for all applications. If something is queued, it will be canceled automatically. Are you sure? ');
+		if (sure) {
+            
+        try {
+			await post(`/internal/resetQueue`, {});
+            addToast({
+					message: 'Queue reset done.',
+					type: 'success'
+			});
+		} catch (error) {
+			return errorNotification(error);
+		}
+        }
+    }
 </script>
 
 <div class="flex items-center space-x-2 p-5 px-6 font-bold">
@@ -138,6 +154,7 @@
 </div>
 <div class="block flex-row justify-start space-x-2 px-5 pt-6 sm:px-10 md:flex">
 	<div class="mb-4 min-w-[16rem] space-y-2 md:mb-0 ">
+    <button class="btn btn-sm text-xs w-full bg-error" on:click={resetQueue}>Reset Build Queue</button>
 		<div class="top-4 md:sticky">
 			{#each builds as build, index (build.id)}
 				<div
@@ -187,7 +204,7 @@
 		{#if !noMoreBuilds}
 			{#if buildCount > 5}
 				<div class="flex space-x-2">
-					<button disabled={noMoreBuilds} class=" btn btn-sm w-full" on:click={loadMoreBuilds}
+					<button disabled={noMoreBuilds} class=" btn btn-sm w-full text-xs" on:click={loadMoreBuilds}
 						>{$t('application.build.load_more')}</button
 					>
 				</div>
