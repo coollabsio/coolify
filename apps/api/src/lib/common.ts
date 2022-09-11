@@ -21,7 +21,7 @@ import { scheduler } from './scheduler';
 import { supportedServiceTypesAndVersions } from './services/supportedVersions';
 import { includeServices } from './services/common';
 
-export const version = '3.10.2';
+export const version = '3.10.3';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -96,7 +96,8 @@ export const asyncExecShellStream = async ({
 				const array = stdout.split('\n');
 				for (const line of array) {
 					if (line !== '\n' && line !== '') {
-						await saveBuildLog({
+						logs.push(line.replace('\n', ''))
+						debug && await saveBuildLog({
 							line: `${line.replace('\n', '')}`,
 							buildId,
 							applicationId
@@ -109,11 +110,12 @@ export const asyncExecShellStream = async ({
 				const array = stderr.split('\n');
 				for (const line of array) {
 					if (line !== '\n' && line !== '') {
-						await saveBuildLog({
+						errorLogs.push(line.replace('\n', ''))
+						debug && await saveBuildLog({
 							line: `${line.replace('\n', '')}`,
 							buildId,
 							applicationId
-						});
+						});	
 					}
 				}
 			});
