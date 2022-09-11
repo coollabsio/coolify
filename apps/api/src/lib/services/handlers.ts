@@ -1006,79 +1006,136 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
         }
 
         const initDbSQL = `
-		drop table if exists event;
-		drop table if exists pageview;
-		drop table if exists session;
-		drop table if exists website;
-		drop table if exists account;
-		
-		create table account (
-			user_id serial primary key,
-			username varchar(255) unique not null,
-			password varchar(60) not null,
-			is_admin bool not null default false,
-			created_at timestamp with time zone default current_timestamp,
-			updated_at timestamp with time zone default current_timestamp
-		);
-		
-		create table website (
-			website_id serial primary key,
-			website_uuid uuid unique not null,
-			user_id int not null references account(user_id) on delete cascade,
-			name varchar(100) not null,
-			domain varchar(500),
-			share_id varchar(64) unique,
-			created_at timestamp with time zone default current_timestamp
-		);
-		
-		create table session (
-			session_id serial primary key,
-			session_uuid uuid unique not null,
-			website_id int not null references website(website_id) on delete cascade,
-			created_at timestamp with time zone default current_timestamp,
-			hostname varchar(100),
-			browser varchar(20),
-			os varchar(20),
-			device varchar(20),
-			screen varchar(11),
-			language varchar(35),
-			country char(2)
-		);
-		
-		create table pageview (
-			view_id serial primary key,
-			website_id int not null references website(website_id) on delete cascade,
-			session_id int not null references session(session_id) on delete cascade,
-			created_at timestamp with time zone default current_timestamp,
-			url varchar(500) not null,
-			referrer varchar(500)
-		);
-		
-		create table event (
-			event_id serial primary key,
-			website_id int not null references website(website_id) on delete cascade,
-			session_id int not null references session(session_id) on delete cascade,
-			created_at timestamp with time zone default current_timestamp,
-			url varchar(500) not null,
-			event_type varchar(50) not null,
-			event_value varchar(50) not null
-		);
-		
-		create index website_user_id_idx on website(user_id);
-		
-		create index session_created_at_idx on session(created_at);
-		create index session_website_id_idx on session(website_id);
-		
-		create index pageview_created_at_idx on pageview(created_at);
-		create index pageview_website_id_idx on pageview(website_id);
-		create index pageview_session_id_idx on pageview(session_id);
-		create index pageview_website_id_created_at_idx on pageview(website_id, created_at);
-		create index pageview_website_id_session_id_created_at_idx on pageview(website_id, session_id, created_at);
-		
-		create index event_created_at_idx on event(created_at);
-		create index event_website_id_idx on event(website_id);
-		create index event_session_id_idx on event(session_id);
-		
+		-- CreateTable
+CREATE TABLE "account" (
+    "user_id" SERIAL NOT NULL,
+    "username" VARCHAR(255) NOT NULL,
+    "password" VARCHAR(60) NOT NULL,
+    "is_admin" BOOLEAN NOT NULL DEFAULT false,
+    "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY ("user_id")
+);
+
+-- CreateTable
+CREATE TABLE "event" (
+    "event_id" SERIAL NOT NULL,
+    "website_id" INTEGER NOT NULL,
+    "session_id" INTEGER NOT NULL,
+    "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+    "url" VARCHAR(500) NOT NULL,
+    "event_type" VARCHAR(50) NOT NULL,
+    "event_value" VARCHAR(50) NOT NULL,
+
+    PRIMARY KEY ("event_id")
+);
+
+-- CreateTable
+CREATE TABLE "pageview" (
+    "view_id" SERIAL NOT NULL,
+    "website_id" INTEGER NOT NULL,
+    "session_id" INTEGER NOT NULL,
+    "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+    "url" VARCHAR(500) NOT NULL,
+    "referrer" VARCHAR(500),
+
+    PRIMARY KEY ("view_id")
+);
+
+-- CreateTable
+CREATE TABLE "session" (
+    "session_id" SERIAL NOT NULL,
+    "session_uuid" UUID NOT NULL,
+    "website_id" INTEGER NOT NULL,
+    "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+    "hostname" VARCHAR(100),
+    "browser" VARCHAR(20),
+    "os" VARCHAR(20),
+    "device" VARCHAR(20),
+    "screen" VARCHAR(11),
+    "language" VARCHAR(35),
+    "country" CHAR(2),
+
+    PRIMARY KEY ("session_id")
+);
+
+-- CreateTable
+CREATE TABLE "website" (
+    "website_id" SERIAL NOT NULL,
+    "website_uuid" UUID NOT NULL,
+    "user_id" INTEGER NOT NULL,
+    "name" VARCHAR(100) NOT NULL,
+    "domain" VARCHAR(500),
+    "share_id" VARCHAR(64),
+    "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY ("website_id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "account.username_unique" ON "account"("username");
+
+-- CreateIndex
+CREATE INDEX "event_created_at_idx" ON "event"("created_at");
+
+-- CreateIndex
+CREATE INDEX "event_session_id_idx" ON "event"("session_id");
+
+-- CreateIndex
+CREATE INDEX "event_website_id_idx" ON "event"("website_id");
+
+-- CreateIndex
+CREATE INDEX "pageview_created_at_idx" ON "pageview"("created_at");
+
+-- CreateIndex
+CREATE INDEX "pageview_session_id_idx" ON "pageview"("session_id");
+
+-- CreateIndex
+CREATE INDEX "pageview_website_id_created_at_idx" ON "pageview"("website_id", "created_at");
+
+-- CreateIndex
+CREATE INDEX "pageview_website_id_idx" ON "pageview"("website_id");
+
+-- CreateIndex
+CREATE INDEX "pageview_website_id_session_id_created_at_idx" ON "pageview"("website_id", "session_id", "created_at");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "session.session_uuid_unique" ON "session"("session_uuid");
+
+-- CreateIndex
+CREATE INDEX "session_created_at_idx" ON "session"("created_at");
+
+-- CreateIndex
+CREATE INDEX "session_website_id_idx" ON "session"("website_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "website.website_uuid_unique" ON "website"("website_uuid");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "website.share_id_unique" ON "website"("share_id");
+
+-- CreateIndex
+CREATE INDEX "website_user_id_idx" ON "website"("user_id");
+
+-- AddForeignKey
+ALTER TABLE "event" ADD FOREIGN KEY ("session_id") REFERENCES "session"("session_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "event" ADD FOREIGN KEY ("website_id") REFERENCES "website"("website_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "pageview" ADD FOREIGN KEY ("session_id") REFERENCES "session"("session_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "pageview" ADD FOREIGN KEY ("website_id") REFERENCES "website"("website_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "session" ADD FOREIGN KEY ("website_id") REFERENCES "website"("website_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "website" ADD FOREIGN KEY ("user_id") REFERENCES "account"("user_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
 		insert into account (username, password, is_admin) values ('admin', '${bcrypt.hashSync(
             umamiAdminPassword,
             10
