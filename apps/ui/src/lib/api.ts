@@ -11,8 +11,8 @@ export function getAPIUrl() {
 		return `https://${CODESANDBOX_HOST.replace(/\$PORT/, '3001')}`;
 	}
 	return dev
-		? 'https://kaname-png-coolify-vrgj9w6jq5x2xxxv-3001.githubpreview.dev'
-		: 'https://kaname-png-coolify-vrgj9w6jq5x2xxxv-3000.githubpreview.dev';
+		? 'http://localhost:3001'
+		: 'http://localhost:3000';
 }
 export function getWebhookUrl(type: string) {
 	if (GITPOD_WORKSPACE_URL) {

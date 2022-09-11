@@ -46,8 +46,8 @@ export function getAPIUrl() {
 		return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/, '3001')}`;
 	}
 	return isDev
-		? 'https://kaname-png-coolify-vrgj9w6jq5x2xxxv-3001.githubpreview.dev'
-		: 'https://kaname-png-coolify-vrgj9w6jq5x2xxxv-3000.githubpreview.dev';
+		? 'http://localhost:3001'
+		: 'http://localhost:3000';
 }
 
 export function getUIUrl() {
@@ -59,7 +59,7 @@ export function getUIUrl() {
 	if (process.env.CODESANDBOX_HOST) {
 		return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/, '3000')}`;
 	}
-	return 'https://kaname-png-coolify-vrgj9w6jq5x2xxxv-3000.githubpreview.dev';
+	return 'http://localhost:3000';
 }
 
 const mainTraefikEndpoint = isDev
