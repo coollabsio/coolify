@@ -75,13 +75,15 @@ export const asyncExecShellStream = async ({ debug, buildId, applicationId, comm
 	return await new Promise(async (resolve, reject) => {
 		const { execaCommand } = await import('execa')
 		const subprocess = execaCommand(command, { env: { DOCKER_BUILDKIT: "1", DOCKER_HOST: engine } })
-		if (debug) {
+		const errorLogs = []
+		const logs = []
 			subprocess.stdout.on('data', async (data) => {
 				const stdout = data.toString();
 				const array = stdout.split('\n')
 				for (const line of array) {
 					if (line !== '\n' && line !== '') {
-						await saveBuildLog({
+						logs.push(line.replace('\n', ''))
+						debug && await saveBuildLog({
 							line: `${line.replace('\n', '')}`,
 							buildId,
 							applicationId
@@ -94,6 +96,22 @@ export const asyncExecShellStream = async ({ debug, buildId, applicationId, comm
 				const array = stderr.split('\n')
 				for (const line of array) {
 					if (line !== '\n' && line !== '') {
+						errorLogs.push(line.replace('\n', ''))
+						debug && await saveBuildLog({
+							line: `${line.replace('\n', '')}`,
+							buildId,
+							applicationId
+						});	
+					}
+				}
+			})
+		subprocess.on('exit', async (code) => {
+			await asyncSleep(1000);
+			if (code === 0) {
+				resolve(code)
+			} else {
+				if (!debug) {
+					for (const line of errorLogs) {
 						await saveBuildLog({
 							line: `${line.replace('\n', '')}`,
 							buildId,
@@ -101,13 +119,6 @@ export const asyncExecShellStream = async ({ debug, buildId, applicationId, comm
 						});
 					}
 				}
-			})
-		}
-		subprocess.on('exit', async (code) => {
-			await asyncSleep(1000);
-			if (code === 0) {
-				resolve(code)
-			} else {
 				reject(code)
 			}
 		})

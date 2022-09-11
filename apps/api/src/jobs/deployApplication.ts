@@ -357,7 +357,9 @@ import * as buildpacks from '../lib/buildPacks';
 									where: { id: buildId, status: { in: ['queued', 'running'] } },
 									data: { status: 'failed' }
 								});
-								await saveBuildLog({ line: error, buildId, applicationId: application.id });
+								if (error !== 1) {
+									await saveBuildLog({ line: error, buildId, applicationId: application.id });
+								}
 							}
 						});
 					}
