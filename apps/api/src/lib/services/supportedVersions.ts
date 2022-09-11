@@ -116,7 +116,7 @@ export const supportedServiceTypesAndVersions = [
 	{
 		name: 'umami',
 		fancyName: 'Umami',
-		baseImage: 'ghcr.io/mikecao/umami',
+		baseImage: 'ghcr.io/umami-software/umami',
 		images: ['postgres:12-alpine'],
 		versions: ['postgresql-latest'],
 		recommendedVersion: 'postgresql-latest',
