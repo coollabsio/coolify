@@ -169,10 +169,21 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                             pullmergeRequestAction === 'reopened' ||
                             pullmergeRequestAction === 'synchronize'
                         ) {
+
                             await prisma.application.update({
                                 where: { id: application.id },
                                 data: { updatedAt: new Date() }
                             });
+                            let previewApplicationId = undefined
+							if (pullmergeRequestId) {
+								const foundPreviewApplications = await prisma.previewApplication.findMany({ where: { applicationId: application.id, prMrId: pullmergeRequestId } })
+								if (foundPreviewApplications.length > 0) {
+									previewApplicationId = foundPreviewApplications[0].id
+								} else {
+									const previewApplication = await prisma.previewApplication.create({ data: { prMrId: pullmergeRequestId, application: { connect: { id: application.id } } } })
+									previewApplicationId = previewApplication.id
+								}
+							}
                             // if (application.connectedDatabase && pullmergeRequestAction === 'opened' || pullmergeRequestAction === 'reopened') {
                             //     // Coolify hosted database
                             //     if (application.connectedDatabase.databaseId) {
@@ -187,6 +198,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                                 data: {
                                     id: buildId,
                                     pullmergeRequestId,
+                                    previewApplicationId,
                                     sourceBranch,
                                     applicationId: application.id,
                                     destinationDockerId: application.destinationDocker.id,
@@ -206,13 +218,19 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                                     await removeContainer({ id, dockerId: application.destinationDocker.id });
                                 } catch (error) { }
                             }
-                            if (application.connectedDatabase.databaseId) {
-                                const databaseId = application.connectedDatabase.databaseId;
-                                const database = await prisma.database.findUnique({ where: { id: databaseId } });
-                                if (database) {
-                                    await removeBranchDatabase(database, pullmergeRequestId);
+                            const foundPreviewApplications = await prisma.previewApplication.findMany({ where: {applicationId: application.id, prMrId: pullmergeRequestId}})
+                            if (foundPreviewApplications.length > 0) {
+                                for (const preview of foundPreviewApplications) {
+                                    await prisma.previewApplication.delete({where: {id: preview.id}})
                                 }
                             }
+                            // if (application?.connectedDatabase?.databaseId) {
+                            //     const databaseId = application.connectedDatabase.databaseId;
+                            //     const database = await prisma.database.findUnique({ where: { id: databaseId } });
+                            //     if (database) {
+                            //         await removeBranchDatabase(database, pullmergeRequestId);
+                            //     }
+                            // }
                         }
                     }
                 }

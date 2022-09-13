@@ -38,8 +38,16 @@ import * as buildpacks from '../lib/buildPacks';
 					for (const queueBuild of queuedBuilds) {
 						actions.push(async () => {
 							let application = await prisma.application.findUnique({ where: { id: queueBuild.applicationId }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, persistentStorage: true, secrets: true, settings: true, teams: true } })
-							let { id: buildId, type, sourceBranch = null, pullmergeRequestId = null, forceRebuild } = queueBuild
+							let { id: buildId, type, sourceBranch = null, pullmergeRequestId = null, previewApplicationId = null, forceRebuild } = queueBuild
 							application = decryptApplication(application)
+							const originalApplicationId = application.id
+							if (pullmergeRequestId) {
+								const previewApplications = await prisma.previewApplication.findMany({where: {applicationId: originalApplicationId, prMrId: pullmergeRequestId}})
+								if (previewApplications.length > 0) {
+									previewApplicationId = previewApplications[0].id
+								}
+							}
+							const usableApplicationId = previewApplicationId || originalApplicationId
 							try {
 								if (queueBuild.status === 'running') {
 									await saveBuildLog({ line: 'Building halted, restarting...', buildId, applicationId: application.id });
