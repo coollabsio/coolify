@@ -219,6 +219,8 @@
 						<path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
 					</svg>
 				</a>
+				<Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
+
 				<a
 					id="settings"
 					sveltekit:prefetch
@@ -245,6 +247,9 @@
 						<circle cx="12" cy="12" r="3" />
 					</svg>
 				</a>
+				<Tooltip triggeredBy="#settings" placement="right" color="bg-settings  text-black"
+					>Settings</Tooltip
+				>
 
 				<div id="logout" class="icons bg-coolgray-200 hover:text-error" on:click={logout}>
 					<svg
@@ -264,6 +269,8 @@
 						<path d="M7 12h14l-3 -3m0 6l3 -3" />
 					</svg>
 				</div>
+				<Tooltip triggeredBy="#logout" placement="right" color="bg-red-600">Logout</Tooltip>
+
 				<div
 					class="w-full text-center font-bold text-stone-400 hover:bg-coolgray-200 hover:text-white"
 				>
@@ -287,8 +294,3 @@
 		<slot />
 	</div>
 </main>
-
-<Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
-<Tooltip triggeredBy="#settings" placement="right" color="bg-settings  text-black">Settings</Tooltip
->
-<Tooltip triggeredBy="#logout" placement="right" color="bg-red-600">Logout</Tooltip>
