@@ -127,3 +127,9 @@ export interface StopPreviewApplication extends OnlyId {
         pullmergeRequestId: string | null,
     }
 }
+export interface RestartPreviewApplication {
+    Params: {
+        id: string,
+        pullmergeRequestId: string | null,
+    }
+}

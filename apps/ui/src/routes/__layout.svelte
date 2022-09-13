@@ -290,7 +290,7 @@
 	{/if}
 {/if}
 <main>
-	<div class={$appSession.userId ? 'pl-14 lg:px-20' : null}>
+	<div class={$appSession.userId ? 'pl-14 lg:pl-20' : null}>
 		<slot />
 	</div>
 </main>

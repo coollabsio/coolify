@@ -144,6 +144,7 @@ importers:
       classnames: 2.3.1
       cuid: 2.1.8
       daisyui: 2.24.2
+      dayjs: 1.11.5
       eslint: 8.23.0
       eslint-config-prettier: 8.5.0
       eslint-plugin-svelte3: 4.0.0
@@ -169,6 +170,7 @@ importers:
       '@tailwindcss/typography': 0.5.7_tailwindcss@3.1.8
       cuid: 2.1.8
       daisyui: 2.24.2_25hquoklqeoqwmt7fwvvcyxm5e
+      dayjs: 1.11.5
       js-cookie: 3.0.1
       p-limit: 4.0.0
       svelte-select: 4.4.7

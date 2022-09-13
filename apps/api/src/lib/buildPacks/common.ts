@@ -707,7 +707,6 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
 	Dockerfile.push(`RUN ${buildCommand}`);
-	console.log(Dockerfile.join('\n'))
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
 	await buildImage({ ...data, isCache: true });
 }

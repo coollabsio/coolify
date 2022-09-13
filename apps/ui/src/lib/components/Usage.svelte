@@ -108,21 +108,21 @@
 		<div class="stats stats-vertical min-w-[16rem] mb-5 rounded bg-transparent">
 			<div class="stat">
 				<div class="stat-title">Total Memory</div>
-				<div class="stat-value text-2xl">
+				<div class="stat-value text-2xl text-white">
 					{(usage?.memory?.totalMemMb).toFixed(0)}<span class="text-sm">MB</span>
 				</div>
 			</div>
 
 			<div class="stat">
 				<div class="stat-title">Used Memory</div>
-				<div class="stat-value text-2xl">
+				<div class="stat-value text-2xl text-white">
 					{(usage?.memory?.usedMemMb).toFixed(0)}<span class="text-sm">MB</span>
 				</div>
 			</div>
 
 			<div class="stat">
 				<div class="stat-title">Free Memory</div>
-				<div class="stat-value text-2xl">
+				<div class="stat-value text-2xl text-white">
 					{(usage?.memory?.freeMemPercentage).toFixed(0)}<span class="text-sm">%</span>
 				</div>
 			</div>
@@ -131,41 +131,41 @@
 		<div class="stats stats-vertical min-w-[20rem] mb-5 bg-transparent rounded">
 			<div class="stat">
 				<div class="stat-title">Total CPU</div>
-				<div class="stat-value text-2xl">
+				<div class="stat-value text-2xl text-white">
 					{usage?.cpu?.count}
 				</div>
 			</div>
 
 			<div class="stat">
 				<div class="stat-title">CPU Usage</div>
-				<div class="stat-value text-2xl">
+				<div class="stat-value text-2xl text-white">
 					{usage?.cpu?.usage}<span class="text-sm">%</span>
 				</div>
 			</div>
 
 			<div class="stat">
 				<div class="stat-title">Load Average (5,10,30mins)</div>
-				<div class="stat-value text-2xl">{usage?.cpu?.load}</div>
+				<div class="stat-value text-2xl text-white">{usage?.cpu?.load}</div>
 			</div>
 		</div>
 		<div class="stats stats-vertical min-w-[16rem] mb-5 bg-transparent rounded">
 			<div class="stat">
 				<div class="stat-title">Total Disk</div>
-				<div class="stat-value text-2xl">
+				<div class="stat-value text-2xl text-white">
 					{usage?.disk?.totalGb}<span class="text-sm">GB</span>
 				</div>
 			</div>
 
 			<div class="stat">
 				<div class="stat-title">Used Disk</div>
-				<div class="stat-value text-2xl">
+				<div class="stat-value text-2xl text-white">
 					{usage?.disk?.usedGb}<span class="text-sm">GB</span>
 				</div>
 			</div>
 
 			<div class="stat">
 				<div class="stat-title">Free Disk</div>
-				<div class="stat-value text-2xl">
+				<div class="stat-value text-2xl text-white">
 					{usage?.disk?.freePercentage}<span class="text-sm">%</span>
 				</div>
 			</div>

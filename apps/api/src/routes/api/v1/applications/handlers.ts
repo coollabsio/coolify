@@ -12,7 +12,7 @@ import { checkDomainsIsValidInDNS, checkDoubleBranch, checkExposedPort, createDi
 import { checkContainer, formatLabelsOnDocker, isContainerExited, removeContainer } from '../../../../lib/docker';
 
 import type { FastifyRequest } from 'fastify';
-import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain, StopPreviewApplication } from './types';
+import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain, StopPreviewApplication, RestartPreviewApplication } from './types';
 import { OnlyId } from '../../../../types';
 
 function filterObject(obj, callback) {
@@ -83,8 +83,6 @@ export async function getApplicationStatus(request: FastifyRequest<OnlyId>) {
                 isExited = status.status.isExited;
                 isRestarting = status.status.isRestarting
             }
-
-            // isExited = await isContainerExited(application.destinationDocker.id, id);
         }
         return {
             isRunning,
@@ -164,7 +162,8 @@ export async function getApplicationFromDB(id: string, teamId: string) {
                 gitSource: { include: { githubApp: true, gitlabApp: true } },
                 secrets: true,
                 persistentStorage: true,
-                connectedDatabase: true
+                connectedDatabase: true,
+                previewApplication: true
             }
         });
         if (!application) {
@@ -350,6 +349,7 @@ export async function stopPreviewApplication(request: FastifyRequest<StopPreview
             if (found) {
                 await removeContainer({ id: container, dockerId: application.destinationDocker.id });
             }
+            await prisma.previewApplication.deleteMany({ where: { applicationId: application.id, pullmergeRequestId } })
         }
         return reply.code(201).send();
     } catch ({ status, message }) {
@@ -617,7 +617,7 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
                     githubAppId: application.gitSource?.githubApp?.id,
                     gitlabAppId: application.gitSource?.gitlabApp?.id,
                     status: 'queued',
-                    type: 'manual'
+                    type: pullmergeRequestId ? application.gitSource?.githubApp?.id ? 'manual_pr' : 'manual_mr' : 'manual'
                 }
             });
             return {
@@ -808,7 +808,6 @@ export async function saveSecret(request: FastifyRequest<SaveSecret>, reply: Fas
     try {
         const { id } = request.params
         let { name, value, isBuildSecret, isPRMRSecret, isNew } = request.body
-
         if (isNew) {
             const found = await prisma.secret.findFirst({ where: { name, applicationId: id, isPRMRSecret } });
             if (found) {
@@ -820,14 +819,24 @@ export async function saveSecret(request: FastifyRequest<SaveSecret>, reply: Fas
                 });
             }
         } else {
-            value = encrypt(value.trim());
+            if (value) {
+                value = encrypt(value.trim());
+            }
             const found = await prisma.secret.findFirst({ where: { applicationId: id, name, isPRMRSecret } });
 
             if (found) {
-                await prisma.secret.updateMany({
-                    where: { applicationId: id, name, isPRMRSecret },
-                    data: { value, isBuildSecret, isPRMRSecret }
-                });
+                if (!value && isPRMRSecret) {
+                    await prisma.secret.deleteMany({
+                        where: { applicationId: id, name, isPRMRSecret }
+                    });
+                } else {
+
+                    await prisma.secret.updateMany({
+                        where: { applicationId: id, name, isPRMRSecret },
+                        data: { value, isBuildSecret, isPRMRSecret }
+                    });
+                }
+
             } else {
                 await prisma.secret.create({
                     data: { name, value, isBuildSecret, isPRMRSecret, application: { connect: { id } } }
@@ -894,6 +903,181 @@ export async function deleteStorage(request: FastifyRequest<DeleteStorage>) {
     }
 }
 
+export async function restartPreview(request: FastifyRequest<RestartPreviewApplication>, reply: FastifyReply) {
+    try {
+        const { id, pullmergeRequestId } = request.params
+        const { teamId } = request.user
+        let application: any = await getApplicationFromDB(id, teamId);
+        if (application?.destinationDockerId) {
+            const buildId = cuid();
+            const { id: dockerId, network } = application.destinationDocker;
+            const { secrets, port, repository, persistentStorage, id: applicationId, buildPack, exposePort } = application;
+
+            const envs = [
+                `PORT=${port}`
+            ];
+            if (secrets.length > 0) {
+                secrets.forEach((secret) => {
+                    if (pullmergeRequestId) {
+                        const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
+                        if (isSecretFound.length > 0) {
+                            envs.push(`${secret.name}=${isSecretFound[0].value}`);
+                        } else {
+                            envs.push(`${secret.name}=${secret.value}`);
+                        }
+                    } else {
+                        if (!secret.isPRMRSecret) {
+                            envs.push(`${secret.name}=${secret.value}`);
+                        }
+                    }
+                });
+            }
+            const { workdir } = await createDirectories({ repository, buildId });
+            const labels = []
+            let image = null
+            const { stdout: container } = await executeDockerCmd({ dockerId, command: `docker container ls --filter 'label=com.docker.compose.service=${id}-${pullmergeRequestId}' --format '{{json .}}'` })
+            const containersArray = container.trim().split('\n');
+            for (const container of containersArray) {
+                const containerObj = formatLabelsOnDocker(container);
+                image = containerObj[0].Image
+                Object.keys(containerObj[0].Labels).forEach(function (key) {
+                    if (key.startsWith('coolify')) {
+                        labels.push(`${key}=${containerObj[0].Labels[key]}`)
+                    }
+                })
+            }
+            let imageFound = false;
+            try {
+                await executeDockerCmd({
+                    dockerId,
+                    command: `docker image inspect ${image}`
+                })
+                imageFound = true;
+            } catch (error) {
+                //
+            }
+            if (!imageFound) {
+                throw { status: 500, message: 'Image not found, cannot restart application.' }
+            }
+            await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
+
+            let envFound = false;
+            try {
+                envFound = !!(await fs.stat(`${workdir}/.env`));
+            } catch (error) {
+                //
+            }
+            const volumes =
+                persistentStorage?.map((storage) => {
+                    return `${applicationId}${storage.path.replace(/\//gi, '-')}:${buildPack !== 'docker' ? '/app' : ''
+                        }${storage.path}`;
+                }) || [];
+            const composeVolumes = volumes.map((volume) => {
+                return {
+                    [`${volume.split(':')[0]}`]: {
+                        name: volume.split(':')[0]
+                    }
+                };
+            });
+            const composeFile = {
+                version: '3.8',
+                services: {
+                    [`${applicationId}-${pullmergeRequestId}`]: {
+                        image,
+                        container_name: `${applicationId}-${pullmergeRequestId}`,
+                        volumes,
+                        env_file: envFound ? [`${workdir}/.env`] : [],
+                        labels,
+                        depends_on: [],
+                        expose: [port],
+                        ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                        ...defaultComposeConfiguration(network),
+                    }
+                },
+                networks: {
+                    [network]: {
+                        external: true
+                    }
+                },
+                volumes: Object.assign({}, ...composeVolumes)
+            };
+            await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
+            await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}-${pullmergeRequestId}` })
+            await executeDockerCmd({ dockerId, command: `docker rm ${id}-${pullmergeRequestId}` })
+            await executeDockerCmd({ dockerId, command: `docker compose --project-directory ${workdir} up -d` })
+            return reply.code(201).send();
+        }
+        throw { status: 500, message: 'Application cannot be restarted.' }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+export async function getPreviewStatus(request: FastifyRequest<RestartPreviewApplication>) {
+    try {
+        const { id, pullmergeRequestId } = request.params
+        const { teamId } = request.user
+        let isRunning = false;
+        let isExited = false;
+        let isRestarting = false;
+        let isBuilding = false
+        const application: any = await getApplicationFromDB(id, teamId);
+        if (application?.destinationDockerId) {
+            const status = await checkContainer({ dockerId: application.destinationDocker.id, container: `${id}-${pullmergeRequestId}` });
+            if (status?.found) {
+                isRunning = status.status.isRunning;
+                isExited = status.status.isExited;
+                isRestarting = status.status.isRestarting
+            }
+            const building = await prisma.build.findMany({ where: { applicationId: id, pullmergeRequestId, status: { in: ['queued', 'running'] } } })
+            isBuilding = building.length > 0
+        }
+        return {
+            isBuilding,
+            isRunning,
+            isRestarting,
+            isExited,
+        };
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+export async function loadPreviews(request: FastifyRequest<OnlyId>) {
+    try {
+        const { id } = request.params
+        const application = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } });
+        const { stdout } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker container ls --filter 'name=${id}-' --format "{{json .}}"` })
+        if (stdout === '') {
+            throw { status: 500, message: 'No previews found.' }
+        }
+        const containers = formatLabelsOnDocker(stdout).filter(container => container.Labels['coolify.configuration'] && container.Labels['coolify.type'] === 'standalone-application')
+
+        const jsonContainers = containers
+            .map((container) =>
+                JSON.parse(Buffer.from(container.Labels['coolify.configuration'], 'base64').toString())
+            )
+            .filter((container) => {
+                return container.pullmergeRequestId && container.applicationId === id;
+            });
+        for (const container of jsonContainers) {
+            const found = await prisma.previewApplication.findMany({ where: { applicationId: container.applicationId, pullmergeRequestId: container.pullmergeRequestId } })
+            if (found.length === 0) {
+                await prisma.previewApplication.create({
+                    data: {
+                        pullmergeRequestId: container.pullmergeRequestId,
+                        sourceBranch: container.branch,
+                        customDomain: container.fqdn,
+                        application: { connect: { id: container.applicationId } }
+                    }
+                })
+            }
+        }
+        return {
+            previews: await prisma.previewApplication.findMany({ where: { applicationId: id } })
+        }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function getPreviews(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
@@ -909,26 +1093,7 @@ export async function getPreviews(request: FastifyRequest<OnlyId>) {
 
         const applicationSecrets = secrets.filter((secret) => !secret.isPRMRSecret);
         const PRMRSecrets = secrets.filter((secret) => secret.isPRMRSecret);
-        const application = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } });
-        const { stdout } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker container ls --filter 'name=${id}-' --format "{{json .}}"` })
-        if (stdout === '') {
-            return {
-                containers: [],
-                applicationSecrets: [],
-                PRMRSecrets: []
-            }
-        }
-        const containers = formatLabelsOnDocker(stdout).filter(container => container.Labels['coolify.configuration'] && container.Labels['coolify.type'] === 'standalone-application')
-
-        const jsonContainers = containers
-            .map((container) =>
-                JSON.parse(Buffer.from(container.Labels['coolify.configuration'], 'base64').toString())
-            )
-            .filter((container) => {
-                return container.pullmergeRequestId && container.applicationId === id;
-            });
         return {
-            containers: jsonContainers,
             applicationSecrets: applicationSecrets.sort((a, b) => {
                 return ('' + a.name).localeCompare(b.name);
             }),
@@ -1002,12 +1167,6 @@ export async function getBuildLogs(request: FastifyRequest<GetBuildLogs>) {
             });
         }
 
-        builds = builds.map((build) => {
-            const updatedAt = day(build.updatedAt).utc();
-            build.took = updatedAt.diff(day(build.createdAt)) / 1000;
-            build.since = updatedAt.fromNow();
-            return build;
-        });
         return {
             builds,
             buildCount

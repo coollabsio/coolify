@@ -42,7 +42,7 @@ import * as buildpacks from '../lib/buildPacks';
 							application = decryptApplication(application)
 							const originalApplicationId = application.id
 							if (pullmergeRequestId) {
-								const previewApplications = await prisma.previewApplication.findMany({where: {applicationId: originalApplicationId, prMrId: pullmergeRequestId}})
+								const previewApplications = await prisma.previewApplication.findMany({where: {applicationId: originalApplicationId, pullmergeRequestId}})
 								if (previewApplications.length > 0) {
 									previewApplicationId = previewApplications[0].id
 								}

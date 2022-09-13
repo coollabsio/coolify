@@ -5,7 +5,6 @@
 	export let isNewSecret = false;
 	export let isPRMRSecret = false;
 	export let PRMRSecret: any = {};
-
 	if (isPRMRSecret) value = PRMRSecret.value;
 
 	import { page } from '$app/stores';
@@ -39,7 +38,15 @@
 
 	async function createSecret(isNew: any) {
 		try {
-			if (!name || !value) return;
+			if (isNew) {
+				if (!name || !value) return;
+			}
+			if (value === undefined && isPRMRSecret) {
+				return
+			}
+			if (value === '' && !isPRMRSecret) {
+				throw new Error('Value is required.')
+			}
 			await saveSecret({
 				isNew,
 				name,
@@ -108,7 +115,6 @@
 		name={isNewSecret ? 'secretValue' : 'secretValueNew'}
 		isPasswordField={true}
 		bind:value
-		required
 		placeholder="J$#@UIO%HO#$U%H"
 	/>
 </td>
@@ -130,7 +136,7 @@
 			class:translate-x-0={!isBuildSecret}
 		>
 			<span
-				class=" absolute inset-0 flex h-full w-full items-center justify-center transition-opacity duration-200 ease-in"
+				class="absolute inset-0 flex h-full w-full items-center justify-center transition-opacity duration-200 ease-in"
 				class:opacity-0={isBuildSecret}
 				class:opacity-100={!isBuildSecret}
 				aria-hidden="true"
