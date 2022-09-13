@@ -28,11 +28,7 @@
 			Cookies.set('token', token, {
 				path: '/'
 			});
-			$appSession.teamId = payload.teamId;
-			$appSession.userId = payload.userId;
-			$appSession.permission = payload.permission;
-			$appSession.isAdmin = payload.isAdmin;
-			return await goto('/');
+			return window.location.assign('/');
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
