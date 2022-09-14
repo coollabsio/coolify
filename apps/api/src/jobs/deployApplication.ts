@@ -42,7 +42,7 @@ import * as buildpacks from '../lib/buildPacks';
 							application = decryptApplication(application)
 							const originalApplicationId = application.id
 							if (pullmergeRequestId) {
-								const previewApplications = await prisma.previewApplication.findMany({where: {applicationId: originalApplicationId, pullmergeRequestId}})
+								const previewApplications = await prisma.previewApplication.findMany({ where: { applicationId: originalApplicationId, pullmergeRequestId } })
 								if (previewApplications.length > 0) {
 									previewApplicationId = previewApplications[0].id
 								}
@@ -112,17 +112,17 @@ import * as buildpacks from '../lib/buildPacks';
 									)
 									.digest('hex');
 								const { debug } = settings;
-								if (concurrency === 1) {
-									await prisma.build.updateMany({
-										where: {
-											status: { in: ['queued', 'running'] },
-											id: { not: buildId },
-											applicationId,
-											createdAt: { lt: new Date(new Date().getTime() - 10 * 1000) }
-										},
-										data: { status: 'failed' }
-									});
-								}
+								// if (concurrency === 1) {
+								// 	await prisma.build.updateMany({
+								// 		where: {
+								// 			status: { in: ['queued', 'running'] },
+								// 			id: { not: buildId },
+								// 			applicationId,
+								// 			createdAt: { lt: new Date(new Date().getTime() - 10 * 1000) }
+								// 		},
+								// 		data: { status: 'failed' }
+								// 	});
+								// }
 								let imageId = applicationId;
 								let domain = getDomain(fqdn);
 								const volumes =
@@ -346,10 +346,15 @@ import * as buildpacks from '../lib/buildPacks';
 										await saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
 									} catch (error) {
 										await saveBuildLog({ line: error, buildId, applicationId });
-										await prisma.build.updateMany({
-											where: { id: buildId, status: { in: ['queued', 'running'] } },
-											data: { status: 'failed' }
-										});
+										const foundBuild = await prisma.build.findUnique({ where: { id: buildId } })
+										if (foundBuild) {
+											await prisma.build.update({
+												where: { id: buildId },
+												data: {
+													status: 'failed'
+												}
+											});
+										}
 										throw new Error(error);
 									}
 									await saveBuildLog({ line: 'Proxy will be updated shortly.', buildId, applicationId });
@@ -361,10 +366,15 @@ import * as buildpacks from '../lib/buildPacks';
 								}
 							}
 							catch (error) {
-								await prisma.build.updateMany({
-									where: { id: buildId, status: { in: ['queued', 'running'] } },
-									data: { status: 'failed' }
-								});
+								const foundBuild = await prisma.build.findUnique({ where: { id: buildId } })
+								if (foundBuild) {
+									await prisma.build.update({
+										where: { id: buildId },
+										data: {
+											status: 'failed'
+										}
+									});
+								}
 								if (error !== 1) {
 									await saveBuildLog({ line: error, buildId, applicationId: application.id });
 								}
