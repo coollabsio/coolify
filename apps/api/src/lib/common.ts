@@ -45,7 +45,7 @@ export function getAPIUrl() {
 	if (process.env.CODESANDBOX_HOST) {
 		return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/, '3001')}`
 	}
-	return isDev ? 'http://localhost:3001' : 'http://localhost:3000';
+	return isDev ? 'http://host.docker.internal:3001' : 'http://localhost:3000';
 }
 
 export function getUIUrl() {
