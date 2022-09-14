@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14.5-alpine
+    restart: always
+    container_name: coolify-pg
+    networks:
+      - coolify-infra
+    command:
+      - "postgres"
+      - "-c"
+      - "log_connections=yes"
+      - "-c"
+      - "max_connections=1337"
+    environment:
+       POSTGRES_DB: coolify
+       POSTGRES_USER: coolify
+       POSTGRES_PASSWORD: coolify
+       POSTGRES_HOST_AUTH_METHOD: "trust"
+    volumes:
+      - 'coolify-pgdb:/var/lib/postgresql/data'
+networks:
+  coolify-infra:
+    attachable: true
+    name: coolify-infra
+
+volumes:
+  coolify-db:
+    name: coolify-db
+  coolify-pgdb:
+    name: coolify-pgdb
+  coolify-ssl-certs:
+    name: coolify-ssl-certs
+  coolify-letsencrypt:
+    name: coolify-letsencrypt
+  coolify-traefik-letsencrypt:
+    name: coolify-traefik-letsencrypt

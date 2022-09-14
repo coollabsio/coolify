@@ -20,7 +20,22 @@ services:
       - '.env'
     networks:
       - coolify-infra
-
+  # postgres:
+  #   image: postgres:14.5-alpine
+  #   restart: always
+  #   container_name: coolify-pg
+  #   command:
+  #     - "postgres"
+  #     - "-c"
+  #     - "log_connections=yes"
+  #     - "-c"
+  #     - "max_connections=1337"
+  #   volumes:
+  #     - 'coolify-pgdb:/var/lib/postgresql/data'
+  #   ports:
+  #     - target: 5432
+  #       published: 5432
+  #       protocol: tcp
 networks:
   coolify-infra:
     attachable: true
@@ -29,6 +44,8 @@ networks:
 volumes:
   coolify-db:
     name: coolify-db
+  coolify-pgdb:
+    name: coolify-pgdb
   coolify-ssl-certs:
     name: coolify-ssl-certs
   coolify-letsencrypt:
