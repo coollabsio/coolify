@@ -1195,8 +1195,17 @@ export async function getBuildIdLogs(request: FastifyRequest<GetBuildIdLogs>) {
         try {
             await fs.stat(file)
         } catch (error) {
+            let logs = await prisma.buildLog.findMany({
+                where: { buildId, time: { gt: sequence } },
+                orderBy: { time: 'asc' }
+            });
+            const data = await prisma.build.findFirst({ where: { id: buildId } });
+            const createdAt = day(data.createdAt).utc();
             return {
-                logs: [],
+                logs: logs.map(log => {
+                    log.time = Number(log.time)
+                    return log
+                }),
                 took: day().diff(createdAt) / 1000,
                 status: data?.status || 'queued'
             }
