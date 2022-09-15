@@ -163,9 +163,9 @@
 			>
 				{#each logs as log}
 					{#if fromDb}
-						<div>[{day.unix(log.time).format('HH:mm:ss.SSS')}] {log.line + '\n'}</div>
-					{:else}
 						<div>{log.line + '\n'}</div>
+					{:else}
+						<div>[{day.unix(log.time).format('HH:mm:ss.SSS')}] {log.line + '\n'}</div>
 					{/if}
 				{/each}
 			</div>

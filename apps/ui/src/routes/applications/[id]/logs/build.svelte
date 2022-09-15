@@ -23,7 +23,6 @@
 	export let application: any;
 	export let buildCount: any;
 	import { page } from '$app/stores';
-	console.log(builds[0].createdAt);
 	import { addToast } from '$lib/store';
 	import BuildLog from './_BuildLog.svelte';
 	import { get, post } from '$lib/api';
@@ -31,35 +30,52 @@
 	import { changeQueryParams, dateOptions, errorNotification, asyncSleep } from '$lib/common';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { day } from '$lib/dayjs';
+	import { onDestroy, onMount } from 'svelte';
+	const { id } = $page.params;
+
+	let loadBuildLogsInterval: any = null;
 	let buildId: any;
 
 	let skip = 0;
 	let noMoreBuilds = buildCount < 5 || buildCount <= skip;
-	const { id } = $page.params;
 	let preselectedBuildId = $page.url.searchParams.get('buildId');
 	if (preselectedBuildId) buildId = preselectedBuildId;
 
-	async function updateBuildStatus({ detail }: { detail: any }) {
-		const { status } = detail;
-		if (status !== 'running') {
-			try {
-				const data = await get(`/applications/${id}/logs/build?buildId=${buildId}`);
-				builds = builds.filter((build: any) => {
-					if (build.id === data.builds[0].id) {
-						build.status = data.builds[0].status;
-					}
-					return build;
-				});
-			} catch (error) {
-				return errorNotification(error);
-			}
-		} else {
-			builds = builds.filter((build: any) => {
-				if (build.id === buildId) build.status = status;
-				return build;
-			});
-		}
+	onMount(async () => {
+		getBuildLogs();
+		loadBuildLogsInterval = setInterval(() => {
+			getBuildLogs();
+		}, 2000);
+		
+	});
+	onDestroy(() => {
+		clearInterval(loadBuildLogsInterval);
+	});
+	async function getBuildLogs() {
+		const response = await get(`/applications/${$page.params.id}/logs/build?skip=0`);
+		builds = response.builds;
 	}
+	// async function updateBuildStatus({ detail }: { detail: any }) {
+	// 	const { status } = detail;
+	// 	if (status !== 'running') {
+	// 		try {
+	// 			const data = await get(`/applications/${id}/logs/build?buildId=${buildId}`);
+	// 			builds = builds.filter((build: any) => {
+	// 				if (build.id === data.builds[0].id) {
+	// 					build.status = data.builds[0].status;
+	// 				}
+	// 				return build;
+	// 			});
+	// 		} catch (error) {
+	// 			return errorNotification(error);
+	// 		}
+	// 	} else {
+	// 		builds = builds.filter((build: any) => {
+	// 			if (build.id === buildId) build.status = status;
+	// 			return build;
+	// 		});
+	// 	}
+	// }
 	async function loadMoreBuilds() {
 		if (buildCount >= skip) {
 			skip = skip + 5;
@@ -198,7 +214,7 @@
 						{#if build.status === 'running'}
 							<div>
 								<span class="font-bold text-xl"
-									>{(day().utc().diff(day(build.createdAt)) / 1000).toFixed(0)}s</span
+									>{day(build.updatedAt).utc().diff(day(build.createdAt)) / 1000}s</span
 								>
 							</div>
 						{:else}
@@ -233,7 +249,7 @@
 	<div class="flex-1 md:w-96">
 		{#if buildId}
 			{#key buildId}
-				<svelte:component this={BuildLog} {buildId} on:updateBuildStatus={updateBuildStatus} />
+				<svelte:component this={BuildLog} {buildId} />
 			{/key}
 		{/if}
 	</div>

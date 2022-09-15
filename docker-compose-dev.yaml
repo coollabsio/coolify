@@ -2,12 +2,10 @@ version: '3.8'
 
 services:
  fluent-bit:
-    image: fluent/fluent-bit:1.9.8
+    image: coollabsio/coolify-fluent-bit:1.0.0
     container_name: coolify-fluentbit
     volumes:
       - ./logs:/logs
-      - ./others/fluentbit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
-      - ./others/fluentbit/parser.conf:/fluent-bit/etc/parser.conf
     ports:
       - "24224:24224"
     networks:
