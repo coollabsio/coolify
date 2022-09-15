@@ -33,6 +33,8 @@ importers:
       bree: 9.1.2
       cabin: 9.1.2
       compare-versions: 5.0.1
+      csv-parse: ^5.3.0
+      csvtojson: ^2.0.10
       cuid: 2.1.8
       dayjs: 1.11.5
       dockerode: 3.3.4
@@ -65,7 +67,7 @@ importers:
       typescript: 4.8.2
       unique-names-generator: 4.7.1
     dependencies:
-      '@breejs/ts-worker': 2.0.0_d3un4r7p64mpe4ydkpns6lvpxy
+      '@breejs/ts-worker': 2.0.0_zx7xfusupi724hd5vcuaoj6jni
       '@fastify/autoload': 5.3.1
       '@fastify/cookie': 8.1.0
       '@fastify/cors': 8.1.0
@@ -80,6 +82,8 @@ importers:
       bree: 9.1.2
       cabin: 9.1.2
       compare-versions: 5.0.1
+      csv-parse: 5.3.0
+      csvtojson: 2.0.10
       cuid: 2.1.8
       dayjs: 1.11.5
       dockerode: 3.3.4
@@ -241,11 +245,12 @@ packages:
     engines: {node: '>= 10'}
     dev: false
 
-  /@breejs/ts-worker/2.0.0_d3un4r7p64mpe4ydkpns6lvpxy:
+  /@breejs/ts-worker/2.0.0_zx7xfusupi724hd5vcuaoj6jni:
     resolution: {integrity: sha512-6anHRcmgYlF7mrm/YVRn6rx2cegLuiY3VBxkkimOTWC/dVQeH336imVSuIKEGKTwiuNTPr2hswVdDSneNuXg3A==}
     engines: {node: '>= 12.11'}
     peerDependencies:
       bree: '>=9.0.0'
+      tsconfig-paths: '>= 4'
     dependencies:
       bree: 9.1.2
       ts-node: 10.8.2_r4hqq7vrw4pxsipnb7ha25ylfe
@@ -1870,6 +1875,10 @@ packages:
       readable-stream: 3.6.0
     dev: false
 
+  /bluebird/3.7.2:
+    resolution: {integrity: sha512-XpNj6GDQzdfW+r2Wnn7xiSAd7TM3jzkxGXBGTtWKuSXv1xUV+azxAm8jdWZN06QTQk+2N2XB9jRDkvbmQmcRtg==}
+    dev: false
+
   /bn.js/4.12.0:
     resolution: {integrity: sha512-c98Bf3tPniI+scsdk237ku1Dc3ujXQTSgyiPUDEOe7tRkhrqridvh8klBv0HCEso1OLOYcHuCv/cS6DNxKH+ZA==}
     dev: false
@@ -2291,6 +2300,20 @@ packages:
     resolution: {integrity: sha512-/Tb/JcjK111nNScGob5MNtsntNM1aCNUDipB/TkwZFhyDrrE47SOx/18wF2bbjgc3ZzCSKW1T5nt5EbFoAz/Vg==}
     engines: {node: '>=4'}
     hasBin: true
+
+  /csv-parse/5.3.0:
+    resolution: {integrity: sha512-UXJCGwvJ2fep39purtAn27OUYmxB1JQto+zhZ4QlJpzsirtSFbzLvip1aIgziqNdZp/TptvsKEV5BZSxe10/DQ==}
+    dev: false
+
+  /csvtojson/2.0.10:
+    resolution: {integrity: sha512-lUWFxGKyhraKCW8Qghz6Z0f2l/PqB1W3AO0HKJzGIQ5JRSlR651ekJDiGJbBT4sRNNv5ddnSGVEnsxP9XRCVpQ==}
+    engines: {node: '>=4.0.0'}
+    hasBin: true
+    dependencies:
+      bluebird: 3.7.2
+      lodash: 4.17.21
+      strip-bom: 2.0.0
+    dev: false
 
   /cuid/2.1.8:
     resolution: {integrity: sha512-xiEMER6E7TlTPnDxrM4eRiC6TRgjNX9xzEZ5U/Se2YJKr7Mq4pJn/2XEHjl3STcSh96GmkHPcBXLES8M29wyyg==}
@@ -3898,6 +3921,10 @@ packages:
     dependencies:
       has-symbols: 1.0.3
     dev: true
+
+  /is-utf8/0.2.1:
+    resolution: {integrity: sha512-rMYPYvCzsXywIsldgLaSoPlw5PfoB/ssr7hY4pLfcodrA5M/eArza1a9VmTiNIBNMjOGr1Ow9mTyU2o69U6U9Q==}
+    dev: false
 
   /is-uuid/1.0.2:
     resolution: {integrity: sha512-tCByphFcJgf2qmiMo5hMCgNAquNSagOetVetDvBXswGkNfoyEMvGH1yDlF8cbZbKnbVBr4Y5/rlpMz9umxyBkQ==}
@@ -5593,6 +5620,13 @@ packages:
     engines: {node: '>=12'}
     dependencies:
       ansi-regex: 6.0.1
+    dev: false
+
+  /strip-bom/2.0.0:
+    resolution: {integrity: sha512-kwrX1y7czp1E69n2ajbG65mIo9dqvJ+8aBQXOGVxqwvNbsXdFM6Lq37dLAY3mknUwru8CfcCbfOLL/gMo+fi3g==}
+    engines: {node: '>=0.10.0'}
+    dependencies:
+      is-utf8: 0.2.1
     dev: false
 
   /strip-bom/3.0.0:

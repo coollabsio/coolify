@@ -20,28 +20,22 @@ services:
       - '.env'
     networks:
       - coolify-infra
-  # postgres:
-  #   image: postgres:14.5-alpine
-  #   restart: always
-  #   container_name: coolify-pg
-  #   command:
-  #     - "postgres"
-  #     - "-c"
-  #     - "log_connections=yes"
-  #     - "-c"
-  #     - "max_connections=1337"
-  #   volumes:
-  #     - 'coolify-pgdb:/var/lib/postgresql/data'
-  #   ports:
-  #     - target: 5432
-  #       published: 5432
-  #       protocol: tcp
+  fluent-bit:
+    image: fluent/fluent-bit:1.9.8
+    container_name: coolify-fluentbit
+    volumes:
+      - 'coolify-logs:/app/logs'
+      - /app/fluentbit/:/fluent-bit/etc/
+    networks:
+      - coolify-infra
 networks:
   coolify-infra:
     attachable: true
     name: coolify-infra
 
 volumes:
+  coolify-logs:
+    name: coolify-logs
   coolify-db:
     name: coolify-db
   coolify-pgdb:

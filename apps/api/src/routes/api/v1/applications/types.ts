@@ -97,6 +97,7 @@ export interface GetBuildLogs extends OnlyId {
 }
 export interface GetBuildIdLogs {
     Params: {
+        id: string,
         buildId: string
     },
     Querystring: {

@@ -5,6 +5,7 @@ import axios from 'axios';
 import { FastifyReply } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
+import csv from 'csvtojson';
 
 import { day } from '../../../../lib/dayjs';
 import { makeLabelForStandaloneApplication, setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
@@ -14,6 +15,7 @@ import { checkContainer, formatLabelsOnDocker, isContainerExited, removeContaine
 import type { FastifyRequest } from 'fastify';
 import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain, StopPreviewApplication, RestartPreviewApplication } from './types';
 import { OnlyId } from '../../../../types';
+import path from 'node:path';
 
 function filterObject(obj, callback) {
     return Object.fromEntries(Object.entries(obj).
@@ -1178,22 +1180,38 @@ export async function getBuildLogs(request: FastifyRequest<GetBuildLogs>) {
 
 export async function getBuildIdLogs(request: FastifyRequest<GetBuildIdLogs>) {
     try {
-        const { buildId } = request.params
+        // TODO: Fluentbit could still hold the logs, so we need to check if the logs are done
+        const { buildId, id } = request.params
         let { sequence = 0 } = request.query
         if (typeof sequence !== 'number') {
             sequence = Number(sequence)
         }
-        let logs = await prisma.buildLog.findMany({
-            where: { buildId, time: { gt: sequence } },
-            orderBy: { time: 'asc' }
-        });
+        let file = `/app/logs/${id}_buildlog_${buildId}.csv`
+        if (isDev) {
+            file = `${process.cwd()}/../../logs/${id}_buildlog_${buildId}.csv`
+        }
         const data = await prisma.build.findFirst({ where: { id: buildId } });
         const createdAt = day(data.createdAt).utc();
+        try {
+            await fs.stat(file)
+        } catch (error) {
+            return {
+                logs: [],
+                took: day().diff(createdAt) / 1000,
+                status: data?.status || 'queued'
+            }
+        }
+        let fileLogs = (await fs.readFile(file)).toString()
+        let decryptedLogs = await csv({ noheader: true }).fromString(fileLogs)
+        let logs = decryptedLogs.map(log => {
+            const parsed = {
+                time: log['field1'],
+                line: decrypt(log['field2'] + '","' + log['field3'])
+            }
+            return parsed
+        }).filter(log => log.time > sequence)
         return {
-            logs: logs.map(log => {
-                log.time = Number(log.time)
-                return log
-            }),
+            logs,
             took: day().diff(createdAt) / 1000,
             status: data?.status || 'queued'
         }

@@ -11,7 +11,7 @@
 	import LoadingLogs from '$lib/components/LoadingLogs.svelte';
 	import { errorNotification } from '$lib/common';
 	import Tooltip from '$lib/components/Tooltip.svelte';
-
+	import { day } from '$lib/dayjs';
 	let logs: any = [];
 	let currentStatus: any;
 	let streamInterval: any;
@@ -159,7 +159,7 @@
 				bind:this={logsEl}
 			>
 				{#each logs as log}
-					<div>{log.line + '\n'}</div>
+					<div>[{day.unix(log.time).format('HH:mm:ss.SSS')}] {log.line + '\n'}</div>
 				{/each}
 			</div>
 		{:else}

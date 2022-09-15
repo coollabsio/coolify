@@ -33,6 +33,7 @@ RUN chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker
 RUN (curl -sSL "https://github.com/buildpacks/pack/releases/download/v0.27.0/pack-v0.27.0-linux.tgz" | tar -C /usr/local/bin/ --no-same-owner -xzv pack)
 
 COPY --from=build /app/apps/api/build/ .
+COPY --from=build /app/others/fluentbit/ ./fluentbit
 COPY --from=build /app/apps/ui/build/ ./public
 COPY --from=build /app/apps/api/prisma/ ./prisma
 COPY --from=build /app/apps/api/package.json .
