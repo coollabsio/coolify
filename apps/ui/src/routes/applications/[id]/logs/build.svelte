@@ -51,7 +51,7 @@
 		clearInterval(loadBuildLogsInterval);
 	});
 	async function getBuildLogs() {
-		const response = await get(`/applications/${$page.params.id}/logs/build?skip=0`);
+		const response = await get(`/applications/${$page.params.id}/logs/build?skip=${skip}`);
 		builds = response.builds;
 	}
 	// async function updateBuildStatus({ detail }: { detail: any }) {
