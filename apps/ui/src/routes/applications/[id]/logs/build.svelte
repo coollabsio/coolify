@@ -213,8 +213,10 @@
 					<div class="w-48 text-center text-xs">
 						{#if build.status === 'running'}
 							<div>
+								{day(build.createdAt)}
+								{day()}
 								<span class="font-bold text-xl"
-									>{day(build.updatedAt).utc().diff(day(build.createdAt)) / 1000}s</span
+									>{(day().utc().diff(day(build.createdAt)) / 1000).toFixed(0)}s</span
 								>
 							</div>
 						{:else}
