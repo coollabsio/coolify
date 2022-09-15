@@ -1206,6 +1206,7 @@ export async function getBuildIdLogs(request: FastifyRequest<GetBuildIdLogs>) {
                     log.time = Number(log.time)
                     return log
                 }),
+                fromDb: true,
                 took: day().diff(createdAt) / 1000,
                 status: data?.status || 'queued'
             }
@@ -1221,6 +1222,7 @@ export async function getBuildIdLogs(request: FastifyRequest<GetBuildIdLogs>) {
         }).filter(log => log.time > sequence)
         return {
             logs,
+            fromDb: false,
             took: day().diff(createdAt) / 1000,
             status: data?.status || 'queued'
         }

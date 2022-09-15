@@ -18,7 +18,7 @@
 	let followingBuild: any;
 	let followingInterval: any;
 	let logsEl: any;
-
+	let fromDb = false;
 	let cancelInprogress = false;
 
 	const { id } = $page.params;
@@ -38,13 +38,16 @@
 	}
 	async function streamLogs(sequence = 0) {
 		try {
-			let { logs: responseLogs, status } = await get(
-				`/applications/${id}/logs/build/${buildId}?sequence=${sequence}`
-			);
+			let {
+				logs: responseLogs,
+				status,
+				fromDb: from
+			} = await get(`/applications/${id}/logs/build/${buildId}?sequence=${sequence}`);
 			currentStatus = status;
 			logs = logs.concat(
 				responseLogs.map((log: any) => ({ ...log, line: cleanAnsiCodes(log.line) }))
 			);
+			fromDb = from;
 			streamInterval = setInterval(async () => {
 				if (status !== 'running' && status !== 'queued') {
 					clearInterval(streamInterval);
@@ -159,7 +162,11 @@
 				bind:this={logsEl}
 			>
 				{#each logs as log}
-					<div>[{day.unix(log.time).format('HH:mm:ss.SSS')}] {log.line + '\n'}</div>
+					{#if fromDb}
+						<div>[{day.unix(log.time).format('HH:mm:ss.SSS')}] {log.line + '\n'}</div>
+					{:else}
+						<div>{log.line + '\n'}</div>
+					{/if}
 				{/each}
 			</div>
 		{:else}
