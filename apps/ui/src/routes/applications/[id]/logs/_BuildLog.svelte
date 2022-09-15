@@ -11,7 +11,7 @@
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { day } from '$lib/dayjs';
 	import { selectedBuildId } from '$lib/store';
-	
+
 	let logs: any = [];
 	let currentStatus: any;
 	let streamInterval: any;
@@ -43,11 +43,13 @@
 				status,
 				fromDb: from
 			} = await get(`/applications/${id}/logs/build/${$selectedBuildId}?sequence=${sequence}`);
+
 			currentStatus = status;
 			logs = logs.concat(
 				responseLogs.map((log: any) => ({ ...log, line: cleanAnsiCodes(log.line) }))
 			);
 			fromDb = from;
+
 			streamInterval = setInterval(async () => {
 				if (status !== 'running' && status !== 'queued') {
 					clearInterval(streamInterval);
@@ -60,7 +62,8 @@
 					);
 					status = data.status;
 					currentStatus = status;
-
+					fromDb = data.fromDb;
+					
 					logs = logs.concat(
 						data.logs.map((log: any) => ({ ...log, line: cleanAnsiCodes(log.line) }))
 					);
