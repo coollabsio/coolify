@@ -12,6 +12,7 @@ services:
         mode: host
     volumes:
       - 'coolify-db:/app/db'
+      - 'coolify-logs:/app/logs'
       - 'coolify-ssl-certs:/app/ssl'
       - 'coolify-traefik-letsencrypt:/etc/traefik/acme'
       - 'coolify-letsencrypt:/etc/letsencrypt'
