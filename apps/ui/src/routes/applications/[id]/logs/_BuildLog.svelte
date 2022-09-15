@@ -78,7 +78,7 @@
 		try {
 			cancelInprogress = true;
 			await post(`/applications/${id}/cancel`, {
-				$selectedBuildId,
+				buildId: $selectedBuildId,
 				applicationId: id
 			});
 		} catch (error) {
