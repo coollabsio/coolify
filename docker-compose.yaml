@@ -21,11 +21,10 @@ services:
     networks:
       - coolify-infra
   fluent-bit:
-    image: fluent/fluent-bit:1.9.8
+    image: coollabsio/coolify-fluent-bit:1.9.8
     container_name: coolify-fluentbit
     volumes:
       - 'coolify-logs:/app/logs'
-      - /app/fluentbit/:/fluent-bit/etc/
     networks:
       - coolify-infra
 networks:
