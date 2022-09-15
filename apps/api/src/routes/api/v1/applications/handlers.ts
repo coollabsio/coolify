@@ -1168,7 +1168,12 @@ export async function getBuildLogs(request: FastifyRequest<GetBuildLogs>) {
                 skip
             });
         }
-
+        builds = builds.map((build) => {
+            if (build.status === 'running') {
+                build.elapsed = (day().utc().diff(day(build.createdAt)) / 1000).toFixed(0);
+            }
+            return build
+        })
         return {
             builds,
             buildCount

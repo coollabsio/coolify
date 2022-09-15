@@ -1,6 +1,4 @@
 <script lang="ts">
-	export let buildId: any;
-
 	import { createEventDispatcher, onDestroy, onMount } from 'svelte';
 	const dispatch = createEventDispatcher();
 
@@ -12,6 +10,8 @@
 	import { errorNotification } from '$lib/common';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { day } from '$lib/dayjs';
+	import { selectedBuildId } from '$lib/store';
+	
 	let logs: any = [];
 	let currentStatus: any;
 	let streamInterval: any;
@@ -42,7 +42,7 @@
 				logs: responseLogs,
 				status,
 				fromDb: from
-			} = await get(`/applications/${id}/logs/build/${buildId}?sequence=${sequence}`);
+			} = await get(`/applications/${id}/logs/build/${$selectedBuildId}?sequence=${sequence}`);
 			currentStatus = status;
 			logs = logs.concat(
 				responseLogs.map((log: any) => ({ ...log, line: cleanAnsiCodes(log.line) }))
@@ -56,7 +56,7 @@
 				const nextSequence = logs[logs.length - 1]?.time || 0;
 				try {
 					const data = await get(
-						`/applications/${id}/logs/build/${buildId}?sequence=${nextSequence}`
+						`/applications/${id}/logs/build/${$selectedBuildId}?sequence=${nextSequence}`
 					);
 					status = data.status;
 					currentStatus = status;
@@ -78,7 +78,7 @@
 		try {
 			cancelInprogress = true;
 			await post(`/applications/${id}/cancel`, {
-				buildId,
+				$selectedBuildId,
 				applicationId: id
 			});
 		} catch (error) {

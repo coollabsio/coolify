@@ -157,3 +157,5 @@ export const addToast = (toast: AddToast) => {
     if (t.timeout) t.timeoutInterval = setTimeout(() => dismissToast(id), t.timeout)
     toasts.update((all: any) => [t, ...all])
 }
+
+export const selectedBuildId: any = writable(null)

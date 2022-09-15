@@ -23,7 +23,7 @@
 	export let application: any;
 	export let buildCount: any;
 	import { page } from '$app/stores';
-	import { addToast } from '$lib/store';
+	import { addToast, selectedBuildId } from '$lib/store';
 	import BuildLog from './_BuildLog.svelte';
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
@@ -34,12 +34,11 @@
 	const { id } = $page.params;
 
 	let loadBuildLogsInterval: any = null;
-	let buildId: any;
 
 	let skip = 0;
 	let noMoreBuilds = buildCount < 5 || buildCount <= skip;
 	let preselectedBuildId = $page.url.searchParams.get('buildId');
-	if (preselectedBuildId) buildId = preselectedBuildId;
+	if (preselectedBuildId) $selectedBuildId = preselectedBuildId;
 
 	onMount(async () => {
 		getBuildLogs();
@@ -92,8 +91,8 @@
 		}
 	}
 	function loadBuild(build: any) {
-		buildId = build;
-		return changeQueryParams(buildId);
+		$selectedBuildId = build;
+		return changeQueryParams($selectedBuildId);
 	}
 	async function resetQueue() {
 		const sure = confirm(
@@ -192,7 +191,7 @@
 					class:rounded-tr={index === 0}
 					class:rounded-br={index === builds.length - 1}
 					class="flex cursor-pointer items-center justify-center py-4 no-underline transition-all duration-100 hover:bg-coolgray-300 hover:shadow-xl"
-					class:bg-coolgray-200={buildId === build.id}
+					class:bg-coolgray-200={$selectedBuildId === build.id}
 				>
 					<div class="flex-col px-2 text-center min-w-[10rem]">
 						<div class="text-sm font-bold">
@@ -213,13 +212,11 @@
 					<div class="w-48 text-center text-xs">
 						{#if build.status === 'running'}
 							<div>
-								{day(build.createdAt)}
-								{day()}
 								<span class="font-bold text-xl"
-									>{(day().utc().diff(day(build.createdAt)) / 1000).toFixed(0)}s</span
+									>{build.elapsed}s</span
 								>
 							</div>
-						{:else}
+						{:else if build.status !== 'queued'}
 							<div>{day(build.updatedAt).utc().fromNow()}</div>
 							<div>
 								{$t('application.build.finished_in')}
@@ -249,9 +246,9 @@
 		{/if}
 	</div>
 	<div class="flex-1 md:w-96">
-		{#if buildId}
-			{#key buildId}
-				<svelte:component this={BuildLog} {buildId} />
+		{#if $selectedBuildId}
+			{#key $selectedBuildId}
+				<svelte:component this={BuildLog} />
 			{/key}
 		{/if}
 	</div>
