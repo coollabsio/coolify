@@ -144,7 +144,7 @@
 		loadBuildingStatusInterval = setInterval(() => {
 			application.previewApplication.forEach((preview: any) => {
 				if (status[id] === 'building') {
-					getStatus(preview);
+					await getStatus(preview);
 				}
 			});
 		}, 3000);
