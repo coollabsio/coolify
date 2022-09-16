@@ -142,7 +142,7 @@
 	});
 	onMount(async () => {
 		loadBuildingStatusInterval = setInterval(() => {
-			application.previewApplication.forEach((preview: any) => {
+			application.previewApplication.forEach(async (preview: any) => {
 				if (status[id] === 'building') {
 					await getStatus(preview);
 				}
