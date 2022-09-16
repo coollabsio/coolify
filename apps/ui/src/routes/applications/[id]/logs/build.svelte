@@ -54,34 +54,14 @@
 		const response = await get(`/applications/${$page.params.id}/logs/build?skip=${skip}`);
 		builds = response.builds;
 	}
-	// async function updateBuildStatus({ detail }: { detail: any }) {
-	// 	const { status } = detail;
-	// 	if (status !== 'running') {
-	// 		try {
-	// 			const data = await get(`/applications/${id}/logs/build?buildId=${buildId}`);
-	// 			builds = builds.filter((build: any) => {
-	// 				if (build.id === data.builds[0].id) {
-	// 					build.status = data.builds[0].status;
-	// 				}
-	// 				return build;
-	// 			});
-	// 		} catch (error) {
-	// 			return errorNotification(error);
-	// 		}
-	// 	} else {
-	// 		builds = builds.filter((build: any) => {
-	// 			if (build.id === buildId) build.status = status;
-	// 			return build;
-	// 		});
-	// 	}
-	// }
+	
 	async function loadMoreBuilds() {
 		if (buildCount >= skip) {
 			skip = skip + 5;
-			noMoreBuilds = buildCount >= skip;
+			noMoreBuilds = buildCount <= skip;
 			try {
 				const data = await get(`/applications/${id}/logs/build?skip=${skip}`);
-				builds = builds.concat(data.builds);
+				builds = data.builds
 				return;
 			} catch (error) {
 				return errorNotification(error);
@@ -235,7 +215,7 @@
 		</div>
 		{#if !noMoreBuilds}
 			{#if buildCount > 5}
-				<div class="flex space-x-2">
+				<div class="flex space-x-2 pb-10">
 					<button
 						disabled={noMoreBuilds}
 						class=" btn btn-sm w-full text-xs"

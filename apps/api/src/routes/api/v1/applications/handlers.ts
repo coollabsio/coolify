@@ -13,7 +13,7 @@ import { checkDomainsIsValidInDNS, checkDoubleBranch, checkExposedPort, createDi
 import { checkContainer, formatLabelsOnDocker, isContainerExited, removeContainer } from '../../../../lib/docker';
 
 import type { FastifyRequest } from 'fastify';
-import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain, StopPreviewApplication, RestartPreviewApplication } from './types';
+import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain, StopPreviewApplication, RestartPreviewApplication, GetBuilds } from './types';
 import { OnlyId } from '../../../../types';
 import path from 'node:path';
 
@@ -1147,7 +1147,7 @@ export async function getApplicationLogs(request: FastifyRequest<GetApplicationL
         return errorHandler({ status, message })
     }
 }
-export async function getBuildLogs(request: FastifyRequest<GetBuildLogs>) {
+export async function getBuilds(request: FastifyRequest<GetBuilds>) {
     try {
         const { id } = request.params
         let { buildId, skip = 0 } = request.query
@@ -1164,8 +1164,7 @@ export async function getBuildLogs(request: FastifyRequest<GetBuildLogs>) {
             builds = await prisma.build.findMany({
                 where: { applicationId: id },
                 orderBy: { createdAt: 'desc' },
-                take: 5,
-                skip
+                take: 5 + skip
             });
         }
         builds = builds.map((build) => {

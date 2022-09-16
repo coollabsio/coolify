@@ -89,7 +89,7 @@ export interface GetApplicationLogs extends OnlyId {
         since: number,
     }
 }
-export interface GetBuildLogs extends OnlyId {
+export interface GetBuilds extends OnlyId {
     Querystring: {
         buildId: string
         skip: number,
