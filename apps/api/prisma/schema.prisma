@@ -55,7 +55,7 @@ model Permission {
 
 model Team {
   id                String              @id @default(cuid())
-  name              String?
+  name              String?             @unique
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   databaseId        String?
