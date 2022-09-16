@@ -119,6 +119,7 @@
 			return 'error';
 		} finally {
 			numberOfGetStatus--;
+			status = status
 		}
 	}
 	async function restartPreview(preview: any) {
@@ -143,11 +144,23 @@
 	onMount(async () => {
 		loadBuildingStatusInterval = setInterval(() => {
 			application.previewApplication.forEach(async (preview: any) => {
-				if (status[id] === 'building') {
-					await getStatus(preview);
+				const { applicationId, pullmergeRequestId } = preview;
+				if (status[preview.id] === 'building') {
+					const response = await get(
+						`/applications/${applicationId}/previews/${pullmergeRequestId}/status`
+					);
+					if (response.isBuilding) {
+						status[preview.id] = 'building';
+					} else if (response.isRunning) {
+						status[preview.id] = 'running';
+						return 'running';
+					} else {
+						status[preview.id] = 'stopped';
+						return 'stopped';
+					}
 				}
 			});
-		}, 3000);
+		}, 2000);
 		try {
 			loading.init = true;
 			loading.restart = true;
@@ -279,8 +292,8 @@
 						<div class="w-full rounded p-5 bg-coolgray-200 indicator">
 							{#await getStatus(preview)}
 								<span class="indicator-item badge bg-yellow-500 badge-sm" />
-							{:then status}
-								{#if status === 'running'}
+							{:then}
+								{#if status[preview.id] === 'running'}
 									<span class="indicator-item badge bg-success badge-sm" />
 								{:else}
 									<span class="indicator-item badge bg-error badge-sm" />
