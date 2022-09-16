@@ -94,9 +94,11 @@
 		</div>
 		{#if $appSession.teamId === '0'}
 			<button
+				disabled={loading.cleanup}
 				on:click={manuallyCleanupStorage}
 				class:loading={loading.cleanup}
-				class="btn btn-sm bg-coollabs">Cleanup Storage</button
+				class:bg-coollabs={!loading.cleanup}
+				class="btn btn-sm">Cleanup Storage</button
 			>
 		{/if}
 	</div>
