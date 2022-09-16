@@ -172,7 +172,7 @@ export const supportedServiceTypesAndVersions = [
 		fancyName: 'Appwrite',
 		baseImage: 'appwrite/appwrite',
 		images: ['mariadb:10.7', 'redis:6.2-alpine', 'appwrite/telegraf:1.4.0'],
-		versions: ['latest', '0.15.3'],
+		versions: ['latest', '1.0','0.15.3'],
 		recommendedVersion: '0.15.3',
 		ports: {
 			main: 80
