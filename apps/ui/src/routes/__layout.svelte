@@ -138,7 +138,7 @@
 					sveltekit:prefetch
 					href="/"
 					class="icons  hover:text-white"
-					class:text-white={$page.url.pathname === '/'}
+					class:text-pink-500={$page.url.pathname === '/'}
 					class:bg-coolgray-500={$page.url.pathname === '/'}
 					class:bg-coolgray-200={!($page.url.pathname === '/')}
 				>
@@ -165,7 +165,7 @@
 						sveltekit:prefetch
 						href="/servers"
 						class="icons hover:text-white"
-						class:text-white={$page.url.pathname === '/servers'}
+						class:text-sky-500={$page.url.pathname === '/servers'}
 						class:bg-coolgray-500={$page.url.pathname === '/servers'}
 						class:bg-coolgray-200={!($page.url.pathname === '/servers')}
 					>
