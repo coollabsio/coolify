@@ -49,4 +49,3 @@
 		<h1 class="text-center text-xs">Nothing here.</h1>
 	{/if}
 </div>
-<div class="text-xs text-center">Remote servers will be here soon</div>
