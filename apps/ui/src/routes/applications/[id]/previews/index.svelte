@@ -24,14 +24,14 @@
 	import { t } from '$lib/translations';
 	import { goto } from '$app/navigation';
 	import { asyncSleep, errorNotification, getDomain, getRndInteger } from '$lib/common';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { addToast } from '$lib/store';
 	import SimpleExplainer from '$lib/components/SimpleExplainer.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 
 	const { id } = $page.params;
-
+	let loadBuildingStatusInterval: any = null;
 	let PRMRSecrets: any;
 	let applicationSecrets: any;
 	let loading = {
@@ -137,7 +137,17 @@
 			loading.restart = false;
 		}
 	}
+	onDestroy(() => {
+		clearInterval(loadBuildingStatusInterval);
+	});
 	onMount(async () => {
+		loadBuildingStatusInterval = setInterval(() => {
+			application.previewApplication.forEach((preview: any) => {
+				if (status[id] === 'building') {
+					getStatus(preview);
+				}
+			});
+		}, 3000);
 		try {
 			loading.init = true;
 			loading.restart = true;
