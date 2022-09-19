@@ -84,3 +84,7 @@ export function handlerNotFoundLoad(error: any, url: URL) {
 		error: new Error(`Could not load ${url}`)
 	};
 }
+
+export function getRndInteger(min: number, max: number) {
+	return Math.floor(Math.random() * (max - min + 1)) + min;
+}

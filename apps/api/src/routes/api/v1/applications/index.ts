@@ -1,8 +1,8 @@
 import { FastifyPluginAsync } from 'fastify';
 import { OnlyId } from '../../../../types';
-import { cancelDeployment, checkDNS, checkDomain, checkRepository, deleteApplication, deleteSecret, deleteStorage, deployApplication, getApplication, getApplicationLogs, getApplicationStatus, getBuildIdLogs, getBuildLogs, getBuildPack, getGitHubToken, getGitLabSSHKey, getImages, getPreviews, getSecrets, getStorages, getUsage, listApplications, newApplication, restartApplication, saveApplication, saveApplicationSettings, saveApplicationSource, saveBuildPack, saveConnectedDatabase, saveDeployKey, saveDestination, saveGitLabSSHKey, saveRepository, saveSecret, saveStorage, stopApplication, stopPreviewApplication } from './handlers';
+import { cancelDeployment, checkDNS, checkDomain, checkRepository, deleteApplication, deleteSecret, deleteStorage, deployApplication, getApplication, getApplicationLogs, getApplicationStatus, getBuildIdLogs, getBuildPack, getBuilds, getGitHubToken, getGitLabSSHKey, getImages, getPreviews, getPreviewStatus, getSecrets, getStorages, getUsage, listApplications, loadPreviews, newApplication, restartApplication, restartPreview, saveApplication, saveApplicationSettings, saveApplicationSource, saveBuildPack, saveConnectedDatabase, saveDeployKey, saveDestination, saveGitLabSSHKey, saveRepository, saveSecret, saveStorage, stopApplication, stopPreviewApplication } from './handlers';
 
-import type { CancelDeployment, CheckDNS, CheckDomain, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, DeployApplication, GetApplicationLogs, GetBuildIdLogs, GetBuildLogs, GetImages, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, StopPreviewApplication } from './types';
+import type { CancelDeployment, CheckDNS, CheckDomain, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, DeployApplication, GetApplicationLogs, GetBuildIdLogs, GetBuilds, GetImages, RestartPreviewApplication, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, StopPreviewApplication } from './types';
 
 const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.addHook('onRequest', async (request) => {
@@ -37,9 +37,12 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.delete<DeleteStorage>('/:id/storages', async (request) => await deleteStorage(request));
 
     fastify.get<OnlyId>('/:id/previews', async (request) => await getPreviews(request));
+    fastify.post<OnlyId>('/:id/previews/load', async (request) => await loadPreviews(request));
+    fastify.get<RestartPreviewApplication>('/:id/previews/:pullmergeRequestId/status', async (request) => await getPreviewStatus(request));
+    fastify.post<RestartPreviewApplication>('/:id/previews/:pullmergeRequestId/restart', async (request, reply) => await restartPreview(request, reply));
 
     fastify.get<GetApplicationLogs>('/:id/logs', async (request) => await getApplicationLogs(request));
-    fastify.get<GetBuildLogs>('/:id/logs/build', async (request) => await getBuildLogs(request));
+    fastify.get<GetBuilds>('/:id/logs/build', async (request) => await getBuilds(request));
     fastify.get<GetBuildIdLogs>('/:id/logs/build/:buildId', async (request) => await getBuildIdLogs(request));
 
     fastify.get('/:id/usage', async (request) => await getUsage(request))

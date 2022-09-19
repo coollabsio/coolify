@@ -67,7 +67,8 @@
 		setLocation,
 		addToast,
 		isDeploymentEnabled,
-		checkIfDeploymentEnabledApplications
+		checkIfDeploymentEnabledApplications,
+		selectedBuildId
 	} from '$lib/store';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
 	import Tooltip from '$lib/components/Tooltip.svelte';
@@ -89,13 +90,10 @@
 				message: $t('application.deployment_queued'),
 				type: 'success'
 			});
-			if ($page.url.pathname.startsWith(`/applications/${id}/logs/build`)) {
-				return window.location.assign(`/applications/${id}/logs/build?buildId=${buildId}`);
-			} else {
-				return await goto(`/applications/${id}/logs/build?buildId=${buildId}`, {
-					replaceState: true
-				});
-			}
+			$selectedBuildId = buildId;
+			return await goto(`/applications/${id}/logs/build?buildId=${buildId}`, {
+				replaceState: true
+			});
 		} catch (error) {
 			return errorNotification(error);
 		}

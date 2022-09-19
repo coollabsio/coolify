@@ -1,4 +1,4 @@
-import { base64Encode, executeDockerCmd, generateTimestamp, getDomain, isDev, prisma, version } from "../common";
+import { base64Encode, encrypt, executeDockerCmd, generateTimestamp, getDomain, isDev, prisma, version } from "../common";
 import { promises as fs } from 'fs';
 import { day } from "../dayjs";
 
@@ -461,17 +461,32 @@ export const saveBuildLog = async ({
 	buildId: string;
 	applicationId: string;
 }): Promise<any> => {
+	const { default: got } = await import('got')
+
 	if (line && typeof line === 'string' && line.includes('ghs_')) {
 		const regex = /ghs_.*@/g;
 		line = line.replace(regex, '<SENSITIVE_DATA_DELETED>@');
 	}
 	const addTimestamp = `[${generateTimestamp()}] ${line}`;
-	if (isDev) console.debug(`[${applicationId}] ${addTimestamp}`);
-	return await prisma.buildLog.create({
-		data: {
-			line: addTimestamp, buildId, time: Number(day().valueOf()), applicationId
-		}
-	});
+	const fluentBitUrl = isDev ? 'http://localhost:24224' : 'http://coolify-fluentbit:24224';
+
+	if (isDev) {
+		console.debug(`[${applicationId}] ${addTimestamp}`);
+	}
+	try {
+		return await got.post(`${fluentBitUrl}/${applicationId}_buildlog_${buildId}.csv`, {
+			json: {
+				line: encrypt(line)
+			}
+		})
+	} catch(error) {
+		return await prisma.buildLog.create({
+			data: {
+				line: addTimestamp, buildId, time: Number(day().valueOf()), applicationId
+			}
+		});
+	}
+
 };
 
 export async function copyBaseConfigurationFiles(
@@ -707,7 +722,6 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
 	Dockerfile.push(`RUN ${buildCommand}`);
-	console.log(Dockerfile.join('\n'))
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
 	await buildImage({ ...data, isCache: true });
 }

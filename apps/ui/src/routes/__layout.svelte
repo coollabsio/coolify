@@ -320,10 +320,12 @@
 			</li>
 			<li>
 				<a
-					class="no-underline"
+					class="no-underline icons hover:text-white"
 					sveltekit:prefetch
 					href="/"
-					class:bg-primary={$page.url.pathname === '/'}
+					class:text-pink-500={$page.url.pathname === '/'}
+					class:bg-coolgray-500={$page.url.pathname === '/'}
+					class:bg-coolgray-200={!($page.url.pathname === '/')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -396,6 +398,7 @@
 					</svg>
 					IAM
 				</a>
+				<Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
 			</li>
 			<li>
 				<a
@@ -422,6 +425,9 @@
 					</svg>
 					Settings
 				</a>
+				<Tooltip triggeredBy="#settings" placement="right" color="bg-settings text-black"
+					>Settings</Tooltip
+				>
 			</li>
 			<li>
 				<div class="no-underline hover:bg-error" on:click={logout}>
@@ -443,12 +449,8 @@
 					</svg>
 					Logout
 				</div>
+				<Tooltip triggeredBy="#logout" placement="right" color="bg-red-600">Logout</Tooltip>
 			</li>
 		</ul>
 	</div>
 </div>
-
-<Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
-<Tooltip triggeredBy="#settings" placement="right" color="bg-settings  text-black">Settings</Tooltip
->
-<Tooltip triggeredBy="#logout" placement="right" color="bg-red-600">Logout</Tooltip>

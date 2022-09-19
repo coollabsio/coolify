@@ -37,7 +37,7 @@
 		<div class="grid grid-col gap-8 auto-cols-max grid-cols-1  p-4">
 			{#each servers as server}
 				<div class="no-underline mb-5">
-					<div class="w-full rounded bg-coolgray-100 indicator">
+					<div class="w-full rounded bg-coolgray-200 indicator">
 						{#if $appSession.teamId === '0'}
 							<Usage {server} />
 						{/if}
@@ -49,4 +49,3 @@
 		<h1 class="text-center text-xs">Nothing here.</h1>
 	{/if}
 </div>
-<div class="text-xs text-center">Remote servers will be here soon</div>

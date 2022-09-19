@@ -31,7 +31,7 @@
 	import { get, post } from '$lib/api';
 	import Usage from '$lib/components/Usage.svelte';
 	import { t } from '$lib/translations';
-	import { asyncSleep } from '$lib/common';
+	import { asyncSleep, getRndInteger } from '$lib/common';
 	import { appSession, search, addToast} from '$lib/store';
 
 	import ApplicationsIcons from '$lib/components/svg/applications/ApplicationIcons.svelte';
@@ -87,9 +87,7 @@
 		filtered.destinations = [];
 		filtered.otherDestinations = [];
 	}
-	function getRndInteger(min: number, max: number) {
-		return Math.floor(Math.random() * (max - min + 1)) + min;
-	}
+
 
 	async function getStatus(resources: any) {
 		const { id, buildPack, dualCerts } = resources;

@@ -21,7 +21,7 @@ import { scheduler } from './scheduler';
 import { supportedServiceTypesAndVersions } from './services/supportedVersions';
 import { includeServices } from './services/common';
 
-export const version = '3.10.3';
+export const version = '3.10.4';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -45,9 +45,7 @@ export function getAPIUrl() {
 	if (process.env.CODESANDBOX_HOST) {
 		return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/, '3001')}`;
 	}
-	return isDev
-		? 'http://localhost:3001'
-		: 'http://localhost:3000';
+	return isDev ? 'http://host.docker.internal:3001' : 'http://localhost:3000';
 }
 
 export function getUIUrl() {

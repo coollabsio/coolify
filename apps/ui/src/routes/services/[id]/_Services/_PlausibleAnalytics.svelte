@@ -21,7 +21,9 @@
 		name="scriptName"
 		id="scriptName"
 		readonly={!$appSession.isAdmin && !$status.service.isRunning}
-		disabled={!$appSession.isAdmin || $status.service.isRunning}
+		disabled={!$appSession.isAdmin ||
+			$status.service.isRunning ||
+			$status.service.initialLoading}
 		placeholder="plausible.js"
 		bind:value={service.plausibleAnalytics.scriptName}
 		required
@@ -33,7 +35,9 @@
 		class="w-full"
 		name="email"
 		id="email"
-		disabled={readOnly}
+		disabled={!$appSession.isAdmin ||
+			$status.service.isRunning ||
+			$status.service.initialLoading}
 		readonly={readOnly}
 		placeholder={$t('forms.email')}
 		bind:value={service.plausibleAnalytics.email}
@@ -45,7 +49,9 @@
 	<CopyPasswordField
 		name="username"
 		id="username"
-		disabled={readOnly}
+		disabled={!$appSession.isAdmin ||
+			$status.service.isRunning ||
+			$status.service.initialLoading}
 		readonly={readOnly}
 		placeholder={$t('forms.username')}
 		bind:value={service.plausibleAnalytics.username}

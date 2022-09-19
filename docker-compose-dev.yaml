@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+ fluent-bit:
+    image: coollabsio/coolify-fluent-bit:1.0.0
+    command: /fluent-bit/bin/fluent-bit -c /fluent-bit/etc/fluent-bit-dev.conf
+    container_name: coolify-fluentbit
+    volumes:
+      - ./logs:/logs
+    ports:
+      - "24224:24224"
+    networks:
+      - coolify-infra
+networks:
+  coolify-infra:
+    attachable: true
+    name: coolify-infra

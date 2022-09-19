@@ -12,6 +12,7 @@ services:
         mode: host
     volumes:
       - 'coolify-db:/app/db'
+      - 'coolify-logs:/app/logs'
       - 'coolify-ssl-certs:/app/ssl'
       - 'coolify-traefik-letsencrypt:/etc/traefik/acme'
       - 'coolify-letsencrypt:/etc/letsencrypt'
@@ -20,15 +21,25 @@ services:
       - '.env'
     networks:
       - coolify-infra
-
+  fluent-bit:
+    image: coollabsio/coolify-fluent-bit:1.0.0
+    container_name: coolify-fluentbit
+    volumes:
+      - 'coolify-logs:/app/logs'
+    networks:
+      - coolify-infra
 networks:
   coolify-infra:
     attachable: true
     name: coolify-infra
 
 volumes:
+  coolify-logs:
+    name: coolify-logs
   coolify-db:
     name: coolify-db
+  coolify-pgdb:
+    name: coolify-pgdb
   coolify-ssl-certs:
     name: coolify-ssl-certs
   coolify-letsencrypt:

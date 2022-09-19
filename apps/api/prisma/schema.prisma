@@ -119,6 +119,19 @@ model Application {
   secrets             Secret[]
   teams               Team[]
   connectedDatabase   ApplicationConnectedDatabase?
+  previewApplication  PreviewApplication[]
+}
+
+model PreviewApplication {
+  id                 String      @id @default(cuid())
+  pullmergeRequestId String
+  sourceBranch       String
+  isRandomDomain     Boolean     @default(false)
+  customDomain       String?
+  applicationId      String      @unique
+  application        Application @relation(fields: [applicationId], references: [id])
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 }
 
 model ApplicationConnectedDatabase {
@@ -210,21 +223,22 @@ model BuildLog {
 }
 
 model Build {
-  id                  String   @id @default(cuid())
-  type                String
-  applicationId       String?
-  destinationDockerId String?
-  gitSourceId         String?
-  githubAppId         String?
-  gitlabAppId         String?
-  commit              String?
-  pullmergeRequestId  String?
-  forceRebuild        Boolean  @default(false)
-  sourceBranch        String?
-  branch              String?
-  status              String?  @default("queued")
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  type                 String
+  applicationId        String?
+  destinationDockerId  String?
+  gitSourceId          String?
+  githubAppId          String?
+  gitlabAppId          String?
+  commit               String?
+  pullmergeRequestId   String?
+  previewApplicationId String?
+  forceRebuild         Boolean  @default(false)
+  sourceBranch         String?
+  branch               String?
+  status               String?  @default("queued")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
 
 model DestinationDocker {
