@@ -8,7 +8,7 @@
 	<div class="title">SearXNG</div>
 </div>
 
-<div class="grid grid-cols-2 items-center px-10">
+<div class="grid grid-cols-2 items-center lg:px-10 px-2">
 	<label for="secretKey">Secret Key</label>
 	<CopyPasswordField
 		name="secretKey"
@@ -23,7 +23,7 @@
 	<div class="title">Redis</div>
 </div>
 
-<div class="grid grid-cols-2 items-center px-10">
+<div class="grid grid-cols-2 items-center lg:px-10 px-2">
 	<label for="redisPassword">{$t('forms.password')}</label>
 	<CopyPasswordField
 		name="redisPassword"

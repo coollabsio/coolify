@@ -10,7 +10,7 @@
 			.slice(-16);
 </script>
 
-<a {id} href={url} target="_blank" class="icons inline-block text-pink-500 cursor-pointer text-xs">
+<a {id} href={url} target="_blank" class="icons inline-block cursor-pointer text-xs mx-2">
 	<svg
 		xmlns="http://www.w3.org/2000/svg"
 		class="w-6 h-6"

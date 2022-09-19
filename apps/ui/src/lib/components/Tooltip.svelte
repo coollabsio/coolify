@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Tooltip } from 'flowbite-svelte';
 	export let placement = 'bottom';
-	export let color = 'bg-coollabs text-left';
+	export let color = 'bg-coolgray-300 font-thin text-left';
 	export let triggeredBy = '#tooltip-default';
 </script>
 

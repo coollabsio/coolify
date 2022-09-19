@@ -63,19 +63,14 @@
 	});
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">
-		{$t('application.configuration.configure_destination')}
-	</div>
-</div>
-<div class="flex flex-col justify-center">
+<div class="flex flex-col justify-center w-full">
 	{#if !destinations || ownDestinations.length === 0}
 		<div class="flex-col">
 			<div class="pb-2 text-center font-bold">
 				{$t('application.configuration.no_configurable_destination')}
 			</div>
 			<div class="flex justify-center">
-				<a href="/new/destination" sveltekit:prefetch class="add-icon bg-sky-600 hover:bg-sky-500">
+				<a href="/destinations/new" sveltekit:prefetch class="add-icon bg-sky-600 hover:bg-sky-500">
 					<svg
 						class="w-6"
 						xmlns="http://www.w3.org/2000/svg"
@@ -93,7 +88,7 @@
 			</div>
 		</div>
 	{:else}
-		<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
+		<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row mx-auto">
 			{#each ownDestinations as destination}
 				<div class="p-2">
 					<form on:submit|preventDefault={() => handleSubmit(destination.id)}>
@@ -106,9 +101,9 @@
 			{/each}
 		</div>
 		{#if otherDestinations.length > 0 && $appSession.teamId === '0'}
-			<div class="px-6 pb-5 pt-10 text-xl font-bold">Other Destinations</div>
+			<div class="px-6 pb-5 pt-10 title">Other Destinations</div>
 		{/if}
-		<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row">
+		<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row mx-auto">
 			{#each otherDestinations as destination}
 				<div class="p-2">
 					<form on:submit|preventDefault={() => handleSubmit(destination.id)}>

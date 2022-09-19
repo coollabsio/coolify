@@ -15,9 +15,13 @@
 
 <div class="flex items-center py-4 pr-8">
 	<div class="flex w-96 flex-col">
-		<div class="text-xs font-bold text-stone-100 md:text-base">
-			{title}<Explaner explanation={description} />
-		</div>
+		<!-- svelte-ignore a11y-label-has-associated-control -->
+		<label>
+			{title}
+			{#if description && description !== ''}
+				<Explaner explanation={description} />
+			{/if}
+		</label>
 	</div>
 </div>
 <div class:text-center={isCenter} class="flex justify-center">

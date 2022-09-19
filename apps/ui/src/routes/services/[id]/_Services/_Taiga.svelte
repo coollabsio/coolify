@@ -8,8 +8,8 @@
 	<div class="title">Taiga</div>
 </div>
 
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="secretKey">Secret Key</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="secretKey">Secret Key</label>
 	<CopyPasswordField
 		name="secretKey"
 		id="secretKey"
@@ -24,8 +24,8 @@
 	<div class="title">Django</div>
 </div>
 
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="djangoAdminUser">Admin User</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="djangoAdminUser">Admin User</label>
 	<CopyPasswordField
 		name="djangoAdminUser"
 		id="djangoAdminUser"
@@ -34,8 +34,8 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="djangoAdminPassword">Admin Password</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="djangoAdminPassword">Admin Password</label>
 	<CopyPasswordField
 		name="djangoAdminPassword"
 		id="djangoAdminPassword"
@@ -49,8 +49,8 @@
 	<div class="title">RabbitMQ</div>
 </div>
 
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="rabbitMQUser">User</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="rabbitMQUser">User</label>
 	<CopyPasswordField
 		name="rabbitMQUser"
 		id="rabbitMQUser"
@@ -59,8 +59,8 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="rabbitMQPassword">Password</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="rabbitMQPassword">Password</label>
 	<CopyPasswordField
 		name="rabbitMQPassword"
 		id="rabbitMQPassword"
@@ -75,8 +75,8 @@
 	<div class="title">PostgreSQL</div>
 </div>
 
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlHost">PostgreSQL Host</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="postgresqlHost">PostgreSQL Host</label>
 	<CopyPasswordField
 		name="postgresqlHost"
 		id="postgresqlHost"
@@ -85,8 +85,8 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlPort">PostgreSQL Port</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="postgresqlPort">PostgreSQL Port</label>
 	<CopyPasswordField
 		name="postgresqlPort"
 		id="postgresqlPort"
@@ -95,8 +95,8 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlUser">PostgreSQL User</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="postgresqlUser">PostgreSQL User</label>
 	<CopyPasswordField
 		name="postgresqlUser"
 		id="postgresqlUser"
@@ -105,8 +105,8 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlPassword">PostgreSQL Password</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="postgresqlPassword">PostgreSQL Password</label>
 	<CopyPasswordField
 		name="postgresqlPassword"
 		id="postgresqlPassword"

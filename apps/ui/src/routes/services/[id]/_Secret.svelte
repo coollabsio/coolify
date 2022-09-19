@@ -50,6 +50,8 @@
 
 <td>
 	<input
+		
+	style="min-width: 350px !important;"
 		id={isNewSecret ? 'secretName' : 'secretNameNew'}
 		bind:value={name}
 		required
@@ -67,6 +69,7 @@
 		bind:value
 		required
 		placeholder="J$#@UIO%HO#$U%H"
+		inputStyle="min-width: 350px; !important"
 	/>
 </td>
 

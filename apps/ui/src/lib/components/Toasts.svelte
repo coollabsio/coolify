@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { fade } from 'svelte/transition';
 	import Toast from './Toast.svelte';
 
 	import { dismissToast, pauseToast, resumeToast, toasts } from '$lib/store';
@@ -7,9 +6,9 @@
 
 {#if $toasts}
 	<section>
-		<article class="toast toast-top toast-end rounded-none" role="alert" transition:fade>
+		<article class="toast toast-top toast-end rounded-none px-10" role="alert" >
 			{#each $toasts as toast (toast.id)}
-				<Toast
+				<Toast	
 					type={toast.type}
 					on:resume={() => resumeToast(toast.id)}
 					on:pause={() => pauseToast(toast.id)}

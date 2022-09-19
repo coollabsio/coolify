@@ -7,7 +7,7 @@
 <div class="flex space-x-1 py-5 font-bold">
 	<div class="title">MeiliSearch</div>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
+<div class="grid grid-cols-2 items-center lg:px-10 px-2">
 	<label for="masterKey">{$t('forms.admin_api_key')}</label>
 	<CopyPasswordField
 		id="masterKey"
