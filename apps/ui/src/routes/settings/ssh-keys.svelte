@@ -65,7 +65,7 @@
 		<Menu />
 		<div class="flex flex-col mt-5">
 			<div
-					class="flex flex-col space-y-4 p-6 lg:p-0 lg:flex-row lg:space-y0 lg:space-x-4 w-full lg:justify-between lg:items-center mb-5"
+					class="flex flex-col space-y-2 p-6 lg:p-0 lg:flex-row lg:space-y0 lg:space-x-4 w-full lg:justify-between lg:items-center mb-5"
 					style="min-width: 83vw"
 				>
 				<div class="title font-bold">SSH Keys</div>

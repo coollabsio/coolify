@@ -8,12 +8,13 @@
 
 <div class="flex space-x-1 py-5">
 	<div class="title">
-		Ghost <Explainer explanation="You can change these values in the Ghost admin panel." />
+		Ghost <Explainer explanation="You can change these values in the <span class='text-settings'>Ghost admin panel<span>." />
 	</div>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
-	<label class="text-base font-bold text-stone-100" for="email">{$t('forms.default_email_address')}</label>
-	<input 
+<div class="space-y-2">
+<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<label for="email">{$t('forms.default_email_address')}</label>
+	<input
 		class="w-full"
 		name="email"
 		id="email"
@@ -24,8 +25,8 @@
 		required
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
-	<label class="text-base font-bold text-stone-100" for="defaultPassword">{$t('forms.default_password')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<label for="defaultPassword">{$t('forms.default_password')}</label>
 	<CopyPasswordField
 		id="defaultPassword"
 		isPasswordField
@@ -35,11 +36,13 @@
 		value={service.ghost.defaultPassword}
 	/>
 </div>
+</div>
 <div class="flex space-x-1 py-5 font-bold">
 	<div class="title">MariaDB</div>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
-	<label class="text-base font-bold text-stone-100" for="mariadbUser">{$t('forms.username')}</label>
+<div class="space-y-2">
+<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<label for="mariadbUser">{$t('forms.username')}</label>
 	<CopyPasswordField
 		name="mariadbUser"
 		id="mariadbUser"
@@ -48,8 +51,8 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
-	<label class="text-base font-bold text-stone-100" for="mariadbPassword">{$t('forms.password')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<label for="mariadbPassword">{$t('forms.password')}</label>
 	<CopyPasswordField
 		id="mariadbPassword"
 		isPasswordField
@@ -59,9 +62,9 @@
 		value={service.ghost.mariadbPassword}
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
-	<label class="text-base font-bold text-stone-100" for="mariadbDatabase">{$t('index.database')}</label>
-	<input 
+<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<label for="mariadbDatabase">{$t('index.database')}</label>
+	<input
 		class="w-full"
 		name="mariadbDatabase"
 		id="mariadbDatabase"
@@ -72,8 +75,8 @@
 		placeholder="{$t('forms.eg')}: ghost_db"
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
-	<label class="text-base font-bold text-stone-100" for="mariadbRootUser">{$t('forms.root_db_user')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<label for="mariadbRootUser">{$t('forms.root_db_user')}</label>
 	<CopyPasswordField
 		id="mariadbRootUser"
 		readonly
@@ -82,8 +85,8 @@
 		value={service.ghost.mariadbRootUser}
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
-	<label class="text-base font-bold text-stone-100" for="mariadbRootUserPassword">{$t('forms.root_db_password')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<label for="mariadbRootUserPassword">{$t('forms.root_db_password')}</label>
 	<CopyPasswordField
 		id="mariadbRootUserPassword"
 		isPasswordField
@@ -92,4 +95,5 @@
 		name="mariadbRootUserPassword"
 		value={service.ghost.mariadbRootUserPassword}
 	/>
+</div>
 </div>

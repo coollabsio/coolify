@@ -68,12 +68,7 @@
 	}
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">
-		{$t('application.configuration.select_a_git_source')}
-	</div>
-</div>
-<div class="max-w-5xl mx-auto px-5">
+<div class="max-w-6xl mx-auto px-5">
 	<div class="title pb-8">Git App</div>
 	<div class="flex flex-wrap justify-center">
 		{#if !filteredSources || ownSources.length === 0}

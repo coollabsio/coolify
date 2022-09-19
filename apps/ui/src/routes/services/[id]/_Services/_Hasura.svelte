@@ -8,8 +8,8 @@
 	<div class="title">Hasura</div>
 </div>
 
-<div class="grid grid-cols-2 items-center lg:px-10">
-	<label class="text-base font-bold text-stone-100" for="graphQLAdminPassword">GraphQL Admin Password</label>
+<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<label for="graphQLAdminPassword">GraphQL Admin Password</label>
 	<CopyPasswordField
 		name="graphQLAdminPassword"
 		id="graphQLAdminPassword"
@@ -24,34 +24,36 @@
 	<div class="title">PostgreSQL</div>
 </div>
 
-<div class="grid grid-cols-2 items-center lg:px-10">
-	<label class="text-base font-bold text-stone-100" for="postgresqlUser">{$t('forms.username')}</label>
-	<CopyPasswordField
-		name="postgresqlUser"
-		id="postgresqlUser"
-		value={service.hasura.postgresqlUser}
-		readonly
-		disabled
-	/>
-</div>
-<div class="grid grid-cols-2 items-center lg:px-10">
-	<label class="text-base font-bold text-stone-100" for="postgresqlPassword">{$t('forms.password')}</label>
-	<CopyPasswordField
-		id="postgresqlPassword"
-		isPasswordField
-		readonly
-		disabled
-		name="postgresqlPassword"
-		value={service.hasura.postgresqlPassword}
-	/>
-</div>
-<div class="grid grid-cols-2 items-center lg:px-10">
-	<label class="text-base font-bold text-stone-100" for="postgresqlDatabase">{$t('index.database')}</label>
-	<CopyPasswordField
-		name="postgresqlDatabase"
-		id="postgresqlDatabase"
-		value={service.hasura.postgresqlDatabase}
-		readonly
-		disabled
-	/>
+<div class="space-y-2">
+	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+		<label for="postgresqlUser">{$t('forms.username')}</label>
+		<CopyPasswordField
+			name="postgresqlUser"
+			id="postgresqlUser"
+			value={service.hasura.postgresqlUser}
+			readonly
+			disabled
+		/>
+	</div>
+	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+		<label for="postgresqlPassword">{$t('forms.password')}</label>
+		<CopyPasswordField
+			id="postgresqlPassword"
+			isPasswordField
+			readonly
+			disabled
+			name="postgresqlPassword"
+			value={service.hasura.postgresqlPassword}
+		/>
+	</div>
+	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+		<label for="postgresqlDatabase">{$t('index.database')}</label>
+		<CopyPasswordField
+			name="postgresqlDatabase"
+			id="postgresqlDatabase"
+			value={service.hasura.postgresqlDatabase}
+			readonly
+			disabled
+		/>
+	</div>
 </div>

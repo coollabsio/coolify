@@ -28,8 +28,7 @@
 	export let destinations: any;
 
 	let filtered: any = setInitials();
-	import { get, post } from '$lib/api';
-	import Usage from '$lib/components/Usage.svelte';
+	import { get } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { asyncSleep, getRndInteger } from '$lib/common';
 	import { appSession, search, addToast} from '$lib/store';
@@ -274,16 +273,13 @@
    
 </script>
 
-<nav class="header p-7">
+<nav class="header">
 	<h1 class="mr-4 text-2xl font-bold">{$t('index.dashboard')}</h1>
 	{#if $appSession.isAdmin && (applications.length !== 0 || destinations.length !== 0 || databases.length !== 0 || services.length !== 0 || gitSources.length !== 0 || destinations.length !== 0)}
 		<NewResource />
 	{/if}
 </nav>
 <div class="container lg:mx-auto lg:p-0 px-8 pt-5">
-	<!-- {#if $appSession.teamId === '0'}
-		<Usage />
-	{/if} -->
 	{#if applications.length !== 0 || destinations.length !== 0 || databases.length !== 0 || services.length !== 0 || gitSources.length !== 0 || destinations.length !== 0}
 		<div class="form-control">
 			<div class="input-group flex w-full">

@@ -57,9 +57,6 @@
 	}
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">{$t('forms.select_a_service_version')}</div>
-</div>
 {#if from}
 	<div class="pb-10 text-center">
 		Warning: you are about to change the version of this service.<br />This could cause problem

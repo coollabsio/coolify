@@ -127,7 +127,7 @@
 <br />
 
 {#if invitations.length > 0}
-	<div class="mx-auto max-w-4xl px-6 py-4">
+	<div class="mx-auto max-w-6xl px-6 py-4">
 		<div class="title font-bold">Pending invitations</div>
 		<div class="pt-10 text-center">
 			{#each invitations as invitation}
@@ -149,7 +149,7 @@
 		</div>
 	</div>
 {/if}
-<div class="mx-auto max-w-4xl px-6 py-4">
+<div class="mx-auto max-w-6xl px-6 py-4">
 	{#if $appSession.teamId === '0' && accounts.length > 0}
 		<div class="title font-bold">Accounts</div>
 	{:else}
@@ -189,7 +189,7 @@
 	</div>
 </div>
 
-<div class="mx-auto max-w-4xl px-6">
+<div class="mx-auto max-w-6xl px-6">
 	<div class="title font-bold">Teams</div>
 	<div class="flex-col items-center justify-center pt-10">
 		<div class="flex flex-row flex-wrap justify-center px-2 pb-10 md:flex-row">

@@ -188,13 +188,30 @@
 	});
 </script>
 
-<nav class="header">
-	<div class="hidden items-center space-x-2 p-5 px-6 font-bold lg:flex">
-		<div class="flex flex-col">
-			<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
-				Configuration
+<nav class="header lg:flex-row flex-col-reverse">
+	<div class="flex flex-row space-x-2 font-bold pt-10 lg:pt-0">
+		<div class="flex flex-col items-center justify-center">
+			<div class="title">
+				{#if $page.url.pathname === `/applications/${id}`}
+					Configurations
+				{:else if $page.url.pathname === `/applications/${id}/secrets`}
+					Secrets
+				{:else if $page.url.pathname === `/applications/${id}/storages`}
+					Persistent Storages
+				{:else if $page.url.pathname === `/applications/${id}/previews`}
+					Preview Deployments
+				{:else if $page.url.pathname === `/applications/${id}/logs`}
+					Application Logs
+				{:else if $page.url.pathname === `/applications/${id}/logs/build`}
+					Build Logs
+				{:else if $page.url.pathname === `/applications/${id}/configuration/source`}
+					Select a Git Source
+				{:else if $page.url.pathname === `/applications/${id}/configuration/destination`}
+					Select a Destination
+					{:else if $page.url.pathname === `/applications/${id}/configuration/buildpack`}
+					Select a Build Pack
+				{/if}
 			</div>
-			<span class="text-xs">{application.name}</span>
 		</div>
 		{#if application.gitSource?.htmlUrl && application.repository && application.branch}
 			<a
@@ -242,15 +259,10 @@
 			<Tooltip triggeredBy="#git">Open on Git</Tooltip>
 		{/if}
 	</div>
-	<div
-		class="flex flex-row flex-wrap space-x-4 space-y-3 justify-center lg:justify-start py-2 lg:py-0"
-	>
+	<div class="lg:block hidden flex-1" />
+	<div class="flex flex-row flex-wrap space-x-3 justify-center lg:justify-start lg:py-0">
 		{#if $location}
-			<a
-				id="open"
-				href={$location}
-				target="_blank"
-				class="icons flex items-center bg-transparent text-sm mt-3"
+			<a id="open" href={$location} target="_blank" class="icons bg-transparent"
 				><svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="h-6 w-6"
@@ -269,13 +281,13 @@
 			>
 			<Tooltip triggeredBy="#open">Open</Tooltip>
 
-			<div class="border border-coolgray-500 h-8" />
+			<div class="hidden lg:block border border-coolgray-500 h-8" />
 		{/if}
 		{#if $status.application.isExited || $status.application.isRestarting}
 			<a
 				id="applicationerror"
 				href={$isDeploymentEnabled ? `/applications/${id}/logs` : null}
-				class="icons bg-transparent text-sm flex items-center text-error"
+				class="icons bg-transparent text-sm text-error"
 				sveltekit:prefetch
 			>
 				<svg
@@ -299,9 +311,7 @@
 			<Tooltip triggeredBy="#applicationerror">Application exited with an error!</Tooltip>
 		{/if}
 		{#if $status.application.initialLoading}
-			<button
-				class="icons flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"
-			>
+			<button class="icons animate-spin bg-transparent duration-500 ease-in-out">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="h-6 w-6"
@@ -327,7 +337,7 @@
 				on:click={stopApplication}
 				type="submit"
 				disabled={!$isDeploymentEnabled}
-				class="icons bg-transparent text-sm flex items-center space-x-2 text-error"
+				class="icons bg-transparent text-error"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -351,7 +361,7 @@
 				on:click={restartApplication}
 				type="submit"
 				disabled={!$isDeploymentEnabled}
-				class="icons bg-transparent text-sm flex items-center space-x-2"
+				class="icons bg-transparent"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -375,7 +385,7 @@
 					id="forceredeploy"
 					type="submit"
 					disabled={!$isDeploymentEnabled}
-					class="icons bg-transparent text-sm flex items-center space-x-2"
+					class="icons bg-transparent"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -402,7 +412,7 @@
 					id="deploy"
 					type="submit"
 					disabled={!$isDeploymentEnabled}
-					class="icons bg-transparent text-sm flex items-center space-x-2 text-success"
+					class="icons bg-transparent text-success"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -422,7 +432,7 @@
 			</form>
 		{/if}
 
-		<div class="border border-coolgray-500 h-8" />
+		<div class="hidden lg:block border border-coolgray-500 h-8" />
 		<a
 			href={$isDeploymentEnabled ? `/applications/${id}` : null}
 			sveltekit:prefetch
@@ -548,7 +558,7 @@
 			>
 			<Tooltip triggeredBy="#previews">Previews</Tooltip>
 		{/if}
-		<div class="border border-coolgray-500 h-8" />
+		<div class="hidden lg:block border border-coolgray-500 h-8" />
 		<a
 			href={$isDeploymentEnabled && $status.application.isRunning
 				? `/applications/${id}/logs`
@@ -614,7 +624,7 @@
 			</button></a
 		>
 		<Tooltip triggeredBy="#buildlogs">Build Logs</Tooltip>
-		<div class="border border-coolgray-500 h-8" />
+		<div class="hidden lg:block border border-coolgray-500 h-8" />
 
 		{#if forceDelete}
 			<button
@@ -628,7 +638,7 @@
 			>
 				Force Delete
 			</button>
-			<Tooltip triggeredBy="#forcedelete">Force Delete</Tooltip>
+			<Tooltip triggeredBy="#forcedelete" placement="left">Force Delete</Tooltip>
 		{:else}
 			<button
 				id="delete"
@@ -640,7 +650,7 @@
 			>
 				<DeleteIcon />
 			</button>
-			<Tooltip triggeredBy="#delete">Delete</Tooltip>
+			<Tooltip triggeredBy="#delete" placement="left">Delete</Tooltip>
 		{/if}
 	</div>
 </nav>

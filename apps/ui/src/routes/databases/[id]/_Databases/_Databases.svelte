@@ -107,22 +107,22 @@
 	}
 </script>
 
-<div class="mx-auto max-w-4xl p-4">
+<div class="mx-auto max-w-6xl p-4">
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
-		<div class="flex flex-col lg:flex-row justify-between lg:space-x-1 space-y-3 pb-5 lg:items-center items-start">
+		<div class="flex space-x-1 pb-5 items-center">
 			<h1 class="title">{$t('general')}</h1>
 			{#if $appSession.isAdmin}
 				<button
 					type="submit"
-					class="btn btn-sm w-full lg:w-auto"
+					class="btn btn-sm"
 					class:loading
 					class:bg-databases={!loading}
 					disabled={loading}>{$t('forms.save')}</button
 				>
 			{/if}
 		</div>
-		<div class="grid gap-4 grid-cols-2 auto-rows-max lg:px-10">
-			<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
+		<div class="grid gap-4 grid-cols-2 auto-rows-max lg:px-10 px-2">
+			<label for="name">{$t('forms.name')}</label>
 			<input
 				class="w-full"
 				readonly={!$appSession.isAdmin}
@@ -131,9 +131,7 @@
 				bind:value={database.name}
 				required
 			/>
-			<label for="destination" class="text-base font-bold text-stone-100"
-				>{$t('application.destination')}</label
-			>
+			<label for="destination">{$t('application.destination')}</label>
 			{#if database.destinationDockerId}
 				<div class="no-underline">
 					<input
@@ -145,7 +143,7 @@
 					/>
 				</div>
 			{/if}
-			<label for="version" class="text-base font-bold text-stone-100">Version / Tag</label>
+			<label for="version">Version / Tag</label>
 			<a
 				href={$appSession.isAdmin && !$status.database.isRunning
 					? `/databases/${id}/configuration/version?from=/databases/${id}`
@@ -160,7 +158,7 @@
 					class:cursor-pointer={!$status.database.isRunning}
 				/></a
 			>
-			<label for="host" class="text-base font-bold text-stone-100">{$t('forms.host')}</label>
+			<label for="host">{$t('forms.host')}</label>
 			<CopyPasswordField
 				placeholder={$t('forms.generated_automatically_after_start')}
 				isPasswordField={false}
@@ -170,14 +168,18 @@
 				name="host"
 				value={database.id}
 			/>
-			<label for="publicPort" class="text-base font-bold text-stone-100">{$t('forms.port')}</label>
+			<label for="publicPort">{$t('forms.port')}</label>
 			<CopyPasswordField
 				placeholder={$t('database.generated_automatically_after_set_to_public')}
 				id="publicPort"
 				readonly
 				disabled
 				name="publicPort"
-				value={publicLoading ? 'Loading...' : $status.database.isPublic ? database.publicPort : privatePort}
+				value={publicLoading
+					? 'Loading...'
+					: $status.database.isPublic
+					? database.publicPort
+					: privatePort}
 			/>
 		</div>
 		{#if database.type === 'mysql'}
@@ -195,9 +197,9 @@
 		{:else if database.type === 'edgedb'}
 			<EdgeDB {database} />
 		{/if}
-		<div class="flex flex-col space-y-3 mt-5">
+		<div class="flex flex-col space-y-2 mt-5">
 			<div>
-				<label for="url" class="text-base font-bold text-stone-100"
+				<label class="px-2" for="url"
 					>{$t('database.connection_string')}
 					{#if !$status.database.isPublic && database.destinationDocker.remoteEngine}
 						<Explainer
@@ -206,7 +208,7 @@
 					{/if}</label
 				>
 			</div>
-			<div class="lg:px-10">
+			<div class="lg:px-10 px-2">
 				<CopyPasswordField
 					textarea={true}
 					placeholder={$t('forms.generated_automatically_after_start')}
@@ -223,7 +225,7 @@
 	<div class="flex space-x-1 pb-5 font-bold">
 		<h1 class="title">{$t('application.features')}</h1>
 	</div>
-	<div class="grid gap-4 grid-cols-2 auto-rows-max lg:px-10">
+	<div class="grid gap-4 grid-cols-2 auto-rows-max lg:px-10 px-2">
 		<Setting
 			id="isPublic"
 			loading={publicLoading}

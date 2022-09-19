@@ -5,7 +5,6 @@
 			const response = await get(`/applications/${params.id}/storages`);
 			return {
 				props: {
-					application: stuff.application,
 					...response
 				}
 			};
@@ -19,13 +18,12 @@
 </script>
 
 <script lang="ts">
-	export let application: any;
 	export let persistentStorages: any;
 	import { page } from '$app/stores';
 	import Storage from './_Storage.svelte';
 	import { get } from '$lib/api';
-	import SimpleExplainer from '$lib/components/SimpleExplainer.svelte';
 	import { t } from '$lib/translations';
+	import Explainer from '$lib/components/Explainer.svelte';
 
 	const { id } = $page.params;
 	async function refreshStorage() {
@@ -35,17 +33,11 @@
 </script>
 
 <div class="mx-auto max-w-6xl rounded-xl px-6 pt-4">
-	
-	<div class="flex flex-col justify-center py-4 text-center">
-		<h1 class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block font-bold mb-4">
-			Persistent Storage
-		</h1>
-		<SimpleExplainer customClass="w-full" text={$t('application.storage.persistent_storage_explainer')} />
-	</div>
+
 	<table class="mx-auto border-separate text-left">
 		<thead>
 			<tr class="h-12">
-				<th scope="col">{$t('forms.path')}</th>
+				<th scope="col">{$t('forms.path')} <Explainer explanation={$t('application.storage.persistent_storage_explainer')} /></th>
 			</tr>
 		</thead>
 		<tbody>

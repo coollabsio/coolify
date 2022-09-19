@@ -156,12 +156,12 @@
 	}
 </script>
 
-<div class="mx-auto max-w-5xl">
+<div class="mx-auto max-w-6xl">
 	<form
-		class="flex flex-col lg:flex-row w-full lg:px-32 space-y-5 lg:space-y-0 lg:space-x-5 lg:items-center"
+		class="flex flex-col lg:flex-row w-full lg:px-32 space-y-5 lg:space-y-0 lg:space-x-5 justify-start"
 		on:submit|preventDefault={loadBranches}
 	>
-		<div class="space-y-4 w-full">
+		<div class="space-y-2 w-full">
 			<input
 				class="w-full"
 				placeholder="eg: https://github.com/coollabsio/nodejs-example/tree/main"
@@ -170,6 +170,7 @@
 			{#if branchSelectOptions.length > 0}
 				<div class="custom-select-wrapper">
 					<Select
+					class="w-full"
 						placeholder={loading.branches
 							? $t('application.configuration.loading_branches')
 							: !publicRepositoryLink

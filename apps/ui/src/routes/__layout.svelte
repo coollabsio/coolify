@@ -107,10 +107,11 @@
 </script>
 
 <svelte:head>
-	<title>Coolify</title>
 	{#if !$appSession.whiteLabeled}
+		<title>Coolify</title>
 		<link rel="icon" href="/favicon.png" />
 	{:else if $appSession.whiteLabeledDetails.icon}
+		<title>Coolify</title>
 		<link rel="icon" href={$appSession.whiteLabeledDetails.icon} />
 	{/if}
 </svelte:head>
@@ -284,25 +285,18 @@
 			{/if}
 		{/if}
 		<div
-			class="navbar bg-neutral-focus lg:hidden space-x-2 flex flex-row items-center"
+			class="navbar lg:hidden space-x-2 flex flex-row items-center bg-coollabs"
 			class:hidden={!$appSession.userId}
 		>
-			<label for="main-drawer" class="drawer-button btn btn-square btn-ghost">
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					fill="none"
-					viewBox="0 0 24 24"
-					class="inline-block w-5 h-5 stroke-current"
-					><path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M4 6h16M4 12h16M4 18h16"
-					/></svg
-				>
+			<label for="main-drawer" class="drawer-button btn btn-square btn-ghost flex-col">
+				<span class="burger bg-white" />
+				<span class="burger bg-white" />
+				<span class="burger bg-white" />
 			</label>
 			<div class="prose flex flex-row justify-between space-x-1 w-full items-center pr-3">
-				<h3 class="mb-0">Coolify</h3>
+				{#if !$appSession.whiteLabeled}
+				<h3 class="mb-0 text-white">Coolify</h3>
+				{/if}
 				<UpdateAvailable />
 			</div>
 		</div>
@@ -314,10 +308,7 @@
 	</div>
 	<div class="drawer-side">
 		<label for="main-drawer" class="drawer-overlay w-full" />
-		<ul class="menu bg-base-100 w-80 p-2 rounded-r-lg space-y-3">
-			<li class="menu-title">
-				<span>Main</span>
-			</li>
+		<ul class="menu bg-coolgray-300 w-60 p-2  space-y-3 pt-4 ">
 			<li>
 				<a
 					class="no-underline icons hover:text-white"
@@ -329,7 +320,7 @@
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="h-9 w-9"
+						class="h-8 w-8"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -346,12 +337,10 @@
 					Dashboard
 				</a>
 			</li>
-			<li class="menu-title">
-				<span>Manage</span>
-			</li>
+
 			<li>
 				<a
-					class="no-underline"
+					class="no-underline icons hover:text-white"
 					sveltekit:prefetch
 					href="/servers"
 					class:bg-applications={$page.url.pathname.startsWith('/servers')}
@@ -375,15 +364,12 @@
 					Servers
 				</a>
 			</li>
-			<li class="menu-title">
-				<span>Dashboard settings</span>
-			</li>
 			<li>
-				<a class="no-underline" href="/iam" class:bg-iam={$page.url.pathname.startsWith('/iam')}
+				<a class="no-underline icons hover:text-white" href="/iam" class:bg-iam={$page.url.pathname.startsWith('/iam')}
 					><svg
 						xmlns="http://www.w3.org/2000/svg"
 						viewBox="0 0 24 24"
-						class="h-9 w-9"
+						class="h-8 w-8"
 						stroke-width="1.5"
 						stroke="currentColor"
 						fill="none"
@@ -402,7 +388,7 @@
 			</li>
 			<li>
 				<a
-					class="no-underline"
+					class="no-underline icons hover:text-white"
 					href={$appSession.teamId === '0' ? '/settings/global' : '/settings/ssh-keys'}
 					class:bg-settings={$page.url.pathname.startsWith('/settings')}
 					class:text-black={$page.url.pathname.startsWith('/settings')}
@@ -410,7 +396,7 @@
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						viewBox="0 0 24 24"
-						class="h-9 w-9"
+						class="h-8 w-8"
 						stroke-width="1.5"
 						stroke="currentColor"
 						fill="none"
@@ -430,7 +416,7 @@
 				>
 			</li>
 			<li>
-				<div class="no-underline hover:bg-error" on:click={logout}>
+				<div class="no-underline icons hover:bg-error" on:click={logout}>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="ml-1 h-8 w-8"
@@ -447,9 +433,17 @@
 						/>
 						<path d="M7 12h14l-3 -3m0 6l3 -3" />
 					</svg>
-					Logout
+					<div class="-ml-1">Logout</div>
 				</div>
 				<Tooltip triggeredBy="#logout" placement="right" color="bg-red-600">Logout</Tooltip>
+			</li>
+			<li class="flex-1 bg-transparent" />
+			<li class="w-full justify-center">
+				<a
+					class="text-xs hover:bg-coolgray-200 no-underline hover:text-white"
+					href={`https://github.com/coollabsio/coolify/releases/tag/v${$appSession.version}`}
+					target="_blank">Changelog: v{$appSession.version}</a
+				>
 			</li>
 		</ul>
 	</div>

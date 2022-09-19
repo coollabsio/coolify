@@ -68,9 +68,6 @@
 </script>
 
 <div class="mx-auto max-w-6xl px-6 pt-4">
-	<h1 class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block font-bold mb-4">
-		Secrets
-	</h1>
 	<div class="overflow-x-auto">
 		<table class="mx-auto border-separate text-left">
 			<thead>

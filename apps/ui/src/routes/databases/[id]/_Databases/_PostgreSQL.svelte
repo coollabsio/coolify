@@ -9,11 +9,9 @@
 <div class="flex space-x-1 py-5 font-bold">
 	<h1 class="title">PostgreSQL</h1>
 </div>
-<div class="space-y-2 lg:px-10">
+<div class="space-y-2 lg:px-10 px-2">
 	<div class="grid grid-cols-2 items-center">
-		<label for="defaultDatabase" class="text-base font-bold text-stone-100"
-			>{$t('database.default_database')}</label
-		>
+		<label for="defaultDatabase">{$t('database.default_database')}</label>
 		<CopyPasswordField
 			required
 			readonly={database.defaultDatabase}
@@ -25,7 +23,7 @@
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center">
-		<label for="rootUser" class="text-base font-bold text-stone-100"
+		<label for="rootUser"
 			>Postgres User Password <Explainer
 				explanation="Could be changed while the database is running."
 			/></label
@@ -41,7 +39,7 @@
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center">
-		<label for="dbUser" class="text-base font-bold text-stone-100">{$t('forms.user')}</label>
+		<label for="dbUser">{$t('forms.user')}</label>
 		<CopyPasswordField
 			readonly
 			disabled
@@ -52,7 +50,7 @@
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center">
-		<label for="dbUserPassword" class="text-base font-bold text-stone-100"
+		<label for="dbUserPassword"
 			>{$t('forms.password')}
 			<Explainer explanation="Could be changed while the database is running." /></label
 		>

@@ -90,7 +90,7 @@
 	}
 </script>
 
-<div class="mx-auto max-w-4xl lg:px-6 px-3">
+<div class="mx-auto max-w-6xl lg:px-6 px-3">
 	{#if !source.githubAppId}
 		<form on:submit|preventDefault={newGithubApp} class="py-4">
 			<div class="grid gap-1 lg:grid-flow-col pb-7">
@@ -144,7 +144,7 @@
 			<div class="flex lg:flex-row lg:justify-between flex-col space-y-3 w-full lg:items-center">
 				<h1 class="title">{$t('general')}</h1>
 				{#if $appSession.isAdmin}
-					<div class="flex flex-col lg:flex-row lg:space-x-4 lg:w-fit space-y-4 lg:space-y-0 w-full">
+					<div class="flex flex-col lg:flex-row lg:space-x-4 lg:w-fit space-y-2 lg:space-y-0 w-full">
 						<button class="btn btn-sm bg-sources" type="submit" disabled={loading}
 							>{loading ? 'Saving...' : 'Save'}</button
 						>

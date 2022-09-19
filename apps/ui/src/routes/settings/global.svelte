@@ -203,10 +203,10 @@
 		<div class="mt-5">
 			<form on:submit|preventDefault={handleSubmit}>
 				<div
-					class="flex flex-col space-y-4 p-6 lg:p-0 lg:flex-row lg:space-y0 lg:space-x-4 w-full lg:justify-between lg:items-center mb-5"
+					class="flex flex-col space-y-2 p-6 lg:p-0 lg:flex-row lg:space-y0 lg:space-x-4 w-full lg:justify-between lg:items-center mb-5"
 				>
 					<div class="title font-bold">{$t('index.global_settings')}</div>
-					<div class="flex lg:flex-row lg:space-x-4 flex-col space-y-4 lg:space-y-0">
+					<div class="flex lg:flex-row lg:space-x-4 flex-col space-y-2 lg:space-y-0">
 						<button
 							class="btn btn-sm bg-settings text-black"
 							type="submit"

@@ -56,7 +56,6 @@
 	import { page } from '$app/stores';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import { del, get, post } from '$lib/api';
-	import { goto } from '$app/navigation';
 	import { t } from '$lib/translations';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
 	import {
@@ -70,6 +69,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import ServiceLinks from './_ServiceLinks.svelte';
+	import { goto } from '$app/navigation';
 	const { id } = $page.params;
 
 	export let service: any;
@@ -86,7 +86,7 @@
 				if (service.type && $status.service.isRunning)
 					await post(`/services/${service.id}/${service.type}/stop`, {});
 				await del(`/services/${service.id}`, { id: service.id });
-				return await window.location.assign(`/`);
+				return await goto('/');
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
@@ -156,19 +156,31 @@
 	});
 </script>
 
-<nav class="header">
-	<div class="hidden items-center space-x-2 p-5 px-6 font-bold lg:flex">
-		<div class="flex flex-col">
-			<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
-				Configuration
+<nav class="header lg:flex-row flex-col-reverse">
+	<div class="flex flex-row space-x-2 font-bold pt-10 lg:pt-0">
+		<div class="flex flex-col items-center justify-center">
+			<div class="title">
+				{#if $page.url.pathname === `/services/${id}`}
+					Configurations
+				{:else if $page.url.pathname === `/services/${id}/secrets`}
+					Secrets
+				{:else if $page.url.pathname === `/services/${id}/storages`}
+					Persistent Storages
+				{:else if $page.url.pathname === `/services/${id}/logs`}
+					Service Logs
+				{:else if $page.url.pathname === `/services/${id}/configuration/type`}
+					Select a Service Type
+				{:else if $page.url.pathname === `/services/${id}/configuration/version`}
+					Select a Service Version
+				{:else if $page.url.pathname === `/services/${id}/configuration/destination`}
+					Select a Destination
+				{/if}
 			</div>
-			<span class="text-xs">{service.name}</span>
 		</div>
 		<ServiceLinks {service} />
 	</div>
-	<div
-		class="flex flex-row flex-wrap space-x-4 space-y-3 justify-center lg:justify-start py-2 lg:py-0"
-	>
+	<div class="lg:block hidden flex-1" />
+	<div class="flex flex-row flex-wrap space-x-3 justify-center lg:justify-start lg:py-0">
 		{#if $location}
 			<a
 				id="open"
@@ -192,7 +204,7 @@
 				</svg></a
 			>
 			<Tooltip triggeredBy="#open">Open</Tooltip>
-			<div class="border border-stone-700 h-8" />
+			<div class="hidden lg:block border border-coolgray-500 h-8" />
 		{/if}
 		{#if $status.service.isExited}
 			<a
@@ -291,8 +303,9 @@
 			</button>
 			<Tooltip triggeredBy="#start">Start</Tooltip>
 		{/if}
-		<div class="border border-stone-700 h-8" />
+
 		{#if service.type && service.destinationDockerId && service.version}
+			<div class="hidden lg:block border border-coolgray-500 h-8" />
 			<a
 				href="/services/{id}"
 				sveltekit:prefetch
@@ -386,8 +399,8 @@
 					</svg>
 				</button></a
 			>
-			<Tooltip triggeredBy="#persistentstorage">Persistent Storage</Tooltip>
-			<div class="border border-stone-700 h-8" />
+			<Tooltip triggeredBy="#persistentstorage">Persistent Storages</Tooltip>
+			<div class="hidden lg:block border border-coolgray-500 h-8" />
 			<a
 				href={$isDeploymentEnabled && $status.service.isRunning ? `/services/${id}/logs` : null}
 				sveltekit:prefetch
@@ -421,6 +434,7 @@
 			>
 			<Tooltip triggeredBy="#logs">Logs</Tooltip>
 		{/if}
+		<div class="hidden lg:block border border-coolgray-500 h-8" />
 		<button
 			id="delete"
 			on:click={deleteService}
@@ -429,7 +443,7 @@
 			class:hover:text-red-500={$appSession.isAdmin}
 			class="icons bg-transparent  text-sm"><DeleteIcon /></button
 		>
-		<Tooltip triggeredBy="#delete">Delete</Tooltip>
+		<Tooltip triggeredBy="#delete" placement="left">Delete</Tooltip>
 	</div>
 </nav>
 <slot />

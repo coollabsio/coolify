@@ -52,11 +52,6 @@
 	}
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">
-		{$t('application.configuration.configure_destination')}
-	</div>
-</div>
 <div class="flex justify-center">
 	{#if !destinations || destinations.length === 0}
 		<div class="flex-col">

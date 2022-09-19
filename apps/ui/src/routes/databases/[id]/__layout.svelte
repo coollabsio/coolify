@@ -150,25 +150,33 @@
 </script>
 
 {#if id !== 'new'}
-	<nav class="header justify-center lg:justify-between">
-		<div class="hidden items-center space-x-2 p-5 px-6 font-bold lg:flex">
-			<div class="flex flex-col">
-				<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
-					Configuration
+	<nav class="header lg:flex-row flex-col-reverse">
+		<div class="flex flex-row space-x-2 font-bold pt-10 lg:pt-0">
+			<div class="flex flex-col items-center justify-center">
+				<div class="title">
+					{#if $page.url.pathname === `/databases/${id}`}
+						Configurations
+					{:else if $page.url.pathname === `/databases/${id}/logs`}
+						Database Logs
+					{:else if $page.url.pathname === `/databases/${id}/configuration/type`}
+						Select a Database Type
+					{:else if $page.url.pathname === `/databases/${id}/configuration/version`}
+						Select a Database Version
+					{:else if $page.url.pathname === `/databases/${id}/configuration/destination`}
+						Select a Destination
+					{/if}
 				</div>
-				<span class="text-xs">{database.name}</span>
 			</div>
 			<DatabaseLinks {database} />
 		</div>
-		<div
-			class="flex flex-row flex-wrap space-x-4 space-y-3 justify-center lg:justify-start py-2 lg:py-0"
-		>
+		<div class="lg:block hidden flex-1" />
+		<div class="flex flex-row flex-wrap space-x-3 justify-center lg:justify-start lg:py-0">
 			{#if database.type && database.destinationDockerId && database.version}
 				{#if $status.database.isExited}
 					<a
 						id="exited"
 						href={!$status.database.isRunning ? `/databases/${id}/logs` : null}
-						class="icons bg-transparent text-sm flex items-center text-red-500 tooltip-error"
+						class="icons bg-transparent text-red-500 tooltip-error"
 						sveltekit:prefetch
 					>
 						<svg
@@ -192,9 +200,7 @@
 					<Tooltip triggeredBy="#exited">{'Service exited with an error!'}</Tooltip>
 				{/if}
 				{#if $status.database.initialLoading}
-					<button
-						class="icons flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out"
-					>
+					<button class="icons flex animate-spin  duration-500 ease-in-out">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							class="h-6 w-6"
@@ -220,7 +226,7 @@
 						on:click={stopDatabase}
 						type="submit"
 						disabled={!$appSession.isAdmin}
-						class="icons bg-transparent text-sm flex items-center space-x-2 text-red-500 mt-3"
+						class="icons bg-transparent text-red-500"
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -346,7 +352,7 @@
 				>
 			{/if}
 
-			<Tooltip triggeredBy="#delete">{'Delete'}</Tooltip>
+			<Tooltip triggeredBy="#delete" placement="left">Delete</Tooltip>
 		</div>
 	</nav>
 {/if}

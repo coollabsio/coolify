@@ -91,14 +91,6 @@
 	}
 </script>
 
-<div class="flex h-20 items-center space-x-2 p-5 px-6 font-bold">
-	<div class="-mb-5 flex-col">
-		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
-			Database Logs
-		</div>
-		<span class="text-xs">{database.name}</span>
-	</div>
-</div>
 <div class="flex flex-row justify-center space-x-2 px-10 pt-6">
 	{#if logs.length === 0}
 		<div class="text-xl font-bold tracking-tighter">{$t('application.build.waiting_logs')}</div>

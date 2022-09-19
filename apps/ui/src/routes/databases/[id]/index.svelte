@@ -48,33 +48,24 @@
 	});
 </script>
 
-<div class="flex items-center space-x-2 p-5 font-bold lg:hidden">
-	<div class="flex-col">
-		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
-			Configuration
-		</div>
-		<span class="text-xs">{database.name}</span>
-	</div>
-	<DatabaseLinks {database} />
-</div>
+{#if $status.database.isRunning}
+	<div class="mx-auto max-w-6xl p-5">
+		<div class="text-center">
+			<div class="stat w-64">
+				<div class="stat-title">Used Memory / Memory Limit</div>
+				<div class="stat-value text-xl">{usage?.MemUsage}</div>
+			</div>
 
-<div class="mx-auto max-w-4xl p-5">
-	<div class="text-2xl font-bold">Database Usage</div>
-	<div class="text-center">
-		<div class="stat w-64">
-			<div class="stat-title">Used Memory / Memory Limit</div>
-			<div class="stat-value text-xl">{usage?.MemUsage}</div>
-		</div>
+			<div class="stat w-64">
+				<div class="stat-title">Used CPU</div>
+				<div class="stat-value text-xl">{usage?.CPUPerc}</div>
+			</div>
 
-		<div class="stat w-64">
-			<div class="stat-title">Used CPU</div>
-			<div class="stat-value text-xl">{usage?.CPUPerc}</div>
-		</div>
-
-		<div class="stat w-64">
-			<div class="stat-title">Network IO</div>
-			<div class="stat-value text-xl">{usage?.NetIO}</div>
+			<div class="stat w-64">
+				<div class="stat-title">Network IO</div>
+				<div class="stat-value text-xl">{usage?.NetIO}</div>
+			</div>
 		</div>
 	</div>
-</div>
+{/if}
 <Databases bind:database {privatePort} />
