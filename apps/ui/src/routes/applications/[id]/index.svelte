@@ -48,6 +48,7 @@
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { goto } from '$app/navigation';
+	import { fade } from 'svelte/transition';
 
 	const { id } = $page.params;
 
@@ -295,7 +296,7 @@
 </script>
 
 {#if $status.application.isRunning}
-	<div class="mx-auto max-w-6xl px-6 lg:my-0 my-4 lg:pt-0 pt-4 rounded">
+	<div class="mx-auto max-w-6xl px-6 lg:my-0 my-4 lg:pt-0 pt-4 rounded" in:fade>
 		<div class="text-center">
 			<div class="stat w-64">
 				<div class="stat-title">Used Memory / Memory Limit</div>

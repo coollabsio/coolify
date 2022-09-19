@@ -200,13 +200,10 @@
 <div class="mx-auto w-full">
 	<div class="flex lg:flex-row flex-col">
 		<Menu />
-		<div class="mt-5">
 			<form on:submit|preventDefault={handleSubmit}>
-				<div
-					class="flex flex-col space-y-2 p-6 lg:p-0 lg:flex-row lg:space-y0 lg:space-x-4 w-full lg:justify-between lg:items-center mb-5"
-				>
+				<div class="flex flex-col lg:flex-row flex-wrap items-center space-x-3 justify-center lg:justify-start lg:py-0 px-4">
 					<div class="title font-bold">{$t('index.global_settings')}</div>
-					<div class="flex lg:flex-row lg:space-x-4 flex-col space-y-2 lg:space-y-0">
+					<div class="flex lg:flex-row lg:space-x-4 flex-col space-y-2 lg:space-y-0 py-4">
 						<button
 							class="btn btn-sm bg-settings text-black"
 							type="submit"
@@ -235,125 +232,142 @@
 						>
 					</div>
 				</div>
-				<div class="grid gap-4 grid-cols-2 auto-rows-max lg:px-10 p-6">
-					<div class="pt-2 text-base font-bold text-stone-100">
-						{$t('application.url_fqdn')}
-						<Explainer explanation={$t('setting.ssl_explainer')} />
-					</div>
-					<input
-						class="w-full"
-						bind:value={fqdn}
-						readonly={!$appSession.isAdmin || isFqdnSet}
-						disabled={!$appSession.isAdmin || isFqdnSet}
-						on:input={resetView}
-						name="fqdn"
-						id="fqdn"
-						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-						placeholder="{$t('forms.eg')}: https://coolify.io"
-					/>
+				<div class="grid grid-flow-row gap-2 lg:px-10 px-2 pr-5">
+					<div class="grid grid-cols-2 items-center">
+						<div>
+							{$t('application.url_fqdn')}
+							<Explainer explanation={$t('setting.ssl_explainer')} />
+						</div>
+						<input
+							class="w-full"
+							bind:value={fqdn}
+							readonly={!$appSession.isAdmin || isFqdnSet}
+							disabled={!$appSession.isAdmin || isFqdnSet}
+							on:input={resetView}
+							name="fqdn"
+							id="fqdn"
+							pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+							placeholder="{$t('forms.eg')}: https://coolify.io"
+						/>
 
-					{#if forceSave}
-						<div class="flex-col space-y-2 pt-4 text-center">
-							{#if isNonWWWDomainOK}
-								<button
-									class="btn btn-sm bg-success"
-									on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
-									>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
-								>
-							{:else}
-								<button
-									class="btn btn-sm bg-error"
-									on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
-									>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
-								>
-							{/if}
-							{#if dualCerts}
-								{#if isWWWDomainOK}
+						{#if forceSave}
+							<div class="flex-col space-y-2 pt-4 text-center">
+								{#if isNonWWWDomainOK}
 									<button
 										class="btn btn-sm bg-success"
-										on:click|preventDefault={() =>
-											isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
-										>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
+										on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+										>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
 									>
 								{:else}
 									<button
 										class="btn btn-sm bg-error"
-										on:click|preventDefault={() =>
-											isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
-										>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
+										on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+										>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
 									>
 								{/if}
-							{/if}
+								{#if dualCerts}
+									{#if isWWWDomainOK}
+										<button
+											class="btn btn-sm bg-success"
+											on:click|preventDefault={() =>
+												isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+											>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
+										>
+									{:else}
+										<button
+											class="btn btn-sm bg-error"
+											on:click|preventDefault={() =>
+												isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+											>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
+										>
+									{/if}
+								{/if}
+							</div>
+						{/if}
+					</div>
+					<div class="grid grid-cols-2 items-center">
+						<div>
+							{$t('forms.public_port_range')}
+							<Explainer explanation={$t('forms.public_port_range_explainer')} />
 						</div>
-					{/if}
-					<div class="pt-2 text-base font-bold text-stone-100">
-						{$t('forms.public_port_range')}
-						<Explainer explanation={$t('forms.public_port_range_explainer')} />
+
+						<div class="flex flex-row items-center space-x-2">
+							<input
+								class=" w-full px-2"
+								type="number"
+								bind:value={minPort}
+								min="1024"
+								max={maxPort}
+							/>
+							<p>-</p>
+							<input
+								class="w-full px-2"
+								type="number"
+								bind:value={maxPort}
+								min={minPort}
+								max="65543"
+							/>
+						</div>
 					</div>
-					<div class="flex flex-row items-center space-x-2">
-						<input
-							class="h-8 w-full px-2"
-							type="number"
-							bind:value={minPort}
-							min="1024"
-							max={maxPort}
-						/>
-						<p>-</p>
-						<input
-							class="h-8 w-full px-2"
-							type="number"
-							bind:value={maxPort}
-							min={minPort}
-							max="65543"
-						/>
-					</div>
-					<Setting
-						id="isDNSCheckEnabled"
-						bind:setting={isDNSCheckEnabled}
-						title={$t('setting.is_dns_check_enabled')}
-						description={$t('setting.is_dns_check_enabled_explainer')}
-						on:click={() => changeSettings('isDNSCheckEnabled')}
-					/>
-					<div class="text-base font-bold text-stone-100">
-						Custom DNS servers <Explainer
-							explanation="You can specify a custom DNS server to verify your domains all over Coolify.<br><br>By default, the OS defined DNS servers are used."
-						/>
-					</div>
-					<input class="w-full" placeholder="1.1.1.1,8.8.8.8" bind:value={DNSServers} />
-					<Setting
-						id="dualCerts"
-						dataTooltip={$t('setting.must_remove_domain_before_changing')}
-						disabled={isFqdnSet}
-						bind:setting={dualCerts}
-						title={$t('application.ssl_www_and_non_www')}
-						description={$t('setting.generate_www_non_www_ssl')}
-						on:click={() => !isFqdnSet && changeSettings('dualCerts')}
-					/>
-					<Setting
-						id="isRegistrationEnabled"
-						bind:setting={isRegistrationEnabled}
-						title={$t('setting.registration_allowed')}
-						description={$t('setting.registration_allowed_explainer')}
-						on:click={() => changeSettings('isRegistrationEnabled')}
-					/>
-					<Setting
-						id="isAPIDebuggingEnabled"
-						bind:setting={isAPIDebuggingEnabled}
-						title="API Debugging"
-						description="Enable API debugging. This will log all API requests and responses.<br><br>You need to restart the Coolify for this to take effect."
-						on:click={() => changeSettings('isAPIDebuggingEnabled')}
-					/>
-					{#if browser && $features.beta}
+					<div class="grid grid-cols-2 items-center">
 						<Setting
-							id="isAutoUpdateEnabled"
-							bind:setting={isAutoUpdateEnabled}
-							title={$t('setting.auto_update_enabled')}
-							description={$t('setting.auto_update_enabled_explainer')}
-							on:click={() => changeSettings('isAutoUpdateEnabled')}
+							id="isDNSCheckEnabled"
+							bind:setting={isDNSCheckEnabled}
+							title={$t('setting.is_dns_check_enabled')}
+							description={$t('setting.is_dns_check_enabled_explainer')}
+							on:click={() => changeSettings('isDNSCheckEnabled')}
 						/>
+					</div>
+					<div class="grid grid-cols-2 items-center">
+						<div>
+							Custom DNS servers <Explainer
+								explanation="You can specify a custom DNS server to verify your domains all over Coolify.<br><br>By default, the OS defined DNS servers are used."
+							/>
+						</div>
+
+						<input class="w-full" placeholder="1.1.1.1,8.8.8.8" bind:value={DNSServers} />
+					</div>
+					<div class="grid grid-cols-2 items-center">
+						<Setting
+							id="dualCerts"
+							dataTooltip={$t('setting.must_remove_domain_before_changing')}
+							disabled={isFqdnSet}
+							bind:setting={dualCerts}
+							title={$t('application.ssl_www_and_non_www')}
+							description={$t('setting.generate_www_non_www_ssl')}
+							on:click={() => !isFqdnSet && changeSettings('dualCerts')}
+						/>
+					</div>
+					<div class="grid grid-cols-2 items-center">
+						<Setting
+							id="isRegistrationEnabled"
+							bind:setting={isRegistrationEnabled}
+							title={$t('setting.registration_allowed')}
+							description={$t('setting.registration_allowed_explainer')}
+							on:click={() => changeSettings('isRegistrationEnabled')}
+						/>
+					</div>
+					<div class="grid grid-cols-2 items-center">
+						<Setting
+							id="isAPIDebuggingEnabled"
+							bind:setting={isAPIDebuggingEnabled}
+							title="API Debugging"
+							description="Enable API debugging. This will log all API requests and responses.<br><br>You need to restart the Coolify for this to take effect."
+							on:click={() => changeSettings('isAPIDebuggingEnabled')}
+						/>
+					</div>
+					{#if browser && $features.beta}
+						<div class="grid grid-cols-2 items-center">
+							<Setting
+								id="isAutoUpdateEnabled"
+								bind:setting={isAutoUpdateEnabled}
+								title={$t('setting.auto_update_enabled')}
+								description={$t('setting.auto_update_enabled_explainer')}
+								on:click={() => changeSettings('isAutoUpdateEnabled')}
+							/>
+						</div>
 					{/if}
 				</div>
 			</form>
-		</div>
 	</div>
 </div>

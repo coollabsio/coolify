@@ -195,8 +195,9 @@
 					<Tooltip triggeredBy="#dashboard" placement="right">Dashboard</Tooltip>
 					<Tooltip triggeredBy="#servers" placement="right">Servers</Tooltip>
 					<div class="flex-1" />
-
-					<UpdateAvailable />
+					<div class="lg:block hidden">
+						<UpdateAvailable />
+					</div>
 					<div class="flex flex-col space-y-2 py-2">
 						<a
 							id="iam"
@@ -301,7 +302,6 @@
 				{#if !$appSession.whiteLabeled}
 					<h3 class="mb-0 text-white">Coolify</h3>
 				{/if}
-				<UpdateAvailable />
 			</div>
 		</div>
 		<main>
@@ -416,6 +416,10 @@
 					Settings
 				</a>
 			</li>
+			<li class="flex-1 bg-transparent" />
+			<div class="block lg:hidden">
+				<UpdateAvailable />
+			</div>
 			<li>
 				<div class="no-underline icons hover:bg-error" on:click={logout}>
 					<svg
@@ -437,12 +441,11 @@
 					<div class="-ml-1">Logout</div>
 				</div>
 			</li>
-			<li class="flex-1 bg-transparent" />
-			<li class="w-full justify-center">
+			<li class="w-full">
 				<a
-					class="text-xs hover:bg-coolgray-200 no-underline hover:text-white"
+					class="text-xs hover:bg-coolgray-200 no-underline hover:text-white text-right"
 					href={`https://github.com/coollabsio/coolify/releases/tag/v${$appSession.version}`}
-					target="_blank">Changelog: v{$appSession.version}</a
+					target="_blank">v{$appSession.version}</a
 				>
 			</li>
 		</ul>

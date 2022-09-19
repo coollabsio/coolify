@@ -65,9 +65,9 @@
 		<Menu />
 		<div class="flex flex-col mt-5">
 			<div
-					class="flex flex-col space-y-2 p-6 lg:p-0 lg:flex-row lg:space-y0 lg:space-x-4 w-full lg:justify-between lg:items-center mb-5"
-					style="min-width: 83vw"
-				>
+				class="flex flex-col lg:flex-row flex-wrap items-center space-x-3 justify-center lg:justify-start lg:py-0 px-4 pb-4 lg:pb-4"
+				style="min-width: 83vw"
+			>
 				<div class="title font-bold">SSH Keys</div>
 				<button
 					on:click={() => (isModalActive = true)}

@@ -32,7 +32,7 @@
 <div class="header">
 	<h1 class="text-2xl font-bold">Servers</h1>
 </div>
-<div class="container lg:mx-auto lg:p-0 px-8 p-5 lg:pt-20">
+<div class="container lg:mx-auto lg:p-0 px-8 p-5">
 	{#if servers.length > 0}
 		<div class="grid grid-col gap-8 auto-cols-max grid-cols-1  p-4">
 			{#each servers as server}

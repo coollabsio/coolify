@@ -260,7 +260,7 @@
 		{/if}
 	</div>
 	<div class="lg:block hidden flex-1" />
-	<div class="flex flex-row flex-wrap space-x-3 justify-center lg:justify-start lg:py-0">
+	<div class="flex flex-row flex-wrap space-x-3 justify-center lg:justify-start lg:py-0 px-12 lg:px-0">
 		{#if $location}
 			<a id="open" href={$location} target="_blank" class="icons bg-transparent"
 				><svg

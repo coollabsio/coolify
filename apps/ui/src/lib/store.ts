@@ -26,7 +26,8 @@ interface AddToast {
     message: string,
     timeout?: number | undefined
 }
-
+export const updateLoading: Writable<boolean> = writable(false);
+export const isUpdateAvailable: Writable<boolean> = writable(false);
 export const search: any = writable('')
 export const loginEmail: Writable<string | undefined> = writable()
 export const appSession: Writable<AppSession> = writable({

@@ -4,7 +4,7 @@
 	export let type = 'info';
 	function success() {
 		if (type === 'success') {
-			return 'bg-gradient-to-r from-coollabs to-pink-500';
+			return 'bg-gradient-to-r from-purple-500 via-pink-500 to-red-500';
 		}
 	}
 </script>
@@ -15,7 +15,7 @@
 	on:focus={() => dispatch('pause')}
 	on:mouseout={() => dispatch('resume')}
 	on:blur={() => dispatch('resume')}
-	class={`alert shadow-lg text-white hover:scale-105 transition-all duration-100 cursor-pointer rounded ${success()}`}
+	class={`flex flex-row alert shadow-lg text-white hover:scale-105 transition-all duration-100 cursor-pointer rounded ${success()}`}
 	class:alert-error={type === 'error'}
 	class:alert-info={type === 'info'}
 >
