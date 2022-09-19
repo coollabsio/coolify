@@ -89,7 +89,7 @@ export interface GetApplicationLogs extends OnlyId {
         since: number,
     }
 }
-export interface GetBuildLogs extends OnlyId {
+export interface GetBuilds extends OnlyId {
     Querystring: {
         buildId: string
         skip: number,
@@ -97,6 +97,7 @@ export interface GetBuildLogs extends OnlyId {
 }
 export interface GetBuildIdLogs {
     Params: {
+        id: string,
         buildId: string
     },
     Querystring: {
@@ -124,6 +125,12 @@ export interface DeployApplication extends OnlyId {
 
 export interface StopPreviewApplication extends OnlyId {
     Body: {
+        pullmergeRequestId: string | null,
+    }
+}
+export interface RestartPreviewApplication {
+    Params: {
+        id: string,
         pullmergeRequestId: string | null,
     }
 }

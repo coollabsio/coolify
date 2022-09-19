@@ -1,3 +1,24 @@
+/*
+ Example of a supported version:
+{
+	// Name used to identify the service internally
+	name: 'umami',
+	// Fancier name to show to the user
+	fancyName: 'Umami',
+	// Docker base image for the service
+	baseImage: 'ghcr.io/mikecao/umami',
+	// Optional: If there is any dependent image, you should list it here
+	images: [],
+	// Usable tags
+	versions: ['postgresql-latest'],
+	// Which tag is the recommended
+	recommendedVersion: 'postgresql-latest',
+	// Application's default port, Umami listens on 3000
+	ports: {
+	  main: 3000
+	}
+  }
+*/
 export const supportedServiceTypesAndVersions = [
 	{
 		name: 'plausibleanalytics',
@@ -151,7 +172,7 @@ export const supportedServiceTypesAndVersions = [
 		fancyName: 'Appwrite',
 		baseImage: 'appwrite/appwrite',
 		images: ['mariadb:10.7', 'redis:6.2-alpine', 'appwrite/telegraf:1.4.0'],
-		versions: ['latest', '0.15.3'],
+		versions: ['latest', '1.0','0.15.3'],
 		recommendedVersion: '0.15.3',
 		ports: {
 			main: 80

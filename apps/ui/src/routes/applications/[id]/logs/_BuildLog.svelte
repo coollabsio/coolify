@@ -1,6 +1,4 @@
 <script lang="ts">
-	export let buildId: any;
-
 	import { createEventDispatcher, onDestroy, onMount } from 'svelte';
 	const dispatch = createEventDispatcher();
 
@@ -11,6 +9,8 @@
 	import LoadingLogs from '$lib/components/LoadingLogs.svelte';
 	import { errorNotification } from '$lib/common';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import { day } from '$lib/dayjs';
+	import { selectedBuildId } from '$lib/store';
 
 	let logs: any = [];
 	let currentStatus: any;
@@ -18,7 +18,7 @@
 	let followingBuild: any;
 	let followingInterval: any;
 	let logsEl: any;
-
+	let fromDb = false;
 	let cancelInprogress = false;
 
 	const { id } = $page.params;
@@ -38,13 +38,18 @@
 	}
 	async function streamLogs(sequence = 0) {
 		try {
-			let { logs: responseLogs, status } = await get(
-				`/applications/${id}/logs/build/${buildId}?sequence=${sequence}`
-			);
+			let {
+				logs: responseLogs,
+				status,
+				fromDb: from
+			} = await get(`/applications/${id}/logs/build/${$selectedBuildId}?sequence=${sequence}`);
+
 			currentStatus = status;
 			logs = logs.concat(
 				responseLogs.map((log: any) => ({ ...log, line: cleanAnsiCodes(log.line) }))
 			);
+			fromDb = from;
+
 			streamInterval = setInterval(async () => {
 				if (status !== 'running' && status !== 'queued') {
 					clearInterval(streamInterval);
@@ -53,11 +58,12 @@
 				const nextSequence = logs[logs.length - 1]?.time || 0;
 				try {
 					const data = await get(
-						`/applications/${id}/logs/build/${buildId}?sequence=${nextSequence}`
+						`/applications/${id}/logs/build/${$selectedBuildId}?sequence=${nextSequence}`
 					);
 					status = data.status;
 					currentStatus = status;
-
+					fromDb = data.fromDb;
+					
 					logs = logs.concat(
 						data.logs.map((log: any) => ({ ...log, line: cleanAnsiCodes(log.line) }))
 					);
@@ -75,7 +81,7 @@
 		try {
 			cancelInprogress = true;
 			await post(`/applications/${id}/cancel`, {
-				buildId,
+				buildId: $selectedBuildId,
 				applicationId: id
 			});
 		} catch (error) {
@@ -159,7 +165,11 @@
 				bind:this={logsEl}
 			>
 				{#each logs as log}
-					<div>{log.line + '\n'}</div>
+					{#if fromDb}
+						<div>{log.line + '\n'}</div>
+					{:else}
+						<div>[{day.unix(log.time).format('HH:mm:ss.SSS')}] {log.line + '\n'}</div>
+					{/if}
 				{/each}
 			</div>
 		{:else}

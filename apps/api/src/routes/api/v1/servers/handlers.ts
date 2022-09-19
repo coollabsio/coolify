@@ -8,9 +8,7 @@ export async function listServers(request: FastifyRequest) {
     try {
         const userId = request.user.userId;
         const teamId = request.user.teamId;
-        const servers = await prisma.destinationDocker.findMany({ where: { teams: { some: { id: teamId === '0' ? undefined : teamId } }, remoteEngine: false }, distinct: ['engine'] })
-        // const remoteServers = await prisma.destinationDocker.findMany({ where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }, distinct: ['remoteIpAddress', 'engine'] })
-
+        const servers = await prisma.destinationDocker.findMany({ where: { teams: { some: { id: teamId === '0' ? undefined : teamId } }}, distinct: ['remoteIpAddress', 'engine'] })
         return {
             servers
         }
@@ -67,8 +65,7 @@ export async function showUsage(request: FastifyRequest) {
         const { stdout: stats } = await executeSSHCmd({ dockerId: id, command: `vmstat -s` })
         const { stdout: disks } = await executeSSHCmd({ dockerId: id, command: `df -m / --output=size,used,pcent|grep -v 'Used'| xargs` })
         const { stdout: cpus } = await executeSSHCmd({ dockerId: id, command: `nproc --all` })
-        // const { stdout: cpuUsage } = await executeSSHCmd({ dockerId: id, command: `echo $[100-$(vmstat 1 2|tail -1|awk '{print $15}')]` })
-        // console.log(cpuUsage)
+        const { stdout: cpuUsage } = await executeSSHCmd({ dockerId: id, command: `echo $[100-$(vmstat 1 2|tail -1|awk '{print $15}')]` })
         const parsed: any = parseFromText(stats)
         return {
             usage: {
@@ -81,8 +78,8 @@ export async function showUsage(request: FastifyRequest) {
                     freeMemPercentage: (parsed.totalMemoryKB - parsed.usedMemoryKB) / parsed.totalMemoryKB * 100
                 },
                 cpu: {
-                    load: 0,
-                    usage: 0,
+                    load: [0,0,0],
+                    usage: cpuUsage,
                     count: cpus
                 },
                 disk: {

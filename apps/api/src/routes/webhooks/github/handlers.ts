@@ -1,7 +1,7 @@
 import axios from "axios";
 import cuid from "cuid";
 import crypto from "crypto";
-import { encrypt, errorHandler, getUIUrl, isDev, prisma } from "../../../lib/common";
+import { encrypt, errorHandler, getDomain, getUIUrl, isDev, prisma } from "../../../lib/common";
 import { checkContainer, removeContainer } from "../../../lib/docker";
 import { createdBranchDatabase, getApplicationFromDBWebhook, removeBranchDatabase } from "../../api/v1/applications/handlers";
 
@@ -169,10 +169,29 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                             pullmergeRequestAction === 'reopened' ||
                             pullmergeRequestAction === 'synchronize'
                         ) {
+
                             await prisma.application.update({
                                 where: { id: application.id },
                                 data: { updatedAt: new Date() }
                             });
+                            let previewApplicationId = undefined
+                            if (pullmergeRequestId) {
+                                const foundPreviewApplications = await prisma.previewApplication.findMany({ where: { applicationId: application.id, pullmergeRequestId } })
+                                if (foundPreviewApplications.length > 0) {
+                                    previewApplicationId = foundPreviewApplications[0].id
+                                } else {
+                                    const protocol = application.fqdn.includes('https://') ? 'https://' : 'http://'
+                                    const previewApplication = await prisma.previewApplication.create({
+                                        data: {
+                                            pullmergeRequestId,
+                                            sourceBranch,
+                                            customDomain: `${protocol}${pullmergeRequestId}.${getDomain(application.fqdn)}`,
+                                            application: { connect: { id: application.id } }
+                                        }
+                                    })
+                                    previewApplicationId = previewApplication.id
+                                }
+                            }
                             // if (application.connectedDatabase && pullmergeRequestAction === 'opened' || pullmergeRequestAction === 'reopened') {
                             //     // Coolify hosted database
                             //     if (application.connectedDatabase.databaseId) {
@@ -187,6 +206,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                                 data: {
                                     id: buildId,
                                     pullmergeRequestId,
+                                    previewApplicationId,
                                     sourceBranch,
                                     applicationId: application.id,
                                     destinationDockerId: application.destinationDocker.id,
@@ -198,7 +218,9 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                                 }
                             });
 
-
+                            return {
+                                message: 'Queued. Thank you!'
+                            };
                         } else if (pullmergeRequestAction === 'closed') {
                             if (application.destinationDockerId) {
                                 const id = `${application.id}-${pullmergeRequestId}`;
@@ -206,13 +228,22 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                                     await removeContainer({ id, dockerId: application.destinationDocker.id });
                                 } catch (error) { }
                             }
-                            if (application.connectedDatabase.databaseId) {
-                                const databaseId = application.connectedDatabase.databaseId;
-                                const database = await prisma.database.findUnique({ where: { id: databaseId } });
-                                if (database) {
-                                    await removeBranchDatabase(database, pullmergeRequestId);
+                            const foundPreviewApplications = await prisma.previewApplication.findMany({ where: { applicationId: application.id, pullmergeRequestId } })
+                            if (foundPreviewApplications.length > 0) {
+                                for (const preview of foundPreviewApplications) {
+                                    await prisma.previewApplication.delete({ where: { id: preview.id } })
                                 }
                             }
+                            return {
+                                message: 'PR closed. Thank you!'
+                            };
+                            // if (application?.connectedDatabase?.databaseId) {
+                            //     const databaseId = application.connectedDatabase.databaseId;
+                            //     const database = await prisma.database.findUnique({ where: { id: databaseId } });
+                            //     if (database) {
+                            //         await removeBranchDatabase(database, pullmergeRequestId);
+                            //     }
+                            // }
                         }
                     }
                 }

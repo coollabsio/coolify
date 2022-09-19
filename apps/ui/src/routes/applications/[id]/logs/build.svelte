@@ -23,55 +23,45 @@
 	export let application: any;
 	export let buildCount: any;
 	import { page } from '$app/stores';
-
-import {addToast} from '$lib/store';
+	import { addToast, selectedBuildId } from '$lib/store';
 	import BuildLog from './_BuildLog.svelte';
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { changeQueryParams, dateOptions, errorNotification, asyncSleep } from '$lib/common';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import { day } from '$lib/dayjs';
+	import { onDestroy, onMount } from 'svelte';
+	const { id } = $page.params;
 
-	let buildId: any;
+	let loadBuildLogsInterval: any = null;
 
 	let skip = 0;
 	let noMoreBuilds = buildCount < 5 || buildCount <= skip;
-
-	let buildTook = 0;
-	const { id } = $page.params;
 	let preselectedBuildId = $page.url.searchParams.get('buildId');
-	if (preselectedBuildId) buildId = preselectedBuildId;
+	if (preselectedBuildId) $selectedBuildId = preselectedBuildId;
 
-	async function updateBuildStatus({ detail }: { detail: any }) {
-		const { status, took } = detail;
-		if (status !== 'running') {
-			try {
-				const data = await get(`/applications/${id}/logs/build?buildId=${buildId}`);
-				builds = builds.filter((build: any) => {
-					if (build.id === data.builds[0].id) {
-						build.status = data.builds[0].status;
-						build.took = data.builds[0].took;
-						build.since = data.builds[0].since;
-					}
-					return build;
-				});
-			} catch (error) {
-				return errorNotification(error);
-			}
-		} else {
-			builds = builds.filter((build: any) => {
-				if (build.id === buildId) build.status = status;
-				return build;
-			});
-			buildTook = took;
-		}
+	onMount(async () => {
+		getBuildLogs();
+		loadBuildLogsInterval = setInterval(() => {
+			getBuildLogs();
+		}, 2000);
+		
+	});
+	onDestroy(() => {
+		clearInterval(loadBuildLogsInterval);
+	});
+	async function getBuildLogs() {
+		const response = await get(`/applications/${$page.params.id}/logs/build?skip=${skip}`);
+		builds = response.builds;
 	}
+	
 	async function loadMoreBuilds() {
 		if (buildCount >= skip) {
 			skip = skip + 5;
-			noMoreBuilds = buildCount >= skip;
+			noMoreBuilds = buildCount <= skip;
 			try {
 				const data = await get(`/applications/${id}/logs/build?skip=${skip}`);
-				builds = builds.concat(data.builds);
+				builds = data.builds
 				return;
 			} catch (error) {
 				return errorNotification(error);
@@ -81,26 +71,40 @@ import {addToast} from '$lib/store';
 		}
 	}
 	function loadBuild(build: any) {
-		buildId = build;
-		return changeQueryParams(buildId);
+		$selectedBuildId = build;
+		return changeQueryParams($selectedBuildId);
 	}
-     async function resetQueue() {
-        const sure = confirm('It will reset all build queues for all applications. If something is queued, it will be canceled automatically. Are you sure? ');
+	async function resetQueue() {
+		const sure = confirm(
+			'It will reset all build queues for all applications. If something is queued, it will be canceled automatically. Are you sure? '
+		);
 		if (sure) {
-            
-        try {
-			await post(`/internal/resetQueue`, {});
-            addToast({
+			try {
+				await post(`/internal/resetQueue`, {});
+				addToast({
 					message: 'Queue reset done.',
 					type: 'success'
-			});
-			await asyncSleep(500)
-			return window.location.reload()
-		} catch (error) {
-			return errorNotification(error);
+				});
+				await asyncSleep(500);
+				return window.location.reload();
+			} catch (error) {
+				return errorNotification(error);
+			}
 		}
-        }
-    }
+	}
+	function generateBadgeColors(status: string) {
+		if (status === 'failed') {
+			return 'text-red-500';
+		} else if (status === 'running') {
+			return 'text-yellow-300';
+		} else if (status === 'success') {
+			return 'text-green-500';
+		} else if (status === 'canceled') {
+			return 'text-orange-500';
+		} else {
+			return 'text-white';
+		}
+	}
 </script>
 
 <div class="flex items-center space-x-2 p-5 px-6 font-bold">
@@ -156,7 +160,9 @@ import {addToast} from '$lib/store';
 </div>
 <div class="block flex-row justify-start space-x-2 px-5 pt-6 sm:px-10 md:flex">
 	<div class="mb-4 min-w-[16rem] space-y-2 md:mb-0 ">
-    <button class="btn btn-sm text-xs w-full bg-error" on:click={resetQueue}>Reset Build Queue</button>
+		<button class="btn btn-sm text-xs w-full bg-error" on:click={resetQueue}
+			>Reset Build Queue</button
+		>
 		<div class="top-4 md:sticky">
 			{#each builds as build, index (build.id)}
 				<div
@@ -164,8 +170,8 @@ import {addToast} from '$lib/store';
 					on:click={() => loadBuild(build.id)}
 					class:rounded-tr={index === 0}
 					class:rounded-br={index === builds.length - 1}
-					class="flex cursor-pointer items-center justify-center py-4 no-underline transition-all duration-100 hover:bg-coolgray-400 hover:shadow-xl"
-					class:bg-coolgray-400={buildId === build.id}
+					class="flex cursor-pointer items-center justify-center py-4 no-underline transition-all duration-100 hover:bg-coolgray-300 hover:shadow-xl"
+					class:bg-coolgray-200={$selectedBuildId === build.id}
 				>
 					<div class="flex-col px-2 text-center min-w-[10rem]">
 						<div class="text-sm font-bold">
@@ -174,50 +180,55 @@ import {addToast} from '$lib/store';
 						<div class="text-xs">
 							{build.type}
 						</div>
-						<div class="badge badge-sm text-xs text-white uppercase rounded bg-coolgray-300 border-none font-bold" 
-						class:text-red-500={build.status === 'failed'} 
-						class:text-orange-500={build.status === 'canceled'}
-						class:text-green-500={build.status === 'success'}
-						class:text-yellow-500={build.status === 'running'}>{build.status}</div>
+						<div
+							class={`badge badge-sm text-xs uppercase rounded bg-coolgray-300 border-none font-bold ${generateBadgeColors(
+								build.status
+							)}`}
+						>
+							{build.status}
+						</div>
 					</div>
 
 					<div class="w-48 text-center text-xs">
 						{#if build.status === 'running'}
-							<div class="font-bold">{$t('application.build.running')}</div>
 							<div>
-								Elapsed
-								<span class="font-bold">{buildTook}s</span>
+								<span class="font-bold text-xl"
+									>{build.elapsed}s</span
+								>
 							</div>
-						{:else if build.status === 'queued'}
-							<div class="font-bold">{$t('application.build.queued')}</div>
-						{:else}
-							<div>{build.since}</div>
+						{:else if build.status !== 'queued'}
+							<div>{day(build.updatedAt).utc().fromNow()}</div>
 							<div>
-								{$t('application.build.finished_in')} <span class="font-bold">{build.took}s</span>
+								{$t('application.build.finished_in')}
+								<span class="font-bold"
+									>{day(build.updatedAt).utc().diff(day(build.createdAt)) / 1000}s</span
+								>
 							</div>
 						{/if}
 					</div>
 				</div>
 				<Tooltip triggeredBy={`#building-${build.id}`}
 					>{new Intl.DateTimeFormat('default', dateOptions).format(new Date(build.createdAt)) +
-						`\n${build.status}`}</Tooltip
+						`\n`}</Tooltip
 				>
 			{/each}
 		</div>
 		{#if !noMoreBuilds}
 			{#if buildCount > 5}
-				<div class="flex space-x-2">
-					<button disabled={noMoreBuilds} class=" btn btn-sm w-full text-xs" on:click={loadMoreBuilds}
-						>{$t('application.build.load_more')}</button
+				<div class="flex space-x-2 pb-10">
+					<button
+						disabled={noMoreBuilds}
+						class=" btn btn-sm w-full text-xs"
+						on:click={loadMoreBuilds}>{$t('application.build.load_more')}</button
 					>
 				</div>
 			{/if}
 		{/if}
 	</div>
 	<div class="flex-1 md:w-96">
-		{#if buildId}
-			{#key buildId}
-				<svelte:component this={BuildLog} {buildId} on:updateBuildStatus={updateBuildStatus} />
+		{#if $selectedBuildId}
+			{#key $selectedBuildId}
+				<svelte:component this={BuildLog} />
 			{/key}
 		{/if}
 	</div>

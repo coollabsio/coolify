@@ -12,7 +12,7 @@ function configureMiddleware(
 	if (isHttps) {
 		traefik.http.routers[id] = {
 			entrypoints: ['web'],
-			rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
+			rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`/\`)`,
 			service: `${id}`,
 			middlewares: ['redirect-to-https']
 		};
@@ -53,7 +53,7 @@ function configureMiddleware(
 		if (isDualCerts) {
 			traefik.http.routers[`${id}-secure`] = {
 				entrypoints: ['websecure'],
-				rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
+				rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`/\`)`,
 				service: `${id}`,
 				tls: {
 					certresolver: 'letsencrypt'
@@ -64,7 +64,7 @@ function configureMiddleware(
 			if (isWWW) {
 				traefik.http.routers[`${id}-secure-www`] = {
 					entrypoints: ['websecure'],
-					rule: `Host(\`www.${nakedDomain}\`)`,
+					rule: `Host(\`www.${nakedDomain}\`) && PathPrefix(\`/\`)`,
 					service: `${id}`,
 					tls: {
 						certresolver: 'letsencrypt'
@@ -73,7 +73,7 @@ function configureMiddleware(
 				};
 				traefik.http.routers[`${id}-secure`] = {
 					entrypoints: ['websecure'],
-					rule: `Host(\`${nakedDomain}\`)`,
+					rule: `Host(\`${nakedDomain}\`) && PathPrefix(\`/\`)`,
 					service: `${id}`,
 					tls: {
 						domains: {
@@ -86,7 +86,7 @@ function configureMiddleware(
 			} else {
 				traefik.http.routers[`${id}-secure-www`] = {
 					entrypoints: ['websecure'],
-					rule: `Host(\`www.${nakedDomain}\`)`,
+					rule: `Host(\`www.${nakedDomain}\`) && PathPrefix(\`/\`)`,
 					service: `${id}`,
 					tls: {
 						domains: {
@@ -97,7 +97,7 @@ function configureMiddleware(
 				};
 				traefik.http.routers[`${id}-secure`] = {
 					entrypoints: ['websecure'],
-					rule: `Host(\`${domain}\`)`,
+					rule: `Host(\`${domain}\`) && PathPrefix(\`/\`)`,
 					service: `${id}`,
 					tls: {
 						certresolver: 'letsencrypt'
@@ -110,14 +110,14 @@ function configureMiddleware(
 	} else {
 		traefik.http.routers[id] = {
 			entrypoints: ['web'],
-			rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
+			rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`/\`)`,
 			service: `${id}`,
 			middlewares: []
 		};
 
 		traefik.http.routers[`${id}-secure`] = {
 			entrypoints: ['websecure'],
-			rule: `Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)`,
+			rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`/\`)`,
 			service: `${id}`,
 			tls: {
 				domains: {

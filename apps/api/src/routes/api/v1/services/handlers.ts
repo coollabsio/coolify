@@ -456,7 +456,7 @@ export async function activatePlausibleUsers(request: FastifyRequest<OnlyId>, re
         if (destinationDockerId) {
             await executeDockerCmd({
                 dockerId: destinationDocker.id,
-                command: `docker exec ${id} 'psql -H postgresql://${postgresqlUser}:${postgresqlPassword}@localhost:5432/${postgresqlDatabase} -c "UPDATE users SET email_verified = true;"'`
+                command: `docker exec ${id}-postgresql psql -H postgresql://${postgresqlUser}:${postgresqlPassword}@localhost:5432/${postgresqlDatabase} -c "UPDATE users SET email_verified = true;"`
             })
             return await reply.code(201).send()
         }
@@ -476,7 +476,7 @@ export async function cleanupPlausibleLogs(request: FastifyRequest<OnlyId>, repl
         if (destinationDockerId) {
             await executeDockerCmd({
                 dockerId: destinationDocker.id,
-                command: `docker exec ${id}-clickhouse sh -c "/usr/bin/clickhouse-client -q \\"SELECT name FROM system.tables WHERE name LIKE '%log%';\\"| xargs -I{} /usr/bin/clickhouse-client -q \"TRUNCATE TABLE system.{};\""`
+                command: `docker exec ${id}-clickhouse /usr/bin/clickhouse-client -q \\"SELECT name FROM system.tables WHERE name LIKE '%log%';\\"| xargs -I{} /usr/bin/clickhouse-client -q \"TRUNCATE TABLE system.{};\"`
             })
             return await reply.code(201).send()
         }
