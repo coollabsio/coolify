@@ -141,8 +141,8 @@
 							id="dashboard"
 							sveltekit:prefetch
 							href="/"
-							class="icons  hover:text-white"
-							class:text-white={$page.url.pathname === '/'}
+							class="icons hover:text-pink-500"
+							class:text-pink-500={$page.url.pathname === '/'}
 							class:bg-coolgray-500={$page.url.pathname === '/'}
 							class:bg-coolgray-200={!($page.url.pathname === '/')}
 						>
@@ -168,8 +168,8 @@
 								id="servers"
 								sveltekit:prefetch
 								href="/servers"
-								class="icons hover:text-white"
-								class:text-white={$page.url.pathname === '/servers'}
+								class="icons hover:text-sky-500"
+								class:text-sky-500={$page.url.pathname === '/servers'}
 								class:bg-coolgray-500={$page.url.pathname === '/servers'}
 								class:bg-coolgray-200={!($page.url.pathname === '/servers')}
 							>
@@ -202,7 +202,7 @@
 							id="iam"
 							sveltekit:prefetch
 							href="/iam"
-							class="icons bg-coolgray-200"
+							class="icons hover:text-iam"
 							class:text-iam={$page.url.pathname.startsWith('/iam')}
 							class:bg-coolgray-500={$page.url.pathname.startsWith('/iam')}
 							><svg
@@ -226,7 +226,7 @@
 							id="settings"
 							sveltekit:prefetch
 							href={$appSession.teamId === '0' ? '/settings/global' : '/settings/ssh-keys'}
-							class="icons bg-coolgray-200"
+							class="icons hover:text-settings"
 							class:text-settings={$page.url.pathname.startsWith('/settings')}
 							class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
 						>
@@ -248,7 +248,11 @@
 							</svg>
 						</a>
 
-						<div id="logout" class="icons bg-coolgray-200 hover:text-error" on:click={logout}>
+						<div
+							id="logout"
+							class="icons bg-coolgray-200 hover:text-error cursor-pointer"
+							on:click={logout}
+						>
 							<svg
 								xmlns="http://www.w3.org/2000/svg"
 								class="ml-1 h-8 w-8"
@@ -295,7 +299,7 @@
 			</label>
 			<div class="prose flex flex-row justify-between space-x-1 w-full items-center pr-3">
 				{#if !$appSession.whiteLabeled}
-				<h3 class="mb-0 text-white">Coolify</h3>
+					<h3 class="mb-0 text-white">Coolify</h3>
 				{/if}
 				<UpdateAvailable />
 			</div>
@@ -311,12 +315,10 @@
 		<ul class="menu bg-coolgray-300 w-60 p-2  space-y-3 pt-4 ">
 			<li>
 				<a
-					class="no-underline icons hover:text-white"
+					class="no-underline icons hover:text-white hover:bg-pink-500"
 					sveltekit:prefetch
 					href="/"
-					class:text-pink-500={$page.url.pathname === '/'}
-					class:bg-coolgray-500={$page.url.pathname === '/'}
-					class:bg-coolgray-200={!($page.url.pathname === '/')}
+					class:bg-pink-500={$page.url.pathname === '/'}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -340,10 +342,10 @@
 
 			<li>
 				<a
-					class="no-underline icons hover:text-white"
+					class="no-underline icons hover:text-white hover:bg-sky-500"
 					sveltekit:prefetch
 					href="/servers"
-					class:bg-applications={$page.url.pathname.startsWith('/servers')}
+					class:bg-sky-500={$page.url.pathname.startsWith('/servers')}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -365,7 +367,10 @@
 				</a>
 			</li>
 			<li>
-				<a class="no-underline icons hover:text-white" href="/iam" class:bg-iam={$page.url.pathname.startsWith('/iam')}
+				<a
+					class="no-underline icons hover:text-white hover:bg-iam"
+					href="/iam"
+					class:bg-iam={$page.url.pathname.startsWith('/iam')}
 					><svg
 						xmlns="http://www.w3.org/2000/svg"
 						viewBox="0 0 24 24"
@@ -384,11 +389,10 @@
 					</svg>
 					IAM
 				</a>
-				<Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
 			</li>
 			<li>
 				<a
-					class="no-underline icons hover:text-white"
+					class="no-underline icons hover:text-black hover:bg-settings"
 					href={$appSession.teamId === '0' ? '/settings/global' : '/settings/ssh-keys'}
 					class:bg-settings={$page.url.pathname.startsWith('/settings')}
 					class:text-black={$page.url.pathname.startsWith('/settings')}
@@ -411,9 +415,6 @@
 					</svg>
 					Settings
 				</a>
-				<Tooltip triggeredBy="#settings" placement="right" color="bg-settings text-black"
-					>Settings</Tooltip
-				>
 			</li>
 			<li>
 				<div class="no-underline icons hover:bg-error" on:click={logout}>
@@ -435,7 +436,6 @@
 					</svg>
 					<div class="-ml-1">Logout</div>
 				</div>
-				<Tooltip triggeredBy="#logout" placement="right" color="bg-red-600">Logout</Tooltip>
 			</li>
 			<li class="flex-1 bg-transparent" />
 			<li class="w-full justify-center">
@@ -448,3 +448,7 @@
 		</ul>
 	</div>
 </div>
+
+<Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
+<Tooltip triggeredBy="#settings" placement="right" color="bg-settings text-black">Settings</Tooltip>
+<Tooltip triggeredBy="#logout" placement="right" color="bg-red-600">Logout</Tooltip>
