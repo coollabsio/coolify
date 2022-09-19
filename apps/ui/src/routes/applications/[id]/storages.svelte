@@ -33,11 +33,10 @@
 </script>
 
 <div class="mx-auto max-w-6xl rounded-xl px-6 pt-4">
-
 	<table class="mx-auto border-separate text-left">
 		<thead>
 			<tr class="h-12">
-				<th scope="col">{$t('forms.path')} <Explainer explanation={$t('application.storage.persistent_storage_explainer')} /></th>
+				<th scope="col">{$t('forms.path')} <Explainer position="dropdown-bottom" explanation={$t('application.storage.persistent_storage_explainer')} /></th>
 			</tr>
 		</thead>
 		<tbody>
