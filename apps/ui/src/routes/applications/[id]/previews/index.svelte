@@ -177,10 +177,10 @@
 </script>
 
 <div class="flex items-center space-x-2 p-5 px-6 font-bold">
-	<div class="-mb-5 flex-col">
-		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
+	<div class="flex flex-col justify-center py-4 text-center">
+		<h1 class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block font-bold mb-4">
 			Preview Deployments
-		</div>
+		</h1>
 		<span class="text-xs">{application?.name}</span>
 	</div>
 	{#if application.gitSource?.htmlUrl && application.repository && application.branch}
