@@ -23,9 +23,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 		onRequest: [fastify.authenticate]
 	}, async (request) => await getCurrentUser(request, fastify));
 
-	fastify.get('/undead', {
-		onRequest: [fastify.authenticate]
-	}, async function () {
+	fastify.get('/undead', async function () {
 		return { message: 'nope' };
 	});
 
@@ -47,7 +45,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 		onRequest: [fastify.authenticate]
 	}, async (request) => await restartCoolify(request));
 
-    fastify.post('/internal/resetQueue', {
+	fastify.post('/internal/resetQueue', {
 		onRequest: [fastify.authenticate]
 	}, async (request) => await resetQueue(request));
 
