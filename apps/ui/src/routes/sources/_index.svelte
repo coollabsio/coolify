@@ -36,8 +36,8 @@
 	});
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">{$t('index.git_sources')}</div>
+<nav class="header">
+	<h1 class="mr-4 text-2xl font-bold">{$t('index.git_sources')}</h1>
 	{#if $appSession.isAdmin}
 		<a href="/sources/new" class="btn btn-square btn-sm bg-sources">
 			<svg
@@ -55,8 +55,9 @@
 			>
 		</a>
 	{/if}
-</div>
-<div class="flex-col justify-center mt-10 pb-12 sm:pb-16">
+</nav>
+<br />
+<div class="flex-col justify-center mt-10 pb-12 sm:pb-16 lg:pt-16">
 	{#if !sources || ownSources.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">{$t('source.no_git_sources_found')}</div>

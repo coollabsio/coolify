@@ -10,13 +10,14 @@
 <div class="flex space-x-1 py-5 font-bold">
 	<div class="title">Plausible Analytics</div>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="scriptName"
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="scriptName"
 		>Script Name <Explainer
 			explanation="Useful if you would like to rename the collector script to prevent it blocked by AdBlockers."
 		/></label
 	>
-	<input
+	<input 
+		class="w-full"
 		name="scriptName"
 		id="scriptName"
 		readonly={!$appSession.isAdmin && !$status.service.isRunning}
@@ -26,9 +27,10 @@
 		required
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="email">{$t('forms.email')}</label>
-	<input
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="email">{$t('forms.email')}</label>
+	<input 
+		class="w-full"
 		name="email"
 		id="email"
 		disabled={readOnly}
@@ -38,8 +40,8 @@
 		required
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="username">{$t('forms.username')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="username">{$t('forms.username')}</label>
 	<CopyPasswordField
 		name="username"
 		id="username"
@@ -50,8 +52,8 @@
 		required
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="password">{$t('forms.password')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="password">{$t('forms.password')}</label>
 	<CopyPasswordField
 		id="password"
 		isPasswordField
@@ -64,8 +66,8 @@
 <div class="flex space-x-1 py-5 font-bold">
 	<div class="title">PostgreSQL</div>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlUser">{$t('forms.username')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="postgresqlUser">{$t('forms.username')}</label>
 	<CopyPasswordField
 		name="postgresqlUser"
 		id="postgresqlUser"
@@ -74,8 +76,8 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlPassword">{$t('forms.password')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="postgresqlPassword">{$t('forms.password')}</label>
 	<CopyPasswordField
 		id="postgresqlPassword"
 		isPasswordField
@@ -85,8 +87,8 @@
 		value={service.plausibleAnalytics.postgresqlPassword}
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="postgresqlDatabase">{$t('index.database')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="postgresqlDatabase">{$t('index.database')}</label>
 	<CopyPasswordField
 		name="postgresqlDatabase"
 		id="postgresqlDatabase"

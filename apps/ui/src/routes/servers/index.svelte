@@ -29,10 +29,10 @@
 	}
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Servers</div>
+<div class="header">
+	<h1 class="text-2xl font-bold">Servers</h1>
 </div>
-<div class="container lg:mx-auto lg:p-0 px-8 p-5">
+<div class="container lg:mx-auto lg:p-0 px-8 p-5 lg:pt-20">
 	{#if servers.length > 0}
 		<div class="grid grid-col gap-8 auto-cols-max grid-cols-1  p-4">
 			{#each servers as server}

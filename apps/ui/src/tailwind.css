@@ -97,7 +97,7 @@ a {
 }
 
 .title {
-	@apply mr-4 text-base tracking-tight md:text-2xl font-bold;
+	@apply mr-4 tracking-tight text-2xl font-bold;
 }
 .nav-main {
 	@apply fixed top-0 left-0 min-h-screen w-16 min-w-[4rem] overflow-hidden border-r border-stone-800 bg-coolgray-200 scrollbar-w-1  scrollbar-thumb-coollabs scrollbar-track-coolgray-200 xl:overflow-visible;
@@ -199,4 +199,8 @@ a {
 
 input {
 	@apply w-48 lg:w-96;
+}
+
+.header {
+	@apply flex flex-row px-4 justify-between items-center bg-neutral-focus z-10 w-full mb-10;
 }

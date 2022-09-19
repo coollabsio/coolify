@@ -90,142 +90,123 @@
 	}
 </script>
 
-<div class="mx-auto max-w-4xl px-6">
+<div class="mx-auto max-w-4xl lg:px-6 px-3">
 	{#if !source.githubAppId}
 		<form on:submit|preventDefault={newGithubApp} class="py-4">
 			<div class="grid gap-1 lg:grid-flow-col pb-7">
-				<div class="title">General</div>
+				<h1 class="title">General</h1>
 				{#if !source.githubAppId}
-					<button class="btn btn-sm bg-sources" type="submit">Save & Redirect to GitHub</button>
-				{/if}
-			</div>
-			<div class="grid grid-flow-row gap-2 px-10">
-				<div class="grid grid-flow-row gap-2">
-					<div class="mt-2 grid lg:grid-cols-2 items-center">
-						<label for="name" class="text-base font-bold text-stone-100">Name</label>
-						<input name="name" id="name" required bind:value={source.name} />
-					</div>
-				</div>
-				<div class="grid lg:grid-cols-2 items-center">
-					<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
-					<input name="htmlUrl" id="htmlUrl" required bind:value={source.htmlUrl} />
-				</div>
-				<div class="grid lg:grid-cols-2 items-center">
-					<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
-					<input name="apiUrl" id="apiUrl" required bind:value={source.apiUrl} />
-				</div>
-				<div class="grid lg:grid-cols-2 items-center">
-					<label for="customPort" class="text-base font-bold text-stone-100"
-						>Custom SSH Port <Explainer
-							explanation={'If you use a self-hosted version of Git, you can provide custom port for all the Git related actions.'}
-						/></label
-					>
-					<input
-						name="customPort"
-						id="customPort"
-						disabled={!selfHosted || source.githubAppId}
-						readonly={!selfHosted || source.githubAppId}
-						required
-						value={source.customPort}
-					/>
-				</div>
-				<div class="grid lg:grid-cols-2">
-					<div class="flex flex-col">
-						<label for="organization" class="pt-2 text-base font-bold text-stone-100"
-							>Organization
-							<Explainer
-								explanation={"Fill it if you would like to use an organization's as your Git Source. Otherwise your user will be used."}
-							/></label
+					<div class="w-full flex flex-rpw justify-end">
+						<button class="btn btn-sm bg-sources mt-5 w-full lg:w-fit" type="submit"
+							>Save & Redirect to GitHub</button
 						>
 					</div>
-					<input
-						name="organization"
-						id="organization"
-						placeholder="eg: coollabsio"
-						bind:value={source.organization}
-					/>
-				</div>
+				{/if}
+			</div>
+			<div class="grid gap-4 grid-cols-2 auto-rows-max">
+				<label for="name" class="text-base font-bold text-stone-100">Name</label>
+				<input class="w-full" name="name" id="name" required bind:value={source.name} />
+				<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
+				<input class="w-full" name="htmlUrl" id="htmlUrl" required bind:value={source.htmlUrl} />
+				<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
+				<input class="w-full" name="apiUrl" id="apiUrl" required bind:value={source.apiUrl} />
+				<label for="customPort" class="text-base font-bold text-stone-100"
+					>Custom SSH Port <Explainer
+						explanation={'If you use a self-hosted version of Git, you can provide custom port for all the Git related actions.'}
+					/></label
+				>
+				<input
+					class="w-full"
+					name="customPort"
+					id="customPort"
+					disabled={!selfHosted || source.githubAppId}
+					readonly={!selfHosted || source.githubAppId}
+					required
+					value={source.customPort}
+				/>
+				<label for="organization" class="pt-2 text-base font-bold text-stone-100"
+					>Organization
+					<Explainer
+						explanation={"Fill it if you would like to use an organization's as your Git Source. Otherwise your user will be used."}
+					/></label
+				>
+				<input
+					class="w-full"
+					name="organization"
+					id="organization"
+					placeholder="eg: coollabsio"
+					bind:value={source.organization}
+				/>
 			</div>
 		</form>
 	{:else if source.githubApp?.installationId}
 		<form on:submit|preventDefault={handleSubmit} class="py-4">
-			<div class="flex md:flex-row space-y-2 md:space-y-0 space-x-0 md:space-x-2 flex-col pb-5">
-				<div class="title">{$t('general')}</div>
-
+			<div class="flex lg:flex-row lg:justify-between flex-col space-y-3 w-full lg:items-center">
+				<h1 class="title">{$t('general')}</h1>
 				{#if $appSession.isAdmin}
-					<button class="btn btn-sm bg-sources" type="submit" disabled={loading}
-						>{loading ? 'Saving...' : 'Save'}</button
-					>
-					<a
-						class="btn btn-sm"
-						href={`${source.htmlUrl}/${
-							source.htmlUrl === 'https://github.com' ? 'apps' : 'github-apps'
-						}/${source.githubApp.name}/installations/new`}
-						>{$t('source.change_app_settings', { name: 'GitHub' })}</a
-					>
+					<div class="flex flex-col lg:flex-row lg:space-x-4 lg:w-fit space-y-4 lg:space-y-0 w-full">
+						<button class="btn btn-sm bg-sources" type="submit" disabled={loading}
+							>{loading ? 'Saving...' : 'Save'}</button
+						>
+						<a
+							class="btn btn-sm"
+							href={`${source.htmlUrl}/${
+								source.htmlUrl === 'https://github.com' ? 'apps' : 'github-apps'
+							}/${source.githubApp.name}/installations/new`}
+							>{$t('source.change_app_settings', { name: 'GitHub' })}</a
+						>
+					</div>
 				{/if}
 			</div>
-			<div class="grid grid-flow-row gap-2 px-10">
-				<div class="grid grid-flow-row gap-2">
-					<div class="mt-2 grid lg:grid-cols-2 items-center">
-						<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
-						<input name="name" id="name" required bind:value={source.name} />
-					</div>
-				</div>
-				<div class="grid lg:grid-cols-2 items-center">
-					<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
-					<input
-						name="htmlUrl"
-						id="htmlUrl"
-						disabled={source.githubAppId}
-						readonly={source.githubAppId}
-						required
-						bind:value={source.htmlUrl}
-					/>
-				</div>
-				<div class="grid lg:grid-cols-2 items-center">
-					<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
-					<input
-						name="apiUrl"
-						id="apiUrl"
-						required
-						disabled={source.githubAppId}
-						readonly={source.githubAppId}
-						bind:value={source.apiUrl}
-					/>
-				</div>
-				{#if selfHosted}
-					<div class="grid lg:grid-cols-2 items-center">
-						<label for="customPort" class="text-base font-bold text-stone-100"
-							>Custom SSH Port <Explainer
-								explanation="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
-							/></label
-						>
-						<input
-							name="customPort"
-							id="customPort"
-							disabled={!selfHosted}
-							readonly={!selfHosted}
-							required
-							value={source.customPort}
-						/>
-					</div>
-				{/if}
-				<div class="grid lg:grid-cols-2">
-					<div class="flex flex-col">
-						<label for="organization" class="pt-2 text-base font-bold text-stone-100"
-							>Organization</label
-						>
-					</div>
-					<input
-						readonly
-						disabled
-						name="organization"
-						id="organization"
-						placeholder="eg: coollabsio"
-						bind:value={source.organization}
-					/>
-				</div>
+			<div class="grid gap-4 grid-cols-2 auto-rows-max mt-4">
+				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
+				<input class="w-full" name="name" id="name" required bind:value={source.name} />
+				<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
+				<input
+					class="w-full"
+					name="htmlUrl"
+					id="htmlUrl"
+					disabled={source.githubAppId}
+					readonly={source.githubAppId}
+					required
+					bind:value={source.htmlUrl}
+				/>
+				<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
+				<input
+					class="w-full"
+					name="apiUrl"
+					id="apiUrl"
+					required
+					disabled={source.githubAppId}
+					readonly={source.githubAppId}
+					bind:value={source.apiUrl}
+				/>
+				<label for="customPort" class="text-base font-bold text-stone-100"
+					>Custom SSH Port <Explainer
+						explanation="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
+					/></label
+				>
+				<input
+					class="w-full"
+					name="customPort"
+					id="customPort"
+					disabled={!selfHosted}
+					readonly={!selfHosted}
+					required
+					value={source.customPort}
+				/>
+				<label for="organization" class="pt-2 text-base font-bold text-stone-100"
+					>Organization</label
+				>
+				<input
+					class="w-full"
+					readonly
+					disabled
+					name="organization"
+					id="organization"
+					placeholder="eg: coollabsio"
+					bind:value={source.organization}
+				/>
 			</div>
 		</form>
 	{:else}

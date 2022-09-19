@@ -7,12 +7,12 @@
 <div class="flex space-x-1 py-5 font-bold">
 	<div class="title">Umami</div>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="adminUser">Admin User</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="adminUser">Admin User</label>
 	<input name="adminUser" id="adminUser" placeholder="admin" value="admin" disabled readonly />
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="umamiAdminPassword"
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="umamiAdminPassword"
 		>Initial Admin Password <Explainer
 			explanation="It could be changed in Umami. <br>This is just the password set initially after the first start."
 		/></label

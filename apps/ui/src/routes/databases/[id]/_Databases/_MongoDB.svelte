@@ -7,9 +7,9 @@
 </script>
 
 <div class="flex space-x-1 py-5 font-bold">
-	<div class="title">MongoDB</div>
+	<h1 class="title">MongoDB</h1>
 </div>
-<div class="space-y-2 px-10">
+<div class="space-y-2 lg:px-10">
 	<div class="grid grid-cols-2 items-center">
 		<label for="rootUser" class="text-base font-bold text-stone-100">{$t('forms.root_user')}</label>
 		<CopyPasswordField

@@ -10,8 +10,8 @@
 	<div class="title">Appwrite</div>
 </div>
 
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="opensslKeyV1">Encryption Key</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="opensslKeyV1">Encryption Key</label>
 	<CopyPasswordField
 		name="opensslKeyV1"
 		id="opensslKeyV1"
@@ -21,8 +21,8 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="executorSecret">Executor Secret</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="executorSecret">Executor Secret</label>
 	<CopyPasswordField
 		name="executorSecret"
 		id="executorSecret"
@@ -37,7 +37,7 @@
 	<div class="title">Redis</div>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="redisPassword">Password</label>
+	<label class="text-base font-bold text-stone-100" for="redisPassword">Password</label>
 	<CopyPasswordField
 		name="redisPassword"
 		id="redisPassword"
@@ -53,7 +53,7 @@
 </div>
 
 <!-- <div class="grid grid-cols-2 items-center px-10">
-	<label for="mariadbHost">MariaDB Host</label>
+	<label class="text-base font-bold text-stone-100" for="mariadbHost">MariaDB Host</label>
 	<CopyPasswordField
 		name="mariadbHost"
 		id="mariadbHost"
@@ -63,7 +63,7 @@
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="mariadbPort">MariaDB Port</label>
+	<label class="text-base font-bold text-stone-100" for="mariadbPort">MariaDB Port</label>
 	<CopyPasswordField
 		name="mariadbPort"
 		id="mariadbPort"
@@ -73,7 +73,7 @@
 	/>
 </div> -->
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="mariadbUser">{$t('forms.username')}</label>
+	<label class="text-base font-bold text-stone-100" for="mariadbUser">{$t('forms.username')}</label>
 	<CopyPasswordField
 		name="mariadbUser"
 		id="mariadbUser"
@@ -83,7 +83,7 @@
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="mariadbPassword">{$t('forms.password')}</label>
+	<label class="text-base font-bold text-stone-100" for="mariadbPassword">{$t('forms.password')}</label>
 	<CopyPasswordField
 		id="mariadbPassword"
 		isPasswordField
@@ -94,7 +94,7 @@
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="mariadbRootUser">Root User</label>
+	<label class="text-base font-bold text-stone-100" for="mariadbRootUser">Root User</label>
 	<CopyPasswordField
 		name="mariadbRootUser"
 		id="mariadbRootUser"
@@ -104,7 +104,7 @@
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="mariadbRootUserPassword">Root Password</label>
+	<label class="text-base font-bold text-stone-100" for="mariadbRootUserPassword">Root Password</label>
 	<CopyPasswordField
 		id="mariadbRootUserPassword"
 		isPasswordField
@@ -115,7 +115,7 @@
 	/>
 </div>
 <div class="grid grid-cols-2 items-center px-10">
-	<label for="mariadbDatabase">{$t('index.database')}</label>
+	<label class="text-base font-bold text-stone-100" for="mariadbDatabase">{$t('index.database')}</label>
 	<CopyPasswordField
 		name="mariadbDatabase"
 		id="mariadbDatabase"

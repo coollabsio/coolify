@@ -48,8 +48,8 @@
 	});
 </script>
 
-<div class="flex h-20 items-center space-x-2 p-5 px-6 font-bold">
-	<div class="-mb-5 flex-col">
+<div class="flex items-center space-x-2 p-5 font-bold lg:hidden">
+	<div class="flex-col">
 		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
 			Configuration
 		</div>
@@ -58,7 +58,7 @@
 	<DatabaseLinks {database} />
 </div>
 
-<div class="mx-auto max-w-4xl px-6 py-4">
+<div class="mx-auto max-w-4xl p-5">
 	<div class="text-2xl font-bold">Database Usage</div>
 	<div class="text-center">
 		<div class="stat w-64">

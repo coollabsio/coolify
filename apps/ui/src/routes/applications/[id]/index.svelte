@@ -94,7 +94,7 @@
 		}
 	];
 	function containerClass() {
-		return 'text-white bg-transparent font-thin px-0';
+		return 'text-white bg-transparent font-thin px-0 w-full';
 	}
 
 	async function getUsage() {
@@ -294,8 +294,8 @@
 	}
 </script>
 
-<div class="flex items-center space-x-2 p-5 px-6 font-bold">
-	<div class="-mb-5 flex-col">
+<div class="flex items-center space-x-2 p-5 px-6 font-bold lg:hidden">
+	<div class="flex-col">
 		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
 			Configuration
 		</div>
@@ -348,7 +348,7 @@
 	{/if}
 </div>
 
-<div class="mx-auto max-w-4xl px-6 py-4">
+<div class="mx-auto max-w-4xl px-6 pt-4">
 	<div class="text-2xl font-bold">Application Usage</div>
 	<div class="text-center">
 		<div class="stat w-64">
@@ -370,8 +370,8 @@
 <div class="mx-auto max-w-4xl px-6">
 	<!-- svelte-ignore missing-declaration -->
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
-		<div class="flex space-x-1 pb-5">
-			<div class="title">{$t('general')}</div>
+		<div class="flex space-x-1 pb-5 justify-between items-center">
+			<h1 class="title">{$t('general')}</h1>
 			{#if $appSession.isAdmin}
 				<button
 					class="btn btn-sm"
@@ -384,7 +384,8 @@
 				>
 			{/if}
 		</div>
-		<div class="grid grid-flow-row gap-2 px-10">
+
+		<div class="grid grid-flow-row gap-2 lg:px-10 pr-5">
 			<div class="mt-2 grid grid-cols-2 items-center">
 				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 				<input name="name" id="name" bind:value={application.name} required />
@@ -459,7 +460,7 @@
 						value={application.destinationDocker.name}
 						id="destination"
 						disabled
-						class="bg-transparent"
+						class="bg-transparent w-full"
 					/>
 				</div>
 			</div>
@@ -473,19 +474,16 @@
 								: 'Image that will be used during the build process.'}
 						/>
 					</label>
-
-					<div class="custom-select-wrapper">
-						<Select
-							{isDisabled}
-							containerClasses={isDisabled && containerClass()}
-							id="baseBuildImages"
-							showIndicator={!$status.application.isRunning}
-							items={application.baseBuildImages}
-							on:select={selectBaseBuildImage}
-							value={application.baseBuildImage}
-							isClearable={false}
-						/>
-					</div>
+					<Select
+						{isDisabled}
+						containerClasses={(isDisabled && containerClass()) || 'bg-neutral border-0 w-full'}
+						id="baseBuildImages"
+						showIndicator={!$status.application.isRunning}
+						items={application.baseBuildImages}
+						on:select={selectBaseBuildImage}
+						value={application.baseBuildImage}
+						isClearable={false}
+					/>
 				</div>
 			{/if}
 			{#if application.buildPack !== 'docker'}
@@ -494,18 +492,16 @@
 						>{$t('application.base_image')}
 						<Explainer explanation={'Image that will be used for the deployment.'} /></label
 					>
-					<div class="custom-select-wrapper">
-						<Select
-							{isDisabled}
-							containerClasses={isDisabled && containerClass()}
-							id="baseImages"
-							showIndicator={!$status.application.isRunning}
-							items={application.baseImages}
-							on:select={selectBaseImage}
-							value={application.baseImage}
-							isClearable={false}
-						/>
-					</div>
+					<Select
+						{isDisabled}
+						containerClasses={(isDisabled && containerClass()) || 'bg-neutral border-0'}
+						id="baseImages"
+						showIndicator={!$status.application.isRunning}
+						items={application.baseImages}
+						on:select={selectBaseImage}
+						value={application.baseImage}
+						isClearable={false}
+					/>
 				</div>
 			{/if}
 			{#if application.buildPack !== 'docker' && (application.buildPack === 'nextjs' || application.buildPack === 'nuxtjs')}
@@ -574,7 +570,7 @@
 		<div class="flex space-x-1 py-5 font-bold">
 			<div class="title">{$t('application.application')}</div>
 		</div>
-		<div class="grid grid-flow-row gap-2 px-10">
+		<div class="grid grid-flow-row gap-2 lg:px-10 pr-5">
 			<div class="grid grid-cols-2 items-center">
 				<Setting
 					id="isBot"
@@ -866,7 +862,7 @@
 	<div class="flex space-x-1 pb-5 font-bold">
 		<div class="title">{$t('application.features')}</div>
 	</div>
-	<div class="px-10 pb-10">
+	<div class="lg:px-10 lg:pb-10 pb-6">
 		{#if !application.settings.isPublicRepository}
 			<div class="grid grid-cols-2 items-center">
 				<Setting
@@ -891,7 +887,7 @@
 				/>
 			</div>
 		{/if}
-		<div class="grid grid-cols-2 items-center">
+		<div class="grid grid-cols-2 items-center w-full">
 			<Setting
 				id="debug"
 				isCenter={false}

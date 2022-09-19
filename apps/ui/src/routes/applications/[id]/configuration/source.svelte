@@ -73,7 +73,7 @@
 		{$t('application.configuration.select_a_git_source')}
 	</div>
 </div>
-<div class="max-w-5xl mx-auto ">
+<div class="max-w-5xl mx-auto px-5">
 	<div class="title pb-8">Git App</div>
 	<div class="flex flex-wrap justify-center">
 		{#if !filteredSources || ownSources.length === 0}
@@ -192,7 +192,7 @@
 			</div>
 		{/if}
 	</div>
-	<div class="flex items-center">
+	<div class="flex flex-row items-center">
 		<div class="title py-4">Public Repository</div>
 		<DocLink url="https://docs.coollabs.io/coolify/applications/#public-repository" />
 	</div>

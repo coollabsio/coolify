@@ -180,9 +180,10 @@
 
 <div class="mx-auto max-w-4xl px-6 pb-12">
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
-		<div class="flex space-x-1 pb-5">
+		<div class="flex flex-col lg:flex-row justify-between lg:space-x-1 space-y-3 pb-5 items-center">
 			<div class="title">{$t('general')}</div>
-			{#if $appSession.isAdmin}
+			<div class="flex flex-row space-y-3 items-center">
+				{#if $appSession.isAdmin}
 				<button
 					type="submit"
 					class="btn btn-sm"
@@ -215,213 +216,194 @@
 					class:loading={loading.cleanup}>Cleanup Unnecessary Database Logs</button
 				>
 			{/if}
+			</div>
 		</div>
 
-		<div class="grid grid-flow-row gap-2">
-			{#if service.type === 'minio' && !service.minio.apiFqdn && $status.service.isRunning}
-				<div class="text-center">
-					<span class="font-bold text-red-500">IMPORTANT!</span> There was a small modification with
-					Minio in the latest version of Coolify. Now you can separate the Console URL from the API URL,
-					so you could use both through SSL. But this proccess cannot be done automatically, so you have
-					to stop your Minio instance, configure the new domain and start it back. Sorry for any inconvenience.
-				</div>
-			{/if}
-			<div class="mt-2 grid grid-cols-2 items-center px-10">
-				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
-				<div>
-					<input
-						readonly={!$appSession.isAdmin}
-						name="name"
-						id="name"
-						bind:value={service.name}
-						required
-					/>
-				</div>
+		{#if service.type === 'minio' && !service.minio.apiFqdn && $status.service.isRunning}
+			<div class="py-5">
+				<span class="font-bold text-red-500">IMPORTANT!</span> There was a small modification with Minio
+				in the latest version of Coolify. Now you can separate the Console URL from the API URL, so you
+				could use both through SSL. But this proccess cannot be done automatically, so you have to stop
+				your Minio instance, configure the new domain and start it back. Sorry for any inconvenience.
 			</div>
-			<div class="grid grid-cols-2 items-center px-10">
-				<label for="version" class="text-base font-bold text-stone-100">Version / Tag</label>
-				<a
-					href={$appSession.isAdmin && !$status.service.isRunning && !$status.service.initialLoading
-						? `/services/${id}/configuration/version?from=/services/${id}`
-						: ''}
-					class="no-underline"
-				>
-					<input
-						value={service.version}
-						id="service"
-						readonly
-						disabled={$status.service.isRunning || $status.service.initialLoading}
-						class:cursor-pointer={!$status.service.isRunning}
-					/></a
-				>
-			</div>
-			<div class="grid grid-cols-2 items-center px-10">
-				<label for="destination" class="text-base font-bold text-stone-100"
-					>{$t('application.destination')}</label
-				>
-				<div>
-					{#if service.destinationDockerId}
-						<div class="no-underline">
-							<input
-								value={service.destinationDocker.name}
-								id="destination"
-								disabled
-								class="bg-transparent "
-							/>
-						</div>
-					{/if}
-				</div>
-			</div>
-			{#if service.type === 'minio'}
-				<div class="grid grid-cols-2 px-10">
-					<div class="flex-col ">
-						<label for="fqdn" class="pt-2 text-base font-bold text-stone-100">Console URL</label>
-					</div>
+		{/if}
 
-					<CopyPasswordField
-						placeholder="eg: https://console.min.io"
-						readonly={isDisabled}
-						disabled={isDisabled}
-						name="fqdn"
-						id="fqdn"
-						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-						bind:value={service.fqdn}
-						required
-					/>
-				</div>
-				<div class="grid grid-cols-2 px-10">
-					<div class="flex-col ">
-						<label for="apiFqdn" class="pt-2 text-base font-bold text-stone-100"
-							>API URL <Explainer explanation={$t('application.https_explainer')} /></label
-						>
-					</div>
-
-					<CopyPasswordField
-						placeholder="eg: https://min.io"
-						readonly={!$appSession.isAdmin && !$status.service.isRunning}
-						disabled={isDisabled}
-						name="apiFqdn"
-						id="apiFqdn"
-						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-						bind:value={service.minio.apiFqdn}
-						required
-					/>
-				</div>
-			{:else}
-				<div class="grid grid-cols-2 px-10">
-					<div class="flex-col ">
-						<label for="fqdn" class="pt-2 text-base font-bold text-stone-100"
-							>{$t('application.url_fqdn')}
-							<Explainer explanation={$t('application.https_explainer')} />
-						</label>
-					</div>
-
-					<CopyPasswordField
-						placeholder="eg: https://analytics.coollabs.io"
-						readonly={!$appSession.isAdmin && !$status.service.isRunning}
-						disabled={!$appSession.isAdmin ||
-							$status.service.isRunning ||
-							$status.service.initialLoading}
-						name="fqdn"
-						id="fqdn"
-						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-						bind:value={service.fqdn}
-						required
-					/>
-				</div>
-			{/if}
-			{#if forceSave}
-				<div class="flex-col space-y-2 pt-4 text-center">
-					{#if isNonWWWDomainOK}
-						<button
-							class="btn btn-sm bg-green-600 hover:bg-green-500"
-							on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
-							>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
-						>
-					{:else}
-						<button
-							class="btn btn-sm bg-red-600 hover:bg-red-500"
-							on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
-							>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
-						>
-					{/if}
-					{#if dualCerts}
-						{#if isWWWDomainOK}
-							<button
-								class="btn btn-sm bg-green-600 hover:bg-green-500"
-								on:click|preventDefault={() => isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
-								>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
-							>
-						{:else}
-							<button
-								class="btn btn-sm bg-red-600 hover:bg-red-500"
-								on:click|preventDefault={() => isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
-								>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
-							>
-						{/if}
-					{/if}
-				</div>
-			{/if}
-			<div class="grid grid-cols-2 items-center px-10">
-				<Setting
-					id="dualCerts"
-					disabled={$status.service.isRunning}
-					dataTooltip={$t('forms.must_be_stopped_to_modify')}
-					bind:setting={dualCerts}
-					title={$t('application.ssl_www_and_non_www')}
-					description={$t('services.generate_www_non_www_ssl')}
-					on:click={() => !$status.service.isRunning && changeSettings('dualCerts')}
+		<div class="grid gap-4 grid-cols-2 grid-rows-1 lg:px-10">
+			<label class="text-base font-bold text-stone-100" for="name" >{$t('forms.name')}</label>
+			<div>
+				<input
+					readonly={!$appSession.isAdmin}
+					name="name"
+					id="name"
+					bind:value={service.name}
+					required
 				/>
 			</div>
-			<div class="grid grid-cols-2 items-center px-10">
-				<label for="exposePort" class="text-base font-bold text-stone-100"
-					>Exposed Port <Explainer
-						explanation={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
-					/></label
-				>
+			<label class="text-base font-bold text-stone-100" for="version">Version / Tag</label>
+			<a
+				href={$appSession.isAdmin && !$status.service.isRunning && !$status.service.initialLoading
+					? `/services/${id}/configuration/version?from=/services/${id}`
+					: ''}
+				class="no-underline"
+			>
 				<input
+					value={service.version}
+					id="service"
+					readonly
+					disabled={$status.service.isRunning || $status.service.initialLoading}
+					class:cursor-pointer={!$status.service.isRunning}
+				/></a
+			>
+			<label class="text-base font-bold text-stone-100" for="destination"
+				>{$t('application.destination')}</label
+			>
+			<div>
+				{#if service.destinationDockerId}
+					<div class="no-underline">
+						<input
+							value={service.destinationDocker.name}
+							id="destination"
+							disabled
+							class="bg-transparent "
+						/>
+					</div>
+				{/if}
+			</div>
+
+			{#if service.type === 'minio'}
+				<label class="text-base font-bold text-stone-100" for="fqdn">Console URL</label>
+
+				<CopyPasswordField
+					placeholder="eg: https://console.min.io"
+					readonly={isDisabled}
+					disabled={isDisabled}
+					name="fqdn"
+					id="fqdn"
+					pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+					bind:value={service.fqdn}
+					required
+				/>
+				<label class="text-base font-bold text-stone-100" for="apiFqdn" 
+					>API URL <Explainer explanation={$t('application.https_explainer')} /></label
+				>
+				<CopyPasswordField
+					placeholder="eg: https://min.io"
+					readonly={!$appSession.isAdmin && !$status.service.isRunning}
+					disabled={isDisabled}
+					name="apiFqdn"
+					id="apiFqdn"
+					pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+					bind:value={service.minio.apiFqdn}
+					required
+				/>
+			{:else}
+				<label class="text-base font-bold text-stone-100" for="fqdn" 
+					>{$t('application.url_fqdn')}
+					<Explainer explanation={$t('application.https_explainer')} />
+				</label>
+				<CopyPasswordField
+					placeholder="eg: https://analytics.coollabs.io"
 					readonly={!$appSession.isAdmin && !$status.service.isRunning}
 					disabled={!$appSession.isAdmin ||
 						$status.service.isRunning ||
 						$status.service.initialLoading}
-					name="exposePort"
-					id="exposePort"
-					bind:value={service.exposePort}
-					placeholder="12345"
+					name="fqdn"
+					id="fqdn"
+					pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+					bind:value={service.fqdn}
+					required
 				/>
-			</div>
-
-			{#if service.type === 'plausibleanalytics'}
-				<PlausibleAnalytics bind:service {readOnly} />
-			{:else if service.type === 'minio'}
-				<MinIo {service} />
-			{:else if service.type === 'vscodeserver'}
-				<VsCodeServer {service} />
-			{:else if service.type === 'wordpress'}
-				<Wordpress bind:service {readOnly} {settings} />
-			{:else if service.type === 'ghost'}
-				<Ghost bind:service {readOnly} />
-			{:else if service.type === 'meilisearch'}
-				<MeiliSearch bind:service />
-			{:else if service.type === 'umami'}
-				<Umami bind:service />
-			{:else if service.type === 'hasura'}
-				<Hasura bind:service />
-			{:else if service.type === 'fider'}
-				<Fider bind:service {readOnly} />
-			{:else if service.type === 'appwrite'}
-				<Appwrite bind:service {readOnly} />
-			{:else if service.type === 'moodle'}
-				<Moodle bind:service {readOnly} />
-			{:else if service.type === 'glitchTip'}
-				<GlitchTip bind:service />
-			{:else if service.type === 'searxng'}
-				<Searxng bind:service />
-			{:else if service.type === 'weblate'}
-				<Weblate bind:service />
-			{:else if service.type === 'taiga'}
-				<Taiga bind:service />
 			{/if}
 		</div>
+		{#if forceSave}
+			<div class="flex-col space-y-2 pt-4 text-center">
+				{#if isNonWWWDomainOK}
+					<button
+						class="btn btn-sm bg-green-600 hover:bg-green-500"
+						on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+						>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
+					>
+				{:else}
+					<button
+						class="btn btn-sm bg-red-600 hover:bg-red-500"
+						on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+						>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
+					>
+				{/if}
+				{#if dualCerts}
+					{#if isWWWDomainOK}
+						<button
+							class="btn btn-sm bg-green-600 hover:bg-green-500"
+							on:click|preventDefault={() => isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+							>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
+						>
+					{:else}
+						<button
+							class="btn btn-sm bg-red-600 hover:bg-red-500"
+							on:click|preventDefault={() => isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+							>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
+						>
+					{/if}
+				{/if}
+			</div>
+		{/if}
+
+		<div class="grid gap-4 grid-cols-2 grid-rows-1 lg:px-10">
+			<Setting
+				id="dualCerts"
+				disabled={$status.service.isRunning}
+				dataTooltip={$t('forms.must_be_stopped_to_modify')}
+				bind:setting={dualCerts}
+				title={$t('application.ssl_www_and_non_www')}
+				description={$t('services.generate_www_non_www_ssl')}
+				on:click={() => !$status.service.isRunning && changeSettings('dualCerts')}
+			/>
+			<label class="text-base font-bold text-stone-100" for="exposePort"
+				>Exposed Port <Explainer
+					explanation={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
+				/></label
+			>
+			<input
+				readonly={!$appSession.isAdmin && !$status.service.isRunning}
+				disabled={!$appSession.isAdmin ||
+					$status.service.isRunning ||
+					$status.service.initialLoading}
+				name="exposePort"
+				id="exposePort"
+				bind:value={service.exposePort}
+				placeholder="12345"
+			/>
+		</div>
+		{#if service.type === 'plausibleanalytics'}
+			<PlausibleAnalytics bind:service {readOnly} />
+		{:else if service.type === 'minio'}
+			<MinIo {service} />
+		{:else if service.type === 'vscodeserver'}
+			<VsCodeServer {service} />
+		{:else if service.type === 'wordpress'}
+			<Wordpress bind:service {readOnly} {settings} />
+		{:else if service.type === 'ghost'}
+			<Ghost bind:service {readOnly} />
+		{:else if service.type === 'meilisearch'}
+			<MeiliSearch bind:service />
+		{:else if service.type === 'umami'}
+			<Umami bind:service />
+		{:else if service.type === 'hasura'}
+			<Hasura bind:service />
+		{:else if service.type === 'fider'}
+			<Fider bind:service {readOnly} />
+		{:else if service.type === 'appwrite'}
+			<Appwrite bind:service {readOnly} />
+		{:else if service.type === 'moodle'}
+			<Moodle bind:service {readOnly} />
+		{:else if service.type === 'glitchTip'}
+			<GlitchTip bind:service />
+		{:else if service.type === 'searxng'}
+			<Searxng bind:service />
+		{:else if service.type === 'weblate'}
+			<Weblate bind:service />
+		{:else if service.type === 'taiga'}
+			<Taiga bind:service />
+		{/if}
 	</form>
 </div>

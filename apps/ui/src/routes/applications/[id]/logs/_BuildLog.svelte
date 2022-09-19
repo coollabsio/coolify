@@ -154,20 +154,15 @@
 			{/if}
 		</div>
 		{#if logs.length > 0}
-			<div
-				class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
-				bind:this={logsEl}
-			>
+			<div class="font-mono w-full rounder bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded-md mb-20 flex flex-col whitespace-nowrap -mt-12 scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1">
 				{#each logs as log}
-					<div>{log.line + '\n'}</div>
+					<p>{log.line + '\n'}</p>
 				{/each}
 			</div>
 		{:else}
-			<div
-				class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
-			>
-				No logs found.
-			</div>
+		<div class="font-mono w-full rounder bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded-md mb-20 flex flex-col whitespace-nowrap -mt-12 scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1">
+			No logs found.
+		</div>
 		{/if}
 	{/if}
 </div>

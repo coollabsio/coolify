@@ -72,8 +72,8 @@
 	<div class="title">Wordpress</div>
 </div>
 
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="extraConfig">{$t('forms.extra_config')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="extraConfig">{$t('forms.extra_config')}</label>
 	<textarea
 		bind:value={service.wordpress.extraConfig}
 		disabled={$status.service.isRunning || $status.service.initialLoading}
@@ -91,7 +91,7 @@ define('SUBDOMAIN_INSTALL', false);`
 			: 'N/A'}
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
+<div class="grid grid-cols-2 items-center lg:px-10">
 	<Setting
 		id="ftpEnabled"
 		bind:setting={service.wordpress.ftpEnabled}
@@ -103,16 +103,16 @@ define('SUBDOMAIN_INSTALL', false);`
 	/>
 </div>
 {#if service.wordpress.ftpEnabled}
-	<div class="grid grid-cols-2 items-center px-10">
-		<label for="ftpUrl">sFTP Connection URI</label>
+	<div class="grid grid-cols-2 items-center lg:px-10">
+		<label class="text-base font-bold text-stone-100" for="ftpUrl">sFTP Connection URI</label>
 		<CopyPasswordField id="ftpUrl" readonly disabled name="ftpUrl" value={ftpUrl} />
 	</div>
-	<div class="grid grid-cols-2 items-center px-10">
-		<label for="ftpUser">User</label>
+	<div class="grid grid-cols-2 items-center lg:px-10">
+		<label class="text-base font-bold text-stone-100" for="ftpUser">User</label>
 		<CopyPasswordField id="ftpUser" readonly disabled name="ftpUser" value={ftpUser} />
 	</div>
-	<div class="grid grid-cols-2 items-center px-10">
-		<label for="ftpPassword">Password</label>
+	<div class="grid grid-cols-2 items-center lg:px-10">
+		<label class="text-base font-bold text-stone-100" for="ftpPassword">Password</label>
 		<CopyPasswordField
 			id="ftpPassword"
 			isPasswordField
@@ -126,7 +126,7 @@ define('SUBDOMAIN_INSTALL', false);`
 <div class="flex space-x-1 py-5 font-bold">
 	<div class="title">MySQL</div>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
+<div class="grid grid-cols-2 items-center lg:px-10">
 	<Setting
 		id="ownMysql"
 		dataTooltip={$t('forms.must_be_stopped_to_modify')}
@@ -138,8 +138,8 @@ define('SUBDOMAIN_INSTALL', false);`
 	/>
 </div>
 {#if service.wordpress.ownMysql}
-	<div class="grid grid-cols-2 items-center px-10">
-		<label for="mysqlHost">Host</label>
+	<div class="grid grid-cols-2 items-center lg:px-10">
+		<label class="text-base font-bold text-stone-100" for="mysqlHost">Host</label>
 		<input
 			name="mysqlHost"
 			id="mysqlHost"
@@ -150,8 +150,8 @@ define('SUBDOMAIN_INSTALL', false);`
 			placeholder="{$t('forms.eg')}: db.coolify.io"
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center px-10">
-		<label for="mysqlPort">Port</label>
+	<div class="grid grid-cols-2 items-center lg:px-10">
+		<label class="text-base font-bold text-stone-100" for="mysqlPort">Port</label>
 		<input
 			name="mysqlPort"
 			id="mysqlPort"
@@ -163,9 +163,10 @@ define('SUBDOMAIN_INSTALL', false);`
 		/>
 	</div>
 {/if}
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="mysqlDatabase">{$t('index.database')}</label>
-	<input
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="mysqlDatabase">{$t('index.database')}</label>
+	<input 
+		class="w-full"
 		name="mysqlDatabase"
 		id="mysqlDatabase"
 		required
@@ -176,8 +177,8 @@ define('SUBDOMAIN_INSTALL', false);`
 	/>
 </div>
 {#if !service.wordpress.ownMysql}
-	<div class="grid grid-cols-2 items-center px-10">
-		<label for="mysqlRootUser">{$t('forms.root_user')}</label>
+	<div class="grid grid-cols-2 items-center lg:px-10">
+		<label class="text-base font-bold text-stone-100" for="mysqlRootUser">{$t('forms.root_user')}</label>
 		<input
 			name="mysqlRootUser"
 			id="mysqlRootUser"
@@ -187,8 +188,8 @@ define('SUBDOMAIN_INSTALL', false);`
 			disabled={$status.service.isRunning || !service.wordpress.ownMysql}
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center px-10">
-		<label for="mysqlRootUserPassword">{$t('forms.roots_password')}</label>
+	<div class="grid grid-cols-2 items-center lg:px-10">
+		<label class="text-base font-bold text-stone-100" for="mysqlRootUserPassword">{$t('forms.roots_password')}</label>
 		<CopyPasswordField
 			id="mysqlRootUserPassword"
 			isPasswordField
@@ -199,9 +200,10 @@ define('SUBDOMAIN_INSTALL', false);`
 		/>
 	</div>
 {/if}
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="mysqlUser">{$t('forms.user')}</label>
-	<input
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="mysqlUser">{$t('forms.user')}</label>
+	<input 
+		class="w-full"
 		name="mysqlUser"
 		id="mysqlUser"
 		bind:value={service.wordpress.mysqlUser}
@@ -209,8 +211,8 @@ define('SUBDOMAIN_INSTALL', false);`
 		disabled={$status.service.isRunning || !service.wordpress.ownMysql}
 	/>
 </div>
-<div class="grid grid-cols-2 items-center px-10">
-	<label for="mysqlPassword">{$t('forms.password')}</label>
+<div class="grid grid-cols-2 items-center lg:px-10">
+	<label class="text-base font-bold text-stone-100" for="mysqlPassword">{$t('forms.password')}</label>
 	<CopyPasswordField
 		id="mysqlPassword"
 		isPasswordField
