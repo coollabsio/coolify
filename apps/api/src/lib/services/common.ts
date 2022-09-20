@@ -20,7 +20,7 @@ export const includeServices: any = {
 	glitchTip: true,
 	searxng: true,
 	weblate: true,
-	taiga: true
+	taiga: true,
 };
 export async function configureServiceType({
 	id,
@@ -350,13 +350,6 @@ export async function configureServiceType({
 				}
 			}
 		});
-	} else if (type === 'grafana') {
-		await prisma.service.update({
-			where: { id },
-			data: {
-				type
-			}
-		});
 	} else {
 		await prisma.service.update({
 			where: { id },
@@ -385,6 +378,6 @@ export async function removeService({ id }: { id: string }): Promise<void> {
 	await prisma.searxng.deleteMany({ where: { serviceId: id } });
 	await prisma.weblate.deleteMany({ where: { serviceId: id } });
 	await prisma.taiga.deleteMany({ where: { serviceId: id } });
-	
+
 	await prisma.service.delete({ where: { id } });
 }

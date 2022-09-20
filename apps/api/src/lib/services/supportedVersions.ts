@@ -172,7 +172,7 @@ export const supportedServiceTypesAndVersions = [
 		fancyName: 'Appwrite',
 		baseImage: 'appwrite/appwrite',
 		images: ['mariadb:10.7', 'redis:6.2-alpine', 'appwrite/telegraf:1.4.0'],
-		versions: ['latest', '1.0','0.15.3'],
+		versions: ['latest', '1.0', '0.15.3'],
 		recommendedVersion: '1.0',
 		ports: {
 			main: 80
@@ -242,6 +242,17 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 3000
+		}
+	},
+	{
+		name: 'trilium',
+		fancyName: 'Trilium Notes',
+		baseImage: 'zadam/trilium',
+		images: [],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8080
 		}
 	},
 ];

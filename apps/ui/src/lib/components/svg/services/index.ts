@@ -19,3 +19,4 @@ export { default as GlitchTip }  from './GlitchTip.svelte';
 export { default as Searxng }  from './Searxng.svelte';
 export { default as Weblate }  from './Weblate.svelte';
 export { default as Grafana }  from './Grafana.svelte';
+export { default as Trilium } from './Trilium.svelte'
