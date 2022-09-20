@@ -315,7 +315,7 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
             destinationDocker,
             persistentStorage,
             exposePort,
-            minio: { rootUser, rootUserPassword },
+            minio: { rootUser, rootUserPassword, apiFqdn },
             serviceSecret
         } = service;
 
@@ -334,7 +334,7 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 volumes: [`${id}-minio-data:/data`],
                 environmentVariables: {
-                    MINIO_SERVER_URL: fqdn,
+                    MINIO_SERVER_URL: apiFqdn,
                     MINIO_DOMAIN: getDomain(fqdn),
                     MINIO_ROOT_USER: rootUser,
                     MINIO_ROOT_PASSWORD: rootUserPassword,
