@@ -233,4 +233,15 @@ export const supportedServiceTypesAndVersions = [
 	// 		main: 80
 	// 	}
 	// },
+	{
+		name: 'trilium',
+		fancyName: 'Trilium Notes',
+		baseImage: 'zadam/trilium',
+		images: [],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8080
+		}
+	},
 ];
