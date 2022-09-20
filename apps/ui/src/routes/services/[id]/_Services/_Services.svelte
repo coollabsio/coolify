@@ -39,6 +39,7 @@
 	import Weblate from './_Weblate.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import Taiga from './_Taiga.svelte';
+	import DocLink from '$lib/components/DocLink.svelte';
 
 	const { id } = $page.params;
 	$: isDisabled =
@@ -126,6 +127,20 @@
 			loading.verification = false;
 		}
 	}
+	async function migrateAppwriteDB() {
+		loading.verification = true;
+		try {
+			await post(`/services/${id}/${service.type}/migrate`, { id: service.id });
+			return addToast({
+				message: "Appwrite's database has been migrated.",
+				type: 'success'
+			});
+		} catch (error) {
+			return errorNotification(error);
+		} finally {
+			loading.verification = false;
+		}
+	}
 	async function changeSettings(name: any) {
 		try {
 			if (name === 'dualCerts') {
@@ -153,6 +168,9 @@
 		} finally {
 			loading.cleanup = false;
 		}
+	}
+	function doNothing() {
+		return;
 	}
 	onMount(async () => {
 		if (browser && window.location.hostname === 'demo.coolify.io' && !service.fqdn) {
@@ -182,7 +200,7 @@
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
 		<div class="flex space-x-1 pb-5 items-center">
 			<h1 class="title">{$t('general')}</h1>
-			<div class="flex flex-row space-y-3 items-center">
+			<div class="flex flex-row space-x-2 items-center">
 				{#if $appSession.isAdmin}
 					<button
 						type="submit"
@@ -200,21 +218,35 @@
 					>
 				{/if}
 				{#if service.type === 'plausibleanalytics' && $status.service.isRunning}
+					<div class="btn-group">
+						<button
+							class="btn btn-sm"
+							on:click|preventDefault={setEmailsToVerified}
+							disabled={loading.verification}
+							class:loading={loading.verification}
+							>{loading.verification
+								? $t('forms.verifying')
+								: $t('forms.verify_emails_without_smtp')}</button
+						>
+						<button
+							class="btn btn-sm"
+							on:click|preventDefault={cleanupLogs}
+							disabled={loading.cleanup}
+							class:loading={loading.cleanup}>Cleanup Unnecessary Database Logs</button
+						>
+					</div>
+				{/if}
+				{#if service.type === 'appwrite' && $status.service.isRunning}
 					<button
 						class="btn btn-sm"
-						on:click|preventDefault={setEmailsToVerified}
+						on:click|preventDefault={migrateAppwriteDB}
 						disabled={loading.verification}
 						class:loading={loading.verification}
 						>{loading.verification
-							? $t('forms.verifying')
-							: $t('forms.verify_emails_without_smtp')}</button
+							? 'Migrating... it may take a while...'
+							: "Migrate Appwrite's Database"}</button
 					>
-					<button
-						class="btn btn-sm"
-						on:click|preventDefault={cleanupLogs}
-						disabled={loading.cleanup}
-						class:loading={loading.cleanup}>Cleanup Unnecessary Database Logs</button
-					>
+					<DocLink url="https://appwrite.io/docs/upgrade#run-the-migration" />
 				{/if}
 			</div>
 		</div>

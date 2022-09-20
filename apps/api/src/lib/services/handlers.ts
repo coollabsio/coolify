@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { ServiceStartStop } from '../../routes/api/v1/services/types';
 import { asyncSleep, ComposeFile, createDirectories, defaultComposeConfiguration, errorHandler, executeDockerCmd, getDomain, getFreePublicPort, getServiceFromDB, getServiceImage, getServiceMainPort, isARM, isDev, makeLabelForServices, persistentVolumes, prisma } from '../common';
 import { defaultServiceConfigurations } from '../services';
+import { OnlyId } from '../../types';
 
 export async function startService(request: FastifyRequest<ServiceStartStop>) {
     try {
@@ -2640,3 +2641,23 @@ async function startTaigaService(request: FastifyRequest<ServiceStartStop>) {
     }
 }
 
+export async function migrateAppwriteDB(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
+    try {
+        const { id } = request.params
+        const teamId = request.user.teamId;
+        const {
+            destinationDockerId,
+            destinationDocker,
+        } = await getServiceFromDB({ id, teamId });
+        if (destinationDockerId) {
+            await executeDockerCmd({
+                dockerId: destinationDocker.id,
+                command: `docker exec ${id} migrate`
+            })
+            return await reply.code(201).send()
+        }
+        throw { status: 500, message: 'Could cleanup logs.' }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
