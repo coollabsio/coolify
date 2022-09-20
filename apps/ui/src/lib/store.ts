@@ -26,7 +26,8 @@ interface AddToast {
     message: string,
     timeout?: number | undefined
 }
-
+export const updateLoading: Writable<boolean> = writable(false);
+export const isUpdateAvailable: Writable<boolean> = writable(false);
 export const search: any = writable('')
 export const loginEmail: Writable<string | undefined> = writable()
 export const appSession: Writable<AppSession> = writable({
@@ -73,6 +74,7 @@ export const status: Writable<any> = writable({
     application: {
         isRunning: false,
         isExited: false,
+        isRestarting: false,
         loading: false,
         initialLoading: true
     },
@@ -156,3 +158,5 @@ export const addToast = (toast: AddToast) => {
     if (t.timeout) t.timeoutInterval = setTimeout(() => dismissToast(id), t.timeout)
     toasts.update((all: any) => [t, ...all])
 }
+
+export const selectedBuildId: any = writable(null)

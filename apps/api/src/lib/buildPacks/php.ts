@@ -16,7 +16,10 @@ const createDockerfile = async (data, image, htaccessFound): Promise<void> => {
 		secrets.forEach((secret) => {
 			if (secret.isBuildSecret) {
 				if (pullmergeRequestId) {
-					if (secret.isPRMRSecret) {
+					const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
+					if (isSecretFound.length > 0) {
+						Dockerfile.push(`ARG ${secret.name}=${isSecretFound[0].value}`);
+					} else {
 						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
 					}
 				} else {

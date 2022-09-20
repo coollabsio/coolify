@@ -43,13 +43,17 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
 
         let isRunning = false;
         let isExited = false
-
+        let isRestarting = false;
         const service = await getServiceFromDB({ id, teamId });
         const { destinationDockerId, settings } = service;
 
         if (destinationDockerId) {
-            isRunning = await checkContainer({ dockerId: service.destinationDocker.id, container: id });
-            isExited = await isContainerExited(service.destinationDocker.id, id);
+            const status = await checkContainer({ dockerId: service.destinationDocker.id, container: id });
+            if (status?.found) {
+                isRunning = status.status.isRunning;
+                isExited = status.status.isExited;
+                isRestarting = status.status.isRestarting
+            }
         }
         return {
             isRunning,
@@ -452,7 +456,7 @@ export async function activatePlausibleUsers(request: FastifyRequest<OnlyId>, re
         if (destinationDockerId) {
             await executeDockerCmd({
                 dockerId: destinationDocker.id,
-                command: `docker exec ${id} 'psql -H postgresql://${postgresqlUser}:${postgresqlPassword}@localhost:5432/${postgresqlDatabase} -c "UPDATE users SET email_verified = true;"'`
+                command: `docker exec ${id}-postgresql psql -H postgresql://${postgresqlUser}:${postgresqlPassword}@localhost:5432/${postgresqlDatabase} -c "UPDATE users SET email_verified = true;"`
             })
             return await reply.code(201).send()
         }
@@ -472,7 +476,7 @@ export async function cleanupPlausibleLogs(request: FastifyRequest<OnlyId>, repl
         if (destinationDockerId) {
             await executeDockerCmd({
                 dockerId: destinationDocker.id,
-                command: `docker exec ${id}-clickhouse sh -c "/usr/bin/clickhouse-client -q \\"SELECT name FROM system.tables WHERE name LIKE '%log%';\\"| xargs -I{} /usr/bin/clickhouse-client -q \"TRUNCATE TABLE system.{};\""`
+                command: `docker exec ${id}-clickhouse /usr/bin/clickhouse-client -q \\"SELECT name FROM system.tables WHERE name LIKE '%log%';\\"| xargs -I{} /usr/bin/clickhouse-client -q \"TRUNCATE TABLE system.{};\"`
             })
             return await reply.code(201).send()
         }
@@ -554,7 +558,7 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
                 });
 
                 try {
-                    const isRunning = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-ftp` });
+                    const { found: isRunning } = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-ftp` });
                     if (isRunning) {
                         await executeDockerCmd({
                             dockerId: destinationDocker.id,

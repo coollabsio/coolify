@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { ServiceStartStop } from '../../routes/api/v1/services/types';
 import { asyncSleep, ComposeFile, createDirectories, defaultComposeConfiguration, errorHandler, executeDockerCmd, getDomain, getFreePublicPort, getServiceFromDB, getServiceImage, getServiceMainPort, isARM, isDev, makeLabelForServices, persistentVolumes, prisma } from '../common';
 import { defaultServiceConfigurations } from '../services';
+import { OnlyId } from '../../types';
 
 export async function startService(request: FastifyRequest<ServiceStartStop>) {
     try {
@@ -317,7 +318,7 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
             destinationDocker,
             persistentStorage,
             exposePort,
-            minio: { rootUser, rootUserPassword },
+            minio: { rootUser, rootUserPassword, apiFqdn },
             serviceSecret
         } = service;
 
@@ -336,7 +337,7 @@ async function startMinioService(request: FastifyRequest<ServiceStartStop>) {
                 image: `${image}:${version}`,
                 volumes: [`${id}-minio-data:/data`],
                 environmentVariables: {
-                    MINIO_SERVER_URL: fqdn,
+                    MINIO_SERVER_URL: apiFqdn,
                     MINIO_DOMAIN: getDomain(fqdn),
                     MINIO_ROOT_USER: rootUser,
                     MINIO_ROOT_PASSWORD: rootUserPassword,
@@ -658,7 +659,7 @@ async function startLanguageToolService(request: FastifyRequest<ServiceStartStop
                     image: config.languagetool.image,
                     environment: config.languagetool.environmentVariables,
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    volumes: config.languagetool,
+                    volumes: config.languagetool.volumes,
                     labels: makeLabelForServices('languagetool'),
                     ...defaultComposeConfiguration(network),
                 }
@@ -713,7 +714,7 @@ async function startN8nService(request: FastifyRequest<ServiceStartStop>) {
                 [id]: {
                     container_name: id,
                     image: config.n8n.image,
-                    volumes: config.n8n,
+                    volumes: config.n8n.volumes,
                     environment: config.n8n.environmentVariables,
                     labels: makeLabelForServices('n8n'),
                     ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
@@ -1009,79 +1010,136 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
         }
 
         const initDbSQL = `
-		drop table if exists event;
-		drop table if exists pageview;
-		drop table if exists session;
-		drop table if exists website;
-		drop table if exists account;
-		
-		create table account (
-			user_id serial primary key,
-			username varchar(255) unique not null,
-			password varchar(60) not null,
-			is_admin bool not null default false,
-			created_at timestamp with time zone default current_timestamp,
-			updated_at timestamp with time zone default current_timestamp
-		);
-		
-		create table website (
-			website_id serial primary key,
-			website_uuid uuid unique not null,
-			user_id int not null references account(user_id) on delete cascade,
-			name varchar(100) not null,
-			domain varchar(500),
-			share_id varchar(64) unique,
-			created_at timestamp with time zone default current_timestamp
-		);
-		
-		create table session (
-			session_id serial primary key,
-			session_uuid uuid unique not null,
-			website_id int not null references website(website_id) on delete cascade,
-			created_at timestamp with time zone default current_timestamp,
-			hostname varchar(100),
-			browser varchar(20),
-			os varchar(20),
-			device varchar(20),
-			screen varchar(11),
-			language varchar(35),
-			country char(2)
-		);
-		
-		create table pageview (
-			view_id serial primary key,
-			website_id int not null references website(website_id) on delete cascade,
-			session_id int not null references session(session_id) on delete cascade,
-			created_at timestamp with time zone default current_timestamp,
-			url varchar(500) not null,
-			referrer varchar(500)
-		);
-		
-		create table event (
-			event_id serial primary key,
-			website_id int not null references website(website_id) on delete cascade,
-			session_id int not null references session(session_id) on delete cascade,
-			created_at timestamp with time zone default current_timestamp,
-			url varchar(500) not null,
-			event_type varchar(50) not null,
-			event_value varchar(50) not null
-		);
-		
-		create index website_user_id_idx on website(user_id);
-		
-		create index session_created_at_idx on session(created_at);
-		create index session_website_id_idx on session(website_id);
-		
-		create index pageview_created_at_idx on pageview(created_at);
-		create index pageview_website_id_idx on pageview(website_id);
-		create index pageview_session_id_idx on pageview(session_id);
-		create index pageview_website_id_created_at_idx on pageview(website_id, created_at);
-		create index pageview_website_id_session_id_created_at_idx on pageview(website_id, session_id, created_at);
-		
-		create index event_created_at_idx on event(created_at);
-		create index event_website_id_idx on event(website_id);
-		create index event_session_id_idx on event(session_id);
-		
+		-- CreateTable
+CREATE TABLE "account" (
+    "user_id" SERIAL NOT NULL,
+    "username" VARCHAR(255) NOT NULL,
+    "password" VARCHAR(60) NOT NULL,
+    "is_admin" BOOLEAN NOT NULL DEFAULT false,
+    "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY ("user_id")
+);
+
+-- CreateTable
+CREATE TABLE "event" (
+    "event_id" SERIAL NOT NULL,
+    "website_id" INTEGER NOT NULL,
+    "session_id" INTEGER NOT NULL,
+    "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+    "url" VARCHAR(500) NOT NULL,
+    "event_type" VARCHAR(50) NOT NULL,
+    "event_value" VARCHAR(50) NOT NULL,
+
+    PRIMARY KEY ("event_id")
+);
+
+-- CreateTable
+CREATE TABLE "pageview" (
+    "view_id" SERIAL NOT NULL,
+    "website_id" INTEGER NOT NULL,
+    "session_id" INTEGER NOT NULL,
+    "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+    "url" VARCHAR(500) NOT NULL,
+    "referrer" VARCHAR(500),
+
+    PRIMARY KEY ("view_id")
+);
+
+-- CreateTable
+CREATE TABLE "session" (
+    "session_id" SERIAL NOT NULL,
+    "session_uuid" UUID NOT NULL,
+    "website_id" INTEGER NOT NULL,
+    "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+    "hostname" VARCHAR(100),
+    "browser" VARCHAR(20),
+    "os" VARCHAR(20),
+    "device" VARCHAR(20),
+    "screen" VARCHAR(11),
+    "language" VARCHAR(35),
+    "country" CHAR(2),
+
+    PRIMARY KEY ("session_id")
+);
+
+-- CreateTable
+CREATE TABLE "website" (
+    "website_id" SERIAL NOT NULL,
+    "website_uuid" UUID NOT NULL,
+    "user_id" INTEGER NOT NULL,
+    "name" VARCHAR(100) NOT NULL,
+    "domain" VARCHAR(500),
+    "share_id" VARCHAR(64),
+    "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY ("website_id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "account.username_unique" ON "account"("username");
+
+-- CreateIndex
+CREATE INDEX "event_created_at_idx" ON "event"("created_at");
+
+-- CreateIndex
+CREATE INDEX "event_session_id_idx" ON "event"("session_id");
+
+-- CreateIndex
+CREATE INDEX "event_website_id_idx" ON "event"("website_id");
+
+-- CreateIndex
+CREATE INDEX "pageview_created_at_idx" ON "pageview"("created_at");
+
+-- CreateIndex
+CREATE INDEX "pageview_session_id_idx" ON "pageview"("session_id");
+
+-- CreateIndex
+CREATE INDEX "pageview_website_id_created_at_idx" ON "pageview"("website_id", "created_at");
+
+-- CreateIndex
+CREATE INDEX "pageview_website_id_idx" ON "pageview"("website_id");
+
+-- CreateIndex
+CREATE INDEX "pageview_website_id_session_id_created_at_idx" ON "pageview"("website_id", "session_id", "created_at");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "session.session_uuid_unique" ON "session"("session_uuid");
+
+-- CreateIndex
+CREATE INDEX "session_created_at_idx" ON "session"("created_at");
+
+-- CreateIndex
+CREATE INDEX "session_website_id_idx" ON "session"("website_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "website.website_uuid_unique" ON "website"("website_uuid");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "website.share_id_unique" ON "website"("share_id");
+
+-- CreateIndex
+CREATE INDEX "website_user_id_idx" ON "website"("user_id");
+
+-- AddForeignKey
+ALTER TABLE "event" ADD FOREIGN KEY ("session_id") REFERENCES "session"("session_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "event" ADD FOREIGN KEY ("website_id") REFERENCES "website"("website_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "pageview" ADD FOREIGN KEY ("session_id") REFERENCES "session"("session_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "pageview" ADD FOREIGN KEY ("website_id") REFERENCES "website"("website_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "session" ADD FOREIGN KEY ("website_id") REFERENCES "website"("website_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "website" ADD FOREIGN KEY ("user_id") REFERENCES "account"("user_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
 		insert into account (username, password, is_admin) values ('admin', '${bcrypt.hashSync(
             umamiAdminPassword,
             10
@@ -1119,7 +1177,6 @@ async function startUmamiService(request: FastifyRequest<ServiceStartStop>) {
             },
             volumes: volumeMounts
         };
-        console.log(composeFile)
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         await startServiceContainers(destinationDocker.id, composeFileDestination)
@@ -1321,10 +1378,6 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
         const teamId = request.user.teamId;
         const { version, fqdn, destinationDocker, secrets, exposePort, network, port, workdir, image, appwrite } = await defaultServiceConfigurations({ id, teamId })
 
-        let isStatsEnabled = false
-        if (secrets.find(s => s === '_APP_USAGE_STATS=enabled')) {
-            isStatsEnabled = true
-        }
         const {
             opensslKeyV1,
             executorSecret,
@@ -1702,50 +1755,48 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
             },
 
         };
-        if (isStatsEnabled) {
-            dockerCompose[id].depends_on.push(`${id}-influxdb`);
-            dockerCompose[`${id}-usage`] = {
-                image: `${image}:${version}`,
-                container_name: `${id}-usage`,
-                labels: makeLabelForServices('appwrite'),
-                entrypoint: "usage",
-                depends_on: [
-                    `${id}-mariadb`,
-                    `${id}-influxdb`,
-                ],
-                environment: [
-                    "_APP_ENV=production",
-                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
-                    `_APP_DB_HOST=${mariadbHost}`,
-                    `_APP_DB_PORT=${mariadbPort}`,
-                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
-                    `_APP_DB_USER=${mariadbUser}`,
-                    `_APP_DB_PASS=${mariadbPassword}`,
-                    `_APP_INFLUXDB_HOST=${id}-influxdb`,
-                    "_APP_INFLUXDB_PORT=8086",
-                    `_APP_REDIS_HOST=${id}-redis`,
-                    "_APP_REDIS_PORT=6379",
-                    ...secrets
-                ],
-                ...defaultComposeConfiguration(network),
-            }
-            dockerCompose[`${id}-influxdb`] = {
-                image: "appwrite/influxdb:1.5.0",
-                container_name: `${id}-influxdb`,
-                volumes: [
-                    `${id}-influxdb:/var/lib/influxdb:rw`
-                ],
-                ...defaultComposeConfiguration(network),
-            }
-            dockerCompose[`${id}-telegraf`] = {
-                image: "appwrite/telegraf:1.4.0",
-                container_name: `${id}-telegraf`,
-                environment: [
-                    `_APP_INFLUXDB_HOST=${id}-influxdb`,
-                    "_APP_INFLUXDB_PORT=8086",
-                ],
-                ...defaultComposeConfiguration(network),
-            }
+        dockerCompose[id].depends_on.push(`${id}-influxdb`);
+        dockerCompose[`${id}-usage`] = {
+            image: `${image}:${version}`,
+            container_name: `${id}-usage`,
+            labels: makeLabelForServices('appwrite'),
+            entrypoint: "usage",
+            depends_on: [
+                `${id}-mariadb`,
+                `${id}-influxdb`,
+            ],
+            environment: [
+                "_APP_ENV=production",
+                `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                `_APP_DB_HOST=${mariadbHost}`,
+                `_APP_DB_PORT=${mariadbPort}`,
+                `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                `_APP_DB_USER=${mariadbUser}`,
+                `_APP_DB_PASS=${mariadbPassword}`,
+                `_APP_INFLUXDB_HOST=${id}-influxdb`,
+                "_APP_INFLUXDB_PORT=8086",
+                `_APP_REDIS_HOST=${id}-redis`,
+                "_APP_REDIS_PORT=6379",
+                ...secrets
+            ],
+            ...defaultComposeConfiguration(network),
+        }
+        dockerCompose[`${id}-influxdb`] = {
+            image: "appwrite/influxdb:1.5.0",
+            container_name: `${id}-influxdb`,
+            volumes: [
+                `${id}-influxdb:/var/lib/influxdb:rw`
+            ],
+            ...defaultComposeConfiguration(network),
+        }
+        dockerCompose[`${id}-telegraf`] = {
+            image: "appwrite/telegraf:1.4.0",
+            container_name: `${id}-telegraf`,
+            environment: [
+                `_APP_INFLUXDB_HOST=${id}-influxdb`,
+                "_APP_INFLUXDB_PORT=8086",
+            ],
+            ...defaultComposeConfiguration(network),
         }
 
         const composeFile: any = {
@@ -2643,6 +2694,27 @@ async function startGrafanaService(request: FastifyRequest<ServiceStartStop>) {
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         await startServiceContainers(destinationDocker.id, composeFileDestination)
         return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
+export async function migrateAppwriteDB(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
+    try {
+        const { id } = request.params
+        const teamId = request.user.teamId;
+        const {
+            destinationDockerId,
+            destinationDocker,
+        } = await getServiceFromDB({ id, teamId });
+        if (destinationDockerId) {
+            await executeDockerCmd({
+                dockerId: destinationDocker.id,
+                command: `docker exec ${id} migrate`
+            })
+            return await reply.code(201).send()
+        }
+        throw { status: 500, message: 'Could cleanup logs.' }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }

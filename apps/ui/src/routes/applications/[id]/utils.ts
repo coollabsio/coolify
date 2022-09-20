@@ -22,7 +22,7 @@ export async function saveSecret({
 	applicationId
 }: Props): Promise<void> {
 	if (!name) return errorNotification(`${t.get('forms.name')} ${t.get('forms.is_required')}`);
-	if (!value) return errorNotification(`${t.get('forms.value')} ${t.get('forms.is_required')}`);
+	if (!value && isNew) return errorNotification(`${t.get('forms.value')} ${t.get('forms.is_required')}`);
 	try {
 		await post(`/applications/${applicationId}/secrets`, {
 			name,

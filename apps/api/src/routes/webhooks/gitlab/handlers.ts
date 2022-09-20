@@ -2,7 +2,7 @@ import axios from "axios";
 import cuid from "cuid";
 import crypto from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { errorHandler, getAPIUrl, getUIUrl, isDev, listSettings, prisma } from "../../../lib/common";
+import { errorHandler, getAPIUrl, getDomain, getUIUrl, isDev, listSettings, prisma } from "../../../lib/common";
 import { checkContainer, removeContainer } from "../../../lib/docker";
 import { getApplicationFromDB, getApplicationFromDBWebhook } from "../../api/v1/applications/handlers";
 
@@ -91,8 +91,8 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                 }
             }
         } else if (objectKind === 'merge_request') {
-            const { object_attributes: { work_in_progress: isDraft, action, source_branch: sourceBranch, target_branch: targetBranch, iid: pullmergeRequestId }, project: { id } } = request.body
-
+            const { object_attributes: { work_in_progress: isDraft, action, source_branch: sourceBranch, target_branch: targetBranch }, project: { id } } = request.body
+            const pullmergeRequestId = request.body.object_attributes.iid.toString();
             const projectId = Number(id);
             if (!allowedActions.includes(action)) {
                 throw { status: 500, message: 'Action not allowed.' }
@@ -107,7 +107,7 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                     const buildId = cuid();
                     if (application.settings.previews) {
                         if (application.destinationDockerId) {
-                            const isRunning = await checkContainer(
+                            const { found: isRunning } = await checkContainer(
                                 {
                                     dockerId: application.destinationDocker.id,
                                     container: application.id
@@ -130,10 +130,29 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                                 where: { id: application.id },
                                 data: { updatedAt: new Date() }
                             });
+                            let previewApplicationId = undefined
+                            if (pullmergeRequestId) {
+                                const foundPreviewApplications = await prisma.previewApplication.findMany({ where: { applicationId: application.id, pullmergeRequestId } })
+                                if (foundPreviewApplications.length > 0) {
+                                    previewApplicationId = foundPreviewApplications[0].id
+                                } else {
+                                    const protocol = application.fqdn.includes('https://') ? 'https://' : 'http://'
+                                    const previewApplication = await prisma.previewApplication.create({
+                                        data: {
+                                            pullmergeRequestId,
+                                            sourceBranch,
+                                            customDomain: `${protocol}${pullmergeRequestId}.${getDomain(application.fqdn)}`,
+                                            application: { connect: { id: application.id } }
+                                        }
+                                    })
+                                    previewApplicationId = previewApplication.id
+                                }
+                            }
                             await prisma.build.create({
                                 data: {
                                     id: buildId,
-                                    pullmergeRequestId: pullmergeRequestId.toString(),
+                                    pullmergeRequestId,
+                                    previewApplicationId,
                                     sourceBranch,
                                     applicationId: application.id,
                                     destinationDockerId: application.destinationDocker.id,
@@ -150,8 +169,19 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                         } else if (action === 'close') {
                             if (application.destinationDockerId) {
                                 const id = `${application.id}-${pullmergeRequestId}`;
-                                await removeContainer({ id, dockerId: application.destinationDocker.id });
+                                try {
+                                    await removeContainer({ id, dockerId: application.destinationDocker.id });
+                                } catch (error) { }
                             }
+                            const foundPreviewApplications = await prisma.previewApplication.findMany({ where: { applicationId: application.id, pullmergeRequestId } })
+                            if (foundPreviewApplications.length > 0) {
+                                for (const preview of foundPreviewApplications) {
+                                    await prisma.previewApplication.delete({ where: { id: preview.id } })
+                                }
+                            }
+                            return {
+                                message: 'MR closed. Thank you!'
+                            };
 
                         }
                     }

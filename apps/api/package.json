@@ -29,6 +29,8 @@
     "bree": "9.1.2",
     "cabin": "9.1.2",
     "compare-versions": "5.0.1",
+    "csv-parse": "^5.3.0",
+    "csvtojson": "^2.0.10",
     "cuid": "2.1.8",
     "dayjs": "1.11.5",
     "dockerode": "3.3.4",

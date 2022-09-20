@@ -156,40 +156,40 @@
 	}
 </script>
 
-<div class="mx-auto max-w-5xl">
-	<div class="grid grid-flow-row gap-2 px-10">
-		<div class="flex">
-			<form class="flex" on:submit|preventDefault={loadBranches}>
-				<div class="space-y-4">
-					<input
-						placeholder="eg: https://github.com/coollabsio/nodejs-example/tree/main"
-						bind:value={publicRepositoryLink}
+<div class="mx-auto max-w-6xl">
+	<form
+		class="flex flex-col lg:flex-row w-full lg:px-32 space-y-5 lg:space-y-0 lg:space-x-5 justify-start"
+		on:submit|preventDefault={loadBranches}
+	>
+		<div class="space-y-2 w-full">
+			<input
+				class="w-full"
+				placeholder="eg: https://github.com/coollabsio/nodejs-example/tree/main"
+				bind:value={publicRepositoryLink}
+			/>
+			{#if branchSelectOptions.length > 0}
+				<div class="custom-select-wrapper">
+					<Select
+					class="w-full"
+						placeholder={loading.branches
+							? $t('application.configuration.loading_branches')
+							: !publicRepositoryLink
+							? $t('application.configuration.select_a_repository_first')
+							: $t('application.configuration.select_a_branch')}
+						isWaiting={loading.branches}
+						showIndicator={!!publicRepositoryLink && !loading.branches}
+						id="branches"
+						on:select={saveRepository}
+						items={branchSelectOptions}
+						isDisabled={loading.branches || !!!publicRepositoryLink}
+						isClearable={false}
 					/>
-					{#if branchSelectOptions.length > 0}
-						<div class="custom-select-wrapper">
-							<Select
-								placeholder={loading.branches
-									? $t('application.configuration.loading_branches')
-									: !publicRepositoryLink
-									? $t('application.configuration.select_a_repository_first')
-									: $t('application.configuration.select_a_branch')}
-								isWaiting={loading.branches}
-								showIndicator={!!publicRepositoryLink && !loading.branches}
-								id="branches"
-								on:select={saveRepository}
-								items={branchSelectOptions}
-								isDisabled={loading.branches || !!!publicRepositoryLink}
-								isClearable={false}
-							/>
-						</div>
-					{/if}
 				</div>
-
-				<button class="btn mx-4 bg-orange-600" class:loading={loading.branches} type="submit"
-					>Load Repository</button
-				>
-			</form>
+			{/if}
 		</div>
-	</div>
-	
+
+		<button class="btn bg-orange-600" class:loading={loading.branches} type="submit">
+			Load Repository
+		</button>
+	</form>
 </div>

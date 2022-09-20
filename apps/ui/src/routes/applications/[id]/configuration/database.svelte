@@ -126,7 +126,7 @@
 		</div>
 	{/if}
 
-	<div class="mx-auto max-w-4xl p-6">
+	<div class="mx-auto max-w-6xl p-6">
 		<div class="grid grid-flow-row gap-2 px-10">
 			<div class="font-bold text-xl tracking-tight">Connect a Hosted / Remote Database</div>
 			<div class="mt-2 grid grid-cols-2 items-center px-4">

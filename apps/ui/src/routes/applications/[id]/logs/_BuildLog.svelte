@@ -1,6 +1,4 @@
 <script lang="ts">
-	export let buildId: any;
-
 	import { createEventDispatcher, onDestroy, onMount } from 'svelte';
 	const dispatch = createEventDispatcher();
 
@@ -11,6 +9,8 @@
 	import LoadingLogs from '$lib/components/LoadingLogs.svelte';
 	import { errorNotification } from '$lib/common';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import { day } from '$lib/dayjs';
+	import { selectedBuildId } from '$lib/store';
 
 	let logs: any = [];
 	let currentStatus: any;
@@ -18,7 +18,7 @@
 	let followingBuild: any;
 	let followingInterval: any;
 	let logsEl: any;
-
+	let fromDb = false;
 	let cancelInprogress = false;
 
 	const { id } = $page.params;
@@ -38,13 +38,18 @@
 	}
 	async function streamLogs(sequence = 0) {
 		try {
-			let { logs: responseLogs, status } = await get(
-				`/applications/${id}/logs/build/${buildId}?sequence=${sequence}`
-			);
+			let {
+				logs: responseLogs,
+				status,
+				fromDb: from
+			} = await get(`/applications/${id}/logs/build/${$selectedBuildId}?sequence=${sequence}`);
+
 			currentStatus = status;
 			logs = logs.concat(
 				responseLogs.map((log: any) => ({ ...log, line: cleanAnsiCodes(log.line) }))
 			);
+			fromDb = from;
+
 			streamInterval = setInterval(async () => {
 				if (status !== 'running' && status !== 'queued') {
 					clearInterval(streamInterval);
@@ -53,11 +58,12 @@
 				const nextSequence = logs[logs.length - 1]?.time || 0;
 				try {
 					const data = await get(
-						`/applications/${id}/logs/build/${buildId}?sequence=${nextSequence}`
+						`/applications/${id}/logs/build/${$selectedBuildId}?sequence=${nextSequence}`
 					);
 					status = data.status;
 					currentStatus = status;
-
+					fromDb = data.fromDb;
+					
 					logs = logs.concat(
 						data.logs.map((log: any) => ({ ...log, line: cleanAnsiCodes(log.line) }))
 					);
@@ -75,7 +81,7 @@
 		try {
 			cancelInprogress = true;
 			await post(`/applications/${id}/cancel`, {
-				buildId,
+				buildId: $selectedBuildId,
 				applicationId: id
 			});
 		} catch (error) {
@@ -103,7 +109,7 @@
 			<button
 				id="follow"
 				on:click={followBuild}
-				class="bg-transparent btn btn-sm btn-linkhover:text-green-500 hover:bg-coolgray-500"
+				class="bg-transparent btn btn-sm btn-link hover:text-green-500 hover:bg-coolgray-500"
 				class:text-green-500={followingBuild}
 			>
 				<svg
@@ -154,20 +160,19 @@
 			{/if}
 		</div>
 		{#if logs.length > 0}
-			<div
-				class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
-				bind:this={logsEl}
-			>
+			<div class="font-mono w-full rounder bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded-md mb-20 flex flex-col whitespace-nowrap -mt-12 scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1">
 				{#each logs as log}
-					<div>{log.line + '\n'}</div>
+					{#if fromDb}
+						<div>{log.line + '\n'}</div>
+					{:else}
+						<div>[{day.unix(log.time).format('HH:mm:ss.SSS')}] {log.line + '\n'}</div>
+					{/if}
 				{/each}
 			</div>
 		{:else}
-			<div
-				class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
-			>
-				No logs found.
-			</div>
+		<div class="font-mono w-full rounder bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded-md mb-20 flex flex-col whitespace-nowrap -mt-12 scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1">
+			No logs found.
+		</div>
 		{/if}
 	{/if}
 </div>

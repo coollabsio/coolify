@@ -1,13 +1,23 @@
-
-import axios from 'axios';
-import { compareVersions } from 'compare-versions';
-import cuid from 'cuid';
-import bcrypt from 'bcryptjs';
-import { asyncExecShell, asyncSleep, cleanupDockerStorage, errorHandler, isDev, listSettings, prisma, uniqueName, version } from '../../../lib/common';
-import { supportedServiceTypesAndVersions } from '../../../lib/services/supportedVersions';
-import type { FastifyReply, FastifyRequest } from 'fastify';
-import type { Login, Update } from '.';
-import type { GetCurrentUser } from './types';
+import axios from "axios";
+import { compareVersions } from "compare-versions";
+import cuid from "cuid";
+import bcrypt from "bcryptjs";
+import {
+	asyncExecShell,
+	asyncSleep,
+	cleanupDockerStorage,
+	errorHandler,
+	isDev,
+	listSettings,
+	prisma,
+	uniqueName,
+	version,
+} from "../../../lib/common";
+import { supportedServiceTypesAndVersions } from "../../../lib/services/supportedVersions";
+import { scheduler } from "../../../lib/scheduler";
+import type { FastifyReply, FastifyRequest } from "fastify";
+import type { Login, Update } from ".";
+import type { GetCurrentUser } from "./types";
 
 export async function hashPassword(password: string): Promise<string> {
 	const saltRounds = 15;
@@ -17,34 +27,38 @@ export async function hashPassword(password: string): Promise<string> {
 export async function cleanupManually(request: FastifyRequest) {
 	try {
 		const { serverId } = request.body;
-		const destination = await prisma.destinationDocker.findUnique({ where: { id: serverId } })
-		await cleanupDockerStorage(destination.id, true, true)
-		return {}
+		const destination = await prisma.destinationDocker.findUnique({
+			where: { id: serverId },
+		});
+		await cleanupDockerStorage(destination.id, true, true);
+		return {};
 	} catch ({ status, message }) {
-		return errorHandler({ status, message })
+		return errorHandler({ status, message });
 	}
 }
 export async function checkUpdate(request: FastifyRequest) {
 	try {
-		const isStaging = request.hostname === 'staging.coolify.io'
+		const isStaging =
+			request.hostname === "staging.coolify.io" ||
+			request.hostname === "arm.coolify.io";
 		const currentVersion = version;
 		const { data: versions } = await axios.get(
-			`https://get.coollabs.io/versions.json?appId=${process.env['COOLIFY_APP_ID']}&version=${currentVersion}`
+			`https://get.coollabs.io/versions.json?appId=${process.env["COOLIFY_APP_ID"]}&version=${currentVersion}`
 		);
-		const latestVersion = versions['coolify'].main.version
+		const latestVersion = versions["coolify"].main.version;
 		const isUpdateAvailable = compareVersions(latestVersion, currentVersion);
 		if (isStaging) {
 			return {
 				isUpdateAvailable: true,
-				latestVersion: 'next'
-			}
+				latestVersion: "next",
+			};
 		}
 		return {
 			isUpdateAvailable: isStaging ? true : isUpdateAvailable === 1,
-			latestVersion
+			latestVersion,
 		};
 	} catch ({ status, message }) {
-		return errorHandler({ status, message })
+		return errorHandler({ status, message });
 	}
 }
 
@@ -59,7 +73,7 @@ export async function update(request: FastifyRequest<Update>) {
 				`sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env`
 			);
 			await asyncExecShell(
-				`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify && docker rm coolify && docker compose up -d --force-recreate"`
+				`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify coolify-fluentbit && docker rm coolify coolify-fluentbit && docker compose pull && docker compose up -d --force-recreate"`
 			);
 			return {};
 		} else {
@@ -67,13 +81,27 @@ export async function update(request: FastifyRequest<Update>) {
 			return {};
 		}
 	} catch ({ status, message }) {
-		return errorHandler({ status, message })
+		return errorHandler({ status, message });
+	}
+}
+export async function resetQueue(request: FastifyRequest<any>) {
+	try {
+		const teamId = request.user.teamId;
+		if (teamId === "0") {
+			await prisma.build.updateMany({
+				where: { status: { in: ["queued", "running"] } },
+				data: { status: "canceled" },
+			});
+			scheduler.workers.get("deployApplication").postMessage("cancel");
+		}
+	} catch ({ status, message }) {
+		return errorHandler({ status, message });
 	}
 }
 export async function restartCoolify(request: FastifyRequest<any>) {
 	try {
 		const teamId = request.user.teamId;
-		if (teamId === '0') {
+		if (teamId === "0") {
 			if (!isDev) {
 				asyncExecShell(`docker restart coolify`);
 				return {};
@@ -81,9 +109,12 @@ export async function restartCoolify(request: FastifyRequest<any>) {
 				return {};
 			}
 		}
-		throw { status: 500, message: 'You are not authorized to restart Coolify.' };
+		throw {
+			status: 500,
+			message: "You are not authorized to restart Coolify.",
+		};
 	} catch ({ status, message }) {
-		return errorHandler({ status, message })
+		return errorHandler({ status, message });
 	}
 }
 
@@ -92,24 +123,24 @@ export async function showDashboard(request: FastifyRequest) {
 		const userId = request.user.userId;
 		const teamId = request.user.teamId;
 		const applications = await prisma.application.findMany({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-			include: { settings: true, destinationDocker: true, teams: true }
+			where: { teams: { some: { id: teamId === "0" ? undefined : teamId } } },
+			include: { settings: true, destinationDocker: true, teams: true },
 		});
 		const databases = await prisma.database.findMany({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-			include: { settings: true, destinationDocker: true, teams: true }
+			where: { teams: { some: { id: teamId === "0" ? undefined : teamId } } },
+			include: { settings: true, destinationDocker: true, teams: true },
 		});
 		const services = await prisma.service.findMany({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-			include: { destinationDocker: true, teams: true }
+			where: { teams: { some: { id: teamId === "0" ? undefined : teamId } } },
+			include: { destinationDocker: true, teams: true },
 		});
 		const gitSources = await prisma.gitSource.findMany({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-			include: { teams: true }
+			where: { teams: { some: { id: teamId === "0" ? undefined : teamId } } },
+			include: { teams: true },
 		});
 		const destinations = await prisma.destinationDocker.findMany({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-			include: { teams: true }
+			where: { teams: { some: { id: teamId === "0" ? undefined : teamId } } },
+			include: { teams: true },
 		});
 		const settings = await listSettings();
 		return {
@@ -121,88 +152,98 @@ export async function showDashboard(request: FastifyRequest) {
 			settings,
 		};
 	} catch ({ status, message }) {
-		return errorHandler({ status, message })
+		return errorHandler({ status, message });
 	}
 }
 
-export async function login(request: FastifyRequest<Login>, reply: FastifyReply) {
+export async function login(
+	request: FastifyRequest<Login>,
+	reply: FastifyReply
+) {
 	if (request.user) {
-		return reply.redirect('/dashboard');
+		return reply.redirect("/dashboard");
 	} else {
 		const { email, password, isLogin } = request.body || {};
 		if (!email || !password) {
-			throw { status: 500, message: 'Email and password are required.' };
+			throw { status: 500, message: "Email and password are required." };
 		}
 		const users = await prisma.user.count();
 		const userFound = await prisma.user.findUnique({
 			where: { email },
 			include: { teams: true, permission: true },
-			rejectOnNotFound: false
+			rejectOnNotFound: false,
 		});
 		if (!userFound && isLogin) {
-			throw { status: 500, message: 'User not found.' };
+			throw { status: 500, message: "User not found." };
 		}
-		const { isRegistrationEnabled, id } = await prisma.setting.findFirst()
+		const { isRegistrationEnabled, id } = await prisma.setting.findFirst();
 		let uid = cuid();
-		let permission = 'read';
+		let permission = "read";
 		let isAdmin = false;
 
 		if (users === 0) {
-			await prisma.setting.update({ where: { id }, data: { isRegistrationEnabled: false } });
-			uid = '0';
+			await prisma.setting.update({
+				where: { id },
+				data: { isRegistrationEnabled: false },
+			});
+			uid = "0";
 		}
 		if (userFound) {
-			if (userFound.type === 'email') {
-				if (userFound.password === 'RESETME') {
+			if (userFound.type === "email") {
+				if (userFound.password === "RESETME") {
 					const hashedPassword = await hashPassword(password);
 					if (userFound.updatedAt < new Date(Date.now() - 1000 * 60 * 10)) {
-						if (userFound.id === '0') {
+						if (userFound.id === "0") {
 							await prisma.user.update({
 								where: { email: userFound.email },
-								data: { password: 'RESETME' }
+								data: { password: "RESETME" },
 							});
 						} else {
 							await prisma.user.update({
 								where: { email: userFound.email },
-								data: { password: 'RESETTIMEOUT' }
+								data: { password: "RESETTIMEOUT" },
 							});
 						}
 
 						throw {
 							status: 500,
-							message: 'Password reset link has expired. Please request a new one.'
+							message:
+								"Password reset link has expired. Please request a new one.",
 						};
 					} else {
 						await prisma.user.update({
 							where: { email: userFound.email },
-							data: { password: hashedPassword }
+							data: { password: hashedPassword },
 						});
 						return {
 							userId: userFound.id,
 							teamId: userFound.id,
 							permission: userFound.permission,
-							isAdmin: true
+							isAdmin: true,
 						};
 					}
 				}
 
-				const passwordMatch = await bcrypt.compare(password, userFound.password);
+				const passwordMatch = await bcrypt.compare(
+					password,
+					userFound.password
+				);
 				if (!passwordMatch) {
 					throw {
 						status: 500,
-						message: 'Wrong password or email address.'
+						message: "Wrong password or email address.",
 					};
 				}
 				uid = userFound.id;
 				isAdmin = true;
 			}
 		} else {
-			permission = 'owner';
+			permission = "owner";
 			isAdmin = true;
 			if (!isRegistrationEnabled) {
 				throw {
 					status: 404,
-					message: 'Registration disabled by administrator.'
+					message: "Registration disabled by administrator.",
 				};
 			}
 			const hashedPassword = await hashPassword(password);
@@ -212,17 +253,17 @@ export async function login(request: FastifyRequest<Login>, reply: FastifyReply)
 						id: uid,
 						email,
 						password: hashedPassword,
-						type: 'email',
+						type: "email",
 						teams: {
 							create: {
 								id: uid,
 								name: uniqueName(),
-								destinationDocker: { connect: { network: 'coolify' } }
-							}
+								destinationDocker: { connect: { network: "coolify" } },
+							},
 						},
-						permission: { create: { teamId: uid, permission: 'owner' } }
+						permission: { create: { teamId: uid, permission: "owner" } },
 					},
-					include: { teams: true }
+					include: { teams: true },
 				});
 			} else {
 				await prisma.user.create({
@@ -230,16 +271,16 @@ export async function login(request: FastifyRequest<Login>, reply: FastifyReply)
 						id: uid,
 						email,
 						password: hashedPassword,
-						type: 'email',
+						type: "email",
 						teams: {
 							create: {
 								id: uid,
-								name: uniqueName()
-							}
+								name: uniqueName(),
+							},
 						},
-						permission: { create: { teamId: uid, permission: 'owner' } }
+						permission: { create: { teamId: uid, permission: "owner" } },
 					},
-					include: { teams: true }
+					include: { teams: true },
 				});
 			}
 		}
@@ -247,18 +288,21 @@ export async function login(request: FastifyRequest<Login>, reply: FastifyReply)
 			userId: uid,
 			teamId: uid,
 			permission,
-			isAdmin
+			isAdmin,
 		};
 	}
 }
 
-export async function getCurrentUser(request: FastifyRequest<GetCurrentUser>, fastify) {
-	let token = null
-	const { teamId } = request.query
+export async function getCurrentUser(
+	request: FastifyRequest<GetCurrentUser>,
+	fastify
+) {
+	let token = null;
+	const { teamId } = request.query;
 	try {
 		const user = await prisma.user.findUnique({
-			where: { id: request.user.userId }
-		})
+			where: { id: request.user.userId },
+		});
 		if (!user) {
 			throw "User not found";
 		}
@@ -269,20 +313,20 @@ export async function getCurrentUser(request: FastifyRequest<GetCurrentUser>, fa
 		try {
 			const user = await prisma.user.findFirst({
 				where: { id: request.user.userId, teams: { some: { id: teamId } } },
-				include: { teams: true, permission: true }
-			})
+				include: { teams: true, permission: true },
+			});
 			if (user) {
-				const permission = user.permission.find(p => p.teamId === teamId).permission
+				const permission = user.permission.find(
+					(p) => p.teamId === teamId
+				).permission;
 				const payload = {
 					...request.user,
 					teamId,
 					permission: permission || null,
-					isAdmin: permission === 'owner' || permission === 'admin'
-
-				}
-				token = fastify.jwt.sign(payload)
+					isAdmin: permission === "owner" || permission === "admin",
+				};
+				token = fastify.jwt.sign(payload);
 			}
-
 		} catch (error) {
 			// No new token -> not switching teams
 		}
@@ -291,6 +335,6 @@ export async function getCurrentUser(request: FastifyRequest<GetCurrentUser>, fa
 		settings: await prisma.setting.findFirst(),
 		supportedServiceTypesAndVersions,
 		token,
-		...request.user
-	}
+		...request.user,
+	};
 }

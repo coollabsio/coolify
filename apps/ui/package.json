@@ -42,6 +42,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"dayjs": "1.11.5",
 		"@sveltejs/adapter-static": "1.0.0-next.39",
 		"@tailwindcss/typography": "^0.5.7",
 		"cuid": "2.1.8",

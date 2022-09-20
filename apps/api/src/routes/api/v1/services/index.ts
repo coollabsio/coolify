@@ -30,7 +30,7 @@ import {
 
 import type { OnlyId } from '../../../../types';
 import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetGlitchTipSettings, SetWordpressSettings } from './types';
-import { startService, stopService } from '../../../../lib/services/handlers';
+import { migrateAppwriteDB, startService, stopService } from '../../../../lib/services/handlers';
 
 const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.addHook('onRequest', async (request) => {
@@ -76,6 +76,8 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.post<OnlyId>('/:id/plausibleanalytics/activate', async (request, reply) => await activatePlausibleUsers(request, reply));
     fastify.post<OnlyId>('/:id/plausibleanalytics/cleanup', async (request, reply) => await cleanupPlausibleLogs(request, reply));
     fastify.post<ActivateWordpressFtp>('/:id/wordpress/ftp', async (request, reply) => await activateWordpressFtp(request, reply));
+
+    fastify.post<OnlyId>('/:id/appwrite/migrate', async (request, reply) => await migrateAppwriteDB(request, reply));
 };
 
 export default root;

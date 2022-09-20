@@ -61,10 +61,13 @@
 	<div class="mr-4 text-2xl tracking-tight">{$t('index.settings')}</div>
 </div>
 <div class="mx-auto w-full">
-	<div class="flex flex-row">
+	<div class="flex lg:flex-row flex-col">
 		<Menu />
-		<div class="grid grid-flow-row gap-2 py-4">
-			<div class="flex space-x-1 pb-6">
+		<div class="flex flex-col mt-5">
+			<div
+				class="flex flex-col lg:flex-row flex-wrap items-center space-x-3 justify-center lg:justify-start lg:py-0 px-4 pb-4 lg:pb-4"
+				style="min-width: 83vw"
+			>
 				<div class="title font-bold">SSH Keys</div>
 				<button
 					on:click={() => (isModalActive = true)}
@@ -72,7 +75,7 @@
 					disabled={loading.save}>New SSH Key</button
 				>
 			</div>
-			<div class="grid grid-flow-col gap-2 px-10">
+			<div class="grid grid-flow-col gap-2 lg:px-10 px-6">
 				{#if sshKeys.length === 0}
 					<div class="text-sm ">No SSH keys found</div>
 				{:else}

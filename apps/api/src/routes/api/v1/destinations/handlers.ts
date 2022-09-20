@@ -229,7 +229,7 @@ export async function getDestinationStatus(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         const destination = await prisma.destinationDocker.findUnique({ where: { id } })
-        const isRunning = await checkContainer({ dockerId: destination.id, container: 'coolify-proxy', remove: true })
+        const { found: isRunning } = await checkContainer({ dockerId: destination.id, container: 'coolify-proxy', remove: true })
         return {
             isRunning
         }
