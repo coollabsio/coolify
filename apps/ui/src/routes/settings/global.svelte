@@ -236,7 +236,7 @@
 					<div class="grid grid-cols-2 items-center">
 						<div>
 							{$t('application.url_fqdn')}
-							<Explainer explanation={$t('setting.ssl_explainer')} />
+							<Explainer position="dropdown-bottom" explanation={$t('setting.ssl_explainer')} />
 						</div>
 						<input
 							class="w-full"
