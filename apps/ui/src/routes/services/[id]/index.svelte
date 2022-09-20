@@ -50,24 +50,22 @@
 	});
 </script>
 
-{#if $status.service.isRunning}
-	<div class="mx-auto max-w-6xl px-6 lg:my-0 my-4 lg:pt-0 pt-4 rounded">
-		<div class="text-center">
-			<div class="stat w-64">
-				<div class="stat-title">Used Memory / Memory Limit</div>
-				<div class="stat-value text-xl">{usage?.MemUsage}</div>
-			</div>
+<div class="mx-auto max-w-6xl px-6 lg:my-0 my-4 lg:pt-0 pt-4 rounded">
+	<div class="text-center">
+		<div class="stat w-64">
+			<div class="stat-title">Used Memory / Memory Limit</div>
+			<div class="stat-value text-xl">{usage?.MemUsage}</div>
+		</div>
 
-			<div class="stat w-64">
-				<div class="stat-title">Used CPU</div>
-				<div class="stat-value text-xl">{usage?.CPUPerc}</div>
-			</div>
+		<div class="stat w-64">
+			<div class="stat-title">Used CPU</div>
+			<div class="stat-value text-xl">{usage?.CPUPerc}</div>
+		</div>
 
-			<div class="stat w-64">
-				<div class="stat-title">Network IO</div>
-				<div class="stat-value text-xl">{usage?.NetIO}</div>
-			</div>
+		<div class="stat w-64">
+			<div class="stat-title">Network IO</div>
+			<div class="stat-value text-xl">{usage?.NetIO}</div>
 		</div>
 	</div>
-{/if}
+</div>
 <Services bind:service bind:readOnly bind:settings />
