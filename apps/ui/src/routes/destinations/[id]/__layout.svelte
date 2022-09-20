@@ -88,17 +88,25 @@
 </script>
 
 {#if $page.params.id !== 'new'}
-	<nav class="nav-side">
-		<button
-			id="delete"
-			on:click={() => deleteDestination(destination)}
-			type="submit"
-			disabled={!$appSession.isAdmin && isDestinationDeletable}
-			class:hover:text-red-500={$appSession.isAdmin && isDestinationDeletable}
-			class="icons bg-transparent text-sm"
-			class:text-stone-600={!isDestinationDeletable}><DeleteIcon /></button
-		>
+	<nav class="header lg:flex-row flex-col-reverse">
+		<div class="flex flex-row space-x-2 font-bold pt-10 lg:pt-0">
+			<div class="flex flex-col items-center justify-center">
+				<div class="title">Configurations</div>
+			</div>
+		</div>
+		<div class="lg:block hidden flex-1" />
+		<div class="flex flex-row flex-wrap space-x-3 justify-center lg:justify-start lg:py-0">
+			<button
+				id="delete"
+				on:click={() => deleteDestination(destination)}
+				type="submit"
+				disabled={!$appSession.isAdmin && isDestinationDeletable}
+				class:hover:text-red-500={$appSession.isAdmin && isDestinationDeletable}
+				class="icons bg-transparent text-sm"
+				class:text-stone-600={!isDestinationDeletable}><DeleteIcon /></button
+			>
+			<Tooltip triggeredBy="#delete">{deletable()}</Tooltip>
+		</div>
 	</nav>
-	<Tooltip triggeredBy="#delete">{deletable()}</Tooltip>
 {/if}
 <slot />

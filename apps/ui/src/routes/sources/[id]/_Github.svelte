@@ -103,7 +103,7 @@
 					</div>
 				{/if}
 			</div>
-			<div class="grid gap-4 grid-cols-2 auto-rows-max">
+			<div class="grid gap-2 grid-cols-2 auto-rows-max">
 				<label for="name" class="text-base font-bold text-stone-100">Name</label>
 				<input class="w-full" name="name" id="name" required bind:value={source.name} />
 				<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
@@ -158,7 +158,7 @@
 					</div>
 				{/if}
 			</div>
-			<div class="grid gap-4 grid-cols-2 auto-rows-max mt-4">
+			<div class="grid gap-2 grid-cols-2 auto-rows-max mt-4">
 				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 				<input class="w-full" name="name" id="name" required bind:value={source.name} />
 				<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>

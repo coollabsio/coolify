@@ -121,7 +121,7 @@
 				>
 			{/if}
 		</div>
-		<div class="grid gap-4 grid-cols-2 auto-rows-max lg:px-10 px-2">
+		<div class="grid gap-2 grid-cols-2 auto-rows-max lg:px-10 px-2">
 			<label for="name">{$t('forms.name')}</label>
 			<input
 				class="w-full"
@@ -225,7 +225,7 @@
 	<div class="flex space-x-1 pb-5 font-bold">
 		<h1 class="title">{$t('application.features')}</h1>
 	</div>
-	<div class="grid gap-4 grid-cols-2 auto-rows-max lg:px-10 px-2">
+	<div class="grid gap-2 grid-cols-2 auto-rows-max lg:px-10 px-2">
 		<Setting
 			id="isPublic"
 			loading={publicLoading}

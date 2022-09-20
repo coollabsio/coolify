@@ -142,24 +142,24 @@
 </script>
 
 <form on:submit|preventDefault={handleSubmit} class="py-4">
-	<div class="grid gap-4 grid-cols-2 grid-rows-1">
+	<div class="flex space-x-2">
 		<button
 			type="submit"
-			class="btn btn-sm w-full"
+			class="btn btn-sm"
 			class:bg-destinations={!loading.save}
 			class:loading={loading.save}
 			disabled={loading.save}
 			>{$t('forms.save')}
 		</button>
 		<button
-			class="btn btn-sm w-full"
+			class="btn btn-sm"
 			class:loading={loading.restart}
 			class:bg-error={!loading.restart}
 			disabled={loading.restart}
 			on:click|preventDefault={forceRestartProxy}>{$t('destination.force_restart_proxy')}</button
 		>
 	</div>
-	<div class="grid gap-4 grid-cols-2 auto-rows-max mt-10 items-center">
+	<div class="grid gap-2 grid-cols-2 auto-rows-max mt-10 items-center">
 		<label for="name" class="text-base font-bold text-stone-100 w-full">{$t('forms.name')}</label>
 		<input
 			class="w-full"

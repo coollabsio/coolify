@@ -260,7 +260,7 @@
 			</div>
 		{/if}
 
-		<div class="grid gap-4 grid-cols-1 grid-rows-1 lg:px-10 px-2">
+		<div class="grid gap-2 grid-cols-1 grid-rows-1 lg:px-10 px-2">
 			<div class="mt-2 grid grid-cols-2 items-center">
 				<label for="name">{$t('forms.name')}</label>
 				<input name="name" id="name" class="w-full" bind:value={service.name} required />
@@ -383,7 +383,18 @@
 			</div>
 		{/if}
 
-		<div class="grid grid-flow-row gap-2 lg:px-10 px-2 pt-4">
+		<div class="grid grid-flow-row gap-2 lg:px-10 px-2 pt-2">
+			<div class="grid grid-cols-2 items-center">
+				<Setting
+					id="dualCerts"
+					disabled={$status.service.isRunning}
+					dataTooltip={$t('forms.must_be_stopped_to_modify')}
+					bind:setting={dualCerts}
+					title={$t('application.ssl_www_and_non_www')}
+					description={$t('services.generate_www_non_www_ssl')}
+					on:click={() => !$status.service.isRunning && changeSettings('dualCerts')}
+				/>
+			</div>
 			<div class="grid grid-cols-2 items-center">
 				<label for="exposePort"
 					>Exposed Port <Explainer
@@ -402,17 +413,7 @@
 					placeholder="12345"
 				/>
 			</div>
-			<div class="grid grid-cols-2 items-center">
-				<Setting
-					id="dualCerts"
-					disabled={$status.service.isRunning}
-					dataTooltip={$t('forms.must_be_stopped_to_modify')}
-					bind:setting={dualCerts}
-					title={$t('application.ssl_www_and_non_www')}
-					description={$t('services.generate_www_non_www_ssl')}
-					on:click={() => !$status.service.isRunning && changeSettings('dualCerts')}
-				/>
-			</div>
+		
 		</div>
 		{#if service.type === 'plausibleanalytics'}
 			<PlausibleAnalytics bind:service {readOnly} />

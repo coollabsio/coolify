@@ -166,7 +166,6 @@
 
 <form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
 	<div class="flex space-x-1 pb-5">
-		<div class="title font-bold">{$t('forms.configuration')}</div>
 		{#if $appSession.isAdmin}
 			<button
 				type="submit"
