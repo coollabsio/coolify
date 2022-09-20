@@ -70,6 +70,9 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         if (type === 'taiga') {
             return await startTaigaService(request)
         }
+        if (type === 'grafana') {
+            return await startGrafanaService(request)
+        }
         throw `Service type ${type} not supported.`
     } catch (error) {
         throw { status: 500, message: error?.message || error }
@@ -2634,6 +2637,61 @@ async function startTaigaService(request: FastifyRequest<ServiceStartStop>) {
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
 
+        await startServiceContainers(destinationDocker.id, composeFileDestination)
+        return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
+async function startGrafanaService(request: FastifyRequest<ServiceStartStop>) {
+    try {
+        const { id } = request.params;
+        const teamId = request.user.teamId;
+        const service = await getServiceFromDB({ id, teamId });
+        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort, persistentStorage } =
+            service;
+        const network = destinationDockerId && destinationDocker.network;
+        const port = getServiceMainPort('grafana');
+
+        const { workdir } = await createDirectories({ repository: type, buildId: id });
+        const image = getServiceImage(type);
+
+        const config = {
+            grafana: {
+                image: `${image}:${version}`,
+                volumes: [`${id}-grafana:/var/lib/grafana`],
+                environmentVariables: {}
+            }
+        };
+        if (serviceSecret.length > 0) {
+            serviceSecret.forEach((secret) => {
+                config.grafana.environmentVariables[secret.name] = secret.value;
+            });
+        }
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
+        const composeFile: ComposeFile = {
+            version: '3.8',
+            services: {
+                [id]: {
+                    container_name: id,
+                    image: config.grafana.image,
+                    volumes: config.grafana.volumes,
+                    environment: config.grafana.environmentVariables,
+                    ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                    labels: makeLabelForServices('grafana'),
+                    ...defaultComposeConfiguration(network),
+                }
+            },
+            networks: {
+                [network]: {
+                    external: true
+                }
+            },
+            volumes: volumeMounts
+        };
+        const composeFileDestination = `${workdir}/docker-compose.yaml`;
+        await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         await startServiceContainers(destinationDocker.id, composeFileDestination)
         return {}
     } catch ({ status, message }) {

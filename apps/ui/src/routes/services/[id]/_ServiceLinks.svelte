@@ -75,4 +75,8 @@
 	<a href="https://weblate.org" target="_blank">
 		<Icons.Weblate />
 	</a>
+{:else if service.type === 'grafana'}
+	<a href="https://github.com/grafana/grafana" target="_blank">
+		<Icons.Grafana />
+	</a>
 {/if}
