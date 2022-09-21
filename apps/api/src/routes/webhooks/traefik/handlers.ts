@@ -178,7 +178,19 @@ function configureMiddleware(
 
 export async function traefikConfiguration(request, reply) {
 	try {
+		const sslpath = '/etc/traefik/acme/custom';
+		const certificates = await prisma.certificate.findMany()
+		let parsedCertificates = []
+		for (const certificate of certificates) {
+			parsedCertificates.push({
+				certFile: `${sslpath}/${certificate.id}-cert.pem`,
+				keyFile: `${sslpath}/${certificate.id}-key.pem`
+			})
+		}
 		const traefik = {
+			tls: {
+				certificates: parsedCertificates
+			},
 			http: {
 				routers: {},
 				services: {},

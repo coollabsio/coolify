@@ -4,7 +4,7 @@
 	export let type = 'info';
 	function success() {
 		if (type === 'success') {
-			return 'bg-gradient-to-r from-purple-500 via-pink-500 to-red-500';
+			return 'bg-coollabs';
 		}
 	}
 </script>

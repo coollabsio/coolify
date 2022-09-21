@@ -1,8 +1,9 @@
 import { parentPort } from 'node:worker_threads';
 import axios from 'axios';
 import { compareVersions } from 'compare-versions';
-import { asyncExecShell, cleanupDockerStorage, executeDockerCmd, isDev, prisma, startTraefikTCPProxy, generateDatabaseConfiguration, startTraefikProxy, listSettings, version, createRemoteEngineConfiguration } from '../lib/common';
-
+import { asyncExecShell, cleanupDockerStorage, executeDockerCmd, isDev, prisma, startTraefikTCPProxy, generateDatabaseConfiguration, startTraefikProxy, listSettings, version, createRemoteEngineConfiguration, decrypt } from '../lib/common';
+import { checkContainer } from '../lib/docker';
+import fs from 'fs/promises'
 async function autoUpdater() {
     try {
         const currentVersion = version;
@@ -38,6 +39,46 @@ async function autoUpdater() {
             }
         }
     } catch (error) { }
+}
+async function checkFluentBit() {
+    if (!isDev) {
+        const engine = '/var/run/docker.sock';
+        const { id } = await prisma.destinationDocker.findFirst({
+            where: { engine, network: 'coolify' }
+        });
+        const { found } = await checkContainer({ dockerId: id, container: 'coolify-fluentbit' });
+        if (!found) {
+            await asyncExecShell(`env | grep COOLIFY > .env`);
+            await asyncExecShell(`docker compose up -d fluent-bit`);
+        }
+    }
+}
+async function copySSLCertificates() {
+    try {
+        const certificates = await prisma.certificate.findMany({ include: { team: true } })
+        const teamIds = certificates.map(c => c.team.map(t => t.id)).flat()
+        const destinations = await prisma.destinationDocker.findMany({ where: { isCoolifyProxyUsed: true, teams: { some: { id: { in: teamIds } } } } })
+        for (const destination of destinations) {
+            if (destination.remoteEngine) {
+                // TODO: copy certificates to remote engine
+            } else {
+                for (const certificate of certificates) {
+                    const { id, key, cert } = certificate
+                    const decryptedKey = decrypt(key)
+                    await asyncExecShell(`docker exec coolify-proxy sh -c 'mkdir -p /etc/traefik/acme/custom/'`)
+                    await fs.writeFile(`/tmp/${id}-key.pem`, decryptedKey)
+                    await fs.writeFile(`/tmp/${id}-cert.pem`, cert)
+                    await asyncExecShell(`docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/`)
+                    await asyncExecShell(`docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/`)
+                    await fs.rm(`/tmp/${id}-key.pem`)
+                    await fs.rm(`/tmp/${id}-cert.pem`)
+                }
+            }
+
+        }
+    } catch (error) {
+
+    }
 }
 async function checkProxies() {
     try {
@@ -213,6 +254,14 @@ async function cleanupStorage() {
                 }
                 if (message === 'action:checkProxies') {
                     await checkProxies();
+                    return;
+                }
+                if (message === 'action:checkFluentBit') {
+                    await checkFluentBit();
+                    return;
+                }
+                if (message === 'action:copySSLCertificates') {
+                    await copySSLCertificates();
                     return;
                 }
                 if (message === 'action:autoUpdater') {

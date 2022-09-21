@@ -218,7 +218,7 @@
 				id="git"
 				href="{application.gitSource.htmlUrl}/{application.repository}/tree/{application.branch}"
 				target="_blank"
-				class="w-6 h-6"
+				class="w-6 h-6 lg:w-10 lg:h-10"
 			>
 				{#if application.gitSource?.type === 'gitlab'}
 					<svg viewBox="0 0 128 128" class="icons">

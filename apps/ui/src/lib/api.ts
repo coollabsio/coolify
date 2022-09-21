@@ -39,7 +39,7 @@ export function getWebhookUrl(type: string) {
 async function send({
 	method,
 	path,
-	data = {},
+	data = null,
 	headers,
 	timeout = 120000
 }: {
@@ -53,7 +53,7 @@ async function send({
 	const controller = new AbortController();
 	const id = setTimeout(() => controller.abort(), timeout);
 	const opts: any = { method, headers: {}, body: null, signal: controller.signal };
-	if (Object.keys(data).length > 0) {
+	if (data && Object.keys(data).length > 0) {
 		const parsedData = data;
 		for (const [key, value] of Object.entries(data)) {
 			if (value === '') {
@@ -85,7 +85,9 @@ async function send({
 	if (dev && !path.startsWith('https://')) {
 		path = `${getAPIUrl()}${path}`;
 	}
-
+	if (method === 'POST' && data && !opts.body) {
+		opts.body = data;
+	}
 	const response = await fetch(`${path}`, opts);
 
 	clearTimeout(id);
@@ -132,7 +134,7 @@ export function del(
 
 export function post(
 	path: string,
-	data: Record<string, unknown>,
+	data: Record<string, unknown> | FormData,
 	headers?: Record<string, unknown>
 ): Promise<Record<string, any>> {
 	return send({ method: 'POST', path, data, headers });

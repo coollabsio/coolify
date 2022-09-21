@@ -3,19 +3,29 @@
 	import { appSession } from '$lib/store';
 </script>
 
-<div class="flex flex-col pt-4 space-y-6 px-10">
+<ul class="menu bg-coolgray-200 rounded lg:w-52">
 	{#if $appSession.teamId === '0'}
-		<a
-			href="/settings/global"
-			class="sub-menu no-underline w-full"
-			class:sub-menu-active={$page.routeId === 'settings/global'}
+		<li
+			class="hover:bg-coollabs duration-150"
+			class:bordered={$page.url.pathname === '/settings/coolify'}
+			class:bg-coolgray-500={$page.url.pathname === '/settings/coolify'}
 		>
-			Global Settings
-		</a>
+			<a href="/settings/coolify" class="no-underline w-full">Coolify Settings</a>
+		</li>
 	{/if}
-	<a
-		href="/settings/ssh-keys"
-		class="sub-menu no-underline w-full"
-		class:sub-menu-active={$page.routeId === 'settings/ssh-keys'}>SSH Keys</a
+
+	<li
+		class="hover:bg-coollabs duration-150"
+		class:bordered={$page.url.pathname === '/settings/ssh'}
+		class:bg-coolgray-500={$page.url.pathname === '/settings/ssh'}
 	>
-</div>
+		<a href="/settings/ssh" class="no-underline w-full">SSH Keys</a>
+	</li>
+	<li
+		class="hover:bg-coollabs duration-150"
+		class:bordered={$page.url.pathname === '/settings/certificates'}
+		class:bg-coolgray-400={$page.url.pathname === '/settings/certificates'}
+	>
+		<a href="/settings/certificates" class="no-underline w-full">SSL Certificates</a>
+	</li>
+</ul>

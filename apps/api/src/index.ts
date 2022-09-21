@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import serve from '@fastify/static';
 import env from '@fastify/env';
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
 import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
 import { asyncExecShell, createRemoteEngineConfiguration, getDomain, isDev, listSettings, prisma, version } from './lib/common';
@@ -31,6 +32,7 @@ prisma.setting.findFirst().then(async (settings) => {
 		logger: settings?.isAPIDebuggingEnabled || false,
 		trustProxy: true
 	});
+
 	const schema = {
 		type: 'object',
 		required: ['COOLIFY_SECRET_KEY', 'COOLIFY_DATABASE_URL', 'COOLIFY_IS_ON'],
@@ -88,13 +90,13 @@ prisma.setting.findFirst().then(async (settings) => {
 			return reply.status(200).sendFile('index.html');
 		});
 	}
+	fastify.register(multipart, { limits: { fileSize: 100000 } });
 	fastify.register(autoLoad, {
 		dir: join(__dirname, 'plugins')
 	});
 	fastify.register(autoLoad, {
 		dir: join(__dirname, 'routes')
 	});
-
 	fastify.register(cookie)
 	fastify.register(cors);
 	fastify.addHook('onRequest', async (request, reply) => {
@@ -145,11 +147,15 @@ prisma.setting.findFirst().then(async (settings) => {
 			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupStorage")
 		}, isDev ? 6000 : 60000 * 10)
 
-		// checkProxies
+		// checkProxies and checkFluentBit
 		setInterval(async () => {
 			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkProxies")
+			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkFluentBit")
 		}, 10000)
 
+		setInterval(async () => {
+			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:copySSLCertificates")
+		}, 2000)
 		// cleanupPrismaEngines
 		// setInterval(async () => {
 		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupPrismaEngines")

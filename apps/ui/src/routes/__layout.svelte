@@ -226,7 +226,7 @@
 						<a
 							id="settings"
 							sveltekit:prefetch
-							href={$appSession.teamId === '0' ? '/settings/global' : '/settings/ssh-keys'}
+							href={$appSession.teamId === '0' ? '/settings/coolify' : '/settings/ssh'}
 							class="icons hover:text-settings"
 							class:text-settings={$page.url.pathname.startsWith('/settings')}
 							class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
@@ -393,7 +393,7 @@
 			<li>
 				<a
 					class="no-underline icons hover:text-black hover:bg-settings"
-					href={$appSession.teamId === '0' ? '/settings/global' : '/settings/ssh-keys'}
+					href={$appSession.teamId === '0' ? '/settings/coolify' : '/settings/ssh'}
 					class:bg-settings={$page.url.pathname.startsWith('/settings')}
 					class:text-black={$page.url.pathname.startsWith('/settings')}
 				>

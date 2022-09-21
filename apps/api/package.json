@@ -21,6 +21,7 @@
     "@fastify/env": "4.1.0",
     "@fastify/jwt": "6.3.2",
     "@fastify/static": "6.5.0",
+    "@fastify/multipart": "7.2.0",
     "@iarna/toml": "2.2.5",
     "@ladjs/graceful": "3.0.2",
     "@prisma/client": "4.3.1",
@@ -49,6 +50,7 @@
     "p-all": "4.0.0",
     "p-throttle": "5.0.0",
     "public-ip": "6.0.1",
+    "pump": "^3.0.0",
     "ssh-config": "4.1.6",
     "strip-ansi": "7.0.1",
     "unique-names-generator": "4.7.1"
