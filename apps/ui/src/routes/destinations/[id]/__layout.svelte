@@ -90,8 +90,12 @@
 {#if $page.params.id !== 'new'}
 	<nav class="header lg:flex-row flex-col-reverse">
 		<div class="flex flex-row space-x-2 font-bold pt-10 lg:pt-0">
-			<div class="flex flex-col items-center justify-center">
-				<div class="title">Configurations</div>
+			<div class="flex flex-col items-center justify-center title">
+				{#if $page.url.pathname === `/destinations/${$page.params.id}`}
+					Configurations
+				{:else if $page.url.pathname.startsWith(`/destinations/${$page.params.id}/configuration/sshkey`)}
+					Select a SSH Key
+				{/if}
 			</div>
 		</div>
 		<div class="lg:block hidden flex-1" />

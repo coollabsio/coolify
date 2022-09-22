@@ -160,7 +160,7 @@
 		>
 	</div>
 	<div class="grid gap-2 grid-cols-2 auto-rows-max mt-10 items-center">
-		<label for="name" class="text-base font-bold text-stone-100 w-full">{$t('forms.name')}</label>
+		<label for="name">{$t('forms.name')}</label>
 		<input
 			class="w-full"
 			name="name"
@@ -169,9 +169,7 @@
 			readonly={!$appSession.isAdmin}
 			bind:value={destination.name}
 		/>
-		<label for="engine" class="text-base font-bold text-stone-100 w-full"
-			>{$t('forms.engine')}</label
-		>
+		<label for="engine">{$t('forms.engine')}</label>
 		<CopyPasswordField
 			id="engine"
 			readonly
@@ -180,7 +178,7 @@
 			placeholder="{$t('forms.eg')}: /var/run/docker.sock"
 			value={destination.engine}
 		/>
-		<label for="network" class="text-base font-bold text-stone-100">{$t('forms.network')}</label>
+		<label for="network">{$t('forms.network')}</label>
 		<CopyPasswordField
 			id="network"
 			readonly
