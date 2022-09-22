@@ -12,9 +12,10 @@ model Certificate {
   id        String   @id @default(cuid())
   key       String
   cert      String
-  team      Team[]
+  team      Team?    @relation(fields: [teamId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  teamId    String?
 }
 
 model Setting {
