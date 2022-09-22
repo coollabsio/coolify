@@ -3,7 +3,7 @@
 	import { appSession } from '$lib/store';
 </script>
 
-<ul class="menu bg-coolgray-200 rounded lg:w-52">
+<ul class="menu bg-coolgray-200 rounded">
 	{#if $appSession.teamId === '0'}
 		<li
 			class="hover:bg-coollabs duration-150"

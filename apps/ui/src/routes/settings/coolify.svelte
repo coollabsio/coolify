@@ -198,23 +198,17 @@
 
 <div class="title font-bold pb-3">Coolify Settings</div>
 
-<div class="mx-auto w-full p-4 bg-coolgray-100 rounded border-coolgray-300 border">
+<div class="mx-auto w-full p-6 bg-coolgray-200 rounded shadow-xl">
 	<div class="flex lg:flex-row flex-col">
-		<!-- <Upload />
-		{#if certificates.length > 0}
-			{#each certificates as cert}
-				<div>{cert.commonName}</div>
-			{/each}
-		{/if} -->
 		<form on:submit|preventDefault={handleSubmit}>
-			<div class="grid grid-flow-row gap-2 lg:px-10 px-2 pr-5">
+			<div class="grid grid-flow-row gap-2  px-4 pr-5">
 				<div class="grid grid-cols-2 items-center">
 					<div>
 						{$t('application.url_fqdn')}
 						<Explainer position="dropdown-bottom" explanation={$t('setting.ssl_explainer')} />
 					</div>
 					<input
-						class="w-full"
+						class="w-full bg-coolgray-100"
 						bind:value={fqdn}
 						readonly={!$appSession.isAdmin || isFqdnSet}
 						disabled={!$appSession.isAdmin || isFqdnSet}
@@ -229,13 +223,13 @@
 						<div class="flex-col space-y-2 pt-4 text-center">
 							{#if isNonWWWDomainOK}
 								<button
-									class="btn btn-sm bg-success"
+									class="btn bg-success"
 									on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
 									>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
 								>
 							{:else}
 								<button
-									class="btn btn-sm bg-error"
+									class="btn btn-error"
 									on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
 									>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
 								>
@@ -243,14 +237,14 @@
 							{#if dualCerts}
 								{#if isWWWDomainOK}
 									<button
-										class="btn btn-sm bg-success"
+										class="btn bg-success"
 										on:click|preventDefault={() =>
 											isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
 										>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
 									>
 								{:else}
 									<button
-										class="btn btn-sm bg-error"
+										class="btn btn-error"
 										on:click|preventDefault={() =>
 											isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
 										>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
@@ -279,7 +273,7 @@
 
 					<div class="flex flex-row items-center space-x-2">
 						<input
-							class=" w-full px-2"
+							class="w-full px-2 bg-coolgray-100"
 							type="number"
 							bind:value={minPort}
 							min="1024"
@@ -287,7 +281,7 @@
 						/>
 						<p>-</p>
 						<input
-							class="w-full px-2"
+							class="w-full px-2 bg-coolgray-100"
 							type="number"
 							bind:value={maxPort}
 							min={minPort}
@@ -311,9 +305,13 @@
 						/>
 					</div>
 
-					<input class="w-full" placeholder="1.1.1.1,8.8.8.8" bind:value={DNSServers} />
+					<input
+						class="w-full bg-coolgray-100"
+						placeholder="1.1.1.1,8.8.8.8"
+						bind:value={DNSServers}
+					/>
 				</div>
-			
+
 				<div class="grid grid-cols-2 items-center">
 					<Setting
 						id="isRegistrationEnabled"
@@ -345,38 +343,35 @@
 				{/if}
 			</div>
 			<div
-			class="flex flex-col lg:flex-row flex-wrap items-center space-x-3 justify-center lg:justify-start lg:py-4 px-4 pb-4 lg:pb-4"
-		>
-			<div class="flex lg:flex-row lg:space-x-4 flex-col space-y-2 lg:space-y-0 px-6">
-				<button
-					class="btn btn-sm bg-settings text-black"
-					type="submit"
-					class:bg-orange-600={forceSave}
-					class:hover:bg-orange-400={forceSave}
-					class:loading={loading.save}
-					disabled={loading.save}
-					>{loading.save
-						? $t('forms.saving')
-						: forceSave
-						? $t('forms.confirm_continue')
-						: $t('forms.save')}</button
-				>
-
-				{#if isFqdnSet}
+				class="flex flex-col lg:flex-row flex-wrap items-center space-x-3 justify-center lg:justify-start pt-8"
+			>
+				<div class="flex lg:flex-row lg:space-x-4 flex-col space-y-2 lg:space-y-0">
 					<button
-						on:click|preventDefault={removeFqdn}
-						disabled={loading.remove}
-						class="btn btn-sm"
-						>{loading.remove ? $t('forms.removing') : $t('forms.remove_domain')}</button
+						class="btn btn-primary"
+						type="submit"
+						class:bg-orange-600={forceSave}
+						class:hover:bg-orange-400={forceSave}
+						class:loading={loading.save}
+						disabled={loading.save}
+						>{loading.save
+							? $t('forms.saving')
+							: forceSave
+							? $t('forms.confirm_continue')
+							: $t('forms.save')}</button
 					>
-				{/if}
-				<button
-					on:click={restartCoolify}
-					class:loading={loading.restart}
-					class="btn btn-sm bg-red-600 hover:bg-red-500">Restart Coolify</button
-				>
+
+					{#if isFqdnSet}
+						<button on:click|preventDefault={removeFqdn} disabled={loading.remove} class="btn"
+							>{loading.remove ? $t('forms.removing') : $t('forms.remove_domain')}</button
+						>
+					{/if}
+					<button
+						on:click={restartCoolify}
+						class:loading={loading.restart}
+						class="btn bg-red-600 hover:bg-red-700">Restart Coolify</button
+					>
+				</div>
 			</div>
-		</div>	
 		</form>
 	</div>
 </div>

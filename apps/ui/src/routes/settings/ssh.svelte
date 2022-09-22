@@ -58,17 +58,17 @@
 </script>
 
 <div class="title font-bold pb-3">SSH Keys</div>
-<div class="w-full lg:w-[50em]">
+<div class="w-full">
 	{#if sshKeys.length === 0}
 		<div class="text-sm">No SSH keys found</div>
 		<label
 				for="my-modal"
-				class="btn btn-sm bg-settings text-black mt-6"
+				class="btn btn-primary mt-6"
 				on:click={() => (isModalActive = true)}>Add SSH Key</label
 			>
 	{:else}
 		<div
-			class="mx-auto w-full p-6 bg-coolgray-100 rounded border-coolgray-300 border "
+			class="mx-auto w-full p-6 bg-coolgray-200 rounded shadow-xl"
 		>
 			<table class="table w-full">
 				<thead>
@@ -84,7 +84,7 @@
 							<td>{key.name}</td>
 							<td>{key.createdAt}</td>
 							<td
-								><button on:click={() => deleteSSHKey(key.id)} class="btn btn-sm bg-error"
+								><button on:click={() => deleteSSHKey(key.id)} class="btn btn-error"
 									>Delete</button
 								></td
 							>
@@ -94,7 +94,7 @@
 			</table>
 			<label
 				for="my-modal"
-				class="btn btn-sm bg-settings text-black mt-6"
+				class="btn btn-primary mt-6"
 				on:click={() => (isModalActive = true)}>Add SSH Key</label
 			>
 		</div>
@@ -132,10 +132,10 @@
 						rows={15}
 					/>
 					<label for="my-modal">
-						<button type="submit" class="btn btn-sm bg-settings text-black mt-4">Save</button
+						<button type="submit" class="btn btn-primary mt-4">Save</button
 						></label
 					>
-					<button on:click={() => (isModalActive = false)} type="button" class="btn btn-sm"
+					<button on:click={() => (isModalActive = false)} type="button" class="btn"
 						>Cancel</button
 					>
 				</form>

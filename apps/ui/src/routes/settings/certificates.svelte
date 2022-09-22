@@ -56,16 +56,16 @@
 </script>
 
 <div class="title font-bold pb-3">SSL Certificates</div>
-<div class="w-full lg:w-[50em]">
+<div class="w-full">
 	{#if certificates.length === 0}
 		<div class="text-sm">No SSL Certificate found</div>
 		<label
 			for="my-modal"
-			class="btn btn-sm bg-settings text-black mt-6"
+			class="btn btn-primary mt-6"
 			on:click={() => (isModalActive = true)}>Add SSL Certificate</label
 		>
 	{:else}
-		<div class="mx-auto w-full p-6 bg-coolgray-100 rounded border-coolgray-300 border ">
+		<div class="mx-auto w-full p-6 bg-coolgray-200 rounded shadow-xl">
 			<table class="table w-full">
 				<thead>
 					<tr>
@@ -80,7 +80,7 @@
 							<td>{cert.commonName}</td>
 							<td>{cert.createdAt}</td>
 							<td
-								><button on:click={() => deleteCertificate(cert.id)} class="btn btn-sm bg-error"
+								><button on:click={() => deleteCertificate(cert.id)} class="btn btn-error"
 									>Delete</button
 								></td
 							>
@@ -88,10 +88,8 @@
 					{/each}
 				</tbody>
 			</table>
-			<label
-				for="my-modal"
-				class="btn btn-sm bg-settings text-black mt-6"
-				on:click={() => (isModalActive = true)}>Add SSL Certificate</label
+			<label for="my-modal" class="btn  btn-primary mt-6" on:click={() => (isModalActive = true)}
+				>Add SSL Certificate</label
 			>
 		</div>
 	{/if}
@@ -100,7 +98,7 @@
 {#if isModalActive}
 	<input type="checkbox" id="my-modal" class="modal-toggle" />
 	<div class="modal modal-bottom sm:modal-middle ">
-		<div class="modal-box rounded bg-coolgray-300  max-w-2xl">
+		<div class="modal-box rounded bg-coolgray-300 max-w-2xl">
 			<h3 class="font-bold text-lg">Add a new SSL Certificate</h3>
 			<p class="py-4">
 				SSL Certificates are used to secure your domain and allow you to use HTTPS. <br /><br />Once
@@ -131,10 +129,10 @@
 						/>
 					</div>
 					<label for="my-modal">
-						<button type="submit" class="btn btn-sm bg-settings text-black mt-4">Upload</button
+						<button type="submit" class="btn btn-primary mt-4">Upload</button
 						></label
 					>
-					<button on:click={() => (isModalActive = false)} type="button" class="btn btn-sm"
+					<button on:click={() => (isModalActive = false)} type="button" class="btn"
 						>Cancel</button
 					>
 				</form>
