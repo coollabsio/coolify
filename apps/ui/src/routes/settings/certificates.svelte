@@ -55,17 +55,20 @@
 	}
 </script>
 
-<div class="title font-bold pb-3">SSL Certificates</div>
 <div class="w-full">
 	{#if certificates.length === 0}
 		<div class="text-sm">No SSL Certificate found</div>
-		<label
-			for="my-modal"
-			class="btn btn-primary mt-6"
-			on:click={() => (isModalActive = true)}>Add SSL Certificate</label
+		<label for="my-modal" class="btn btn-primary mt-6" on:click={() => (isModalActive = true)}
+			>Add SSL Certificate</label
 		>
 	{:else}
-		<div class="mx-auto w-full p-6 bg-coolgray-200 rounded shadow-xl">
+		<div class="mx-auto w-full">
+			<div class="flex border-b border-coolgray-500 mb-6">
+				<div class="title font-bold pb-3 pr-4">SSL Certificates</div>
+				<label for="my-modal" class="btn btn-sm btn-primary" on:click={() => (isModalActive = true)}
+					>Add SSL Certificate</label
+				>
+			</div>
 			<table class="table w-full">
 				<thead>
 					<tr>
@@ -80,7 +83,7 @@
 							<td>{cert.commonName}</td>
 							<td>{cert.createdAt}</td>
 							<td
-								><button on:click={() => deleteCertificate(cert.id)} class="btn btn-error"
+								><button on:click={() => deleteCertificate(cert.id)} class="btn btn-sm btn-error"
 									>Delete</button
 								></td
 							>
@@ -88,9 +91,6 @@
 					{/each}
 				</tbody>
 			</table>
-			<label for="my-modal" class="btn  btn-primary mt-6" on:click={() => (isModalActive = true)}
-				>Add SSL Certificate</label
-			>
 		</div>
 	{/if}
 </div>
@@ -129,12 +129,9 @@
 						/>
 					</div>
 					<label for="my-modal">
-						<button type="submit" class="btn btn-primary mt-4">Upload</button
-						></label
+						<button type="submit" class="btn btn-sm btn-primary mt-4">Upload</button></label
 					>
-					<button on:click={() => (isModalActive = false)} type="button" class="btn"
-						>Cancel</button
-					>
+					<button on:click={() => (isModalActive = false)} type="button" class="btn btn-sm btn-error">Cancel</button>
 				</form>
 			</div>
 		</div>

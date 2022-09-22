@@ -91,26 +91,21 @@
 	}
 </script>
 
-
-<div class="flex flex-row justify-center space-x-2 px-10 pt-6">
+<div class="flex flex-row justify-center space-x-2 px-10">
 	{#if logs.length === 0}
 		<div class="text-xl font-bold tracking-tighter">{$t('application.build.waiting_logs')}</div>
 	{:else}
 		<div class="relative w-full">
-			<div class="text-right " />
-			{#if loadLogsInterval}
-				<LoadingLogs />
-			{/if}
-			<div class="flex justify-end sticky top-0 p-1 mx-1">
+			<div class="flex justify-start sticky space-x-2 pb-2">
 				<button
-					id="follow"
 					on:click={followBuild}
-					class="bg-transparent btn btn-sm btn-link"
-					class:text-green-500={followingLogs}
+					class="btn btn-sm bg-coollabs"
+					class:bg-coolgray-300={followingLogs}
+					class:text-applications={followingLogs}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6"
+						class="w-6 h-6 mr-2"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -124,10 +119,18 @@
 						<line x1="12" y1="8" x2="12" y2="16" />
 						<line x1="16" y1="12" x2="12" y2="16" />
 					</svg>
+					{followingLogs ? 'Following Logs...' : 'Follow Logs'}
 				</button>
-				<Tooltip triggeredBy="#follow">Follow Logs</Tooltip>
+				{#if loadLogsInterval}
+					<button id="streaming" class="btn btn-sm bg-transparent border-none loading" />
+					<Tooltip triggeredBy="#streaming">Streaming logs</Tooltip>
+				{/if}
 			</div>
-			<div class="font-mono w-full rounder bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded-md mb-20 flex flex-col whitespace-nowrap -mt-12 scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1">
+			<div
+				bind:this={logsEl}
+				on:scroll={detect}
+				class="font-mono w-full bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded mb-20 flex flex-col scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1"
+			>
 				{#each logs as log}
 					<p>{log + '\n'}</p>
 				{/each}

@@ -312,7 +312,7 @@
 	</div>
 	<div class="drawer-side">
 		<label for="main-drawer" class="drawer-overlay w-full" />
-		<ul class="menu bg-coolgray-300 w-60 p-2  space-y-3 pt-4 ">
+		<ul class="menu bg-coolgray-200 w-60 p-2  space-y-3 pt-4 ">
 			<li>
 				<a
 					class="no-underline icons hover:text-white hover:bg-pink-500"

@@ -107,9 +107,9 @@
 	}
 </script>
 
-<div class="block flex-row justify-start space-x-2 px-5 pt-6 sm:px-10 md:flex">
+<div class="block flex-row justify-start space-x-2 px-5  sm:px-10 md:flex">
 	<div class="mb-4 min-w-[16rem] space-y-2 md:mb-0 ">
-		<button class="btn btn-sm text-xs w-full bg-error" on:click={resetQueue}
+		<button class="btn btn-sm w-full bg-error" on:click={resetQueue}
 			>Reset Build Queue</button
 		>
 		<div class="top-4 md:sticky">
@@ -167,7 +167,7 @@
 				<div class="flex space-x-2 pb-10">
 					<button
 						disabled={noMoreBuilds}
-						class=" btn btn-sm w-full text-xs"
+						class=" btn btn-sm w-full"
 						on:click={loadMoreBuilds}>{$t('application.build.load_more')}</button
 					>
 				</div>

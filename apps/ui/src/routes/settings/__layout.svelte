@@ -20,12 +20,14 @@
 	};
 </script>
 
-<div class="mx-auto max-w-6xl px-6 grid grid-cols-1 lg:grid-cols-4">
-	<nav class="header flex flex-col">
-		<div class="title pb-10">Settings</div>
-		<Menu />
+<div class="mx-auto max-w-screen-2xl px-6 grid grid-cols-1 lg:grid-cols-4">
+	<nav class="header flex flex-col px-0">
+		<div class="title pb-[3.7rem]">Settings</div>
+		<div class="px-4">
+			<Menu />
+		</div>
 	</nav>
-	<div class="pt-0 lg:pt-24 px-5 lg:px-0 col-span-0 lg:col-span-3">
+	<div class="pt-0 lg:pt-[7rem] px-4 lg:px-7 col-span-0 lg:col-span-3">
 		<slot />
 	</div>
 </div>

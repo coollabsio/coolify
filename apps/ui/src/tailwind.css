@@ -25,10 +25,10 @@ body {
 }
 
 input, .input {
-	@apply h-12 w-96 rounded border border-transparent bg-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:border disabled:border-dashed disabled:border-coolgray-300 disabled:bg-transparent md:text-sm;
+	@apply h-12 w-96 rounded border border-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:border disabled:border-dashed disabled:border-coolgray-200 disabled:bg-transparent disabled:bg-coolblack md:text-sm;
 }
 textarea {
-	@apply min-w-[14rem] rounded border border-transparent bg-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:border disabled:border-dashed disabled:border-coolgray-300 disabled:bg-transparent md:text-sm;
+	@apply min-w-[14rem] rounded border border-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:border disabled:border-dashed disabled:border-coolgray-200 disabled:bg-transparent md:text-sm;
 }
 
 #svelte .custom-select-wrapper .selectContainer.disabled input {
@@ -40,7 +40,7 @@ textarea {
 }
 
 #svelte .custom-select-wrapper .selectContainer {
-	@apply h-12 w-96 rounded border border-coolgray-300 bg-coolgray-200 p-2 px-0 text-xs tracking-tight outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 md:text-sm w-full;
+	@apply h-12 w-96 rounded bg-coolgray-100 p-2 px-0 text-xs tracking-tight outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 md:text-sm w-full ;
 }
 
 #svelte .listContainer {

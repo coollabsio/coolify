@@ -196,11 +196,38 @@
 	}
 </script>
 
-<div class="title font-bold pb-3">Coolify Settings</div>
+<div class="mx-auto w-full">
+	<form on:submit|preventDefault={handleSubmit}>
+		<div class="flex flex-row border-b border-coolgray-500 mb-6">
+			<div class="title font-bold pb-3 pr-4">Coolify Settings</div>
+			<div class="flex flex-row space-x-2">
+				<button
+					class="btn btn-sm btn-primary"
+					type="submit"
+					class:bg-orange-600={forceSave}
+					class:hover:bg-orange-400={forceSave}
+					class:loading={loading.save}
+					disabled={loading.save}
+					>{loading.save
+						? $t('forms.saving')
+						: forceSave
+						? $t('forms.confirm_continue')
+						: $t('forms.save')}</button
+				>
 
-<div class="mx-auto w-full p-6 bg-coolgray-200 rounded shadow-xl">
-	<div class="flex lg:flex-row flex-col">
-		<form on:submit|preventDefault={handleSubmit}>
+				{#if isFqdnSet}
+					<button on:click|preventDefault={removeFqdn} disabled={loading.remove} class="btn"
+						>{loading.remove ? $t('forms.removing') : $t('forms.remove_domain')}</button
+					>
+				{/if}
+				<button
+					on:click={restartCoolify}
+					class:loading={loading.restart}
+					class="btn btn-sm btn-error">Restart Coolify</button
+				>
+			</div>
+		</div>
+		<div class="flex lg:flex-row flex-col">
 			<div class="grid grid-flow-row gap-2  px-4 pr-5">
 				<div class="grid grid-cols-2 items-center">
 					<div>
@@ -208,7 +235,7 @@
 						<Explainer position="dropdown-bottom" explanation={$t('setting.ssl_explainer')} />
 					</div>
 					<input
-						class="w-full bg-coolgray-100"
+						class="w-full"
 						bind:value={fqdn}
 						readonly={!$appSession.isAdmin || isFqdnSet}
 						disabled={!$appSession.isAdmin || isFqdnSet}
@@ -273,7 +300,7 @@
 
 					<div class="flex flex-row items-center space-x-2">
 						<input
-							class="w-full px-2 bg-coolgray-100"
+							class="w-full px-2 "
 							type="number"
 							bind:value={minPort}
 							min="1024"
@@ -281,7 +308,7 @@
 						/>
 						<p>-</p>
 						<input
-							class="w-full px-2 bg-coolgray-100"
+							class="w-full px-2 "
 							type="number"
 							bind:value={maxPort}
 							min={minPort}
@@ -306,7 +333,7 @@
 					</div>
 
 					<input
-						class="w-full bg-coolgray-100"
+						class="w-full "
 						placeholder="1.1.1.1,8.8.8.8"
 						bind:value={DNSServers}
 					/>
@@ -342,36 +369,6 @@
 					</div>
 				{/if}
 			</div>
-			<div
-				class="flex flex-col lg:flex-row flex-wrap items-center space-x-3 justify-center lg:justify-start pt-8"
-			>
-				<div class="flex lg:flex-row lg:space-x-4 flex-col space-y-2 lg:space-y-0">
-					<button
-						class="btn btn-primary"
-						type="submit"
-						class:bg-orange-600={forceSave}
-						class:hover:bg-orange-400={forceSave}
-						class:loading={loading.save}
-						disabled={loading.save}
-						>{loading.save
-							? $t('forms.saving')
-							: forceSave
-							? $t('forms.confirm_continue')
-							: $t('forms.save')}</button
-					>
-
-					{#if isFqdnSet}
-						<button on:click|preventDefault={removeFqdn} disabled={loading.remove} class="btn"
-							>{loading.remove ? $t('forms.removing') : $t('forms.remove_domain')}</button
-						>
-					{/if}
-					<button
-						on:click={restartCoolify}
-						class:loading={loading.restart}
-						class="btn bg-red-600 hover:bg-red-700">Restart Coolify</button
-					>
-				</div>
-			</div>
-		</form>
-	</div>
+		</div>
+	</form>
 </div>

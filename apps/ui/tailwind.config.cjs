@@ -49,7 +49,7 @@ module.exports = {
 				"iam": "#C026D3",
 				coollabs: '#6B16ED',
 				'coollabs-100': '#7317FF',
-				coolblack: '#161616',
+				coolblack: '#141414',
 				'coolgray-100': '#181818',
 				'coolgray-200': '#202020',
 				'coolgray-300': '#242424',

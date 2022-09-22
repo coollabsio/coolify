@@ -57,19 +57,20 @@
 	}
 </script>
 
-<div class="title font-bold pb-3">SSH Keys</div>
 <div class="w-full">
 	{#if sshKeys.length === 0}
 		<div class="text-sm">No SSH keys found</div>
-		<label
-				for="my-modal"
-				class="btn btn-primary mt-6"
-				on:click={() => (isModalActive = true)}>Add SSH Key</label
-			>
-	{:else}
-		<div
-			class="mx-auto w-full p-6 bg-coolgray-200 rounded shadow-xl"
+		<label for="my-modal" class="btn btn-primary mt-6" on:click={() => (isModalActive = true)}
+			>Add SSH Key</label
 		>
+	{:else}
+		<div class="mx-auto w-full">
+			<div class="flex border-b border-coolgray-500 mb-6">
+				<div class="title font-bold pb-3 pr-4">SSH Keys</div>
+				<label for="my-modal" class="btn btn-sm btn-primary" on:click={() => (isModalActive = true)}
+					>Add SSH Key</label
+				>
+			</div>
 			<table class="table w-full">
 				<thead>
 					<tr>
@@ -84,7 +85,7 @@
 							<td>{key.name}</td>
 							<td>{key.createdAt}</td>
 							<td
-								><button on:click={() => deleteSSHKey(key.id)} class="btn btn-error"
+								><button on:click={() => deleteSSHKey(key.id)} class="btn btn-sm btn-error"
 									>Delete</button
 								></td
 							>
@@ -92,11 +93,6 @@
 					{/each}
 				</tbody>
 			</table>
-			<label
-				for="my-modal"
-				class="btn btn-primary mt-6"
-				on:click={() => (isModalActive = true)}>Add SSH Key</label
-			>
 		</div>
 	{/if}
 </div>
@@ -116,12 +112,7 @@
 			<div class="modal-action">
 				<form on:submit|preventDefault={handleSubmit}>
 					<label for="name" class="">Name</label>
-					<input
-						id="name"
-						required
-						bind:value={newSSHKey.name}
-						class="w-full bg-coolgray-100"
-					/>
+					<input id="name" required bind:value={newSSHKey.name} class="w-full bg-coolgray-100" />
 					<label for="privateKey" class="pt-4">Private Key</label>
 					<textarea
 						id="privateKey"
@@ -132,11 +123,12 @@
 						rows={15}
 					/>
 					<label for="my-modal">
-						<button type="submit" class="btn btn-primary mt-4">Save</button
-						></label
+						<button type="submit" class="btn btn-sm btn-primary mt-4">Save</button></label
 					>
-					<button on:click={() => (isModalActive = false)} type="button" class="btn"
-						>Cancel</button
+					<button
+						on:click={() => (isModalActive = false)}
+						type="button"
+						class="btn btn-sm btn-error">Cancel</button
 					>
 				</form>
 			</div>
