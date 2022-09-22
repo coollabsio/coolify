@@ -20,14 +20,12 @@
 
 <script lang="ts">
 	export let secrets: any;
-	export let application: any;
-	import pLimit from 'p-limit';
-	import Secret from './_Secret.svelte';
+		import pLimit from 'p-limit';
 	import { page } from '$app/stores';
-	import { t } from '$lib/translations';
 	import { get } from '$lib/api';
 	import { saveSecret } from './utils';
 	import { addToast } from '$lib/store';
+	import Secret from './_Secret.svelte';
 
 	const limit = pLimit(1);
 	const { id } = $page.params;
@@ -37,8 +35,8 @@
 		const data = await get(`/applications/${id}/secrets`);
 		secrets = [...data.secrets];
 	}
-	async function getValues(e: any) {
-		e.preventDefault();
+	async function getValues() {
+		if (!batchSecrets) return;
 		const eachValuePair = batchSecrets.split('\n');
 		const batchSecretsPairs = eachValuePair
 			.filter((secret) => !secret.startsWith('#') && secret)
@@ -67,41 +65,31 @@
 	}
 </script>
 
-<div class="mx-auto max-w-6xl px-6 pt-4">
-	<div class="overflow-x-auto">
-		<table class="mx-auto border-separate text-left">
-			<thead>
-				<tr class="h-12">
-					<th scope="col">{$t('forms.name')}</th>
-					<th scope="col">{$t('forms.value')}</th>
-					<th scope="col" class="w-64 text-center"
-						>{$t('application.preview.need_during_buildtime')}</th
-					>
-					<th scope="col" class="w-96 text-center">{$t('forms.action')}</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each secrets as secret}
-					{#key secret.id}
-						<tr>
-							<Secret
-								name={secret.name}
-								value={secret.value}
-								isBuildSecret={secret.isBuildSecret}
-								on:refresh={refreshSecrets}
-							/>
-						</tr>
-					{/key}
-				{/each}
-				<tr>
-					<Secret isNewSecret on:refresh={refreshSecrets} />
-				</tr>
-			</tbody>
-		</table>
+<div class="mx-auto w-full">
+	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
+		<div class="title font-bold pb-3">Secrets</div>
 	</div>
-	<h2 class="title my-6 font-bold">Paste .env file</h2>
-	<form on:submit|preventDefault={getValues} class="mb-12 w-full">
-		<textarea bind:value={batchSecrets} class="mb-2 min-h-[200px] w-full" />
-		<button class="btn btn-sm bg-applications" type="submit">Batch add secrets</button>
-	</form>
+	{#each secrets as secret}
+		{#key secret.id}
+			<Secret
+				length={secrets.length}
+				name={secret.name}
+				value={secret.value}
+				isBuildSecret={secret.isBuildSecret}
+				on:refresh={refreshSecrets}
+			/>
+		{/key}
+	{/each}
+	<Secret isNewSecret on:refresh={refreshSecrets} />
+
 </div>
+<form on:submit|preventDefault={getValues} class="mb-12 w-full">
+	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2 pt-10">
+		<div class="flex flex-row space-x-2">
+			<div class="title font-bold pb-3 ">Paste <code>.env</code> file</div>
+			<button class="btn btn-sm bg-primary" type="submit">Add Secrets in Batch</button>
+		</div>
+	</div>
+
+	<textarea placeholder={`PORT=1337\nPASSWORD=supersecret`} bind:value={batchSecrets} class="mb-2 min-h-[200px] w-full" />
+</form>

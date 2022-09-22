@@ -91,7 +91,12 @@
 	}
 </script>
 
-<div class="flex flex-row justify-center space-x-2 px-10">
+<div class="mx-auto w-full">
+	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
+		<div class="title font-bold pb-3">Application Logs</div>
+	</div>
+</div>
+<div class="flex flex-row justify-center space-x-2">
 	{#if logs.length === 0}
 		<div class="text-xl font-bold tracking-tighter">{$t('application.build.waiting_logs')}</div>
 	{:else}
@@ -129,7 +134,7 @@
 			<div
 				bind:this={logsEl}
 				on:scroll={detect}
-				class="font-mono w-full bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded mb-20 flex flex-col scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1"
+				class="font-mono w-full bg-coolgray-100 border border-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded mb-20 flex flex-col scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1"
 			>
 				{#each logs as log}
 					<p>{log + '\n'}</p>

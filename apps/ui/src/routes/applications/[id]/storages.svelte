@@ -32,24 +32,22 @@
 	}
 </script>
 
-<div class="mx-auto max-w-6xl rounded-xl px-6 pt-4">
-	<table class="mx-auto border-separate text-left">
-		<thead>
-			<tr class="h-12">
-				<th scope="col">{$t('forms.path')} <Explainer position="dropdown-bottom" explanation={$t('application.storage.persistent_storage_explainer')} /></th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each persistentStorages as storage}
-				{#key storage.id}
-					<tr>
-						<Storage on:refresh={refreshStorage} {storage} />
-					</tr>
-				{/key}
-			{/each}
-			<tr>
-				<Storage on:refresh={refreshStorage} isNew />
-			</tr>
-		</tbody>
-	</table>
+<div class="w-full">
+	<div class="mx-auto w-full">
+		<div class="flex flex-row border-b border-coolgray-500 mb-6  space-x-2">
+			<div class="title font-bold pb-3">
+				Persistent Volumes <Explainer
+					position="dropdown-bottom"
+					explanation={$t('application.storage.persistent_storage_explainer')}
+				/>
+			</div>
+		</div>
+
+		{#each persistentStorages as storage}
+			{#key storage.id}
+				<Storage on:refresh={refreshStorage} {storage} />
+			{/key}
+		{/each}
+		<Storage on:refresh={refreshStorage} isNew />
+	</div>
 </div>

@@ -104,63 +104,63 @@
 	});
 </script>
 
-<div class="relative" class:pt-10={currentStatus !== 'running'}>
-	{#if currentStatus === 'running'}
-		<div class="flex justify-start sticky top-0 pb-2 space-x-2">
-			<button
-				on:click={followBuild}
-				class="btn btn-sm bg-coollabs"
-				class:bg-coolgray-300={followingLogs}
-				class:text-applications={followingLogs}
+<div class="relative">
+	<div class="flex justify-start  top-0 pb-2 space-x-2">
+		<button
+			on:click={followBuild}
+			class="btn btn-sm bg-coollabs"
+			disabled={currentStatus !== 'running'}
+			class:bg-coolgray-300={followingLogs || currentStatus !== 'running'}
+			class:text-applications={followingLogs}
+		>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				class="w-6 h-6 mr-2"
+				viewBox="0 0 24 24"
+				stroke-width="1.5"
+				stroke="currentColor"
+				fill="none"
+				stroke-linecap="round"
+				stroke-linejoin="round"
 			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6 mr-2"
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<circle cx="12" cy="12" r="9" />
-					<line x1="8" y1="12" x2="12" y2="16" />
-					<line x1="12" y1="8" x2="12" y2="16" />
-					<line x1="16" y1="12" x2="12" y2="16" />
-				</svg>
+				<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+				<circle cx="12" cy="12" r="9" />
+				<line x1="8" y1="12" x2="12" y2="16" />
+				<line x1="12" y1="8" x2="12" y2="16" />
+				<line x1="16" y1="12" x2="12" y2="16" />
+			</svg>
 
-				{followingLogs ? 'Following Logs...' : 'Follow Logs'}
-			</button>
+			{followingLogs ? 'Following Logs...' : 'Follow Logs'}
+		</button>
 
-			<button
-				on:click={cancelBuild}
-				class:animation-spin={cancelInprogress}
-				class="btn btn-sm"
-				class:bg-error={!cancelInprogress}
-				class:bg-coolgray-300={cancelInprogress}
-				class:text-error={cancelInprogress}
+		<button
+			on:click={cancelBuild}
+			class:animation-spin={cancelInprogress}
+			class="btn btn-sm"
+			disabled={currentStatus !== 'running'}
+			class:bg-coolgray-300={cancelInprogress || currentStatus !== 'running'}
+		>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				class="w-6 h-6 mr-2"
+				viewBox="0 0 24 24"
+				stroke-width="1.5"
+				stroke="currentColor"
+				fill="none"
+				stroke-linecap="round"
+				stroke-linejoin="round"
 			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6 mr-2"
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<circle cx="12" cy="12" r="9" />
-					<path d="M10 10l4 4m0 -4l-4 4" />
-				</svg>
-				{cancelInprogress ? 'Cancelling...' : 'Cancel Build'}
-			</button>
-			<button id="streaming" class="btn btn-sm bg-transparent border-none loading" />
-			<Tooltip triggeredBy="#streaming">Streaming logs</Tooltip>
-		</div>
-	{/if}
+				<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+				<circle cx="12" cy="12" r="9" />
+				<path d="M10 10l4 4m0 -4l-4 4" />
+			</svg>
+			{cancelInprogress ? 'Cancelling...' : 'Cancel Build'}
+		</button>
+		{#if currentStatus === 'running'}
+		<button id="streaming" class="btn btn-sm bg-transparent border-none loading" />
+		<Tooltip triggeredBy="#streaming">Streaming logs</Tooltip>
+		{/if}
+	</div>
 	{#if currentStatus === 'queued'}
 		<div
 			class="font-mono w-full bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded mb-20 flex flex-col whitespace-nowrap scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1"
@@ -171,7 +171,7 @@
 		<div
 			bind:this={logsEl}
 			on:scroll={detect}
-			class="font-mono w-full bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded mb-20 flex flex-col scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1"
+			class="font-mono w-full bg-coolgray-100 border border-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded mb-20 flex flex-col scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1"
 		>
 			{#each logs as log}
 				{#if fromDb}

@@ -17,6 +17,9 @@
 		url('/poppins-v19-latin-ext_latin_devanagari-500.woff') format('woff');
 }
 
+button {
+	@apply text-sm !important;
+}
 html {
 	@apply h-full min-h-full overflow-y-scroll;
 }

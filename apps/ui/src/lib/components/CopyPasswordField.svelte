@@ -15,7 +15,7 @@
 	export let placeholder = '';
 	export let inputStyle = '';
 
-	let disabledClass = 'bg-coolback disabled:bg-coolblack w-full';
+	let disabledClass = 'bg-coolback disabled:bg-coolblack lg:w-64 w-full';
 	let isHttps = browser && window.location.protocol === 'https:';
 
 	function copyToClipboard() {
@@ -82,7 +82,7 @@
 		/>
 	{/if}
 
-	<div class="absolute top-0 right-0 m-3  cursor-pointer text-stone-600 hover:text-white">
+	<div class="absolute top-0 right-0 flex justify-center items-center h-full cursor-pointer text-stone-600 hover:text-white mr-3">
 		<div class="flex space-x-2">
 			{#if isPasswordField}
 				<div on:click={() => (showPassword = !showPassword)}>
