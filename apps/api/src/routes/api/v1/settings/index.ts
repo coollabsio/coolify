@@ -2,8 +2,8 @@ import { FastifyPluginAsync } from 'fastify';
 import { X509Certificate } from 'node:crypto';
 
 import { encrypt, errorHandler, prisma } from '../../../../lib/common';
-import { checkDNS, checkDomain, deleteCertificates, deleteDomain, deleteSSHKey, getCertificates, listAllSettings, saveSettings, saveSSHKey } from './handlers';
-import { CheckDNS, CheckDomain, DeleteDomain, DeleteSSHKey, OnlyIdInBody, SaveSettings, SaveSSHKey } from './types';
+import { checkDNS, checkDomain, deleteCertificates, deleteDomain, deleteSSHKey, listAllSettings, saveSettings, saveSSHKey } from './handlers';
+import { CheckDNS, CheckDomain, DeleteDomain, OnlyIdInBody, SaveSettings, SaveSSHKey } from './types';
 
 
 const root: FastifyPluginAsync = async (fastify): Promise<void> => {
