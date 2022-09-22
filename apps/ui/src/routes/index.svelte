@@ -160,6 +160,7 @@
 	}
 	function applicationFilters(application: any) {
 		return (
+			(application.id && application.id.toLowerCase().includes($search.toLowerCase())) ||
 			(application.name && application.name.toLowerCase().includes($search.toLowerCase())) ||
 			(application.fqdn && application.fqdn.toLowerCase().includes($search.toLowerCase())) ||
 			(application.repository &&
@@ -174,6 +175,7 @@
 	}
 	function databaseFilters(database: any) {
 		return (
+			(database.id && database.id.toLowerCase().includes($search.toLowerCase())) ||
 			(database.name && database.name.toLowerCase().includes($search.toLowerCase())) ||
 			(database.type && database.type.toLowerCase().includes($search.toLowerCase())) ||
 			(database.version && database.version.toLowerCase().includes($search.toLowerCase())) ||
@@ -183,6 +185,7 @@
 	}
 	function serviceFilters(service: any) {
 		return (
+			(service.id && service.id.toLowerCase().includes($search.toLowerCase())) ||
 			(service.name && service.name.toLowerCase().includes($search.toLowerCase())) ||
 			(service.type && service.type.toLowerCase().includes($search.toLowerCase())) ||
 			(service.fqdn && service.fqdn.toLowerCase().includes($search.toLowerCase())) ||
@@ -193,6 +196,7 @@
 	}
 	function gitSourceFilters(source: any) {
 		return (
+			(source.id && source.id.toLowerCase().includes($search.toLowerCase())) ||
 			(source.name && source.name.toLowerCase().includes($search.toLowerCase())) ||
 			(source.type && source.type.toLowerCase().includes($search.toLowerCase())) ||
 			(source.htmlUrl && source.htmlUrl.toLowerCase().includes($search.toLowerCase())) ||
@@ -201,6 +205,7 @@
 	}
 	function destinationFilters(destination: any) {
 		return (
+			(destination.id && destination.id.toLowerCase().includes($search.toLowerCase())) ||
 			(destination.name && destination.name.toLowerCase().includes($search.toLowerCase())) ||
 			(destination.type && destination.type.toLowerCase().includes($search.toLowerCase()))
 		);
