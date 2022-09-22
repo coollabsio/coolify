@@ -113,7 +113,7 @@ export const asyncExecShellStream = async ({
 							line: `${line.replace('\n', '')}`,
 							buildId,
 							applicationId
-						});	
+						});
 					}
 				}
 			});
@@ -513,7 +513,7 @@ export async function createRemoteEngineConfiguration(id: string) {
 		try {
 			await fs.stat(`/tmp/coolify-ssh-agent.pid`);
 			await fs.rm(`/tmp/coolify-ssh-agent.pid`);
-		} catch (error) {}
+		} catch (error) { }
 		await asyncExecShell(`eval $(ssh-agent -sa /tmp/coolify-ssh-agent.pid)`);
 	}
 	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh-add -q ${sshKeyFile}`);
@@ -526,9 +526,17 @@ export async function createRemoteEngineConfiguration(id: string) {
 			await asyncExecShell(
 				`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh -F /dev/null -o "StrictHostKeyChecking no" -fNL ${localPort}:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`
 			);
-		} catch (error) {}
+		} catch (error) { }
 	}
 	const config = sshConfig.parse('');
+	const foundWildcard = config.find({ Host: '*' });
+	if (!foundWildcard) {
+		config.append({
+			Host: '*',
+			ControlMaster: 'auto',
+			ControlPath: `${homedir}/.ssh/coolify-%r@%h:%p`,
+		})
+	}
 	const found = config.find({ Host: remoteIpAddress });
 	if (!found) {
 		config.append({
@@ -540,6 +548,7 @@ export async function createRemoteEngineConfiguration(id: string) {
 			StrictHostKeyChecking: 'no'
 		});
 	}
+
 	try {
 		await fs.stat(`${homedir}/.ssh/`);
 	} catch (error) {
@@ -738,32 +747,32 @@ type DatabaseConfiguration = {
 	};
 }
 	| {
-			volume: string;
-			image: string;
-			command?: string;
-			ulimits: Record<string, unknown>;
-			privatePort: number;
-			environmentVariables: {
-				MONGO_INITDB_ROOT_USERNAME?: string;
-				MONGO_INITDB_ROOT_PASSWORD?: string;
-				MONGODB_ROOT_USER?: string;
-				MONGODB_ROOT_PASSWORD?: string;
-			};
-	  }
+		volume: string;
+		image: string;
+		command?: string;
+		ulimits: Record<string, unknown>;
+		privatePort: number;
+		environmentVariables: {
+			MONGO_INITDB_ROOT_USERNAME?: string;
+			MONGO_INITDB_ROOT_PASSWORD?: string;
+			MONGODB_ROOT_USER?: string;
+			MONGODB_ROOT_PASSWORD?: string;
+		};
+	}
 	| {
-			volume: string;
-			image: string;
-			command?: string;
-			ulimits: Record<string, unknown>;
-			privatePort: number;
-			environmentVariables: {
-				MARIADB_ROOT_USER: string;
-				MARIADB_ROOT_PASSWORD: string;
-				MARIADB_USER: string;
-				MARIADB_PASSWORD: string;
-				MARIADB_DATABASE: string;
-			};
-	  }
+		volume: string;
+		image: string;
+		command?: string;
+		ulimits: Record<string, unknown>;
+		privatePort: number;
+		environmentVariables: {
+			MARIADB_ROOT_USER: string;
+			MARIADB_ROOT_PASSWORD: string;
+			MARIADB_USER: string;
+			MARIADB_PASSWORD: string;
+			MARIADB_DATABASE: string;
+		};
+	}
 	| {
 		volume: string;
 		image: string;
@@ -919,9 +928,8 @@ export function generateDatabaseConfiguration(database: any, arch: string): Data
 		};
 		if (isARM(arch)) {
 			configuration.volume = `${id}-${type}-data:/data`;
-			configuration.command = `/usr/local/bin/redis-server --appendonly ${
-				appendOnly ? 'yes' : 'no'
-			} --requirepass ${dbUserPassword}`;
+			configuration.command = `/usr/local/bin/redis-server --appendonly ${appendOnly ? 'yes' : 'no'
+				} --requirepass ${dbUserPassword}`;
 		}
 		return configuration;
 	} else if (type === 'couchdb') {
@@ -1005,12 +1013,12 @@ export type ComposeFileService = {
 	command?: string;
 	ports?: string[];
 	build?:
-		| {
-				context: string;
-				dockerfile: string;
-				args?: Record<string, unknown>;
-		  }
-		| string;
+	| {
+		context: string;
+		dockerfile: string;
+		args?: Record<string, unknown>;
+	}
+	| string;
 	deploy?: {
 		restart_policy?: {
 			condition?: string;
@@ -1079,7 +1087,7 @@ export const createDirectories = async ({
 	let workdirFound = false;
 	try {
 		workdirFound = !!(await fs.stat(workdir));
-	} catch (error) {}
+	} catch (error) { }
 	if (workdirFound) {
 		await asyncExecShell(`rm -fr ${workdir}`);
 	}
@@ -1428,6 +1436,9 @@ export async function getServiceFromDB({
 		where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
 		include: includeServices
 	});
+	if (!body) {
+		return null
+	}
 	let { type } = body;
 	type = fixType(type);
 
@@ -1595,7 +1606,7 @@ export async function stopBuild(buildId, applicationId) {
 					}
 				}
 				count++;
-			} catch (error) {}
+			} catch (error) { }
 		}, 100);
 	});
 }
@@ -1626,7 +1637,7 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 		if (images) {
 			await executeDockerCmd({ dockerId, command: `docker rmi -f ${images}" -q | xargs -r` });
 		}
-	} catch (error) {}
+	} catch (error) { }
 	if (lowDiskSpace || force) {
 		if (isDev) {
 			if (!force) console.log(`[DEV MODE] Low disk space: ${lowDiskSpace}`);
@@ -1637,17 +1648,17 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 				dockerId,
 				command: `docker container prune -f --filter "label=coolify.managed=true"`
 			});
-		} catch (error) {}
+		} catch (error) { }
 		try {
 			await executeDockerCmd({ dockerId, command: `docker image prune -f` });
-		} catch (error) {}
+		} catch (error) { }
 		try {
 			await executeDockerCmd({ dockerId, command: `docker image prune -a -f` });
-		} catch (error) {}
+		} catch (error) { }
 		// Cleanup build caches
 		try {
 			await executeDockerCmd({ dockerId, command: `docker builder prune -a -f` });
-		} catch (error) {}
+		} catch (error) { }
 	}
 }
 
