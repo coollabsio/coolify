@@ -19,7 +19,7 @@
 			if (!service || Object.entries(service).length === 0) {
 				return {
 					status: 302,
-					redirect: '/databases'
+					redirect: '/'
 				};
 			}
 			const configurationPhase = checkConfiguration(service);

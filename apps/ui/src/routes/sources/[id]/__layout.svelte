@@ -9,7 +9,7 @@
 			if (id !== 'new' && (!source || Object.entries(source).length === 0)) {
 				return {
 					status: 302,
-					redirect: '/sources'
+					redirect: '/'
 				};
 			}
 			return {

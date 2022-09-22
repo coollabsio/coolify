@@ -16,7 +16,7 @@
 			if (id !== 'new' && (!destination || Object.entries(destination).length === 0)) {
 				return {
 					status: 302,
-					redirect: '/destinations'
+					redirect: '/'
 				};
 			}
 			const configurationPhase = checkConfiguration(destination);

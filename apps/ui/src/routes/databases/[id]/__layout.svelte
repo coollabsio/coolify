@@ -19,7 +19,7 @@
 			if (id !== 'new' && (!database || Object.entries(database).length === 0)) {
 				return {
 					status: 302,
-					redirect: '/databases'
+					redirect: '/'
 				};
 			}
 			const configurationPhase = checkConfiguration(database);

@@ -20,7 +20,7 @@
 			if (!application || Object.entries(application).length === 0) {
 				return {
 					status: 302,
-					redirect: '/applications'
+					redirect: '/'
 				};
 			}
 			const configurationPhase = checkConfiguration(application);
