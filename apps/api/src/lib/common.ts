@@ -94,7 +94,6 @@ export const asyncExecShellStream = async ({
 				const array = stdout.split('\n');
 				for (const line of array) {
 					if (line !== '\n' && line !== '') {
-						logs.push(line.replace('\n', ''))
 						debug && await saveBuildLog({
 							line: `${line.replace('\n', '')}`,
 							buildId,
@@ -108,7 +107,6 @@ export const asyncExecShellStream = async ({
 				const array = stderr.split('\n');
 				for (const line of array) {
 					if (line !== '\n' && line !== '') {
-						errorLogs.push(line.replace('\n', ''))
 						debug && await saveBuildLog({
 							line: `${line.replace('\n', '')}`,
 							buildId,
