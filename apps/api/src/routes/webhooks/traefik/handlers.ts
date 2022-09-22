@@ -546,7 +546,19 @@ export async function traefikOtherConfiguration(request: FastifyRequest<TraefikO
 export async function remoteTraefikConfiguration(request: FastifyRequest<OnlyId>) {
 	const { id } = request.params
 	try {
+		const sslpath = '/etc/traefik/acme/custom';
+		const certificates = await prisma.certificate.findMany({ where: { team: { destinationDocker: { some: { id, remoteEngine: true, isCoolifyProxyUsed: true, remoteVerified: true } } } } })
+		let parsedCertificates = []
+		for (const certificate of certificates) {
+			parsedCertificates.push({
+				certFile: `${sslpath}/${certificate.id}-cert.pem`,
+				keyFile: `${sslpath}/${certificate.id}-key.pem`
+			})
+		}
 		const traefik = {
+			tls: {
+				certificates: parsedCertificates
+			},
 			http: {
 				routers: {},
 				services: {},
