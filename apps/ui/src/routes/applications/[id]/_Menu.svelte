@@ -218,9 +218,10 @@
 	</li>
 	<li
 		class="rounded"
+		class:text-stone-600={!$status.application.isRunning}
 		class:bg-coollabs={$page.url.pathname === `/applications/${$page.params.id}/usage`}
 	>
-		<a href={`/applications/${$page.params.id}/usage`} class="no-underline w-full"
+		<a href={$status.application.isRunning ? `/applications/${$page.params.id}/usage` : ''} class="no-underline w-full"
 			><svg
 				xmlns="http://www.w3.org/2000/svg"
 				class="w-6 h-6"

@@ -195,6 +195,7 @@ export function findBuildPack(pack: string, packageManager = 'npm') {
 export const buildPacks = [
 	{
 		name: 'node',
+		type: 'base',
 		fancyName: 'Node.js',
 		hoverColor: 'hover:bg-green-700',
 		color: 'bg-green-700',
@@ -202,6 +203,7 @@ export const buildPacks = [
 	},
 	{
 		name: 'static',
+		type: 'base',
 		fancyName: 'Static',
 		hoverColor: 'hover:bg-orange-700',
 		color: 'bg-orange-700',
@@ -210,6 +212,7 @@ export const buildPacks = [
 
 	{
 		name: 'php',
+		type: 'base',
 		fancyName: 'PHP',
 		hoverColor: 'hover:bg-indigo-700',
 		color: 'bg-indigo-700',
@@ -217,6 +220,8 @@ export const buildPacks = [
 	},
 	{
 		name: 'laravel',
+		type: 'specific',
+		base: 'php',
 		fancyName: 'Laravel',
 		hoverColor: 'hover:bg-indigo-700',
 		color: 'bg-indigo-700',
@@ -224,6 +229,7 @@ export const buildPacks = [
 	},
 	{
 		name: 'docker',
+		type: 'base',
 		fancyName: 'Docker',
 		hoverColor: 'hover:bg-sky-700',
 		color: 'bg-sky-700',
@@ -231,6 +237,8 @@ export const buildPacks = [
 	},
 	{
 		name: 'svelte',
+		type: 'specific',
+		base: 'node',
 		fancyName: 'Svelte',
 		hoverColor: 'hover:bg-orange-700',
 		color: 'bg-orange-700',
@@ -238,6 +246,8 @@ export const buildPacks = [
 	},
 	{
 		name: 'vuejs',
+		type: 'specific',
+		base: 'node',
 		fancyName: 'VueJS',
 		hoverColor: 'hover:bg-green-700',
 		color: 'bg-green-700',
@@ -245,6 +255,8 @@ export const buildPacks = [
 	},
 	{
 		name: 'nuxtjs',
+		type: 'specific',
+		base: 'node',
 		fancyName: 'NuxtJS',
 		hoverColor: 'hover:bg-green-700',
 		color: 'bg-green-700',
@@ -252,6 +264,8 @@ export const buildPacks = [
 	},
 	{
 		name: 'gatsby',
+		type: 'specific',
+		base: 'node',
 		fancyName: 'Gatsby',
 		hoverColor: 'hover:bg-blue-700',
 		color: 'bg-blue-700',
@@ -259,6 +273,8 @@ export const buildPacks = [
 	},
 	{
 		name: 'astro',
+		type: 'specific',
+		base: 'node',
 		fancyName: 'Astro',
 		hoverColor: 'hover:bg-pink-700',
 		color: 'bg-pink-700',
@@ -266,14 +282,17 @@ export const buildPacks = [
 	},
 	{
 		name: 'eleventy',
+		type: 'specific',
+		base: 'node',
 		fancyName: 'Eleventy',
 		hoverColor: 'hover:bg-red-700',
 		color: 'bg-red-700',
 		isCoolifyBuildPack: true,
 	},
-
 	{
 		name: 'react',
+		type: 'specific',
+		base: 'node',
 		fancyName: 'React',
 		hoverColor: 'hover:bg-blue-700',
 		color: 'bg-blue-700',
@@ -281,6 +300,8 @@ export const buildPacks = [
 	},
 	{
 		name: 'preact',
+		type: 'specific',
+		base: 'node',
 		fancyName: 'Preact',
 		hoverColor: 'hover:bg-blue-700',
 		color: 'bg-blue-700',
@@ -288,6 +309,8 @@ export const buildPacks = [
 	},
 	{
 		name: 'nextjs',
+		type: 'specific',
+		base: 'node',
 		fancyName: 'NextJS',
 		hoverColor: 'hover:bg-blue-700',
 		color: 'bg-blue-700',
@@ -295,6 +318,8 @@ export const buildPacks = [
 	},
 	{
 		name: 'nestjs',
+		type: 'specific',
+		base: 'node',
 		fancyName: 'NestJS',
 		hoverColor: 'hover:bg-red-700',
 		color: 'bg-red-700',
@@ -302,6 +327,7 @@ export const buildPacks = [
 	},
 	{
 		name: 'rust',
+		type: 'base',
 		fancyName: 'Rust',
 		hoverColor: 'hover:bg-pink-700',
 		color: 'bg-pink-700',
@@ -309,6 +335,7 @@ export const buildPacks = [
 	},
 	{
 		name: 'python',
+		type: 'base',
 		fancyName: 'Python',
 		hoverColor: 'hover:bg-green-700',
 		color: 'bg-green-700',
@@ -316,6 +343,7 @@ export const buildPacks = [
 	},
 	{
 		name: 'deno',
+		type: 'base',
 		fancyName: 'Deno',
 		hoverColor: 'hover:bg-green-700',
 		color: 'bg-green-700',
@@ -323,6 +351,7 @@ export const buildPacks = [
 	},
     {
         name: 'heroku',
+		type: 'base',
 		fancyName: 'Heroku',
 		hoverColor: 'hover:bg-purple-700',
 		color: 'bg-purple-700',

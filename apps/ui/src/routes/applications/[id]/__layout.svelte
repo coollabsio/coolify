@@ -175,9 +175,11 @@
 	<nav class="header flex flex-row order-2 lg:order-1 px-0 lg:px-4">
 		<div class="title lg:pb-10">
 			{#if $page.url.pathname === `/applications/${id}/configuration/source`}
-				Select a Git Source
+				Select a Source
 			{:else if $page.url.pathname === `/applications/${id}/configuration/destination`}
 				Select a Destination
+				{:else if $page.url.pathname === `/applications/${id}/configuration/repository`}
+				Select a Repository
 			{:else if $page.url.pathname === `/applications/${id}/configuration/buildpack`}
 				Select a Build Pack
 			{:else}
@@ -319,14 +321,15 @@
 			</button>
 			<Tooltip triggeredBy="#forceredeploy">Force Redeploy (without cache)</Tooltip>
 		{:else}
+		{#if $isDeploymentEnabled}
 			<button
-				class="icons bg-applications hover:bg-green-500 flex items-center font-bold"
+				class="icons flex items-center font-bold"
 				disabled={!$isDeploymentEnabled}
 				on:click={() => handleDeploySubmit(false)}
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6 mr-2"
+					class="w-6 h-6 mr-2 text-green-500"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
@@ -337,8 +340,9 @@
 					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 					<path d="M7 4v16l13 -8z" />
 				</svg>
-				Build & Deploy
+				Deploy
 			</button>
+			{/if}
 		{/if}
 
 		{#if $location && $status.application.isRunning}
@@ -363,10 +367,15 @@
 		{/if}
 	</div>
 </div>
-<div class="mx-auto max-w-screen-2xl px-0 lg:px-2 grid grid-cols-1 lg:grid-cols-4">
-	<nav class="header flex flex-col lg:pt-0 ">
-		<Menu {application} />
-	</nav>
+<div
+	class="mx-auto max-w-screen-2xl px-0 lg:px-2 grid grid-cols-1"
+	class:lg:grid-cols-4={!$page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
+>
+	{#if !$page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
+		<nav class="header flex flex-col lg:pt-0 ">
+			<Menu {application} />
+		</nav>
+	{/if}
 	<div class="pt-0 col-span-0 lg:col-span-3 pb-24">
 		<slot />
 	</div>

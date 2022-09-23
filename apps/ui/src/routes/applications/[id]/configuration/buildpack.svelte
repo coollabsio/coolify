@@ -261,7 +261,7 @@
 		</div>
 	</div>
 {:else}
-	<div class="max-w-6xl mx-auto  px-5">
+	<div class="max-w-screen-2xl mx-auto px-10">
 		<div class="title pb-2">Other</div>
 		<div class="flex flex-wrap justify-center">
 			{#each buildPacks.filter((bp) => bp.isHerokuBuildPack === true) as buildPack}
@@ -271,10 +271,20 @@
 			{/each}
 		</div>
 	</div>
-	<div class="max-w-6xl mx-auto px-5">
-		<div class="title pb-2">Coolify Custom</div>
+	<div class="max-w-screen-2xl mx-auto px-10">
+		<div class="title pb-2">Coolify Base</div>
 		<div class="flex flex-wrap justify-center">
-			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true) as buildPack}
+			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true && bp.type ==='base') as buildPack}
+				<div class="p-2">
+					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
+				</div>
+			{/each}
+		</div>
+	</div>
+	<div class="max-w-screen-2xl mx-auto px-10">
+		<div class="title pb-2">Coolify Specific</div>
+		<div class="flex flex-wrap justify-center">
+			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true && bp.type ==='specific') as buildPack}
 				<div class="p-2">
 					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
 				</div>

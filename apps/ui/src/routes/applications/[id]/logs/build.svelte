@@ -121,22 +121,24 @@
 				<svelte:component this={BuildLog} />
 			{/key}
 		{:else}
+		{#if buildCount === 0}
+		 Not build logs found.
+			{:else}
 			Select a build to see the logs.
+
+			{/if}
 		{/if}
 	</div>
 	<div class="mb-4 min-w-[16rem] space-y-2 md:mb-0 ">
 		<div class="top-4 md:sticky">
-			{#if !noMoreBuilds}
-				{#if buildCount > 5}
 					<div class="flex space-x-2 pb-2">
 						<button
 							disabled={noMoreBuilds}
-							class=" btn btn-sm w-full btn-primary"
+							class:btn-primary={!noMoreBuilds}
+							class=" btn btn-sm w-full"
 							on:click={loadMoreBuilds}>{$t('application.build.load_more')}</button
 						>
 					</div>
-				{/if}
-			{/if}
 			{#each builds as build, index (build.id)}
 				<div
 					id={`building-${build.id}`}
@@ -186,6 +188,3 @@
 		</div>
 	</div>
 </div>
-{#if buildCount === 0}
-	<div class="text-center text-xl font-bold">{$t('application.build.no_logs')}</div>
-{/if}

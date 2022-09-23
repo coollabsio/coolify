@@ -348,7 +348,6 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 	if (buildPack === 'heroku') {
 		payload.baseImage = 'heroku/buildpacks:20';
 		payload.baseImages = herokuVersions;
-
 	}
 	return payload;
 }

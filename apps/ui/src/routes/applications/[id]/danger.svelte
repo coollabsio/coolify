@@ -21,12 +21,11 @@
 <script lang="ts">
 	export let application: any;
 	import { page } from '$app/stores';
-	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import { del, get } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { appSession, status } from '$lib/store';
-	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
-	import Tooltip from '$lib/components/Tooltip.svelte';
+	import { errorNotification } from '$lib/common';
+	import { goto } from '$app/navigation';
 	const { id } = $page.params;
 
 	let forceDelete = false;
@@ -36,7 +35,7 @@
 			$status.application.initialLoading = true;
 			try {
 				await del(`/applications/${id}`, { id, force });
-				return await window.location.assign(`/`);
+				return await goto('/')
 			} catch (error) {
 				if (error.message.startsWith(`Command failed: SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid`)) {
 					forceDelete = true;

@@ -68,7 +68,7 @@
 	}
 </script>
 
-<div class="max-w-6xl mx-auto px-5">
+<div class="max-w-screen-2xl mx-auto px-9">
 	<div class="title pb-8">Git App</div>
 	<div class="flex flex-wrap justify-center">
 		{#if !filteredSources || ownSources.length === 0}
@@ -98,7 +98,7 @@
 				</div>
 			</div>
 		{:else}
-			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row ">
+			<div class="flex flex-col justify-center">
 				{#each ownSources as source}
 					<div class="p-2 relative">
 						<div class="absolute -m-4">

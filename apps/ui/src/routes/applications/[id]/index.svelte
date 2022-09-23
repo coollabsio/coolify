@@ -56,7 +56,7 @@
 		!$appSession.isAdmin || $status.application.isRunning || $status.application.initialLoading;
 
 	let loading = false;
-
+	let fqdnEl: any = null;
 	let forceSave = false;
 	let debug = application.settings.debug;
 	let previews = application.settings.previews;
@@ -96,6 +96,7 @@
 			await handleSubmit();
 		}
 		await getBaseBuildImages();
+		if (!application.fqdn && fqdnEl) fqdnEl.focus()
 	});
 	async function getBaseBuildImages() {
 		const data = await post(`/applications/images`, {
@@ -383,6 +384,90 @@
 						disabled={$status.application.isRunning}
 					/>
 				</div>
+				{#if !isBot}
+					<div class="grid grid-cols-2 items-center">
+						<label for="fqdn"
+							>{$t('application.url_fqdn')}
+							<Explainer
+								explanation={"If you specify <span class='text-settings font-bold'>https</span>, the application will be accessible only over https.<br>SSL certificate will be generated automatically.<br><br>If you specify <span class='text-settings font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application.<br><br><span class='text-settings font-bold'>You must set your DNS to point to the server IP in advance.</span>"}
+							/>
+						</label>
+						<div>
+							<input
+								bind:this={fqdnEl}
+								class="w-full"
+								required={!application.settings.isBot}
+								readonly={isDisabled}
+								disabled={isDisabled}
+								name="fqdn"
+								id="fqdn"
+								class:border={!application.settings.isBot&& !application.fqdn}
+								class:border-red-500={!application.settings.isBot && !application.fqdn}
+								bind:value={application.fqdn}
+								pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+								placeholder="eg: https://coollabs.io"
+							/>
+							{#if forceSave}
+								<div class="flex-col space-y-2 pt-4 text-center">
+									{#if isNonWWWDomainOK}
+										<button
+											class="btn btn-sm bg-green-600 hover:bg-green-500"
+											on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+											>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
+										>
+									{:else}
+										<button
+											class="btn btn-sm bg-red-600 hover:bg-red-500"
+											on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
+											>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
+										>
+									{/if}
+									{#if dualCerts}
+										{#if isWWWDomainOK}
+											<button
+												class="btn btn-sm bg-green-600 hover:bg-green-500"
+												on:click|preventDefault={() =>
+													isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+												>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
+											>
+										{:else}
+											<button
+												class="btn btn-sm bg-red-600 hover:bg-red-500"
+												on:click|preventDefault={() =>
+													isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
+												>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
+											>
+										{/if}
+									{/if}
+								</div>
+							{/if}
+						</div>
+					</div>
+					<div class="grid grid-cols-2 items-center pb-4">
+						<Setting
+							id="dualCerts"
+							dataTooltip={$t('forms.must_be_stopped_to_modify')}
+							disabled={$status.application.isRunning}
+							isCenter={false}
+							bind:setting={dualCerts}
+							title={$t('application.ssl_www_and_non_www')}
+							description="Generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-settings'>both DNS entries</span> set in advance.<br><br>Useful if you expect to have visitors on both."
+							on:click={() => !$status.application.isRunning && changeSettings('dualCerts')}
+						/>
+					</div>
+					{#if isHttps}
+						<div class="grid grid-cols-2 items-center pb-4">
+							<Setting
+								id="isCustomSSL"
+								isCenter={false}
+								bind:setting={isCustomSSL}
+								title="Use Custom SSL Certificate"
+								description="Use Custom SSL Certificated added in the Settings/SSL Certificates section. <br><br>By default, the SSL certificate is generated automatically through Let's Encrypt"
+								on:click={() => changeSettings('isCustomSSL')}
+							/>
+						</div>
+					{/if}
+				{/if}
 			</div>
 
 			<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">Build & Deploy</div>
@@ -494,87 +579,7 @@
 					{/if}
 				{/if}
 
-				{#if !isBot}
-					<div class="grid grid-cols-2 items-center pt-8">
-						<label for="fqdn"
-							>{$t('application.url_fqdn')}
-							<Explainer
-								explanation={"If you specify <span class='text-settings font-bold'>https</span>, the application will be accessible only over https.<br>SSL certificate will be generated automatically.<br><br>If you specify <span class='text-settings font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application.<br><br><span class='text-settings font-bold'>You must set your DNS to point to the server IP in advance.</span>"}
-							/>
-						</label>
-						<div>
-							<input
-								class="w-full"
-								required={!application.settings.isBot}
-								readonly={isDisabled}
-								disabled={isDisabled}
-								name="fqdn"
-								id="fqdn"
-								bind:value={application.fqdn}
-								pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-								placeholder="eg: https://coollabs.io"
-							/>
-							{#if forceSave}
-								<div class="flex-col space-y-2 pt-4 text-center">
-									{#if isNonWWWDomainOK}
-										<button
-											class="btn btn-sm bg-green-600 hover:bg-green-500"
-											on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
-											>DNS settings for {nonWWWDomain} is OK, click to recheck.</button
-										>
-									{:else}
-										<button
-											class="btn btn-sm bg-red-600 hover:bg-red-500"
-											on:click|preventDefault={() => isDNSValid(getDomain(nonWWWDomain), false)}
-											>DNS settings for {nonWWWDomain} is invalid, click to recheck.</button
-										>
-									{/if}
-									{#if dualCerts}
-										{#if isWWWDomainOK}
-											<button
-												class="btn btn-sm bg-green-600 hover:bg-green-500"
-												on:click|preventDefault={() =>
-													isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
-												>DNS settings for www.{nonWWWDomain} is OK, click to recheck.</button
-											>
-										{:else}
-											<button
-												class="btn btn-sm bg-red-600 hover:bg-red-500"
-												on:click|preventDefault={() =>
-													isDNSValid(getDomain(`www.${nonWWWDomain}`), true)}
-												>DNS settings for www.{nonWWWDomain} is invalid, click to recheck.</button
-											>
-										{/if}
-									{/if}
-								</div>
-							{/if}
-						</div>
-					</div>
-					<div class="grid grid-cols-2 items-center pb-4">
-						<Setting
-							id="dualCerts"
-							dataTooltip={$t('forms.must_be_stopped_to_modify')}
-							disabled={$status.application.isRunning}
-							isCenter={false}
-							bind:setting={dualCerts}
-							title={$t('application.ssl_www_and_non_www')}
-							description="Generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-settings'>both DNS entries</span> set in advance.<br><br>Useful if you expect to have visitors on both."
-							on:click={() => !$status.application.isRunning && changeSettings('dualCerts')}
-						/>
-					</div>
-					{#if isHttps}
-						<div class="grid grid-cols-2 items-center pb-4">
-							<Setting
-								id="isCustomSSL"
-								isCenter={false}
-								bind:setting={isCustomSSL}
-								title="Use Custom SSL Certificate"
-								description="Use Custom SSL Certificated added in the Settings/SSL Certificates section. <br><br>By default, the SSL certificate is generated automatically through Let's Encrypt"
-								on:click={() => changeSettings('isCustomSSL')}
-							/>
-						</div>
-					{/if}
-				{/if}
+				
 				{#if application.buildPack === 'python'}
 					<div class="grid grid-cols-2 items-center">
 						<label for="pythonModule">WSGI / ASGI</label>
