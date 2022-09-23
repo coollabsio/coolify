@@ -55,17 +55,7 @@
 	$: isDisabled =
 		!$appSession.isAdmin || $status.application.isRunning || $status.application.initialLoading;
 
-	let domainEl: HTMLInputElement;
-
 	let loading = false;
-
-	let usageLoading = false;
-	let usage = {
-		MemUsage: 0,
-		CPUPerc: 0,
-		NetIO: 0
-	};
-	let usageInterval: any;
 
 	let forceSave = false;
 	let debug = application.settings.debug;
@@ -98,27 +88,11 @@
 		return 'text-white bg-transparent font-thin px-0 w-full border border-dashed border-coolgray-200 bg-transparent';
 	}
 
-	async function getUsage() {
-		if (usageLoading) return;
-		if (!$status.application.isRunning) return;
-		usageLoading = true;
-		const data = await get(`/applications/${id}/usage`);
-		usage = data.usage;
-		usageLoading = false;
-	}
-	onDestroy(() => {
-		clearInterval(usageInterval);
-	});
 	onMount(async () => {
 		if (window.location.hostname === 'demo.coolify.io' && !application.fqdn) {
 			application.fqdn = `http://${cuid()}.demo.coolify.io`;
 			await handleSubmit();
-		}
-		// !isBot && domainEl.focus();
-		await getUsage();
-		usageInterval = setInterval(async () => {
-			await getUsage();
-		}, 1000);
+		}	
 		await getBaseBuildImages();
 	});
 	async function getBaseBuildImages() {

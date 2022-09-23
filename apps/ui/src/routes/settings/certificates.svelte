@@ -55,20 +55,14 @@
 	}
 </script>
 
-<div class="w-full">
-	{#if certificates.length === 0}
-		<div class="text-sm">No SSL Certificate found</div>
-		<label for="my-modal" class="btn btn-primary mt-6" on:click={() => (isModalActive = true)}
-			>Add SSL Certificate</label
-		>
-	{:else}
-		<div class="mx-auto w-full">
-			<div class="flex border-b border-coolgray-500 mb-6">
-				<div class="title font-bold pb-3 pr-4">SSL Certificates</div>
-				<label for="my-modal" class="btn btn-sm btn-primary" on:click={() => (isModalActive = true)}
-					>Add SSL Certificate</label
-				>
-			</div>
+	<div class="mx-auto w-full">
+		<div class="flex border-b border-coolgray-500 mb-6">
+			<div class="title font-bold pb-3 pr-4">SSL Certificates</div>
+			<label for="my-modal" class="btn btn-sm btn-primary" on:click={() => (isModalActive = true)}
+				>Add SSL Certificate</label
+			>
+		</div>
+		{#if certificates.length > 0}
 			<table class="table w-full">
 				<thead>
 					<tr>
@@ -91,10 +85,11 @@
 					{/each}
 				</tbody>
 			</table>
-		</div>
-	{/if}
-</div>
-
+		{:else}
+			<div class="text-sm">No SSL Certificate found</div>
+		{/if}
+	</div>
+		
 {#if isModalActive}
 	<input type="checkbox" id="my-modal" class="modal-toggle" />
 	<div class="modal modal-bottom sm:modal-middle ">
@@ -131,7 +126,11 @@
 					<label for="my-modal">
 						<button type="submit" class="btn btn-sm btn-primary mt-4">Upload</button></label
 					>
-					<button on:click={() => (isModalActive = false)} type="button" class="btn btn-sm btn-error">Cancel</button>
+					<button
+						on:click={() => (isModalActive = false)}
+						type="button"
+						class="btn btn-sm btn-error">Cancel</button
+					>
 				</form>
 			</div>
 		</div>

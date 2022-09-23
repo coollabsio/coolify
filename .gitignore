@@ -14,3 +14,4 @@ local-serve
 apps/api/db/migration.db-journal
 apps/api/core*
 logs
+others/certificates
