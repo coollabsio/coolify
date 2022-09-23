@@ -104,8 +104,7 @@
 	});
 </script>
 
-<div class="relative">
-	<div class="flex justify-start  top-0 pb-2 space-x-2">
+	<div class="flex justify-start top-0 pb-2 space-x-2">
 		<button
 			on:click={followBuild}
 			class="btn btn-sm bg-coollabs"
@@ -188,4 +187,3 @@
 			No logs found yet.
 		</div>
 	{/if}
-</div>

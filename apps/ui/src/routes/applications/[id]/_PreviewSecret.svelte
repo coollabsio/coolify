@@ -4,7 +4,6 @@
 	export let name = '';
 	export let value = '';
 	export let isBuildSecret = false;
-	export let isNewSecret = false;
 
 	import { page } from '$app/stores';
 	import { del, post, put } from '$lib/api';
@@ -16,63 +15,17 @@
 
 	const dispatch = createEventDispatcher();
 	const { id } = $page.params;
-	function cleanupState() {
-		if (isNewSecret) {
-			name = '';
-			value = '';
-			isBuildSecret = false;
-		}
-	}
-	async function removeSecret() {
-		try {
-			await del(`/applications/${id}/secrets`, { name });
-			cleanupState();
-			addToast({
-				message: 'Secret removed.',
-				type: 'success'
-			});
-			dispatch('refresh');
-		} catch (error) {
-			return errorNotification(error);
-		}
-	}
 
-	async function addNewSecret() {
+	async function updatePreviewSecret() {
 		try {
-			if (!name) return errorNotification(`${t.get('forms.name')} ${t.get('forms.is_required')}`);
-			if (!value) return errorNotification(`${t.get('forms.value')} ${t.get('forms.is_required')}`);
-			await post(`/applications/${id}/secrets`, {
+			await put(`/applications/${id}/secrets/preview`, {
 				name,
-				value,
-				isBuildSecret
-			});
-			cleanupState();
-			addToast({
-				message: 'Secret added.',
-				type: 'success'
-			});
-			dispatch('refresh');
-		} catch (error) {
-			return errorNotification(error);
-		}
-	}
-
-	async function updateSecret({
-		changeIsBuildSecret = false
-	}: { changeIsBuildSecret?: boolean } = {}) {
-		if (changeIsBuildSecret) isBuildSecret = !isBuildSecret;
-		if (isNewSecret) return
-		try {
-			await put(`/applications/${id}/secrets`, {
-				name,
-				value,
-				isBuildSecret: changeIsBuildSecret ? isBuildSecret : undefined
+				value
 			});
 			addToast({
 				message: 'Secret updated.',
 				type: 'success'
 			});
-			dispatch('refresh');
 		} catch (error) {
 			return errorNotification(error);
 		}
@@ -81,48 +34,43 @@
 
 <div class="w-full font-bold grid grid-cols-1 lg:grid-cols-4 gap-2 pb-2">
 	<div class="flex flex-col">
-		{#if (index === 0 && !isNewSecret) || length === 0}
+		{#if index === 0 || length === 0}
 			<label for="name" class="pb-2 uppercase">name</label>
 		{/if}
 
 		<input
-			id={isNewSecret ? 'secretName' : 'secretNameNew'}
-			bind:value={name}
+			id="secretName"
+			readonly
+			disabled
+			value={name}
 			required
 			placeholder="EXAMPLE_VARIABLE"
-			readonly={!isNewSecret}
 			class=" w-full"
-			class:bg-coolblack={!isNewSecret}
-			class:border={!isNewSecret}
-			class:border-dashed={!isNewSecret}
-			class:border-coolgray-300={!isNewSecret}
-			class:cursor-not-allowed={!isNewSecret}
 		/>
 	</div>
 	<div class="flex flex-col">
-		{#if (index === 0 && !isNewSecret) || length === 0}
+		{#if index === 0 || length === 0}
 			<label for="value" class="pb-2 uppercase">value</label>
 		{/if}
 
 		<CopyPasswordField
-			id={isNewSecret ? 'secretValue' : 'secretValueNew'}
-			name={isNewSecret ? 'secretValue' : 'secretValueNew'}
+			id="secretValue"
+			name="secretValue"
 			isPasswordField={true}
 			bind:value
 			placeholder="J$#@UIO%HO#$U%H"
 		/>
 	</div>
 	<div class="flex lg:flex-col flex-row justify-start items-center pt-3 lg:pt-0">
-		{#if (index === 0 && !isNewSecret) || length === 0}
+		{#if index === 0 || length === 0}
 			<label for="name" class="pb-2 uppercase lg:block hidden">Need during buildtime?</label>
 		{/if}
 		<label for="name" class="pb-2 uppercase lg:hidden block">Need during buildtime?</label>
 
 		<div class="flex justify-center h-full items-center pt-0 lg:pt-0 pl-4 lg:pl-0">
 			<button
-				on:click={() => updateSecret({ changeIsBuildSecret: true })}
 				aria-pressed="false"
-				class="relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out "
+				class="opacity-50 cursor-pointer cursor-not-allowedrelative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out "
 				class:bg-green-600={isBuildSecret}
 				class:bg-stone-700={!isBuildSecret}
 			>
@@ -165,25 +113,16 @@
 		</div>
 	</div>
 	<div class="flex flex-row lg:flex-col lg:items-center items-start">
-		{#if (index === 0 && !isNewSecret) || length === 0}
+		{#if index === 0 || length === 0}
 			<label for="name" class="pb-2 uppercase lg:block hidden">Actions</label>
 		{/if}
 
 		<div class="flex justify-center h-full items-center pt-3">
-			{#if isNewSecret}
+			<div class="flex flex-row justify-center space-x-2">
 				<div class="flex items-center justify-center">
-					<button class="btn btn-sm btn-primary" on:click={addNewSecret}>Add</button>
+					<button class="btn btn-sm btn-primary" on:click={updatePreviewSecret}>Update</button>
 				</div>
-			{:else}
-				<div class="flex flex-row justify-center space-x-2">
-					<div class="flex items-center justify-center">
-						<button class="btn btn-sm btn-primary" on:click={() => updateSecret()}>Set</button>
-					</div>
-					<div class="flex justify-center items-end">
-						<button class="btn btn-sm btn-error" on:click={removeSecret}>Remove</button>
-					</div>
-				</div>
-			{/if}
+			</div>
 		</div>
 	</div>
 </div>

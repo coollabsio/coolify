@@ -181,12 +181,21 @@
 			{:else if $page.url.pathname === `/applications/${id}/configuration/buildpack`}
 				Select a Build Pack
 			{:else}
-				Configurations
+				<div class="flex justify-center items-center space-x-2">
+					<div>Configurations</div>
+					<div
+						class="badge rounded uppercase"
+						class:text-green-500={$status.application.isRunning}
+						class:text-red-500={!$status.application.isRunning}
+					>
+						{$status.application.isRunning ? 'Running' : 'Stopped'}
+					</div>
+				</div>
 			{/if}
 		</div>
 	</nav>
 	<div
-		class="header flex flex-row items-start justify-center lg:justify-end space-x-2 order-1 lg:order-2"
+		class="pt-4 flex flex-row items-start justify-center lg:justify-end space-x-2 order-1 lg:order-2"
 	>
 		{#if $status.application.isExited || $status.application.isRestarting}
 			<a
@@ -285,63 +294,58 @@
 			</button>
 			<Tooltip triggeredBy="#restart">Restart (useful to change secrets)</Tooltip>
 
-			<form on:submit|preventDefault={() => handleDeploySubmit(true)}>
-				<button
-					id="forceredeploy"
-					type="submit"
-					disabled={!$isDeploymentEnabled}
-					class="icons bg-transparent "
+			<button
+				id="forceredeploy"
+				disabled={!$isDeploymentEnabled}
+				class="icons bg-transparent "
+				on:click={() => handleDeploySubmit(true)}
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="w-6 h-6"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
 				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<path
-							d="M16.3 5h.7a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h5l-2.82 -2.82m0 5.64l2.82 -2.82"
-							transform="rotate(-45 12 12)"
-						/>
-					</svg>
-					
-				</button>
-				<Tooltip triggeredBy="#forceredeploy">Force redeploy (without cache)</Tooltip>
-			</form>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<path
+						d="M16.3 5h.7a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h5l-2.82 -2.82m0 5.64l2.82 -2.82"
+						transform="rotate(-45 12 12)"
+					/>
+				</svg>
+			</button>
+			<Tooltip triggeredBy="#forceredeploy">Force Redeploy (without cache)</Tooltip>
 		{:else}
-			<form on:submit|preventDefault={() => handleDeploySubmit(false)}>
-				<button
-					type="submit"
-					disabled={!$isDeploymentEnabled}
-					class="btn bg-success"
+			<button
+				class="icons bg-applications hover:bg-green-500 flex items-center font-bold"
+				disabled={!$isDeploymentEnabled}
+				on:click={() => handleDeploySubmit(false)}
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="w-6 h-6 mr-2"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
 				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6 mr-4"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<path d="M7 4v16l13 -8z" />
-					</svg>
-					Build & Deploy
-				</button>
-			</form>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<path d="M7 4v16l13 -8z" />
+				</svg>
+				Build & Deploy
+			</button>
 		{/if}
 
 		{#if $location && $status.application.isRunning}
-			<a href={$location} target="_blank" class="btn text-sm btn-primary"
+			<a id="openApplication" href={$location} target="_blank" class="icons bg-transparent "
 				><svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="h-6 w-6 mr-2"
+					class="h-6 w-6"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
@@ -353,16 +357,17 @@
 					<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
 					<line x1="10" y1="14" x2="20" y2="4" />
 					<polyline points="15 4 20 4 20 9" />
-				</svg>Open</a
+				</svg></a
 			>
+			<Tooltip triggeredBy="#openApplication">Open Application</Tooltip>
 		{/if}
 	</div>
 </div>
-<div class="mx-auto max-w-screen-2xl px-6 grid grid-cols-1 lg:grid-cols-4">
+<div class="mx-auto max-w-screen-2xl px-0 lg:px-2 grid grid-cols-1 lg:grid-cols-4">
 	<nav class="header flex flex-col lg:pt-0 ">
 		<Menu {application} />
 	</nav>
-	<div class="pt-0 px-5 col-span-0 lg:col-span-3 pb-24">
+	<div class="pt-0 col-span-0 lg:col-span-3 pb-24">
 		<slot />
 	</div>
 </div>

@@ -60,12 +60,9 @@
 </script>
 
 <div class="w-full font-bold grid gap-2">
-	<div class="flex flex-col">
-		<label for="name" class="pb-2 uppercase">{!isNew ? 'name' : ''}</label>
-		{#if isNew}
-			<div class="lg:hidden block pt-10 pb-2 uppercase">New Persistent Storage</div>
-		{/if}
-		<div class="flex  flex-col lg:flex-row lg:space-y-0 space-y-2">
+	<div class="flex flex-col pb-2">
+		
+		<div class="flex flex-col lg:flex-row lg:space-y-0 space-y-2">
 			<input
 				class="w-full lg:w-64"
 				bind:value={storage.path}

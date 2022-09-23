@@ -114,12 +114,14 @@
 		</div>
 	</div>
 </div>
-<div class="block flex-col justify-start space-x-2 flex flex-col-reverse lg:flex-row">
+<div class="block flex-col justify-start space-x-5 flex flex-col-reverse lg:flex-row">
 	<div class="flex-1 md:w-96">
 		{#if $selectedBuildId}
 			{#key $selectedBuildId}
 				<svelte:component this={BuildLog} />
 			{/key}
+		{:else}
+			Select a build to see the logs.
 		{/if}
 	</div>
 	<div class="mb-4 min-w-[16rem] space-y-2 md:mb-0 ">
@@ -141,10 +143,10 @@
 					on:click={() => loadBuild(build.id)}
 					class:rounded-tr={index === 0}
 					class:rounded-br={index === builds.length - 1}
-					class="flex cursor-pointer items-center justify-center py-4 no-underline transition-all duration-100 hover:bg-coolgray-300 hover:shadow-xl"
+					class="flex cursor-pointer items-center justify-center py-4 no-underline transition-all duration-150 hover:bg-coolgray-300 hover:shadow-xl"
 					class:bg-coolgray-200={$selectedBuildId === build.id}
 				>
-					<div class="flex-col px-2 text-center min-w-[10rem]">
+					<div class="flex-col px-2 text-center min-w-[6rem]">
 						<div class="text-sm font-bold">
 							{build.branch || application.branch}
 						</div>
@@ -160,7 +162,7 @@
 						</div>
 					</div>
 
-					<div class="w-48 text-center text-xs">
+					<div class="w-32 text-center text-xs">
 						{#if build.status === 'running'}
 							<div>
 								<span class="font-bold text-xl">{build.elapsed}s</span>

@@ -20,12 +20,16 @@
 
 <script lang="ts">
 	export let secrets: any;
-		import pLimit from 'p-limit';
+	export let previewSecrets: any;
+	import pLimit from 'p-limit';
 	import { page } from '$app/stores';
-	import { get } from '$lib/api';
-	import { saveSecret } from './utils';
+	import { get, post, put } from '$lib/api';
 	import { addToast } from '$lib/store';
 	import Secret from './_Secret.svelte';
+	import PreviewSecret from './_PreviewSecret.svelte';
+	import { errorNotification } from '$lib/common';
+	import { t } from '$lib/translations';
+	import Explainer from '$lib/components/Explainer.svelte';
 
 	const limit = pLimit(1);
 	const { id } = $page.params;
@@ -33,6 +37,7 @@
 	let batchSecrets = '';
 	async function refreshSecrets() {
 		const data = await get(`/applications/${id}/secrets`);
+		previewSecrets = [...data.previewSecrets];
 		secrets = [...data.secrets];
 	}
 	async function getValues() {
@@ -47,13 +52,37 @@
 				return {
 					name,
 					value: cleanValue,
-					isNew: !secrets.find((secret: any) => name === secret.name)
+					createSecret: !secrets.find((secret: any) => name === secret.name)
 				};
 			});
 
 		await Promise.all(
-			batchSecretsPairs.map(({ name, value, isNew }) =>
-				limit(() => saveSecret({ name, value, applicationId: id, isNew }))
+			batchSecretsPairs.map(({ name, value, createSecret }) =>
+				limit(async () => {
+					try {
+						if (createSecret) {
+							await post(`/applications/${id}/secrets`, {
+								name,
+								value
+							});
+							addToast({
+								message: 'Secret created.',
+								type: 'success'
+							});
+						} else {
+							await put(`/applications/${id}/secrets`, {
+								name,
+								value
+							});
+							addToast({
+								message: 'Secret updated.',
+								type: 'success'
+							});
+						}
+					} catch (error) {
+						return errorNotification(error);
+					}
+				})
 			)
 		);
 		batchSecrets = '';
@@ -69,9 +98,10 @@
 	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
 		<div class="title font-bold pb-3">Secrets</div>
 	</div>
-	{#each secrets as secret}
+	{#each secrets as secret, index}
 		{#key secret.id}
 			<Secret
+				{index}
 				length={secrets.length}
 				name={secret.name}
 				value={secret.value}
@@ -80,16 +110,44 @@
 			/>
 		{/key}
 	{/each}
-	<Secret isNewSecret on:refresh={refreshSecrets} />
-
+	<div class="lg:pt-0 pt-10">
+		<Secret on:refresh={refreshSecrets} length={secrets.length} isNewSecret />
+	</div>
+	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
+		<div class="title font-bold pb-3 pt-8">
+			Preview Secrets <Explainer
+				explanation="These values overwrite application secrets in PR/MR deployments. <br>Useful for creating <span class='text-green-500 font-bold'>staging</span> environments."
+			/>
+		</div>
+	</div>
+	{#if previewSecrets.length !== 0}
+		{#each previewSecrets as secret, index}
+			{#key index}
+				<PreviewSecret
+					{index}
+					length={secrets.length}
+					name={secret.name}
+					value={secret.value}
+					isBuildSecret={secret.isBuildSecret}
+					on:refresh={refreshSecrets}
+				/>
+			{/key}
+		{/each}
+	{:else}
+		Add secrets first to see Preview Secrets.
+	{/if}
 </div>
 <form on:submit|preventDefault={getValues} class="mb-12 w-full">
 	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2 pt-10">
 		<div class="flex flex-row space-x-2">
 			<div class="title font-bold pb-3 ">Paste <code>.env</code> file</div>
-			<button class="btn btn-sm bg-primary" type="submit">Add Secrets in Batch</button>
+			<button type="submit" class="btn btn-sm bg-primary">Add Secrets in Batch</button>
 		</div>
 	</div>
 
-	<textarea placeholder={`PORT=1337\nPASSWORD=supersecret`} bind:value={batchSecrets} class="mb-2 min-h-[200px] w-full" />
+	<textarea
+		placeholder={`PORT=1337\nPASSWORD=supersecret`}
+		bind:value={batchSecrets}
+		class="mb-2 min-h-[200px] w-full"
+	/>
 </form>

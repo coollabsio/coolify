@@ -72,7 +72,7 @@
 			on:click={() => deleteApplication(application.name, false)}
 			type="submit"
 			disabled={!$appSession.isAdmin}
-			class="btn btn-sm btn-error text-sm"
+			class="btn btn-lg btn-error hover:bg-red-700 text-sm"
 		>
 			Delete Application
 		</button>

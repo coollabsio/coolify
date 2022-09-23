@@ -15,7 +15,7 @@
 	export let placeholder = '';
 	export let inputStyle = '';
 
-	let disabledClass = 'bg-coolback disabled:bg-coolblack lg:w-64 w-full';
+	let disabledClass = 'bg-coolback disabled:bg-coolblack  w-full';
 	let isHttps = browser && window.location.protocol === 'https:';
 
 	function copyToClipboard() {

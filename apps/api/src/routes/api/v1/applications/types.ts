@@ -65,7 +65,7 @@ export interface SaveSecret extends OnlyId {
         name: string,
         value: string,
         isBuildSecret: boolean,
-        isPRMRSecret: boolean,
+        previewSecret: boolean,
         isNew: boolean
     }
 }
