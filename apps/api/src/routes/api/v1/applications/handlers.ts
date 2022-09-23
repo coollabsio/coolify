@@ -321,17 +321,12 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
 export async function saveApplicationSettings(request: FastifyRequest<SaveApplicationSettings>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        const { debug, previews, dualCerts, autodeploy, branch, projectId, isBot, isDBBranching } = request.body
-        // const isDouble = await checkDoubleBranch(branch, projectId);
-        // if (isDouble && autodeploy) {
-        //     await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false } })
-        //     throw { status: 500, message: 'Cannot activate automatic deployments until only one application is defined for this repository / branch.' }
-        // }
+        const { debug, previews, dualCerts, autodeploy, branch, projectId, isBot, isDBBranching, isCustomSSL } = request.body
         await prisma.application.update({
             where: { id },
-            data: { fqdn: isBot ? null : undefined, settings: { update: { debug, previews, dualCerts, autodeploy, isBot, isDBBranching } } },
+            data: { fqdn: isBot ? null : undefined, settings: { update: { debug, previews, dualCerts, autodeploy, isBot, isDBBranching, isCustomSSL } } },
             include: { destinationDocker: true }
-        });
+        }); 
         return reply.code(201).send();
     } catch ({ status, message }) {
         return errorHandler({ status, message })

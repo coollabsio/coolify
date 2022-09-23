@@ -41,7 +41,7 @@
 		}
 	}
 	async function deleteCertificate(id: string) {
-		const sure = confirm('Are you sure you would like to delete this SSH key?');
+		const sure = confirm('Are you sure you would like to delete this SSL Certificate?');
 		if (sure) {
 			try {
 				if (!id) return;
@@ -89,7 +89,7 @@
 			<div class="text-sm">No SSL Certificate found</div>
 		{/if}
 	</div>
-		
+
 {#if isModalActive}
 	<input type="checkbox" id="my-modal" class="modal-toggle" />
 	<div class="modal modal-bottom sm:modal-middle ">

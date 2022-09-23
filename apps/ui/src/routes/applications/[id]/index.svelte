@@ -61,12 +61,14 @@
 	let debug = application.settings.debug;
 	let previews = application.settings.previews;
 	let dualCerts = application.settings.dualCerts;
+	let isCustomSSL = application.settings.isCustomSSL;
 	let autodeploy = application.settings.autodeploy;
 	let isBot = application.settings.isBot;
 	let isDBBranching = application.settings.isDBBranching;
 
 	let baseDatabaseBranch: any = application?.connectedDatabase?.hostedDatabaseDBName || null;
 	let nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
+	let isHttps = application.fqdn && application.fqdn.startsWith('https://');
 	let isNonWWWDomainOK = false;
 	let isWWWDomainOK = false;
 
@@ -92,7 +94,7 @@
 		if (window.location.hostname === 'demo.coolify.io' && !application.fqdn) {
 			application.fqdn = `http://${cuid()}.demo.coolify.io`;
 			await handleSubmit();
-		}	
+		}
 		await getBaseBuildImages();
 	});
 	async function getBaseBuildImages() {
@@ -141,6 +143,9 @@
 		if (name === 'autodeploy') {
 			autodeploy = !autodeploy;
 		}
+		if (name === 'isCustomSSL') {
+			isCustomSSL = !isCustomSSL;
+		}
 		if (name === 'isBot') {
 			if ($status.application.isRunning) return;
 			isBot = !isBot;
@@ -159,6 +164,7 @@
 				isBot,
 				autodeploy,
 				isDBBranching,
+				isCustomSSL,
 				branch: application.branch,
 				projectId: application.projectId
 			});
@@ -184,6 +190,9 @@
 			}
 			if (name === 'isDBBranching') {
 				isDBBranching = !isDBBranching;
+			}
+			if (name === 'isCustomSSL') {
+				isCustomSSL = !isCustomSSL;
 			}
 			return errorNotification(error);
 		} finally {
@@ -214,6 +223,11 @@
 				message: 'Configuration saved.',
 				type: 'success'
 			});
+			if (application.fqdn && application.fqdn.startsWith('https')) {
+				isHttps = true;
+			} else {
+				isHttps = false;
+			}
 		} catch (error) {
 			//@ts-ignore
 			if (error?.message.startsWith($t('application.dns_not_set_partial_error'))) {
@@ -548,6 +562,18 @@
 							on:click={() => !$status.application.isRunning && changeSettings('dualCerts')}
 						/>
 					</div>
+					{#if isHttps}
+						<div class="grid grid-cols-2 items-center pb-4">
+							<Setting
+								id="isCustomSSL"
+								isCenter={false}
+								bind:setting={isCustomSSL}
+								title="Use Custom SSL Certificate"
+								description="Use Custom SSL Certificated added in the Settings/SSL Certificates section. <br><br>By default, the SSL certificate is generated automatically through Let's Encrypt"
+								on:click={() => changeSettings('isCustomSSL')}
+							/>
+						</div>
+					{/if}
 				{/if}
 				{#if application.buildPack === 'python'}
 					<div class="grid grid-cols-2 items-center">

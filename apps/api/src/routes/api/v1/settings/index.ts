@@ -45,6 +45,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 				}
 			}
 			await prisma.certificate.create({ data: { cert, key: encrypt(key), team: { connect: { id: teamId } } } })
+			await prisma.applicationSettings.updateMany({ where: { application: { AND: [{ fqdn: { endsWith: cn } }, { fqdn: { startsWith: 'https' } }] } }, data: { isCustomSSL: true } })
 			return { message: 'Certificated uploaded' }
 		} catch ({ status, message }) {
 			return errorHandler({ status, message });
