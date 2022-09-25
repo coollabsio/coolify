@@ -753,7 +753,7 @@
 						/>
 					</div>
 				{/if}
-				{#if application.buildPack !== 'laravel' && application.buildPack !== 'heroku'}
+				{#if application.buildPack !== 'laravel'}
 					<div class="grid grid-cols-2 items-center">
 						<div class="flex-col">
 							<label for="baseDirectory"
