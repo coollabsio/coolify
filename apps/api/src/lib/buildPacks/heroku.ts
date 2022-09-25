@@ -5,34 +5,13 @@ export default async function (data: any): Promise<void> {
     const { buildId, applicationId, tag, dockerId, debug, workdir, baseDirectory } = data
     try {
         await saveBuildLog({ line: `Building image started.`, buildId, applicationId });
-        const { stdout } = await executeDockerCmd({
+        await executeDockerCmd({
+            debug,
             dockerId,
             command: `pack build -p ${workdir}${baseDirectory} ${applicationId}:${tag} --builder heroku/buildpacks:20`
         })
-        if (debug) {
-            const array = stdout.split('\n')
-            for (const line of array) {
-                if (line !== '\n') {
-                    await saveBuildLog({
-                        line: `${line.replace('\n', '')}`,
-                        buildId,
-                        applicationId
-                    });
-                }
-            }
-        }
         await saveBuildLog({ line: `Building image successful.`, buildId, applicationId });
     } catch (error) {
-        const array = error.stdout.split('\n')
-        for (const line of array) {
-            if (line !== '\n') {
-                await saveBuildLog({
-                    line: `${line.replace('\n', '')}`,
-                    buildId,
-                    applicationId
-                });
-            }
-        }
         throw error;
     }
 }
