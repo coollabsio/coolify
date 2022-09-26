@@ -15,7 +15,6 @@ import { checkContainer, formatLabelsOnDocker, isContainerExited, removeContaine
 import type { FastifyRequest } from 'fastify';
 import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain, StopPreviewApplication, RestartPreviewApplication, GetBuilds } from './types';
 import { OnlyId } from '../../../../types';
-import path from 'node:path';
 
 function filterObject(obj, callback) {
     return Object.fromEntries(Object.entries(obj).
@@ -326,7 +325,7 @@ export async function saveApplicationSettings(request: FastifyRequest<SaveApplic
             where: { id },
             data: { fqdn: isBot ? null : undefined, settings: { update: { debug, previews, dualCerts, autodeploy, isBot, isDBBranching, isCustomSSL } } },
             include: { destinationDocker: true }
-        }); 
+        });
         return reply.code(201).send();
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -817,10 +816,15 @@ export async function getSecrets(request: FastifyRequest<OnlyId>) {
 export async function updatePreviewSecret(request: FastifyRequest<SaveSecret>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        const { name, value } = request.body
+        let { name, value } = request.body
+        if (value) {
+            value = encrypt(value.trim())
+        } else {
+            value = ''
+        }
         await prisma.secret.updateMany({
             where: { applicationId: id, name, isPRMRSecret: true },
-            data: { value: encrypt(value.trim()) }
+            data: { value }
         });
         return reply.code(201).send()
     } catch ({ status, message }) {

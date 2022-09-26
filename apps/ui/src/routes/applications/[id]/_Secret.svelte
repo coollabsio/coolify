@@ -39,8 +39,8 @@
 
 	async function addNewSecret() {
 		try {
-			if (!name) return errorNotification(`${t.get('forms.name')} ${t.get('forms.is_required')}`);
-			if (!value) return errorNotification(`${t.get('forms.value')} ${t.get('forms.is_required')}`);
+			if (!name) return errorNotification({ message: 'Name is required.' });
+			if (!value) return errorNotification({ message: 'Value is required.' });
 			await post(`/applications/${id}/secrets`, {
 				name,
 				value,
@@ -61,7 +61,7 @@
 		changeIsBuildSecret = false
 	}: { changeIsBuildSecret?: boolean } = {}) {
 		if (changeIsBuildSecret) isBuildSecret = !isBuildSecret;
-		if (isNewSecret) return
+		if (isNewSecret) return;
 		try {
 			await put(`/applications/${id}/secrets`, {
 				name,
