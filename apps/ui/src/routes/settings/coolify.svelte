@@ -216,7 +216,7 @@
 				>
 
 				{#if isFqdnSet}
-					<button on:click|preventDefault={removeFqdn} disabled={loading.remove} class="btn"
+					<button on:click|preventDefault={removeFqdn} disabled={loading.remove} class="btn btn-sm"
 						>{loading.remove ? $t('forms.removing') : $t('forms.remove_domain')}</button
 					>
 				{/if}
