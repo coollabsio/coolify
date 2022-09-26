@@ -87,7 +87,7 @@
 		}
 	];
 	function containerClass() {
-		return 'text-white bg-transparent font-thin px-0 w-full border border-dashed border-coolgray-200 bg-transparent';
+		return 'text-white bg-transparent font-thin px-0 w-full border border-dashed border-coolgray-200';
 	}
 
 	onMount(async () => {
@@ -96,7 +96,7 @@
 			await handleSubmit();
 		}
 		await getBaseBuildImages();
-		if (!application.fqdn && fqdnEl) fqdnEl.focus()
+		if (!application.fqdn && fqdnEl) fqdnEl.focus();
 	});
 	async function getBaseBuildImages() {
 		const data = await post(`/applications/images`, {
@@ -401,7 +401,7 @@
 								disabled={isDisabled}
 								name="fqdn"
 								id="fqdn"
-								class:border={!application.settings.isBot&& !application.fqdn}
+								class:border={!application.settings.isBot && !application.fqdn}
 								class:border-red-500={!application.settings.isBot && !application.fqdn}
 								bind:value={application.fqdn}
 								pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
@@ -579,7 +579,6 @@
 					{/if}
 				{/if}
 
-				
 				{#if application.buildPack === 'python'}
 					<div class="grid grid-cols-2 items-center">
 						<label for="pythonModule">WSGI / ASGI</label>
@@ -601,6 +600,7 @@
 							name="pythonModule"
 							id="pythonModule"
 							required
+							class="w-full"
 							bind:value={application.pythonModule}
 							placeholder={application.pythonWSGI?.toLowerCase() !== 'none' ? 'main' : 'main.py'}
 						/>
@@ -614,6 +614,7 @@
 								name="pythonVariable"
 								id="pythonVariable"
 								required
+								class="w-full"
 								bind:value={application.pythonVariable}
 								placeholder="default: app"
 							/>
@@ -628,6 +629,7 @@
 								name="pythonVariable"
 								id="pythonVariable"
 								required
+								class="w-full"
 								bind:value={application.pythonVariable}
 								placeholder="default: app"
 							/>
@@ -635,7 +637,7 @@
 					{/if}
 				{/if}
 				{#if !staticDeployments.includes(application.buildPack)}
-					<div class="grid grid-cols-2 items-center">
+					<div class="grid grid-cols-2 items-center pt-4">
 						<label for="port"
 							>{$t('forms.port')}
 							<Explainer explanation={'The port your application listens on.'} /></label
@@ -651,7 +653,7 @@
 						/>
 					</div>
 				{/if}
-				<div class="grid grid-cols-2 items-center py-4">
+				<div class="grid grid-cols-2 items-center pb-4">
 					<label for="exposePort"
 						>Exposed Port <Explainer
 							explanation={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
