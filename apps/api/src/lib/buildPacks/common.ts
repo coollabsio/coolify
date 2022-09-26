@@ -342,6 +342,7 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 	}
 	if (buildPack === 'laravel') {
 		payload.baseImage = 'webdevops/php-apache:8.2-alpine';
+		payload.baseImages = phpVersions;
 		payload.baseBuildImage = 'node:18';
 		payload.baseBuildImages = nodeVersions;
 	}
