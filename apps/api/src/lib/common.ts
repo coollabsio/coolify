@@ -531,6 +531,7 @@ export async function createRemoteEngineConfiguration(id: string) {
 	if (!foundWildcard) {
 		config.append({
 			Host: '*',
+			StrictHostKeyChecking: 'no',
 			ControlMaster: 'auto',
 			ControlPath: `${homedir}/.ssh/coolify-%r@%h:%p`,
 		})

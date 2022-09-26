@@ -53,56 +53,61 @@ async function checkFluentBit() {
         }
     }
 }
+async function copyRemoteCertificates(certificate: any, dockerId: string, remoteIpAddress: string) {
+    try {
+        const { id, key, cert } = certificate
+        const decryptedKey = decrypt(key)
+        await fs.writeFile(`/tmp/${id}-key.pem`, decryptedKey)
+        await fs.writeFile(`/tmp/${id}-cert.pem`, cert)
+        await asyncExecShell(`scp /tmp/${id}-cert.pem /tmp/${id}-key.pem ${remoteIpAddress}:/tmp/`)
+        await executeSSHCmd({ dockerId, command: `docker exec coolify-proxy sh -c 'test -d /etc/traefik/acme/custom/ || mkdir -p /etc/traefik/acme/custom/'` })
+        await executeSSHCmd({ dockerId, command: `docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/` })
+        await executeSSHCmd({ dockerId, command: `docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/` })
+
+    } catch (error) {
+        console.log('Error copying SSL certificates to remote engine', error)
+    }
+}
+async function copyLocalCertificates(certificate: any) {
+    try {
+        const { id, key, cert } = certificate
+        const decryptedKey = decrypt(key)
+        await asyncExecShell(`docker exec coolify-proxy sh -c 'test -d /etc/traefik/acme/custom/ || mkdir -p /etc/traefik/acme/custom/'`)
+        await fs.writeFile(`/tmp/${id}-key.pem`, decryptedKey)
+        await fs.writeFile(`/tmp/${id}-cert.pem`, cert)
+        await asyncExecShell(`docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/`)
+        await asyncExecShell(`docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/`)
+    } catch (error) {
+        console.log('Error copying SSL certificates to remote engine', error)
+    }
+}
 async function copySSLCertificates() {
     try {
         const certificates = await prisma.certificate.findMany({ include: { team: true } })
         const teamIds = certificates.map(c => c.teamId)
         const destinations = await prisma.destinationDocker.findMany({ where: { isCoolifyProxyUsed: true, teams: { some: { id: { in: [...teamIds] } } } } })
+        let promises = []
         for (const destination of destinations) {
             if (destination.remoteEngine) {
-
                 const { id: dockerId, remoteIpAddress, remoteVerified } = destination
                 if (!remoteVerified) {
                     continue;
                 }
                 for (const certificate of certificates) {
-                    try {
-                        const { id, key, cert } = certificate
-                        const decryptedKey = decrypt(key)
-                        await fs.writeFile(`/tmp/${id}-key.pem`, decryptedKey)
-                        await fs.writeFile(`/tmp/${id}-cert.pem`, cert)
-                        await asyncExecShell(`scp /tmp/${id}-cert.pem /tmp/${id}-key.pem ${remoteIpAddress}:/tmp/`)
-                        await fs.rm(`/tmp/${id}-key.pem`)
-                        await fs.rm(`/tmp/${id}-cert.pem`)
-                        await executeSSHCmd({ dockerId, command: `docker exec coolify-proxy sh -c 'test -d /etc/traefik/acme/custom/ || mkdir -p /etc/traefik/acme/custom/'` })
-                        await executeSSHCmd({ dockerId, command: `docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/ && rm /tmp/${id}-key.pem` })
-                        await executeSSHCmd({ dockerId, command: `docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/ && rm /tmp/${id}-cert.pem` })
-                    } catch (error) {
-                        console.log('Error copying SSL certificates to remote engine', error)
-                    }
+                    promises.push(copyRemoteCertificates(certificate, dockerId, remoteIpAddress))
                 }
-
             } else {
-
                 for (const certificate of certificates) {
-                    try {
-                        const { id, key, cert } = certificate
-                        const decryptedKey = decrypt(key)
-                        await asyncExecShell(`docker exec coolify-proxy sh -c 'test -d /etc/traefik/acme/custom/ || mkdir -p /etc/traefik/acme/custom/'`)
-                        await fs.writeFile(`/tmp/${id}-key.pem`, decryptedKey)
-                        await fs.writeFile(`/tmp/${id}-cert.pem`, cert)
-                        await asyncExecShell(`docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/`)
-                        await asyncExecShell(`docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/`)
-                        await fs.rm(`/tmp/${id}-key.pem`)
-                        await fs.rm(`/tmp/${id}-cert.pem`)
-                    } catch (error) {
-                        console.log('Error copying SSL certificates to remote engine', error)
-                    }
+                    promises.push(copyLocalCertificates(certificate))
                 }
             }
         }
+        await Promise.all(promises)
+
     } catch (error) {
         console.log('Error copying SSL certificates', error)
+    } finally {
+        await asyncExecShell(`find /tmp/ -maxdepth 1 -type f -name '*-*.pem' -delete`)
     }
 }
 async function checkProxies() {
