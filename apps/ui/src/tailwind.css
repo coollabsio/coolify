@@ -207,3 +207,7 @@ a {
 .burger {
 	@apply block m-[2px] h-[3px] w-5 rounded
 }
+
+.bg-coollabs-gradient {
+	@apply bg-gradient-to-r from-purple-500 via-pink-500 to-red-500;
+}

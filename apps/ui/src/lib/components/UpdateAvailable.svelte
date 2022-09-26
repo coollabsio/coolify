@@ -86,7 +86,7 @@
 				id="update"
 				disabled={updateStatus.success === false}
 				on:click={update}
-				class="icons bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white duration-75 hover:scale-105  w-full"
+				class="icons bg-coollabs-gradient text-white duration-75 hover:scale-105  w-full"
 			>
 				{#if updateStatus.loading}
 					<svg

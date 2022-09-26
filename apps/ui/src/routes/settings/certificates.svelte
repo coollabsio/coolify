@@ -57,7 +57,7 @@
 
 	<div class="mx-auto w-full">
 		<div class="flex border-b border-coolgray-500 mb-6">
-			<div class="title font-bold pb-3 pr-4">SSL Certificates</div>
+			<div class="title font-bold pb-3 pr-4">SSL Certificates <span class="badge rounded bg-coollabs-gradient text-white">BETA</span></div>
 			<label for="my-modal" class="btn btn-sm btn-primary" on:click={() => (isModalActive = true)}
 				>Add SSL Certificate</label
 			>

@@ -332,11 +332,7 @@
 						/>
 					</div>
 
-					<input
-						class="w-full "
-						placeholder="1.1.1.1,8.8.8.8"
-						bind:value={DNSServers}
-					/>
+					<input class="w-full " placeholder="1.1.1.1,8.8.8.8" bind:value={DNSServers} />
 				</div>
 
 				<div class="grid grid-cols-2 items-center">
@@ -357,17 +353,15 @@
 						on:click={() => changeSettings('isAPIDebuggingEnabled')}
 					/>
 				</div>
-				{#if browser && $features.beta}
-					<div class="grid grid-cols-2 items-center">
-						<Setting
-							id="isAutoUpdateEnabled"
-							bind:setting={isAutoUpdateEnabled}
-							title={$t('setting.auto_update_enabled')}
-							description={$t('setting.auto_update_enabled_explainer')}
-							on:click={() => changeSettings('isAutoUpdateEnabled')}
-						/>
-					</div>
-				{/if}
+				<div class="grid grid-cols-2 items-center">
+					<Setting
+						id="isAutoUpdateEnabled"
+						bind:setting={isAutoUpdateEnabled}
+						title={$t('setting.auto_update_enabled')}
+						description={$t('setting.auto_update_enabled_explainer')}
+						on:click={() => changeSettings('isAutoUpdateEnabled')}
+					/>
+				</div>
 			</div>
 		</div>
 	</form>
