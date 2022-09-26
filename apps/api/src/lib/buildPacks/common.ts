@@ -586,9 +586,9 @@ export async function buildImage({
 	} else {
 		await saveBuildLog({ line: `Building image started.`, buildId, applicationId });
 	}
-	if (!debug && isCache) {
+	if (!debug) {
 		await saveBuildLog({
-			line: `Debug turned off. To see more details, allow it in the configuration.`,
+			line: `Debug turned off. To see more details, allow it in the features tab.`,
 			buildId,
 			applicationId
 		});

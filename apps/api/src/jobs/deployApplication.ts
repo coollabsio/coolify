@@ -211,7 +211,6 @@ import * as buildpacks from '../lib/buildPacks';
 										//
 									}
 									await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId, baseImage);
-
 									if (forceRebuild) deployNeeded = true
 									if (!imageFound || deployNeeded) {
 										// if (true) {
