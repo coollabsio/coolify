@@ -383,7 +383,7 @@ export const setDefaultConfiguration = async (data: any) => {
 	if (!publishDirectory) publishDirectory = template?.publishDirectory || null;
 	if (baseDirectory) {
 		if (!baseDirectory.startsWith('/')) baseDirectory = `/${baseDirectory}`;
-		if (!baseDirectory.endsWith('/')) baseDirectory = `${baseDirectory}/`;
+		if (baseDirectory.endsWith('/') && baseDirectory !== '/') baseDirectory = baseDirectory.slice(0, -1);
 	}
 	if (dockerFileLocation) {
 		if (!dockerFileLocation.startsWith('/')) dockerFileLocation = `/${dockerFileLocation}`;
