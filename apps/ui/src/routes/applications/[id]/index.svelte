@@ -266,7 +266,6 @@
 		await getBaseBuildImages();
 		await handleSubmit();
 	}
-
 	async function isDNSValid(domain: any, isWWW: any) {
 		try {
 			await get(`/applications/${id}/check?domain=${domain}`);
@@ -707,24 +706,6 @@
 						/>
 					</div>
 				{/if}
-				{#if application.buildPack === 'docker'}
-					<div class="grid grid-cols-2 items-center pt-4">
-						<label for="dockerFileLocation"
-							>Dockerfile Location <Explainer
-								explanation={"Should be absolute path, like <span class='text-settings font-bold'>/data/Dockerfile</span> or <span class='text-settings font-bold'>/Dockerfile.</span>"}
-							/></label
-						>
-						<input
-							class="w-full"
-							disabled={isDisabled}
-							readonly={!$appSession.isAdmin}
-							name="dockerFileLocation"
-							id="dockerFileLocation"
-							bind:value={application.dockerFileLocation}
-							placeholder="default: /Dockerfile"
-						/>
-					</div>
-				{/if}
 				{#if application.buildPack === 'deno'}
 					<div class="grid grid-cols-2 items-center">
 						<label for="denoMainFile">Main File</label>
@@ -774,6 +755,31 @@
 							bind:value={application.baseDirectory}
 							placeholder="{$t('forms.default')}: /"
 						/>
+					</div>
+				{/if}
+				{#if application.buildPack === 'docker'}
+					<div class="grid grid-cols-2 items-center pb-4">
+						<label for="dockerFileLocation"
+						class="mb-10"
+							>Dockerfile Location <Explainer
+								explanation={"Should be absolute path, like <span class='text-settings font-bold'>/data/Dockerfile</span> or <span class='text-settings font-bold'>/Dockerfile.</span>"}
+							/></label
+						>
+						<div class="form-control w-full">
+							<input
+							class="w-full input"
+							disabled={isDisabled}
+							readonly={!$appSession.isAdmin}
+							name="dockerFileLocation"
+							id="dockerFileLocation"
+							bind:value={application.dockerFileLocation}
+							placeholder="default: /Dockerfile"
+						/>
+							<label class="label">
+							  <span class="label-text-alt text-xs">Path: {application.baseDirectory.replace(/^\/$/,'')}{application.dockerFileLocation}</span>
+							</label>
+						  </div>
+						
 					</div>
 				{/if}
 				{#if !notNodeDeployments.includes(application.buildPack)}

@@ -607,30 +607,6 @@ export async function buildImage({
 	}
 }
 
-export async function streamEvents({ stream, docker, buildId, applicationId, debug }) {
-	await new Promise((resolve, reject) => {
-		docker.engine.modem.followProgress(stream, onFinished, onProgress);
-		function onFinished(err, res) {
-			if (err) reject(err);
-			resolve(res);
-		}
-		async function onProgress(event) {
-			if (event.error) {
-				reject(event.error);
-			} else if (event.stream) {
-				if (event.stream !== '\n') {
-					if (debug)
-						await saveBuildLog({
-							line: `${event.stream.replace('\n', '')}`,
-							buildId,
-							applicationId
-						});
-				}
-			}
-		}
-	});
-}
-
 export function makeLabelForStandaloneApplication({
 	applicationId,
 	fqdn,
