@@ -40,9 +40,13 @@
 <form on:submit|preventDefault={() => handleSubmit(buildPack.name)}>
 	<button
 		type="submit"
-		class="box-selection relative flex text-xl font-bold {buildPack.hoverColor} {foundConfig?.name ===
+		class="box-selection relative flex flex-col items-center text-xl font-bold {buildPack.hoverColor} {foundConfig?.name ===
 			buildPack.name && buildPack.color}"
-		><span>{buildPack.fancyName}</span>
+	>
+		<div>{buildPack.fancyName}</div>
+		{#if buildPack.base}
+			<div class="text-xs font-mono">{buildPack.base}</div>
+		{/if}
 		{#if !scanning && foundConfig?.name === buildPack.name}
 			<span class="absolute bottom-0 pb-2 text-xs"
 				>{$t('application.configuration.buildpack.choose_this_one')}</span

@@ -143,7 +143,6 @@
 		}
 	}
 </script>
-
 {#if repositories.length === 0 && loading.repositories === false}
 	<div class="flex-col text-center">
 		<div class="pb-4">{$t('application.configuration.no_repositories_configured')}</div>
@@ -152,10 +151,9 @@
 		>
 	</div>
 {:else}
-	<form on:submit|preventDefault={handleSubmit} class="flex flex-col justify-center text-center">
-		<div class="flex-col space-y-3 md:space-y-0 space-x-1">
-			<div class="flex-row md:flex gap-4">
-				<div class="custom-select-wrapper">
+	<form on:submit|preventDefault={handleSubmit} class="px-10">
+		<div class="flex lg:flex-row flex-col lg:space-y-0 space-y-2 space-x-0 lg:space-x-2 items-center">
+				<div class="custom-select-wrapper w-1/2"><label for="repository" class="pb-1">Repository</label>
 					<Select
 						placeholder={loading.repositories
 							? $t('application.configuration.loading_repositories')
@@ -170,7 +168,7 @@
 					/>
 				</div>
 				<input class="hidden" bind:value={selected.projectId} name="projectId" />
-				<div class="custom-select-wrapper">
+				<div class="custom-select-wrapper w-1/2"><label for="repository" class="pb-1">Branch</label>
 					<Select
 						placeholder={loading.branches
 							? $t('application.configuration.loading_branches')
@@ -185,9 +183,7 @@
 						isDisabled={loading.branches || !selected.repository}
 						isClearable={false}
 					/>
-				</div>
-			</div>
-		</div>
+				</div></div>
 		<div class="pt-5 flex-col flex justify-center items-center space-y-4">
 			<button
 				class="btn btn-wide"

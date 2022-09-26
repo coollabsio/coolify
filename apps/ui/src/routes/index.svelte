@@ -28,11 +28,10 @@
 	export let destinations: any;
 
 	let filtered: any = setInitials();
-	import { get, post } from '$lib/api';
-	import Usage from '$lib/components/Usage.svelte';
+	import { get } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { asyncSleep, getRndInteger } from '$lib/common';
-	import { appSession, search, addToast} from '$lib/store';
+	import { appSession, search } from '$lib/store';
 
 	import ApplicationsIcons from '$lib/components/svg/applications/ApplicationIcons.svelte';
 	import DatabaseIcons from '$lib/components/svg/databases/DatabaseIcons.svelte';
@@ -43,6 +42,25 @@
 	let numberOfGetStatus = 0;
 	let status: any = {};
 	doSearch();
+
+	async function refreshStatusApplications() {
+		numberOfGetStatus = 0;
+		for (const application of applications) {
+			getStatus(application, true);
+		}
+	}
+	async function refreshStatusServices() {
+		numberOfGetStatus = 0;
+		for (const service of services) {
+			getStatus(service, true);
+		}
+	}
+	async function refreshStatusDatabases() {
+		numberOfGetStatus = 0;
+		for (const database of databases) {
+			getStatus(database, true);
+		}
+	}
 	function setInitials(onlyOthers: boolean = false) {
 		return {
 			applications:
@@ -88,12 +106,17 @@
 		filtered.otherDestinations = [];
 	}
 
-
-	async function getStatus(resources: any) {
-		const { id, buildPack, dualCerts } = resources;
-		if (status[id]) return status[id];
+	async function getStatus(resources: any, force: boolean = false) {
+		const { id, buildPack, dualCerts, type } = resources;
+		if (buildPack && applications.length > 10 && !force) {
+			return;
+		}
+		if (type && services.length > 10 && !force) {
+			return;
+		}
+		if (status[id] && !force) return status[id];
 		while (numberOfGetStatus > 1) {
-			await asyncSleep(getRndInteger(100, 200));
+			await asyncSleep(getRndInteger(100, 500));
 		}
 		try {
 			numberOfGetStatus++;
@@ -119,6 +142,7 @@
 			status[id] = 'error';
 			return 'error';
 		} finally {
+			status = { ...status };
 			numberOfGetStatus--;
 		}
 	}
@@ -161,6 +185,7 @@
 	}
 	function applicationFilters(application: any) {
 		return (
+			(application.id && application.id.toLowerCase().includes($search.toLowerCase())) ||
 			(application.name && application.name.toLowerCase().includes($search.toLowerCase())) ||
 			(application.fqdn && application.fqdn.toLowerCase().includes($search.toLowerCase())) ||
 			(application.repository &&
@@ -175,6 +200,7 @@
 	}
 	function databaseFilters(database: any) {
 		return (
+			(database.id && database.id.toLowerCase().includes($search.toLowerCase())) ||
 			(database.name && database.name.toLowerCase().includes($search.toLowerCase())) ||
 			(database.type && database.type.toLowerCase().includes($search.toLowerCase())) ||
 			(database.version && database.version.toLowerCase().includes($search.toLowerCase())) ||
@@ -184,6 +210,7 @@
 	}
 	function serviceFilters(service: any) {
 		return (
+			(service.id && service.id.toLowerCase().includes($search.toLowerCase())) ||
 			(service.name && service.name.toLowerCase().includes($search.toLowerCase())) ||
 			(service.type && service.type.toLowerCase().includes($search.toLowerCase())) ||
 			(service.fqdn && service.fqdn.toLowerCase().includes($search.toLowerCase())) ||
@@ -194,6 +221,7 @@
 	}
 	function gitSourceFilters(source: any) {
 		return (
+			(source.id && source.id.toLowerCase().includes($search.toLowerCase())) ||
 			(source.name && source.name.toLowerCase().includes($search.toLowerCase())) ||
 			(source.type && source.type.toLowerCase().includes($search.toLowerCase())) ||
 			(source.htmlUrl && source.htmlUrl.toLowerCase().includes($search.toLowerCase())) ||
@@ -202,6 +230,7 @@
 	}
 	function destinationFilters(destination: any) {
 		return (
+			(destination.id && destination.id.toLowerCase().includes($search.toLowerCase())) ||
 			(destination.name && destination.name.toLowerCase().includes($search.toLowerCase())) ||
 			(destination.type && destination.type.toLowerCase().includes($search.toLowerCase()))
 		);
@@ -271,20 +300,15 @@
 			filtered = setInitials();
 		}
 	}
-   
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">{$t('index.dashboard')}</div>
+<nav class="header">
+	<h1 class="mr-4 text-2xl font-bold">{$t('index.dashboard')}</h1>
 	{#if $appSession.isAdmin && (applications.length !== 0 || destinations.length !== 0 || databases.length !== 0 || services.length !== 0 || gitSources.length !== 0 || destinations.length !== 0)}
 		<NewResource />
 	{/if}
-    
-</div>
-<div class="container lg:mx-auto lg:p-0 px-8 p-5">
-	<!-- {#if $appSession.teamId === '0'}
-		<Usage />
-	{/if} -->
+</nav>
+<div class="container lg:mx-auto lg:p-0 px-8 pt-5">
 	{#if applications.length !== 0 || destinations.length !== 0 || databases.length !== 0 || services.length !== 0 || gitSources.length !== 0 || destinations.length !== 0}
 		<div class="form-control">
 			<div class="input-group flex w-full">
@@ -317,8 +341,8 @@
 					on:input={() => doSearch()}
 				/>
 			</div>
-			<label for="search" class="label w-full">
-				<span class="label-text text-xs flex flex-wrap gap-2  items-center">
+			<label for="search" class="label w-full mt-3">
+				<span class="label-text text-xs flex flex-wrap gap-2 items-center">
 					<button
 						class:bg-coollabs={$search === '!notmine'}
 						class="badge badge-lg text-white text-xs rounded"
@@ -375,7 +399,10 @@
 	{/if}
 	{#if (filtered.applications.length > 0 && applications.length > 0) || filtered.otherApplications.length > 0}
 		<div class="flex items-center mt-10">
-			<h1 class="title lg:text-3xl">Applications</h1>
+			<h1 class="title lg:text-3xl pr-4">Applications</h1>
+			<button class="btn btn-sm btn-primary" on:click={refreshStatusApplications}
+				>Refresh Status</button
+			>
 		</div>
 	{/if}
 	{#if filtered.applications.length > 0 && applications.length > 0}
@@ -386,11 +413,13 @@
 			{#if filtered.applications.length > 0}
 				{#each filtered.applications as application}
 					<a class="no-underline mb-5" href={`/applications/${application.id}`}>
-						<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-green-600 indicator">
+						<div
+							class="w-full rounded p-5 bg-coolgray-200 hover:bg-green-600 indicator duration-150"
+						>
 							{#await getStatus(application)}
 								<span class="indicator-item badge bg-yellow-500 badge-sm" />
-							{:then status}
-								{#if status === 'running'}
+							{:then}
+								{#if status[application.id] === 'running'}
 									<span class="indicator-item badge bg-success badge-sm" />
 								{:else}
 									<span class="indicator-item badge bg-error badge-sm" />
@@ -492,11 +521,11 @@
 		>
 			{#each filtered.otherApplications as application}
 				<a class="no-underline mb-5" href={`/applications/${application.id}`}>
-					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-green-600 indicator">
+					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-green-600 indicator duration-150">
 						{#await getStatus(application)}
 							<span class="indicator-item badge bg-yellow-500 badge-sm" />
-						{:then status}
-							{#if status === 'running'}
+						{:then}
+							{#if status[application.id] === 'running'}
 								<span class="indicator-item badge bg-success badge-sm" />
 							{:else}
 								<span class="indicator-item badge bg-error badge-sm" />
@@ -580,7 +609,9 @@
 	{/if}
 	{#if (filtered.services.length > 0 && services.length > 0) || filtered.otherServices.length > 0}
 		<div class="flex items-center mt-10">
-			<h1 class="title lg:text-3xl">Services</h1>
+			<h1 class="title lg:text-3xl pr-4">Services</h1>
+			<button class="btn btn-sm btn-primary" on:click={refreshStatusServices}>Refresh Status</button
+			>
 		</div>
 	{/if}
 	{#if filtered.services.length > 0 && services.length > 0}
@@ -591,11 +622,13 @@
 			{#if filtered.services.length > 0}
 				{#each filtered.services as service}
 					<a class="no-underline mb-5" href={`/services/${service.id}`}>
-						<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-pink-600 indicator">
+						<div
+							class="w-full rounded p-5 bg-coolgray-200 hover:bg-pink-600 indicator duration-150"
+						>
 							{#await getStatus(service)}
 								<span class="indicator-item badge bg-yellow-500 badge-sm" />
-							{:then status}
-								{#if status === 'running'}
+							{:then}
+								{#if status[service.id] === 'running'}
 									<span class="indicator-item badge bg-success badge-sm" />
 								{:else}
 									<span class="indicator-item badge bg-error badge-sm" />
@@ -663,11 +696,11 @@
 		>
 			{#each filtered.otherServices as service}
 				<a class="no-underline mb-5" href={`/services/${service.id}`}>
-					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-pink-600 indicator">
+					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-pink-600 indicator duration-150">
 						{#await getStatus(service)}
 							<span class="indicator-item badge bg-yellow-500 badge-sm" />
-						{:then status}
-							{#if status === 'running'}
+						{:then}
+							{#if status[service.id] === 'running'}
 								<span class="indicator-item badge bg-success badge-sm" />
 							{:else}
 								<span class="indicator-item badge bg-error badge-sm" />
@@ -720,7 +753,10 @@
 	{/if}
 	{#if (filtered.databases.length > 0 && databases.length > 0) || filtered.otherDatabases.length > 0}
 		<div class="flex items-center mt-10">
-			<h1 class="title lg:text-3xl">Databases</h1>
+			<h1 class="title lg:text-3xl pr-4">Databases</h1>
+			<button class="btn btn-sm btn-primary" on:click={refreshStatusDatabases}
+				>Refresh Status</button
+			>
 		</div>
 	{/if}
 	{#if filtered.databases.length > 0 && databases.length > 0}
@@ -731,11 +767,13 @@
 			{#if filtered.databases.length > 0}
 				{#each filtered.databases as database}
 					<a class="no-underline mb-5" href={`/databases/${database.id}`}>
-						<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-databases indicator">
+						<div
+							class="w-full rounded p-5 bg-coolgray-200 hover:bg-databases indicator duration-150"
+						>
 							{#await getStatus(database)}
 								<span class="indicator-item badge bg-yellow-500 badge-sm" />
-							{:then status}
-								{#if status === 'running'}
+							{:then}
+								{#if status[database.id] === 'running'}
 									<span class="indicator-item badge bg-success badge-sm" />
 								{:else}
 									<span class="indicator-item badge bg-error badge-sm" />
@@ -807,11 +845,11 @@
 		>
 			{#each filtered.otherDatabases as database}
 				<a class="no-underline mb-5" href={`/databases/${database.id}`}>
-					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-databases indicator">
+					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-databases indicator duration-150">
 						{#await getStatus(database)}
 							<span class="indicator-item badge bg-yellow-500 badge-sm" />
-						{:then status}
-							{#if status === 'running'}
+						{:then}
+							{#if status[database.id] === 'running'}
 								<span class="indicator-item badge bg-success badge-sm" />
 							{:else}
 								<span class="indicator-item badge bg-error badge-sm" />
@@ -879,7 +917,7 @@
 			{#if filtered.gitSources.length > 0}
 				{#each filtered.gitSources as source}
 					<a class="no-underline mb-5" href={`/sources/${source.id}`}>
-						<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-sources indicator">
+						<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-sources indicator duration-150">
 							<div class="w-full flex flex-row">
 								<div class="absolute top-0 left-0 -m-5 h-10 w-10">
 									{#if source?.type === 'gitlab'}
@@ -951,7 +989,7 @@
 		>
 			{#each filtered.otherGitSources as source}
 				<a class="no-underline mb-5" href={`/sources/${source.id}`}>
-					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-sources indicator">
+					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-sources indicator duration-150">
 						<div class="w-full flex flex-row">
 							<div class="absolute top-0 left-0 -m-5 h-10 w-10">
 								{#if source?.type === 'gitlab'}
@@ -1018,7 +1056,9 @@
 			{#if filtered.destinations.length > 0}
 				{#each filtered.destinations as destination}
 					<a class="no-underline mb-5" href={`/destinations/${destination.id}`}>
-						<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-destinations indicator">
+						<div
+							class="w-full rounded p-5 bg-coolgray-200 hover:bg-destinations indicator duration-150"
+						>
 							<div class="w-full flex flex-row">
 								<div class="absolute top-0 left-0 -m-5 h-10 w-10">
 									<svg
@@ -1100,7 +1140,9 @@
 		>
 			{#each filtered.otherDestinations as destination}
 				<a class="no-underline mb-5" href={`/destinations/${destination.id}`}>
-					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-destinations indicator">
+					<div
+						class="w-full rounded p-5 bg-coolgray-200 hover:bg-destinations indicator duration-150"
+					>
 						<div class="w-full flex flex-row">
 							<div class="absolute top-0 left-0 -m-5 h-10 w-10">
 								<svg

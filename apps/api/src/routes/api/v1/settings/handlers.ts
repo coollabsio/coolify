@@ -1,8 +1,9 @@
 import { promises as dns } from 'dns';
+import { X509Certificate } from 'node:crypto';
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { checkDomainsIsValidInDNS, decrypt, encrypt, errorHandler, getDomain, isDNSValid, isDomainConfigured, listSettings, prisma } from '../../../../lib/common';
-import { CheckDNS, CheckDomain, DeleteDomain, DeleteSSHKey, SaveSettings, SaveSSHKey } from './types';
+import { asyncExecShell, checkDomainsIsValidInDNS, decrypt, encrypt, errorHandler, isDNSValid, isDomainConfigured, listSettings, prisma } from '../../../../lib/common';
+import { CheckDNS, CheckDomain, DeleteDomain, OnlyIdInBody, SaveSettings, SaveSSHKey } from './types';
 
 
 export async function listAllSettings(request: FastifyRequest) {
@@ -16,8 +17,16 @@ export async function listAllSettings(request: FastifyRequest) {
                 unencryptedKeys.push({ id: key.id, name: key.name, privateKey: decrypt(key.privateKey), createdAt: key.createdAt })
             }
         }
+        const certificates = await prisma.certificate.findMany({ where: { team: { id: teamId } } })
+        let cns = [];
+        for (const certificate of certificates) {
+            const x509 = new X509Certificate(certificate.cert);
+            cns.push({ commonName: x509.subject.split('\n').find((s) => s.startsWith('CN=')).replace('CN=', ''), id: certificate.id, createdAt: certificate.createdAt })
+        }
+
         return {
             settings,
+            certificates: cns,
             sshKeys: unencryptedKeys
         }
     } catch ({ status, message }) {
@@ -118,10 +127,21 @@ export async function saveSSHKey(request: FastifyRequest<SaveSSHKey>, reply: Fas
         return errorHandler({ status, message })
     }
 }
-export async function deleteSSHKey(request: FastifyRequest<DeleteSSHKey>, reply: FastifyReply) {
+export async function deleteSSHKey(request: FastifyRequest<OnlyIdInBody>, reply: FastifyReply) {
     try {
         const { id } = request.body;
         await prisma.sshKey.delete({ where: { id } })
+        return reply.code(201).send()
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
+export async function deleteCertificates(request: FastifyRequest<OnlyIdInBody>, reply: FastifyReply) {
+    try {
+        const { id } = request.body;
+        await asyncExecShell(`docker exec coolify-proxy sh -c 'rm -f /etc/traefik/acme/custom/${id}-key.pem /etc/traefik/acme/custom/${id}-cert.pem'`)
+        await prisma.certificate.delete({ where: { id } })
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })

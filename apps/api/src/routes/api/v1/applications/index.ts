@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { OnlyId } from '../../../../types';
-import { cancelDeployment, checkDNS, checkDomain, checkRepository, deleteApplication, deleteSecret, deleteStorage, deployApplication, getApplication, getApplicationLogs, getApplicationStatus, getBuildIdLogs, getBuildPack, getBuilds, getGitHubToken, getGitLabSSHKey, getImages, getPreviews, getPreviewStatus, getSecrets, getStorages, getUsage, listApplications, loadPreviews, newApplication, restartApplication, restartPreview, saveApplication, saveApplicationSettings, saveApplicationSource, saveBuildPack, saveConnectedDatabase, saveDeployKey, saveDestination, saveGitLabSSHKey, saveRepository, saveSecret, saveStorage, stopApplication, stopPreviewApplication } from './handlers';
+import { cancelDeployment, checkDNS, checkDomain, checkRepository, deleteApplication, deleteSecret, deleteStorage, deployApplication, getApplication, getApplicationLogs, getApplicationStatus, getBuildIdLogs, getBuildPack, getBuilds, getGitHubToken, getGitLabSSHKey, getImages, getPreviews, getPreviewStatus, getSecrets, getStorages, getUsage, listApplications, loadPreviews, newApplication, restartApplication, restartPreview, saveApplication, saveApplicationSettings, saveApplicationSource, saveBuildPack, saveConnectedDatabase, saveDeployKey, saveDestination, saveGitLabSSHKey,  saveRepository, saveSecret, saveStorage, stopApplication, stopPreviewApplication, updatePreviewSecret, updateSecret } from './handlers';
 
 import type { CancelDeployment, CheckDNS, CheckDomain, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, DeployApplication, GetApplicationLogs, GetBuildIdLogs, GetBuilds, GetImages, RestartPreviewApplication, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, StopPreviewApplication } from './types';
 
@@ -30,6 +30,8 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 
     fastify.get<OnlyId>('/:id/secrets', async (request) => await getSecrets(request));
     fastify.post<SaveSecret>('/:id/secrets', async (request, reply) => await saveSecret(request, reply));
+    fastify.put<SaveSecret>('/:id/secrets', async (request, reply) => await updateSecret(request, reply));
+    fastify.put<SaveSecret>('/:id/secrets/preview', async (request, reply) => await updatePreviewSecret(request, reply));
     fastify.delete<DeleteSecret>('/:id/secrets', async (request) => await deleteSecret(request));
 
     fastify.get<OnlyId>('/:id/storages', async (request) => await getStorages(request));

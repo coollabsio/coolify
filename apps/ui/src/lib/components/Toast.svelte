@@ -2,6 +2,11 @@
 	import { createEventDispatcher } from 'svelte';
 	const dispatch = createEventDispatcher();
 	export let type = 'info';
+	function success() {
+		if (type === 'success') {
+			return 'bg-coollabs';
+		}
+	}
 </script>
 
 <div
@@ -10,8 +15,7 @@
 	on:focus={() => dispatch('pause')}
 	on:mouseout={() => dispatch('resume')}
 	on:blur={() => dispatch('resume')}
-	class="alert shadow-lg text-white rounded hover:scale-105 transition-all duration-100 cursor-pointer"
-	class:bg-coollabs={type === 'success'}
+	class={`flex flex-row alert shadow-lg text-white hover:scale-105 transition-all duration-100 cursor-pointer rounded ${success()}`}
 	class:alert-error={type === 'error'}
 	class:alert-info={type === 'info'}
 >

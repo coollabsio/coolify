@@ -154,7 +154,7 @@ import * as buildpacks from '../lib/buildPacks';
 									startCommand = configuration.startCommand;
 									buildCommand = configuration.buildCommand;
 									publishDirectory = configuration.publishDirectory;
-									baseDirectory = configuration.baseDirectory;
+									baseDirectory = configuration.baseDirectory || '';
 									dockerFileLocation = configuration.dockerFileLocation;
 									denoMainFile = configuration.denoMainFile;
 									const commit = await importers[gitSource.type]({

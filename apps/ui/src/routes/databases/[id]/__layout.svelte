@@ -19,7 +19,7 @@
 			if (id !== 'new' && (!database || Object.entries(database).length === 0)) {
 				return {
 					status: 302,
-					redirect: '/databases'
+					redirect: '/'
 				};
 			}
 			const configurationPhase = checkConfiguration(database);
@@ -62,6 +62,7 @@
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import { onDestroy, onMount } from 'svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import DatabaseLinks from './_DatabaseLinks.svelte';
 	const { id } = $page.params;
 
 	$status.database.isPublic = database.settings.isPublic || false;
@@ -149,104 +150,123 @@
 </script>
 
 {#if id !== 'new'}
-	<nav class="nav-side">
-		{#if database.type && database.destinationDockerId && database.version}
-			{#if $status.database.isExited}
-				<a
-					id="exited"
-					href={!$status.database.isRunning ? `/databases/${id}/logs` : null}
-					class="icons bg-transparent text-sm flex items-center text-red-500 tooltip-error"
-					sveltekit:prefetch
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentcolor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
+	<nav class="header lg:flex-row flex-col-reverse">
+		<div class="flex flex-row space-x-2 font-bold pt-10 lg:pt-0">
+			<div class="flex flex-col items-center justify-center">
+				<div class="title">
+					{#if $page.url.pathname === `/databases/${id}`}
+						Configurations
+					{:else if $page.url.pathname === `/databases/${id}/logs`}
+						Database Logs
+					{:else if $page.url.pathname === `/databases/${id}/configuration/type`}
+						Select a Database Type
+					{:else if $page.url.pathname === `/databases/${id}/configuration/version`}
+						Select a Database Version
+					{:else if $page.url.pathname === `/databases/${id}/configuration/destination`}
+						Select a Destination
+					{/if}
+				</div>
+			</div>
+			<DatabaseLinks {database} />
+		</div>
+		<div class="lg:block hidden flex-1" />
+		<div class="flex flex-row flex-wrap space-x-3 justify-center lg:justify-start lg:py-0">
+			{#if database.type && database.destinationDockerId && database.version}
+				{#if $status.database.isExited}
+					<a
+						id="exited"
+						href={!$status.database.isRunning ? `/databases/${id}/logs` : null}
+						class="icons bg-transparent text-red-500 tooltip-error"
+						sveltekit:prefetch
 					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<path
-							d="M8.7 3h6.6c.3 0 .5 .1 .7 .3l4.7 4.7c.2 .2 .3 .4 .3 .7v6.6c0 .3 -.1 .5 -.3 .7l-4.7 4.7c-.2 .2 -.4 .3 -.7 .3h-6.6c-.3 0 -.5 -.1 -.7 -.3l-4.7 -4.7c-.2 -.2 -.3 -.4 -.3 -.7v-6.6c0 -.3 .1 -.5 .3 -.7l4.7 -4.7c.2 -.2 .4 -.3 .7 -.3z"
-						/>
-						<line x1="12" y1="8" x2="12" y2="12" />
-						<line x1="12" y1="16" x2="12.01" y2="16" />
-					</svg>
-				</a>
-				<Tooltip triggeredBy="#exited">{'Service exited with an error!'}</Tooltip>
-			{/if}
-			{#if $status.database.initialLoading}
-				<button
-					class="icons flex animate-spin items-center space-x-2 bg-transparent text-sm duration-500 ease-in-out hover:bg-transparent"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-6 w-6"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="w-6 h-6"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentcolor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<path
+								d="M8.7 3h6.6c.3 0 .5 .1 .7 .3l4.7 4.7c.2 .2 .3 .4 .3 .7v6.6c0 .3 -.1 .5 -.3 .7l-4.7 4.7c-.2 .2 -.4 .3 -.7 .3h-6.6c-.3 0 -.5 -.1 -.7 -.3l-4.7 -4.7c-.2 -.2 -.3 -.4 -.3 -.7v-6.6c0 -.3 .1 -.5 .3 -.7l4.7 -4.7c.2 -.2 .4 -.3 .7 -.3z"
+							/>
+							<line x1="12" y1="8" x2="12" y2="12" />
+							<line x1="12" y1="16" x2="12.01" y2="16" />
+						</svg>
+					</a>
+					<Tooltip triggeredBy="#exited">{'Service exited with an error!'}</Tooltip>
+				{/if}
+				{#if $status.database.initialLoading}
+					<button class="icons flex animate-spin  duration-500 ease-in-out">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-6 w-6"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<path d="M9 4.55a8 8 0 0 1 6 14.9m0 -4.45v5h5" />
+							<line x1="5.63" y1="7.16" x2="5.63" y2="7.17" />
+							<line x1="4.06" y1="11" x2="4.06" y2="11.01" />
+							<line x1="4.63" y1="15.1" x2="4.63" y2="15.11" />
+							<line x1="7.16" y1="18.37" x2="7.16" y2="18.38" />
+							<line x1="11" y1="19.94" x2="11" y2="19.95" />
+						</svg>
+					</button>
+				{:else if $status.database.isRunning}
+					<button
+						id="stop"
+						on:click={stopDatabase}
+						type="submit"
+						disabled={!$appSession.isAdmin}
+						class="icons bg-transparent text-red-500"
 					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<path d="M9 4.55a8 8 0 0 1 6 14.9m0 -4.45v5h5" />
-						<line x1="5.63" y1="7.16" x2="5.63" y2="7.17" />
-						<line x1="4.06" y1="11" x2="4.06" y2="11.01" />
-						<line x1="4.63" y1="15.1" x2="4.63" y2="15.11" />
-						<line x1="7.16" y1="18.37" x2="7.16" y2="18.38" />
-						<line x1="11" y1="19.94" x2="11" y2="19.95" />
-					</svg>
-				</button>
-			{:else if $status.database.isRunning}
-				<button
-					id="stop"
-					on:click={stopDatabase}
-					type="submit"
-					disabled={!$appSession.isAdmin}
-					class="icons bg-transparent text-sm flex items-center space-x-2 text-red-500"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<rect x="6" y="5" width="4" height="14" rx="1" />
-						<rect x="14" y="5" width="4" height="14" rx="1" />
-					</svg>
-				</button>
-				<Tooltip triggeredBy="#stop">{'Stop'}</Tooltip>
-			{:else}
-				<button
-					id="start"
-					on:click={startDatabase}
-					type="submit"
-					disabled={!$appSession.isAdmin}
-					class="icons bg-transparent text-sm flex items-center space-x-2 text-green-500"
-					><svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<path d="M7 4v16l13 -8z" />
-					</svg>
-				</button>
-				<Tooltip triggeredBy="#start">{'Start'}</Tooltip>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="w-6 h-6"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<rect x="6" y="5" width="4" height="14" rx="1" />
+							<rect x="14" y="5" width="4" height="14" rx="1" />
+						</svg>
+					</button>
+					<Tooltip triggeredBy="#stop">{'Stop'}</Tooltip>
+				{:else}
+					<button
+						id="start"
+						on:click={startDatabase}
+						type="submit"
+						disabled={!$appSession.isAdmin}
+						class="icons bg-transparent text-sm flex items-center space-x-2 text-green-500"
+						><svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="w-6 h-6"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<path d="M7 4v16l13 -8z" />
+						</svg>
+					</button>
+					<Tooltip triggeredBy="#start">{'Start'}</Tooltip>
+				{/if}
 			{/if}
 			<div class="border border-stone-700 h-8" />
 			<a
@@ -282,34 +302,6 @@
 				></a
 			>
 			<Tooltip triggeredBy="#configuration">{'Configuration'}</Tooltip>
-			<a
-				href="/databases/{id}/secrets"
-				sveltekit:prefetch
-				class="hover:text-pink-500 rounded"
-				class:text-pink-500={$page.url.pathname === `/databases/${id}/secrets`}
-				class:bg-coolgray-500={$page.url.pathname === `/databases/${id}/secrets`}
-			>
-				<button id="secrets" disabled={$isDeploymentEnabled} class="icons bg-transparent text-sm ">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<path
-							d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"
-						/>
-						<circle cx="12" cy="11" r="1" />
-						<line x1="12" y1="12" x2="12" y2="14.5" />
-					</svg></button
-				></a
-			>
-			<Tooltip triggeredBy="#secrets">Secrets</Tooltip>
 			<div class="border border-stone-700 h-8" />
 			<a
 				id="databaselogs"
@@ -340,29 +332,28 @@
 				></a
 			>
 			<Tooltip triggeredBy="#databaselogs">{'Logs'}</Tooltip>
-		{/if}
+			{#if forceDelete}
+				<button
+					on:click={() => deleteDatabase(true)}
+					type="submit"
+					disabled={!$appSession.isAdmin}
+					class:hover:text-red-500={$appSession.isAdmin}
+					class="icons bg-transparent text-sm"
+				>
+					Force Delete</button
+				>{:else}
+				<button
+					id="delete"
+					on:click={() => deleteDatabase(false)}
+					type="submit"
+					disabled={!$appSession.isAdmin}
+					class:hover:text-red-500={$appSession.isAdmin}
+					class="icons bg-transparent text-sm"><DeleteIcon /></button
+				>
+			{/if}
 
-		{#if forceDelete}
-			<button
-				on:click={() => deleteDatabase(true)}
-				type="submit"
-				disabled={!$appSession.isAdmin}
-				class:hover:text-red-500={$appSession.isAdmin}
-				class="icons bg-transparent text-sm"
-			>
-				Force Delete</button
-			>{:else}
-			<button
-				id="delete"
-				on:click={() => deleteDatabase(false)}
-				type="submit"
-				disabled={!$appSession.isAdmin}
-				class:hover:text-red-500={$appSession.isAdmin}
-				class="icons bg-transparent text-sm"><DeleteIcon /></button
-			>
-		{/if}
-
-		<Tooltip triggeredBy="#delete">{'Delete'}</Tooltip>
+			<Tooltip triggeredBy="#delete" placement="left">Delete</Tooltip>
+		</div>
 	</nav>
 {/if}
 <slot />

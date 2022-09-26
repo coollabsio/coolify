@@ -31,9 +31,9 @@
 
 <div class="flex justify-center px-6 pb-8">
 	<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
-		<div class="flex items-center space-x-2 pb-5">
+		<div class="flex items-start lg:items-center space-x-0 lg:space-x-4 pb-5 flex-col space-y-4 lg:space-y-0">
 			<div class="title font-bold">{$t('forms.configuration')}</div>
-			<button type="submit" class="btn btn-sm bg-destinations" class:loading disabled={loading}
+			<button type="submit" class="btn btn-sm bg-destinations w-full lg:w-fit" class:loading disabled={loading}
 				>{loading
 					? payload.isCoolifyProxyUsed
 						? $t('destination.new.saving_and_configuring_proxy')
@@ -41,12 +41,12 @@
 					: $t('forms.save')}</button
 			>
 		</div>
-		<div class="mt-2 grid grid-cols-2 items-center px-10">
+		<div class="mt-2 grid grid-cols-2 items-center lg:pl-10">
 			<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
 			<input required name="name" placeholder={$t('forms.name')} bind:value={payload.name} />
 		</div>
 
-		<div class="grid grid-cols-2 items-center px-10">
+		<div class="grid grid-cols-2 items-center lg:pl-10">
 			<label for="engine" class="text-base font-bold text-stone-100">{$t('forms.engine')}</label>
 			<input
 				required
@@ -55,7 +55,7 @@
 				bind:value={payload.engine}
 			/>
 		</div>
-		<div class="grid grid-cols-2 items-center px-10">
+		<div class="grid grid-cols-2 items-center lg:pl-10">
 			<label for="network" class="text-base font-bold text-stone-100">{$t('forms.network')}</label>
 			<input
 				required
@@ -65,7 +65,7 @@
 			/>
 		</div>
 		{#if $appSession.teamId === '0'}
-			<div class="grid grid-cols-2 items-center px-10">
+			<div class="grid grid-cols-2 items-center lg:pl-10">
 				<Setting
 					id="changeProxySetting"
 					bind:setting={payload.isCoolifyProxyUsed}

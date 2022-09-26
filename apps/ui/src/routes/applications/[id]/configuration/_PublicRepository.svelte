@@ -21,6 +21,7 @@
 	};
 	async function loadBranches() {
 		try {
+			if (!publicRepositoryLink) return
 			loading.branches = true;
 			publicRepositoryLink = publicRepositoryLink.trim();
 			const protocol = publicRepositoryLink.split(':')[0];
@@ -156,40 +157,36 @@
 	}
 </script>
 
-<div class="mx-auto max-w-5xl">
-	<div class="grid grid-flow-row gap-2 px-10">
-		<div class="flex">
-			<form class="flex" on:submit|preventDefault={loadBranches}>
-				<div class="space-y-4">
-					<input
-						placeholder="eg: https://github.com/coollabsio/nodejs-example/tree/main"
-						bind:value={publicRepositoryLink}
-					/>
-					{#if branchSelectOptions.length > 0}
-						<div class="custom-select-wrapper">
-							<Select
-								placeholder={loading.branches
-									? $t('application.configuration.loading_branches')
-									: !publicRepositoryLink
-									? $t('application.configuration.select_a_repository_first')
-									: $t('application.configuration.select_a_branch')}
-								isWaiting={loading.branches}
-								showIndicator={!!publicRepositoryLink && !loading.branches}
-								id="branches"
-								on:select={saveRepository}
-								items={branchSelectOptions}
-								isDisabled={loading.branches || !!!publicRepositoryLink}
-								isClearable={false}
-							/>
-						</div>
-					{/if}
-				</div>
-
-				<button class="btn mx-4 bg-orange-600" class:loading={loading.branches} type="submit"
-					>Load Repository</button
-				>
-			</form>
+<div class="mx-auto max-w-screen-2xl">
+	<form class="flex flex-col" on:submit|preventDefault={loadBranches}>
+		<div class="flex flex-col space-y-2 w-full">
+			<div class="flex flex-row space-x-2"><input
+				class="w-full"
+				placeholder="eg: https://github.com/coollabsio/nodejs-example/tree/main"
+				bind:value={publicRepositoryLink}
+			/>
+				<button class="btn bg-orange-600" class:loading={loading.branches} type="submit">
+					Load Repository
+				</button>
+			</div>
+			
+			<div class="custom-select-wrapper">
+				<Select
+					class="w-full"
+					placeholder={loading.branches
+						? $t('application.configuration.loading_branches')
+						: branchSelectOptions.length ===0
+						? 'Please type a repository link first.'
+						: $t('application.configuration.select_a_branch')}
+					isWaiting={loading.branches}
+					showIndicator={!!publicRepositoryLink && !loading.branches}
+					id="branches"
+					on:select={saveRepository}
+					items={branchSelectOptions}
+					isDisabled={loading.branches || !ownerName}
+					isClearable={false}
+				/>
+			</div>
 		</div>
-	</div>
-	
+	</form>
 </div>

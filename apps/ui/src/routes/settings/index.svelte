@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { appSession } from '$lib/store';
 	if ($appSession.teamId !== '0') {
-		goto('/settings/ssh-keys');
+		goto('/settings/ssh');
 	}
-	goto('/settings/global');
+	goto('/settings/coolify');
 </script>

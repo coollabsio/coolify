@@ -87,7 +87,7 @@
 	<span class="arrow-right-applications px-1 text-fuchsia-500">></span>
 	<span class="pr-2">{team.name}</span>
 </div>
-<div class="mx-auto max-w-4xl px-6">
+<div class="mx-auto max-w-6xl px-6">
 	<form on:submit|preventDefault={handleSubmit} class=" py-4">
 		<div class="flex space-x-1 pb-5">
 			<div class="title font-bold">{$t('index.settings')}</div>

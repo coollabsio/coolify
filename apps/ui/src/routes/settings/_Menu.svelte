@@ -3,19 +3,22 @@
 	import { appSession } from '$lib/store';
 </script>
 
-<div class="flex flex-col pt-4 space-y-6 px-10">
+<ul class="menu border bg-coolgray-100 border-coolgray-200 rounded-box p-2 space-y-2">
+	<li class="menu-title">
+		<span>General</span>
+	</li>
 	{#if $appSession.teamId === '0'}
-		<a
-			href="/settings/global"
-			class="sub-menu no-underline"
-			class:sub-menu-active={$page.routeId === 'settings/global'}
-		>
-			Global Settings
-		</a>
+		<li class="rounded" class:bg-coollabs={$page.url.pathname === `/settings/coolify`}>
+			<a href={`/settings/coolify`} class="no-underline w-full">Coolify Settings</a>
+		</li>
 	{/if}
-	<a
-		href="/settings/ssh-keys"
-		class="sub-menu no-underline"
-		class:sub-menu-active={$page.routeId === 'settings/ssh-keys'}>SSH Keys</a
-	>
-</div>
+	<li class="menu-title">
+		<span>Keys & Certificates</span>
+	</li>
+	<li class="rounded" class:bg-coollabs={$page.url.pathname === `/settings/ssh`}>
+		<a href={`/settings/ssh`} class="no-underline w-full">SSH Keys</a>
+	</li>
+	<li class="rounded" class:bg-coollabs={$page.url.pathname === `/settings/certificates`}>
+		<a href={`/settings/certificates`} class="no-underline w-full">SSL Certificates</a>
+	</li>
+</ul>

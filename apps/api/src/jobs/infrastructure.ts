@@ -1,8 +1,9 @@
 import { parentPort } from 'node:worker_threads';
 import axios from 'axios';
 import { compareVersions } from 'compare-versions';
-import { asyncExecShell, cleanupDockerStorage, executeDockerCmd, isDev, prisma, startTraefikTCPProxy, generateDatabaseConfiguration, startTraefikProxy, listSettings, version, createRemoteEngineConfiguration } from '../lib/common';
-
+import { asyncExecShell, cleanupDockerStorage, executeDockerCmd, isDev, prisma, startTraefikTCPProxy, generateDatabaseConfiguration, startTraefikProxy, listSettings, version, createRemoteEngineConfiguration, decrypt, executeSSHCmd } from '../lib/common';
+import { checkContainer } from '../lib/docker';
+import fs from 'fs/promises'
 async function autoUpdater() {
     try {
         const currentVersion = version;
@@ -38,6 +39,68 @@ async function autoUpdater() {
             }
         }
     } catch (error) { }
+}
+async function checkFluentBit() {
+    if (!isDev) {
+        const engine = '/var/run/docker.sock';
+        const { id } = await prisma.destinationDocker.findFirst({
+            where: { engine, network: 'coolify' }
+        });
+        const { found } = await checkContainer({ dockerId: id, container: 'coolify-fluentbit' });
+        if (!found) {
+            await asyncExecShell(`env | grep COOLIFY > .env`);
+            await asyncExecShell(`docker compose up -d fluent-bit`);
+        }
+    }
+}
+async function copyRemoteCertificates(id: string, dockerId: string, remoteIpAddress: string) {
+    try {
+        await asyncExecShell(`scp /tmp/${id}-cert.pem /tmp/${id}-key.pem ${remoteIpAddress}:/tmp/`)
+        await executeSSHCmd({ dockerId, command: `docker exec coolify-proxy sh -c 'test -d /etc/traefik/acme/custom/ || mkdir -p /etc/traefik/acme/custom/'` })
+        await executeSSHCmd({ dockerId, command: `docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/` })
+        await executeSSHCmd({ dockerId, command: `docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/` })
+    } catch (error) {
+        console.log({ error })
+    }
+}
+async function copyLocalCertificates(id: string) {
+    try {
+        await asyncExecShell(`docker exec coolify-proxy sh -c 'test -d /etc/traefik/acme/custom/ || mkdir -p /etc/traefik/acme/custom/'`)
+        await asyncExecShell(`docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/`)
+        await asyncExecShell(`docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/`)
+    } catch (error) {
+        console.log({ error })
+    }
+}
+async function copySSLCertificates() {
+    try {
+        const pAll = await import('p-all');
+        const actions = []
+        const certificates = await prisma.certificate.findMany({ include: { team: true } })
+        const teamIds = certificates.map(c => c.teamId)
+        const destinations = await prisma.destinationDocker.findMany({ where: { isCoolifyProxyUsed: true, teams: { some: { id: { in: [...teamIds] } } } } })
+        for (const certificate of certificates) {
+            const { id, key, cert } = certificate
+            const decryptedKey = decrypt(key)
+            await fs.writeFile(`/tmp/${id}-key.pem`, decryptedKey)
+            await fs.writeFile(`/tmp/${id}-cert.pem`, cert)
+            for (const destination of destinations) {
+                if (destination.remoteEngine) {
+                    if (destination.remoteVerified) {
+                        const { id: dockerId, remoteIpAddress } = destination
+                        actions.push(async () => copyRemoteCertificates(id, dockerId, remoteIpAddress))
+                    }
+                } else {
+                    actions.push(async () => copyLocalCertificates(id))
+                }
+            }
+        }
+        await pAll.default(actions, { concurrency: 1 })
+    } catch (error) {
+        console.log(error)
+    } finally {
+        await asyncExecShell(`find /tmp/ -maxdepth 1 -type f -name '*-*.pem' -delete`)
+    }
 }
 async function checkProxies() {
     try {
@@ -189,7 +252,8 @@ async function cleanupStorage() {
 (async () => {
     let status = {
         cleanupStorage: false,
-        autoUpdater: false
+        autoUpdater: false,
+        copySSLCertificates: false,
     }
     if (parentPort) {
         parentPort.on('message', async (message) => {
@@ -213,6 +277,18 @@ async function cleanupStorage() {
                 }
                 if (message === 'action:checkProxies') {
                     await checkProxies();
+                    return;
+                }
+                if (message === 'action:checkFluentBit') {
+                    await checkFluentBit();
+                    return;
+                }
+                if (message === 'action:copySSLCertificates') {
+                    if (!status.copySSLCertificates) {
+                        status.copySSLCertificates = true
+                        await copySSLCertificates();
+                        status.copySSLCertificates = false
+                    }
                     return;
                 }
                 if (message === 'action:autoUpdater') {

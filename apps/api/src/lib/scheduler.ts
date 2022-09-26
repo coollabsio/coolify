@@ -9,8 +9,8 @@ Bree.extend(TSBree);
 
 const options: any = {
 	defaultExtension: 'js',
-	// logger: new Cabin(),
-	logger: false,
+	logger: new Cabin(),
+	// logger: false,
 	workerMessageHandler: async ({ name, message }) => {
 		if (name === 'deployApplication' && message?.deploying) {
 			if (scheduler.workers.has('autoUpdater') || scheduler.workers.has('cleanupStorage')) {

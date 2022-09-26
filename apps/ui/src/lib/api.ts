@@ -3,33 +3,35 @@ import Cookies from 'js-cookie';
 
 export function getAPIUrl() {
 	if (GITPOD_WORKSPACE_URL) {
-		const { href } = new URL(GITPOD_WORKSPACE_URL)
-		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '')
-		return newURL
+		const { href } = new URL(GITPOD_WORKSPACE_URL);
+		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '');
+		return newURL;
 	}
 	if (CODESANDBOX_HOST) {
-		     return `https://${CODESANDBOX_HOST.replace(/\$PORT/,'3001')}`
+		return `https://${CODESANDBOX_HOST.replace(/\$PORT/, '3001')}`;
 	}
-	return dev ? 'http://localhost:3001' : 'http://localhost:3000';
+	return dev
+		? 'http://localhost:3001'
+		: 'http://localhost:3000';
 }
 export function getWebhookUrl(type: string) {
 	if (GITPOD_WORKSPACE_URL) {
-		const { href } = new URL(GITPOD_WORKSPACE_URL)
-		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '')
+		const { href } = new URL(GITPOD_WORKSPACE_URL);
+		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '');
 		if (type === 'github') {
-			return `${newURL}/webhooks/github/events`
+			return `${newURL}/webhooks/github/events`;
 		}
 		if (type === 'gitlab') {
-			return `${newURL}/webhooks/gitlab/events`
+			return `${newURL}/webhooks/gitlab/events`;
 		}
 	}
 	if (CODESANDBOX_HOST) {
-		const newURL = `https://${CODESANDBOX_HOST.replace(/\$PORT/,'3001')}`
+		const newURL = `https://${CODESANDBOX_HOST.replace(/\$PORT/, '3001')}`;
 		if (type === 'github') {
-			return `${newURL}/webhooks/github/events`
+			return `${newURL}/webhooks/github/events`;
 		}
 		if (type === 'gitlab') {
-			return `${newURL}/webhooks/gitlab/events`
+			return `${newURL}/webhooks/gitlab/events`;
 		}
 	}
 	return `https://webhook.site/0e5beb2c-4e9b-40e2-a89e-32295e570c21/events`;
@@ -37,7 +39,7 @@ export function getWebhookUrl(type: string) {
 async function send({
 	method,
 	path,
-	data = {},
+	data = null,
 	headers,
 	timeout = 120000
 }: {
@@ -51,7 +53,7 @@ async function send({
 	const controller = new AbortController();
 	const id = setTimeout(() => controller.abort(), timeout);
 	const opts: any = { method, headers: {}, body: null, signal: controller.signal };
-	if (Object.keys(data).length > 0) {
+	if (data && Object.keys(data).length > 0) {
 		const parsedData = data;
 		for (const [key, value] of Object.entries(data)) {
 			if (value === '') {
@@ -83,7 +85,9 @@ async function send({
 	if (dev && !path.startsWith('https://')) {
 		path = `${getAPIUrl()}${path}`;
 	}
-
+	if (method === 'POST' && data && !opts.body) {
+		opts.body = data;
+	}
 	const response = await fetch(`${path}`, opts);
 
 	clearTimeout(id);
@@ -103,7 +107,11 @@ async function send({
 		return {};
 	}
 	if (!response.ok) {
-		if (response.status === 401 && !path.startsWith('https://api.github') && !path.includes('/v4/user')) {
+		if (
+			response.status === 401 &&
+			!path.startsWith('https://api.github') &&
+			!path.includes('/v4/user')
+		) {
 			Cookies.remove('token');
 		}
 
@@ -126,7 +134,7 @@ export function del(
 
 export function post(
 	path: string,
-	data: Record<string, unknown>,
+	data: Record<string, unknown> | FormData,
 	headers?: Record<string, unknown>
 ): Promise<Record<string, any>> {
 	return send({ method: 'POST', path, data, headers });

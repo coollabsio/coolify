@@ -72,19 +72,16 @@
 	{:else}
 		<span class="indicator-item badge bg-success badge-sm" />
 	{/if}
-	{#if server.remoteEngine}
-		<div
-			class="absolute top-0 right-0 text-xl font-bold uppercase bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 p-1 rounded m-2"
-		>
-			BETA
-		</div>
-	{/if}
-	<div class="w-full flex flex-row space-x-4">
+
+	<div class="w-full flex flex-col lg:flex-row space-y-4 lg:space-y-0 space-x-4">
 		<div class="flex flex-col">
 			<h1 class="font-bold text-lg lg:text-xl truncate">
 				{server.name}
+				{#if server.remoteEngine}
+					<span class="badge bg-coollabs-gradient rounded text-white"> BETA </span>
+				{/if}
 			</h1>
-			<div class="text-xs ">
+			<div class="text-xs">
 				{#if server?.remoteIpAddress}
 					<h2>{server?.remoteIpAddress}</h2>
 				{:else}

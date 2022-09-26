@@ -59,32 +59,36 @@
 	}
 </script>
 
-<td>
-	<input
-		bind:value={storage.path}
-		required
-		placeholder="eg: /sqlite.db"
-	/>
-</td>
-<td>
-	{#if isNew}
-		<div class="flex items-center justify-center">
-			<button class="btn btn-sm bg-applications" on:click={() => saveStorage(true)}
-				>{$t('forms.add')}</button
-			>
+<div class="w-full font-bold grid gap-2">
+	<div class="flex flex-col pb-2">
+		
+		<div class="flex flex-col lg:flex-row lg:space-y-0 space-y-2">
+			<input
+				class="w-full lg:w-64"
+				bind:value={storage.path}
+				required
+				placeholder="eg: /sqlite.db"
+			/>
+			{#if isNew}
+				<div class="flex items-center justify-center w-full lg:w-64">
+					<button class="btn btn-sm btn-primary" on:click={() => saveStorage(true)}
+						>{$t('forms.add')}</button
+					>
+				</div>
+			{:else}
+				<div class="flex flex-row items-center justify-center space-x-2 w-full lg:w-64">
+					<div class="flex items-center justify-center">
+						<button class="btn btn-sm btn-primary" on:click={() => saveStorage(false)}
+							>{$t('forms.set')}</button
+						>
+					</div>
+					<div class="flex justify-center">
+						<button class="btn btn-sm btn-error" on:click={removeStorage}
+							>{$t('forms.remove')}</button
+						>
+					</div>
+				</div>
+			{/if}
 		</div>
-	{:else}
-		<div class="flex flex-row justify-center space-x-2">
-			<div class="flex items-center justify-center">
-				<button class="btn btn-sm bg-applications" on:click={() => saveStorage(false)}
-					>{$t('forms.set')}</button
-				>
-			</div>
-			<div class="flex justify-center items-end">
-				<button class="btn btn-sm bg-red-600 hover:bg-red-500" on:click={removeStorage}
-					>{$t('forms.remove')}</button
-				>
-			</div>
-		</div>
-	{/if}
-</td>
+	</div>
+</div>

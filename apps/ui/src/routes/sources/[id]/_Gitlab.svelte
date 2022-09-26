@@ -143,26 +143,28 @@
 	}
 </script>
 
-<div class="mx-auto max-w-4xl px-6">
+<div class="mx-auto max-w-6xl px-6">
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
-		<div class="flex space-x-1 pb-7">
-			<div class="title">General</div>
-			{#if $appSession.isAdmin}
-				<button type="submit" class="btn btn-sm bg-sources" disabled={loading}
-					>{loading ? $t('forms.saving') : $t('forms.save')}</button
-				>
-				{#if source.gitlabAppId}
-					<button class="btn btn-sm" on:click|preventDefault={changeSettings}
-						>{$t('source.change_app_settings', { name: 'GitLab' })}</button
+		<div class="flex lg:flex-row lg:justify-between flex-col space-y-3 w-full lg:items-center">
+			<h1 class="title">General</h1>
+			<div class="flex flex-col lg:flex-row lg:space-x-4 lg:w-fit space-y-2 lg:space-y-0 w-full">
+				{#if $appSession.isAdmin}
+					<button type="submit" class="btn btn-sm bg-sources" disabled={loading}
+						>{loading ? $t('forms.saving') : $t('forms.save')}</button
 					>
-				{:else}
-					<button class="btn btn-sm" on:click|preventDefault|stopPropagation={newApp}
-						>Create new GitLab App manually</button
-					>
+					{#if source.gitlabAppId}
+						<button class="btn btn-sm" on:click|preventDefault={changeSettings}
+							>{$t('source.change_app_settings', { name: 'GitLab' })}</button
+						>
+					{:else}
+						<button class="btn btn-sm" on:click|preventDefault|stopPropagation={newApp}
+							>Create new GitLab App manually</button
+						>
+					{/if}
 				{/if}
-			{/if}
+			</div>
 		</div>
-		<div class="grid grid-flow-row gap-2 px-10">
+		<div class="grid grid-flow-row gap-2 lg:px-10">
 			{#if !source.gitlabAppId}
 				<a
 					href="https://docs.coollabs.io/coolify/sources#how-to-integrate-with-gitlab"
@@ -172,7 +174,7 @@
 				>
 				<div class="grid grid-cols-2 items-center">
 					<label for="type" class="text-base font-bold text-stone-100">Application Type</label>
-					<select name="type" id="type" class="w-96" bind:value={applicationType}>
+					<select name="type" id="type" class="lg:w-96 w-full" bind:value={applicationType}>
 						<option value="user">{$t('source.gitlab.user_owned')}</option>
 						<option value="group">{$t('source.gitlab.group_owned')}</option>
 						{#if source.htmlUrl !== 'https://gitlab.com'}
@@ -185,6 +187,7 @@
 					<div class="grid grid-cols-2 items-center">
 						<label for="groupName" class="text-base font-bold text-stone-100">Group Name</label>
 						<input
+							class="w-full"
 							name="groupName"
 							id="groupName"
 							required
@@ -197,12 +200,29 @@
 			<div class="grid grid-flow-row gap-2">
 				<div class="mt-2 grid grid-cols-2 items-center">
 					<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
-					<input name="name" id="name" required bind:value={source.name} />
+					<input class="w-full" name="name" id="name" required bind:value={source.name} />
 				</div>
 			</div>
+			{#if source.gitlabApp.groupName}
+				<div class="grid grid-cols-2 items-center">
+					<label for="groupName" class="text-base font-bold text-stone-100"
+						>{$t('source.group_name')}</label
+					>
+					<input
+						class="w-full"
+						name="groupName"
+						id="groupName"
+						disabled={source.gitlabAppId}
+						readonly={source.gitlabAppId}
+						required
+						bind:value={source.gitlabApp.groupName}
+					/>
+				</div>
+			{/if}
 			<div class="grid grid-cols-2 items-center">
 				<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
 				<input
+					class="w-full"
 					name="htmlUrl"
 					id="htmlUrl"
 					required
@@ -214,6 +234,7 @@
 			<div class="grid grid-cols-2 items-center">
 				<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
 				<input
+					class="w-full"
 					name="apiUrl"
 					id="apiUrl"
 					disabled={source.gitlabAppId}
@@ -230,6 +251,7 @@
 						/></label
 					>
 					<input
+						class="w-full"
 						name="customPort"
 						id="customPort"
 						disabled={!selfHosted}
@@ -249,6 +271,7 @@
 					>
 				</div>
 				<input
+					class="w-full"
 					disabled={source.gitlabAppId}
 					readonly={source.gitlabAppId}
 					on:change={checkOauthId}
@@ -266,6 +289,7 @@
 					>{$t('source.application_id')}</label
 				>
 				<input
+					class="w-full"
 					name="appId"
 					id="appId"
 					disabled={source.gitlabAppId}

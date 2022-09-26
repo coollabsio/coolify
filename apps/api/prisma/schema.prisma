@@ -8,6 +8,16 @@ datasource db {
   url      = env("COOLIFY_DATABASE_URL")
 }
 
+model Certificate {
+  id        String   @id @default(cuid())
+  key       String
+  cert      String
+  team      Team?    @relation(fields: [teamId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  teamId    String?
+}
+
 model Setting {
   id                    String   @id @default(cuid())
   fqdn                  String?  @unique
@@ -70,6 +80,7 @@ model Team {
   gitLabApps        GitlabApp[]
   service           Service[]
   users             User[]
+  certificate       Certificate[]
 }
 
 model TeamInvitation {
@@ -161,6 +172,7 @@ model ApplicationSettings {
   isBot              Boolean     @default(false)
   isPublicRepository Boolean     @default(false)
   isDBBranching      Boolean     @default(false)
+  isCustomSSL        Boolean     @default(false)
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
   application        Application @relation(fields: [applicationId], references: [id])

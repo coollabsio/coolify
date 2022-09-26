@@ -172,8 +172,8 @@ export const supportedServiceTypesAndVersions = [
 		fancyName: 'Appwrite',
 		baseImage: 'appwrite/appwrite',
 		images: ['mariadb:10.7', 'redis:6.2-alpine', 'appwrite/telegraf:1.4.0'],
-		versions: ['latest', '1.0','0.15.3'],
-		recommendedVersion: '0.15.3',
+		versions: ['latest', '1.0', '0.15.3'],
+		recommendedVersion: '1.0',
 		ports: {
 			main: 80
 		}
@@ -233,4 +233,26 @@ export const supportedServiceTypesAndVersions = [
 	// 		main: 80
 	// 	}
 	// },
+	{
+		name: 'grafana',
+		fancyName: 'Grafana Dashboard',
+		baseImage: 'grafana/grafana',
+		images: [],
+		versions: ['latest', '9.1.3', '9.1.2', '9.0.8', '8.3.11', '8.4.11', '8.5.11'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 3000
+		}
+	},
+	{
+		name: 'trilium',
+		fancyName: 'Trilium Notes',
+		baseImage: 'zadam/trilium',
+		images: [],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 8080
+		}
+	},
 ];

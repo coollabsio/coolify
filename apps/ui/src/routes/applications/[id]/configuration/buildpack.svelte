@@ -254,12 +254,6 @@
 	});
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">
-		{$t('application.configuration.configure_build_pack')}
-	</div>
-</div>
-
 {#if scanning}
 	<div class="flex justify-center space-x-1 p-6 font-bold">
 		<div class="text-xl tracking-tight">
@@ -267,21 +261,30 @@
 		</div>
 	</div>
 {:else}
-	<div class="max-w-5xl mx-auto ">
-		<div class="title pb-2">Coolify</div>
+	<div class="max-w-screen-2xl mx-auto px-10">
+		<div class="title pb-2">Other</div>
 		<div class="flex flex-wrap justify-center">
-			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true) as buildPack}
+			{#each buildPacks.filter((bp) => bp.isHerokuBuildPack === true) as buildPack}
 				<div class="p-2">
 					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
 				</div>
 			{/each}
 		</div>
 	</div>
-
-	<div class="max-w-5xl mx-auto ">
-		<div class="title pb-2">Other</div>
+	<div class="max-w-screen-2xl mx-auto px-10">
+		<div class="title pb-2">Coolify Base</div>
 		<div class="flex flex-wrap justify-center">
-			{#each buildPacks.filter((bp) => bp.isHerokuBuildPack === true) as buildPack}
+			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true && bp.type ==='base') as buildPack}
+				<div class="p-2">
+					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
+				</div>
+			{/each}
+		</div>
+	</div>
+	<div class="max-w-screen-2xl mx-auto px-10">
+		<div class="title pb-2">Coolify Specific</div>
+		<div class="flex flex-wrap justify-center">
+			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true && bp.type ==='specific') as buildPack}
 				<div class="p-2">
 					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
 				</div>

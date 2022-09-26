@@ -47,10 +47,6 @@
 	}
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">{$t('forms.select_a_service')}</div>
-</div>
-
 <div class="flex flex-wrap justify-center">
 	{#each types as type}
 		<div class="p-2">

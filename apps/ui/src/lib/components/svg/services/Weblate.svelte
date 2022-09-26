@@ -4,7 +4,7 @@
 
 <svg
 	xmlns="http://www.w3.org/2000/svg"
-	class={isAbsolute ? 'w-16 h-16 absolute top-0 left-0 -m-7' : 'w-12 h-12 mx-auto'}
+	class={isAbsolute ? 'w-16 h-16 absolute top-0 left-0 -m-7' : 'w-10 h-10 mx-auto'}
 	version="1.1"
 	viewBox="0 0 300 300"
 	><linearGradient

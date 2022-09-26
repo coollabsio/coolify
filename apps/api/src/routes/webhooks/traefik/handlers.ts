@@ -6,7 +6,7 @@ import { TraefikOtherConfiguration } from "./types";
 import { OnlyId } from "../../../types";
 
 function configureMiddleware(
-	{ id, container, port, domain, nakedDomain, isHttps, isWWW, isDualCerts, scriptName, type },
+	{ id, container, port, domain, nakedDomain, isHttps, isWWW, isDualCerts, scriptName, type, isCustomSSL },
 	traefik
 ) {
 	if (isHttps) {
@@ -55,7 +55,7 @@ function configureMiddleware(
 				entrypoints: ['websecure'],
 				rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`/\`)`,
 				service: `${id}`,
-				tls: {
+				tls: isCustomSSL ? true : {
 					certresolver: 'letsencrypt'
 				},
 				middlewares: []
@@ -66,7 +66,7 @@ function configureMiddleware(
 					entrypoints: ['websecure'],
 					rule: `Host(\`www.${nakedDomain}\`) && PathPrefix(\`/\`)`,
 					service: `${id}`,
-					tls: {
+					tls: isCustomSSL ? true : {
 						certresolver: 'letsencrypt'
 					},
 					middlewares: []
@@ -99,7 +99,7 @@ function configureMiddleware(
 					entrypoints: ['websecure'],
 					rule: `Host(\`${domain}\`) && PathPrefix(\`/\`)`,
 					service: `${id}`,
-					tls: {
+					tls: isCustomSSL ? true : {
 						certresolver: 'letsencrypt'
 					},
 					middlewares: []
@@ -178,7 +178,19 @@ function configureMiddleware(
 
 export async function traefikConfiguration(request, reply) {
 	try {
+		const sslpath = '/etc/traefik/acme/custom';
+		const certificates = await prisma.certificate.findMany({ where: { team: { applications: { some: { settings: { isCustomSSL: true } } }, destinationDocker: { some: { remoteEngine: false, isCoolifyProxyUsed: true } } } } })
+		let parsedCertificates = []
+		for (const certificate of certificates) {
+			parsedCertificates.push({
+				certFile: `${sslpath}/${certificate.id}-cert.pem`,
+				keyFile: `${sslpath}/${certificate.id}-key.pem`
+			})
+		}
 		const traefik = {
+			tls: {
+				certificates: parsedCertificates
+			},
 			http: {
 				routers: {},
 				services: {},
@@ -224,7 +236,7 @@ export async function traefikConfiguration(request, reply) {
 				port,
 				destinationDocker,
 				destinationDockerId,
-				settings: { previews, dualCerts }
+				settings: { previews, dualCerts, isCustomSSL }
 			} = application;
 			if (destinationDockerId) {
 				const { network, id: dockerId } = destinationDocker;
@@ -244,7 +256,8 @@ export async function traefikConfiguration(request, reply) {
 							isRunning,
 							isHttps,
 							isWWW,
-							isDualCerts: dualCerts
+							isDualCerts: dualCerts,
+							isCustomSSL
 						});
 					}
 					if (previews) {
@@ -267,7 +280,8 @@ export async function traefikConfiguration(request, reply) {
 									nakedDomain,
 									isHttps,
 									isWWW,
-									isDualCerts: dualCerts
+									isDualCerts: dualCerts,
+									isCustomSSL
 								});
 							}
 						}
@@ -534,7 +548,19 @@ export async function traefikOtherConfiguration(request: FastifyRequest<TraefikO
 export async function remoteTraefikConfiguration(request: FastifyRequest<OnlyId>) {
 	const { id } = request.params
 	try {
+		const sslpath = '/etc/traefik/acme/custom';
+		const certificates = await prisma.certificate.findMany({ where: { team: { applications: { some: { settings: { isCustomSSL: true } } }, destinationDocker: { some: { id, remoteEngine: true, isCoolifyProxyUsed: true, remoteVerified: true } } } } })
+		let parsedCertificates = []
+		for (const certificate of certificates) {
+			parsedCertificates.push({
+				certFile: `${sslpath}/${certificate.id}-cert.pem`,
+				keyFile: `${sslpath}/${certificate.id}-key.pem`
+			})
+		}
 		const traefik = {
+			tls: {
+				certificates: parsedCertificates
+			},
 			http: {
 				routers: {},
 				services: {},

@@ -42,3 +42,8 @@ export interface DeleteSSHKey {
        id: string
     }
 }
+export interface OnlyIdInBody {
+    Body: {
+        id: string
+     }
+}

@@ -42,8 +42,8 @@
 	});
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">{$t('index.databases')}</div>
+<nav class="header">
+	<h1 class="mr-4 text-2xl font-bold">{$t('index.databases')}</h1>
 	{#if $appSession.isAdmin}
 		<button on:click={newDatabase} class="btn btn-square btn-sm bg-databases">
 			<svg
@@ -61,9 +61,9 @@
 			>
 		</button>
 	{/if}
-</div>
-
-<div class="flex-col justify-center mt-10 pb-12 sm:pb-16">
+</nav>
+<br />
+<div class="flex-col justify-center mt-10 pb-12 sm:pb-16 lg:pt-16">
 	{#if !databases || ownDatabases.length === 0}
 		<div class="flex-col">
 			<div class="text-center text-xl font-bold">{$t('database.no_databases_found')}</div>

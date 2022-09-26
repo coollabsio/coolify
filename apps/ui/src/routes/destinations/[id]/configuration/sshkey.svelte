@@ -38,9 +38,6 @@
 	}
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">Select a SSH Keys</div>
-</div>
 <div class="flex flex-col justify-center">
 	<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row ">
 		{#if sshKeys.length > 0}
@@ -61,7 +58,7 @@
 				<div class="pb-2 text-center font-bold">No SSH key found</div>
 				<div class="flex justify-center">
 					<a
-						href="/settings/ssh-keys"
+						href="/settings/ssh"
 						sveltekit:prefetch
 						class="add-icon bg-sky-600 hover:bg-sky-500"
 					>

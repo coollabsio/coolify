@@ -42,4 +42,8 @@
 	<Icons.Searxng {isAbsolute} />
 {:else if type === 'weblate'}
 	<Icons.Weblate {isAbsolute} />
+{:else if type === 'grafana'}
+	<Icons.Grafana {isAbsolute} />
+{:else if type === 'trilium'}
+	<Icons.Trilium {isAbsolute} />
 {/if}

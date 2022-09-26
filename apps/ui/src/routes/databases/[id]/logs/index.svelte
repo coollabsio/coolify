@@ -91,14 +91,6 @@
 	}
 </script>
 
-<div class="flex h-20 items-center space-x-2 p-5 px-6 font-bold">
-	<div class="-mb-5 flex-col">
-		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
-			Database Logs
-		</div>
-		<span class="text-xs">{database.name}</span>
-	</div>
-</div>
 <div class="flex flex-row justify-center space-x-2 px-10 pt-6">
 	{#if logs.length === 0}
 		<div class="text-xl font-bold tracking-tighter">{$t('application.build.waiting_logs')}</div>
@@ -134,16 +126,10 @@
 				</button>
 				<Tooltip triggeredBy="#follow">Follow Logs</Tooltip>
 			</div>
-			<div
-				class="font-mono w-full leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
-				bind:this={logsEl}
-				on:scroll={detect}
-			>
-				<div class="px-2 pr-14">
-					{#each logs as log}
-						{log + '\n'}
-					{/each}
-				</div>
+			<div class="font-mono w-full rounder bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded-md mb-20 flex flex-col whitespace-nowrap -mt-12 scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1 lg:text-base text-[10px]">
+				{#each logs as log}
+					<p>{log + '\n'}</p>
+				{/each}
 			</div>
 		</div>
 	{/if}

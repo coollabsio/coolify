@@ -321,17 +321,12 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
 export async function saveApplicationSettings(request: FastifyRequest<SaveApplicationSettings>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        const { debug, previews, dualCerts, autodeploy, branch, projectId, isBot, isDBBranching } = request.body
-        // const isDouble = await checkDoubleBranch(branch, projectId);
-        // if (isDouble && autodeploy) {
-        //     await prisma.applicationSettings.updateMany({ where: { application: { branch, projectId } }, data: { autodeploy: false } })
-        //     throw { status: 500, message: 'Cannot activate automatic deployments until only one application is defined for this repository / branch.' }
-        // }
+        const { debug, previews, dualCerts, autodeploy, branch, projectId, isBot, isDBBranching, isCustomSSL } = request.body
         await prisma.application.update({
             where: { id },
-            data: { fqdn: isBot ? null : undefined, settings: { update: { debug, previews, dualCerts, autodeploy, isBot, isDBBranching } } },
+            data: { fqdn: isBot ? null : undefined, settings: { update: { debug, previews, dualCerts, autodeploy, isBot, isDBBranching, isCustomSSL } } },
             include: { destinationDocker: true }
-        });
+        }); 
         return reply.code(201).send();
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -787,64 +782,74 @@ export async function saveConnectedDatabase(request, reply) {
 export async function getSecrets(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
+
         let secrets = await prisma.secret.findMany({
-            where: { applicationId: id },
-            orderBy: { createdAt: 'desc' }
+            where: { applicationId: id, isPRMRSecret: false },
+            orderBy: { createdAt: 'asc' }
         });
+        let previewSecrets = await prisma.secret.findMany({
+            where: { applicationId: id, isPRMRSecret: true },
+            orderBy: { createdAt: 'asc' }
+        });
+
         secrets = secrets.map((secret) => {
             secret.value = decrypt(secret.value);
             return secret;
         });
-        secrets = secrets.filter((secret) => !secret.isPRMRSecret).sort((a, b) => {
-            return ('' + a.name).localeCompare(b.name);
-        })
+        previewSecrets = previewSecrets.map((secret) => {
+            secret.value = decrypt(secret.value);
+            return secret;
+        });
+
         return {
-            secrets
+            previewSecrets: previewSecrets.sort((a, b) => {
+                return ('' + a.name).localeCompare(b.name);
+            }),
+            secrets: secrets.sort((a, b) => {
+                return ('' + a.name).localeCompare(b.name);
+            })
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
 
+export async function updatePreviewSecret(request: FastifyRequest<SaveSecret>, reply: FastifyReply) {
+    try {
+        const { id } = request.params
+        const { name, value } = request.body
+        await prisma.secret.updateMany({
+            where: { applicationId: id, name, isPRMRSecret: true },
+            data: { value: encrypt(value.trim()) }
+        });
+        return reply.code(201).send()
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+export async function updateSecret(request: FastifyRequest<SaveSecret>, reply: FastifyReply) {
+    try {
+        const { id } = request.params
+        const { name, value, isBuildSecret = undefined } = request.body
+        await prisma.secret.updateMany({
+            where: { applicationId: id, name },
+            data: { value: encrypt(value.trim()), isBuildSecret }
+        });
+        return reply.code(201).send()
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function saveSecret(request: FastifyRequest<SaveSecret>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        let { name, value, isBuildSecret, isPRMRSecret, isNew } = request.body
-        if (isNew) {
-            const found = await prisma.secret.findFirst({ where: { name, applicationId: id, isPRMRSecret } });
-            if (found) {
-                throw { status: 500, message: `Secret ${name} already exists.` }
-            } else {
-                value = encrypt(value.trim());
-                await prisma.secret.create({
-                    data: { name, value, isBuildSecret, isPRMRSecret, application: { connect: { id } } }
-                });
-            }
-        } else {
-            if (value) {
-                value = encrypt(value.trim());
-            }
-            const found = await prisma.secret.findFirst({ where: { applicationId: id, name, isPRMRSecret } });
-
-            if (found) {
-                if (!value && isPRMRSecret) {
-                    await prisma.secret.deleteMany({
-                        where: { applicationId: id, name, isPRMRSecret }
-                    });
-                } else {
-
-                    await prisma.secret.updateMany({
-                        where: { applicationId: id, name, isPRMRSecret },
-                        data: { value, isBuildSecret, isPRMRSecret }
-                    });
-                }
-
-            } else {
-                await prisma.secret.create({
-                    data: { name, value, isBuildSecret, isPRMRSecret, application: { connect: { id } } }
-                });
-            }
-        }
+        const { name, value, isBuildSecret = false } = request.body
+        await prisma.secret.create({
+            data: { name, value: encrypt(value.trim()), isBuildSecret, isPRMRSecret: false, application: { connect: { id } } }
+        });
+        await prisma.secret.create({
+            data: { name, value: encrypt(value.trim()), isBuildSecret, isPRMRSecret: true, application: { connect: { id } } }
+        });
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })

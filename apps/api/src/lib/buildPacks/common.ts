@@ -342,13 +342,13 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 	}
 	if (buildPack === 'laravel') {
 		payload.baseImage = 'webdevops/php-apache:8.2-alpine';
+		payload.baseImages = phpVersions;
 		payload.baseBuildImage = 'node:18';
 		payload.baseBuildImages = nodeVersions;
 	}
 	if (buildPack === 'heroku') {
 		payload.baseImage = 'heroku/buildpacks:20';
 		payload.baseImages = herokuVersions;
-
 	}
 	return payload;
 }
@@ -384,7 +384,7 @@ export const setDefaultConfiguration = async (data: any) => {
 	if (!publishDirectory) publishDirectory = template?.publishDirectory || null;
 	if (baseDirectory) {
 		if (!baseDirectory.startsWith('/')) baseDirectory = `/${baseDirectory}`;
-		if (!baseDirectory.endsWith('/')) baseDirectory = `${baseDirectory}/`;
+		if (baseDirectory.endsWith('/') && baseDirectory !== '/') baseDirectory = baseDirectory.slice(0, -1);
 	}
 	if (dockerFileLocation) {
 		if (!dockerFileLocation.startsWith('/')) dockerFileLocation = `/${dockerFileLocation}`;

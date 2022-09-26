@@ -1,12 +1,11 @@
 <script lang="ts">
 	import { dev } from '$app/env';
 	import { get, post } from '$lib/api';
-	import { addToast, appSession, features } from '$lib/store';
+	import { addToast, appSession, features, updateLoading, isUpdateAvailable } from '$lib/store';
 	import { asyncSleep, errorNotification } from '$lib/common';
 	import { onMount } from 'svelte';
 	import Tooltip from './Tooltip.svelte';
 
-	let isUpdateAvailable = false;
 	let updateStatus: any = {
 		found: false,
 		loading: false,
@@ -58,37 +57,41 @@
 		if ($appSession.userId) {
 			const overrideVersion = $features.latestVersion;
 			if ($appSession.teamId === '0') {
+				if ($updateLoading === true) return;
 				try {
+					$updateLoading = true;
 					const data = await get(`/update`);
 					if (overrideVersion || data?.isUpdateAvailable) {
 						latestVersion = overrideVersion || data.latestVersion;
 						if (overrideVersion) {
-							isUpdateAvailable = true;
+							$isUpdateAvailable = true;
 						} else {
-							isUpdateAvailable = data.isUpdateAvailable;
+							$isUpdateAvailable = data.isUpdateAvailable;
 						}
 					}
 				} catch (error) {
 					return errorNotification(error);
+				} finally {
+					$updateLoading = false;
 				}
 			}
 		}
 	});
 </script>
 
-<div class="py-2">
+<div class="py-0 lg:py-2">
 	{#if $appSession.teamId === '0'}
-		{#if isUpdateAvailable}
+		{#if $isUpdateAvailable}
 			<button
 				id="update"
 				disabled={updateStatus.success === false}
 				on:click={update}
-				class="icons bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white duration-75 hover:scale-105"
+				class="icons bg-coollabs-gradient text-white duration-75 hover:scale-105  w-full"
 			>
 				{#if updateStatus.loading}
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="lds-heart h-9 w-8"
+						class="lds-heart h-8 w-8"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -102,24 +105,27 @@
 						/>
 					</svg>
 				{:else if updateStatus.success === null}
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-9 w-8"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<circle cx="12" cy="12" r="9" />
-						<line x1="12" y1="8" x2="8" y2="12" />
-						<line x1="12" y1="8" x2="12" y2="16" />
-						<line x1="16" y1="12" x2="12" y2="8" />
-					</svg>
+					<div class="flex items-center justify-center space-x-2">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-8 w-8"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<circle cx="12" cy="12" r="9" />
+							<line x1="12" y1="8" x2="8" y2="12" />
+							<line x1="12" y1="8" x2="12" y2="16" />
+							<line x1="16" y1="12" x2="12" y2="8" />
+						</svg>
+						<span class="flex lg:hidden">Update available</span>
+					</div>
 				{:else if updateStatus.success}
-					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" class="h-9 w-8"
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" class="h-8 w-8"
 						><path
 							fill="#DD2E44"
 							d="M11.626 7.488c-.112.112-.197.247-.268.395l-.008-.008L.134 33.141l.011.011c-.208.403.14 1.223.853 1.937.713.713 1.533 1.061 1.936.853l.01.01L28.21 24.735l-.008-.009c.147-.07.282-.155.395-.269 1.562-1.562-.971-6.627-5.656-11.313-4.687-4.686-9.752-7.218-11.315-5.656z"
@@ -184,7 +190,9 @@
 					>
 				{/if}
 			</button>
-			<Tooltip triggeredBy="#update" placement="right" color="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500">New Version Available!</Tooltip>
+			<Tooltip triggeredBy="#update" placement="right" color="bg-coolgray-200 text-white"
+				>New Version Available!</Tooltip
+			>
 		{/if}
 	{/if}
 </div>

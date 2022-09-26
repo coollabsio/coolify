@@ -107,10 +107,10 @@
 	}
 </script>
 
-<div class="mx-auto max-w-4xl px-6">
+<div class="mx-auto max-w-6xl p-4">
 	<form on:submit|preventDefault={handleSubmit} class="py-4">
-		<div class="flex space-x-1 pb-5">
-			<div class="title">{$t('general')}</div>
+		<div class="flex space-x-1 pb-5 items-center">
+			<h1 class="title">{$t('general')}</h1>
 			{#if $appSession.isAdmin}
 				<button
 					type="submit"
@@ -121,106 +121,94 @@
 				>
 			{/if}
 		</div>
-
-		<div class="grid grid-flow-row gap-2 px-10">
-			<div class="grid grid-cols-2 items-center">
-				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
-				<input
-					readonly={!$appSession.isAdmin}
-					name="name"
-					id="name"
-					bind:value={database.name}
-					required
-				/>
-			</div>
-			<div class="grid grid-cols-2 items-center">
-				<label for="destination" class="text-base font-bold text-stone-100"
-					>{$t('application.destination')}</label
-				>
-				{#if database.destinationDockerId}
-					<div class="no-underline">
-						<input
-							value={database.destinationDocker.name}
-							id="destination"
-							disabled
-							readonly
-							class="bg-transparent "
-						/>
-					</div>
-				{/if}
-			</div>
-
-			<div class="grid grid-cols-2 items-center">
-				<label for="version" class="text-base font-bold text-stone-100">Version / Tag</label>
-				<a
-					href={$appSession.isAdmin && !$status.database.isRunning
-						? `/databases/${id}/configuration/version?from=/databases/${id}`
-						: ''}
-					class="no-underline"
-				>
+		<div class="grid gap-2 grid-cols-2 auto-rows-max lg:px-10 px-2">
+			<label for="name">{$t('forms.name')}</label>
+			<input
+				class="w-full"
+				readonly={!$appSession.isAdmin}
+				name="name"
+				id="name"
+				bind:value={database.name}
+				required
+			/>
+			<label for="destination">{$t('application.destination')}</label>
+			{#if database.destinationDockerId}
+				<div class="no-underline">
 					<input
-						value={database.version}
+						value={database.destinationDocker.name}
+						id="destination"
+						disabled
 						readonly
-						disabled={$status.database.isRunning || $status.database.initialLoading}
-						class:cursor-pointer={!$status.database.isRunning}
-					/></a
-				>
-			</div>
-		</div>
-
-		<div class="grid grid-flow-row gap-2 px-10 pt-2">
-			<div class="grid grid-cols-2 items-center">
-				<label for="host" class="text-base font-bold text-stone-100">{$t('forms.host')}</label>
-				<CopyPasswordField
-					placeholder={$t('forms.generated_automatically_after_start')}
-					isPasswordField={false}
-					readonly
-					disabled
-					id="host"
-					name="host"
-					value={database.id}
-				/>
-			</div>
-			<div class="grid grid-cols-2 items-center">
-				<label for="publicPort" class="text-base font-bold text-stone-100">{$t('forms.port')}</label
-				>
-				<CopyPasswordField
-					placeholder={$t('database.generated_automatically_after_set_to_public')}
-					id="publicPort"
-					readonly
-					disabled
-					name="publicPort"
-					value={publicLoading ? 'Loading...' : $status.database.isPublic ? database.publicPort : privatePort}
-				/>
-			</div>
-		</div>
-		<div class="grid grid-flow-row gap-2">
-			{#if database.type === 'mysql'}
-				<MySql bind:database />
-			{:else if database.type === 'postgresql'}
-				<PostgreSql bind:database />
-			{:else if database.type === 'mongodb'}
-				<MongoDb bind:database />
-			{:else if database.type === 'mariadb'}
-				<MariaDb bind:database />
-			{:else if database.type === 'redis'}
-				<Redis bind:database />
-			{:else if database.type === 'couchdb'}
-				<CouchDb {database} />
-			{:else if database.type === 'edgedb'}
-				<EdgeDB {database} />
-			{/if}
-			<div class="grid grid-cols-2 items-center px-10 pb-8">
-				<div>
-					<label for="url" class="text-base font-bold text-stone-100"
-						>{$t('database.connection_string')}
-						{#if !$status.database.isPublic && database.destinationDocker.remoteEngine}
-							<Explainer
-								explanation="You can only access the database with this URL if your application is deployed to the same Destination."
-							/>
-						{/if}</label
-					>
+						class="bg-transparent w-full"
+					/>
 				</div>
+			{/if}
+			<label for="version">Version / Tag</label>
+			<a
+				href={$appSession.isAdmin && !$status.database.isRunning
+					? `/databases/${id}/configuration/version?from=/databases/${id}`
+					: ''}
+				class="no-underline"
+			>
+				<input
+					class="w-full"
+					value={database.version}
+					readonly
+					disabled={$status.database.isRunning || $status.database.initialLoading}
+					class:cursor-pointer={!$status.database.isRunning}
+				/></a
+			>
+			<label for="host">{$t('forms.host')}</label>
+			<CopyPasswordField
+				placeholder={$t('forms.generated_automatically_after_start')}
+				isPasswordField={false}
+				readonly
+				disabled
+				id="host"
+				name="host"
+				value={database.id}
+			/>
+			<label for="publicPort">{$t('forms.port')}</label>
+			<CopyPasswordField
+				placeholder={$t('database.generated_automatically_after_set_to_public')}
+				id="publicPort"
+				readonly
+				disabled
+				name="publicPort"
+				value={publicLoading
+					? 'Loading...'
+					: $status.database.isPublic
+					? database.publicPort
+					: privatePort}
+			/>
+		</div>
+		{#if database.type === 'mysql'}
+			<MySql bind:database />
+		{:else if database.type === 'postgresql'}
+			<PostgreSql bind:database />
+		{:else if database.type === 'mongodb'}
+			<MongoDb bind:database />
+		{:else if database.type === 'mariadb'}
+			<MariaDb bind:database />
+		{:else if database.type === 'redis'}
+			<Redis bind:database />
+		{:else if database.type === 'couchdb'}
+			<CouchDb {database} />
+		{:else if database.type === 'edgedb'}
+			<EdgeDB {database} />
+		{/if}
+		<div class="flex flex-col space-y-2 mt-5">
+			<div>
+				<label class="px-2" for="url"
+					>{$t('database.connection_string')}
+					{#if !$status.database.isPublic && database.destinationDocker.remoteEngine}
+						<Explainer
+							explanation="You can only access the database with this URL if your application is deployed to the same Destination."
+						/>
+					{/if}</label
+				>
+			</div>
+			<div class="lg:px-10 px-2">
 				<CopyPasswordField
 					textarea={true}
 					placeholder={$t('forms.generated_automatically_after_start')}
@@ -235,31 +223,27 @@
 		</div>
 	</form>
 	<div class="flex space-x-1 pb-5 font-bold">
-		<div class="title">{$t('application.features')}</div>
+		<h1 class="title">{$t('application.features')}</h1>
 	</div>
-	<div class="px-10 pb-10">
-		<div class="grid grid-cols-2 items-center">
-			<Setting
-				id="isPublic"
-				loading={publicLoading}
-				bind:setting={$status.database.isPublic}
-				on:click={() => changeSettings('isPublic')}
-				title={$t('database.set_public')}
-				description={$t('database.warning_database_public')}
-				disabled={!$status.database.isRunning}
-			/>
-		</div>
+	<div class="grid gap-2 grid-cols-2 auto-rows-max lg:px-10 px-2">
+		<Setting
+			id="isPublic"
+			loading={publicLoading}
+			bind:setting={$status.database.isPublic}
+			on:click={() => changeSettings('isPublic')}
+			title={$t('database.set_public')}
+			description={$t('database.warning_database_public')}
+			disabled={!$status.database.isRunning}
+		/>
 		{#if database.type === 'redis'}
-			<div class="grid grid-cols-2 items-center">
-				<Setting
-					id="appendOnly"
-					loading={publicLoading}
-					bind:setting={appendOnly}
-					on:click={() => changeSettings('appendOnly')}
-					title={$t('database.change_append_only_mode')}
-					description={$t('database.warning_append_only')}
-				/>
-			</div>
+			<Setting
+				id="appendOnly"
+				loading={publicLoading}
+				bind:setting={appendOnly}
+				on:click={() => changeSettings('appendOnly')}
+				title={$t('database.change_append_only_mode')}
+				description={$t('database.warning_append_only')}
+			/>
 		{/if}
 	</div>
 </div>

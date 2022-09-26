@@ -69,7 +69,7 @@
 		loading.proxy = false;
 	});
 	async function changeProxySetting() {
-		if (!destination.remoteVerified) return
+		if (!destination.remoteVerified) return;
 		loading.proxy = true;
 		if (!cannotDisable) {
 			const isProxyActivated = destination.isCoolifyProxyUsed;
@@ -166,7 +166,6 @@
 
 <form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
 	<div class="flex space-x-1 pb-5">
-		<div class="title font-bold">{$t('forms.configuration')}</div>
 		{#if $appSession.isAdmin}
 			<button
 				type="submit"
@@ -197,9 +196,10 @@
 		{/if}
 	</div>
 	<div class="grid grid-cols-2 items-center px-10 ">
-		<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
+		<label for="name">{$t('forms.name')}</label>
 		<input
 			name="name"
+			class="w-full"
 			placeholder={$t('forms.name')}
 			disabled={!$appSession.isAdmin}
 			readonly={!$appSession.isAdmin}
@@ -207,7 +207,7 @@
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center px-10">
-		<label for="network" class="text-base font-bold text-stone-100">{$t('forms.network')}</label>
+		<label for="network">{$t('forms.network')}</label>
 		<CopyPasswordField
 			id="network"
 			readonly
@@ -218,7 +218,7 @@
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center px-10">
-		<label for="remoteIpAddress" class="text-base font-bold text-stone-100">IP Address</label>
+		<label for="remoteIpAddress">IP Address</label>
 		<CopyPasswordField
 			id="remoteIpAddress"
 			readonly
@@ -228,7 +228,7 @@
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center px-10">
-		<label for="remoteUser" class="text-base font-bold text-stone-100">User</label>
+		<label for="remoteUser">User</label>
 		<CopyPasswordField
 			id="remoteUser"
 			readonly
@@ -238,7 +238,7 @@
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center px-10">
-		<label for="remotePort" class="text-base font-bold text-stone-100">Port</label>
+		<label for="remotePort">Port</label>
 		<CopyPasswordField
 			id="remotePort"
 			readonly
@@ -248,7 +248,7 @@
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center px-10">
-		<label for="sshKey" class="text-base font-bold text-stone-100">SSH Key</label>
+		<label for="sshKey">SSH Key</label>
 		<a
 			href={!isDisabled ? `/destinations/${id}/configuration/sshkey?from=/destinations/${id}` : ''}
 			class="no-underline"
@@ -256,7 +256,7 @@
 				value={destination.sshKey.name}
 				readonly
 				id="sshKey"
-				class="cursor-pointer hover:bg-coolgray-500"
+				class="cursor-pointer w-full"
 			/></a
 		>
 	</div>
@@ -268,7 +268,7 @@
 			bind:setting={destination.isCoolifyProxyUsed}
 			on:click={changeProxySetting}
 			title={$t('destination.use_coolify_proxy')}
-			description={`This will install a proxy on the destination to allow you to access your applications and services without any manual configuration.${
+			description={`Install & configure a proxy (based on Traefik) on the destination to allow you to access your applications and services without any manual configuration.${
 				cannotDisable
 					? '<span class="font-bold text-white">You cannot disable this proxy as FQDN is configured for Coolify.</span>'
 					: ''

@@ -14,12 +14,8 @@ export default async function (data) {
 		dockerFileLocation
 	} = data
 	try {
-		const file = `${workdir}${dockerFileLocation}`;
-		let dockerFileOut = `${workdir}`;
-		if (baseDirectory) {
-			dockerFileOut = `${workdir}${baseDirectory}`;
-			workdir = `${workdir}${baseDirectory}`;
-		}
+		const file = `${workdir}${baseDirectory}${dockerFileLocation}`;
+		data.workdir = `${workdir}${baseDirectory}`;
 		const Dockerfile: Array<string> = (await fs.readFile(`${file}`, 'utf8'))
 			.toString()
 			.trim()
@@ -28,7 +24,6 @@ export default async function (data) {
 		if (secrets.length > 0) {
 			secrets.forEach((secret) => {
 				if (secret.isBuildSecret) {
-					// TODO: fix secrets
 					if (
 						(pullmergeRequestId && secret.isPRMRSecret) ||
 						(!pullmergeRequestId && !secret.isPRMRSecret)
@@ -45,7 +40,7 @@ export default async function (data) {
 			});
 		}
 
-		await fs.writeFile(`${dockerFileOut}${dockerFileLocation}`, Dockerfile.join('\n'));
+		await fs.writeFile(`${workdir}${dockerFileLocation}`, Dockerfile.join('\n'));
 		await buildImage(data);
 	} catch (error) {
 		throw error;

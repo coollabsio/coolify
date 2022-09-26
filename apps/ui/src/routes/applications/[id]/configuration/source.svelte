@@ -68,12 +68,7 @@
 	}
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">
-		{$t('application.configuration.select_a_git_source')}
-	</div>
-</div>
-<div class="max-w-5xl mx-auto ">
+<div class="max-w-screen-2xl mx-auto px-9">
 	<div class="title pb-8">Git App</div>
 	<div class="flex flex-wrap justify-center">
 		{#if !filteredSources || ownSources.length === 0}
@@ -103,7 +98,7 @@
 				</div>
 			</div>
 		{:else}
-			<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row ">
+			<div class="flex flex-col lg:flex-row lg:flex-wrap justify-center">
 				{#each ownSources as source}
 					<div class="p-2 relative">
 						<div class="absolute -m-4">
@@ -147,7 +142,7 @@
 							<button
 								disabled={source.gitlabApp && !source.gitlabAppId}
 								type="submit"
-								class="disabled:opacity-95 bg-coolgray-200 disabled:text-white box-selection hover:bg-orange-700 group"
+								class="disabled:opacity-95 bg-coolgray-200 disabled:text-white box-selection hover:bg-orange-700 group w-full lg:w-96"
 								class:border-red-500={source.gitlabApp && !source.gitlabAppId}
 								class:border-0={source.gitlabApp && !source.gitlabAppId}
 								class:border-l-4={source.gitlabApp && !source.gitlabAppId}
@@ -192,7 +187,7 @@
 			</div>
 		{/if}
 	</div>
-	<div class="flex items-center">
+	<div class="flex flex-row items-center">
 		<div class="title py-4">Public Repository</div>
 		<DocLink url="https://docs.coollabs.io/coolify/applications/#public-repository" />
 	</div>

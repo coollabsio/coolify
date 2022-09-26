@@ -1,12 +1,8 @@
 <script lang="ts">
-	import { createEventDispatcher, onDestroy, onMount } from 'svelte';
-	const dispatch = createEventDispatcher();
-
+	import { onDestroy, onMount } from 'svelte';
 	import { page } from '$app/stores';
-
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
-	import LoadingLogs from '$lib/components/LoadingLogs.svelte';
 	import { errorNotification } from '$lib/common';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { day } from '$lib/dayjs';
@@ -15,19 +11,30 @@
 	let logs: any = [];
 	let currentStatus: any;
 	let streamInterval: any;
-	let followingBuild: any;
+	let followingLogs: any;
 	let followingInterval: any;
 	let logsEl: any;
 	let fromDb = false;
 	let cancelInprogress = false;
-
+	let position = 0;
 	const { id } = $page.params;
 
 	const cleanAnsiCodes = (str: string) => str.replace(/\x1B\[(\d+)m/g, '');
 
+	function detect() {
+		if (position < logsEl.scrollTop) {
+			position = logsEl.scrollTop;
+		} else {
+			if (followingLogs) {
+				clearInterval(followingInterval);
+				followingLogs = false;
+			}
+			position = logsEl.scrollTop;
+		}
+	}
 	function followBuild() {
-		followingBuild = !followingBuild;
-		if (followingBuild) {
+		followingLogs = !followingLogs;
+		if (followingLogs) {
 			followingInterval = setInterval(() => {
 				logsEl.scrollTop = logsEl.scrollHeight;
 				window.scrollTo(0, document.body.scrollHeight);
@@ -63,11 +70,10 @@
 					status = data.status;
 					currentStatus = status;
 					fromDb = data.fromDb;
-					
+
 					logs = logs.concat(
 						data.logs.map((log: any) => ({ ...log, line: cleanAnsiCodes(log.line) }))
 					);
-					dispatch('updateBuildStatus', { status, took: data.took });
 				} catch (error) {
 					return errorNotification(error);
 				}
@@ -98,86 +104,86 @@
 	});
 </script>
 
-<div class="relative ">
-	{#if currentStatus === 'running'}
-		<LoadingLogs />
-	{/if}
-	{#if currentStatus === 'queued'}
-		<div class="text-center font-bold text-xl">{$t('application.build.queued_waiting_exec')}</div>
-	{:else}
-		<div class="flex justify-end sticky top-0 p-2 mx-1">
-			<button
-				id="follow"
-				on:click={followBuild}
-				class="bg-transparent btn btn-sm btn-link hover:text-green-500 hover:bg-coolgray-500"
-				class:text-green-500={followingBuild}
+	<div class="flex justify-start top-0 pb-2 space-x-2">
+		<button
+			on:click={followBuild}
+			class="btn btn-sm bg-coollabs"
+			disabled={currentStatus !== 'running'}
+			class:bg-coolgray-300={followingLogs || currentStatus !== 'running'}
+			class:text-applications={followingLogs}
+		>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				class="w-6 h-6 mr-2"
+				viewBox="0 0 24 24"
+				stroke-width="1.5"
+				stroke="currentColor"
+				fill="none"
+				stroke-linecap="round"
+				stroke-linejoin="round"
 			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6"
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<circle cx="12" cy="12" r="9" />
-					<line x1="8" y1="12" x2="12" y2="16" />
-					<line x1="12" y1="8" x2="12" y2="16" />
-					<line x1="16" y1="12" x2="12" y2="16" />
-				</svg>
-			</button>
-			<Tooltip triggeredBy="#follow">Follow Logs</Tooltip>
-			{#if currentStatus === 'running'}
-				<button
-					id="cancel"
-					on:click={cancelBuild}
-					class:animation-spin={cancelInprogress}
-					class="bg-transparent btn btn-sm btn-link hover:text-red-500 hover:bg-coolgray-500"
-				>
-					{#if cancelInprogress}
-						Cancelling...
-					{:else}
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="w-6 h-6"
-							viewBox="0 0 24 24"
-							stroke-width="1.5"
-							stroke="currentColor"
-							fill="none"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						>
-							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-							<circle cx="12" cy="12" r="9" />
-							<path d="M10 10l4 4m0 -4l-4 4" />
-						</svg>
-					{/if}
-				</button>
-				<Tooltip triggeredBy="#cancel">Cancel build</Tooltip>
-			{/if}
-		</div>
-		{#if logs.length > 0}
-			<div
-				class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
-				bind:this={logsEl}
+				<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+				<circle cx="12" cy="12" r="9" />
+				<line x1="8" y1="12" x2="12" y2="16" />
+				<line x1="12" y1="8" x2="12" y2="16" />
+				<line x1="16" y1="12" x2="12" y2="16" />
+			</svg>
+
+			{followingLogs ? 'Following Logs...' : 'Follow Logs'}
+		</button>
+
+		<button
+			on:click={cancelBuild}
+			class:animation-spin={cancelInprogress}
+			class="btn btn-sm"
+			disabled={currentStatus !== 'running'}
+			class:bg-coolgray-300={cancelInprogress || currentStatus !== 'running'}
+		>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				class="w-6 h-6 mr-2"
+				viewBox="0 0 24 24"
+				stroke-width="1.5"
+				stroke="currentColor"
+				fill="none"
+				stroke-linecap="round"
+				stroke-linejoin="round"
 			>
-				{#each logs as log}
-					{#if fromDb}
-						<div>{log.line + '\n'}</div>
-					{:else}
-						<div>[{day.unix(log.time).format('HH:mm:ss.SSS')}] {log.line + '\n'}</div>
-					{/if}
-				{/each}
-			</div>
-		{:else}
-			<div
-				class="font-mono leading-6 text-left text-md tracking-tighter rounded bg-coolgray-200 py-5 px-6 whitespace-pre-wrap break-words overflow-auto max-h-[80vh] -mt-12 overflow-y-scroll scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200"
-			>
-				No logs found.
-			</div>
+				<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+				<circle cx="12" cy="12" r="9" />
+				<path d="M10 10l4 4m0 -4l-4 4" />
+			</svg>
+			{cancelInprogress ? 'Cancelling...' : 'Cancel Build'}
+		</button>
+		{#if currentStatus === 'running'}
+		<button id="streaming" class="btn btn-sm bg-transparent border-none loading" />
+		<Tooltip triggeredBy="#streaming">Streaming logs</Tooltip>
 		{/if}
+	</div>
+	{#if currentStatus === 'queued'}
+		<div
+			class="font-mono w-full bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded mb-20 flex flex-col whitespace-nowrap scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1"
+		>
+			{$t('application.build.queued_waiting_exec')}
+		</div>
+	{:else if logs.length > 0}
+		<div
+			bind:this={logsEl}
+			on:scroll={detect}
+			class="font-mono w-full bg-coolgray-100 border border-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded mb-20 flex flex-col scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1"
+		>
+			{#each logs as log}
+				{#if fromDb}
+					<div>{log.line + '\n'}</div>
+				{:else}
+					<div>[{day.unix(log.time).format('HH:mm:ss.SSS')}] {log.line + '\n'}</div>
+				{/if}
+			{/each}
+		</div>
+	{:else}
+		<div
+			class="font-mono w-full bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded mb-20 flex flex-col whitespace-nowrap scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1"
+		>
+			No logs found yet.
+		</div>
 	{/if}
-</div>
