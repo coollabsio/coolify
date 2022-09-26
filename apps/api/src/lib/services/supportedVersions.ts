@@ -235,7 +235,7 @@ export const supportedServiceTypesAndVersions = [
 	// },
 	{
 		name: 'grafana',
-		fancyName: 'Grafana Dashboard',
+		fancyName: 'Grafana',
 		baseImage: 'grafana/grafana',
 		images: [],
 		versions: ['latest', '9.1.3', '9.1.2', '9.0.8', '8.3.11', '8.4.11', '8.5.11'],
