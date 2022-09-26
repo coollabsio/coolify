@@ -152,7 +152,7 @@
 			</div>
 			<div class="font-mono w-full rounder bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded-md mb-20 flex flex-col whitespace-nowrap -mt-12 scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1">
 				{#each logs as log}
-					<p>{log.line + '\n'}</p>
+					<p>{log + '\n'}</p>
 				{/each}
 			</div>
 		</div>
