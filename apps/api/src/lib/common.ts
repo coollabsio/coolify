@@ -546,6 +546,7 @@ export async function createRemoteEngineConfiguration(id: string) {
 			StrictHostKeyChecking: 'no',
 			ControlMaster: 'auto',
 			ControlPath: `${homedir}/.ssh/coolify-%r@%h:%p`,
+			ControlPersist: '10m'
 		})
 	}
 	const found = config.find({ Host: remoteIpAddress });

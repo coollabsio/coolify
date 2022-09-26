@@ -53,59 +53,51 @@ async function checkFluentBit() {
         }
     }
 }
-async function copyRemoteCertificates(certificate: any, dockerId: string, remoteIpAddress: string) {
+async function copyRemoteCertificates(id: string, dockerId: string, remoteIpAddress: string) {
     try {
-        const { id, key, cert } = certificate
-        const decryptedKey = decrypt(key)
-        await fs.writeFile(`/tmp/${id}-key.pem`, decryptedKey)
-        await fs.writeFile(`/tmp/${id}-cert.pem`, cert)
         await asyncExecShell(`scp /tmp/${id}-cert.pem /tmp/${id}-key.pem ${remoteIpAddress}:/tmp/`)
         await executeSSHCmd({ dockerId, command: `docker exec coolify-proxy sh -c 'test -d /etc/traefik/acme/custom/ || mkdir -p /etc/traefik/acme/custom/'` })
         await executeSSHCmd({ dockerId, command: `docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/` })
         await executeSSHCmd({ dockerId, command: `docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/` })
-
     } catch (error) {
-        console.log('Error copying SSL certificates to remote engine', error)
+        console.log({ error })
     }
 }
-async function copyLocalCertificates(certificate: any) {
+async function copyLocalCertificates(id: string) {
     try {
-        const { id, key, cert } = certificate
-        const decryptedKey = decrypt(key)
         await asyncExecShell(`docker exec coolify-proxy sh -c 'test -d /etc/traefik/acme/custom/ || mkdir -p /etc/traefik/acme/custom/'`)
-        await fs.writeFile(`/tmp/${id}-key.pem`, decryptedKey)
-        await fs.writeFile(`/tmp/${id}-cert.pem`, cert)
         await asyncExecShell(`docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/`)
         await asyncExecShell(`docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/`)
     } catch (error) {
-        console.log('Error copying SSL certificates to remote engine', error)
+        console.log({ error })
     }
 }
 async function copySSLCertificates() {
     try {
+        const pAll = await import('p-all');
+        const actions = []
         const certificates = await prisma.certificate.findMany({ include: { team: true } })
         const teamIds = certificates.map(c => c.teamId)
         const destinations = await prisma.destinationDocker.findMany({ where: { isCoolifyProxyUsed: true, teams: { some: { id: { in: [...teamIds] } } } } })
-        let promises = []
-        for (const destination of destinations) {
-            if (destination.remoteEngine) {
-                const { id: dockerId, remoteIpAddress, remoteVerified } = destination
-                if (!remoteVerified) {
-                    continue;
-                }
-                for (const certificate of certificates) {
-                    promises.push(copyRemoteCertificates(certificate, dockerId, remoteIpAddress))
-                }
-            } else {
-                for (const certificate of certificates) {
-                    promises.push(copyLocalCertificates(certificate))
+        for (const certificate of certificates) {
+            const { id, key, cert } = certificate
+            const decryptedKey = decrypt(key)
+            await fs.writeFile(`/tmp/${id}-key.pem`, decryptedKey)
+            await fs.writeFile(`/tmp/${id}-cert.pem`, cert)
+            for (const destination of destinations) {
+                if (destination.remoteEngine) {
+                    if (destination.remoteVerified) {
+                        const { id: dockerId, remoteIpAddress } = destination
+                        actions.push(async () => copyRemoteCertificates(id, dockerId, remoteIpAddress))
+                    }
+                } else {
+                    actions.push(async () => copyLocalCertificates(id))
                 }
             }
         }
-        await Promise.all(promises)
-
+        await pAll.default(actions, { concurrency: 1 })
     } catch (error) {
-        console.log('Error copying SSL certificates', error)
+        console.log(error)
     } finally {
         await asyncExecShell(`find /tmp/ -maxdepth 1 -type f -name '*-*.pem' -delete`)
     }
@@ -260,7 +252,8 @@ async function cleanupStorage() {
 (async () => {
     let status = {
         cleanupStorage: false,
-        autoUpdater: false
+        autoUpdater: false,
+        copySSLCertificates: false,
     }
     if (parentPort) {
         parentPort.on('message', async (message) => {
@@ -291,7 +284,11 @@ async function cleanupStorage() {
                     return;
                 }
                 if (message === 'action:copySSLCertificates') {
-                    await copySSLCertificates();
+                    if (!status.copySSLCertificates) {
+                        status.copySSLCertificates = true
+                        await copySSLCertificates();
+                        status.copySSLCertificates = false
+                    }
                     return;
                 }
                 if (message === 'action:autoUpdater') {
