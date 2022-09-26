@@ -148,8 +148,8 @@
 					class="flex cursor-pointer items-center justify-center py-4 no-underline transition-all duration-150 hover:bg-coolgray-300 hover:shadow-xl"
 					class:bg-coolgray-200={$selectedBuildId === build.id}
 				>
-					<div class="flex-col px-2 text-center min-w-[6rem]">
-						<div class="text-sm font-bold">
+					<div class="flex-col px-2 text-center min-w-[10rem]">
+						<div class="text-sm font-bold truncate">
 							{build.branch || application.branch}
 						</div>
 						<div class="text-xs">

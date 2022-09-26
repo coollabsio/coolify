@@ -98,7 +98,7 @@
 				</div>
 			</div>
 		{:else}
-			<div class="flex flex-col justify-center">
+			<div class="flex flex-col lg:flex-row lg:flex-wrap justify-center">
 				{#each ownSources as source}
 					<div class="p-2 relative">
 						<div class="absolute -m-4">
@@ -142,7 +142,7 @@
 							<button
 								disabled={source.gitlabApp && !source.gitlabAppId}
 								type="submit"
-								class="disabled:opacity-95 bg-coolgray-200 disabled:text-white box-selection hover:bg-orange-700 group"
+								class="disabled:opacity-95 bg-coolgray-200 disabled:text-white box-selection hover:bg-orange-700 group w-full lg:w-96"
 								class:border-red-500={source.gitlabApp && !source.gitlabAppId}
 								class:border-0={source.gitlabApp && !source.gitlabAppId}
 								class:border-l-4={source.gitlabApp && !source.gitlabAppId}
