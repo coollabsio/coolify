@@ -59,6 +59,7 @@
 	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
 	import { t } from '$lib/translations';
+	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import {
 		appSession,
 		status,
@@ -75,9 +76,24 @@
 
 	let statusInterval: any;
 	let forceDelete = false;
-	const { id } = $page.params;
 
+	const { id } = $page.params;
 	$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
+
+	async function deleteApplication(name: string, force: boolean) {
+		const sure = confirm($t('application.confirm_to_delete', { name }));
+		if (sure) {
+			try {
+				await del(`/applications/${id}`, { id, force });
+				return await goto('/');
+			} catch (error) {
+				if (error.message.startsWith(`Command failed: SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid`)) {
+					forceDelete = true;
+				}
+				return errorNotification(error);
+			} 
+		}
+	}
 
 	async function handleDeploySubmit(forceRebuild = false) {
 		if (!$isDeploymentEnabled) return;
@@ -172,13 +188,13 @@
 </script>
 
 <div class="mx-auto max-w-screen-2xl px-6 grid grid-cols-1 lg:grid-cols-2">
-	<nav class="header flex flex-row order-2 lg:order-1 px-0 lg:px-4">
+	<nav class="header flex flex-row order-2 lg:order-1 px-0 lg:px-4 items-start">
 		<div class="title lg:pb-10">
 			{#if $page.url.pathname === `/applications/${id}/configuration/source`}
 				Select a Source
 			{:else if $page.url.pathname === `/applications/${id}/configuration/destination`}
 				Select a Destination
-				{:else if $page.url.pathname === `/applications/${id}/configuration/repository`}
+			{:else if $page.url.pathname === `/applications/${id}/configuration/repository`}
 				Select a Repository
 			{:else if $page.url.pathname === `/applications/${id}/configuration/buildpack`}
 				Select a Build Pack
@@ -195,6 +211,32 @@
 				</div>
 			{/if}
 		</div>
+		{#if $page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
+		<div class="px-2">
+			{#if forceDelete}
+				<button
+					on:click={() => deleteApplication(application.name, true)}
+					disabled={!$appSession.isAdmin}
+					class:bg-red-600={$appSession.isAdmin}
+					class:hover:bg-red-500={$appSession.isAdmin}
+					class="btn btn-sm btn-error text-sm"
+				>
+					Force Delete Application
+				</button>
+			{:else}
+				<button
+					on:click={() => deleteApplication(application.name, false)}
+					disabled={!$appSession.isAdmin}
+					class:bg-red-600={$appSession.isAdmin}
+					class:hover:bg-red-500={$appSession.isAdmin}
+					class="btn btn-sm btn-error text-sm"
+				>
+				 Delete Application
+				</button>
+			{/if}
+		</div>
+
+		{/if}
 	</nav>
 	<div
 		class="pt-4 flex flex-row items-start justify-center lg:justify-end space-x-2 order-1 lg:order-2"
@@ -320,8 +362,7 @@
 				</svg>
 			</button>
 			<Tooltip triggeredBy="#forceredeploy">Force Redeploy (without cache)</Tooltip>
-		{:else}
-		{#if $isDeploymentEnabled}
+		{:else if $isDeploymentEnabled}
 			<button
 				class="icons flex items-center font-bold"
 				disabled={!$isDeploymentEnabled}
@@ -342,7 +383,6 @@
 				</svg>
 				Deploy
 			</button>
-			{/if}
 		{/if}
 
 		{#if $location && $status.application.isRunning}
