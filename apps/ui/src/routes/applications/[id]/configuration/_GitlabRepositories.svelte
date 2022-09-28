@@ -328,8 +328,9 @@
 </script>
 
 <form on:submit={handleSubmit}>
-	<div class="flex flex-col space-y-2 px-4 xl:flex-row xl:space-y-0 xl:space-x-2 ">
+	<div class="flex lg:flex-row flex-col lg:space-y-0 space-y-2 space-x-0 lg:space-x-2 items-center lg:justify-center">
 		<div class="custom-select-wrapper">
+			<label for="groups" class="pb-1">Groups</label>
 			<Select
 				placeholder={loading.base
 					? $t('application.configuration.loading_groups')
@@ -355,6 +356,7 @@
 			/>
 		</div>
 		<div class="custom-select-wrapper">
+			<label for="projects" class="pb-1">Projects</label>
 			<Select
 				placeholder={loading.projects
 					? $t('application.configuration.loading_projects')
@@ -380,6 +382,7 @@
 			/>
 		</div>
 		<div class="custom-select-wrapper">
+			<label for="branches" class="pb-1">Branches</label>
 			<Select
 				placeholder={loading.branches
 					? $t('application.configuration.loading_branches')
