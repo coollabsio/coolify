@@ -472,7 +472,8 @@ export const saveBuildLog = async ({
 
 	if (isDev) {
 		console.debug(`[${applicationId}] ${addTimestamp}`);
-	}
+		return
+	} 
 	try {
 		return await got.post(`${fluentBitUrl}/${applicationId}_buildlog_${buildId}.csv`, {
 			json: {
@@ -697,6 +698,7 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 	if (installCommand) {
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
+	// Dockerfile.push(`ARG CACHEBUST=1`);
 	Dockerfile.push(`RUN ${buildCommand}`);
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
 	await buildImage({ ...data, isCache: true });
