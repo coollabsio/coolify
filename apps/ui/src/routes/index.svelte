@@ -127,15 +127,15 @@
 
 	async function getStatus(resources: any, force: boolean = false) {
 		const { id, buildPack, dualCerts, type } = resources;
-		if (buildPack && applications.length > 10 && !force) {
+		if (buildPack && applications.length + filtered.otherApplications.length > 10 && !force) {
 			noInitialStatus.applications = true;
 			return;
 		}
-		if (type && services.length > 10 && !force) {
+		if (type && services.length + filtered.otherServices.length > 10 && !force) {
 			noInitialStatus.services = true;
 			return;
 		}
-		if (databases.length > 10 && !force) {
+		if (databases.length + filtered.otherDatabases.length > 10 && !force) {
 			noInitialStatus.databases = true;
 			return;
 		}
