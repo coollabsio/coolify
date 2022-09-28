@@ -759,27 +759,32 @@
 				{/if}
 				{#if application.buildPack === 'docker'}
 					<div class="grid grid-cols-2 items-center pb-4">
-						<label for="dockerFileLocation"
-						class="mb-10"
+						<label for="dockerFileLocation" class="mb-10"
 							>Dockerfile Location <Explainer
 								explanation={"Should be absolute path, like <span class='text-settings font-bold'>/data/Dockerfile</span> or <span class='text-settings font-bold'>/Dockerfile.</span>"}
 							/></label
 						>
 						<div class="form-control w-full">
 							<input
-							class="w-full input"
-							disabled={isDisabled}
-							readonly={!$appSession.isAdmin}
-							name="dockerFileLocation"
-							id="dockerFileLocation"
-							bind:value={application.dockerFileLocation}
-							placeholder="default: /Dockerfile"
-						/>
-							<label class="label">
-							  <span class="label-text-alt text-xs">Path: {application.baseDirectory.replace(/^\/$/,'')}{application.dockerFileLocation}</span>
-							</label>
-						  </div>
-						
+								class="w-full input"
+								disabled={isDisabled}
+								readonly={!$appSession.isAdmin}
+								name="dockerFileLocation"
+								id="dockerFileLocation"
+								bind:value={application.dockerFileLocation}
+								placeholder="default: /Dockerfile"
+							/>
+							{#if application?.baseDirectory}
+								<label class="label">
+									<span class="label-text-alt text-xs"
+										>Path: {application.baseDirectory.replace(
+											/^\/$/,
+											''
+										)}{application.dockerFileLocation}</span
+									>
+								</label>
+							{/if}
+						</div>
 					</div>
 				{/if}
 				{#if !notNodeDeployments.includes(application.buildPack)}
