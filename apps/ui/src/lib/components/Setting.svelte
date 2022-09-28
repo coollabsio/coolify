@@ -3,6 +3,7 @@
 	import Tooltip from './Tooltip.svelte';
 
 	export let id: any;
+	export let customClass: any = null;
 	export let setting: any;
 	export let title: any;
 	export let description: any;
@@ -24,7 +25,7 @@
 		</label>
 	</div>
 </div>
-<div class:text-center={isCenter} class="flex justify-center">
+<div class:text-center={isCenter} class={`flex justify-center ${customClass}`}>
 	<div
 		on:click
 		aria-pressed="false"

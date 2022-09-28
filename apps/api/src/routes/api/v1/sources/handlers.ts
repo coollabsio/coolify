@@ -9,7 +9,7 @@ export async function listSources(request: FastifyRequest) {
     try {
         const teamId = request.user?.teamId;
         const sources = await prisma.gitSource.findMany({
-            where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+            where: { OR: [{ teams: { some: { id: teamId === "0" ? undefined : teamId } } }, { isSystemWide: true }] },
             include: { teams: true, githubApp: true, gitlabApp: true }
         });
         return {
@@ -22,11 +22,11 @@ export async function listSources(request: FastifyRequest) {
 export async function saveSource(request, reply) {
     try {
         const { id } = request.params
-        let { name, htmlUrl, apiUrl, customPort } = request.body
+        let { name, htmlUrl, apiUrl, customPort, isSystemWide } = request.body
         if (customPort) customPort = Number(customPort)
         await prisma.gitSource.update({
             where: { id },
-            data: { name, htmlUrl, apiUrl, customPort }
+            data: { name, htmlUrl, apiUrl, customPort, isSystemWide }
         });
         return reply.code(201).send()
     } catch ({ status, message }) {
@@ -56,7 +56,7 @@ export async function getSource(request: FastifyRequest<OnlyId>) {
         }
 
         const source = await prisma.gitSource.findFirst({
-            where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+            where: { id, OR: [{ teams: { some: { id: teamId === "0" ? undefined : teamId } } }, { isSystemWide: true }] },
             include: { githubApp: true, gitlabApp: true }
         });
         if (!source) {
@@ -104,7 +104,7 @@ export async function saveGitHubSource(request: FastifyRequest<SaveGitHubSource>
         const { teamId } = request.user
 
         const { id } = request.params
-        let { name, htmlUrl, apiUrl, organization, customPort } = request.body
+        let { name, htmlUrl, apiUrl, organization, customPort, isSystemWide } = request.body
 
         if (customPort) customPort = Number(customPort)
         if (id === 'new') {
@@ -117,6 +117,7 @@ export async function saveGitHubSource(request: FastifyRequest<SaveGitHubSource>
                     apiUrl,
                     organization,
                     customPort,
+                    isSystemWide,
                     type: 'github',
                     teams: { connect: { id: teamId } }
                 }
