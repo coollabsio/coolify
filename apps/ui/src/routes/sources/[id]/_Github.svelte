@@ -8,6 +8,7 @@
 	import { addToast, appSession } from '$lib/store';
 	import { dev } from '$app/env';
 	import Explainer from '$lib/components/Explainer.svelte';
+	import Setting from '$lib/components/Setting.svelte';
 
 	const { id } = $page.params;
 
@@ -21,7 +22,8 @@
 			await post(`/sources/${id}`, {
 				name: source.name,
 				htmlUrl: source.htmlUrl.replace(/\/$/, ''),
-				apiUrl: source.apiUrl.replace(/\/$/, '')
+				apiUrl: source.apiUrl.replace(/\/$/, ''),
+				isSystemWide: source.isSystemWide
 			});
 			return addToast({
 				message: 'Configuration saved.',
@@ -43,7 +45,8 @@
 				htmlUrl: source.htmlUrl.replace(/\/$/, ''),
 				apiUrl: source.apiUrl.replace(/\/$/, ''),
 				organization: source.organization,
-				customPort: source.customPort
+				customPort: source.customPort,
+				isSystemWide: source.isSystemWide
 			});
 			const { organization, htmlUrl } = source;
 			const { fqdn, ipv4, ipv6 } = settings;
@@ -88,6 +91,16 @@
 			return errorNotification(error);
 		}
 	}
+	async function changeSettings(name: any, save: boolean) {
+		if ($appSession.teamId === '0') {
+			if (name === 'isSystemWide') {
+				source.isSystemWide = !source.isSystemWide;
+			}
+			if (save) {
+				await handleSubmit();
+			}
+		}
+	}
 </script>
 
 <div class="mx-auto max-w-6xl lg:px-6 px-3">
@@ -104,13 +117,13 @@
 				{/if}
 			</div>
 			<div class="grid gap-2 grid-cols-2 auto-rows-max">
-				<label for="name" class="text-base font-bold text-stone-100">Name</label>
+				<label for="name">Name</label>
 				<input class="w-full" name="name" id="name" required bind:value={source.name} />
-				<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
+				<label for="htmlUrl">HTML URL</label>
 				<input class="w-full" name="htmlUrl" id="htmlUrl" required bind:value={source.htmlUrl} />
-				<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
+				<label for="apiUrl">API URL</label>
 				<input class="w-full" name="apiUrl" id="apiUrl" required bind:value={source.apiUrl} />
-				<label for="customPort" class="text-base font-bold text-stone-100"
+				<label for="customPort"
 					>Custom SSH Port <Explainer
 						explanation={'If you use a self-hosted version of Git, you can provide custom port for all the Git related actions.'}
 					/></label
@@ -124,7 +137,7 @@
 					required
 					value={source.customPort}
 				/>
-				<label for="organization" class="pt-2 text-base font-bold text-stone-100"
+				<label for="organization" class="pt-2"
 					>Organization
 					<Explainer
 						explanation={"Fill it if you would like to use an organization's as your Git Source. Otherwise your user will be used."}
@@ -137,14 +150,26 @@
 					placeholder="eg: coollabsio"
 					bind:value={source.organization}
 				/>
+				<Setting
+					customClass="pt-4"
+					isBeta={true}
+					id="autodeploy"
+					isCenter={false}
+					bind:setting={source.isSystemWide}
+					on:click={() => changeSettings('isSystemWide', false)}
+					title="System Wide Git Source"
+					description="System Wide Git Sources are available to all the users in your Coolify instance. <br><br> <span class='font-bold text-warning'>Use with caution, as it can be a security risk.</span>"
+				/>
 			</div>
 		</form>
 	{:else if source.githubApp?.installationId}
 		<form on:submit|preventDefault={handleSubmit} class="py-4">
 			<div class="flex lg:flex-row lg:justify-between flex-col space-y-3 w-full lg:items-center">
 				<h1 class="title">{$t('general')}</h1>
-				{#if $appSession.isAdmin}
-					<div class="flex flex-col lg:flex-row lg:space-x-4 lg:w-fit space-y-2 lg:space-y-0 w-full">
+				{#if $appSession.isAdmin && $appSession.teamId === '0'}
+					<div
+						class="flex flex-col lg:flex-row lg:space-x-4 lg:w-fit space-y-2 lg:space-y-0 w-full"
+					>
 						<button class="btn btn-sm bg-sources" type="submit" disabled={loading}
 							>{loading ? 'Saving...' : 'Save'}</button
 						>
@@ -159,9 +184,16 @@
 				{/if}
 			</div>
 			<div class="grid gap-2 grid-cols-2 auto-rows-max mt-4">
-				<label for="name" class="text-base font-bold text-stone-100">{$t('forms.name')}</label>
-				<input class="w-full" name="name" id="name" required bind:value={source.name} />
-				<label for="htmlUrl" class="text-base font-bold text-stone-100">HTML URL</label>
+				<label for="name">{$t('forms.name')}</label>
+				<input
+					class="w-full"
+					name="name"
+					id="name"
+					required
+					bind:value={source.name}
+					disabled={$appSession.teamId !== '0'}
+				/>
+				<label for="htmlUrl">HTML URL</label>
 				<input
 					class="w-full"
 					name="htmlUrl"
@@ -171,7 +203,7 @@
 					required
 					bind:value={source.htmlUrl}
 				/>
-				<label for="apiUrl" class="text-base font-bold text-stone-100">API URL</label>
+				<label for="apiUrl">API URL</label>
 				<input
 					class="w-full"
 					name="apiUrl"
@@ -181,7 +213,7 @@
 					readonly={source.githubAppId}
 					bind:value={source.apiUrl}
 				/>
-				<label for="customPort" class="text-base font-bold text-stone-100"
+				<label for="customPort"
 					>Custom SSH Port <Explainer
 						explanation="If you use a self-hosted version of Git, you can provide custom port for all the Git related actions."
 					/></label
@@ -195,9 +227,7 @@
 					required
 					value={source.customPort}
 				/>
-				<label for="organization" class="pt-2 text-base font-bold text-stone-100"
-					>Organization</label
-				>
+				<label for="organization" class="pt-2">Organization</label>
 				<input
 					class="w-full"
 					readonly
@@ -206,6 +236,17 @@
 					id="organization"
 					placeholder="eg: coollabsio"
 					bind:value={source.organization}
+				/>
+				<Setting
+					customClass="pt-4"
+					isBeta={true}
+					id="autodeploy"
+					isCenter={false}
+					disabled={$appSession.teamId !== '0'}
+					bind:setting={source.isSystemWide}
+					on:click={() => changeSettings('isSystemWide', true)}
+					title="System Wide Git Source"
+					description="System Wide Git Sources are available to all the users in your Coolify instance. <br><br> <span class='font-bold text-warning'>Use with caution, as it can be a security risk.</span>"
 				/>
 			</div>
 		</form>

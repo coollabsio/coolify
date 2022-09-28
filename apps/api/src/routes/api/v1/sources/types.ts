@@ -7,6 +7,7 @@ export interface SaveGitHubSource extends OnlyId {
         apiUrl: string,
         organization: string,
         customPort: number,
+        isSystemWide: boolean
     }
 }
 export interface SaveGitLabSource extends OnlyId {

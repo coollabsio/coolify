@@ -1,10 +1,13 @@
 <script lang="ts">
+	import Beta from './Beta.svelte';
 	import Explaner from './Explainer.svelte';
 	import Tooltip from './Tooltip.svelte';
 
 	export let id: any;
+	export let customClass: any = null;
 	export let setting: any;
 	export let title: any;
+	export let isBeta: any = false;
 	export let description: any;
 	export let isCenter = true;
 	export let disabled = false;
@@ -18,13 +21,16 @@
 		<!-- svelte-ignore a11y-label-has-associated-control -->
 		<label>
 			{title}
+			{#if isBeta}
+				<Beta />
+			{/if}
 			{#if description && description !== ''}
 				<Explaner explanation={description} />
 			{/if}
 		</label>
 	</div>
 </div>
-<div class:text-center={isCenter} class="flex justify-center">
+<div class:text-center={isCenter} class={`flex justify-center ${customClass}`}>
 	<div
 		on:click
 		aria-pressed="false"

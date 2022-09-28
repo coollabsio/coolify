@@ -135,7 +135,7 @@ export async function showDashboard(request: FastifyRequest) {
 			include: { destinationDocker: true, teams: true },
 		});
 		const gitSources = await prisma.gitSource.findMany({
-			where: { teams: { some: { id: teamId === "0" ? undefined : teamId } } },
+			where: { OR: [{ teams: { some: { id: teamId === "0" ? undefined : teamId } } }, { isSystemWide: true }] },
 			include: { teams: true },
 		});
 		const destinations = await prisma.destinationDocker.findMany({

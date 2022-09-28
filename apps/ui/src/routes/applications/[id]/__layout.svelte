@@ -362,7 +362,7 @@
 				</svg>
 			</button>
 			<Tooltip triggeredBy="#forceredeploy">Force Redeploy (without cache)</Tooltip>
-		{:else if $isDeploymentEnabled}
+		{:else if $isDeploymentEnabled && !$page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
 			<button
 				class="icons flex items-center font-bold"
 				disabled={!$isDeploymentEnabled}

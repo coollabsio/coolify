@@ -299,6 +299,7 @@ model GitSource {
   updatedAt    DateTime      @updatedAt
   githubAppId  String?       @unique
   gitlabAppId  String?       @unique
+  isSystemWide Boolean       @default(false)
   gitlabApp    GitlabApp?    @relation(fields: [gitlabAppId], references: [id])
   githubApp    GithubApp?    @relation(fields: [githubAppId], references: [id])
   application  Application[]

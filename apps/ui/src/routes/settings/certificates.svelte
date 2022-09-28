@@ -20,6 +20,7 @@
 	export let certificates: any;
 	import { del, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
+	import Beta from '$lib/components/Beta.svelte';
 
 	let loading = {
 		save: false
@@ -55,40 +56,40 @@
 	}
 </script>
 
-	<div class="mx-auto w-full">
-		<div class="flex border-b border-coolgray-500 mb-6">
-			<div class="title font-bold pb-3 pr-4">SSL Certificates <span class="badge rounded bg-coollabs-gradient text-white">BETA</span></div>
-			<label for="my-modal" class="btn btn-sm btn-primary" on:click={() => (isModalActive = true)}
-				>Add SSL Certificate</label
-			>
-		</div>
-		{#if certificates.length > 0}
-			<table class="table w-full">
-				<thead>
-					<tr>
-						<th>Common Name</th>
-						<th>CreatedAt</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each certificates as cert}
-						<tr>
-							<td>{cert.commonName}</td>
-							<td>{cert.createdAt}</td>
-							<td
-								><button on:click={() => deleteCertificate(cert.id)} class="btn btn-sm btn-error"
-									>Delete</button
-								></td
-							>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		{:else}
-			<div class="text-sm">No SSL Certificate found</div>
-		{/if}
+<div class="mx-auto w-full">
+	<div class="flex border-b border-coolgray-500 mb-6">
+		<div class="title font-bold pb-3 pr-4">SSL Certificates <Beta /></div>
+		<label for="my-modal" class="btn btn-sm btn-primary" on:click={() => (isModalActive = true)}
+			>Add SSL Certificate</label
+		>
 	</div>
+	{#if certificates.length > 0}
+		<table class="table w-full">
+			<thead>
+				<tr>
+					<th>Common Name</th>
+					<th>CreatedAt</th>
+					<th>Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each certificates as cert}
+					<tr>
+						<td>{cert.commonName}</td>
+						<td>{cert.createdAt}</td>
+						<td
+							><button on:click={() => deleteCertificate(cert.id)} class="btn btn-sm btn-error"
+								>Delete</button
+							></td
+						>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	{:else}
+		<div class="text-sm">No SSL Certificate found</div>
+	{/if}
+</div>
 
 {#if isModalActive}
 	<input type="checkbox" id="my-modal" class="modal-toggle" />
