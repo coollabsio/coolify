@@ -1651,10 +1651,10 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 		}
 	} catch (error) { }
 	if (lowDiskSpace || force) {
-		if (isDev) {
-			if (!force) console.log(`[DEV MODE] Low disk space: ${lowDiskSpace}`);
-			return;
-		}
+		// if (isDev) {
+		// 	if (!force) console.log(`[DEV MODE] Low disk space: ${lowDiskSpace}`);
+		// 	return;
+		// }
 		try {
 			await executeDockerCmd({
 				dockerId,
