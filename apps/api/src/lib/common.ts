@@ -21,7 +21,7 @@ import { scheduler } from './scheduler';
 import { supportedServiceTypesAndVersions } from './services/supportedVersions';
 import { includeServices } from './services/common';
 
-export const version = '3.10.8';
+export const version = '3.10.9';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -1651,10 +1651,10 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 		}
 	} catch (error) { }
 	if (lowDiskSpace || force) {
-		if (isDev) {
-			if (!force) console.log(`[DEV MODE] Low disk space: ${lowDiskSpace}`);
-			return;
-		}
+		// if (isDev) {
+		// 	if (!force) console.log(`[DEV MODE] Low disk space: ${lowDiskSpace}`);
+		// 	return;
+		// }
 		try {
 			await executeDockerCmd({
 				dockerId,

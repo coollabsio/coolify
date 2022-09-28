@@ -472,7 +472,8 @@ export const saveBuildLog = async ({
 
 	if (isDev) {
 		console.debug(`[${applicationId}] ${addTimestamp}`);
-	}
+		return
+	} 
 	try {
 		return await got.post(`${fluentBitUrl}/${applicationId}_buildlog_${buildId}.csv`, {
 			json: {
@@ -586,9 +587,9 @@ export async function buildImage({
 	} else {
 		await saveBuildLog({ line: `Building image started.`, buildId, applicationId });
 	}
-	if (!debug && isCache) {
+	if (!debug) {
 		await saveBuildLog({
-			line: `Debug turned off. To see more details, allow it in the configuration.`,
+			line: `Debug turned off. To see more details, allow it in the features tab.`,
 			buildId,
 			applicationId
 		});
@@ -605,30 +606,6 @@ export async function buildImage({
 	} else {
 		await saveBuildLog({ line: `Building image successful.`, buildId, applicationId });
 	}
-}
-
-export async function streamEvents({ stream, docker, buildId, applicationId, debug }) {
-	await new Promise((resolve, reject) => {
-		docker.engine.modem.followProgress(stream, onFinished, onProgress);
-		function onFinished(err, res) {
-			if (err) reject(err);
-			resolve(res);
-		}
-		async function onProgress(event) {
-			if (event.error) {
-				reject(event.error);
-			} else if (event.stream) {
-				if (event.stream !== '\n') {
-					if (debug)
-						await saveBuildLog({
-							line: `${event.stream.replace('\n', '')}`,
-							buildId,
-							applicationId
-						});
-				}
-			}
-		}
-	});
 }
 
 export function makeLabelForStandaloneApplication({
@@ -721,6 +698,7 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 	if (installCommand) {
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
+	// Dockerfile.push(`ARG CACHEBUST=1`);
 	Dockerfile.push(`RUN ${buildCommand}`);
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
 	await buildImage({ ...data, isCache: true });

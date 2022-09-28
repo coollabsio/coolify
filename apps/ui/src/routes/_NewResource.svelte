@@ -18,8 +18,8 @@
 
 <div class="dropdown dropdown-bottom">
 	<slot>
-		<label for="new" tabindex="0" class="btn btn-square btn-sm bg-coollabs">
-			<svg
+		<label for="new" tabindex="0" class="btn btn-sm text-sm bg-coollabs hover:bg-coollabs-100">
+			Create New Resource <svg
 				class="h-6 w-6"
 				xmlns="http://www.w3.org/2000/svg"
 				fill="none"
@@ -35,11 +35,7 @@
 		>
 	</slot>
 
-	<ul
-		id="new"
-		tabindex="0"
-		class="dropdown-content menu p-2 shadow bg-coolgray-300 rounded w-52"
-	>
+	<ul id="new" tabindex="0" class="dropdown-content menu p-2 shadow bg-coolgray-300 rounded w-52">
 		<li>
 			<button on:click={newApplication} class="no-underline hover:bg-applications rounded-none ">
 				<svg
