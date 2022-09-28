@@ -41,25 +41,44 @@
 
 	let numberOfGetStatus = 0;
 	let status: any = {};
+	let noInitialStatus: any = {
+		applications: false,
+		services: false,
+		databases: false
+	};
+	let loading = {
+		applications: false,
+		services: false,
+		databases: false
+	};
 	doSearch();
 
 	async function refreshStatusApplications() {
+		loading.applications = true;
+		noInitialStatus.applications = false;
 		numberOfGetStatus = 0;
 		for (const application of applications) {
-			getStatus(application, true);
+			await getStatus(application, true);
 		}
+		loading.applications = false;
 	}
 	async function refreshStatusServices() {
+		loading.services = true;
+		noInitialStatus.services = false;
 		numberOfGetStatus = 0;
 		for (const service of services) {
-			getStatus(service, true);
+			await getStatus(service, true);
 		}
+		loading.services = false;
 	}
 	async function refreshStatusDatabases() {
+		loading.databases = true;
+		noInitialStatus.databases = false;
 		numberOfGetStatus = 0;
 		for (const database of databases) {
-			getStatus(database, true);
+			await getStatus(database, true);
 		}
+		loading.databases = false;
 	}
 	function setInitials(onlyOthers: boolean = false) {
 		return {
@@ -109,9 +128,15 @@
 	async function getStatus(resources: any, force: boolean = false) {
 		const { id, buildPack, dualCerts, type } = resources;
 		if (buildPack && applications.length > 10 && !force) {
+			noInitialStatus.applications = true;
 			return;
 		}
 		if (type && services.length > 10 && !force) {
+			noInitialStatus.services = true;
+			return;
+		}
+		if (databases.length > 10 && !force) {
+			noInitialStatus.databases = true;
 			return;
 		}
 		if (status[id] && !force) return status[id];
@@ -498,8 +523,12 @@
 	{#if (filtered.applications.length > 0 && applications.length > 0) || filtered.otherApplications.length > 0}
 		<div class="flex items-center mt-10">
 			<h1 class="title lg:text-3xl pr-4">Applications</h1>
-			<button class="btn btn-sm btn-primary" on:click={refreshStatusApplications}
-				>Refresh Status</button
+			<button
+				class="btn btn-sm btn-primary"
+				class:loading={loading.applications}
+				disabled={loading.applications}
+				on:click={refreshStatusApplications}
+				>{noInitialStatus.applications ? 'Load Status' : 'Refresh Status'}</button
 			>
 		</div>
 	{/if}
@@ -515,12 +544,16 @@
 							class="w-full rounded p-5 bg-coolgray-200 hover:bg-green-600 indicator duration-150"
 						>
 							{#await getStatus(application)}
-								<span class="indicator-item badge bg-yellow-500 badge-sm" />
+								<span class="indicator-item badge bg-yellow-300 badge-sm" />
 							{:then}
-								{#if status[application.id] === 'running'}
-									<span class="indicator-item badge bg-success badge-sm" />
-								{:else}
-									<span class="indicator-item badge bg-error badge-sm" />
+								{#if !noInitialStatus.applications}
+									{#if loading.applications}
+										<span class="indicator-item badge bg-yellow-300 badge-sm" />
+									{:else if status[application.id] === 'running'}
+										<span class="indicator-item badge bg-success badge-sm" />
+									{:else}
+										<span class="indicator-item badge bg-error badge-sm" />
+									{/if}
 								{/if}
 							{/await}
 							<div class="w-full flex flex-row">
@@ -621,12 +654,16 @@
 				<a class="no-underline mb-5" href={`/applications/${application.id}`}>
 					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-green-600 indicator duration-150">
 						{#await getStatus(application)}
-							<span class="indicator-item badge bg-yellow-500 badge-sm" />
+							<span class="indicator-item badge bg-yellow-300 badge-sm" />
 						{:then}
-							{#if status[application.id] === 'running'}
-								<span class="indicator-item badge bg-success badge-sm" />
-							{:else}
-								<span class="indicator-item badge bg-error badge-sm" />
+							{#if !noInitialStatus.applications}
+								{#if loading.applications}
+									<span class="indicator-item badge bg-yellow-300 badge-sm" />
+								{:else if status[application.id] === 'running'}
+									<span class="indicator-item badge bg-success badge-sm" />
+								{:else}
+									<span class="indicator-item badge bg-error badge-sm" />
+								{/if}
 							{/if}
 						{/await}
 						<div class="w-full flex flex-row">
@@ -708,7 +745,12 @@
 	{#if (filtered.services.length > 0 && services.length > 0) || filtered.otherServices.length > 0}
 		<div class="flex items-center mt-10">
 			<h1 class="title lg:text-3xl pr-4">Services</h1>
-			<button class="btn btn-sm btn-primary" on:click={refreshStatusServices}>Refresh Status</button
+			<button
+				class="btn btn-sm btn-primary"
+				class:loading={loading.services}
+				disabled={loading.services}
+				on:click={refreshStatusServices}
+				>{noInitialStatus.services ? 'Load Status' : 'Refresh Status'}</button
 			>
 		</div>
 	{/if}
@@ -724,12 +766,16 @@
 							class="w-full rounded p-5 bg-coolgray-200 hover:bg-pink-600 indicator duration-150"
 						>
 							{#await getStatus(service)}
-								<span class="indicator-item badge bg-yellow-500 badge-sm" />
+								<span class="indicator-item badge bg-yellow-300 badge-sm" />
 							{:then}
-								{#if status[service.id] === 'running'}
-									<span class="indicator-item badge bg-success badge-sm" />
-								{:else}
-									<span class="indicator-item badge bg-error badge-sm" />
+								{#if !noInitialStatus.services}
+									{#if loading.services}
+										<span class="indicator-item badge bg-yellow-300 badge-sm" />
+									{:else if status[service.id] === 'running'}
+										<span class="indicator-item badge bg-success badge-sm" />
+									{:else}
+										<span class="indicator-item badge bg-error badge-sm" />
+									{/if}
 								{/if}
 							{/await}
 							<div class="w-full flex flex-row">
@@ -796,12 +842,16 @@
 				<a class="no-underline mb-5" href={`/services/${service.id}`}>
 					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-pink-600 indicator duration-150">
 						{#await getStatus(service)}
-							<span class="indicator-item badge bg-yellow-500 badge-sm" />
+							<span class="indicator-item badge bg-yellow-300 badge-sm" />
 						{:then}
-							{#if status[service.id] === 'running'}
-								<span class="indicator-item badge bg-success badge-sm" />
-							{:else}
-								<span class="indicator-item badge bg-error badge-sm" />
+							{#if !noInitialStatus.services}
+								{#if loading.services}
+									<span class="indicator-item badge bg-yellow-300 badge-sm" />
+								{:else if status[service.id] === 'running'}
+									<span class="indicator-item badge bg-success badge-sm" />
+								{:else}
+									<span class="indicator-item badge bg-error badge-sm" />
+								{/if}
 							{/if}
 						{/await}
 						<div class="w-full flex flex-row">
@@ -852,8 +902,12 @@
 	{#if (filtered.databases.length > 0 && databases.length > 0) || filtered.otherDatabases.length > 0}
 		<div class="flex items-center mt-10">
 			<h1 class="title lg:text-3xl pr-4">Databases</h1>
-			<button class="btn btn-sm btn-primary" on:click={refreshStatusDatabases}
-				>Refresh Status</button
+			<button
+				class="btn btn-sm btn-primary"
+				on:click={refreshStatusDatabases}
+				class:loading={loading.databases}
+				disabled={loading.databases}
+				>{noInitialStatus.databases ? 'Load Status' : 'Refresh Status'}</button
 			>
 		</div>
 	{/if}
@@ -869,12 +923,16 @@
 							class="w-full rounded p-5 bg-coolgray-200 hover:bg-databases indicator duration-150"
 						>
 							{#await getStatus(database)}
-								<span class="indicator-item badge bg-yellow-500 badge-sm" />
+								<span class="indicator-item badge bg-yellow-300 badge-sm" />
 							{:then}
-								{#if status[database.id] === 'running'}
-									<span class="indicator-item badge bg-success badge-sm" />
-								{:else}
-									<span class="indicator-item badge bg-error badge-sm" />
+								{#if !noInitialStatus.databases}
+									{#if loading.databases}
+										<span class="indicator-item badge bg-yellow-300 badge-sm" />
+									{:else if status[databases.id] === 'running'}
+										<span class="indicator-item badge bg-success badge-sm" />
+									{:else}
+										<span class="indicator-item badge bg-error badge-sm" />
+									{/if}
 								{/if}
 							{/await}
 							<div class="w-full flex flex-row">
@@ -945,12 +1003,16 @@
 				<a class="no-underline mb-5" href={`/databases/${database.id}`}>
 					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-databases indicator duration-150">
 						{#await getStatus(database)}
-							<span class="indicator-item badge bg-yellow-500 badge-sm" />
+							<span class="indicator-item badge bg-yellow-300 badge-sm" />
 						{:then}
-							{#if status[database.id] === 'running'}
-								<span class="indicator-item badge bg-success badge-sm" />
-							{:else}
-								<span class="indicator-item badge bg-error badge-sm" />
+							{#if !noInitialStatus.databases}
+								{#if loading.databases}
+									<span class="indicator-item badge bg-yellow-300 badge-sm" />
+								{:else if status[databases.id] === 'running'}
+									<span class="indicator-item badge bg-success badge-sm" />
+								{:else}
+									<span class="indicator-item badge bg-error badge-sm" />
+								{/if}
 							{/if}
 						{/await}
 						<div class="w-full flex flex-row">
