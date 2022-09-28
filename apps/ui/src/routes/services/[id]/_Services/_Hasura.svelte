@@ -19,6 +19,7 @@
 		disabled
 	/>
 </div>
+<div class="lg:px-10 px-2 py-4">Hasura Console is <span class="text-warning">not enabled by default</span> for security reasons. <br>To enable it, add the following secret:<br><br> <code>HASURA_GRAPHQL_ENABLE_CONSOLE=true</code></div>
 
 <div class="flex space-x-1 py-5 font-bold">
 	<div class="title">PostgreSQL</div>
