@@ -759,7 +759,7 @@
 				{/if}
 				{#if application.buildPack === 'docker'}
 					<div class="grid grid-cols-2 items-center pb-4">
-						<label for="dockerFileLocation" class="mb-10"
+						<label for="dockerFileLocation" class=""
 							>Dockerfile Location <Explainer
 								explanation={"Should be absolute path, like <span class='text-settings font-bold'>/data/Dockerfile</span> or <span class='text-settings font-bold'>/Dockerfile.</span>"}
 							/></label
@@ -774,7 +774,7 @@
 								bind:value={application.dockerFileLocation}
 								placeholder="default: /Dockerfile"
 							/>
-							{#if application?.baseDirectory}
+							{#if application.baseDirectory}
 								<label class="label">
 									<span class="label-text-alt text-xs"
 										>Path: {application.baseDirectory.replace(
