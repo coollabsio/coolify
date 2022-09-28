@@ -21,6 +21,7 @@
 
 <script lang="ts">
 	export let applications: any;
+	export let foundUnconfiguredApplication: boolean;
 	export let databases: any;
 	export let services: any;
 	export let settings: any;
@@ -28,9 +29,9 @@
 	export let destinations: any;
 
 	let filtered: any = setInitials();
-	import { get } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
-	import { asyncSleep, getRndInteger } from '$lib/common';
+	import { asyncSleep, errorNotification, getRndInteger } from '$lib/common';
 	import { appSession, search } from '$lib/store';
 
 	import ApplicationsIcons from '$lib/components/svg/applications/ApplicationIcons.svelte';
@@ -325,6 +326,17 @@
 			filtered = setInitials();
 		}
 	}
+	async function cleanupApplications() {
+		try {
+			const sure = confirm('Are you sure? This will delete all UNCONFIGURED applications and their data.');
+			if (sure) {
+				await post(`/applications/cleanup/unconfigured`, {});
+				return window.location.reload();
+			}
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 <nav class="header">
@@ -334,7 +346,7 @@
 	{/if}
 </nav>
 <div class="container lg:mx-auto lg:p-0 px-8 pt-5">
-	<div class="space-x-2 lg:flex lg:justify-center  text-center mb-4 ">
+	<div class="space-x-2 lg:flex lg:justify-center text-center mb-4 ">
 		<button
 			class="btn btn-sm btn-ghost"
 			class:bg-applications={$search === '!app'}
@@ -521,7 +533,7 @@
 		</div>
 	{/if}
 	{#if (filtered.applications.length > 0 && applications.length > 0) || filtered.otherApplications.length > 0}
-		<div class="flex items-center mt-10">
+		<div class="flex items-center mt-10 space-x-2">
 			<h1 class="title lg:text-3xl pr-4">Applications</h1>
 			<button
 				class="btn btn-sm btn-primary"
@@ -530,6 +542,14 @@
 				on:click={refreshStatusApplications}
 				>{noInitialStatus.applications ? 'Load Status' : 'Refresh Status'}</button
 			>
+			{#if foundUnconfiguredApplication}
+				<button
+					class="btn btn-sm"
+					class:loading={loading.applications}
+					disabled={loading.applications}
+					on:click={cleanupApplications}>Cleanup Unconfigured Resources</button
+				>
+			{/if}
 		</div>
 	{/if}
 	{#if filtered.applications.length > 0 && applications.length > 0}
@@ -559,7 +579,7 @@
 							<div class="w-full flex flex-row">
 								<ApplicationsIcons {application} isAbsolute={true} />
 								<div class="w-full flex flex-col">
-									<h1 class="font-bold text-lg lg:text-xl truncate">
+									<h1 class="font-bold text-base truncate">
 										{application.name}
 										{#if application.settings?.isBot}
 											<span class="text-xs badge bg-coolblack border-none text-applications"
@@ -666,7 +686,7 @@
 						<div class="w-full flex flex-row">
 							<ApplicationsIcons {application} isAbsolute={true} />
 							<div class="w-full flex flex-col">
-								<h1 class="font-bold text-lg lg:text-xl truncate">
+								<h1 class="font-bold text-base truncate">
 									{application.name}
 									{#if application.settings?.isBot}
 										<span class="text-xs badge bg-coolblack border-none text-applications">BOT</span
@@ -778,7 +798,7 @@
 							<div class="w-full flex flex-row">
 								<ServiceIcons type={service.type} isAbsolute={true} />
 								<div class="w-full flex flex-col">
-									<h1 class="font-bold text-lg lg:text-xl truncate">{service.name}</h1>
+									<h1 class="font-bold text-base truncate">{service.name}</h1>
 									<div class="h-10 text-xs">
 										{#if service?.fqdn}
 											<h2>{service?.fqdn.replace('https://', '').replace('http://', '')}</h2>
@@ -851,7 +871,7 @@
 						<div class="w-full flex flex-row">
 							<ServiceIcons type={service.type} isAbsolute={true} />
 							<div class="w-full flex flex-col">
-								<h1 class="font-bold text-lg lg:text-xl truncate">{service.name}</h1>
+								<h1 class="font-bold text-base truncate">{service.name}</h1>
 								<div class="h-10 text-xs">
 									{#if service?.fqdn}
 										<h2>{service?.fqdn.replace('https://', '').replace('http://', '')}</h2>
@@ -933,7 +953,7 @@
 								<DatabaseIcons type={database.type} isAbsolute={true} />
 								<div class="w-full flex flex-col">
 									<div class="h-10">
-										<h1 class="font-bold text-lg lg:text-xl truncate">{database.name}</h1>
+										<h1 class="font-bold text-base truncate">{database.name}</h1>
 										<div class="h-10 text-xs">
 											{#if database?.version}
 												<h2 class="">{database?.version}</h2>
@@ -1010,7 +1030,7 @@
 							<DatabaseIcons type={database.type} isAbsolute={true} />
 							<div class="w-full flex flex-col">
 								<div class="h-10">
-									<h1 class="font-bold text-lg lg:text-xl truncate">{database.name}</h1>
+									<h1 class="font-bold text-base truncate">{database.name}</h1>
 									<div class="h-10 text-xs">
 										{#if database?.version}
 											<h2 class="">{database?.version}</h2>
@@ -1129,7 +1149,7 @@
 								</div>
 								<div class="w-full flex flex-col">
 									<div class="h-10">
-										<h1 class="font-bold text-lg lg:text-xl truncate">{source.name}</h1>
+										<h1 class="font-bold text-base truncate">{source.name}</h1>
 										{#if source.teams.length > 0 && source.teams[0]?.name}
 											<div class="truncate text-xs">{source.teams[0]?.name}</div>
 										{/if}
@@ -1218,7 +1238,7 @@
 							</div>
 							<div class="w-full flex flex-col">
 								<div class="h-10">
-									<h1 class="font-bold text-lg lg:text-xl truncate">{source.name}</h1>
+									<h1 class="font-bold text-base truncate">{source.name}</h1>
 									{#if source.teams.length > 0 && source.teams[0]?.name}
 										<div class="truncate text-xs">{source.teams[0]?.name}</div>
 									{/if}
@@ -1292,7 +1312,7 @@
 									{/if}
 								</div>
 								<div class="w-full flex flex-col">
-									<h1 class="font-bold text-lg lg:text-xl truncate">{destination.name}</h1>
+									<h1 class="font-bold text-base truncate">{destination.name}</h1>
 									<div class="h-10 text-xs">
 										{#if $appSession.teamId === '0' && destination.remoteVerified === false && destination.remoteEngine}
 											<h2 class="text-red-500">Not verified yet</h2>
@@ -1373,7 +1393,7 @@
 								{/if}
 							</div>
 							<div class="w-full flex flex-col">
-								<h1 class="font-bold text-lg lg:text-xl truncate">{destination.name}</h1>
+								<h1 class="font-bold text-base truncate">{destination.name}</h1>
 								<div class="h-10 text-xs">
 									{#if $appSession.teamId === '0' && destination.remoteVerified === false && destination.remoteEngine}
 										<h2 class="text-red-500">Not verified yet</h2>

@@ -122,7 +122,7 @@ export async function showDashboard(request: FastifyRequest) {
 	try {
 		const userId = request.user.userId;
 		const teamId = request.user.teamId;
-		const applications = await prisma.application.findMany({
+		let applications = await prisma.application.findMany({
 			where: { teams: { some: { id: teamId === "0" ? undefined : teamId } } },
 			include: { settings: true, destinationDocker: true, teams: true },
 		});
@@ -143,7 +143,15 @@ export async function showDashboard(request: FastifyRequest) {
 			include: { teams: true },
 		});
 		const settings = await listSettings();
+		let foundUnconfiguredApplication = false;
+		for (const application of applications) {
+			if (!application.buildPack || !application.destinationDockerId || !application.branch || (!application.settings?.isBot && !application?.fqdn)) {
+				foundUnconfiguredApplication = true
+			}
+		}
+
 		return {
+			foundUnconfiguredApplication,
 			applications,
 			databases,
 			services,
