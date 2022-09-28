@@ -152,6 +152,7 @@
 				/>
 				<Setting
 					customClass="pt-4"
+					isBeta={true}
 					id="autodeploy"
 					isCenter={false}
 					bind:setting={source.isSystemWide}
@@ -238,6 +239,7 @@
 				/>
 				<Setting
 					customClass="pt-4"
+					isBeta={true}
 					id="autodeploy"
 					isCenter={false}
 					disabled={$appSession.teamId !== '0'}

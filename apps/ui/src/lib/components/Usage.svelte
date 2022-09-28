@@ -27,6 +27,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
+	import Beta from './Beta.svelte';
 	async function getStatus() {
 		if (loading.usage) return;
 		loading.usage = true;
@@ -78,7 +79,7 @@
 			<h1 class="font-bold text-lg lg:text-xl truncate">
 				{server.name}
 				{#if server.remoteEngine}
-					<span class="badge bg-coollabs-gradient rounded text-white"> BETA </span>
+					<Beta />
 				{/if}
 			</h1>
 			<div class="text-xs">
