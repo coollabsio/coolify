@@ -69,9 +69,9 @@ export async function getImages(request: FastifyRequest<GetImages>) {
         return errorHandler({ status, message })
     }
 }
-export async function cleanupUnconfigured(request: FastifyRequest<any>) {
+export async function cleanupUnconfiguredApplications(request: FastifyRequest<any>) {
     try {
-        let teamId = request.user.teamId
+        const teamId = request.user.teamId
         let applications = await prisma.application.findMany({
             where: { teams: { some: { id: teamId === "0" ? undefined : teamId } } },
             include: { settings: true, destinationDocker: true, teams: true },

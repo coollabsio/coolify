@@ -55,7 +55,6 @@
 	export let database: any;
 	import { del, get, post } from '$lib/api';
 	import { t } from '$lib/translations';
-	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
 	import { appSession, status, isDeploymentEnabled } from '$lib/store';

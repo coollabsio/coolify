@@ -22,6 +22,8 @@
 <script lang="ts">
 	export let applications: any;
 	export let foundUnconfiguredApplication: boolean;
+	export let foundUnconfiguredService: boolean;
+	export let foundUnconfiguredDatabase: boolean;
 	export let databases: any;
 	export let services: any;
 	export let settings: any;
@@ -328,9 +330,37 @@
 	}
 	async function cleanupApplications() {
 		try {
-			const sure = confirm('Are you sure? This will delete all UNCONFIGURED applications and their data.');
+			const sure = confirm(
+				'Are you sure? This will delete all UNCONFIGURED applications and their data.'
+			);
 			if (sure) {
 				await post(`/applications/cleanup/unconfigured`, {});
+				return window.location.reload();
+			}
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
+	async function cleanupServices() {
+		try {
+			const sure = confirm(
+				'Are you sure? This will delete all UNCONFIGURED services and their data.'
+			);
+			if (sure) {
+				await post(`/services/cleanup/unconfigured`, {});
+				return window.location.reload();
+			}
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
+	async function cleanupDatabases() {
+		try {
+			const sure = confirm(
+				'Are you sure? This will delete all UNCONFIGURED databases and their data.'
+			);
+			if (sure) {
+				await post(`/databases/cleanup/unconfigured`, {});
 				return window.location.reload();
 			}
 		} catch (error) {
@@ -534,7 +564,7 @@
 	{/if}
 	{#if (filtered.applications.length > 0 && applications.length > 0) || filtered.otherApplications.length > 0}
 		<div class="flex items-center mt-10 space-x-2">
-			<h1 class="title lg:text-3xl pr-4">Applications</h1>
+			<h1 class="title lg:text-3xl">Applications</h1>
 			<button
 				class="btn btn-sm btn-primary"
 				class:loading={loading.applications}
@@ -760,8 +790,8 @@
 		</div>
 	{/if}
 	{#if (filtered.services.length > 0 && services.length > 0) || filtered.otherServices.length > 0}
-		<div class="flex items-center mt-10">
-			<h1 class="title lg:text-3xl pr-4">Services</h1>
+		<div class="flex items-center mt-10 space-x-2">
+			<h1 class="title lg:text-3xl">Services</h1>
 			<button
 				class="btn btn-sm btn-primary"
 				class:loading={loading.services}
@@ -769,6 +799,14 @@
 				on:click={refreshStatusServices}
 				>{noInitialStatus.services ? 'Load Status' : 'Refresh Status'}</button
 			>
+			{#if foundUnconfiguredService}
+				<button
+					class="btn btn-sm"
+					class:loading={loading.services}
+					disabled={loading.services}
+					on:click={cleanupServices}>Cleanup Unconfigured Resources</button
+				>
+			{/if}
 		</div>
 	{/if}
 	{#if filtered.services.length > 0 && services.length > 0}
@@ -914,8 +952,8 @@
 		</div>
 	{/if}
 	{#if (filtered.databases.length > 0 && databases.length > 0) || filtered.otherDatabases.length > 0}
-		<div class="flex items-center mt-10">
-			<h1 class="title lg:text-3xl pr-4">Databases</h1>
+		<div class="flex items-center mt-10 space-x-2">
+			<h1 class="title lg:text-3xl">Databases</h1>
 			<button
 				class="btn btn-sm btn-primary"
 				on:click={refreshStatusDatabases}
@@ -923,6 +961,14 @@
 				disabled={loading.databases}
 				>{noInitialStatus.databases ? 'Load Status' : 'Refresh Status'}</button
 			>
+			{#if foundUnconfiguredDatabase}
+				<button
+					class="btn btn-sm"
+					class:loading={loading.databases}
+					disabled={loading.databases}
+					on:click={cleanupDatabases}>Cleanup Unconfigured Resources</button
+				>
+			{/if}
 		</div>
 	{/if}
 	{#if filtered.databases.length > 0 && databases.length > 0}
