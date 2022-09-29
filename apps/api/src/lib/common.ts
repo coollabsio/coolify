@@ -1365,7 +1365,7 @@ export async function startTraefikTCPProxy(
 
 	let dependentId = id;
 	if (type === 'wordpressftp') dependentId = `${id}-ftp`;
-	const foundDependentContainer = await checkContainer({
+	const { found: foundDependentContainer } = await checkContainer({
 		dockerId,
 		container: dependentId,
 		remove: true
