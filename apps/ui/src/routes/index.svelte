@@ -57,31 +57,28 @@
 	doSearch();
 
 	async function refreshStatusApplications() {
-		loading.applications = true;
 		noInitialStatus.applications = false;
 		numberOfGetStatus = 0;
 		for (const application of applications) {
-			await getStatus(application, true);
+			status[application.id] = 'loading';
+			getStatus(application, true);
 		}
-		loading.applications = false;
 	}
 	async function refreshStatusServices() {
-		loading.services = true;
 		noInitialStatus.services = false;
 		numberOfGetStatus = 0;
 		for (const service of services) {
-			await getStatus(service, true);
+			status[service.id] = 'loading';
+			getStatus(service, true);
 		}
-		loading.services = false;
 	}
 	async function refreshStatusDatabases() {
-		loading.databases = true;
 		noInitialStatus.databases = false;
 		numberOfGetStatus = 0;
 		for (const database of databases) {
-			await getStatus(database, true);
+			status[database.id] = 'loading';
+			getStatus(database, true);
 		}
-		loading.databases = false;
 	}
 	function setInitials(onlyOthers: boolean = false) {
 		return {
@@ -565,11 +562,7 @@
 	{#if (filtered.applications.length > 0 && applications.length > 0) || filtered.otherApplications.length > 0}
 		<div class="flex items-center mt-10 space-x-2">
 			<h1 class="title lg:text-3xl">Applications</h1>
-			<button
-				class="btn btn-sm btn-primary"
-				class:loading={loading.applications}
-				disabled={loading.applications}
-				on:click={refreshStatusApplications}
+			<button class="btn btn-sm btn-primary" on:click={refreshStatusApplications}
 				>{noInitialStatus.applications ? 'Load Status' : 'Refresh Status'}</button
 			>
 			{#if foundUnconfiguredApplication}
@@ -597,7 +590,7 @@
 								<span class="indicator-item badge bg-yellow-300 badge-sm" />
 							{:then}
 								{#if !noInitialStatus.applications}
-									{#if loading.applications}
+									{#if status[application.id] === 'loading'}
 										<span class="indicator-item badge bg-yellow-300 badge-sm" />
 									{:else if status[application.id] === 'running'}
 										<span class="indicator-item badge bg-success badge-sm" />
@@ -704,7 +697,7 @@
 							<span class="indicator-item badge bg-yellow-300 badge-sm" />
 						{:then}
 							{#if !noInitialStatus.applications}
-								{#if loading.applications}
+								{#if status[application.id] === 'loading'}
 									<span class="indicator-item badge bg-yellow-300 badge-sm" />
 								{:else if status[application.id] === 'running'}
 									<span class="indicator-item badge bg-success badge-sm" />
@@ -792,11 +785,7 @@
 	{#if (filtered.services.length > 0 && services.length > 0) || filtered.otherServices.length > 0}
 		<div class="flex items-center mt-10 space-x-2">
 			<h1 class="title lg:text-3xl">Services</h1>
-			<button
-				class="btn btn-sm btn-primary"
-				class:loading={loading.services}
-				disabled={loading.services}
-				on:click={refreshStatusServices}
+			<button class="btn btn-sm btn-primary" on:click={refreshStatusServices}
 				>{noInitialStatus.services ? 'Load Status' : 'Refresh Status'}</button
 			>
 			{#if foundUnconfiguredService}
@@ -824,7 +813,7 @@
 								<span class="indicator-item badge bg-yellow-300 badge-sm" />
 							{:then}
 								{#if !noInitialStatus.services}
-									{#if loading.services}
+									{#if status[service.id] === 'loading'}
 										<span class="indicator-item badge bg-yellow-300 badge-sm" />
 									{:else if status[service.id] === 'running'}
 										<span class="indicator-item badge bg-success badge-sm" />
@@ -897,7 +886,7 @@
 							<span class="indicator-item badge bg-yellow-300 badge-sm" />
 						{:then}
 							{#if !noInitialStatus.services}
-								{#if loading.services}
+								{#if status[service.id] === 'loading'}
 									<span class="indicator-item badge bg-yellow-300 badge-sm" />
 								{:else if status[service.id] === 'running'}
 									<span class="indicator-item badge bg-success badge-sm" />
@@ -954,11 +943,7 @@
 	{#if (filtered.databases.length > 0 && databases.length > 0) || filtered.otherDatabases.length > 0}
 		<div class="flex items-center mt-10 space-x-2">
 			<h1 class="title lg:text-3xl">Databases</h1>
-			<button
-				class="btn btn-sm btn-primary"
-				on:click={refreshStatusDatabases}
-				class:loading={loading.databases}
-				disabled={loading.databases}
+			<button class="btn btn-sm btn-primary" on:click={refreshStatusDatabases}
 				>{noInitialStatus.databases ? 'Load Status' : 'Refresh Status'}</button
 			>
 			{#if foundUnconfiguredDatabase}
@@ -986,9 +971,9 @@
 								<span class="indicator-item badge bg-yellow-300 badge-sm" />
 							{:then}
 								{#if !noInitialStatus.databases}
-									{#if loading.databases}
+									{#if status[database.id] === 'loading'}
 										<span class="indicator-item badge bg-yellow-300 badge-sm" />
-									{:else if status[databases.id] === 'running'}
+									{:else if status[database.id] === 'running'}
 										<span class="indicator-item badge bg-success badge-sm" />
 									{:else}
 										<span class="indicator-item badge bg-error badge-sm" />
@@ -1063,9 +1048,9 @@
 							<span class="indicator-item badge bg-yellow-300 badge-sm" />
 						{:then}
 							{#if !noInitialStatus.databases}
-								{#if loading.databases}
+								{#if status[database.id] === 'loading'}
 									<span class="indicator-item badge bg-yellow-300 badge-sm" />
-								{:else if status[databases.id] === 'running'}
+								{:else if status[database.id] === 'running'}
 									<span class="indicator-item badge bg-success badge-sm" />
 								{:else}
 									<span class="indicator-item badge bg-error badge-sm" />
