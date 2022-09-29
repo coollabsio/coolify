@@ -18,6 +18,7 @@
 	let fromDb = false;
 	let cancelInprogress = false;
 	let position = 0;
+	let loading = true;
 	const { id } = $page.params;
 
 	const cleanAnsiCodes = (str: string) => str.replace(/\x1B\[(\d+)m/g, '');
@@ -46,6 +47,7 @@
 	}
 	async function streamLogs(sequence = 0) {
 		try {
+			loading = true;
 			let {
 				logs: responseLogs,
 				status,
@@ -60,6 +62,7 @@
 
 			streamInterval = setInterval(async () => {
 				if (status !== 'running' && status !== 'queued') {
+					loading = false;
 					clearInterval(streamInterval);
 					return;
 				}
@@ -75,6 +78,7 @@
 					logs = logs.concat(
 						data.logs.map((log: any) => ({ ...log, line: cleanAnsiCodes(log.line) }))
 					);
+					loading = false;
 				} catch (error) {
 					return errorNotification(error);
 				}
@@ -171,13 +175,13 @@
 	<div
 		bind:this={logsEl}
 		on:scroll={detect}
-		class="font-mono w-full bg-coolgray-100 border border-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded mb-20 flex flex-col scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1"
+		class="font-mono w-full bg-coolgray-100 border border-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded mb-20 flex flex-col scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1 whitespace-pre"
 	>
 		{#each logs as log}
 			{#if fromDb}
-				<div>{log.line + '\n'}</div>
+				{log.line + '\n'}
 			{:else}
-				<div>[{day.unix(log.time).format('HH:mm:ss.SSS')}] {log.line + '\n'}</div>
+				[{day.unix(log.time).format('HH:mm:ss.SSS')}] {log.line + '\n'}
 			{/if}
 		{/each}
 	</div>
@@ -185,6 +189,10 @@
 	<div
 		class="font-mono w-full bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded mb-20 flex flex-col whitespace-nowrap scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1"
 	>
-		{dev ? 'In development, logs are  shown in the console.' : 'No logs found yet.'}
+		{loading
+			? 'Loading logs...'
+			: dev
+			? 'In development, logs are shown in the console.'
+			: 'No logs found yet.'}
 	</div>
 {/if}

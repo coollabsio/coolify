@@ -21,6 +21,9 @@
 
 <script lang="ts">
 	export let applications: any;
+	export let foundUnconfiguredApplication: boolean;
+	export let foundUnconfiguredService: boolean;
+	export let foundUnconfiguredDatabase: boolean;
 	export let databases: any;
 	export let services: any;
 	export let settings: any;
@@ -28,9 +31,9 @@
 	export let destinations: any;
 
 	let filtered: any = setInitials();
-	import { get } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
-	import { asyncSleep, getRndInteger } from '$lib/common';
+	import { asyncSleep, errorNotification, getRndInteger } from '$lib/common';
 	import { appSession, search } from '$lib/store';
 
 	import ApplicationsIcons from '$lib/components/svg/applications/ApplicationIcons.svelte';
@@ -54,31 +57,28 @@
 	doSearch();
 
 	async function refreshStatusApplications() {
-		loading.applications = true;
 		noInitialStatus.applications = false;
 		numberOfGetStatus = 0;
 		for (const application of applications) {
-			await getStatus(application, true);
+			status[application.id] = 'loading';
+			getStatus(application, true);
 		}
-		loading.applications = false;
 	}
 	async function refreshStatusServices() {
-		loading.services = true;
 		noInitialStatus.services = false;
 		numberOfGetStatus = 0;
 		for (const service of services) {
-			await getStatus(service, true);
+			status[service.id] = 'loading';
+			getStatus(service, true);
 		}
-		loading.services = false;
 	}
 	async function refreshStatusDatabases() {
-		loading.databases = true;
 		noInitialStatus.databases = false;
 		numberOfGetStatus = 0;
 		for (const database of databases) {
-			await getStatus(database, true);
+			status[database.id] = 'loading';
+			getStatus(database, true);
 		}
-		loading.databases = false;
 	}
 	function setInitials(onlyOthers: boolean = false) {
 		return {
@@ -325,6 +325,45 @@
 			filtered = setInitials();
 		}
 	}
+	async function cleanupApplications() {
+		try {
+			const sure = confirm(
+				'Are you sure? This will delete all UNCONFIGURED applications and their data.'
+			);
+			if (sure) {
+				await post(`/applications/cleanup/unconfigured`, {});
+				return window.location.reload();
+			}
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
+	async function cleanupServices() {
+		try {
+			const sure = confirm(
+				'Are you sure? This will delete all UNCONFIGURED services and their data.'
+			);
+			if (sure) {
+				await post(`/services/cleanup/unconfigured`, {});
+				return window.location.reload();
+			}
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
+	async function cleanupDatabases() {
+		try {
+			const sure = confirm(
+				'Are you sure? This will delete all UNCONFIGURED databases and their data.'
+			);
+			if (sure) {
+				await post(`/databases/cleanup/unconfigured`, {});
+				return window.location.reload();
+			}
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 <nav class="header">
@@ -334,7 +373,7 @@
 	{/if}
 </nav>
 <div class="container lg:mx-auto lg:p-0 px-8 pt-5">
-	<div class="space-x-2 lg:flex lg:justify-center  text-center mb-4 ">
+	<div class="space-x-2 lg:flex lg:justify-center text-center mb-4 ">
 		<button
 			class="btn btn-sm btn-ghost"
 			class:bg-applications={$search === '!app'}
@@ -521,15 +560,19 @@
 		</div>
 	{/if}
 	{#if (filtered.applications.length > 0 && applications.length > 0) || filtered.otherApplications.length > 0}
-		<div class="flex items-center mt-10">
-			<h1 class="title lg:text-3xl pr-4">Applications</h1>
-			<button
-				class="btn btn-sm btn-primary"
-				class:loading={loading.applications}
-				disabled={loading.applications}
-				on:click={refreshStatusApplications}
+		<div class="flex items-center mt-10 space-x-2">
+			<h1 class="title lg:text-3xl">Applications</h1>
+			<button class="btn btn-sm btn-primary" on:click={refreshStatusApplications}
 				>{noInitialStatus.applications ? 'Load Status' : 'Refresh Status'}</button
 			>
+			{#if foundUnconfiguredApplication}
+				<button
+					class="btn btn-sm"
+					class:loading={loading.applications}
+					disabled={loading.applications}
+					on:click={cleanupApplications}>Cleanup Unconfigured Resources</button
+				>
+			{/if}
 		</div>
 	{/if}
 	{#if filtered.applications.length > 0 && applications.length > 0}
@@ -547,7 +590,7 @@
 								<span class="indicator-item badge bg-yellow-300 badge-sm" />
 							{:then}
 								{#if !noInitialStatus.applications}
-									{#if loading.applications}
+									{#if status[application.id] === 'loading'}
 										<span class="indicator-item badge bg-yellow-300 badge-sm" />
 									{:else if status[application.id] === 'running'}
 										<span class="indicator-item badge bg-success badge-sm" />
@@ -559,7 +602,7 @@
 							<div class="w-full flex flex-row">
 								<ApplicationsIcons {application} isAbsolute={true} />
 								<div class="w-full flex flex-col">
-									<h1 class="font-bold text-lg lg:text-xl truncate">
+									<h1 class="font-bold text-base truncate">
 										{application.name}
 										{#if application.settings?.isBot}
 											<span class="text-xs badge bg-coolblack border-none text-applications"
@@ -654,7 +697,7 @@
 							<span class="indicator-item badge bg-yellow-300 badge-sm" />
 						{:then}
 							{#if !noInitialStatus.applications}
-								{#if loading.applications}
+								{#if status[application.id] === 'loading'}
 									<span class="indicator-item badge bg-yellow-300 badge-sm" />
 								{:else if status[application.id] === 'running'}
 									<span class="indicator-item badge bg-success badge-sm" />
@@ -666,7 +709,7 @@
 						<div class="w-full flex flex-row">
 							<ApplicationsIcons {application} isAbsolute={true} />
 							<div class="w-full flex flex-col">
-								<h1 class="font-bold text-lg lg:text-xl truncate">
+								<h1 class="font-bold text-base truncate">
 									{application.name}
 									{#if application.settings?.isBot}
 										<span class="text-xs badge bg-coolblack border-none text-applications">BOT</span
@@ -740,15 +783,19 @@
 		</div>
 	{/if}
 	{#if (filtered.services.length > 0 && services.length > 0) || filtered.otherServices.length > 0}
-		<div class="flex items-center mt-10">
-			<h1 class="title lg:text-3xl pr-4">Services</h1>
-			<button
-				class="btn btn-sm btn-primary"
-				class:loading={loading.services}
-				disabled={loading.services}
-				on:click={refreshStatusServices}
+		<div class="flex items-center mt-10 space-x-2">
+			<h1 class="title lg:text-3xl">Services</h1>
+			<button class="btn btn-sm btn-primary" on:click={refreshStatusServices}
 				>{noInitialStatus.services ? 'Load Status' : 'Refresh Status'}</button
 			>
+			{#if foundUnconfiguredService}
+				<button
+					class="btn btn-sm"
+					class:loading={loading.services}
+					disabled={loading.services}
+					on:click={cleanupServices}>Cleanup Unconfigured Resources</button
+				>
+			{/if}
 		</div>
 	{/if}
 	{#if filtered.services.length > 0 && services.length > 0}
@@ -766,7 +813,7 @@
 								<span class="indicator-item badge bg-yellow-300 badge-sm" />
 							{:then}
 								{#if !noInitialStatus.services}
-									{#if loading.services}
+									{#if status[service.id] === 'loading'}
 										<span class="indicator-item badge bg-yellow-300 badge-sm" />
 									{:else if status[service.id] === 'running'}
 										<span class="indicator-item badge bg-success badge-sm" />
@@ -778,7 +825,7 @@
 							<div class="w-full flex flex-row">
 								<ServiceIcons type={service.type} isAbsolute={true} />
 								<div class="w-full flex flex-col">
-									<h1 class="font-bold text-lg lg:text-xl truncate">{service.name}</h1>
+									<h1 class="font-bold text-base truncate">{service.name}</h1>
 									<div class="h-10 text-xs">
 										{#if service?.fqdn}
 											<h2>{service?.fqdn.replace('https://', '').replace('http://', '')}</h2>
@@ -839,7 +886,7 @@
 							<span class="indicator-item badge bg-yellow-300 badge-sm" />
 						{:then}
 							{#if !noInitialStatus.services}
-								{#if loading.services}
+								{#if status[service.id] === 'loading'}
 									<span class="indicator-item badge bg-yellow-300 badge-sm" />
 								{:else if status[service.id] === 'running'}
 									<span class="indicator-item badge bg-success badge-sm" />
@@ -851,7 +898,7 @@
 						<div class="w-full flex flex-row">
 							<ServiceIcons type={service.type} isAbsolute={true} />
 							<div class="w-full flex flex-col">
-								<h1 class="font-bold text-lg lg:text-xl truncate">{service.name}</h1>
+								<h1 class="font-bold text-base truncate">{service.name}</h1>
 								<div class="h-10 text-xs">
 									{#if service?.fqdn}
 										<h2>{service?.fqdn.replace('https://', '').replace('http://', '')}</h2>
@@ -894,15 +941,19 @@
 		</div>
 	{/if}
 	{#if (filtered.databases.length > 0 && databases.length > 0) || filtered.otherDatabases.length > 0}
-		<div class="flex items-center mt-10">
-			<h1 class="title lg:text-3xl pr-4">Databases</h1>
-			<button
-				class="btn btn-sm btn-primary"
-				on:click={refreshStatusDatabases}
-				class:loading={loading.databases}
-				disabled={loading.databases}
+		<div class="flex items-center mt-10 space-x-2">
+			<h1 class="title lg:text-3xl">Databases</h1>
+			<button class="btn btn-sm btn-primary" on:click={refreshStatusDatabases}
 				>{noInitialStatus.databases ? 'Load Status' : 'Refresh Status'}</button
 			>
+			{#if foundUnconfiguredDatabase}
+				<button
+					class="btn btn-sm"
+					class:loading={loading.databases}
+					disabled={loading.databases}
+					on:click={cleanupDatabases}>Cleanup Unconfigured Resources</button
+				>
+			{/if}
 		</div>
 	{/if}
 	{#if filtered.databases.length > 0 && databases.length > 0}
@@ -920,9 +971,9 @@
 								<span class="indicator-item badge bg-yellow-300 badge-sm" />
 							{:then}
 								{#if !noInitialStatus.databases}
-									{#if loading.databases}
+									{#if status[database.id] === 'loading'}
 										<span class="indicator-item badge bg-yellow-300 badge-sm" />
-									{:else if status[databases.id] === 'running'}
+									{:else if status[database.id] === 'running'}
 										<span class="indicator-item badge bg-success badge-sm" />
 									{:else}
 										<span class="indicator-item badge bg-error badge-sm" />
@@ -933,7 +984,7 @@
 								<DatabaseIcons type={database.type} isAbsolute={true} />
 								<div class="w-full flex flex-col">
 									<div class="h-10">
-										<h1 class="font-bold text-lg lg:text-xl truncate">{database.name}</h1>
+										<h1 class="font-bold text-base truncate">{database.name}</h1>
 										<div class="h-10 text-xs">
 											{#if database?.version}
 												<h2 class="">{database?.version}</h2>
@@ -997,9 +1048,9 @@
 							<span class="indicator-item badge bg-yellow-300 badge-sm" />
 						{:then}
 							{#if !noInitialStatus.databases}
-								{#if loading.databases}
+								{#if status[database.id] === 'loading'}
 									<span class="indicator-item badge bg-yellow-300 badge-sm" />
-								{:else if status[databases.id] === 'running'}
+								{:else if status[database.id] === 'running'}
 									<span class="indicator-item badge bg-success badge-sm" />
 								{:else}
 									<span class="indicator-item badge bg-error badge-sm" />
@@ -1010,7 +1061,7 @@
 							<DatabaseIcons type={database.type} isAbsolute={true} />
 							<div class="w-full flex flex-col">
 								<div class="h-10">
-									<h1 class="font-bold text-lg lg:text-xl truncate">{database.name}</h1>
+									<h1 class="font-bold text-base truncate">{database.name}</h1>
 									<div class="h-10 text-xs">
 										{#if database?.version}
 											<h2 class="">{database?.version}</h2>
@@ -1129,7 +1180,7 @@
 								</div>
 								<div class="w-full flex flex-col">
 									<div class="h-10">
-										<h1 class="font-bold text-lg lg:text-xl truncate">{source.name}</h1>
+										<h1 class="font-bold text-base truncate">{source.name}</h1>
 										{#if source.teams.length > 0 && source.teams[0]?.name}
 											<div class="truncate text-xs">{source.teams[0]?.name}</div>
 										{/if}
@@ -1218,7 +1269,7 @@
 							</div>
 							<div class="w-full flex flex-col">
 								<div class="h-10">
-									<h1 class="font-bold text-lg lg:text-xl truncate">{source.name}</h1>
+									<h1 class="font-bold text-base truncate">{source.name}</h1>
 									{#if source.teams.length > 0 && source.teams[0]?.name}
 										<div class="truncate text-xs">{source.teams[0]?.name}</div>
 									{/if}
@@ -1292,7 +1343,7 @@
 									{/if}
 								</div>
 								<div class="w-full flex flex-col">
-									<h1 class="font-bold text-lg lg:text-xl truncate">{destination.name}</h1>
+									<h1 class="font-bold text-base truncate">{destination.name}</h1>
 									<div class="h-10 text-xs">
 										{#if $appSession.teamId === '0' && destination.remoteVerified === false && destination.remoteEngine}
 											<h2 class="text-red-500">Not verified yet</h2>
@@ -1373,7 +1424,7 @@
 								{/if}
 							</div>
 							<div class="w-full flex flex-col">
-								<h1 class="font-bold text-lg lg:text-xl truncate">{destination.name}</h1>
+								<h1 class="font-bold text-base truncate">{destination.name}</h1>
 								<div class="h-10 text-xs">
 									{#if $appSession.teamId === '0' && destination.remoteVerified === false && destination.remoteEngine}
 										<h2 class="text-red-500">Not verified yet</h2>

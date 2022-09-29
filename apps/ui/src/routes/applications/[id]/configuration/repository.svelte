@@ -26,8 +26,6 @@
 </script>
 
 <script lang="ts">
-	import { t } from '$lib/translations';
-
 	export let application: any;
 	export let appId: string;
 	export let settings: any;

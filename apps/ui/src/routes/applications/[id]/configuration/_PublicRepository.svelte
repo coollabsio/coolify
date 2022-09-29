@@ -172,7 +172,6 @@
 			
 			<div class="custom-select-wrapper">
 				<Select
-					class="w-full"
 					placeholder={loading.branches
 						? $t('application.configuration.loading_branches')
 						: branchSelectOptions.length ===0

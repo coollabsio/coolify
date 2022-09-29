@@ -328,8 +328,10 @@
 </script>
 
 <form on:submit={handleSubmit}>
-	<div class="flex lg:flex-row flex-col lg:space-y-0 space-y-2 space-x-0 lg:space-x-2 items-center lg:justify-center">
-		<div class="custom-select-wrapper">
+	<div
+		class="flex lg:flex-row flex-col lg:space-y-0 space-y-2 space-x-0 lg:space-x-2 items-center lg:justify-center lg:px-0 px-8"
+	>
+		<div class="custom-select-wrapper w-full">
 			<label for="groups" class="pb-1">Groups</label>
 			<Select
 				placeholder={loading.base
@@ -355,7 +357,7 @@
 				optionIdentifier="id"
 			/>
 		</div>
-		<div class="custom-select-wrapper">
+		<div class="custom-select-wrapper w-full">
 			<label for="projects" class="pb-1">Projects</label>
 			<Select
 				placeholder={loading.projects
@@ -381,7 +383,7 @@
 				isSearchable={true}
 			/>
 		</div>
-		<div class="custom-select-wrapper">
+		<div class="custom-select-wrapper w-full">
 			<label for="branches" class="pb-1">Branches</label>
 			<Select
 				placeholder={loading.branches

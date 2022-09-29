@@ -36,6 +36,33 @@ export async function newService(request: FastifyRequest, reply: FastifyReply) {
         return errorHandler({ status, message })
     }
 }
+export async function cleanupUnconfiguredServices(request: FastifyRequest) {
+    try {
+        const teamId = request.user.teamId;
+        let services = await prisma.service.findMany({
+            where: { teams: { some: { id: teamId === "0" ? undefined : teamId } } },
+            include: { destinationDocker: true, teams: true },
+        });
+        for (const service of services) {
+            if (!service.fqdn) {
+                if (service.destinationDockerId) {
+                    await executeDockerCmd({
+                        dockerId: service.destinationDockerId,
+                        command: `docker ps -a --filter 'label=com.docker.compose.project=${service.id}' --format {{.ID}}|xargs -r -n 1 docker stop -t 0`
+                    })
+                    await executeDockerCmd({
+                        dockerId: service.destinationDockerId,
+                        command: `docker ps -a --filter 'label=com.docker.compose.project=${service.id}' --format {{.ID}}|xargs -r -n 1 docker rm --force`
+                    })
+                }
+                await removeService({ id: service.id });
+            }
+        }
+        return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
     try {
         const teamId = request.user.teamId;

@@ -5,6 +5,7 @@ import {
     checkService,
     checkServiceDomain,
     cleanupPlausibleLogs,
+    cleanupUnconfiguredServices,
     deleteService,
     deleteServiceSecret,
     deleteServiceStorage,
@@ -38,6 +39,8 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     })
     fastify.get('/', async (request) => await listServices(request));
     fastify.post('/new', async (request, reply) => await newService(request, reply));
+
+    fastify.post<any>('/cleanup/unconfigured', async (request) => await cleanupUnconfiguredServices(request));
 
     fastify.get<OnlyId>('/:id', async (request) => await getService(request));
     fastify.post<SaveService>('/:id', async (request, reply) => await saveService(request, reply));

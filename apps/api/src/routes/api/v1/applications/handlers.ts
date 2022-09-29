@@ -69,6 +69,43 @@ export async function getImages(request: FastifyRequest<GetImages>) {
         return errorHandler({ status, message })
     }
 }
+export async function cleanupUnconfiguredApplications(request: FastifyRequest<any>) {
+    try {
+        const teamId = request.user.teamId
+        let applications = await prisma.application.findMany({
+            where: { teams: { some: { id: teamId === "0" ? undefined : teamId } } },
+            include: { settings: true, destinationDocker: true, teams: true },
+        });
+        for (const application of applications) {
+            if (!application.buildPack || !application.destinationDockerId || !application.branch || (!application.settings?.isBot && !application?.fqdn)) {
+                if (application?.destinationDockerId && application.destinationDocker?.network) {
+                    const { stdout: containers } = await executeDockerCmd({
+                        dockerId: application.destinationDocker.id,
+                        command: `docker ps -a --filter network=${application.destinationDocker.network} --filter name=${application.id} --format '{{json .}}'`
+                    })
+                    if (containers) {
+                        const containersArray = containers.trim().split('\n');
+                        for (const container of containersArray) {
+                            const containerObj = JSON.parse(container);
+                            const id = containerObj.ID;
+                            await removeContainer({ id, dockerId: application.destinationDocker.id });
+                        }
+                    }
+                }
+                await prisma.applicationSettings.deleteMany({ where: { applicationId: application.id } });
+                await prisma.buildLog.deleteMany({ where: { applicationId: application.id } });
+                await prisma.build.deleteMany({ where: { applicationId: application.id } });
+                await prisma.secret.deleteMany({ where: { applicationId: application.id } });
+                await prisma.applicationPersistentStorage.deleteMany({ where: { applicationId: application.id } });
+                await prisma.applicationConnectedDatabase.deleteMany({ where: { applicationId: application.id } });
+                await prisma.application.deleteMany({ where: { id: application.id } });
+            }
+        }
+        return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function getApplicationStatus(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
@@ -761,7 +798,10 @@ export async function saveBuildPack(request, reply) {
     try {
         const { id } = request.params
         const { buildPack } = request.body
-        await prisma.application.update({ where: { id }, data: { buildPack } });
+        const { baseImage, baseBuildImage } = setDefaultBaseImage(
+            buildPack
+        );
+        await prisma.application.update({ where: { id }, data: { buildPack, baseImage, baseBuildImage } });
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })

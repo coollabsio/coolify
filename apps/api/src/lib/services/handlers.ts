@@ -1883,11 +1883,11 @@ async function stopServiceContainers(request: FastifyRequest<ServiceStartStop>) 
         if (destinationDockerId) {
             await executeDockerCmd({
                 dockerId: destinationDockerId,
-                command: `docker ps -a --filter 'label=com.docker.compose.project=${id}' --format {{.ID}}|xargs -n 1 docker stop -t 0`
+                command: `docker ps -a --filter 'label=com.docker.compose.project=${id}' --format {{.ID}}|xargs -r -n 1 docker stop -t 0`
             })
             await executeDockerCmd({
                 dockerId: destinationDockerId,
-                command: `docker ps -a --filter 'label=com.docker.compose.project=${id}' --format {{.ID}}|xargs -n 1 docker rm --force`
+                command: `docker ps -a --filter 'label=com.docker.compose.project=${id}' --format {{.ID}}|xargs -r -n 1 docker rm --force`
             })
             return {}
         }

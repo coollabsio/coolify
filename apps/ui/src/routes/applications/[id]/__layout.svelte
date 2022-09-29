@@ -91,12 +91,17 @@
 					forceDelete = true;
 				}
 				return errorNotification(error);
-			} 
+			}
 		}
 	}
 
 	async function handleDeploySubmit(forceRebuild = false) {
 		if (!$isDeploymentEnabled) return;
+		if (!statusInterval) {
+			statusInterval = setInterval(async () => {
+				await getStatus();
+			}, 2000);
+		}
 		try {
 			const { buildId } = await post(`/applications/${id}/deploy`, {
 				...application,
@@ -212,30 +217,29 @@
 			{/if}
 		</div>
 		{#if $page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
-		<div class="px-2">
-			{#if forceDelete}
-				<button
-					on:click={() => deleteApplication(application.name, true)}
-					disabled={!$appSession.isAdmin}
-					class:bg-red-600={$appSession.isAdmin}
-					class:hover:bg-red-500={$appSession.isAdmin}
-					class="btn btn-sm btn-error text-sm"
-				>
-					Force Delete Application
-				</button>
-			{:else}
-				<button
-					on:click={() => deleteApplication(application.name, false)}
-					disabled={!$appSession.isAdmin}
-					class:bg-red-600={$appSession.isAdmin}
-					class:hover:bg-red-500={$appSession.isAdmin}
-					class="btn btn-sm btn-error text-sm"
-				>
-				 Delete Application
-				</button>
-			{/if}
-		</div>
-
+			<div class="px-2">
+				{#if forceDelete}
+					<button
+						on:click={() => deleteApplication(application.name, true)}
+						disabled={!$appSession.isAdmin}
+						class:bg-red-600={$appSession.isAdmin}
+						class:hover:bg-red-500={$appSession.isAdmin}
+						class="btn btn-sm btn-error text-sm"
+					>
+						Force Delete Application
+					</button>
+				{:else}
+					<button
+						on:click={() => deleteApplication(application.name, false)}
+						disabled={!$appSession.isAdmin}
+						class:bg-red-600={$appSession.isAdmin}
+						class:hover:bg-red-500={$appSession.isAdmin}
+						class="btn btn-sm btn-error text-sm"
+					>
+						Delete Application
+					</button>
+				{/if}
+			</div>
 		{/if}
 	</nav>
 	<div

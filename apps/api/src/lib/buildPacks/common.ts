@@ -472,15 +472,15 @@ export const saveBuildLog = async ({
 
 	if (isDev) {
 		console.debug(`[${applicationId}] ${addTimestamp}`);
-		return
-	} 
+	}
 	try {
 		return await got.post(`${fluentBitUrl}/${applicationId}_buildlog_${buildId}.csv`, {
 			json: {
 				line: encrypt(line)
 			}
 		})
-	} catch(error) {
+	} catch (error) {
+		if (isDev) return
 		return await prisma.buildLog.create({
 			data: {
 				line: addTimestamp, buildId, time: Number(day().valueOf()), applicationId

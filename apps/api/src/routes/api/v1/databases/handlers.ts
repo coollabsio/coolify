@@ -51,6 +51,30 @@ export async function newDatabase(request: FastifyRequest, reply: FastifyReply) 
         return errorHandler({ status, message })
     }
 }
+export async function cleanupUnconfiguredDatabases(request: FastifyRequest) {
+    try {
+        const teamId = request.user.teamId;
+        let databases = await prisma.database.findMany({
+            where: { teams: { some: { id: teamId === "0" ? undefined : teamId } } },
+            include: { settings: true, destinationDocker: true, teams: true },
+        });
+        for (const database of databases) {
+            if (!database?.version) {
+                const { id } = database;
+                if (database.destinationDockerId) {
+                    const everStarted = await stopDatabaseContainer(database);
+                    if (everStarted) await stopTcpHttpProxy(id, database.destinationDocker, database.publicPort);
+                }
+                await prisma.databaseSettings.deleteMany({ where: { databaseId: id } });
+                await prisma.databaseSecret.deleteMany({ where: { databaseId: id } });
+                await prisma.database.delete({ where: { id } });
+            }
+        }
+        return {}
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function getDatabaseStatus(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params;
