@@ -66,6 +66,8 @@
 <script lang="ts">
 	export let baseSettings: any;
 	export let supportedServiceTypesAndVersions: any;
+	export let pendingInvitations: any;
+
 	$appSession.isRegistrationEnabled = baseSettings.isRegistrationEnabled;
 	$appSession.ipv4 = baseSettings.ipv4;
 	$appSession.ipv6 = baseSettings.ipv6;
@@ -74,10 +76,13 @@
 	$appSession.whiteLabeledDetails.icon = baseSettings.whiteLabeledIcon;
 	$appSession.supportedServiceTypesAndVersions = supportedServiceTypesAndVersions;
 
+	$appSession.pendingInvitations = pendingInvitations;
+
 	export let userId: string;
 	export let teamId: string;
 	export let permission: string;
 	export let isAdmin: boolean;
+
 	import '../tailwind.css';
 	import Cookies from 'js-cookie';
 	import { fade } from 'svelte/transition';
@@ -202,11 +207,16 @@
 						<a
 							id="iam"
 							sveltekit:prefetch
-							href="/iam"
-							class="icons hover:text-iam"
+							href={$appSession.pendingInvitations.length > 0 ? '/iam/pending' : '/iam'}
+							class="icons hover:text-iam indicator"
 							class:text-iam={$page.url.pathname.startsWith('/iam')}
 							class:bg-coolgray-500={$page.url.pathname.startsWith('/iam')}
-							><svg
+						>
+							{#if $appSession.pendingInvitations.length > 0}
+								<span class="indicator-item badge badge-error font-mono"
+									>{pendingInvitations.length}</span
+								>
+							{/if}<svg
 								xmlns="http://www.w3.org/2000/svg"
 								viewBox="0 0 24 24"
 								class="h-9 w-9"
@@ -387,7 +397,9 @@
 						<path d="M16 3.13a4 4 0 0 1 0 7.75" />
 						<path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
 					</svg>
-					IAM
+					IAM {#if $appSession.pendingInvitations.length > 0}
+						<span class="indicator-item badge badge-error font-mono">{pendingInvitations}</span>
+					{/if}
 				</a>
 			</li>
 			<li>

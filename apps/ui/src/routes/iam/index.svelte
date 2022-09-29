@@ -29,9 +29,11 @@
 	import { addToast, appSession } from '$lib/store';
 	import { goto } from '$app/navigation';
 	import Cookies from 'js-cookie';
-	if (accounts.length === 0) {
-		accounts.push(account);
-	}
+	let search = '';
+	let searchResults: any = [];
+	// if (accounts.length === 0) {
+	// 	accounts.push(account);
+	// }
 
 	async function resetPassword(id: any) {
 		const sure = window.confirm('Are you sure you want to reset the password?');
@@ -65,22 +67,6 @@
 			return errorNotification(error);
 		}
 	}
-	async function acceptInvitation(id: any, teamId: any) {
-		try {
-			await post(`/iam/team/${teamId}/invitation/accept`, { id });
-			return window.location.reload();
-		} catch (error) {
-			return errorNotification(error);
-		}
-	}
-	async function revokeInvitation(id: any, teamId: any) {
-		try {
-			await post(`/iam/team/${teamId}/invitation/revoke`, { id });
-			return window.location.reload();
-		} catch (error) {
-			return errorNotification(error);
-		}
-	}
 
 	async function switchTeam(selectedTeamId: any) {
 		try {
@@ -104,9 +90,78 @@
 		const { id } = await post('/iam/new', {});
 		return await goto(`/iam/team/${id}`, { replaceState: true });
 	}
+	function searchAccount() {
+		searchResults = accounts.filter((account: { email: string | string[] }) => {
+			return account.email.includes(search);
+		});
+	}
 </script>
 
-<nav class="header">
+<div class="w-full">
+	<div class="mx-auto w-full">
+		<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2 items-center">
+			<div class="title font-bold pb-3">Accounts</div>
+		</div>
+	</div>
+</div>
+
+<div class="w-full grid gap-2">
+	<input
+		class="input w-full mb-4"
+		bind:value={search}
+		on:input={searchAccount}
+		placeholder="Search for account..."
+	/>
+	<div class="flex flex-col pb-2 space-y-4 lg:space-y-2">
+		{#if searchResults.length > 0}
+			{#each searchResults as account}
+				<div class="flex flex-col lg:flex-row lg:space-y-0 space-y-2">
+					<input
+						disabled
+						class="input w-full lg:w-64 text-white"
+						readonly
+						placeholder="email"
+						value={account.email}
+					/>
+
+					<div class="flex flex-row items-center justify-center space-x-2 w-full lg:w-96">
+						<div class="flex items-center justify-center">
+							<button class="btn btn-sm btn-primary">Reset Password</button>
+						</div>
+						<div class="flex justify-center">
+							<button class="btn btn-sm btn-error">Delete Account</button>
+						</div>
+					</div>
+				</div>
+			{/each}
+		{:else if searchResults.length === 0 && search !== ''}
+			<div>Nothing found.</div>
+		{:else}
+			{#each accounts as account}
+				<div class="flex flex-col lg:flex-row lg:space-y-0 space-y-2 lg:space-x-4">
+					<input
+						disabled
+						class="input w-full text-white"
+						readonly
+						placeholder="email"
+						value={account.email}
+					/>
+
+					<div class="flex flex-row items-center justify-center space-x-2 w-full lg:w-96">
+						<div class="flex items-center justify-center">
+							<button class="btn btn-sm btn-primary">Reset Password</button>
+						</div>
+						<div class="flex justify-center">
+							<button class="btn btn-sm btn-error">Delete Account</button>
+						</div>
+					</div>
+				</div>
+			{/each}
+		{/if}
+	</div>
+</div>
+
+<!-- <nav class="header">
 	<h1 class="mr-4 text-2xl tracking-tight font-bold">Identity and Access Management</h1>
 	<button on:click={newTeam} class="btn btn-square btn-sm bg-iam">
 		<svg
@@ -240,4 +295,4 @@
 			</div>
 		{/if}
 	</div>
-</div>
+</div> -->
