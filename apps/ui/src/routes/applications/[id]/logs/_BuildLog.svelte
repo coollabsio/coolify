@@ -185,6 +185,6 @@
 	<div
 		class="font-mono w-full bg-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded mb-20 flex flex-col whitespace-nowrap scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1"
 	>
-		{dev ? 'In development, logs are  shown in the console.' : 'No logs found yet.'}
+		{dev ? 'In development, logs are shown in the console.' : 'No logs found yet.'}
 	</div>
 {/if}
