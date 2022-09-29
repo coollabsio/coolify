@@ -170,7 +170,7 @@
 				</button>
 			</div>
 			
-			<div class="custom-select-wrapper w-full">
+			<div class="custom-select-wrapper">
 				<Select
 					placeholder={loading.branches
 						? $t('application.configuration.loading_branches')

@@ -153,7 +153,7 @@
 {:else}
 	<form on:submit|preventDefault={handleSubmit} class="px-10">
 		<div class="flex lg:flex-row flex-col lg:space-y-0 space-y-2 space-x-0 lg:space-x-2 items-center lg:justify-center">
-				<div class="custom-select-wrapper"><label for="repository" class="pb-1">Repository</label>
+				<div class="custom-select-wrapper w-full"><label for="repository" class="pb-1">Repository</label>
 					<Select
 						placeholder={loading.repositories
 							? $t('application.configuration.loading_repositories')
@@ -168,7 +168,7 @@
 					/>
 				</div>
 				<input class="hidden" bind:value={selected.projectId} name="projectId" />
-				<div class="custom-select-wrapper"><label for="repository" class="pb-1">Branch</label>
+				<div class="custom-select-wrapper w-full"><label for="repository" class="pb-1">Branch</label>
 					<Select
 						placeholder={loading.branches
 							? $t('application.configuration.loading_branches')
