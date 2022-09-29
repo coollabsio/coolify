@@ -798,7 +798,10 @@ export async function saveBuildPack(request, reply) {
     try {
         const { id } = request.params
         const { buildPack } = request.body
-        await prisma.application.update({ where: { id }, data: { buildPack } });
+        const { baseImage, baseBuildImage } = setDefaultBaseImage(
+            buildPack
+        );
+        await prisma.application.update({ where: { id }, data: { buildPack, baseImage, baseBuildImage } });
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })
