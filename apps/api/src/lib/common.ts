@@ -9,7 +9,6 @@ import generator from 'generate-password';
 import crypto from 'crypto';
 import { promises as dns } from 'dns';
 import { PrismaClient } from '@prisma/client';
-import cuid from 'cuid';
 import os from 'os';
 import sshConfig from 'ssh-config';
 
@@ -21,7 +20,7 @@ import { scheduler } from './scheduler';
 import { supportedServiceTypesAndVersions } from './services/supportedVersions';
 import { includeServices } from './services/common';
 
-export const version = '3.10.12';
+export const version = '3.10.13';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
