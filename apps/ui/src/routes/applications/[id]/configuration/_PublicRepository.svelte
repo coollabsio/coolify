@@ -170,9 +170,8 @@
 				</button>
 			</div>
 			
-			<div class="custom-select-wrapper">
+			<div class="custom-select-wrapper w-full">
 				<Select
-					class="w-full"
 					placeholder={loading.branches
 						? $t('application.configuration.loading_branches')
 						: branchSelectOptions.length ===0
