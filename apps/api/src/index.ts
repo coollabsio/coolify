@@ -7,7 +7,7 @@ import multipart from '@fastify/multipart';
 import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
 import { asyncExecShell, createRemoteEngineConfiguration, getDomain, isDev, listSettings, prisma, version } from './lib/common';
-import { scheduler } from './lib/scheduler';
+// import { scheduler } from './lib/scheduler';
 import { compareVersions } from 'compare-versions';
 import Graceful from '@ladjs/graceful'
 declare module 'fastify' {
@@ -125,37 +125,37 @@ prisma.setting.findFirst().then(async (settings) => {
 		console.log(`Coolify's API is listening on ${host}:${port}`);
 		await initServer();
 
-		const graceful = new Graceful({ brees: [scheduler] });
-		graceful.listen();
+		// const graceful = new Graceful({ brees: [scheduler] });
+		// graceful.listen();
 
-		setInterval(async () => {
-			if (!scheduler.workers.has('deployApplication')) {
-				scheduler.run('deployApplication');
-			}
-			if (!scheduler.workers.has('infrastructure')) {
-				scheduler.run('infrastructure');
-			}
-		}, 2000)
+		// setInterval(async () => {
+		// 	if (!scheduler.workers.has('deployApplication')) {
+		// 		scheduler.run('deployApplication');
+		// 	}
+		// 	if (!scheduler.workers.has('infrastructure')) {
+		// 		scheduler.run('infrastructure');
+		// 	}
+		// }, 2000)
 
 		// autoUpdater
-		setInterval(async () => {
-			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:autoUpdater")
-		}, isDev ? 5000 : 60000 * 15)
+		// setInterval(async () => {
+		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:autoUpdater")
+		// }, isDev ? 5000 : 60000 * 15)
 
-		// cleanupStorage
-		setInterval(async () => {
-			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupStorage")
-		}, isDev ? 6000 : 60000 * 10)
+		// // cleanupStorage
+		// setInterval(async () => {
+		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupStorage")
+		// }, isDev ? 6000 : 60000 * 10)
 
 		// checkProxies and checkFluentBit
-		setInterval(async () => {
-			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkProxies")
-			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkFluentBit")
-		}, 10000)
+		// setInterval(async () => {
+		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkProxies")
+		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkFluentBit")
+		// }, 10000)
 
-		setInterval(async () => {
-			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:copySSLCertificates")
-		}, 2000)
+		// setInterval(async () => {
+		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:copySSLCertificates")
+		// }, 2000)
 		
 		// cleanupPrismaEngines
 		// setInterval(async () => {
