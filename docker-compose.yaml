@@ -10,6 +10,10 @@ services:
         published: 3000
         protocol: tcp
         mode: host
+      - target: 9229
+        published: 9229
+        protocol: tcp
+        mode: host
     volumes:
       - 'coolify-db:/app/db'
       - 'coolify-logs:/app/logs'
