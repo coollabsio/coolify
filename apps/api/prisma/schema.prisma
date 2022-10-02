@@ -247,6 +247,7 @@ model Build {
   previewApplicationId String?
   forceRebuild         Boolean  @default(false)
   sourceBranch         String?
+  sourceRepository     String?
   branch               String?
   status               String?  @default("queued")
   createdAt            DateTime @default(now())
