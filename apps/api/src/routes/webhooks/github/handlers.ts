@@ -148,6 +148,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                     const pullmergeRequestId = body.number.toString();
                     const pullmergeRequestAction = body.action;
                     const sourceBranch = body.pull_request.head.ref.includes('/') ? body.pull_request.head.ref.split('/')[2] : body.pull_request.head.ref;
+                    console.log({sourceBranch, sourceRepository: body.pull_request.head.repo.full_name})
                     if (!allowedActions.includes(pullmergeRequestAction)) {
                         throw { status: 500, message: 'Action not allowed.' }
                     }
