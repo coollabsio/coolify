@@ -186,7 +186,6 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                                         data: {
                                             pullmergeRequestId,
                                             sourceBranch,
-                                            sourceRepository,
                                             customDomain: `${protocol}${pullmergeRequestId}.${getDomain(application.fqdn)}`,
                                             application: { connect: { id: application.id } }
                                         }
