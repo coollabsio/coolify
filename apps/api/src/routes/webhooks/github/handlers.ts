@@ -80,7 +80,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
             branch = body.ref.includes('/') ? body.ref.split('/')[2] : body.ref;
         } else if (githubEvent === 'pull_request') {
             projectId = body.pull_request.base.repo.id;
-            branch = body.pull_request.base.ref.includes('/') ? body.pull_request.base.ref.split('/')[2] : body.pull_request.base.ref;
+            branch = body.pull_request.base.ref
         }
         if (!projectId || !branch) {
             throw { status: 500, message: 'Cannot parse projectId or branch from the webhook?!' }
@@ -147,7 +147,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                 } else if (githubEvent === 'pull_request') {
                     const pullmergeRequestId = body.number.toString();
                     const pullmergeRequestAction = body.action;
-                    const sourceBranch = body.pull_request.head.ref.includes('/') ? body.pull_request.head.ref.split('/')[2] : body.pull_request.head.ref;
+                    const sourceBranch = body.pull_request.head.ref
                     const sourceRepository = body.pull_request.head.repo.full_name
                     if (!allowedActions.includes(pullmergeRequestAction)) {
                         throw { status: 500, message: 'Action not allowed.' }
