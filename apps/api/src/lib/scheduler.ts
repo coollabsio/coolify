@@ -18,10 +18,10 @@ const options: any = {
 			}
 		}
 	},
-	// jobs: [
-	// 	{ name: 'infrastructure' },
-	// 	{ name: 'deployApplication' },
-	// ],
+	jobs: [
+		{ name: 'infrastructure' },
+		{ name: 'deployApplication' },
+	],
 };
 if (isDev) options.root = path.join(__dirname, '../jobs');
 
