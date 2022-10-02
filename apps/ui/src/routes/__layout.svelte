@@ -66,7 +66,7 @@
 <script lang="ts">
 	export let baseSettings: any;
 	export let supportedServiceTypesAndVersions: any;
-	export let pendingInvitations: any;
+	export let pendingInvitations: any = 0;
 
 	$appSession.isRegistrationEnabled = baseSettings.isRegistrationEnabled;
 	$appSession.ipv4 = baseSettings.ipv4;
@@ -398,7 +398,7 @@
 						<path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
 					</svg>
 					IAM {#if $appSession.pendingInvitations.length > 0}
-						<span class="indicator-item badge badge-error font-mono">{pendingInvitations}</span>
+						<span class="indicator-item rounded-full badge badge-error font-mono">{pendingInvitations}</span>
 					{/if}
 				</a>
 			</li>
