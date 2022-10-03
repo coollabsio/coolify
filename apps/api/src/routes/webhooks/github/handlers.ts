@@ -66,12 +66,18 @@ export async function configureGitHubApp(request, reply) {
 }
 export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promise<any> {
     try {
-        const allowedGithubEvents = ['push', 'pull_request'];
+        const allowedGithubEvents = ['push', 'pull_request', 'ping', 'installation'];
         const allowedActions = ['opened', 'reopened', 'synchronize', 'closed'];
         const githubEvent = request.headers['x-github-event']?.toString().toLowerCase();
         const githubSignature = request.headers['x-hub-signature-256']?.toString().toLowerCase();
         if (!allowedGithubEvents.includes(githubEvent)) {
             throw { status: 500, message: 'Event not allowed.' }
+        }
+        if (githubEvent === 'ping') {
+            return { pong: 'cool' }
+        }
+        if (githubEvent === 'installation') {
+            return { status: 'cool' }
         }
         let projectId, branch;
         const body = request.body
