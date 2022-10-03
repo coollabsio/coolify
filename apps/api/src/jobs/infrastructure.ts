@@ -146,10 +146,7 @@ async function checkProxies() {
             const { destinationDockerId, destinationDocker, publicPort, id } = database;
             if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
                 const { privatePort } = generateDatabaseConfiguration(database, arch);
-                portReachable = await isReachable(publicPort, { host: destinationDocker.remoteIpAddress || ipv4 || ipv6 })
-                if (!portReachable) {
-                    await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
-                }
+                await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
             }
         }
         const wordpressWithFtp = await prisma.wordpress.findMany({
@@ -160,10 +157,7 @@ async function checkProxies() {
             const { service, ftpPublicPort } = ftp;
             const { destinationDockerId, destinationDocker, id } = service;
             if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-                portReachable = await isReachable(ftpPublicPort, { host: destinationDocker.remoteIpAddress || ipv4 || ipv6 })
-                if (!portReachable) {
-                    await startTraefikTCPProxy(destinationDocker, id, ftpPublicPort, 22, 'wordpressftp');
-                }
+                await startTraefikTCPProxy(destinationDocker, id, ftpPublicPort, 22, 'wordpressftp');
             }
         }
 
@@ -176,10 +170,7 @@ async function checkProxies() {
             const { service, publicPort } = minio;
             const { destinationDockerId, destinationDocker, id } = service;
             if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-                portReachable = await isReachable(publicPort, { host: destinationDocker.remoteIpAddress || ipv4 || ipv6 })
-                if (!portReachable) {
-                    await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
-                }
+                await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
             }
         }
     } catch (error) {

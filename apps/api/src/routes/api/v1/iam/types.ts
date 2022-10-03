@@ -5,6 +5,14 @@ export interface SaveTeam extends OnlyId {
         name: string
     }
 }
+export interface DeleteUserFromTeam {
+    Body: {
+        uid: string
+    },
+    Params: {
+        id: string
+    }
+}
 export interface InviteToTeam {
     Body: {
         email: string,

@@ -23,6 +23,7 @@ export interface GitHubEvents {
                 ref: string,
                 repo: {
                     id: string,
+                    full_name: string,
                 }
             }
         }

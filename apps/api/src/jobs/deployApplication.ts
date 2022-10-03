@@ -38,7 +38,7 @@ import * as buildpacks from '../lib/buildPacks';
 					for (const queueBuild of queuedBuilds) {
 						actions.push(async () => {
 							let application = await prisma.application.findUnique({ where: { id: queueBuild.applicationId }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, persistentStorage: true, secrets: true, settings: true, teams: true } })
-							let { id: buildId, type, sourceBranch = null, pullmergeRequestId = null, previewApplicationId = null, forceRebuild } = queueBuild
+							let { id: buildId, type, sourceBranch = null, pullmergeRequestId = null, previewApplicationId = null, forceRebuild, sourceRepository = null } = queueBuild
 							application = decryptApplication(application)
 							const originalApplicationId = application.id
 							if (pullmergeRequestId) {
@@ -54,7 +54,6 @@ import * as buildpacks from '../lib/buildPacks';
 								}
 								const {
 									id: applicationId,
-									repository,
 									name,
 									destinationDocker,
 									destinationDockerId,
@@ -77,6 +76,7 @@ import * as buildpacks from '../lib/buildPacks';
 								} = application
 								let {
 									branch,
+									repository,
 									buildPack,
 									port,
 									installCommand,
@@ -135,6 +135,7 @@ import * as buildpacks from '../lib/buildPacks';
 									branch = sourceBranch;
 									domain = `${pullmergeRequestId}.${domain}`;
 									imageId = `${applicationId}-${pullmergeRequestId}`;
+									repository = sourceRepository || repository;
 								}
 
 								let deployNeeded = true;

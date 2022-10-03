@@ -139,7 +139,7 @@ model PreviewApplication {
   sourceBranch       String
   isRandomDomain     Boolean     @default(false)
   customDomain       String?
-  applicationId      String      @unique
+  applicationId      String
   application        Application @relation(fields: [applicationId], references: [id])
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
@@ -247,6 +247,7 @@ model Build {
   previewApplicationId String?
   forceRebuild         Boolean  @default(false)
   sourceBranch         String?
+  sourceRepository     String?
   branch               String?
   status               String?  @default("queued")
   createdAt            DateTime @default(now())

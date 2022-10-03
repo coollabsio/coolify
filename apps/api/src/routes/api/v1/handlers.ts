@@ -353,8 +353,10 @@ export async function getCurrentUser(
 			// No new token -> not switching teams
 		}
 	}
+	const pendingInvitations = await prisma.teamInvitation.findMany({ where: { uid: request.user.userId } })
 	return {
 		settings: await prisma.setting.findFirst(),
+		pendingInvitations,
 		supportedServiceTypesAndVersions,
 		token,
 		...request.user,

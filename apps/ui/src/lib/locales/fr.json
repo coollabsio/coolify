@@ -318,6 +318,6 @@
 		"root": "(suprême)",
 		"root_team_explainer": "Il s'agit de l'équipe <span class='text-red-500 font-bold'>suprême</span>. \nCela signifie que les membres de ce groupe peuvent gérer les paramètres à l'échelle de l'instance et avoir tous les privilèges dans Coolify (imaginez comme un utilisateur root sous Linux).",
 		"send_invitation": "Envoyer une invitation",
-		"you": "(Toi)"
+		"you": "Toi"
 	}
 }

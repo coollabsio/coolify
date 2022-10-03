@@ -156,11 +156,6 @@ prisma.setting.findFirst().then(async (settings) => {
 		setInterval(async () => {
 			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:copySSLCertificates")
 		}, 2000)
-		
-		// cleanupPrismaEngines
-		// setInterval(async () => {
-		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupPrismaEngines")
-		// }, 60000)
 
 		await Promise.all([
 			getArch(),

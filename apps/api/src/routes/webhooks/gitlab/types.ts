@@ -8,6 +8,9 @@ export interface GitLabEvents {
     Body: {
         object_attributes: {
             work_in_progress: string
+            source: {
+                path_with_namespace: string
+            }
             isDraft: string
             action: string
             source_branch: string
