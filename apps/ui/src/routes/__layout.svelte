@@ -213,7 +213,7 @@
 							class:bg-coolgray-500={$page.url.pathname.startsWith('/iam')}
 						>
 							{#if $appSession.pendingInvitations.length > 0}
-								<span class="indicator-item badge badge-error font-mono"
+								<span class="indicator-item rounded-full badge badge-primary mr-2"
 									>{pendingInvitations.length}</span
 								>
 							{/if}<svg
@@ -398,7 +398,9 @@
 						<path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
 					</svg>
 					IAM {#if $appSession.pendingInvitations.length > 0}
-						<span class="indicator-item rounded-full badge badge-error font-mono">{pendingInvitations}</span>
+						<span class="indicator-item rounded-full badge badge-primary"
+							>{pendingInvitations.length}</span
+						>
 					{/if}
 				</a>
 			</li>
