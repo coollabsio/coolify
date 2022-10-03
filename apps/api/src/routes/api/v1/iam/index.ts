@@ -26,7 +26,6 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 
     fastify.delete<BodyId>('/user/remove', async (request, reply) => await removeUser(request, reply));
     fastify.post<BodyId>('/user/password', async (request, reply) => await changePassword(request, reply));
-    // fastify.delete('/user', async (request, reply) => await deleteUser(request, reply));
 
 };
 
