@@ -58,19 +58,16 @@
 </script>
 
 <div class="w-full">
-	{#if sshKeys.length === 0}
-		<div class="text-sm">No SSH keys found</div>
-		<label for="my-modal" class="btn btn-primary mt-6" on:click={() => (isModalActive = true)}
+	<div class="flex border-b border-coolgray-500 mb-6">
+		<div class="title font-bold pb-3 pr-4">SSH Keys</div>
+		<label for="my-modal" class="btn btn-sm btn-primary" on:click={() => (isModalActive = true)}
 			>Add SSH Key</label
 		>
+	</div>
+	{#if sshKeys.length === 0}
+		<div class="text-sm">No SSH keys found</div>
 	{:else}
 		<div class="mx-auto w-full">
-			<div class="flex border-b border-coolgray-500 mb-6">
-				<div class="title font-bold pb-3 pr-4">SSH Keys</div>
-				<label for="my-modal" class="btn btn-sm btn-primary" on:click={() => (isModalActive = true)}
-					>Add SSH Key</label
-				>
-			</div>
 			<table class="table w-full">
 				<thead>
 					<tr>

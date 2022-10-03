@@ -352,6 +352,7 @@
 
 			<li>
 				<a
+					id="servers"
 					class="no-underline icons hover:text-white hover:bg-sky-500"
 					sveltekit:prefetch
 					href="/servers"

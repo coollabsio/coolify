@@ -1,7 +1,11 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import { appSession } from '$lib/store';
+	if ($appSession.pendingInvitations.length === 0) {
+		goto('/iam/teams');
+	}
 	async function acceptInvitation(id: any, teamId: any) {
 		try {
 			await post(`/iam/team/${teamId}/invitation/accept`, { id });

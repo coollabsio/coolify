@@ -4,10 +4,10 @@
 </script>
 
 <ul class="menu border bg-coolgray-100 border-coolgray-200 rounded-box p-2 space-y-2">
-	<li class="menu-title">
-		<span>General</span>
-	</li>
 	{#if $appSession.teamId === '0'}
+		<li class="menu-title">
+			<span>General</span>
+		</li>
 		<li class="rounded" class:bg-coollabs={$page.url.pathname === `/settings/coolify`}>
 			<a href={`/settings/coolify`} class="no-underline w-full">Coolify Settings</a>
 		</li>

@@ -5,9 +5,10 @@ import { decrypt, errorHandler, prisma, uniqueName } from '../../../../lib/commo
 import { day } from '../../../../lib/dayjs';
 
 import type { OnlyId } from '../../../../types';
-import type { BodyId, InviteToTeam, SaveTeam, SetPermission } from './types';
+import type { BodyId, DeleteUserFromTeam, InviteToTeam, SaveTeam, SetPermission } from './types';
 
-export async function listTeams(request: FastifyRequest) {
+
+export async function listAccounts(request: FastifyRequest) {
     try {
         const userId = request.user.userId;
         const teamId = request.user.teamId;
@@ -15,10 +16,24 @@ export async function listTeams(request: FastifyRequest) {
             where: { id: userId },
             select: { id: true, email: true, teams: true }
         });
-        let accounts = [];
-        let allTeams = [];
+        let accounts = await prisma.user.findMany({ where: { teams: { some: { id: teamId } } }, select: { id: true, email: true, teams: true } });
         if (teamId === '0') {
             accounts = await prisma.user.findMany({ select: { id: true, email: true, teams: true } });
+        }
+        return {
+            account,
+            accounts
+        };
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+export async function listTeams(request: FastifyRequest) {
+    try {
+        const userId = request.user.userId;
+        const teamId = request.user.teamId;
+        let allTeams = [];
+        if (teamId === '0') {
             allTeams = await prisma.team.findMany({
                 where: { users: { none: { id: userId } } },
                 include: { permissions: true }
@@ -28,14 +43,26 @@ export async function listTeams(request: FastifyRequest) {
             where: { users: { some: { id: userId } } },
             include: { permissions: true }
         });
-        const invitations = await prisma.teamInvitation.findMany({ where: { uid: userId } });
         return {
             ownTeams,
             allTeams,
-            invitations,
-            account,
-            accounts
         };
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+export async function removeUserFromTeam(request: FastifyRequest<DeleteUserFromTeam>, reply: FastifyReply) {
+    try {
+        const { uid } = request.body;
+        const { id } = request.params;
+        const userId = request.user.userId;
+        const foundUser = await prisma.team.findMany({ where: { id, users: { some: { id: userId } } } });
+        if (foundUser.length === 0) {
+            return errorHandler({ status: 404, message: 'Team not found' });
+        }
+        await prisma.team.update({ where: { id }, data: { users: { disconnect: { id: uid } } } });
+        await prisma.permission.deleteMany({ where: { teamId: id, userId: uid } })
+        return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }

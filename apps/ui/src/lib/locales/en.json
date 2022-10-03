@@ -328,7 +328,7 @@
 		"members": "Members",
 		"root_team_explainer": "This is the <span class='text-red-500 '>root</span> team. That means members of this group can manage instance wide settings and have all the priviliges in Coolify (imagine like root user on Linux).",
 		"permission": "Permission",
-		"you": "(You)",
+		"you": "You",
 		"promote_to": "Promote to {{grade}}",
 		"revoke_invitation": "Revoke invitation",
 		"pending_invitation": "Pending invitation",
