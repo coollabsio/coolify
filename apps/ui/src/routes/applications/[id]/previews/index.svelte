@@ -184,10 +184,10 @@
 	</div>
 {:else if application.previewApplication.length > 0}
 	<div
-		class="grid grid-col gap-4 auto-cols-max grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+		class="grid grid-col gap-4 auto-cols-max grid-cols-1 md:grid-cols-2 lg:grid-cols-2 px-6"
 	>
 		{#each application.previewApplication as preview}
-			<div class="no-underline mb-5 w-full lg:w-96">
+			<div class="no-underline mb-5 w-full">
 				<div class="w-full rounded p-5 bg-coolgray-200 indicator">
 					{#await getStatus(preview)}
 						<span class="indicator-item badge bg-yellow-500 badge-sm" />

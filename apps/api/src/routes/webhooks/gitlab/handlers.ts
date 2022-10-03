@@ -39,9 +39,7 @@ export async function configureGitLabApp(request: FastifyRequest<ConfigureGitLab
 export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
     const { object_kind: objectKind, ref, project_id } = request.body
     try {
-
         const allowedActions = ['opened', 'reopen', 'close', 'open', 'update'];
-
         const webhookToken = request.headers['x-gitlab-token'];
         if (!webhookToken && !isDev) {
             throw { status: 500, message: 'Invalid webhookToken.' }
@@ -91,7 +89,7 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                 }
             }
         } else if (objectKind === 'merge_request') {
-            const { object_attributes: { work_in_progress: isDraft, action, source_branch: sourceBranch, target_branch: targetBranch }, project: { id } } = request.body
+            const { object_attributes: { work_in_progress: isDraft, action, source_branch: sourceBranch, target_branch: targetBranch, source: { path_with_namespace: sourceRepository } }, project: { id } } = request.body
             const pullmergeRequestId = request.body.object_attributes.iid.toString();
             const projectId = Number(id);
             if (!allowedActions.includes(action)) {
@@ -100,7 +98,6 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
             if (isDraft) {
                 throw { status: 500, message: 'Draft MR, do nothing.' }
             }
-
             const applicationsFound = await getApplicationFromDBWebhook(projectId, targetBranch);
             if (applicationsFound && applicationsFound.length > 0) {
                 for (const application of applicationsFound) {
@@ -153,6 +150,7 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                                     id: buildId,
                                     pullmergeRequestId,
                                     previewApplicationId,
+                                    sourceRepository,
                                     sourceBranch,
                                     applicationId: application.id,
                                     destinationDockerId: application.destinationDocker.id,
