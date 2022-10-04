@@ -63,7 +63,7 @@ export const supportedServiceTypesAndVersions = [
 	},
 	{
 		name: 'wordpress',
-		fancyName: 'Wordpress',
+		fancyName: 'WordPress',
 		baseImage: 'wordpress',
 		images: ['bitnami/mysql:5.7'],
 		versions: ['latest', 'php8.1', 'php8.0', 'php7.4', 'php7.3'],
