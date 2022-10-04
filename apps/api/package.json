@@ -11,7 +11,7 @@
     "build": "rimraf build && esbuild `find src \\( -name '*.ts' \\)| grep -v client/` --minify=true --platform=node --outdir=build --format=cjs",
     "format": "prettier --write 'src/**/*.{js,ts,json,md}'",
     "lint": "prettier --check 'src/**/*.{js,ts,json,md}' && eslint --ignore-path .eslintignore .",
-    "predev": "npx -y prisma migrate deploy && npx prisma generate && npx prisma db seed",
+    "prestart": "npx -y prisma migrate deploy && npx prisma generate && npx prisma db seed",
     "start": "NODE_ENV=production node index.js"
   },
   "dependencies": {
