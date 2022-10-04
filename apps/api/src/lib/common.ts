@@ -140,27 +140,9 @@ export const asyncExecShellStream = async ({
 
 export const asyncSleep = (delay: number): Promise<unknown> =>
 	new Promise((resolve) => setTimeout(resolve, delay));
-export const prisma = new PrismaClient({
-	errorFormat: 'minimal'
-	// log: [
-	// 	{
-	// 	  emit: 'event',
-	// 	  level: 'query',
-	// 	},
-	// 	{
-	// 	  emit: 'stdout',
-	// 	  level: 'error',
-	// 	},
-	// 	{
-	// 	  emit: 'stdout',
-	// 	  level: 'info',
-	// 	},
-	// 	{
-	// 	  emit: 'stdout',
-	// 	  level: 'warn',
-	// 	},
-	//   ],
-});
+export const prisma = () => {
+	return null
+}
 
 // prisma.$on('query', (e) => {
 // console.log({e})
