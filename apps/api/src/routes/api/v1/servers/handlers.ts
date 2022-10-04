@@ -8,7 +8,16 @@ export async function listServers(request: FastifyRequest) {
     try {
         const userId = request.user.userId;
         const teamId = request.user.teamId;
-        const servers = await prisma.destinationDocker.findMany({ where: { teams: { some: { id: teamId === '0' ? undefined : teamId } }}, distinct: ['remoteIpAddress', 'engine'] })
+        let servers = await prisma.destinationDocker.findMany({ where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } }, distinct: ['remoteIpAddress', 'engine'] })
+        servers = servers.filter((server) => {
+            if (server.remoteEngine) {
+                if (server.remoteVerified) {
+                    return server
+                }
+            } else {
+                return server
+            }
+        })
         return {
             servers
         }
@@ -78,7 +87,7 @@ export async function showUsage(request: FastifyRequest) {
                     freeMemPercentage: (parsed.totalMemoryKB - parsed.usedMemoryKB) / parsed.totalMemoryKB * 100
                 },
                 cpu: {
-                    load: [0,0,0],
+                    load: [0, 0, 0],
                     usage: cpuUsage,
                     count: cpus
                 },
