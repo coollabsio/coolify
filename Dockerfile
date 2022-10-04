@@ -38,7 +38,6 @@ COPY --from=build /app/apps/ui/build/ ./public
 COPY --from=build /app/apps/api/prisma/ ./prisma
 COPY --from=build /app/apps/api/package.json .
 COPY --from=build /app/docker-compose.yaml .
-COPY --from=build /app/.npmrc .
 
 RUN pnpm install -p
 
