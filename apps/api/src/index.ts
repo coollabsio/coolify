@@ -29,9 +29,9 @@ declare module 'fastify' {
 const port = isDev ? 3001 : 3000;
 const host = '0.0.0.0';
 (async () => {
-	const settings = prisma.setting.findFirst()
+	// const settings = prisma.setting.findFirst()
 	const fastify = Fastify({
-		logger: settings?.isAPIDebuggingEnabled || false,
+		logger: false,
 		trustProxy: true
 	});
 
@@ -101,66 +101,66 @@ const host = '0.0.0.0';
 	});
 	fastify.register(cookie)
 	fastify.register(cors);
-	fastify.addHook('onRequest', async (request, reply) => {
-		let allowedList = ['coolify:3000'];
-		const { ipv4, ipv6, fqdn } = await prisma.setting.findFirst({})
+	// fastify.addHook('onRequest', async (request, reply) => {
+	// 	let allowedList = ['coolify:3000'];
+	// 	const { ipv4, ipv6, fqdn } = await prisma.setting.findFirst({})
 
-		ipv4 && allowedList.push(`${ipv4}:3000`);
-		ipv6 && allowedList.push(ipv6);
-		fqdn && allowedList.push(getDomain(fqdn));
-		isDev && allowedList.push('localhost:3000') && allowedList.push('localhost:3001') && allowedList.push('host.docker.internal:3001');
-		const remotes = await prisma.destinationDocker.findMany({ where: { remoteEngine: true, remoteVerified: true } })
-		if (remotes.length > 0) {
-			remotes.forEach(remote => {
-				allowedList.push(`${remote.remoteIpAddress}:3000`);
-			})
-		}
-		if (!allowedList.includes(request.headers.host)) {
-			// console.log('not allowed', request.headers.host)
-		}
-	})
+	// 	ipv4 && allowedList.push(`${ipv4}:3000`);
+	// 	ipv6 && allowedList.push(ipv6);
+	// 	fqdn && allowedList.push(getDomain(fqdn));
+	// 	isDev && allowedList.push('localhost:3000') && allowedList.push('localhost:3001') && allowedList.push('host.docker.internal:3001');
+	// 	const remotes = await prisma.destinationDocker.findMany({ where: { remoteEngine: true, remoteVerified: true } })
+	// 	if (remotes.length > 0) {
+	// 		remotes.forEach(remote => {
+	// 			allowedList.push(`${remote.remoteIpAddress}:3000`);
+	// 		})
+	// 	}
+	// 	if (!allowedList.includes(request.headers.host)) {
+	// 		// console.log('not allowed', request.headers.host)
+	// 	}
+	// })
 	try {
 		await fastify.listen({ port, host })
 		console.log(`Coolify's API is listening on ${host}:${port}`);
 		await initServer();
 
-		const graceful = new Graceful({ brees: [scheduler] });
-		graceful.listen();
+		// const graceful = new Graceful({ brees: [scheduler] });
+		// graceful.listen();
 
-		setInterval(async () => {
-			if (!scheduler.workers.has('deployApplication')) {
-				scheduler.run('deployApplication');
-			}
-			if (!scheduler.workers.has('infrastructure')) {
-				scheduler.run('infrastructure');
-			}
-		}, 2000)
+		// setInterval(async () => {
+		// 	if (!scheduler.workers.has('deployApplication')) {
+		// 		scheduler.run('deployApplication');
+		// 	}
+		// 	if (!scheduler.workers.has('infrastructure')) {
+		// 		scheduler.run('infrastructure');
+		// 	}
+		// }, 2000)
 
 		// autoUpdater
-		setInterval(async () => {
-			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:autoUpdater")
-		}, isDev ? 5000 : 60000 * 15)
+		// setInterval(async () => {
+		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:autoUpdater")
+		// }, 60000 * 15)
 
-		// cleanupStorage
-		setInterval(async () => {
-			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupStorage")
-		}, isDev ? 6000 : 60000 * 10)
+		// // cleanupStorage
+		// setInterval(async () => {
+		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupStorage")
+		// }, 60000 * 10)
 
-		// checkProxies and checkFluentBit
-		setInterval(async () => {
-			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkProxies")
-			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkFluentBit")
-		}, 10000)
+		// // checkProxies and checkFluentBit
+		// setInterval(async () => {
+		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkProxies")
+		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkFluentBit")
+		// }, 10000)
 
-		setInterval(async () => {
-			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:copySSLCertificates")
-		}, 2000)
+		// setInterval(async () => {
+		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:copySSLCertificates")
+		// }, 2000)
 
-		await Promise.all([
-			getArch(),
-			getIPAddress(),
-			configureRemoteDockers(),
-		])
+		// await Promise.all([
+			// getArch(),
+			// getIPAddress(),
+			// configureRemoteDockers(),
+		// ])
 	} catch (error) {
 		console.error(error);
 		process.exit(1);
@@ -178,13 +178,13 @@ async function getIPAddress() {
 		if (!settings.ipv4) {
 			console.log(`Getting public IPv4 address...`);
 			const ipv4 = await publicIpv4({ timeout: 2000 })
-			await prisma.setting.update({ where: { id: settings.id }, data: { ipv4 } })
+			// await prisma.setting.update({ where: { id: settings.id }, data: { ipv4 } })
 		}
 
 		if (!settings.ipv6) {
 			console.log(`Getting public IPv6 address...`);
 			const ipv6 = await publicIpv6({ timeout: 2000 })
-			await prisma.setting.update({ where: { id: settings.id }, data: { ipv6 } })
+			// await prisma.setting.update({ where: { id: settings.id }, data: { ipv6 } })
 		}
 
 	} catch (error) { }
