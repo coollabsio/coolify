@@ -218,20 +218,34 @@ export async function verifyRemoteDockerEngineFn(id: string) {
     const { stdout: daemonJson } = await executeSSHCmd({ dockerId: id, command: `cat /etc/docker/daemon.json` });
     try {
         let daemonJsonParsed = JSON.parse(daemonJson);
+        let isUpdated = false;
         if (!daemonJsonParsed['live-restore'] || daemonJsonParsed['live-restore'] !== true) {
+            isUpdated = true;
             daemonJsonParsed['live-restore'] = true
+
+        }
+        if (!daemonJsonParsed?.features?.buildkit) {
+            isUpdated = true;
+            daemonJsonParsed.features = {
+                buildkit: true
+            }
+        }
+        if (isUpdated) {
             await executeSSHCmd({ dockerId: id, command: `echo '${JSON.stringify(daemonJsonParsed)}' > /etc/docker/daemon.json` });
             await executeSSHCmd({ dockerId: id, command: `systemctl restart docker` });
         }
     } catch (error) {
         const daemonJsonParsed = {
-            "live-restore": true
+            "live-restore": true,
+            "features": {
+                "buildkit": true
+            }
         }
-        console.log(JSON.stringify(daemonJsonParsed))
         await executeSSHCmd({ dockerId: id, command: `echo '${JSON.stringify(daemonJsonParsed)}' > /etc/docker/daemon.json` });
         await executeSSHCmd({ dockerId: id, command: `systemctl restart docker` });
+    } finally {
+        await prisma.destinationDocker.update({ where: { id }, data: { remoteVerified: true } })
     }
-    await prisma.destinationDocker.update({ where: { id }, data: { remoteVerified: true } })
 }
 export async function verifyRemoteDockerEngine(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
     const { id } = request.params;
