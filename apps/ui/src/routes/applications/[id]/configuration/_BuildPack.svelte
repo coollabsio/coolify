@@ -14,6 +14,8 @@
 	export let foundConfig: any;
 	export let scanning: any;
 	export let packageManager: any;
+	export let dockerComposeFile: any = null;
+	export let dockerComposeFileLocation: string | null = null;
 
 	async function handleSubmit(name: string) {
 		try {
@@ -25,10 +27,12 @@
 			delete tempBuildPack.fancyName;
 			delete tempBuildPack.color;
 			delete tempBuildPack.hoverColor;
-
-			if (foundConfig?.buildPack !== name) {
-				await post(`/applications/${id}`, { ...tempBuildPack, buildPack: name });
-			}
+			await post(`/applications/${id}`, {
+				...tempBuildPack,
+				buildPack: name,
+				dockerComposeFile,
+				dockerComposeFileLocation
+			});
 			await post(`/applications/${id}/configuration/buildpack`, { buildPack: name });
 			return await goto(from || `/applications/${id}`);
 		} catch (error) {

@@ -22,6 +22,10 @@ services:
         published: 3001
         protocol: tcp
         mode: host
+      - target: 5555
+        published: 5555
+        protocol: tcp
+        mode: host
     volumes:
       - ./:/app
       - '/var/run/docker.sock:/var/run/docker.sock'

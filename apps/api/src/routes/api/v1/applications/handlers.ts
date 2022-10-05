@@ -289,13 +289,16 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             baseImage,
             baseBuildImage,
             deploymentType,
-            baseDatabaseBranch
+            baseDatabaseBranch,
+            dockerComposeFile,
+            dockerComposeFileLocation,
+            dockerComposeConfiguration
         } = request.body
+        console.log({dockerComposeConfiguration})
         if (port) port = Number(port);
         if (exposePort) {
             exposePort = Number(exposePort);
         }
-
         const { destinationDocker: { engine, remoteEngine, remoteIpAddress }, exposePort: configuredPort } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
         if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, engine, remoteEngine, remoteIpAddress })
         if (denoOptions) denoOptions = denoOptions.trim();
@@ -324,6 +327,9 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
                     baseImage,
                     baseBuildImage,
                     deploymentType,
+                    dockerComposeFile,
+                    dockerComposeFileLocation,
+                    dockerComposeConfiguration,
                     ...defaultConfiguration,
                     connectedDatabase: { update: { hostedDatabaseDBName: baseDatabaseBranch } }
                 }
@@ -342,6 +348,9 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
                     baseImage,
                     baseBuildImage,
                     deploymentType,
+                    dockerComposeFile,
+                    dockerComposeFileLocation,
+                    dockerComposeConfiguration,
                     ...defaultConfiguration
                 }
             });

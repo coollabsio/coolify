@@ -21,7 +21,10 @@ export interface SaveApplication extends OnlyId {
         baseImage: string,
         baseBuildImage: string,
         deploymentType: string,
-        baseDatabaseBranch: string
+        baseDatabaseBranch: string,
+        dockerComposeFile: string,
+        dockerComposeFileLocation: string,
+        dockerComposeConfiguration: string
     }
 }
 export interface SaveApplicationSettings extends OnlyId {

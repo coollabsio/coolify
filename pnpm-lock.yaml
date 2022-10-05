@@ -159,6 +159,7 @@ importers:
       flowbite: 1.5.2
       flowbite-svelte: 0.26.2
       js-cookie: 3.0.1
+      js-yaml: 4.1.0
       p-limit: 4.0.0
       postcss: 8.4.16
       prettier: 2.7.1
@@ -181,6 +182,7 @@ importers:
       daisyui: 2.24.2_25hquoklqeoqwmt7fwvvcyxm5e
       dayjs: 1.11.5
       js-cookie: 3.0.1
+      js-yaml: 4.1.0
       p-limit: 4.0.0
       svelte-file-dropzone: 1.0.0
       svelte-select: 4.4.7

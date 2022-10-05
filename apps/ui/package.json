@@ -48,6 +48,7 @@
 		"daisyui": "2.24.2",
 		"dayjs": "1.11.5",
 		"js-cookie": "3.0.1",
+		"js-yaml": "4.1.0",
 		"p-limit": "4.0.0",
 		"svelte-file-dropzone": "^1.0.0",
 		"svelte-select": "4.4.7",

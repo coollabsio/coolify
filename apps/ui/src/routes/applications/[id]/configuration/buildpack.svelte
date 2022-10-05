@@ -34,12 +34,15 @@
 	import { buildPacks, findBuildPack, scanningTemplates } from '$lib/templates';
 	import { errorNotification } from '$lib/common';
 	import BuildPack from './_BuildPack.svelte';
+	import yaml from 'js-yaml';
 
 	const { id } = $page.params;
 
-	let scanning = true;
+	let scanning: boolean = true;
 	let foundConfig: any = null;
-	let packageManager = 'npm';
+	let packageManager: string = 'npm';
+	let dockerComposeFile: any = null;
+	let dockerComposeFileLocation: string | null = null;
 
 	export let apiUrl: any;
 	export let projectId: any;
@@ -60,10 +63,14 @@
 			}
 		}
 	}
-	async function scanRepository(): Promise<void> {
+	async function scanRepository(isPublicRepository: boolean): Promise<void> {
 		try {
 			if (type === 'gitlab') {
-				const files = await get(`${apiUrl}/v4/projects/${projectId}/repository/tree`, {
+				if (isPublicRepository) {
+					return;
+				}
+				const url = isPublicRepository ? `` : `/v4/projects/${projectId}/repository/tree`;
+				const files = await get(`${apiUrl}${url}`, {
 					Authorization: `Bearer ${$appSession.tokens.gitlab}`
 				});
 				const packageJson = files.find(
@@ -81,6 +88,14 @@
 				const dockerfile = files.find(
 					(file: { name: string; type: string }) =>
 						file.name === 'Dockerfile' && file.type === 'blob'
+				);
+				const dockerComposeFileYml = files.find(
+					(file: { name: string; type: string }) =>
+						file.name === 'docker-compose.yml' && file.type === 'blob'
+				);
+				const dockerComposeFileYaml = files.find(
+					(file: { name: string; type: string }) =>
+						file.name === 'docker-compose.yaml' && file.type === 'blob'
 				);
 				const cargoToml = files.find(
 					(file: { name: string; type: string }) =>
@@ -105,11 +120,12 @@
 				const laravel = files.find(
 					(file: { name: string; type: string }) => file.name === 'artisan' && file.type === 'blob'
 				);
-
 				if (yarnLock) packageManager = 'yarn';
 				if (pnpmLock) packageManager = 'pnpm';
 
-				if (dockerfile) {
+				if (dockerComposeFileYml || dockerComposeFileYaml) {
+					foundConfig = findBuildPack('dockercompose', packageManager);
+				} else if (dockerfile) {
 					foundConfig = findBuildPack('docker', packageManager);
 				} else if (packageJson && !laravel) {
 					const path = packageJson.path;
@@ -135,8 +151,13 @@
 					foundConfig = findBuildPack('node', packageManager);
 				}
 			} else if (type === 'github') {
+				const headers = isPublicRepository
+					? {}
+					: {
+							Authorization: `token ${$appSession.tokens.github}`
+					  };
 				const files = await get(`${apiUrl}/repos/${repository}/contents?ref=${branch}`, {
-					Authorization: `Bearer ${$appSession.tokens.github}`,
+					...headers,
 					Accept: 'application/vnd.github.v2.json'
 				});
 				const packageJson = files.find(
@@ -154,6 +175,14 @@
 				const dockerfile = files.find(
 					(file: { name: string; type: string }) =>
 						file.name === 'Dockerfile' && file.type === 'file'
+				);
+				const dockerComposeFileYml = files.find(
+					(file: { name: string; type: string }) =>
+						file.name === 'docker-compose.yml' && file.type === 'file'
+				);
+				const dockerComposeFileYaml = files.find(
+					(file: { name: string; type: string }) =>
+						file.name === 'docker-compose.yaml' && file.type === 'file'
 				);
 				const cargoToml = files.find(
 					(file: { name: string; type: string }) =>
@@ -182,7 +211,25 @@
 				if (yarnLock) packageManager = 'yarn';
 				if (pnpmLock) packageManager = 'pnpm';
 
-				if (dockerfile) {
+				if (dockerComposeFileYml || dockerComposeFileYaml) {
+					foundConfig = findBuildPack('compose', packageManager);
+					const data = await get(
+						`${apiUrl}/repos/${repository}/contents/${
+							dockerComposeFileYml ? 'docker-compose.yml' : 'docker-compose.yaml'
+						}?ref=${branch}`,
+						{
+							...headers,
+							Accept: 'application/vnd.github.v2.json'
+						}
+					);
+					if (data?.content) {
+						const content = atob(data.content);
+						dockerComposeFile = JSON.stringify(yaml.load(content) || null);
+						dockerComposeFileLocation = dockerComposeFileYml
+							? 'docker-compose.yml'
+							: 'docker-compose.yaml';
+					}
+				} else if (dockerfile) {
 					foundConfig = findBuildPack('docker', packageManager);
 				} else if (packageJson && !laravel) {
 					const data: any = await get(`${packageJson.git_url}`, {
@@ -237,7 +284,7 @@
 			if (error.message === 'Bad credentials') {
 				const { token } = await get(`/applications/${id}/configuration/githubToken`);
 				$appSession.tokens.github = token;
-				return await scanRepository();
+				return await scanRepository(isPublicRepository);
 			}
 			return errorNotification(error);
 		} finally {
@@ -246,11 +293,7 @@
 		}
 	}
 	onMount(async () => {
-		if (!isPublicRepository) {
-			await scanRepository();
-		} else {
-			scanning = false;
-		}
+		await scanRepository(isPublicRepository);
 	});
 </script>
 
@@ -266,7 +309,12 @@
 		<div class="flex flex-wrap justify-center">
 			{#each buildPacks.filter((bp) => bp.isHerokuBuildPack === true) as buildPack}
 				<div class="p-2">
-					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
+					<BuildPack
+						{packageManager}
+						{buildPack}
+						{scanning}
+						bind:foundConfig
+					/>
 				</div>
 			{/each}
 		</div>
@@ -274,9 +322,16 @@
 	<div class="max-w-screen-2xl mx-auto px-10">
 		<div class="title pb-2">Coolify Base</div>
 		<div class="flex flex-wrap justify-center">
-			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true && bp.type ==='base') as buildPack}
+			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true && bp.type === 'base') as buildPack}
 				<div class="p-2">
-					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
+					<BuildPack
+						{packageManager}
+						{buildPack}
+						{scanning}
+						bind:foundConfig
+						{dockerComposeFile}
+						{dockerComposeFileLocation}
+					/>
 				</div>
 			{/each}
 		</div>
@@ -284,9 +339,14 @@
 	<div class="max-w-screen-2xl mx-auto px-10">
 		<div class="title pb-2">Coolify Specific</div>
 		<div class="flex flex-wrap justify-center">
-			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true && bp.type ==='specific') as buildPack}
+			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true && bp.type === 'specific') as buildPack}
 				<div class="p-2">
-					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
+					<BuildPack
+						{packageManager}
+						{buildPack}
+						{scanning}
+						bind:foundConfig
+					/>
 				</div>
 			{/each}
 		</div>

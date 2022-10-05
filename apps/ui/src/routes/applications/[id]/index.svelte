@@ -29,7 +29,7 @@
 	export let application: any;
 	export let settings: any;
 	import { page } from '$app/stores';
-	import { onDestroy, onMount } from 'svelte';
+	import { onMount } from 'svelte';
 	import Select from 'svelte-select';
 	import { get, post } from '$lib/api';
 	import cuid from 'cuid';
@@ -45,10 +45,9 @@
 	import { t } from '$lib/translations';
 	import { errorNotification, getDomain, notNodeDeployments, staticDeployments } from '$lib/common';
 	import Setting from '$lib/components/Setting.svelte';
-	import Tooltip from '$lib/components/Tooltip.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { goto } from '$app/navigation';
-	import { fade } from 'svelte/transition';
+	import yaml from 'js-yaml';
 
 	const { id } = $page.params;
 
@@ -58,6 +57,10 @@
 	let loading = false;
 	let fqdnEl: any = null;
 	let forceSave = false;
+	let isPublicRepository = application.settings.isPublicRepository;
+	let apiUrl = application.gitSource.apiUrl;
+	let branch = application.branch;
+	let repository = application.repository;
 	let debug = application.settings.debug;
 	let previews = application.settings.previews;
 	let dualCerts = application.settings.dualCerts;
@@ -65,6 +68,11 @@
 	let autodeploy = application.settings.autodeploy;
 	let isBot = application.settings.isBot;
 	let isDBBranching = application.settings.isDBBranching;
+
+	let dockerComposeFile = JSON.parse(application.dockerComposeFile) || null;
+	let dockerComposeServices: any[] = [];
+	let dockerComposeFileLocation = application.dockerComposeFileLocation;
+	let dockerComposeConfiguration = JSON.parse(application.dockerComposeConfiguration) || {};
 
 	let baseDatabaseBranch: any = application?.connectedDatabase?.hostedDatabaseDBName || null;
 	let nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
@@ -86,6 +94,26 @@
 			label: 'Uvicorn'
 		}
 	];
+
+	function normalizeDockerServices(services: any[]) {
+		const tempdockerComposeServices = [];
+		for (const [name, data] of Object.entries(services)) {
+			tempdockerComposeServices.push({
+				name,
+				data
+			});
+		}
+		for (const service of tempdockerComposeServices) {
+			if (!dockerComposeConfiguration[service.name]) {
+				dockerComposeConfiguration[service.name] = {};
+			}
+		}
+		return tempdockerComposeServices;
+	}
+	if (dockerComposeFile?.services) {
+		dockerComposeServices = normalizeDockerServices(dockerComposeFile.services);
+	}
+
 	function containerClass() {
 		return 'text-white bg-transparent font-thin px-0 w-full border border-dashed border-coolgray-200';
 	}
@@ -214,7 +242,11 @@
 					dualCerts,
 					exposePort: application.exposePort
 				}));
-			await post(`/applications/${id}`, { ...application, baseDatabaseBranch });
+			await post(`/applications/${id}`, {
+				...application,
+				baseDatabaseBranch,
+				dockerComposeConfiguration: JSON.stringify(dockerComposeConfiguration)
+			});
 			setLocation(application, settings);
 			$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
 
@@ -279,6 +311,36 @@
 			errorNotification(error);
 			isWWW ? (isWWWDomainOK = false) : (isNonWWWDomainOK = false);
 			return false;
+		}
+	}
+	async function reloadCompose() {
+		try {
+			const headers = isPublicRepository
+				? {}
+				: {
+						Authorization: `token ${$appSession.tokens.github}`
+				  };
+			const data = await get(
+				`${apiUrl}/repos/${repository}/contents/${dockerComposeFileLocation}?ref=${branch}`,
+				{
+					...headers,
+					Accept: 'application/vnd.github.v2.json'
+				}
+			);
+			if (data?.content) {
+				const content = atob(data.content);
+				let dockerComposeFileContent = JSON.stringify(yaml.load(content) || null);
+				let dockerComposeFileContentJSON = JSON.parse(dockerComposeFileContent);
+				dockerComposeServices = normalizeDockerServices(dockerComposeFileContentJSON?.services);
+				application.dockerComposeFile = dockerComposeFileContent;
+				await handleSubmit();
+			}
+			addToast({
+				message: 'Compose file reloaded.',
+				type: 'success'
+			});
+		} catch (error) {
+			errorNotification(error);
 		}
 	}
 </script>
@@ -372,18 +434,20 @@
 						/>
 					</div>
 				</div>
-				<div class="grid grid-cols-2 items-center">
-					<Setting
-						id="isBot"
-						isCenter={false}
-						bind:setting={isBot}
-						on:click={() => changeSettings('isBot')}
-						title="Is your application a bot?"
-						description="You can deploy applications without domains or make them to listen on the <span class='text-settings font-bold'>Exposed Port</span>.<br></Setting><br>Useful to host <span class='text-settings font-bold'>Twitch bots, regular jobs, or anything that does not require an incoming HTTP connection.</span>"
-						disabled={$status.application.isRunning}
-					/>
-				</div>
-				{#if !isBot}
+				{#if application.buildPack !== 'compose'}
+					<div class="grid grid-cols-2 items-center">
+						<Setting
+							id="isBot"
+							isCenter={false}
+							bind:setting={isBot}
+							on:click={() => changeSettings('isBot')}
+							title="Is your application a bot?"
+							description="You can deploy applications without domains or make them to listen on the <span class='text-settings font-bold'>Exposed Port</span>.<br></Setting><br>Useful to host <span class='text-settings font-bold'>Twitch bots, regular jobs, or anything that does not require an incoming HTTP connection.</span>"
+							disabled={$status.application.isRunning}
+						/>
+					</div>
+				{/if}
+				{#if !isBot && application.buildPack !== 'compose'}
 					<div class="grid grid-cols-2 items-center">
 						<label for="fqdn"
 							>{$t('application.url_fqdn')}
@@ -454,7 +518,7 @@
 							on:click={() => !$status.application.isRunning && changeSettings('dualCerts')}
 						/>
 					</div>
-					{#if isHttps}
+					{#if isHttps && application.buildPack !== 'compose'}
 						<div class="grid grid-cols-2 items-center pb-4">
 							<Setting
 								id="isCustomSSL"
@@ -468,349 +532,395 @@
 					{/if}
 				{/if}
 			</div>
-
-			<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">Build & Deploy</div>
-			<div class="grid grid-flow-row gap-2 px-4 pr-5">
-				{#if application.buildCommand || application.buildPack === 'rust' || application.buildPack === 'laravel'}
-					<div class="grid grid-cols-2 items-center">
-						<label for="baseBuildImage"
-							>{$t('application.base_build_image')}
-							<Explainer
-								explanation={application.buildPack === 'laravel'
-									? 'For building frontend assets with webpack.'
-									: 'Image that will be used during the build process.'}
-							/>
-						</label>
-						<div class="custom-select-wrapper">
-							<Select
-								{isDisabled}
-								containerClasses={isDisabled && containerClass()}
-								id="baseBuildImages"
-								showIndicator={!$status.application.isRunning}
-								items={application.baseBuildImages}
-								on:select={selectBaseBuildImage}
-								value={application.baseBuildImage}
-								isClearable={false}
-							/>
-						</div>
-					</div>
-				{/if}
-				{#if application.buildPack !== 'docker'}
-					<div class="grid grid-cols-2 items-center">
-						<label for="baseImage"
-							>{$t('application.base_image')}
-							<Explainer explanation={'Image that will be used for the deployment.'} /></label
-						>
-						<div class="custom-select-wrapper">
-							<Select
-								{isDisabled}
-								containerClasses={isDisabled && containerClass()}
-								id="baseImages"
-								showIndicator={!$status.application.isRunning}
-								items={application.baseImages}
-								on:select={selectBaseImage}
-								value={application.baseImage}
-								isClearable={false}
-							/>
-						</div>
-					</div>
-				{/if}
-				{#if application.buildPack !== 'docker' && (application.buildPack === 'nextjs' || application.buildPack === 'nuxtjs')}
-					<div class="grid grid-cols-2 items-center pb-8">
-						<label for="deploymentType"
-							>Deployment Type
-							<Explainer
-								explanation={"Defines how to deploy your application. <br><br><span class='text-green-500 font-bold'>Static</span> is for static websites, <span class='text-green-500 font-bold'>node</span> is for server-side applications."}
-							/></label
-						>
-						<div class="custom-select-wrapper">
-							<Select
-								{isDisabled}
-								containerClasses={isDisabled && containerClass()}
-								id="deploymentTypes"
-								showIndicator={!$status.application.isRunning}
-								items={['static', 'node']}
-								on:select={selectDeploymentType}
-								value={application.deploymentType}
-								isClearable={false}
-							/>
-						</div>
-					</div>
-				{/if}
-				{#if $features.beta}
-					{#if !application.settings.isBot && !application.settings.isPublicRepository}
+			{#if application.buildPack !== 'compose'}
+				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
+					Build & Deploy
+				</div>
+				<div class="grid grid-flow-row gap-2 px-4 pr-5">
+					{#if application.buildCommand || application.buildPack === 'rust' || application.buildPack === 'laravel'}
 						<div class="grid grid-cols-2 items-center">
-							<Setting
-								id="isDBBranching"
-								isCenter={false}
-								bind:setting={isDBBranching}
-								on:click={() => changeSettings('isDBBranching')}
-								title="Enable DB Branching"
-								description="Enable DB Branching"
-							/>
+							<label for="baseBuildImage"
+								>{$t('application.base_build_image')}
+								<Explainer
+									explanation={application.buildPack === 'laravel'
+										? 'For building frontend assets with webpack.'
+										: 'Image that will be used during the build process.'}
+								/>
+							</label>
+							<div class="custom-select-wrapper">
+								<Select
+									{isDisabled}
+									containerClasses={isDisabled && containerClass()}
+									id="baseBuildImages"
+									showIndicator={!$status.application.isRunning}
+									items={application.baseBuildImages}
+									on:select={selectBaseBuildImage}
+									value={application.baseBuildImage}
+									isClearable={false}
+								/>
+							</div>
 						</div>
-						{#if isDBBranching}
-							<button
-								on:click|stopPropagation|preventDefault={() =>
-									goto(`/applications/${id}/configuration/database`)}
-								class="btn btn-sm">Configure Connected Database</button
+					{/if}
+					{#if application.buildPack !== 'docker'}
+						<div class="grid grid-cols-2 items-center">
+							<label for="baseImage"
+								>{$t('application.base_image')}
+								<Explainer explanation={'Image that will be used for the deployment.'} /></label
 							>
-							{#if application.connectedDatabase}
-								<div class="grid grid-cols-2 items-center">
-									<label for="baseImage"
-										>Base Database
-										<Explainer
-											explanation={'The name of the database that will be used as base when branching.'}
-										/></label
-									>
-									<input
-										name="baseDatabaseBranch"
-										required
-										id="baseDatabaseBranch"
-										bind:value={baseDatabaseBranch}
-									/>
-								</div>
-								<div class="text-center bg-green-600 rounded">
-									Connected to {application.connectedDatabase.databaseId}
-								</div>
+							<div class="custom-select-wrapper">
+								<Select
+									{isDisabled}
+									containerClasses={isDisabled && containerClass()}
+									id="baseImages"
+									showIndicator={!$status.application.isRunning}
+									items={application.baseImages}
+									on:select={selectBaseImage}
+									value={application.baseImage}
+									isClearable={false}
+								/>
+							</div>
+						</div>
+					{/if}
+					{#if application.buildPack !== 'docker' && (application.buildPack === 'nextjs' || application.buildPack === 'nuxtjs')}
+						<div class="grid grid-cols-2 items-center pb-8">
+							<label for="deploymentType"
+								>Deployment Type
+								<Explainer
+									explanation={"Defines how to deploy your application. <br><br><span class='text-green-500 font-bold'>Static</span> is for static websites, <span class='text-green-500 font-bold'>node</span> is for server-side applications."}
+								/></label
+							>
+							<div class="custom-select-wrapper">
+								<Select
+									{isDisabled}
+									containerClasses={isDisabled && containerClass()}
+									id="deploymentTypes"
+									showIndicator={!$status.application.isRunning}
+									items={['static', 'node']}
+									on:select={selectDeploymentType}
+									value={application.deploymentType}
+									isClearable={false}
+								/>
+							</div>
+						</div>
+					{/if}
+					{#if $features.beta}
+						{#if !application.settings.isBot && !application.settings.isPublicRepository}
+							<div class="grid grid-cols-2 items-center">
+								<Setting
+									id="isDBBranching"
+									isCenter={false}
+									bind:setting={isDBBranching}
+									on:click={() => changeSettings('isDBBranching')}
+									title="Enable DB Branching"
+									description="Enable DB Branching"
+								/>
+							</div>
+							{#if isDBBranching}
+								<button
+									on:click|stopPropagation|preventDefault={() =>
+										goto(`/applications/${id}/configuration/database`)}
+									class="btn btn-sm">Configure Connected Database</button
+								>
+								{#if application.connectedDatabase}
+									<div class="grid grid-cols-2 items-center">
+										<label for="baseImage"
+											>Base Database
+											<Explainer
+												explanation={'The name of the database that will be used as base when branching.'}
+											/></label
+										>
+										<input
+											name="baseDatabaseBranch"
+											required
+											id="baseDatabaseBranch"
+											bind:value={baseDatabaseBranch}
+										/>
+									</div>
+									<div class="text-center bg-green-600 rounded">
+										Connected to {application.connectedDatabase.databaseId}
+									</div>
+								{/if}
 							{/if}
 						{/if}
 					{/if}
-				{/if}
 
-				{#if application.buildPack === 'python'}
-					<div class="grid grid-cols-2 items-center">
-						<label for="pythonModule">WSGI / ASGI</label>
-						<div class="custom-select-wrapper">
-							<Select
-								id="wsgi"
-								items={wsgis}
-								on:select={selectWSGI}
-								value={application.pythonWSGI}
-							/>
-						</div>
-					</div>
-
-					<div class="grid grid-cols-2 items-center">
-						<label for="pythonModule">Module</label>
-						<input
-							disabled={isDisabled}
-							readonly={!$appSession.isAdmin}
-							name="pythonModule"
-							id="pythonModule"
-							required
-							class="w-full"
-							bind:value={application.pythonModule}
-							placeholder={application.pythonWSGI?.toLowerCase() !== 'none' ? 'main' : 'main.py'}
-						/>
-					</div>
-					{#if application.pythonWSGI?.toLowerCase() === 'gunicorn'}
+					{#if application.buildPack === 'python'}
 						<div class="grid grid-cols-2 items-center">
-							<label for="pythonVariable">Variable</label>
+							<label for="pythonModule">WSGI / ASGI</label>
+							<div class="custom-select-wrapper">
+								<Select
+									id="wsgi"
+									items={wsgis}
+									on:select={selectWSGI}
+									value={application.pythonWSGI}
+								/>
+							</div>
+						</div>
+
+						<div class="grid grid-cols-2 items-center">
+							<label for="pythonModule">Module</label>
 							<input
 								disabled={isDisabled}
 								readonly={!$appSession.isAdmin}
-								name="pythonVariable"
-								id="pythonVariable"
+								name="pythonModule"
+								id="pythonModule"
 								required
 								class="w-full"
-								bind:value={application.pythonVariable}
-								placeholder="default: app"
+								bind:value={application.pythonModule}
+								placeholder={application.pythonWSGI?.toLowerCase() !== 'none' ? 'main' : 'main.py'}
 							/>
 						</div>
+						{#if application.pythonWSGI?.toLowerCase() === 'gunicorn'}
+							<div class="grid grid-cols-2 items-center">
+								<label for="pythonVariable">Variable</label>
+								<input
+									disabled={isDisabled}
+									readonly={!$appSession.isAdmin}
+									name="pythonVariable"
+									id="pythonVariable"
+									required
+									class="w-full"
+									bind:value={application.pythonVariable}
+									placeholder="default: app"
+								/>
+							</div>
+						{/if}
+						{#if application.pythonWSGI?.toLowerCase() === 'uvicorn'}
+							<div class="grid grid-cols-2 items-center">
+								<label for="pythonVariable">Variable</label>
+								<input
+									disabled={isDisabled}
+									readonly={!$appSession.isAdmin}
+									name="pythonVariable"
+									id="pythonVariable"
+									required
+									class="w-full"
+									bind:value={application.pythonVariable}
+									placeholder="default: app"
+								/>
+							</div>
+						{/if}
 					{/if}
-					{#if application.pythonWSGI?.toLowerCase() === 'uvicorn'}
-						<div class="grid grid-cols-2 items-center">
-							<label for="pythonVariable">Variable</label>
+					{#if !staticDeployments.includes(application.buildPack)}
+						<div class="grid grid-cols-2 items-center pt-4">
+							<label for="port"
+								>{$t('forms.port')}
+								<Explainer explanation={'The port your application listens on.'} /></label
+							>
 							<input
+								class="w-full"
 								disabled={isDisabled}
 								readonly={!$appSession.isAdmin}
-								name="pythonVariable"
-								id="pythonVariable"
-								required
-								class="w-full"
-								bind:value={application.pythonVariable}
-								placeholder="default: app"
+								name="port"
+								id="port"
+								bind:value={application.port}
+								placeholder="{$t('forms.default')}: 'python' ? '8000' : '3000'"
 							/>
 						</div>
 					{/if}
-				{/if}
-				{#if !staticDeployments.includes(application.buildPack)}
-					<div class="grid grid-cols-2 items-center pt-4">
-						<label for="port"
-							>{$t('forms.port')}
-							<Explainer explanation={'The port your application listens on.'} /></label
-						>
-						<input
-							class="w-full"
-							disabled={isDisabled}
-							readonly={!$appSession.isAdmin}
-							name="port"
-							id="port"
-							bind:value={application.port}
-							placeholder="{$t('forms.default')}: 'python' ? '8000' : '3000'"
-						/>
-					</div>
-				{/if}
-				<div class="grid grid-cols-2 items-center pb-4">
-					<label for="exposePort"
-						>Exposed Port <Explainer
-							explanation={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
-						/></label
-					>
-					<input
-						class="w-full"
-						readonly={!$appSession.isAdmin && !$status.application.isRunning}
-						disabled={isDisabled}
-						name="exposePort"
-						id="exposePort"
-						bind:value={application.exposePort}
-						placeholder="12345"
-					/>
-				</div>
-				{#if !notNodeDeployments.includes(application.buildPack)}
-					<div class="grid grid-cols-2 items-center">
-						<label for="installCommand">{$t('application.install_command')}</label>
-						<input
-							class="w-full"
-							disabled={isDisabled}
-							readonly={!$appSession.isAdmin}
-							name="installCommand"
-							id="installCommand"
-							bind:value={application.installCommand}
-							placeholder="{$t('forms.default')}: yarn install"
-						/>
-					</div>
-					<div class="grid grid-cols-2 items-center">
-						<label for="buildCommand">{$t('application.build_command')}</label>
-						<input
-							class="w-full"
-							disabled={isDisabled}
-							readonly={!$appSession.isAdmin}
-							name="buildCommand"
-							id="buildCommand"
-							bind:value={application.buildCommand}
-							placeholder="{$t('forms.default')}: yarn build"
-						/>
-					</div>
-					<div class="grid grid-cols-2 items-center pb-8">
-						<label for="startCommand">{$t('application.start_command')}</label>
-						<input
-							class="w-full"
-							disabled={isDisabled}
-							readonly={!$appSession.isAdmin}
-							name="startCommand"
-							id="startCommand"
-							bind:value={application.startCommand}
-							placeholder="{$t('forms.default')}: yarn start"
-						/>
-					</div>
-				{/if}
-				{#if application.buildPack === 'deno'}
-					<div class="grid grid-cols-2 items-center">
-						<label for="denoMainFile">Main File</label>
-						<input
-							class="w-full"
-							disabled={isDisabled}
-							readonly={!$appSession.isAdmin}
-							name="denoMainFile"
-							id="denoMainFile"
-							bind:value={application.denoMainFile}
-							placeholder="default: main.ts"
-						/>
-					</div>
-					<div class="grid grid-cols-2 items-center">
-						<label for="denoOptions"
-							>Arguments <Explainer
-								explanation={"List of arguments to pass to <span class='text-settings font-bold'>deno run</span> command. Could include permissions, configurations files, etc."}
+					<div class="grid grid-cols-2 items-center pb-4">
+						<label for="exposePort"
+							>Exposed Port <Explainer
+								explanation={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
 							/></label
 						>
 						<input
 							class="w-full"
+							readonly={!$appSession.isAdmin && !$status.application.isRunning}
 							disabled={isDisabled}
-							readonly={!$appSession.isAdmin}
-							name="denoOptions"
-							id="denoOptions"
-							bind:value={application.denoOptions}
-							placeholder="eg: --allow-net --allow-hrtime --config path/to/file.json"
+							name="exposePort"
+							id="exposePort"
+							bind:value={application.exposePort}
+							placeholder="12345"
 						/>
 					</div>
-				{/if}
-				{#if application.buildPack !== 'laravel'}
-					<div class="grid grid-cols-2 items-center">
-						<div class="flex-col">
-							<label for="baseDirectory"
-								>{$t('forms.base_directory')}
-								<Explainer
-									explanation={"Directory to use as the base for all commands.<br>Could be useful with <span class='text-settings font-bold'>monorepos</span>."}
+					{#if !notNodeDeployments.includes(application.buildPack)}
+						<div class="grid grid-cols-2 items-center">
+							<label for="installCommand">{$t('application.install_command')}</label>
+							<input
+								class="w-full"
+								disabled={isDisabled}
+								readonly={!$appSession.isAdmin}
+								name="installCommand"
+								id="installCommand"
+								bind:value={application.installCommand}
+								placeholder="{$t('forms.default')}: yarn install"
+							/>
+						</div>
+						<div class="grid grid-cols-2 items-center">
+							<label for="buildCommand">{$t('application.build_command')}</label>
+							<input
+								class="w-full"
+								disabled={isDisabled}
+								readonly={!$appSession.isAdmin}
+								name="buildCommand"
+								id="buildCommand"
+								bind:value={application.buildCommand}
+								placeholder="{$t('forms.default')}: yarn build"
+							/>
+						</div>
+						<div class="grid grid-cols-2 items-center pb-8">
+							<label for="startCommand">{$t('application.start_command')}</label>
+							<input
+								class="w-full"
+								disabled={isDisabled}
+								readonly={!$appSession.isAdmin}
+								name="startCommand"
+								id="startCommand"
+								bind:value={application.startCommand}
+								placeholder="{$t('forms.default')}: yarn start"
+							/>
+						</div>
+					{/if}
+					{#if application.buildPack === 'deno'}
+						<div class="grid grid-cols-2 items-center">
+							<label for="denoMainFile">Main File</label>
+							<input
+								class="w-full"
+								disabled={isDisabled}
+								readonly={!$appSession.isAdmin}
+								name="denoMainFile"
+								id="denoMainFile"
+								bind:value={application.denoMainFile}
+								placeholder="default: main.ts"
+							/>
+						</div>
+						<div class="grid grid-cols-2 items-center">
+							<label for="denoOptions"
+								>Arguments <Explainer
+									explanation={"List of arguments to pass to <span class='text-settings font-bold'>deno run</span> command. Could include permissions, configurations files, etc."}
 								/></label
 							>
-						</div>
-						<input
-							class="w-full"
-							disabled={isDisabled}
-							readonly={!$appSession.isAdmin}
-							name="baseDirectory"
-							id="baseDirectory"
-							bind:value={application.baseDirectory}
-							placeholder="{$t('forms.default')}: /"
-						/>
-					</div>
-				{/if}
-				{#if application.buildPack === 'docker'}
-					<div class="grid grid-cols-2 items-center pb-4">
-						<label for="dockerFileLocation" class=""
-							>Dockerfile Location <Explainer
-								explanation={"Should be absolute path, like <span class='text-settings font-bold'>/data/Dockerfile</span> or <span class='text-settings font-bold'>/Dockerfile.</span>"}
-							/></label
-						>
-						<div class="form-control w-full">
 							<input
-								class="w-full input"
+								class="w-full"
 								disabled={isDisabled}
 								readonly={!$appSession.isAdmin}
-								name="dockerFileLocation"
-								id="dockerFileLocation"
-								bind:value={application.dockerFileLocation}
-								placeholder="default: /Dockerfile"
+								name="denoOptions"
+								id="denoOptions"
+								bind:value={application.denoOptions}
+								placeholder="eg: --allow-net --allow-hrtime --config path/to/file.json"
 							/>
-							{#if application.baseDirectory}
-								<label class="label">
-									<span class="label-text-alt text-xs"
-										>Path: {application.baseDirectory.replace(
-											/^\/$/,
-											''
-										)}{application.dockerFileLocation}</span
-									>
-								</label>
+						</div>
+					{/if}
+					{#if application.buildPack !== 'laravel'}
+						<div class="grid grid-cols-2 items-center">
+							<div class="flex-col">
+								<label for="baseDirectory"
+									>{$t('forms.base_directory')}
+									<Explainer
+										explanation={"Directory to use as the base for all commands.<br>Could be useful with <span class='text-settings font-bold'>monorepos</span>."}
+									/></label
+								>
+							</div>
+							<input
+								class="w-full"
+								disabled={isDisabled}
+								readonly={!$appSession.isAdmin}
+								name="baseDirectory"
+								id="baseDirectory"
+								bind:value={application.baseDirectory}
+								placeholder="{$t('forms.default')}: /"
+							/>
+						</div>
+					{/if}
+					{#if application.buildPack === 'docker'}
+						<div class="grid grid-cols-2 items-center pb-4">
+							<label for="dockerFileLocation" class=""
+								>Dockerfile Location <Explainer
+									explanation={"Should be absolute path, like <span class='text-settings font-bold'>/data/Dockerfile</span> or <span class='text-settings font-bold'>/Dockerfile.</span>"}
+								/></label
+							>
+							<div class="form-control w-full">
+								<input
+									class="w-full input"
+									disabled={isDisabled}
+									readonly={!$appSession.isAdmin}
+									name="dockerFileLocation"
+									id="dockerFileLocation"
+									bind:value={application.dockerFileLocation}
+									placeholder="default: /Dockerfile"
+								/>
+								{#if application.baseDirectory}
+									<label class="label">
+										<span class="label-text-alt text-xs"
+											>Path: {application.baseDirectory.replace(
+												/^\/$/,
+												''
+											)}{application.dockerFileLocation}</span
+										>
+									</label>
+								{/if}
+							</div>
+						</div>
+					{/if}
+					{#if !notNodeDeployments.includes(application.buildPack)}
+						<div class="grid grid-cols-2 items-center">
+							<div class="flex-col">
+								<label for="publishDirectory"
+									>{$t('forms.publish_directory')}
+									<Explainer
+										explanation={"Directory containing all the assets for deployment. <br> For example: <span class='text-settings font-bold'>dist</span>,<span class='text-settings font-bold'>_site</span> or <span class='text-settings font-bold'>public</span>."}
+									/></label
+								>
+							</div>
+
+							<input
+								class="w-full"
+								disabled={isDisabled}
+								readonly={!$appSession.isAdmin}
+								name="publishDirectory"
+								id="publishDirectory"
+								required={application.deploymentType === 'static'}
+								bind:value={application.publishDirectory}
+								placeholder=" {$t('forms.default')}: /"
+							/>
+						</div>
+					{/if}
+				</div>
+			{:else}
+				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
+					Docker Compose
+					{#if $appSession.isAdmin}
+						<button
+							class="btn btn-sm  btn-primary"
+							on:click|preventDefault={reloadCompose}
+							class:loading
+							disabled={loading}>Reload Docker Compose File</button
+						>
+					{/if}
+				</div>
+				<div class="grid grid-flow-row gap-2">
+					{#each dockerComposeServices as service}
+						<div class="grid items-center mb-6">
+							<div class="text-xl font-bold uppercase">{service.name}</div>
+							{#if service.data?.image}
+								<div class="text-xs">{service.data.image}</div>
+							{:else}
+								<div class="text-xs">No image, build required</div>
 							{/if}
 						</div>
-					</div>
-				{/if}
-				{#if !notNodeDeployments.includes(application.buildPack)}
-					<div class="grid grid-cols-2 items-center">
-						<div class="flex-col">
-							<label for="publishDirectory"
-								>{$t('forms.publish_directory')}
-								<Explainer
-									explanation={"Directory containing all the assets for deployment. <br> For example: <span class='text-settings font-bold'>dist</span>,<span class='text-settings font-bold'>_site</span> or <span class='text-settings font-bold'>public</span>."}
-								/></label
-							>
-						</div>
 
-						<input
-							class="w-full"
-							disabled={isDisabled}
-							readonly={!$appSession.isAdmin}
-							name="publishDirectory"
-							id="publishDirectory"
-							required={application.deploymentType === 'static'}
-							bind:value={application.publishDirectory}
-							placeholder=" {$t('forms.default')}: /"
-						/>
-					</div>
-				{/if}
-			</div>
+						<div class="grid grid-cols-2 items-center">
+							<label for="fqdn"
+								>{$t('application.url_fqdn')}
+								<Explainer
+									explanation={"If you specify <span class='text-settings font-bold'>https</span>, the application will be accessible only over https.<br>SSL certificate will be generated automatically.<br><br>If you specify <span class='text-settings font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application.<br><br><span class='text-settings font-bold'>You must set your DNS to point to the server IP in advance.</span>"}
+								/>
+							</label>
+							<div>
+								<input
+									class="w-full"
+									name="fqdn"
+									id="fqdn"
+									bind:value={dockerComposeConfiguration[service.name].fqdn}
+									pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+									placeholder="eg: https://coollabs.io"
+								/>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
 		</div>
 	</form>
 </div>

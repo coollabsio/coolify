@@ -212,17 +212,37 @@ import * as buildpacks from '../lib/buildPacks';
 										//
 									}
 									await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId, baseImage);
+									const labels = makeLabelForStandaloneApplication({
+										applicationId,
+										fqdn,
+										name,
+										type,
+										pullmergeRequestId,
+										buildPack,
+										repository,
+										branch,
+										projectId,
+										port: exposePort ? `${exposePort}:${port}` : port,
+										commit,
+										installCommand,
+										buildCommand,
+										startCommand,
+										baseDirectory,
+										publishDirectory
+									});
 									if (forceRebuild) deployNeeded = true
 									if (!imageFound || deployNeeded) {
-										// if (true) {
 										if (buildpacks[buildPack])
 											await buildpacks[buildPack]({
 												dockerId: destinationDocker.id,
+												network: destinationDocker.network,
 												buildId,
 												applicationId,
 												domain,
 												name,
 												type,
+												volumes,
+												labels,
 												pullmergeRequestId,
 												buildPack,
 												repository,
@@ -248,7 +268,7 @@ import * as buildpacks from '../lib/buildPacks';
 												denoOptions,
 												baseImage,
 												baseBuildImage,
-												deploymentType
+												deploymentType,
 											});
 										else {
 											await saveBuildLog({ line: `Build pack ${buildPack} not found`, buildId, applicationId });
@@ -257,112 +277,137 @@ import * as buildpacks from '../lib/buildPacks';
 									} else {
 										await saveBuildLog({ line: 'Build image already available - no rebuild required.', buildId, applicationId });
 									}
-									try {
-										await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker stop -t 0 ${imageId}` })
-										await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker rm ${imageId}` })
-									} catch (error) {
-										//
-									}
-									const envs = [
-										`PORT=${port}`
-									];
-									if (secrets.length > 0) {
-										secrets.forEach((secret) => {
-											if (pullmergeRequestId) {
-												const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
-												if (isSecretFound.length > 0) {
-													envs.push(`${secret.name}=${isSecretFound[0].value}`);
-												} else {
-													envs.push(`${secret.name}=${secret.value}`);
-												}
-											} else {
-												if (!secret.isPRMRSecret) {
-													envs.push(`${secret.name}=${secret.value}`);
-												}
+
+									if (buildPack === 'compose') {
+										try {
+											await executeDockerCmd({
+												dockerId: destinationDockerId,
+												command: `docker ps -a --filter 'label=coolify.applicationId=${applicationId}' --format {{.ID}}|xargs -r -n 1 docker stop -t 0`
+											})
+											await executeDockerCmd({
+												dockerId: destinationDockerId,
+												command: `docker ps -a --filter 'label=coolify.applicationId=${applicationId}' --format {{.ID}}|xargs -r -n 1 docker rm --force`
+											})
+										} catch (error) {
+											//
+										}
+										try {
+											await executeDockerCmd({ debug, buildId, applicationId, dockerId: destinationDocker.id, command: `docker compose --project-directory ${workdir} up -d` })
+											await saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
+											await saveBuildLog({ line: 'Proxy will be updated shortly.', buildId, applicationId });
+											await prisma.build.update({ where: { id: buildId }, data: { status: 'success' } });
+											await prisma.application.update({
+												where: { id: applicationId },
+												data: { configHash: currentHash }
+											});
+										} catch (error) {
+											await saveBuildLog({ line: error, buildId, applicationId });
+											const foundBuild = await prisma.build.findUnique({ where: { id: buildId } })
+											if (foundBuild) {
+												await prisma.build.update({
+													where: { id: buildId },
+													data: {
+														status: 'failed'
+													}
+												});
 											}
-										});
-									}
-									await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
-									const labels = makeLabelForStandaloneApplication({
-										applicationId,
-										fqdn,
-										name,
-										type,
-										pullmergeRequestId,
-										buildPack,
-										repository,
-										branch,
-										projectId,
-										port: exposePort ? `${exposePort}:${port}` : port,
-										commit,
-										installCommand,
-										buildCommand,
-										startCommand,
-										baseDirectory,
-										publishDirectory
-									});
-									let envFound = false;
-									try {
-										envFound = !!(await fs.stat(`${workdir}/.env`));
-									} catch (error) {
-										//
-									}
-									try {
-										await saveBuildLog({ line: 'Deployment started.', buildId, applicationId });
-										const composeVolumes = volumes.map((volume) => {
-											return {
-												[`${volume.split(':')[0]}`]: {
-													name: volume.split(':')[0]
-												}
-											};
-										});
-										const composeFile = {
-											version: '3.8',
-											services: {
-												[imageId]: {
-													image: `${applicationId}:${tag}`,
-													container_name: imageId,
-													volumes,
-													env_file: envFound ? [`${workdir}/.env`] : [],
-													labels,
-													depends_on: [],
-													expose: [port],
-													...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-													// logging: {
-													// 	driver: 'fluentd',
-													// },
-													...defaultComposeConfiguration(destinationDocker.network),
-												}
-											},
-											networks: {
-												[destinationDocker.network]: {
-													external: true
-												}
-											},
-											volumes: Object.assign({}, ...composeVolumes)
-										};
-										await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
-										await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose --project-directory ${workdir} up -d` })
-										await saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
-									} catch (error) {
-										await saveBuildLog({ line: error, buildId, applicationId });
-										const foundBuild = await prisma.build.findUnique({ where: { id: buildId } })
-										if (foundBuild) {
-											await prisma.build.update({
-												where: { id: buildId },
-												data: {
-													status: 'failed'
+											throw new Error(error);
+										}
+
+									} else {
+										try {
+											await executeDockerCmd({
+												dockerId: destinationDockerId,
+												command: `docker ps -a --filter 'label=com.docker.compose.service=${applicationId}' --format {{.ID}}|xargs -r -n 1 docker stop -t 0`
+											})
+											await executeDockerCmd({
+												dockerId: destinationDockerId,
+												command: `docker ps -a --filter 'label=com.docker.compose.service=${applicationId}' --format {{.ID}}|xargs -r -n 1 docker rm --force`
+											})
+										} catch (error) {
+											//
+										}
+										const envs = [
+											`PORT=${port}`
+										];
+										if (secrets.length > 0) {
+											secrets.forEach((secret) => {
+												if (pullmergeRequestId) {
+													const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
+													if (isSecretFound.length > 0) {
+														envs.push(`${secret.name}=${isSecretFound[0].value}`);
+													} else {
+														envs.push(`${secret.name}=${secret.value}`);
+													}
+												} else {
+													if (!secret.isPRMRSecret) {
+														envs.push(`${secret.name}=${secret.value}`);
+													}
 												}
 											});
 										}
-										throw new Error(error);
+										await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
+
+										let envFound = false;
+										try {
+											envFound = !!(await fs.stat(`${workdir}/.env`));
+										} catch (error) {
+											//
+										}
+										try {
+											await saveBuildLog({ line: 'Deployment started.', buildId, applicationId });
+											const composeVolumes = volumes.map((volume) => {
+												return {
+													[`${volume.split(':')[0]}`]: {
+														name: volume.split(':')[0]
+													}
+												};
+											});
+											const composeFile = {
+												version: '3.8',
+												services: {
+													[imageId]: {
+														image: `${applicationId}:${tag}`,
+														container_name: imageId,
+														volumes,
+														env_file: envFound ? [`${workdir}/.env`] : [],
+														labels,
+														depends_on: [],
+														expose: [port],
+														...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+														...defaultComposeConfiguration(destinationDocker.network),
+													}
+												},
+												networks: {
+													[destinationDocker.network]: {
+														external: true
+													}
+												},
+												volumes: Object.assign({}, ...composeVolumes)
+											};
+											await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
+											await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose --project-directory ${workdir} up -d` })
+											await saveBuildLog({ line: 'Deployment successful!', buildId, applicationId });
+										} catch (error) {
+											await saveBuildLog({ line: error, buildId, applicationId });
+											const foundBuild = await prisma.build.findUnique({ where: { id: buildId } })
+											if (foundBuild) {
+												await prisma.build.update({
+													where: { id: buildId },
+													data: {
+														status: 'failed'
+													}
+												});
+											}
+											throw new Error(error);
+										}
+										await saveBuildLog({ line: 'Proxy will be updated shortly.', buildId, applicationId });
+										await prisma.build.update({ where: { id: buildId }, data: { status: 'success' } });
+										if (!pullmergeRequestId) await prisma.application.update({
+											where: { id: applicationId },
+											data: { configHash: currentHash }
+										});
 									}
-									await saveBuildLog({ line: 'Proxy will be updated shortly.', buildId, applicationId });
-									await prisma.build.update({ where: { id: buildId }, data: { status: 'success' } });
-									if (!pullmergeRequestId) await prisma.application.update({
-										where: { id: applicationId },
-										data: { configHash: currentHash }
-									});
 								}
 							}
 							catch (error) {

@@ -634,6 +634,7 @@ export function makeLabelForStandaloneApplication({
 	return [
 		'coolify.managed=true',
 		`coolify.version=${version}`,
+		`coolify.applicationId=${applicationId}`,
 		`coolify.type=standalone-application`,
 		`coolify.configuration=${base64Encode(
 			JSON.stringify({
