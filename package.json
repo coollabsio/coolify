@@ -1,7 +1,7 @@
 {
   "name": "coolify",
   "description": "An open-source & self-hostable Heroku / Netlify alternative.",
-  "version": "3.10.14",
+  "version": "3.10.15",
   "license": "Apache-2.0",
   "repository": "github:coollabsio/coolify",
   "scripts": {
@@ -15,7 +15,8 @@
     "format:api": "NODE_ENV=development pnpm run --filter api format",
     "lint": "run-p -l -n lint:*",
     "lint:api": "NODE_ENV=development pnpm run --filter api lint",
-    "dev": "run-p -l -n dev:*",
+    "dev:container": "pnpm install && pnpm db:push && pnpm db:seed && pnpm dev",
+    "dev": "run-p -l -n dev:api dev:ui",
     "dev:api": "NODE_ENV=development pnpm run --filter api dev",
     "dev:ui": "NODE_ENV=development pnpm run --filter ui dev",
     "build": "NODE_ENV=production run-p -n build:*",
@@ -34,6 +35,7 @@
     "docker",
     "self-host",
     "iaas",
+    "paas",
     "heroku",
     "netlify",
     "open-source",

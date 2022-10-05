@@ -1,6 +1,30 @@
 version: '3.8'
 
 services:
+ coolify:
+    build:
+      context: .
+      dockerfile: Dockerfile-dev
+    command: pnpm dev:container
+    env_file: apps/api/.env
+    environment:
+      - GITPOD_WORKSPACE_URL=${GITPOD_WORKSPACE_URL}
+      - CODESANDBOX_HOST=${CODESANDBOX_HOST}
+    container_name: coolify
+    ports:
+      - target: 3000
+        published: 3000
+        protocol: tcp
+        mode: host
+      - target: 3001
+        published: 3001
+        protocol: tcp
+        mode: host
+    volumes:
+      - ./:/app
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    networks:
+      - coolify-infra
  fluent-bit:
     image: coollabsio/coolify-fluent-bit:1.0.0
     command: /fluent-bit/bin/fluent-bit -c /fluent-bit/etc/fluent-bit-dev.conf
