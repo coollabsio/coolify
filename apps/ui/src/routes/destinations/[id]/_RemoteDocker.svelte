@@ -175,24 +175,23 @@
 				disabled={loading.save}
 				>{$t('forms.save')}
 			</button>
-			{#if !destination.remoteVerified}
-				<button
-					disabled={loading.verify}
-					class="btn btn-sm"
-					class:loading={loading.verify}
-					on:click|preventDefault|stopPropagation={verifyRemoteDocker}
-					>Verify Remote Docker Engine</button
-				>
-			{:else}
-				<button
-					class="btn btn-sm"
-					class:loading={loading.restart}
-					class:bg-error={!loading.restart}
-					disabled={loading.restart}
-					on:click|preventDefault={forceRestartProxy}
-					>{$t('destination.force_restart_proxy')}</button
-				>
-			{/if}
+			<button
+				disabled={loading.verify}
+				class="btn btn-sm"
+				class:loading={loading.verify}
+				on:click|preventDefault|stopPropagation={verifyRemoteDocker}
+				>{!destination.remoteVerified
+					? 'Verify Remote Docker Engine'
+					: 'Check Remote Docker Engine'}</button
+			>
+
+			<button
+				class="btn btn-sm"
+				class:loading={loading.restart}
+				class:bg-error={!loading.restart}
+				disabled={loading.restart}
+				on:click|preventDefault={forceRestartProxy}>{$t('destination.force_restart_proxy')}</button
+			>
 		{/if}
 	</div>
 	<div class="grid grid-cols-2 items-center px-10 ">

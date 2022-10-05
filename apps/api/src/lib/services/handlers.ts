@@ -919,7 +919,7 @@ async function startMeilisearchService(request: FastifyRequest<ServiceStartStop>
         const config = {
             meilisearch: {
                 image: `${image}:${version}`,
-                volumes: [`${id}-datams:/data.ms`],
+                volumes: [`${id}-datams:/meili_data/data.ms`, `${id}-data:/meili_data `],
                 environmentVariables: {
                     MEILI_MASTER_KEY: masterKey
                 }

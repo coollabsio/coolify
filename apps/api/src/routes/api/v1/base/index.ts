@@ -2,12 +2,13 @@ import { FastifyPluginAsync } from 'fastify';
 import { errorHandler, listSettings, version } from '../../../../lib/common';
 
 const root: FastifyPluginAsync = async (fastify): Promise<void> => {
-    fastify.get('/', async () => {
+    fastify.get('/', async (request) => {
+        const teamId = request.user?.teamId;
         const settings = await listSettings()
         try {
             return {
-                ipv4: settings.ipv4,
-                ipv6: settings.ipv6,
+                ipv4: teamId ? settings.ipv4 : 'nope',
+                ipv6: teamId ? settings.ipv6 : 'nope',
                 version,
                 whiteLabeled: process.env.COOLIFY_WHITE_LABELED === 'true',
                 whiteLabeledIcon: process.env.COOLIFY_WHITE_LABELED_ICON,

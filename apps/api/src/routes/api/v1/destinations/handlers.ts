@@ -4,7 +4,7 @@ import sshConfig from 'ssh-config'
 import fs from 'fs/promises'
 import os from 'os';
 
-import { asyncExecShell, createRemoteEngineConfiguration, decrypt, errorHandler, executeDockerCmd, listSettings, prisma, startTraefikProxy, stopTraefikProxy } from '../../../../lib/common';
+import { asyncExecShell, createRemoteEngineConfiguration, decrypt, errorHandler, executeDockerCmd, executeSSHCmd, listSettings, prisma, startTraefikProxy, stopTraefikProxy } from '../../../../lib/common';
 import { checkContainer } from '../../../../lib/docker';
 
 import type { OnlyId } from '../../../../types';
@@ -202,25 +202,58 @@ export async function assignSSHKey(request: FastifyRequest) {
         return errorHandler({ status, message })
     }
 }
-export async function verifyRemoteDockerEngine(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
+export async function verifyRemoteDockerEngineFn(id: string) {
+    await createRemoteEngineConfiguration(id);
+    const { remoteIpAddress, remoteUser, network, isCoolifyProxyUsed } = await prisma.destinationDocker.findFirst({ where: { id } })
+    const host = `ssh://${remoteUser}@${remoteIpAddress}`
+    const { stdout } = await asyncExecShell(`DOCKER_HOST=${host} docker network ls --filter 'name=${network}' --no-trunc --format "{{json .}}"`);
+    if (!stdout) {
+        await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable ${network}`);
+    }
+    const { stdout: coolifyNetwork } = await asyncExecShell(`DOCKER_HOST=${host} docker network ls --filter 'name=coolify-infra' --no-trunc --format "{{json .}}"`);
+    if (!coolifyNetwork) {
+        await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable coolify-infra`);
+    }
+    if (isCoolifyProxyUsed) await startTraefikProxy(id);
+    const { stdout: daemonJson } = await executeSSHCmd({ dockerId: id, command: `cat /etc/docker/daemon.json` });
     try {
-        const { id } = request.params;
-        await createRemoteEngineConfiguration(id);
-        const { remoteIpAddress, remoteUser, network, isCoolifyProxyUsed } = await prisma.destinationDocker.findFirst({ where: { id } })
-        const host = `ssh://${remoteUser}@${remoteIpAddress}`
-        const { stdout } = await asyncExecShell(`DOCKER_HOST=${host} docker network ls --filter 'name=${network}' --no-trunc --format "{{json .}}"`);
-        if (!stdout) {
-            await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable ${network}`);
-        }
-        const { stdout: coolifyNetwork } = await asyncExecShell(`DOCKER_HOST=${host} docker network ls --filter 'name=coolify-infra' --no-trunc --format "{{json .}}"`);
-        if (!coolifyNetwork) {
-            await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable coolify-infra`);
-        }
-        if (isCoolifyProxyUsed) await startTraefikProxy(id);
-        await prisma.destinationDocker.update({ where: { id }, data: { remoteVerified: true } })
-        return reply.code(201).send()
+        let daemonJsonParsed = JSON.parse(daemonJson);
+        let isUpdated = false;
+        if (!daemonJsonParsed['live-restore'] || daemonJsonParsed['live-restore'] !== true) {
+            isUpdated = true;
+            daemonJsonParsed['live-restore'] = true
 
+        }
+        if (!daemonJsonParsed?.features?.buildkit) {
+            isUpdated = true;
+            daemonJsonParsed.features = {
+                buildkit: true
+            }
+        }
+        if (isUpdated) {
+            await executeSSHCmd({ dockerId: id, command: `echo '${JSON.stringify(daemonJsonParsed)}' > /etc/docker/daemon.json` });
+            await executeSSHCmd({ dockerId: id, command: `systemctl restart docker` });
+        }
+    } catch (error) {
+        const daemonJsonParsed = {
+            "live-restore": true,
+            "features": {
+                "buildkit": true
+            }
+        }
+        await executeSSHCmd({ dockerId: id, command: `echo '${JSON.stringify(daemonJsonParsed)}' > /etc/docker/daemon.json` });
+        await executeSSHCmd({ dockerId: id, command: `systemctl restart docker` });
+    } finally {
+        await prisma.destinationDocker.update({ where: { id }, data: { remoteVerified: true } })
+    }
+}
+export async function verifyRemoteDockerEngine(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
+    const { id } = request.params;
+    try {
+        await verifyRemoteDockerEngineFn(id);
+        return reply.code(201).send()
     } catch ({ status, message }) {
+        await prisma.destinationDocker.update({ where: { id }, data: { remoteVerified: false } })
         return errorHandler({ status, message })
     }
 }

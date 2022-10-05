@@ -10,6 +10,7 @@ import { asyncExecShell, createRemoteEngineConfiguration, getDomain, isDev, list
 import { scheduler } from './lib/scheduler';
 import { compareVersions } from 'compare-versions';
 import Graceful from '@ladjs/graceful'
+import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handlers';
 declare module 'fastify' {
 	interface FastifyInstance {
 		config: {
@@ -27,7 +28,8 @@ declare module 'fastify' {
 
 const port = isDev ? 3001 : 3000;
 const host = '0.0.0.0';
-prisma.setting.findFirst().then(async (settings) => {
+(async () => {
+	const settings = await prisma.setting.findFirst()
 	const fastify = Fastify({
 		logger: settings?.isAPIDebuggingEnabled || false,
 		trustProxy: true
@@ -117,11 +119,8 @@ prisma.setting.findFirst().then(async (settings) => {
 			// console.log('not allowed', request.headers.host)
 		}
 	})
-	fastify.listen({ port, host }, async (err: any, address: any) => {
-		if (err) {
-			console.error(err);
-			process.exit(1);
-		}
+	try {
+		await fastify.listen({ port, host })
 		console.log(`Coolify's API is listening on ${host}:${port}`);
 		await initServer();
 
@@ -140,12 +139,12 @@ prisma.setting.findFirst().then(async (settings) => {
 		// autoUpdater
 		setInterval(async () => {
 			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:autoUpdater")
-		}, isDev ? 5000 : 60000 * 15)
+		}, 60000 * 15)
 
 		// cleanupStorage
 		setInterval(async () => {
 			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupStorage")
-		}, isDev ? 6000 : 60000 * 10)
+		}, 60000 * 10)
 
 		// checkProxies and checkFluentBit
 		setInterval(async () => {
@@ -162,19 +161,28 @@ prisma.setting.findFirst().then(async (settings) => {
 			getIPAddress(),
 			configureRemoteDockers(),
 		])
-	});
-})
+	} catch (error) {
+		console.error(error);
+		process.exit(1);
+	}
+
+
+
+})();
+
 
 async function getIPAddress() {
 	const { publicIpv4, publicIpv6 } = await import('public-ip')
 	try {
 		const settings = await listSettings();
 		if (!settings.ipv4) {
+			console.log(`Getting public IPv4 address...`);
 			const ipv4 = await publicIpv4({ timeout: 2000 })
 			await prisma.setting.update({ where: { id: settings.id }, data: { ipv4 } })
 		}
 
 		if (!settings.ipv6) {
+			console.log(`Getting public IPv6 address...`);
 			const ipv6 = await publicIpv6({ timeout: 2000 })
 			await prisma.setting.update({ where: { id: settings.id }, data: { ipv6 } })
 		}
@@ -183,6 +191,7 @@ async function getIPAddress() {
 }
 async function initServer() {
 	try {
+		console.log(`Initializing server...`);
 		await asyncExecShell(`docker network create --attachable coolify`);
 	} catch (error) { }
 	try {
@@ -196,6 +205,7 @@ async function getArch() {
 	try {
 		const settings = await prisma.setting.findFirst({})
 		if (settings && !settings.arch) {
+			console.log(`Getting architecture...`);
 			await prisma.setting.update({ where: { id: settings.id }, data: { arch: process.arch } })
 		}
 	} catch (error) { }
@@ -207,9 +217,13 @@ async function configureRemoteDockers() {
 			where: { remoteVerified: true, remoteEngine: true }
 		});
 		if (remoteDocker.length > 0) {
+			console.log(`Verifying Remote Docker Engines...`);
 			for (const docker of remoteDocker) {
-				await createRemoteEngineConfiguration(docker.id)
+				console.log('Verifying:', docker.remoteIpAddress)
+				await verifyRemoteDockerEngineFn(docker.id);
 			}
 		}
-	} catch (error) { }
+	} catch (error) {
+		console.log(error)
+	}
 }
