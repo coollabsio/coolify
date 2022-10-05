@@ -3,6 +3,7 @@
   "description": "Coolify's Fastify API",
   "license": "Apache-2.0",
   "scripts": {
+    "db:generate":"prisma generate",
     "db:push": "prisma db push && prisma generate",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
@@ -11,7 +12,7 @@
     "build": "rimraf build && esbuild `find src \\( -name '*.ts' \\)| grep -v client/` --minify=true --platform=node --outdir=build --format=cjs",
     "format": "prettier --write 'src/**/*.{js,ts,json,md}'",
     "lint": "prettier --check 'src/**/*.{js,ts,json,md}' && eslint --ignore-path .eslintignore .",
-    "start": "NODE_ENV=production npx -y prisma migrate deploy && npx prisma generate && npx prisma db seed && node index.js"
+    "start": "NODE_ENV=production pnpm prisma migrate deploy && pnpm prisma generate && pnpm prisma db seed && node index.js"
   },
   "dependencies": {
     "@breejs/ts-worker": "2.0.0",
@@ -25,6 +26,7 @@
     "@iarna/toml": "2.2.5",
     "@ladjs/graceful": "3.0.2",
     "@prisma/client": "4.4.0",
+    "prisma": "4.4.0",
     "axios": "0.27.2",
     "bcryptjs": "2.4.3",
     "bree": "9.1.2",
@@ -66,7 +68,7 @@
     "eslint-plugin-prettier": "4.2.1",
     "nodemon": "2.0.20",
     "prettier": "2.7.1",
-    "prisma": "4.4.0",
+   
     "rimraf": "3.0.2",
     "tsconfig-paths": "4.1.0",
     "typescript": "4.8.4"
