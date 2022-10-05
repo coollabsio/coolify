@@ -16,6 +16,7 @@ import python from './python';
 import deno from './deno';
 import laravel from './laravel';
 import heroku from './heroku';
+import compose from './compose'
 
 export {
 	node,
@@ -35,5 +36,6 @@ export {
 	python,
 	deno,
 	laravel,
-    heroku
+    heroku,
+	compose
 };

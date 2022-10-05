@@ -236,6 +236,14 @@ export const buildPacks = [
 		isCoolifyBuildPack: true,
 	},
 	{
+        name: 'compose',
+		type: 'base',
+		fancyName: 'Docker Compose',
+		hoverColor: 'hover:bg-sky-700',
+		color: 'bg-sky-700',
+		isCoolifyBuildPack: true,
+    },
+	{
 		name: 'svelte',
 		type: 'specific',
 		base: 'node',
