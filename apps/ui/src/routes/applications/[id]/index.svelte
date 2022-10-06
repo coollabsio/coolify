@@ -49,6 +49,7 @@
 	import Setting from '$lib/components/Setting.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { goto } from '$app/navigation';
+	import Beta from '$lib/components/Beta.svelte';
 
 	const { id } = $page.params;
 
@@ -257,10 +258,11 @@
 
 			forceSave = false;
 
-			toast && addToast({
-				message: 'Configuration saved.',
-				type: 'success'
-			});
+			toast &&
+				addToast({
+					message: 'Configuration saved.',
+					type: 'success'
+				});
 			if (application.fqdn && application.fqdn.startsWith('https')) {
 				isHttps = true;
 			} else {
@@ -436,7 +438,7 @@
 					{/if}
 				</div>
 				<div class="grid grid-cols-2 items-center">
-					<label for="buildPack">{$t('application.build_pack')}</label>
+					<label for="buildPack">{$t('application.build_pack')} </label>
 					{#if isDisabled}
 						<input class="uppercase w-full" disabled={isDisabled} value={application.buildPack} />
 					{:else}
@@ -910,7 +912,7 @@
 				</div>
 			{:else}
 				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
-					Docker Compose
+					Stack <Beta />
 					{#if $appSession.isAdmin}
 						<button
 							class="btn btn-sm  btn-primary"
@@ -921,7 +923,9 @@
 				</div>
 				<div class="grid grid-flow-row gap-2">
 					{#each dockerComposeServices as service}
-						<div class="grid items-center bg-coolgray-100 rounded border border-coolgray-300 p-2 px-4">
+						<div
+							class="grid items-center bg-coolgray-100 rounded border border-coolgray-300 p-2 px-4"
+						>
 							<div class="text-xl font-bold uppercase">
 								{service.name}
 								<span
@@ -934,7 +938,6 @@
 								>
 							</div>
 							<div class="text-xs">{application.id}-{service.name}</div>
-							
 						</div>
 
 						<div class="grid grid-cols-2 items-center px-8">
@@ -956,6 +959,30 @@
 									placeholder="eg: https://coollabs.io"
 								/>
 							</div>
+						</div>
+						<div class="grid grid-cols-2 items-center px-8">
+							<label for="destinationdns"
+								>Internal DNS on the deployed Destination
+								<Explainer
+									explanation={'You can use these DNS names to access the application from other resources in your Destination.'}
+								/>
+							</label>
+							<input
+								for="destinationdns"
+								class="w-full"
+								disabled
+								readonly
+								value={`${application.id}-${service.name}`}
+							/>
+						</div>
+						<div class="grid grid-cols-2 items-center px-8">
+							<label for="stackdns"
+								>Internal DNS in the current stack
+								<Explainer
+									explanation={'You can use these DNS names to access the application from this stack.'}
+								/>
+							</label>
+							<input for="stackdns" class="w-full" disabled readonly value={service.name} />
 						</div>
 						<div class="grid grid-cols-2 items-center px-8 pb-4">
 							<label for="port"

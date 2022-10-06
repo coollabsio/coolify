@@ -2,7 +2,6 @@ import { promises as fs } from 'fs';
 import { defaultComposeConfiguration, executeDockerCmd } from '../common';
 import { buildImage, saveBuildLog } from './common';
 import yaml from 'js-yaml';
-import { getSecrets } from '../../routes/api/v1/applications/handlers';
 
 export default async function (data) {
     let {
@@ -41,20 +40,18 @@ export default async function (data) {
     const envs = [
         `PORT=${port}`
     ];
-    if (getSecrets.length > 0) {
+    if (secrets.length > 0) {
         secrets.forEach((secret) => {
-            if (secret.isBuildSecret) {
-                if (pullmergeRequestId) {
-                    const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
-                    if (isSecretFound.length > 0) {
-                        envs.push(`${secret.name}=${isSecretFound[0].value}`);
-                    } else {
-                        envs.push(`${secret.name}=${secret.value}`);
-                    }
+            if (pullmergeRequestId) {
+                const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
+                if (isSecretFound.length > 0) {
+                    envs.push(`${secret.name}=${isSecretFound[0].value}`);
                 } else {
-                    if (!secret.isPRMRSecret) {
-                        envs.push(`${secret.name}=${secret.value}`);
-                    }
+                    envs.push(`${secret.name}=${secret.value}`);
+                }
+            } else {
+                if (!secret.isPRMRSecret) {
+                    envs.push(`${secret.name}=${secret.value}`);
                 }
             }
         });
@@ -66,6 +63,8 @@ export default async function (data) {
     } catch (error) {
         //
     }
+    console.log('envFound', envFound)
+    console.log(envs)
     const composeVolumes = volumes.map((volume) => {
         return {
             [`${volume.split(':')[0]}`]: {
