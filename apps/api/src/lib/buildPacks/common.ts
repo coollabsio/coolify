@@ -468,9 +468,9 @@ export const saveBuildLog = async ({
 		line = line.replace(regex, '<SENSITIVE_DATA_DELETED>@');
 	}
 	const addTimestamp = `[${generateTimestamp()}] ${line}`;
-	const fluentBitUrl = isDev ? 'http://localhost:24224' : 'http://coolify-fluentbit:24224';
+	const fluentBitUrl = isDev ? process.env.COOLIFY_CONTAINER_DEV === 'true' ? 'http://coolify-fluentbit:24224' : 'http://localhost:24224' : 'http://coolify-fluentbit:24224';
 
-	if (isDev) {
+	if (isDev && !process.env.COOLIFY_CONTAINER_DEV) {
 		console.debug(`[${applicationId}] ${addTimestamp}`);
 	}
 	try {

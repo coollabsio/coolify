@@ -7,6 +7,7 @@ services:
       dockerfile: Dockerfile-dev
     command: bash -c 'pnpm install && pnpm db:push && pnpm db:seed && pnpm dev'
     environment:
+      - COOLIFY_CONTAINER_DEV=true
       - COOLIFY_APP_ID=random-local-id
       - COOLIFY_SECRET_KEY=12341234123412341234123412341234
       - COOLIFY_DATABASE_URL=file:../db/dev.db
@@ -29,6 +30,7 @@ services:
     volumes:
       - ./:/app
       - '/var/run/docker.sock:/var/run/docker.sock'
+      - /tmp:/tmp
     networks:
       - coolify-infra
  fluent-bit:
@@ -38,7 +40,10 @@ services:
     volumes:
       - ./logs:/logs
     ports:
-      - "24224:24224"
+      - target: 24224
+        published: 24224
+        protocol: tcp
+        mode: host
     networks:
       - coolify-infra
 networks:
