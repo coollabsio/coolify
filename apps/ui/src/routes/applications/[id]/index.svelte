@@ -28,6 +28,8 @@
 <script lang="ts">
 	export let application: any;
 	export let settings: any;
+
+	import yaml from 'js-yaml';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import Select from 'svelte-select';
@@ -47,13 +49,16 @@
 	import Setting from '$lib/components/Setting.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { goto } from '$app/navigation';
-	import yaml from 'js-yaml';
 
 	const { id } = $page.params;
 
 	$: isDisabled =
-		!$appSession.isAdmin || $status.application.isRunning || $status.application.initialLoading;
+		!$appSession.isAdmin ||
+		$status.application.overallStatus === 'degraded' ||
+		$status.application.overallStatus === 'healthy' ||
+		$status.application.initialLoading;
 
+	let statues: any = {};
 	let loading = false;
 	let fqdnEl: any = null;
 	let forceSave = false;
@@ -176,7 +181,7 @@
 			isCustomSSL = !isCustomSSL;
 		}
 		if (name === 'isBot') {
-			if ($status.application.isRunning) return;
+			if ($status.application.overallStatus !== 'stopped') return;
 			isBot = !isBot;
 			application.settings.isBot = isBot;
 			application.fqdn = null;
@@ -228,9 +233,9 @@
 			$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
 		}
 	}
-	async function handleSubmit() {
+	async function handleSubmit(toast: boolean = true) {
 		if (loading) return;
-		loading = true;
+		if (toast) loading = true;
 		try {
 			nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
 			if (application.deploymentType)
@@ -252,7 +257,7 @@
 
 			forceSave = false;
 
-			addToast({
+			toast && addToast({
 				message: 'Configuration saved.',
 				type: 'success'
 			});
@@ -333,7 +338,7 @@
 				let dockerComposeFileContentJSON = JSON.parse(dockerComposeFileContent);
 				dockerComposeServices = normalizeDockerServices(dockerComposeFileContentJSON?.services);
 				application.dockerComposeFile = dockerComposeFileContent;
-				await handleSubmit();
+				await handleSubmit(false);
 			}
 			addToast({
 				message: 'Compose file reloaded.',
@@ -342,6 +347,30 @@
 		} catch (error) {
 			errorNotification(error);
 		}
+	}
+	$: if ($status.application.statuses) {
+		for (const service of dockerComposeServices) {
+			getStatus(service);
+		}
+	}
+	function getStatus(service: any) {
+		let foundStatus = null;
+		const foundService = $status.application.statuses.find(
+			(s: any) => s.name === `${application.id}-${service.name}`
+		);
+		if (foundService) {
+			const statusText = foundService?.status;
+			if (statusText?.isRunning) {
+				foundStatus = 'Running';
+			}
+			if (statusText?.isExited) {
+				foundStatus = 'Exited';
+			}
+			if (statusText?.isRestarting) {
+				foundStatus = 'Restarting';
+			}
+		}
+		statues[service.name] = foundStatus || 'Stopped';
 	}
 </script>
 
@@ -443,7 +472,7 @@
 							on:click={() => changeSettings('isBot')}
 							title="Is your application a bot?"
 							description="You can deploy applications without domains or make them to listen on the <span class='text-settings font-bold'>Exposed Port</span>.<br></Setting><br>Useful to host <span class='text-settings font-bold'>Twitch bots, regular jobs, or anything that does not require an incoming HTTP connection.</span>"
-							disabled={$status.application.isRunning}
+							disabled={isDisabled}
 						/>
 					</div>
 				{/if}
@@ -510,12 +539,12 @@
 						<Setting
 							id="dualCerts"
 							dataTooltip={$t('forms.must_be_stopped_to_modify')}
-							disabled={$status.application.isRunning}
+							disabled={isDisabled}
 							isCenter={false}
 							bind:setting={dualCerts}
 							title={$t('application.ssl_www_and_non_www')}
 							description="Generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-settings'>both DNS entries</span> set in advance.<br><br>Useful if you expect to have visitors on both."
-							on:click={() => !$status.application.isRunning && changeSettings('dualCerts')}
+							on:click={() => !isDisabled && changeSettings('dualCerts')}
 						/>
 					</div>
 					{#if isHttps && application.buildPack !== 'compose'}
@@ -552,7 +581,7 @@
 									{isDisabled}
 									containerClasses={isDisabled && containerClass()}
 									id="baseBuildImages"
-									showIndicator={!$status.application.isRunning}
+									showIndicator={!isDisabled}
 									items={application.baseBuildImages}
 									on:select={selectBaseBuildImage}
 									value={application.baseBuildImage}
@@ -572,7 +601,7 @@
 									{isDisabled}
 									containerClasses={isDisabled && containerClass()}
 									id="baseImages"
-									showIndicator={!$status.application.isRunning}
+									showIndicator={!isDisabled}
 									items={application.baseImages}
 									on:select={selectBaseImage}
 									value={application.baseImage}
@@ -594,7 +623,7 @@
 									{isDisabled}
 									containerClasses={isDisabled && containerClass()}
 									id="deploymentTypes"
-									showIndicator={!$status.application.isRunning}
+									showIndicator={!isDisabled}
 									items={['static', 'node']}
 									on:select={selectDeploymentType}
 									value={application.deploymentType}
@@ -705,7 +734,9 @@
 						<div class="grid grid-cols-2 items-center pt-4">
 							<label for="port"
 								>{$t('forms.port')}
-								<Explainer explanation={'The port your application listens on.'} /></label
+								<Explainer
+									explanation={'The port your application listens inside the docker container.'}
+								/></label
 							>
 							<input
 								class="w-full"
@@ -726,7 +757,7 @@
 						>
 						<input
 							class="w-full"
-							readonly={!$appSession.isAdmin && !$status.application.isRunning}
+							readonly={!isDisabled}
 							disabled={isDisabled}
 							name="exposePort"
 							id="exposePort"
@@ -884,23 +915,29 @@
 						<button
 							class="btn btn-sm  btn-primary"
 							on:click|preventDefault={reloadCompose}
-							class:loading
 							disabled={loading}>Reload Docker Compose File</button
 						>
 					{/if}
 				</div>
 				<div class="grid grid-flow-row gap-2">
 					{#each dockerComposeServices as service}
-						<div class="grid items-center mb-6">
-							<div class="text-xl font-bold uppercase">{service.name}</div>
-							{#if service.data?.image}
-								<div class="text-xs">{service.data.image}</div>
-							{:else}
-								<div class="text-xs">No image, build required</div>
-							{/if}
+						<div class="grid items-center bg-coolgray-100 rounded border border-coolgray-300 p-2 px-4">
+							<div class="text-xl font-bold uppercase">
+								{service.name}
+								<span
+									class="badge rounded text-white"
+									class:text-red-500={statues[service.name] === 'Exited' ||
+										statues[service.name] === 'Stopped'}
+									class:text-yellow-400={statues[service.name] === 'Restarting'}
+									class:text-green-500={statues[service.name] === 'Running'}
+									>{statues[service.name] || 'Loading...'}</span
+								>
+							</div>
+							<div class="text-xs">{application.id}-{service.name}</div>
+							
 						</div>
 
-						<div class="grid grid-cols-2 items-center">
+						<div class="grid grid-cols-2 items-center px-8">
 							<label for="fqdn"
 								>{$t('application.url_fqdn')}
 								<Explainer
@@ -910,6 +947,8 @@
 							<div>
 								<input
 									class="w-full"
+									disabled={isDisabled}
+									readonly={!$appSession.isAdmin}
 									name="fqdn"
 									id="fqdn"
 									bind:value={dockerComposeConfiguration[service.name].fqdn}
@@ -917,6 +956,23 @@
 									placeholder="eg: https://coollabs.io"
 								/>
 							</div>
+						</div>
+						<div class="grid grid-cols-2 items-center px-8 pb-4">
+							<label for="port"
+								>{$t('forms.port')}
+								<Explainer
+									explanation={'The port your application listens inside the docker container.'}
+								/></label
+							>
+							<input
+								class="w-full"
+								disabled={isDisabled}
+								readonly={!$appSession.isAdmin}
+								name="port"
+								id="port"
+								bind:value={dockerComposeConfiguration[service.name].port}
+								placeholder="{$t('forms.default')}: 3000"
+							/>
 						</div>
 					{/each}
 				</div>

@@ -59,7 +59,6 @@
 	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
 	import { t } from '$lib/translations';
-	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import {
 		appSession,
 		status,
@@ -140,13 +139,11 @@
 	async function stopApplication() {
 		try {
 			$status.application.initialLoading = true;
-			// $status.application.loading = true;
 			await post(`/applications/${id}/stop`, {});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
 			$status.application.initialLoading = false;
-			// $status.application.loading = false;
 			await getStatus();
 		}
 	}
@@ -154,18 +151,45 @@
 		if ($status.application.loading) return;
 		$status.application.loading = true;
 		const data = await get(`/applications/${id}/status`);
-		$status.application.isRunning = data.isRunning;
-		$status.application.isExited = data.isExited;
-		$status.application.isRestarting = data.isRestarting;
+
+		$status.application.statuses = data;
+		const numberOfApplications =
+			application.buildPack === 'compose'
+				? Object.entries(JSON.parse(application.dockerComposeConfiguration)).length
+				: 1;
+		if ($status.application.statuses.length === 0) {
+			$status.application.overallStatus = 'stopped';
+		} else {
+			if ($status.application.statuses.length !== numberOfApplications) {
+				$status.application.overallStatus = 'degraded';
+			} else {
+				for (const oneStatus of $status.application.statuses) {
+					if (oneStatus.status.isExited || oneStatus.status.isRestarting) {
+						$status.application.overallStatus = 'degraded';
+						break;
+					}
+					if (oneStatus.status.isRunning) {
+						$status.application.overallStatus = 'healthy';
+					}
+					if (
+						!oneStatus.status.isExited &&
+						!oneStatus.status.isRestarting &&
+						!oneStatus.status.isRunning
+					) {
+						$status.application.overallStatus = 'stopped';
+					}
+				}
+			}
+		}
 		$status.application.loading = false;
 		$status.application.initialLoading = false;
 	}
 
 	onDestroy(() => {
 		$status.application.initialLoading = true;
-		$status.application.isRunning = false;
-		$status.application.isExited = false;
-		$status.application.isRestarting = false;
+		// $status.application.isRunning = false;
+		// $status.application.isExited = false;
+		// $status.application.isRestarting = false;
 		$status.application.loading = false;
 		$location = null;
 		$isDeploymentEnabled = false;
@@ -173,15 +197,11 @@
 	});
 	onMount(async () => {
 		setLocation(application, settings);
-		$status.application.isRunning = false;
-		$status.application.isExited = false;
-		$status.application.isRestarting = false;
+		// $status.application.isRunning = false;
+		// $status.application.isExited = false;
+		// $status.application.isRestarting = false;
 		$status.application.loading = false;
-		if (
-			application.gitSourceId &&
-			application.destinationDockerId &&
-			(application.fqdn || application.settings.isBot)
-		) {
+		if ($isDeploymentEnabled) {
 			await getStatus();
 			statusInterval = setInterval(async () => {
 				await getStatus();
@@ -208,10 +228,15 @@
 					<div>Configurations</div>
 					<div
 						class="badge rounded uppercase"
-						class:text-green-500={$status.application.isRunning}
-						class:text-red-500={!$status.application.isRunning}
+						class:text-green-500={$status.application.overallStatus === 'healthy'}
+						class:text-yellow-400={$status.application.overallStatus === 'degraded'}
+						class:text-red-500={$status.application.overallStatus === 'stopped'}
 					>
-						{$status.application.isRunning ? 'Running' : 'Stopped'}
+						{$status.application.overallStatus === 'healthy'
+							? 'Running'
+							: $status.application.overallStatus === 'degraded'
+							? 'Degraded'
+							: 'Stopped'}
 					</div>
 				</div>
 			{/if}
@@ -245,7 +270,7 @@
 	<div
 		class="pt-4 flex flex-row items-start justify-center lg:justify-end space-x-2 order-1 lg:order-2"
 	>
-		{#if $status.application.isExited || $status.application.isRestarting}
+		{#if $status.application.overallStatus === 'degraded' && application.buildPack !== 'compose'}
 			<a
 				id="applicationerror"
 				href={$isDeploymentEnabled ? `/applications/${id}/logs` : null}
@@ -293,7 +318,7 @@
 					<line x1="11" y1="19.94" x2="11" y2="19.95" />
 				</svg>
 			</button>
-		{:else if $status.application.isRunning}
+		{:else if $status.application.overallStatus === 'healthy'}
 			<button
 				id="stop"
 				on:click={stopApplication}
@@ -385,11 +410,11 @@
 					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 					<path d="M7 4v16l13 -8z" />
 				</svg>
-				Deploy
+				{$status.application.overallStatus === 'degraded' ? 'Restart Degraded Services' : 'Deploy'}
 			</button>
 		{/if}
 
-		{#if $location && $status.application.isRunning}
+		{#if $location && $status.application.overallStatus === 'healthy'}
 			<a id="openApplication" href={$location} target="_blank" class="icons bg-transparent "
 				><svg
 					xmlns="http://www.w3.org/2000/svg"
