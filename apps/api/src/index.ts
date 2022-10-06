@@ -147,9 +147,7 @@ const host = '0.0.0.0';
 
 		// checkProxies and checkFluentBit
 		setInterval(async () => {
-			console.log('checkProxies')
 			await checkProxies();
-			console.log('checkFluentBit')
 			await checkFluentBit();
 		}, 10000)
 
@@ -166,9 +164,6 @@ const host = '0.0.0.0';
 		console.error(error);
 		process.exit(1);
 	}
-
-
-
 })();
 
 
@@ -191,6 +186,7 @@ async function getIPAddress() {
 	} catch (error) { }
 }
 async function initServer() {
+	await asyncExecShell(`env | grep '^COOLIFY' > /app/.env`);
 	try {
 		console.log(`Initializing server...`);
 		await asyncExecShell(`docker network create --attachable coolify`);
@@ -250,7 +246,6 @@ async function autoUpdater() {
 					const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
 					if (isAutoUpdateEnabled) {
 						await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
-						await asyncExecShell(`env | grep COOLIFY > .env`);
 						await asyncExecShell(
 							`sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env`
 						);
@@ -267,17 +262,20 @@ async function autoUpdater() {
 }
 
 async function checkFluentBit() {
-	if (!isDev) {
-		const engine = '/var/run/docker.sock';
-		const { id } = await prisma.destinationDocker.findFirst({
-			where: { engine, network: 'coolify' }
-		});
-		const { found } = await checkContainer({ dockerId: id, container: 'coolify-fluentbit' });
-		if (!found) {
-			await asyncExecShell(`env | grep COOLIFY > .env`);
-			await asyncExecShell(`docker compose up -d fluent-bit`);
+	try {
+		if (!isDev || process.env.COOLIFY_CONTAINER_DEV === 'true') {
+			const engine = '/var/run/docker.sock';
+			const { id } = await prisma.destinationDocker.findFirst({
+				where: { engine, network: 'coolify' }
+			});
+			const { found } = await checkContainer({ dockerId: id, container: 'coolify-fluentbit' });
+			if (!found) {
+				await asyncExecShell(`docker compose up -d fluent-bit`);
+			}
 		}
-	}
+	} catch (error) {
+		console.log(error)
+	 }
 }
 async function checkProxies() {
 	try {
