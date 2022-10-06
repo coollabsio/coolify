@@ -186,7 +186,6 @@ async function getIPAddress() {
 	} catch (error) { }
 }
 async function initServer() {
-	await asyncExecShell(`env | grep '^COOLIFY' > /app/.env`);
 	try {
 		console.log(`Initializing server...`);
 		await asyncExecShell(`docker network create --attachable coolify`);
@@ -246,6 +245,7 @@ async function autoUpdater() {
 					const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
 					if (isAutoUpdateEnabled) {
 						await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
+						await asyncExecShell(`env | grep '^COOLIFY' > .env`);
 						await asyncExecShell(
 							`sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env`
 						);
@@ -263,19 +263,20 @@ async function autoUpdater() {
 
 async function checkFluentBit() {
 	try {
-		if (!isDev || process.env.COOLIFY_CONTAINER_DEV === 'true') {
+		if (!isDev) {
 			const engine = '/var/run/docker.sock';
 			const { id } = await prisma.destinationDocker.findFirst({
 				where: { engine, network: 'coolify' }
 			});
-			const { found } = await checkContainer({ dockerId: id, container: 'coolify-fluentbit' });
+			const { found } = await checkContainer({ dockerId: id, container: 'coolify-fluentbit', remove: true });
 			if (!found) {
+				await asyncExecShell(`env | grep '^COOLIFY' > .env`);
 				await asyncExecShell(`docker compose up -d fluent-bit`);
 			}
 		}
 	} catch (error) {
 		console.log(error)
-	 }
+	}
 }
 async function checkProxies() {
 	try {

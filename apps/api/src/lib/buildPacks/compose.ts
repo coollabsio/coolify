@@ -63,8 +63,6 @@ export default async function (data) {
     } catch (error) {
         //
     }
-    console.log('envFound', envFound)
-    console.log(envs)
     const composeVolumes = volumes.map((volume) => {
         return {
             [`${volume.split(':')[0]}`]: {

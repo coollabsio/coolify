@@ -227,7 +227,7 @@
 				<div class="flex justify-center items-center space-x-2">
 					<div>Configurations</div>
 					<div
-						class="badge rounded uppercase"
+						class="badge badge-lg rounded uppercase"
 						class:text-green-500={$status.application.overallStatus === 'healthy'}
 						class:text-yellow-400={$status.application.overallStatus === 'degraded'}
 						class:text-red-500={$status.application.overallStatus === 'stopped'}
@@ -274,7 +274,7 @@
 			<a
 				id="applicationerror"
 				href={$isDeploymentEnabled ? `/applications/${id}/logs` : null}
-				class="icons bg-transparent text-sm text-error"
+				class="btn btn-error gap-2"
 				sveltekit:prefetch
 			>
 				<svg
@@ -294,14 +294,15 @@
 					<line x1="12" y1="8" x2="12" y2="12" />
 					<line x1="12" y1="16" x2="12.01" y2="16" />
 				</svg>
+				Application Error
 			</a>
 			<Tooltip triggeredBy="#applicationerror">Application exited with an error!</Tooltip>
 		{/if}
 		{#if $status.application.initialLoading}
-			<button class="icons animate-spin bg-transparent duration-500 ease-in-out">
+			<button class="btn btn-ghost btn-sm gap-2">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="h-6 w-6"
+					class="h-6 w-6 animate-spin duration-500 ease-in-out"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
@@ -317,60 +318,12 @@
 					<line x1="7.16" y1="18.37" x2="7.16" y2="18.38" />
 					<line x1="11" y1="19.94" x2="11" y2="19.95" />
 				</svg>
+				Loading...
 			</button>
 		{:else if $status.application.overallStatus === 'healthy'}
 			<button
-				id="stop"
-				on:click={stopApplication}
-				type="submit"
 				disabled={!$isDeploymentEnabled}
-				class="icons bg-transparent text-error"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6"
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<rect x="6" y="5" width="4" height="14" rx="1" />
-					<rect x="14" y="5" width="4" height="14" rx="1" />
-				</svg>
-			</button>
-			<Tooltip triggeredBy="#stop">Stop</Tooltip>
-
-			<button
-				id="restart"
-				on:click={restartApplication}
-				type="submit"
-				disabled={!$isDeploymentEnabled}
-				class="icons bg-transparent"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6"
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
-					<path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
-				</svg>
-			</button>
-			<Tooltip triggeredBy="#restart">Restart (useful to change secrets)</Tooltip>
-
-			<button
-				id="forceredeploy"
-				disabled={!$isDeploymentEnabled}
-				class="icons bg-transparent "
+				class="btn btn-sm gap-2"
 				on:click={() => handleDeploySubmit(true)}
 			>
 				<svg
@@ -389,17 +342,63 @@
 						transform="rotate(-45 12 12)"
 					/>
 				</svg>
+
+				Force Redeploy
 			</button>
-			<Tooltip triggeredBy="#forceredeploy">Force Redeploy (without cache)</Tooltip>
+			<button
+				on:click={stopApplication}
+				type="submit"
+				disabled={!$isDeploymentEnabled}
+				class="btn btn-sm btn-error gap-2"
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="w-6 h-6 "
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<rect x="6" y="5" width="4" height="14" rx="1" />
+					<rect x="14" y="5" width="4" height="14" rx="1" />
+				</svg> Stop
+			</button>
+
+			{#if application.buildPack !== 'compose'}
+				<button
+					on:click={restartApplication}
+					type="submit"
+					disabled={!$isDeploymentEnabled}
+					class="btn btn-sm gap-2"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
+						<path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
+					</svg> Restart
+				</button>
+			{/if}
 		{:else if $isDeploymentEnabled && !$page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
 			<button
-				class="icons flex items-center font-bold"
+				class="btn btn-sm gap-2 btn-primary"
 				disabled={!$isDeploymentEnabled}
 				on:click={() => handleDeploySubmit(false)}
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6 mr-2 text-green-500"
+					class="w-6 h-6"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"

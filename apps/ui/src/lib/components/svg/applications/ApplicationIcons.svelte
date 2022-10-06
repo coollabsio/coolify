@@ -40,4 +40,6 @@
 	<Icons.Laravel {isAbsolute} />
 {:else if application.buildPack?.toLowerCase() === 'heroku'}
 	<Icons.Heroku {isAbsolute} />
+{:else if application.buildPack?.toLowerCase() === 'compose'}
+	<Icons.Compose {isAbsolute} />
 {/if}
