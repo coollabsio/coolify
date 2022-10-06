@@ -7,7 +7,7 @@ import multipart from '@fastify/multipart';
 import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
 import { asyncExecShell, createRemoteEngineConfiguration, getDomain, isDev, listSettings, prisma, version } from './lib/common';
-// import { scheduler } from './lib/scheduler';
+import { scheduler } from './lib/scheduler';
 import { compareVersions } from 'compare-versions';
 import Graceful from '@ladjs/graceful'
 import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handlers';
@@ -72,7 +72,6 @@ const host = '0.0.0.0';
 
 		}
 	};
-
 	const options = {
 		schema,
 		dotenv: true
@@ -124,43 +123,43 @@ const host = '0.0.0.0';
 		console.log(`Coolify's API is listening on ${host}:${port}`);
 		await initServer();
 
-		// const graceful = new Graceful({ brees: [scheduler] });
-		// graceful.listen();
+		const graceful = new Graceful({ brees: [scheduler] });
+		graceful.listen();
 
-		// setInterval(async () => {
-		// 	if (!scheduler.workers.has('deployApplication')) {
-		// 		scheduler.run('deployApplication');
-		// 	}
-		// 	if (!scheduler.workers.has('infrastructure')) {
-		// 		scheduler.run('infrastructure');
-		// 	}
-		// }, 2000)
+		setInterval(async () => {
+			if (!scheduler.workers.has('deployApplication')) {
+				scheduler.run('deployApplication');
+			}
+			if (!scheduler.workers.has('infrastructure')) {
+				scheduler.run('infrastructure');
+			}
+		}, 2000)
 
-		// // autoUpdater
-		// setInterval(async () => {
-		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:autoUpdater")
-		// }, 60000 * 15)
+		// autoUpdater
+		setInterval(async () => {
+			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:autoUpdater")
+		}, 60000 * 15)
 
-		// // cleanupStorage
-		// setInterval(async () => {
-		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupStorage")
-		// }, 60000 * 10)
+		// cleanupStorage
+		setInterval(async () => {
+			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupStorage")
+		}, 60000 * 10)
 
-		// // checkProxies and checkFluentBit
-		// setInterval(async () => {
-		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkProxies")
-		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkFluentBit")
-		// }, 10000)
+		// checkProxies and checkFluentBit
+		setInterval(async () => {
+			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkProxies")
+			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkFluentBit")
+		}, 10000)
 
-		// setInterval(async () => {
-		// 	scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:copySSLCertificates")
-		// }, 2000)
+		setInterval(async () => {
+			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:copySSLCertificates")
+		}, 2000)
 
-		// await Promise.all([
-		// 	getArch(),
-		// 	getIPAddress(),
-		// 	configureRemoteDockers(),
-		// ])
+		await Promise.all([
+			getArch(),
+			getIPAddress(),
+			configureRemoteDockers(),
+		])
 	} catch (error) {
 		console.error(error);
 		process.exit(1);
