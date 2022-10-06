@@ -11,15 +11,14 @@ const options: any = {
 	defaultExtension: 'js',
 	logger: new Cabin(),
 	// logger: false,
-	workerMessageHandler: async ({ name, message }) => {
-		if (name === 'deployApplication' && message?.deploying) {
-			if (scheduler.workers.has('autoUpdater') || scheduler.workers.has('cleanupStorage')) {
-				scheduler.workers.get('deployApplication').postMessage('cancel')
-			}
-		}
-	},
+	// workerMessageHandler: async ({ name, message }) => {
+	// 	if (name === 'deployApplication' && message?.deploying) {
+	// 		if (scheduler.workers.has('autoUpdater') || scheduler.workers.has('cleanupStorage')) {
+	// 			scheduler.workers.get('deployApplication').postMessage('cancel')
+	// 		}
+	// 	}
+	// },
 	jobs: [
-		{ name: 'infrastructure' },
 		{ name: 'deployApplication' },
 	],
 };
