@@ -998,7 +998,6 @@
 								name="port"
 								id="port"
 								bind:value={dockerComposeConfiguration[service.name].port}
-								placeholder="{$t('forms.default')}: 3000"
 							/>
 						</div>
 					{/each}

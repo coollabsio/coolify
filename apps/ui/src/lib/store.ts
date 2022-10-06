@@ -76,7 +76,7 @@ export function checkIfDeploymentEnabledServices(isAdmin: boolean, service: any)
 export const status: Writable<any> = writable({
     application: {
         statuses: [],
-        overallStatus: 'degraded',
+        overallStatus: 'stopped',
         loading: false,
         initialLoading: true
     },
