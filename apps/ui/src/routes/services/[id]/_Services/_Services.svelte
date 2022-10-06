@@ -39,6 +39,7 @@
 	import Weblate from './_Weblate.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import Taiga from './_Taiga.svelte';
+	import Pterodactyl from './_Pterodactyl.svelte';
 	import DocLink from '$lib/components/DocLink.svelte';
 
 	const { id } = $page.params;
@@ -445,6 +446,8 @@
 			<Weblate bind:service />
 		{:else if service.type === 'taiga'}
 			<Taiga bind:service />
+		{:else if service.type === 'pterodactyl'}
+			<Pterodactyl bind:service />
 		{/if}
 	</form>
 </div>

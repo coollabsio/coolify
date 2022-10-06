@@ -415,6 +415,7 @@ model Service {
   searxng            Searxng?
   weblate            Weblate?
   taiga              Taiga?
+  pterodactyl        Pterodactyl?
 }
 
 model PlausibleAnalytics {
@@ -660,4 +661,33 @@ model Taiga {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   service              Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Pterodactyl {
+  id                      String @id @default(cuid())
+  serviceId               String @unique
+  appKey                  String
+  appInitComplete         Boolean @default(false)
+  defaultEmail            String?
+  defaultUserName         String
+  defaultFirstName        String
+  defaultLastName         String
+  defaultPassword         String
+  mariadbUser             String
+  mariadbPassword         String
+  mariadbRootUser         String
+  mariadbRootUserPassword String
+  mariadbDatabase         String
+  mariadbPublicPort       Int?
+  redisPassword           String
+  mailDriver              String?
+  mailHost                String?
+  mailPort                String?
+  mailEncryption          String?
+  mailUser                String?
+  mailPassword            String?
+  mailFrom                String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  service                 Service  @relation(fields: [serviceId], references: [id])
 }

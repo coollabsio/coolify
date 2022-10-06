@@ -76,6 +76,10 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         if (type === 'trilium') {
             return await startTriliumService(request)
         }
+        if(type === 'pterodactyl')
+        {
+            return await startPterodactylService(request)
+        }
 
         throw `Service type ${type} not supported.`
     } catch (error) {
@@ -2770,6 +2774,196 @@ async function startTriliumService(request: FastifyRequest<ServiceStartStop>) {
         await startServiceContainers(destinationDocker.id, composeFileDestination)
         return {}
     } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
+async function startPterodactylService(request: FastifyRequest<ServiceStartStop>) {
+    try {
+        const { id } = request.params;
+        const teamId = request.user.teamId;
+        const service = await getServiceFromDB({ id, teamId });
+        const {
+            type,
+            version,
+            destinationDockerId,
+            destinationDocker,
+            serviceSecret,
+            persistentStorage,
+            exposePort,
+            fqdn,
+            pterodactyl: {
+                appKey,
+                appInitComplete,
+                defaultEmail,
+                defaultUserName,
+				defaultFirstName,
+				defaultLastName,
+				defaultPassword,
+                mariadbUser,
+                mariadbPassword,
+                mariadbRootUser,
+                mariadbRootUserPassword,
+                mariadbDatabase,
+                mariadbPublicPort,
+                redisPassword,
+                mailDriver,
+                mailHost,
+                mailPort,
+                mailEncryption,
+                mailUser,
+                mailPassword,
+                mailFrom
+            }
+        } = service;
+        const network = destinationDockerId && destinationDocker.network;
+
+        const { workdir } = await createDirectories({ repository: type, buildId: id });
+        const image = getServiceImage(type);
+        const domain = getDomain(fqdn);
+        const port = getServiceMainPort('pterodactyl');
+        const config = {
+            pterodactyl: {
+                image: `${image}:${version}`,
+                volumes: [
+                    `${id}-var:/app/var`,
+                    `${id}-logs:/app/storage/logs`
+                ],
+                environmentVariables: {
+                    APP_KEY: appKey,
+                    APP_ENV: 'production',
+                    APP_ENVIRONMENT_ONLY: 'false',
+                    APP_DEBUG: 'false',
+                    APP_THEME: 'pterodactyl',
+                    APP_TIMEZONE: 'UTC',
+                    APP_URL: fqdn,
+                    APP_LOCALE: 'en',
+                    
+                    CACHE_DRIVER: 'redis',
+                    SESSION_DRIVER: 'redis',
+                    QUEUE_DRIVER: 'redis',
+
+                    DB_HOST: `${id}-mariadb`,
+                    DB_PORT: 3306,
+                    DB_DATABASE: mariadbDatabase,
+                    DB_USERNAME: mariadbUser,
+                    DB_PASSWORD: mariadbPassword,
+
+                    REDIS_HOST: `${id}-redis`,
+                    REDIS_PASSWORD: redisPassword,
+                    REDIS_PORT: 6379,
+
+                    MAIL_DRIVER: mailDriver,
+                    MAIL_HOST: mailHost,
+                    MAIL_PORT: mailPort,
+                    MAIL_ENCRYPTION: mailEncryption,
+                    MAIL_USERNAME: mailUser,
+                    MAIL_PASSWORD: mailPassword,
+                    MAIL_FROM: mailFrom
+                }
+            },
+            mariadb: {
+                image: `bitnami/mariadb:latest`,
+                volumes: [ `${id}-mariadb:/bitnami/mariadb` ],
+                environmentVariables: {
+                    MARIADB_USER: mariadbUser,
+                    MARIADB_PASSWORD: mariadbPassword,
+                    MARIADB_DATABASE: mariadbDatabase,
+                    MARIADB_ROOT_USER: mariadbRootUser,
+                    MARIADB_ROOT_PASSWORD: mariadbRootUserPassword
+                }
+            },
+            redis: {
+                image: 'redis:7-alpine'
+            }
+        };
+
+        if(serviceSecret.length > 0) {
+            service.forEach((secret) => {
+                config.pterodactyl.environmentVariables[secret.name] = secret.value;
+            });
+        }
+
+        const { volumeMounts } = persistentVolumes(id, persistentStorage, config);
+        const composeFile: ComposeFile = {
+            version: '3.8',
+            services: {
+                [id]: {
+                    container_name: id,
+                    image: config.pterodactyl.image,
+                    volumes: config.pterodactyl.volumes,
+                    environment: config.pterodactyl.environmentVariables,
+                    ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                    depends_on: [
+                        `${id}-mariadb`,
+                        `${id}-redis`
+                    ],
+                    labels: makeLabelForServices('pterodactyl'),
+                    ...defaultComposeConfiguration(network),
+                },
+                [`${id}-mariadb`]: {
+                    container_name: `${id}-mariadb`,
+                    image: config.mariadb.image,
+                    volumes: config.mariadb.volumes,
+                    ...(mariadbPublicPort ? { ports: [`${mariadbPublicPort}:3306`] } : {}),
+                    environment: config.mariadb.environmentVariables,
+                    labels: makeLabelForServices('pterodactyl'),
+                    ...defaultComposeConfiguration(network),
+                },
+                [`${id}-redis`]: {
+                    container_name: `${id}-redis`,
+                    image: config.redis.image,
+                    command: `redis-server --requirepass ${redisPassword} --save "" --appendonly "no"`,
+                    labels: makeLabelForServices('pterodactyl'),
+                    ...defaultComposeConfiguration(network),
+                }
+            },
+            networks: {
+                [network]: {
+                    external: true
+                }
+            },
+            volumes: volumeMounts
+        };
+
+        const composeFileDestination = `${workdir}/docker-compose.yaml`;
+        await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
+        await startServiceContainers(destinationDocker.id, composeFileDestination);
+
+        await asyncSleep(1000);
+
+        let searchComplete = false;
+        while(!searchComplete)
+        {
+            await asyncSleep(1000);
+            let logs = await executeDockerCmd({ dockerId: destinationDockerId, command: `docker logs ${id}` });
+            searchComplete = logs.stdout.indexOf('Database seeding completed successfully.') !== -1;
+        }
+
+        if(!appInitComplete)
+        {
+            console.log("init required");
+            await executeDockerCmd({
+                dockerId: destinationDockerId,
+                command: `docker exec ${id} php artisan p:user:make --email '${defaultEmail}' --username '${defaultUserName}' --name-first '${defaultFirstName}' --name-last '${defaultLastName}' --password '${defaultPassword}' --admin 1 --no-ansi`
+            });
+        
+            await prisma.service.update({
+                where: { id },
+                data: {
+                    type,
+                    pterodactyl: {
+                        update: {
+                            appInitComplete: true
+                        }
+                    }
+                }
+            });
+        }
+
+        return {}
+    } catch ({ status, message }) {
+        console.log(message);
         return errorHandler({ status, message })
     }
 }

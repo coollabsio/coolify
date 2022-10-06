@@ -83,4 +83,8 @@
 	<a href="https://github.com/zadam/trilium" target="_blank">
 		<Icons.Trilium />
 	</a>
+{:else if service.type === 'pterodactyl'}
+	<a href="https://pterodactyl.io" target="_blank">
+		<Icons.Pterodactyl />
+	</a>
 {/if}

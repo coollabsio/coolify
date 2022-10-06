@@ -255,4 +255,15 @@ export const supportedServiceTypesAndVersions = [
 			main: 8080
 		}
 	},
+	{
+		name: 'pterodactyl',
+		fancyName: 'Pterodactyl',
+		baseImage: 'ghcr.io/pterodactyl/panel',
+		images: ['mariadb:10.7', 'redis:7-alpine'],
+		versions: ['latest'],
+		recommendedVersion: 'latest',
+		ports: {
+			main: 80
+		}
+	},
 ];

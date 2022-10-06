@@ -21,6 +21,7 @@ export const includeServices: any = {
 	searxng: true,
 	weblate: true,
 	taiga: true,
+	pterodactyl: true,
 };
 export async function configureServiceType({
 	id,
@@ -350,6 +351,39 @@ export async function configureServiceType({
 				}
 			}
 		});
+	} else if (type == 'pterodactyl') {
+		const appKey = encrypt(generatePassword({ length: 32 }));
+		const defaultUserName = cuid();
+		const defaultFirstName = 'Admin';
+		const defaultLastName = 'User';
+		const defaultPassword = encrypt(generatePassword({}));
+		const mariadbRootUser = cuid();
+		const mariadbRootUserPassword = encrypt(generatePassword({}));
+		const mariadbUser = cuid();
+		const mariadbPassword = encrypt(generatePassword({}));
+		const mariadbDatabase = 'pterodactyl_db'
+		const redisPassword = encrypt(generatePassword({}));
+		await prisma.service.update({
+			where: { id },
+			data: {
+				type,
+				pterodactyl: {
+					create: {
+						appKey,
+						defaultUserName,
+						defaultFirstName,
+						defaultLastName,
+						defaultPassword,
+						mariadbRootUser,
+						mariadbRootUserPassword,
+						mariadbUser,
+						mariadbPassword,
+						mariadbDatabase,
+						redisPassword,
+					}
+				}
+			}
+		});
 	} else {
 		await prisma.service.update({
 			where: { id },
@@ -378,6 +412,7 @@ export async function removeService({ id }: { id: string }): Promise<void> {
 	await prisma.searxng.deleteMany({ where: { serviceId: id } });
 	await prisma.weblate.deleteMany({ where: { serviceId: id } });
 	await prisma.taiga.deleteMany({ where: { serviceId: id } });
+	await prisma.pterodactyl.deleteMany({ where: { serviceId: id }});
 
 	await prisma.service.delete({ where: { id } });
 }
