@@ -596,7 +596,7 @@ export async function buildImage({
 	}
 	const dockerFile = isCache ? `${dockerFileLocation}-cache` : `${dockerFileLocation}`
 	const cache = `${applicationId}:${tag}${isCache ? '-cache' : ''}`
-	const git_sha = `git rev-parse HEAD`
+	const { git_sha } = await asyncExecShell(`git rev-parse HEAD`)
 	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${git_sha} ${workdir}` })	
 	const { status } = await prisma.build.findUnique({ where: { id: buildId } })
 	if (status === 'canceled') {
