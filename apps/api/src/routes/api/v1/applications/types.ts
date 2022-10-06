@@ -87,7 +87,11 @@ export interface DeleteStorage extends OnlyId {
         path: string,
     }
 }
-export interface GetApplicationLogs extends OnlyId {
+export interface GetApplicationLogs {
+    Params: {
+        id: string,
+        containerId: string
+    }
     Querystring: {
         since: number,
     }

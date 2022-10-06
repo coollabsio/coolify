@@ -59,6 +59,7 @@
 		$status.application.overallStatus === 'healthy' ||
 		$status.application.initialLoading;
 
+	$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
 	let statues: any = {};
 	let loading = false;
 	let fqdnEl: any = null;
@@ -377,7 +378,7 @@
 </script>
 
 <div class="w-full">
-	<form on:submit|preventDefault={handleSubmit}>
+	<form on:submit|preventDefault={() => handleSubmit()}>
 		<div class="mx-auto w-full">
 			<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
 				<div class="title font-bold pb-3 ">General</div>
@@ -440,7 +441,7 @@
 				<div class="grid grid-cols-2 items-center">
 					<label for="buildPack">{$t('application.build_pack')} </label>
 					{#if isDisabled}
-						<input class="uppercase w-full" disabled={isDisabled} value={application.buildPack} />
+						<input class="capitalize w-full" disabled={isDisabled} value={application.buildPack} />
 					{:else}
 						<a
 							href={`/applications/${id}/configuration/buildpack?from=/applications/${id}`}
@@ -914,10 +915,8 @@
 				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
 					Stack <Beta />
 					{#if $appSession.isAdmin}
-						<button
-							class="btn btn-sm  btn-primary"
-							on:click|preventDefault={reloadCompose}
-							disabled={loading}>Reload Docker Compose File</button
+						<button class="btn btn-sm  btn-primary" on:click|preventDefault={reloadCompose}
+							>Reload Docker Compose File</button
 						>
 					{/if}
 				</div>

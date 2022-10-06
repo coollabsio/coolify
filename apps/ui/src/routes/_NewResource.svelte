@@ -18,7 +18,7 @@
 
 <div class="dropdown dropdown-bottom">
 	<slot>
-		<label for="new" tabindex="0" class="btn btn-sm text-sm bg-coollabs hover:bg-coollabs-100">
+		<label for="new" tabindex="0" class="btn btn-sm text-sm bg-coollabs hover:bg-coollabs-100 w-52">
 			<svg
 				class="h-6 w-6"
 				xmlns="http://www.w3.org/2000/svg"
@@ -37,7 +37,7 @@
 
 	<ul id="new" tabindex="0" class="dropdown-content menu p-2 shadow bg-coolgray-300 rounded w-52">
 		<li>
-			<button on:click={newApplication} class="no-underline hover:bg-applications rounded-none ">
+			<button on:click={newApplication} class="no-underline hover:bg-applications tracking-wide font-bold">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="h-6 w-6"
@@ -58,7 +58,7 @@
 			>
 		</li>
 		<li>
-			<button on:click={newService} class="no-underline hover:bg-services rounded-none ">
+			<button on:click={newService} class="no-underline hover:bg-services tracking-wide font-bold">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="h-6 w-6"
@@ -75,7 +75,7 @@
 			>
 		</li>
 		<li>
-			<button on:click={newDatabase} class="no-underline hover:bg-databases rounded-none ">
+			<button on:click={newDatabase} class="no-underline hover:bg-databases  tracking-wide font-bold">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="h-6 w-6"
@@ -94,7 +94,7 @@
 			>
 		</li>
 		<li>
-			<a href="/sources/new" class="no-underline hover:bg-sources rounded-none ">
+			<a href="/sources/new" class="no-underline hover:bg-sources tracking-wide font-bold">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="h-6 w-6"
@@ -116,7 +116,7 @@
 			>
 		</li>
 		<li>
-			<a href="/destinations/new" class="no-underline hover:bg-destinations rounded-none ">
+			<a href="/destinations/new" class="no-underline hover:bg-destinations tracking-wide font-bold">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="h-6 w-6"

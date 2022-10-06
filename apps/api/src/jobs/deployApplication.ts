@@ -85,6 +85,7 @@ import * as buildpacks from '../lib/buildPacks';
 									baseDirectory,
 									publishDirectory,
 									dockerFileLocation,
+									dockerComposeConfiguration,
 									denoMainFile
 								} = application
 								const currentHash = crypto
@@ -112,17 +113,6 @@ import * as buildpacks from '../lib/buildPacks';
 									)
 									.digest('hex');
 								const { debug } = settings;
-								// if (concurrency === 1) {
-								// 	await prisma.build.updateMany({
-								// 		where: {
-								// 			status: { in: ['queued', 'running'] },
-								// 			id: { not: buildId },
-								// 			applicationId,
-								// 			createdAt: { lt: new Date(new Date().getTime() - 10 * 1000) }
-								// 		},
-								// 		data: { status: 'failed' }
-								// 	});
-								// }
 								let imageId = applicationId;
 								let domain = getDomain(fqdn);
 								const volumes =
@@ -138,6 +128,10 @@ import * as buildpacks from '../lib/buildPacks';
 									repository = sourceRepository || repository;
 								}
 
+								try {
+									dockerComposeConfiguration = JSON.parse(dockerComposeConfiguration)
+								} catch (error) { }
+								
 								let deployNeeded = true;
 								let destinationType;
 
@@ -264,6 +258,7 @@ import * as buildpacks from '../lib/buildPacks';
 												pythonModule,
 												pythonVariable,
 												dockerFileLocation,
+												dockerComposeConfiguration,
 												denoMainFile,
 												denoOptions,
 												baseImage,

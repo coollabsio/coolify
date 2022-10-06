@@ -153,10 +153,16 @@
 		const data = await get(`/applications/${id}/status`);
 
 		$status.application.statuses = data;
-		const numberOfApplications =
-			application.buildPack === 'compose'
-				? Object.entries(JSON.parse(application.dockerComposeConfiguration)).length
-				: 1;
+		let numberOfApplications = 0;
+		if (application.dockerComposeConfiguration) {
+			numberOfApplications =
+				application.buildPack === 'compose'
+					? Object.entries(JSON.parse(application.dockerComposeConfiguration)).length
+					: 1;
+		} else {
+			numberOfApplications = 1;
+		}
+
 		if ($status.application.statuses.length === 0) {
 			$status.application.overallStatus = 'stopped';
 		} else {
@@ -187,9 +193,6 @@
 
 	onDestroy(() => {
 		$status.application.initialLoading = true;
-		// $status.application.isRunning = false;
-		// $status.application.isExited = false;
-		// $status.application.isRestarting = false;
 		$status.application.loading = false;
 		$location = null;
 		$isDeploymentEnabled = false;
@@ -197,9 +200,6 @@
 	});
 	onMount(async () => {
 		setLocation(application, settings);
-		// $status.application.isRunning = false;
-		// $status.application.isExited = false;
-		// $status.application.isRestarting = false;
 		$status.application.loading = false;
 		if ($isDeploymentEnabled) {
 			await getStatus();
@@ -321,6 +321,50 @@
 				Loading...
 			</button>
 		{:else if $status.application.overallStatus === 'healthy'}
+		<button
+		on:click={stopApplication}
+		type="submit"
+		disabled={!$isDeploymentEnabled}
+		class="btn btn-sm btn-error gap-2"
+	>
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			class="w-6 h-6 "
+			viewBox="0 0 24 24"
+			stroke-width="1.5"
+			stroke="currentColor"
+			fill="none"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<rect x="6" y="5" width="4" height="14" rx="1" />
+			<rect x="14" y="5" width="4" height="14" rx="1" />
+		</svg> Stop
+	</button>
+	{#if application.buildPack !== 'compose'}
+	<button
+		on:click={restartApplication}
+		type="submit"
+		disabled={!$isDeploymentEnabled}
+		class="btn btn-sm gap-2"
+	>
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			class="w-6 h-6"
+			viewBox="0 0 24 24"
+			stroke-width="1.5"
+			stroke="currentColor"
+			fill="none"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		>
+			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+			<path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
+			<path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
+		</svg> Restart
+	</button>
+{/if}
 			<button
 				disabled={!$isDeploymentEnabled}
 				class="btn btn-sm gap-2"
@@ -345,51 +389,9 @@
 
 				Force Redeploy
 			</button>
-			<button
-				on:click={stopApplication}
-				type="submit"
-				disabled={!$isDeploymentEnabled}
-				class="btn btn-sm btn-error gap-2"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6 "
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<rect x="6" y="5" width="4" height="14" rx="1" />
-					<rect x="14" y="5" width="4" height="14" rx="1" />
-				</svg> Stop
-			</button>
+		
 
-			{#if application.buildPack !== 'compose'}
-				<button
-					on:click={restartApplication}
-					type="submit"
-					disabled={!$isDeploymentEnabled}
-					class="btn btn-sm gap-2"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
-						<path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
-					</svg> Restart
-				</button>
-			{/if}
+		
 		{:else if $isDeploymentEnabled && !$page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
 			<button
 				class="btn btn-sm gap-2 btn-primary"
@@ -412,9 +414,8 @@
 				{$status.application.overallStatus === 'degraded' ? 'Restart Degraded Services' : 'Deploy'}
 			</button>
 		{/if}
-
 		{#if $location && $status.application.overallStatus === 'healthy'}
-			<a id="openApplication" href={$location} target="_blank" class="icons bg-transparent "
+			<a href={$location} target="_blank" class="btn btn-sm gap-2 text-sm bg-primary"
 				><svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="h-6 w-6"
@@ -429,9 +430,8 @@
 					<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
 					<line x1="10" y1="14" x2="20" y2="4" />
 					<polyline points="15 4 20 4 20 9" />
-				</svg></a
+				</svg>Open</a
 			>
-			<Tooltip triggeredBy="#openApplication">Open Application</Tooltip>
 		{/if}
 	</div>
 </div>

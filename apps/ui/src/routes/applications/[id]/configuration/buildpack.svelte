@@ -12,6 +12,7 @@
 			const response = await get(`/applications/${params.id}/configuration/buildpack`);
 			return {
 				props: {
+					application,
 					...response
 				}
 			};
@@ -25,6 +26,14 @@
 </script>
 
 <script lang="ts">
+	export let apiUrl: any;
+	export let projectId: any;
+	export let repository: any;
+	export let branch: any;
+	export let type: any;
+	export let application: any;
+	export let isPublicRepository: boolean;
+
 	import { onMount } from 'svelte';
 
 	import { page } from '$app/stores';
@@ -41,16 +50,9 @@
 	let scanning: boolean = true;
 	let foundConfig: any = null;
 	let packageManager: string = 'npm';
-	let dockerComposeFile: any = null;
-	let dockerComposeFileLocation: string | null = null;
-
-	export let apiUrl: any;
-	export let projectId: any;
-	export let repository: any;
-	export let branch: any;
-	export let type: any;
-	export let application: any;
-	export let isPublicRepository: boolean;
+	let dockerComposeFile: string | null = application.dockerComposeFile || null;
+	let dockerComposeFileLocation: string | null = application.dockerComposeFileLocation || null;
+	let dockerComposeConfiguration: any = application.dockerComposeConfiguration || null;
 
 	function checkPackageJSONContents({ key, json }: { key: any; json: any }) {
 		return json?.dependencies?.hasOwnProperty(key) || json?.devDependencies?.hasOwnProperty(key);
@@ -224,7 +226,8 @@
 					);
 					if (data?.content) {
 						const content = atob(data.content);
-						dockerComposeFile = JSON.stringify(yaml.load(content) || null);
+						const dockerComposeJson = yaml.load(content) || null;
+						dockerComposeFile = JSON.stringify(dockerComposeJson);
 						dockerComposeFileLocation = dockerComposeFileYml
 							? 'docker-compose.yml'
 							: 'docker-compose.yaml';
@@ -309,12 +312,7 @@
 		<div class="flex flex-wrap justify-center">
 			{#each buildPacks.filter((bp) => bp.isHerokuBuildPack === true) as buildPack}
 				<div class="p-2">
-					<BuildPack
-						{packageManager}
-						{buildPack}
-						{scanning}
-						bind:foundConfig
-					/>
+					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
 				</div>
 			{/each}
 		</div>
@@ -331,6 +329,7 @@
 						bind:foundConfig
 						{dockerComposeFile}
 						{dockerComposeFileLocation}
+						{dockerComposeConfiguration}
 					/>
 				</div>
 			{/each}
@@ -341,12 +340,7 @@
 		<div class="flex flex-wrap justify-center">
 			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true && bp.type === 'specific') as buildPack}
 				<div class="p-2">
-					<BuildPack
-						{packageManager}
-						{buildPack}
-						{scanning}
-						bind:foundConfig
-					/>
+					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
 				</div>
 			{/each}
 		</div>

@@ -160,12 +160,12 @@
 		<span>Logs</span>
 	</li>
 	<li
-		class:text-stone-600={!$status.application.isRunning}
+		class:text-stone-600={$status.application.overallStatus !== 'healthy'}
 		class="rounded"
 		class:bg-coollabs={$page.url.pathname === `/applications/${$page.params.id}/logs`}
 	>
 		<a
-			href={$status.application.isRunning ? `/applications/${$page.params.id}/logs` : ''}
+			href={$status.application.overallStatus === 'healthy' ? `/applications/${$page.params.id}/logs` : ''}
 			class="no-underline w-full"
 			><svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -218,10 +218,10 @@
 	</li>
 	<li
 		class="rounded"
-		class:text-stone-600={!$status.application.isRunning}
+		class:text-stone-600={$status.application.overallStatus !== 'healthy'}
 		class:bg-coollabs={$page.url.pathname === `/applications/${$page.params.id}/usage`}
 	>
-		<a href={$status.application.isRunning ? `/applications/${$page.params.id}/usage` : ''} class="no-underline w-full"
+		<a href={$status.application.overallStatus === 'healthy' ? `/applications/${$page.params.id}/usage` : ''} class="no-underline w-full"
 			><svg
 				xmlns="http://www.w3.org/2000/svg"
 				class="w-6 h-6"

@@ -16,7 +16,8 @@ export default async function (data) {
         baseDirectory,
         secrets,
         pullmergeRequestId,
-        port
+        port,
+        dockerComposeConfiguration
     } = data
     const fileYml = `${workdir}${baseDirectory}/docker-compose.yml`;
     const fileYaml = `${workdir}${baseDirectory}/docker-compose.yaml`;
@@ -76,6 +77,9 @@ export default async function (data) {
         value['env_file'] = envFound ? [`${workdir}/.env`] : []
         value['labels'] = labels
         value['volumes'] = volumes
+        if (dockerComposeConfiguration[key].port) {
+            value['expose'] = [dockerComposeConfiguration[key].port]
+        }
         if (value['networks']?.length > 0) {
             value['networks'].forEach((network) => {
                 networks[network] = {

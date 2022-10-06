@@ -1223,7 +1223,7 @@ export async function getPreviews(request: FastifyRequest<OnlyId>) {
 
 export async function getApplicationLogs(request: FastifyRequest<GetApplicationLogs>) {
     try {
-        const { id } = request.params;
+        const { id, containerId } = request.params;
         let { since = 0 } = request.query
         if (since !== 0) {
             since = day(since).unix();
@@ -1234,10 +1234,8 @@ export async function getApplicationLogs(request: FastifyRequest<GetApplicationL
         });
         if (destinationDockerId) {
             try {
-                // const found = await checkContainer({ dockerId, container: id })
-                // if (found) {
                 const { default: ansi } = await import('strip-ansi')
-                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
+                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${containerId}` })
                 const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const logs = stripLogsStderr.concat(stripLogsStdout)

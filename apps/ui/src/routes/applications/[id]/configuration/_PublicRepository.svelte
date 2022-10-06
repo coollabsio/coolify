@@ -165,7 +165,7 @@
 				placeholder="eg: https://github.com/coollabsio/nodejs-example/tree/main"
 				bind:value={publicRepositoryLink}
 			/>
-				<button class="btn bg-orange-600" class:loading={loading.branches} type="submit">
+				<button class="btn bg-orange-600" type="submit">
 					Load Repository
 				</button>
 			</div>
