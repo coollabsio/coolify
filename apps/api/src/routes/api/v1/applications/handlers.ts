@@ -1243,7 +1243,10 @@ export async function getApplicationLogs(request: FastifyRequest<GetApplicationL
                 return { logs: sortedLogs }
                 // }
             } catch (error) {
-                const { statusCode } = error;
+                const { statusCode, stderr } = error;
+                if (stderr.startsWith('Error: No such container')) {
+                    return { logs: [], noContainer: true }
+                }
                 if (statusCode === 404) {
                     return {
                         logs: []

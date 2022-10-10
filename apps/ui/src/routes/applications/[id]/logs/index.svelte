@@ -5,8 +5,6 @@
 	import { errorNotification } from '$lib/common';
 	import { onMount, onDestroy } from 'svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
-	import { status } from '$lib/store';
-	import { goto } from '$app/navigation';
 
 	let application: any = {};
 	let logsLoading = false;
@@ -19,6 +17,8 @@
 	let position = 0;
 	let services: any = [];
 	let selectedService: any = null;
+	let noContainer = false;
+
 	const { id } = $page.params;
 	onMount(async () => {
 		const response = await get(`/applications/${id}`);
@@ -33,7 +33,7 @@
 					name: ''
 				}
 			];
-			await selectService('')
+			await selectService('');
 		}
 	});
 	onDestroy(() => {
@@ -50,27 +50,17 @@
 		}
 		return tempdockerComposeServices;
 	}
-	async function loadAllLogs() {
-		try {
-			logsLoading = true;
-			const data: any = await get(`/applications/${id}/logs`);
-			if (data?.logs) {
-				lastLog = data.logs[data.logs.length - 1];
-				logs = data.logs;
-			}
-		} catch (error) {
-			return errorNotification(error);
-		} finally {
-			logsLoading = false;
-		}
-	}
 	async function loadLogs() {
 		if (logsLoading) return;
 		try {
 			const newLogs: any = await get(
 				`/applications/${id}/logs/${selectedService}?since=${lastLog?.split(' ')[0] || 0}`
 			);
-
+			if (newLogs.noContainer) {
+				noContainer = true;
+			} else {
+				noContainer = false;
+			}
 			if (newLogs?.logs && newLogs.logs[newLogs.logs.length - 1] !== logs[logs.length - 1]) {
 				logs = logs.concat(newLogs.logs);
 				lastLog = newLogs.logs[newLogs.logs.length - 1];
@@ -103,7 +93,7 @@
 		}
 	}
 	async function selectService(service: any, init: boolean = false) {
-		if (services.length === 1 && init) return
+		if (services.length === 1 && init) return;
 
 		if (loadLogsInterval) clearInterval(loadLogsInterval);
 		if (followingInterval) clearInterval(followingInterval);
@@ -143,7 +133,9 @@
 {#if selectedService}
 	<div class="flex flex-row justify-center space-x-2">
 		{#if logs.length === 0}
-			<div class="text-xl font-bold tracking-tighter">{$t('application.build.waiting_logs')}</div>
+			{#if noContainer}
+				<div class="text-xl font-bold tracking-tighter">Container not found / exited.</div>
+			{/if}
 		{:else}
 			<div class="relative w-full">
 				<div class="flex justify-start sticky space-x-2 pb-2">

@@ -160,12 +160,12 @@
 		<span>Logs</span>
 	</li>
 	<li
-		class:text-stone-600={$status.application.overallStatus !== 'healthy'}
+		class:text-stone-600={$status.application.overallStatus === 'stopped'}
 		class="rounded"
 		class:bg-coollabs={$page.url.pathname === `/applications/${$page.params.id}/logs`}
 	>
 		<a
-			href={$status.application.overallStatus === 'healthy' ? `/applications/${$page.params.id}/logs` : ''}
+			href={$status.application.overallStatus !== 'stopped' ? `/applications/${$page.params.id}/logs` : ''}
 			class="no-underline w-full"
 			><svg
 				xmlns="http://www.w3.org/2000/svg"
