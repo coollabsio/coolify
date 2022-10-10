@@ -73,6 +73,4 @@ export default async function ({
 	const { stdout: commit } = await asyncExecShell(`cd ${workdir}/ && git rev-parse HEAD`);
 
 	return commit.replace('\n', '');
-
-
 }
