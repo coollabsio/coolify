@@ -21,9 +21,11 @@
 
 	const { id } = $page.params;
 
-	let loading = false;
-	let publicLoading = false;
-
+	let loading = {
+		main: false,
+		public: false
+	};
+	let publicUrl = '';
 	let appendOnly = database.settings.appendOnly;
 
 	let databaseDefault: any;
@@ -47,23 +49,46 @@
 			databaseDbUser = '';
 		}
 	}
-	function generateUrl(): string {
-		return `${database.type}://${
-			databaseDbUser ? databaseDbUser + ':' : ''
-		}${databaseDbUserPassword}@${
-			$status.database.isPublic
-				? database.destinationDocker.remoteEngine
-					? database.destinationDocker.remoteIpAddress
-					: $appSession.ipv4
-				: database.id
-		}:${$status.database.isPublic ? database.publicPort : privatePort}/${databaseDefault}`;
+	function generateUrl() {
+		const ipAddress = () => {
+			if ($status.database.isPublic) {
+				if (database.destinationDocker.remoteEngine) {
+					return database.destinationDocker.remoteIpAddress;
+				}
+				if ($appSession.ipv6) {
+					return $appSession.ipv6;
+				}
+				if ($appSession.ipv4) {
+					return $appSession.ipv4;
+				}
+				return '<Cannot determine public IP address>';
+			} else {
+				return database.id;
+			}
+		};
+		const user = () => {
+			if (databaseDbUser) {
+				return databaseDbUser + ':';
+			}
+			return '';
+		};
+		const port = () => {
+			if ($status.database.isPublic) {
+				return database.publicPort;
+			} else {
+				return privatePort;
+			}
+		};
+		publicUrl = `${
+			database.type
+		}://${user()}${databaseDbUserPassword}@${ipAddress()}:${port()}/${databaseDefault}`;
 	}
 
 	async function changeSettings(name: any) {
 		if (name !== 'appendOnly') {
-			if (publicLoading || !$status.database.isRunning) return;
+			if (loading.public || !$status.database.isRunning) return;
 		}
-		publicLoading = true;
+		loading.public = true;
 		let data = {
 			isPublic: $status.database.isPublic,
 			appendOnly
@@ -87,12 +112,12 @@
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
-			publicLoading = false;
+			loading.public = false;
 		}
 	}
 	async function handleSubmit() {
 		try {
-			loading = true;
+			loading.main = true;
 			await post(`/databases/${id}`, { ...database, isRunning: $status.database.isRunning });
 			generateDbDetails();
 			addToast({
@@ -102,7 +127,7 @@
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
-			loading = false;
+			loading.main = false;
 		}
 	}
 </script>
@@ -115,9 +140,9 @@
 				<button
 					type="submit"
 					class="btn btn-sm"
-					class:loading
-					class:bg-databases={!loading}
-					disabled={loading}>{$t('forms.save')}</button
+					class:loading={loading.main}
+					class:bg-databases={!loading.main}
+					disabled={loading.main}>{$t('forms.save')}</button
 				>
 			{/if}
 		</div>
@@ -175,7 +200,7 @@
 				readonly
 				disabled
 				name="publicPort"
-				value={publicLoading
+				value={loading.public
 					? 'Loading...'
 					: $status.database.isPublic
 					? database.publicPort
@@ -198,8 +223,8 @@
 			<EdgeDB {database} />
 		{/if}
 		<div class="flex flex-col space-y-2 mt-5">
-			<div>
-				<label class="px-2" for="url"
+			<div class="grid gap-2 grid-cols-2 auto-rows-max lg:px-10 px-2">
+				<label for="url"
 					>{$t('database.connection_string')}
 					{#if !$status.database.isPublic && database.destinationDocker.remoteEngine}
 						<Explainer
@@ -207,18 +232,21 @@
 						/>
 					{/if}</label
 				>
+				<button class="btn btn-sm" on:click|preventDefault={generateUrl}
+					>Show Connection String</button
+				>
 			</div>
 			<div class="lg:px-10 px-2">
-				<CopyPasswordField
-					textarea={true}
-					placeholder={$t('forms.generated_automatically_after_start')}
-					isPasswordField={false}
-					id="url"
-					name="url"
-					readonly
-					disabled
-					value={publicLoading || loading ? 'Loading...' : generateUrl()}
-				/>
+				{#if publicUrl}
+					<CopyPasswordField
+						placeholder="Click on the button to generate URL"
+						id="url"
+						name="url"
+						readonly
+						disabled
+						value={loading.public ? 'Loading...' : publicUrl}
+					/>
+				{/if}
 			</div>
 		</div>
 	</form>
@@ -228,7 +256,7 @@
 	<div class="grid gap-2 grid-cols-2 auto-rows-max lg:px-10 px-2">
 		<Setting
 			id="isPublic"
-			loading={publicLoading}
+			loading={loading.public}
 			bind:setting={$status.database.isPublic}
 			on:click={() => changeSettings('isPublic')}
 			title={$t('database.set_public')}
@@ -238,7 +266,7 @@
 		{#if database.type === 'redis'}
 			<Setting
 				id="appendOnly"
-				loading={publicLoading}
+				loading={loading.public}
 				bind:setting={appendOnly}
 				on:click={() => changeSettings('appendOnly')}
 				title={$t('database.change_append_only_mode')}
