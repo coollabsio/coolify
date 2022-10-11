@@ -1,5 +1,12 @@
 ARG PNPM_VERSION=7.11.0
 ARG NPM_VERSION=8.19.1
+# https://download.docker.com/linux/static/stable/
+ARG DOCKER_VERSION=20.10.18
+# https://github.com/docker/compose/releases
+# Reverted to 2.6.1 because of this https://github.com/docker/compose/issues/9704. 2.9.0 still has a bug.
+ARG DOCKER_COMPOSE_VERSION=2.6.1
+# https://github.com/buildpacks/pack/releases
+ARG PACK_VERSION=v0.27.0
 
 FROM node:18-slim as build
 WORKDIR /app
@@ -23,14 +30,12 @@ RUN npm --no-update-notifier --no-fund --global install pnpm@${PNPM_VERSION}
 RUN npm install -g npm@${PNPM_VERSION}
 
 RUN mkdir -p ~/.docker/cli-plugins/
-# https://download.docker.com/linux/static/stable/
-RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-20.10.9 -o /usr/bin/docker
-# https://github.com/docker/compose/releases
-# Reverted to 2.6.1 because of this https://github.com/docker/compose/issues/9704. 2.9.0 still has a bug.
-RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-compose-linux-2.6.1 -o ~/.docker/cli-plugins/docker-compose
-RUN chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker
 
-RUN (curl -sSL "https://github.com/buildpacks/pack/releases/download/v0.27.0/pack-v0.27.0-linux.tgz" | tar -C /usr/local/bin/ --no-same-owner -xzv pack)
+RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-$DOCKER_VERSION -o /usr/bin/docker
+RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-compose-linux-$DOCKER_COMPOSE_VERSION -o ~/.docker/cli-plugins/docker-compose
+RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/pack-$PACK_VERSION -o /usr/local/bin/pack 
+
+RUN chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker /usr/local/bin/pack
 
 COPY --from=build /app/apps/api/build/ .
 COPY --from=build /app/others/fluentbit/ ./fluentbit
