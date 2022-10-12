@@ -87,6 +87,9 @@ export async function removeContainer({
 			await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}` })
 			await executeDockerCmd({ dockerId, command: `docker rm ${id}` })
 		}
+		if (JSON.parse(stdout).Status === 'exited') {
+			await executeDockerCmd({ dockerId, command: `docker rm ${id}` })
+		}
 	} catch (error) {
 		throw error;
 	}

@@ -272,14 +272,13 @@
 	>
 		{#if $status.application.overallStatus === 'degraded' && application.buildPack !== 'compose'}
 			<a
-				id="applicationerror"
 				href={$isDeploymentEnabled ? `/applications/${id}/logs` : null}
-				class="btn btn-error gap-2"
+				class="btn btn-sm text-sm gap-2"
 				sveltekit:prefetch
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6"
+					class="w-6 h-6 text-red-500"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentcolor"
@@ -296,7 +295,6 @@
 				</svg>
 				Application Error
 			</a>
-			<Tooltip triggeredBy="#applicationerror">Application exited with an error!</Tooltip>
 		{/if}
 		{#if $status.application.initialLoading}
 			<button class="btn btn-ghost btn-sm gap-2">
@@ -321,50 +319,50 @@
 				Loading...
 			</button>
 		{:else if $status.application.overallStatus === 'healthy'}
-		<button
-		on:click={stopApplication}
-		type="submit"
-		disabled={!$isDeploymentEnabled}
-		class="btn btn-sm btn-error gap-2"
-	>
-		<svg
-			xmlns="http://www.w3.org/2000/svg"
-			class="w-6 h-6 "
-			viewBox="0 0 24 24"
-			stroke-width="1.5"
-			stroke="currentColor"
-			fill="none"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-		>
-			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-			<rect x="6" y="5" width="4" height="14" rx="1" />
-			<rect x="14" y="5" width="4" height="14" rx="1" />
-		</svg> Stop
-	</button>
-	{#if application.buildPack !== 'compose'}
-	<button
-		on:click={restartApplication}
-		type="submit"
-		disabled={!$isDeploymentEnabled}
-		class="btn btn-sm gap-2"
-	>
-		<svg
-			xmlns="http://www.w3.org/2000/svg"
-			class="w-6 h-6"
-			viewBox="0 0 24 24"
-			stroke-width="1.5"
-			stroke="currentColor"
-			fill="none"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-		>
-			<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-			<path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
-			<path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
-		</svg> Restart
-	</button>
-{/if}
+			<button
+				on:click={stopApplication}
+				type="submit"
+				disabled={!$isDeploymentEnabled}
+				class="btn btn-sm btn-error gap-2"
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="w-6 h-6 "
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<rect x="6" y="5" width="4" height="14" rx="1" />
+					<rect x="14" y="5" width="4" height="14" rx="1" />
+				</svg> Stop
+			</button>
+			{#if application.buildPack !== 'compose'}
+				<button
+					on:click={restartApplication}
+					type="submit"
+					disabled={!$isDeploymentEnabled}
+					class="btn btn-sm gap-2"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
+						<path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
+					</svg> Restart
+				</button>
+			{/if}
 			<button
 				disabled={!$isDeploymentEnabled}
 				class="btn btn-sm gap-2"
@@ -389,51 +387,73 @@
 
 				Force Redeploy
 			</button>
-		
-
-		
 		{:else if $isDeploymentEnabled && !$page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
+			{#if $status.application.overallStatus === 'degraded'}
+				<button
+					on:click={stopApplication}
+					type="submit"
+					disabled={!$isDeploymentEnabled}
+					class="btn btn-sm btn-error gap-2"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6 "
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<rect x="6" y="5" width="4" height="14" rx="1" />
+						<rect x="14" y="5" width="4" height="14" rx="1" />
+					</svg> Stop
+				</button>
+			{/if}
 			<button
 				class="btn btn-sm gap-2"
-				class:btn-error={$status.application.overallStatus === 'degraded'}
 				class:btn-primary={$status.application.overallStatus !== 'degraded'}
 				disabled={!$isDeploymentEnabled}
 				on:click={() => handleDeploySubmit(false)}
 			>
-			{#if $status.application.overallStatus !== 'degraded'}
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6"
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<path d="M7 4v16l13 -8z" />
-				</svg>
+				{#if $status.application.overallStatus !== 'degraded'}
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path d="M7 4v16l13 -8z" />
+					</svg>
 				{:else}
-				<svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="w-6 h-6"
-				viewBox="0 0 24 24"
-				stroke-width="1.5"
-				stroke="currentColor"
-				fill="none"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			>
-				<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-				<path
-					d="M16.3 5h.7a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h5l-2.82 -2.82m0 5.64l2.82 -2.82"
-					transform="rotate(-45 12 12)"
-				/>
-			</svg>
-
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path
+							d="M16.3 5h.7a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h5l-2.82 -2.82m0 5.64l2.82 -2.82"
+							transform="rotate(-45 12 12)"
+						/>
+					</svg>
 				{/if}
-				{$status.application.overallStatus === 'degraded' ? 'Restart Degraded Stack' : 'Deploy'}
+				{$status.application.overallStatus === 'degraded'
+					? $status.application.statuses.length === 1
+						? 'Force Redeploy'
+						: 'Redeploy Stack'
+					: 'Deploy'}
 			</button>
 		{/if}
 		{#if $location && $status.application.overallStatus === 'healthy'}

@@ -102,10 +102,8 @@
 					: {
 							Authorization: `Bearer ${$appSession.tokens.gitlab}`
 					  };
-				if (isPublicRepository) {
-					return;
-				}
-				const url = isPublicRepository ? `` : `/v4/projects/${projectId}/repository/tree`;
+
+				const url = isPublicRepository ? `/projects/${projectId}/repository/tree` : `/v4/projects/${projectId}/repository/tree`;
 				const files = await get(`${apiUrl}${url}`, {
 					...headers
 				});

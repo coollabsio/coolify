@@ -237,6 +237,7 @@
 			(application.id && application.id.toLowerCase().includes($search.toLowerCase())) ||
 			(application.name && application.name.toLowerCase().includes($search.toLowerCase())) ||
 			(application.fqdn && application.fqdn.toLowerCase().includes($search.toLowerCase())) ||
+			(application.dockerComposeConfiguration && application.dockerComposeConfiguration.toLowerCase().includes($search.toLowerCase())) ||
 			(application.repository &&
 				application.repository.toLowerCase().includes($search.toLowerCase())) ||
 			(application.buildpack &&
