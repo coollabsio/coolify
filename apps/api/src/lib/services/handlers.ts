@@ -1410,6 +1410,7 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 depends_on: [
                     `${id}-mariadb`,
                     `${id}-redis`,
+                    `${id}-influxdb`,
                 ],
                 environment: [
                     "_APP_ENV=production",
@@ -1772,54 +1773,77 @@ async function startAppWriteService(request: FastifyRequest<ServiceStartStop>) {
                 ],
                 ...defaultComposeConfiguration(network),
             },
-
+            [`${id}-usage-timeseries`]: {
+                image: `${image}:${version}`,
+                container_name: `${id}-usage`,
+                labels: makeLabelForServices('appwrite'),
+                entrypoint: "usage --type=timeseries",
+                depends_on: [
+                    `${id}-mariadb`,
+                    `${id}-influxdb`,
+                ],
+                environment: [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    `_APP_INFLUXDB_HOST=${id}-influxdb`,
+                    "_APP_INFLUXDB_PORT=8086",
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `OPEN_RUNTIMES_NETWORK=${network}`,
+                    ...secrets
+                ],
+                ...defaultComposeConfiguration(network),
+            },
+            [`${id}-usage-database`]: {
+                image: `${image}:${version}`,
+                container_name: `${id}-usage-database`,
+                labels: makeLabelForServices('appwrite'),
+                entrypoint: "usage --type=database",
+                depends_on: [
+                    `${id}-mariadb`,
+                    `${id}-influxdb`,
+                ],
+                environment: [
+                    "_APP_ENV=production",
+                    `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
+                    `_APP_DB_HOST=${mariadbHost}`,
+                    `_APP_DB_PORT=${mariadbPort}`,
+                    `_APP_DB_SCHEMA=${mariadbDatabase}`,
+                    `_APP_DB_USER=${mariadbUser}`,
+                    `_APP_DB_PASS=${mariadbPassword}`,
+                    `_APP_INFLUXDB_HOST=${id}-influxdb`,
+                    "_APP_INFLUXDB_PORT=8086",
+                    `_APP_REDIS_HOST=${id}-redis`,
+                    "_APP_REDIS_PORT=6379",
+                    `OPEN_RUNTIMES_NETWORK=${network}`,
+                    ...secrets
+                ],
+                ...defaultComposeConfiguration(network),
+            },
+            [`${id}-influxdb`]: {
+                image: "appwrite/influxdb:1.5.0",
+                container_name: `${id}-influxdb`,
+                volumes: [
+                    `${id}-influxdb:/var/lib/influxdb:rw`
+                ],
+                ...defaultComposeConfiguration(network),
+            },
+            [`${id}-telegraf`]: {
+                image: "appwrite/telegraf:1.4.0",
+                container_name: `${id}-telegraf`,
+                environment: [
+                    `_APP_INFLUXDB_HOST=${id}-influxdb`,
+                    "_APP_INFLUXDB_PORT=8086",
+                    `OPEN_RUNTIMES_NETWORK=${network}`,
+                ],
+                ...defaultComposeConfiguration(network),
+            }
         };
-        dockerCompose[id].depends_on.push(`${id}-influxdb`);
-        dockerCompose[`${id}-usage`] = {
-            image: `${image}:${version}`,
-            container_name: `${id}-usage`,
-            labels: makeLabelForServices('appwrite'),
-            entrypoint: "usage",
-            depends_on: [
-                `${id}-mariadb`,
-                `${id}-influxdb`,
-            ],
-            environment: [
-                "_APP_ENV=production",
-                `_APP_OPENSSL_KEY_V1=${opensslKeyV1}`,
-                `_APP_DB_HOST=${mariadbHost}`,
-                `_APP_DB_PORT=${mariadbPort}`,
-                `_APP_DB_SCHEMA=${mariadbDatabase}`,
-                `_APP_DB_USER=${mariadbUser}`,
-                `_APP_DB_PASS=${mariadbPassword}`,
-                `_APP_INFLUXDB_HOST=${id}-influxdb`,
-                "_APP_INFLUXDB_PORT=8086",
-                `_APP_REDIS_HOST=${id}-redis`,
-                "_APP_REDIS_PORT=6379",
-                `OPEN_RUNTIMES_NETWORK=${network}`,
-                ...secrets
-            ],
-            ...defaultComposeConfiguration(network),
-        }
-        dockerCompose[`${id}-influxdb`] = {
-            image: "appwrite/influxdb:1.5.0",
-            container_name: `${id}-influxdb`,
-            volumes: [
-                `${id}-influxdb:/var/lib/influxdb:rw`
-            ],
-            ...defaultComposeConfiguration(network),
-        }
-        dockerCompose[`${id}-telegraf`] = {
-            image: "appwrite/telegraf:1.4.0",
-            container_name: `${id}-telegraf`,
-            environment: [
-                `_APP_INFLUXDB_HOST=${id}-influxdb`,
-                "_APP_INFLUXDB_PORT=8086",
-                `OPEN_RUNTIMES_NETWORK=${network}`,
-            ],
-            ...defaultComposeConfiguration(network),
-        }
-
         const composeFile: any = {
             version: '3.8',
             services: dockerCompose,
