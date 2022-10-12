@@ -17,7 +17,7 @@
     "format:api": "NODE_ENV=development pnpm run --filter api format",
     "lint": "run-p -l -n lint:*",
     "lint:api": "NODE_ENV=development pnpm run --filter api lint",
-    "dev:container": "docker-compose -f docker-compose-dev.yaml up || docker compose -f docker-compose-dev.yaml up",
+    "dev:container": "docker-compose -f docker-compose-dev.yaml up --build || docker compose -f docker-compose-dev.yaml up --build",
     "dev": "run-p -l -n dev:api dev:ui",
     "dev:api": "NODE_ENV=development pnpm run --filter api dev",
     "dev:ui": "NODE_ENV=development pnpm run --filter ui dev",
