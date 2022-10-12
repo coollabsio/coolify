@@ -3,11 +3,9 @@
 	import { get } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
-	import LoadingLogs from '$lib/components/LoadingLogs.svelte';
 	import { onMount, onDestroy } from 'svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
-	import { status } from '$lib/store';
-	import { goto } from '$app/navigation';
+
 	let application: any = {};
 	let logsLoading = false;
 	let loadLogsInterval: any = null;
@@ -17,47 +15,52 @@
 	let followingLogs: any;
 	let logsEl: any;
 	let position = 0;
-	if (
-		!$status.application.isExited &&
-		!$status.application.isRestarting &&
-		!$status.application.isRunning
-	) {
-		goto(`/applications/${$page.params.id}/`, { replaceState: true });
-	}
+	let services: any = [];
+	let selectedService: any = null;
+	let noContainer = false;
+
 	const { id } = $page.params;
 	onMount(async () => {
 		const response = await get(`/applications/${id}`);
 		application = response.application;
-		loadAllLogs();
-		loadLogsInterval = setInterval(() => {
-			loadLogs();
-		}, 1000);
+		if (response.application.dockerComposeFile) {
+			services = normalizeDockerServices(
+				JSON.parse(response.application.dockerComposeFile).services
+			);
+		} else {
+			services = [
+				{
+					name: ''
+				}
+			];
+			await selectService('');
+		}
 	});
 	onDestroy(() => {
 		clearInterval(loadLogsInterval);
 		clearInterval(followingInterval);
 	});
-	async function loadAllLogs() {
-		try {
-			logsLoading = true;
-			const data: any = await get(`/applications/${id}/logs`);
-			if (data?.logs) {
-				lastLog = data.logs[data.logs.length - 1];
-				logs = data.logs;
-			}
-		} catch (error) {
-			return errorNotification(error);
-		} finally {
-			logsLoading = false;
+	function normalizeDockerServices(services: any[]) {
+		const tempdockerComposeServices = [];
+		for (const [name, data] of Object.entries(services)) {
+			tempdockerComposeServices.push({
+				name,
+				data
+			});
 		}
+		return tempdockerComposeServices;
 	}
 	async function loadLogs() {
 		if (logsLoading) return;
 		try {
 			const newLogs: any = await get(
-				`/applications/${id}/logs?since=${lastLog?.split(' ')[0] || 0}`
+				`/applications/${id}/logs/${selectedService}?since=${lastLog?.split(' ')[0] || 0}`
 			);
-
+			if (newLogs.noContainer) {
+				noContainer = true;
+			} else {
+				noContainer = false;
+			}
 			if (newLogs?.logs && newLogs.logs[newLogs.logs.length - 1] !== logs[logs.length - 1]) {
 				logs = logs.concat(newLogs.logs);
 				lastLog = newLogs.logs[newLogs.logs.length - 1];
@@ -89,6 +92,22 @@
 			clearInterval(followingInterval);
 		}
 	}
+	async function selectService(service: any, init: boolean = false) {
+		if (services.length === 1 && init) return;
+
+		if (loadLogsInterval) clearInterval(loadLogsInterval);
+		if (followingInterval) clearInterval(followingInterval);
+
+		logs = [];
+		lastLog = null;
+		followingLogs = false;
+
+		selectedService = `${application.id}${service.name ? `-${service.name}` : ''}`;
+		loadLogs();
+		loadLogsInterval = setInterval(() => {
+			loadLogs();
+		}, 1000);
+	}
 </script>
 
 <div class="mx-auto w-full">
@@ -96,50 +115,69 @@
 		<div class="title font-bold pb-3">Application Logs</div>
 	</div>
 </div>
-<div class="flex flex-row justify-center space-x-2">
-	{#if logs.length === 0}
-		<div class="text-xl font-bold tracking-tighter">{$t('application.build.waiting_logs')}</div>
-	{:else}
-		<div class="relative w-full">
-			<div class="flex justify-start sticky space-x-2 pb-2">
-				<button
-					on:click={followBuild}
-					class="btn btn-sm bg-coollabs"
-					class:bg-coolgray-300={followingLogs}
-					class:text-applications={followingLogs}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6 mr-2"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<circle cx="12" cy="12" r="9" />
-						<line x1="8" y1="12" x2="12" y2="16" />
-						<line x1="12" y1="8" x2="12" y2="16" />
-						<line x1="16" y1="12" x2="12" y2="16" />
-					</svg>
-					{followingLogs ? 'Following Logs...' : 'Follow Logs'}
-				</button>
-				{#if loadLogsInterval}
-					<button id="streaming" class="btn btn-sm bg-transparent border-none loading" />
-					<Tooltip triggeredBy="#streaming">Streaming logs</Tooltip>
-				{/if}
-			</div>
-			<div
-				bind:this={logsEl}
-				on:scroll={detect}
-				class="font-mono w-full bg-coolgray-100 border border-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded mb-20 flex flex-col scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1"
-			>
-				{#each logs as log}
-					<p>{log + '\n'}</p>
-				{/each}
-			</div>
-		</div>
-	{/if}
+<div class="flex gap-2 lg:gap-8 pb-4">
+	{#each services as service}
+		<button
+			on:click={() => selectService(service, true)}
+			class:bg-primary={selectedService ===
+				`${application.id}${service.name ? `-${service.name}` : ''}`}
+			class:bg-coolgray-200={selectedService !==
+				`${application.id}${service.name ? `-${service.name}` : ''}`}
+			class="w-full rounded p-5 hover:bg-primary font-bold"
+		>
+			{application.id}{service.name ? `-${service.name}` : ''}</button
+		>
+	{/each}
 </div>
+
+{#if selectedService}
+	<div class="flex flex-row justify-center space-x-2">
+		{#if logs.length === 0}
+			{#if noContainer}
+				<div class="text-xl font-bold tracking-tighter">Container not found / exited.</div>
+			{/if}
+		{:else}
+			<div class="relative w-full">
+				<div class="flex justify-start sticky space-x-2 pb-2">
+					<button
+						on:click={followBuild}
+						class="btn btn-sm bg-coollabs"
+						class:bg-coolgray-300={followingLogs}
+						class:text-applications={followingLogs}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="w-6 h-6 mr-2"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<circle cx="12" cy="12" r="9" />
+							<line x1="8" y1="12" x2="12" y2="16" />
+							<line x1="12" y1="8" x2="12" y2="16" />
+							<line x1="16" y1="12" x2="12" y2="16" />
+						</svg>
+						{followingLogs ? 'Following Logs...' : 'Follow Logs'}
+					</button>
+					{#if loadLogsInterval}
+						<button id="streaming" class="btn btn-sm bg-transparent border-none loading" />
+						<Tooltip triggeredBy="#streaming">Streaming logs</Tooltip>
+					{/if}
+				</div>
+				<div
+					bind:this={logsEl}
+					on:scroll={detect}
+					class="font-mono w-full bg-coolgray-100 border border-coolgray-200 p-5 overflow-x-auto overflox-y-auto max-h-[80vh] rounded mb-20 flex flex-col scrollbar-thumb-coollabs scrollbar-track-coolgray-200 scrollbar-w-1"
+				>
+					{#each logs as log}
+						<p>{log + '\n'}</p>
+					{/each}
+				</div>
+			</div>
+		{/if}
+	</div>
+{/if}

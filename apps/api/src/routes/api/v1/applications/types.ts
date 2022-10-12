@@ -21,7 +21,10 @@ export interface SaveApplication extends OnlyId {
         baseImage: string,
         baseBuildImage: string,
         deploymentType: string,
-        baseDatabaseBranch: string
+        baseDatabaseBranch: string,
+        dockerComposeFile: string,
+        dockerComposeFileLocation: string,
+        dockerComposeConfiguration: string
     }
 }
 export interface SaveApplicationSettings extends OnlyId {
@@ -84,7 +87,11 @@ export interface DeleteStorage extends OnlyId {
         path: string,
     }
 }
-export interface GetApplicationLogs extends OnlyId {
+export interface GetApplicationLogs {
+    Params: {
+        id: string,
+        containerId: string
+    }
     Querystring: {
         since: number,
     }

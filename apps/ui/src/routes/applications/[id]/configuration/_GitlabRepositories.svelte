@@ -95,7 +95,7 @@
 				if (newWindow?.closed) {
 					clearInterval(timer);
 					$appSession.tokens.gitlab = localStorage.getItem('gitLabToken');
-					localStorage.removeItem('gitLabToken');
+					// localStorage.removeItem('gitLabToken');
 					resolve();
 				}
 			}, 100);

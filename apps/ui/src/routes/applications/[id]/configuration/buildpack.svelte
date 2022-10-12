@@ -12,6 +12,7 @@
 			const response = await get(`/applications/${params.id}/configuration/buildpack`);
 			return {
 				props: {
+					application,
 					...response
 				}
 			};
@@ -25,22 +26,6 @@
 </script>
 
 <script lang="ts">
-	import { onMount } from 'svelte';
-
-	import { page } from '$app/stores';
-	import { get } from '$lib/api';
-	import { appSession } from '$lib/store';
-	import { t } from '$lib/translations';
-	import { buildPacks, findBuildPack, scanningTemplates } from '$lib/templates';
-	import { errorNotification } from '$lib/common';
-	import BuildPack from './_BuildPack.svelte';
-
-	const { id } = $page.params;
-
-	let scanning = true;
-	let foundConfig: any = null;
-	let packageManager = 'npm';
-
 	export let apiUrl: any;
 	export let projectId: any;
 	export let repository: any;
@@ -48,6 +33,28 @@
 	export let type: any;
 	export let application: any;
 	export let isPublicRepository: boolean;
+
+	import { onMount } from 'svelte';
+
+	import { page } from '$app/stores';
+	import { get, getAPIUrl } from '$lib/api';
+	import { appSession } from '$lib/store';
+	import { t } from '$lib/translations';
+	import { buildPacks, findBuildPack, scanningTemplates } from '$lib/templates';
+	import { errorNotification } from '$lib/common';
+	import BuildPack from './_BuildPack.svelte';
+	import yaml from 'js-yaml';
+
+	const { id } = $page.params;
+
+	let htmlUrl = application.gitSource.htmlUrl;
+
+	let scanning: boolean = true;
+	let foundConfig: any = null;
+	let packageManager: string = 'npm';
+	let dockerComposeFile: string | null = application.dockerComposeFile || null;
+	let dockerComposeFileLocation: string | null = application.dockerComposeFileLocation || null;
+	let dockerComposeConfiguration: any = application.dockerComposeConfiguration || null;
 
 	function checkPackageJSONContents({ key, json }: { key: any; json: any }) {
 		return json?.dependencies?.hasOwnProperty(key) || json?.devDependencies?.hasOwnProperty(key);
@@ -60,11 +67,45 @@
 			}
 		}
 	}
-	async function scanRepository(): Promise<void> {
+	async function getGitlabToken() {
+		return await new Promise<void>((resolve, reject) => {
+			const left = screen.width / 2 - 1020 / 2;
+			const top = screen.height / 2 - 618 / 2;
+			const newWindow = open(
+				`${htmlUrl}/oauth/authorize?client_id=${
+					application.gitSource.gitlabApp.appId
+				}&redirect_uri=${getAPIUrl()}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${
+					$page.params.id
+				}`,
+				'GitLab',
+				'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
+					top +
+					', left=' +
+					left +
+					', toolbar=0, menubar=0, status=0'
+			);
+			const timer = setInterval(() => {
+				if (newWindow?.closed) {
+					clearInterval(timer);
+					$appSession.tokens.gitlab = localStorage.getItem('gitLabToken');
+					localStorage.removeItem('gitLabToken');
+					resolve();
+				}
+			}, 100);
+		});
+	}
+	async function scanRepository(isPublicRepository: boolean): Promise<void> {
 		try {
 			if (type === 'gitlab') {
-				const files = await get(`${apiUrl}/v4/projects/${projectId}/repository/tree`, {
-					Authorization: `Bearer ${$appSession.tokens.gitlab}`
+				const headers = isPublicRepository
+					? {}
+					: {
+							Authorization: `Bearer ${$appSession.tokens.gitlab}`
+					  };
+
+				const url = isPublicRepository ? `/projects/${projectId}/repository/tree` : `/v4/projects/${projectId}/repository/tree`;
+				const files = await get(`${apiUrl}${url}`, {
+					...headers
 				});
 				const packageJson = files.find(
 					(file: { name: string; type: string }) =>
@@ -81,6 +122,14 @@
 				const dockerfile = files.find(
 					(file: { name: string; type: string }) =>
 						file.name === 'Dockerfile' && file.type === 'blob'
+				);
+				const dockerComposeFileYml = files.find(
+					(file: { name: string; type: string }) =>
+						file.name === 'docker-compose.yml' && file.type === 'blob'
+				);
+				const dockerComposeFileYaml = files.find(
+					(file: { name: string; type: string }) =>
+						file.name === 'docker-compose.yaml' && file.type === 'blob'
 				);
 				const cargoToml = files.find(
 					(file: { name: string; type: string }) =>
@@ -105,11 +154,24 @@
 				const laravel = files.find(
 					(file: { name: string; type: string }) => file.name === 'artisan' && file.type === 'blob'
 				);
-
 				if (yarnLock) packageManager = 'yarn';
 				if (pnpmLock) packageManager = 'pnpm';
 
-				if (dockerfile) {
+				if (dockerComposeFileYml || dockerComposeFileYaml) {
+					foundConfig = findBuildPack('compose', packageManager);
+					const id = dockerComposeFileYml.id || dockerComposeFileYaml.id;
+					const data = await get(`${apiUrl}/v4/projects/${projectId}/repository/blobs/${id}`, {
+						...headers
+					});
+					if (data?.content) {
+						const content = atob(data.content);
+						const dockerComposeJson = yaml.load(content) || null;
+						dockerComposeFile = JSON.stringify(dockerComposeJson);
+						dockerComposeFileLocation = dockerComposeFileYml
+							? 'docker-compose.yml'
+							: 'docker-compose.yaml';
+					}
+				} else if (dockerfile) {
 					foundConfig = findBuildPack('docker', packageManager);
 				} else if (packageJson && !laravel) {
 					const path = packageJson.path;
@@ -135,8 +197,13 @@
 					foundConfig = findBuildPack('node', packageManager);
 				}
 			} else if (type === 'github') {
+				const headers = isPublicRepository
+					? {}
+					: {
+							Authorization: `token ${$appSession.tokens.github}`
+					  };
 				const files = await get(`${apiUrl}/repos/${repository}/contents?ref=${branch}`, {
-					Authorization: `Bearer ${$appSession.tokens.github}`,
+					...headers,
 					Accept: 'application/vnd.github.v2.json'
 				});
 				const packageJson = files.find(
@@ -154,6 +221,14 @@
 				const dockerfile = files.find(
 					(file: { name: string; type: string }) =>
 						file.name === 'Dockerfile' && file.type === 'file'
+				);
+				const dockerComposeFileYml = files.find(
+					(file: { name: string; type: string }) =>
+						file.name === 'docker-compose.yml' && file.type === 'file'
+				);
+				const dockerComposeFileYaml = files.find(
+					(file: { name: string; type: string }) =>
+						file.name === 'docker-compose.yaml' && file.type === 'file'
 				);
 				const cargoToml = files.find(
 					(file: { name: string; type: string }) =>
@@ -182,11 +257,30 @@
 				if (yarnLock) packageManager = 'yarn';
 				if (pnpmLock) packageManager = 'pnpm';
 
-				if (dockerfile) {
+				if (dockerComposeFileYml || dockerComposeFileYaml) {
+					foundConfig = findBuildPack('compose', packageManager);
+					const data = await get(
+						`${apiUrl}/repos/${repository}/contents/${
+							dockerComposeFileYml ? 'docker-compose.yml' : 'docker-compose.yaml'
+						}?ref=${branch}`,
+						{
+							...headers,
+							Accept: 'application/vnd.github.v2.json'
+						}
+					);
+					if (data?.content) {
+						const content = atob(data.content);
+						const dockerComposeJson = yaml.load(content) || null;
+						dockerComposeFile = JSON.stringify(dockerComposeJson);
+						dockerComposeFileLocation = dockerComposeFileYml
+							? 'docker-compose.yml'
+							: 'docker-compose.yaml';
+					}
+				} else if (dockerfile) {
 					foundConfig = findBuildPack('docker', packageManager);
 				} else if (packageJson && !laravel) {
 					const data: any = await get(`${packageJson.git_url}`, {
-						Authorization: `Bearer ${$appSession.tokens.github}`,
+						...headers,
 						Accept: 'application/vnd.github.v2.raw'
 					});
 					const json = JSON.parse(data) || {};
@@ -214,30 +308,39 @@
 				error.message === '401 Unauthorized'
 			) {
 				if (application.gitSource.gitlabAppId) {
-					let htmlUrl = application.gitSource.htmlUrl;
-					const left = screen.width / 2 - 1020 / 2;
-					const top = screen.height / 2 - 618 / 2;
-					const newWindow = open(
-						`${htmlUrl}/oauth/authorize?client_id=${application.gitSource.gitlabApp.appId}&redirect_uri=${window.location.origin}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${$page.params.id}`,
-						'GitLab',
-						'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
-							top +
-							', left=' +
-							left +
-							', toolbar=0, menubar=0, status=0'
-					);
-					const timer = setInterval(() => {
-						if (newWindow?.closed) {
-							clearInterval(timer);
-							window.location.reload();
-						}
-					}, 100);
+					if (!$appSession.tokens.gitlab) {
+						await getGitlabToken();
+					}
+					scanRepository(isPublicRepository);
+					// let htmlUrl = application.gitSource.htmlUrl;
+					// const left = screen.width / 2 - 1020 / 2;
+					// const top = screen.height / 2 - 618 / 2;
+					// const newWindow = open(
+					// 	`${htmlUrl}/oauth/authorize?client_id=${
+					// 		application.gitSource.gitlabApp.appId
+					// 	}&redirect_uri=${getAPIUrl()}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${
+					// 		$page.params.id
+					// 	}`,
+					// 	'GitLab',
+					// 	'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
+					// 		top +
+					// 		', left=' +
+					// 		left +
+					// 		', toolbar=0, menubar=0, status=0'
+					// );
+					// const timer = setInterval(() => {
+					// 	if (newWindow?.closed) {
+					// 		clearInterval(timer);
+					// 		$appSession.tokens.gitlab = localStorage.getItem('gitLabToken');
+					// 		// localStorage.removeItem('gitLabToken'	);
+
+					// 	}
+					// }, 100);
 				}
-			}
-			if (error.message === 'Bad credentials') {
+			} else if (error.message === 'Bad credentials') {
 				const { token } = await get(`/applications/${id}/configuration/githubToken`);
 				$appSession.tokens.github = token;
-				return await scanRepository();
+				return await scanRepository(isPublicRepository);
 			}
 			return errorNotification(error);
 		} finally {
@@ -246,11 +349,7 @@
 		}
 	}
 	onMount(async () => {
-		if (!isPublicRepository) {
-			await scanRepository();
-		} else {
-			scanning = false;
-		}
+		await scanRepository(isPublicRepository);
 	});
 </script>
 
@@ -274,9 +373,17 @@
 	<div class="max-w-screen-2xl mx-auto px-10">
 		<div class="title pb-2">Coolify Base</div>
 		<div class="flex flex-wrap justify-center">
-			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true && bp.type ==='base') as buildPack}
+			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true && bp.type === 'base') as buildPack}
 				<div class="p-2">
-					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
+					<BuildPack
+						{packageManager}
+						{buildPack}
+						{scanning}
+						bind:foundConfig
+						{dockerComposeFile}
+						{dockerComposeFileLocation}
+						{dockerComposeConfiguration}
+					/>
 				</div>
 			{/each}
 		</div>
@@ -284,7 +391,7 @@
 	<div class="max-w-screen-2xl mx-auto px-10">
 		<div class="title pb-2">Coolify Specific</div>
 		<div class="flex flex-wrap justify-center">
-			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true && bp.type ==='specific') as buildPack}
+			{#each buildPacks.filter((bp) => bp.isCoolifyBuildPack === true && bp.type === 'specific') as buildPack}
 				<div class="p-2">
 					<BuildPack {packageManager} {buildPack} {scanning} bind:foundConfig />
 				</div>

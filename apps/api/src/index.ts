@@ -6,11 +6,14 @@ import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
-import { asyncExecShell, createRemoteEngineConfiguration, getDomain, isDev, listSettings, prisma, version } from './lib/common';
+import { asyncExecShell, cleanupDockerStorage, createRemoteEngineConfiguration, decrypt, executeDockerCmd, executeSSHCmd, generateDatabaseConfiguration, getDomain, isDev, listSettings, prisma, startTraefikProxy, startTraefikTCPProxy, version } from './lib/common';
 import { scheduler } from './lib/scheduler';
 import { compareVersions } from 'compare-versions';
 import Graceful from '@ladjs/graceful'
+import axios from 'axios';
+import fs from 'fs/promises';
 import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handlers';
+import { checkContainer } from './lib/docker';
 declare module 'fastify' {
 	interface FastifyInstance {
 		config: {
@@ -72,7 +75,6 @@ const host = '0.0.0.0';
 
 		}
 	};
-
 	const options = {
 		schema,
 		dotenv: true
@@ -131,29 +133,26 @@ const host = '0.0.0.0';
 			if (!scheduler.workers.has('deployApplication')) {
 				scheduler.run('deployApplication');
 			}
-			if (!scheduler.workers.has('infrastructure')) {
-				scheduler.run('infrastructure');
-			}
 		}, 2000)
 
 		// autoUpdater
 		setInterval(async () => {
-			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:autoUpdater")
+			await autoUpdater()
 		}, 60000 * 15)
 
 		// cleanupStorage
 		setInterval(async () => {
-			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:cleanupStorage")
+			await cleanupStorage()
 		}, 60000 * 10)
 
 		// checkProxies and checkFluentBit
 		setInterval(async () => {
-			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkProxies")
-			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:checkFluentBit")
+			await checkProxies();
+			await checkFluentBit();
 		}, 10000)
 
 		setInterval(async () => {
-			scheduler.workers.has('infrastructure') && scheduler.workers.get('infrastructure').postMessage("action:copySSLCertificates")
+			await copySSLCertificates();
 		}, 2000)
 
 		await Promise.all([
@@ -165,9 +164,6 @@ const host = '0.0.0.0';
 		console.error(error);
 		process.exit(1);
 	}
-
-
-
 })();
 
 
@@ -225,5 +221,239 @@ async function configureRemoteDockers() {
 		}
 	} catch (error) {
 		console.log(error)
+	}
+}
+
+async function autoUpdater() {
+	try {
+		const currentVersion = version;
+		const { data: versions } = await axios
+			.get(
+				`https://get.coollabs.io/versions.json`
+				, {
+					params: {
+						appId: process.env['COOLIFY_APP_ID'] || undefined,
+						version: currentVersion
+					}
+				})
+		const latestVersion = versions['coolify'].main.version;
+		const isUpdateAvailable = compareVersions(latestVersion, currentVersion);
+		if (isUpdateAvailable === 1) {
+			const activeCount = 0
+			if (activeCount === 0) {
+				if (!isDev) {
+					const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
+					if (isAutoUpdateEnabled) {
+						await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
+						await asyncExecShell(`env | grep '^COOLIFY' > .env`);
+						await asyncExecShell(
+							`sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env`
+						);
+						await asyncExecShell(
+							`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify coolify-fluentbit && docker rm coolify coolify-fluentbit && docker compose pull && docker compose up -d --force-recreate"`
+						);
+					}
+				} else {
+					console.log('Updating (not really in dev mode).');
+				}
+			}
+		}
+	} catch (error) { }
+}
+
+async function checkFluentBit() {
+	try {
+		if (!isDev) {
+			const engine = '/var/run/docker.sock';
+			const { id } = await prisma.destinationDocker.findFirst({
+				where: { engine, network: 'coolify' }
+			});
+			const { found } = await checkContainer({ dockerId: id, container: 'coolify-fluentbit', remove: true });
+			if (!found) {
+				await asyncExecShell(`env | grep '^COOLIFY' > .env`);
+				await asyncExecShell(`docker compose up -d fluent-bit`);
+			}
+		}
+	} catch (error) {
+		console.log(error)
+	}
+}
+async function checkProxies() {
+	try {
+		const { default: isReachable } = await import('is-port-reachable');
+		let portReachable;
+
+		const { arch, ipv4, ipv6 } = await listSettings();
+
+		// Coolify Proxy local
+		const engine = '/var/run/docker.sock';
+		const localDocker = await prisma.destinationDocker.findFirst({
+			where: { engine, network: 'coolify', isCoolifyProxyUsed: true }
+		});
+		if (localDocker) {
+			portReachable = await isReachable(80, { host: ipv4 || ipv6 })
+			if (!portReachable) {
+				await startTraefikProxy(localDocker.id);
+			}
+		}
+		// Coolify Proxy remote
+		const remoteDocker = await prisma.destinationDocker.findMany({
+			where: { remoteEngine: true, remoteVerified: true }
+		});
+		if (remoteDocker.length > 0) {
+			for (const docker of remoteDocker) {
+				if (docker.isCoolifyProxyUsed) {
+					portReachable = await isReachable(80, { host: docker.remoteIpAddress })
+					if (!portReachable) {
+						await startTraefikProxy(docker.id);
+					}
+				}
+				try {
+					await createRemoteEngineConfiguration(docker.id)
+				} catch (error) { }
+			}
+		}
+		// TCP Proxies
+		const databasesWithPublicPort = await prisma.database.findMany({
+			where: { publicPort: { not: null } },
+			include: { settings: true, destinationDocker: true }
+		});
+		for (const database of databasesWithPublicPort) {
+			const { destinationDockerId, destinationDocker, publicPort, id } = database;
+			if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
+				const { privatePort } = generateDatabaseConfiguration(database, arch);
+				await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
+			}
+		}
+		const wordpressWithFtp = await prisma.wordpress.findMany({
+			where: { ftpPublicPort: { not: null } },
+			include: { service: { include: { destinationDocker: true } } }
+		});
+		for (const ftp of wordpressWithFtp) {
+			const { service, ftpPublicPort } = ftp;
+			const { destinationDockerId, destinationDocker, id } = service;
+			if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
+				await startTraefikTCPProxy(destinationDocker, id, ftpPublicPort, 22, 'wordpressftp');
+			}
+		}
+
+		// HTTP Proxies
+		const minioInstances = await prisma.minio.findMany({
+			where: { publicPort: { not: null } },
+			include: { service: { include: { destinationDocker: true } } }
+		});
+		for (const minio of minioInstances) {
+			const { service, publicPort } = minio;
+			const { destinationDockerId, destinationDocker, id } = service;
+			if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
+				await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
+			}
+		}
+	} catch (error) {
+
+	}
+}
+
+async function copySSLCertificates() {
+	try {
+		const pAll = await import('p-all');
+		const actions = []
+		const certificates = await prisma.certificate.findMany({ include: { team: true } })
+		const teamIds = certificates.map(c => c.teamId)
+		const destinations = await prisma.destinationDocker.findMany({ where: { isCoolifyProxyUsed: true, teams: { some: { id: { in: [...teamIds] } } } } })
+		for (const certificate of certificates) {
+			const { id, key, cert } = certificate
+			const decryptedKey = decrypt(key)
+			await fs.writeFile(`/tmp/${id}-key.pem`, decryptedKey)
+			await fs.writeFile(`/tmp/${id}-cert.pem`, cert)
+			for (const destination of destinations) {
+				if (destination.remoteEngine) {
+					if (destination.remoteVerified) {
+						const { id: dockerId, remoteIpAddress } = destination
+						actions.push(async () => copyRemoteCertificates(id, dockerId, remoteIpAddress))
+					}
+				} else {
+					actions.push(async () => copyLocalCertificates(id))
+				}
+			}
+		}
+		await pAll.default(actions, { concurrency: 1 })
+	} catch (error) {
+		console.log(error)
+	} finally {
+		await asyncExecShell(`find /tmp/ -maxdepth 1 -type f -name '*-*.pem' -delete`)
+	}
+}
+
+async function copyRemoteCertificates(id: string, dockerId: string, remoteIpAddress: string) {
+	try {
+		await asyncExecShell(`scp /tmp/${id}-cert.pem /tmp/${id}-key.pem ${remoteIpAddress}:/tmp/`)
+		await executeSSHCmd({ dockerId, command: `docker exec coolify-proxy sh -c 'test -d /etc/traefik/acme/custom/ || mkdir -p /etc/traefik/acme/custom/'` })
+		await executeSSHCmd({ dockerId, command: `docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/` })
+		await executeSSHCmd({ dockerId, command: `docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/` })
+	} catch (error) {
+		console.log({ error })
+	}
+}
+async function copyLocalCertificates(id: string) {
+	try {
+		await asyncExecShell(`docker exec coolify-proxy sh -c 'test -d /etc/traefik/acme/custom/ || mkdir -p /etc/traefik/acme/custom/'`)
+		await asyncExecShell(`docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/`)
+		await asyncExecShell(`docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/`)
+	} catch (error) {
+		console.log({ error })
+	}
+}
+
+async function cleanupStorage() {
+	const destinationDockers = await prisma.destinationDocker.findMany();
+	let enginesDone = new Set()
+	for (const destination of destinationDockers) {
+		if (enginesDone.has(destination.engine) || enginesDone.has(destination.remoteIpAddress)) return
+		if (destination.engine) enginesDone.add(destination.engine)
+		if (destination.remoteIpAddress) enginesDone.add(destination.remoteIpAddress)
+
+		let lowDiskSpace = false;
+		try {
+			let stdout = null
+			if (!isDev) {
+				const output = await executeDockerCmd({ dockerId: destination.id, command: `CONTAINER=$(docker ps -lq | head -1) && docker exec $CONTAINER sh -c 'df -kPT /'` })
+				stdout = output.stdout;
+			} else {
+				const output = await asyncExecShell(
+					`df -kPT /`
+				);
+				stdout = output.stdout;
+			}
+			let lines = stdout.trim().split('\n');
+			let header = lines[0];
+			let regex =
+				/^Filesystem\s+|Type\s+|1024-blocks|\s+Used|\s+Available|\s+Capacity|\s+Mounted on\s*$/g;
+			const boundaries = [];
+			let match;
+
+			while ((match = regex.exec(header))) {
+				boundaries.push(match[0].length);
+			}
+
+			boundaries[boundaries.length - 1] = -1;
+			const data = lines.slice(1).map((line) => {
+				const cl = boundaries.map((boundary) => {
+					const column = boundary > 0 ? line.slice(0, boundary) : line;
+					line = line.slice(boundary);
+					return column.trim();
+				});
+				return {
+					capacity: Number.parseInt(cl[5], 10) / 100
+				};
+			});
+			if (data.length > 0) {
+				const { capacity } = data[0];
+				if (capacity > 0.8) {
+					lowDiskSpace = true;
+				}
+			}
+		} catch (error) { }
+		await cleanupDockerStorage(destination.id, lowDiskSpace, false)
 	}
 }

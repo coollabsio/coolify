@@ -29,7 +29,7 @@ export function findBuildPack(pack: string, packageManager = 'npm') {
 			port: 80
 		};
 	}
-	if (pack === 'docker') {
+	if (pack === 'docker' || pack === 'compose') {
 		return {
 			...metaData,
 			installCommand: null,
@@ -39,6 +39,7 @@ export function findBuildPack(pack: string, packageManager = 'npm') {
 			port: null
 		};
 	}
+
 	if (pack === 'svelte') {
 		return {
 			...metaData,
@@ -236,6 +237,14 @@ export const buildPacks = [
 		isCoolifyBuildPack: true,
 	},
 	{
+		name: 'compose',
+		type: 'base',
+		fancyName: 'Docker Compose',
+		hoverColor: 'hover:bg-sky-700',
+		color: 'bg-sky-700',
+		isCoolifyBuildPack: true,
+	},
+	{
 		name: 'svelte',
 		type: 'specific',
 		base: 'node',
@@ -349,14 +358,14 @@ export const buildPacks = [
 		color: 'bg-green-700',
 		isCoolifyBuildPack: true,
 	},
-    {
-        name: 'heroku',
+	{
+		name: 'heroku',
 		type: 'base',
 		fancyName: 'Heroku',
 		hoverColor: 'hover:bg-purple-700',
 		color: 'bg-purple-700',
 		isHerokuBuildPack: true,
-    }
+	}
 ];
 export const scanningTemplates = {
 	'@sveltejs/kit': {

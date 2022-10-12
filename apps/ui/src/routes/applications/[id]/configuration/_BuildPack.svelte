@@ -14,6 +14,9 @@
 	export let foundConfig: any;
 	export let scanning: any;
 	export let packageManager: any;
+	export let dockerComposeFile: string | null = null;
+	export let dockerComposeFileLocation: string | null = null;
+	export let dockerComposeConfiguration: any = null;
 
 	async function handleSubmit(name: string) {
 		try {
@@ -25,10 +28,20 @@
 			delete tempBuildPack.fancyName;
 			delete tempBuildPack.color;
 			delete tempBuildPack.hoverColor;
-
-			if (foundConfig?.buildPack !== name) {
-				await post(`/applications/${id}`, { ...tempBuildPack, buildPack: name });
+			let composeConfiguration: any = {}
+			if (!dockerComposeConfiguration && dockerComposeFile) {
+				for (const [name, _] of Object.entries(JSON.parse(dockerComposeFile).services)) {
+					composeConfiguration[name] = {};
+				}
+				
 			}
+			await post(`/applications/${id}`, {
+				...tempBuildPack,
+				buildPack: name,
+				dockerComposeFile,
+				dockerComposeFileLocation,
+				dockerComposeConfiguration: JSON.stringify(composeConfiguration) || JSON.stringify({})
+			});
 			await post(`/applications/${id}/configuration/buildpack`, { buildPack: name });
 			return await goto(from || `/applications/${id}`);
 		} catch (error) {

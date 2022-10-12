@@ -110,23 +110,64 @@ export async function getApplicationStatus(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         const { teamId } = request.user
-        let isRunning = false;
-        let isExited = false;
-        let isRestarting = false;
+        let payload = []
         const application: any = await getApplicationFromDB(id, teamId);
         if (application?.destinationDockerId) {
-            const status = await checkContainer({ dockerId: application.destinationDocker.id, container: id });
-            if (status?.found) {
-                isRunning = status.status.isRunning;
-                isExited = status.status.isExited;
-                isRestarting = status.status.isRestarting
+            if (application.buildPack === 'compose') {
+                const { stdout: containers } = await executeDockerCmd({
+                    dockerId: application.destinationDocker.id,
+                    command:
+                        `docker ps -a --filter "label=coolify.applicationId=${id}" --format '{{json .}}'`
+                });
+                const containersArray = containers.trim().split('\n');
+                if (containersArray.length > 0 && containersArray[0] !== '') {
+                    for (const container of containersArray) {
+                        let isRunning = false;
+                        let isExited = false;
+                        let isRestarting = false;
+                        const containerObj = JSON.parse(container);
+                        const status = containerObj.State
+                        if (status === 'running') {
+                            isRunning = true;
+                        }
+                        if (status === 'exited') {
+                            isExited = true;
+                        }
+                        if (status === 'restarting') {
+                            isRestarting = true;
+                        }
+                        payload.push({
+                            name: containerObj.Names,
+                            status: {
+                                isRunning,
+                                isExited,
+                                isRestarting
+                            }
+                        })
+                    }
+                }
+            } else {
+                let isRunning = false;
+                let isExited = false;
+                let isRestarting = false;
+                const status = await checkContainer({ dockerId: application.destinationDocker.id, container: id });
+                if (status?.found) {
+                    isRunning = status.status.isRunning;
+                    isExited = status.status.isExited;
+                    isRestarting = status.status.isRestarting
+                    payload.push({
+                        name: id,
+                        status: {
+                            isRunning,
+                            isExited,
+                            isRestarting
+                        }
+                    })
+
+                }
             }
         }
-        return {
-            isRunning,
-            isRestarting,
-            isExited,
-        };
+        return payload
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
@@ -289,13 +330,15 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             baseImage,
             baseBuildImage,
             deploymentType,
-            baseDatabaseBranch
+            baseDatabaseBranch,
+            dockerComposeFile,
+            dockerComposeFileLocation,
+            dockerComposeConfiguration
         } = request.body
         if (port) port = Number(port);
         if (exposePort) {
             exposePort = Number(exposePort);
         }
-
         const { destinationDocker: { engine, remoteEngine, remoteIpAddress }, exposePort: configuredPort } = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } })
         if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, engine, remoteEngine, remoteIpAddress })
         if (denoOptions) denoOptions = denoOptions.trim();
@@ -324,6 +367,9 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
                     baseImage,
                     baseBuildImage,
                     deploymentType,
+                    dockerComposeFile,
+                    dockerComposeFileLocation,
+                    dockerComposeConfiguration,
                     ...defaultConfiguration,
                     connectedDatabase: { update: { hostedDatabaseDBName: baseDatabaseBranch } }
                 }
@@ -342,6 +388,9 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
                     baseImage,
                     baseBuildImage,
                     deploymentType,
+                    dockerComposeFile,
+                    dockerComposeFileLocation,
+                    dockerComposeConfiguration,
                     ...defaultConfiguration
                 }
             });
@@ -506,6 +555,21 @@ export async function stopApplication(request: FastifyRequest<OnlyId>, reply: Fa
         const application: any = await getApplicationFromDB(id, teamId);
         if (application?.destinationDockerId) {
             const { id: dockerId } = application.destinationDocker;
+            if (application.buildPack === 'compose') {
+                const { stdout: containers } = await executeDockerCmd({
+                    dockerId: application.destinationDocker.id,
+                    command:
+                        `docker ps -a --filter "label=coolify.applicationId=${id}" --format '{{json .}}'`
+                });
+                const containersArray = containers.trim().split('\n');
+                if (containersArray.length > 0 && containersArray[0] !== '') {
+                    for (const container of containersArray) {
+                        const containerObj = JSON.parse(container);
+                        await removeContainer({ id: containerObj.ID, dockerId: application.destinationDocker.id });
+                    }
+                }
+                return
+            }
             const { found } = await checkContainer({ dockerId, container: id });
             if (found) {
                 await removeContainer({ id, dockerId: application.destinationDocker.id });
@@ -605,6 +669,24 @@ export async function getUsage(request) {
         const application: any = await getApplicationFromDB(id, teamId);
         if (application.destinationDockerId) {
             [usage] = await Promise.all([getContainerUsage(application.destinationDocker.id, id)]);
+        }
+        return {
+            usage
+        }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+
+export async function getUsageByContainer(request) {
+    try {
+        const { id, containerId } = request.params
+        const teamId = request.user?.teamId;
+        let usage = {};
+
+        const application: any = await getApplicationFromDB(id, teamId);
+        if (application.destinationDockerId) {
+            [usage] = await Promise.all([getContainerUsage(application.destinationDocker.id, containerId)]);
         }
         return {
             usage
@@ -1159,7 +1241,7 @@ export async function getPreviews(request: FastifyRequest<OnlyId>) {
 
 export async function getApplicationLogs(request: FastifyRequest<GetApplicationLogs>) {
     try {
-        const { id } = request.params;
+        const { id, containerId } = request.params;
         let { since = 0 } = request.query
         if (since !== 0) {
             since = day(since).unix();
@@ -1170,10 +1252,8 @@ export async function getApplicationLogs(request: FastifyRequest<GetApplicationL
         });
         if (destinationDockerId) {
             try {
-                // const found = await checkContainer({ dockerId, container: id })
-                // if (found) {
                 const { default: ansi } = await import('strip-ansi')
-                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
+                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${containerId}` })
                 const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const logs = stripLogsStderr.concat(stripLogsStdout)
@@ -1181,7 +1261,10 @@ export async function getApplicationLogs(request: FastifyRequest<GetApplicationL
                 return { logs: sortedLogs }
                 // }
             } catch (error) {
-                const { statusCode } = error;
+                const { statusCode, stderr } = error;
+                if (stderr.startsWith('Error: No such container')) {
+                    return { logs: [], noContainer: true }
+                }
                 if (statusCode === 404) {
                     return {
                         logs: []

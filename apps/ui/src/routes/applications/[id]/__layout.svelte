@@ -59,7 +59,6 @@
 	import { goto } from '$app/navigation';
 	import { onDestroy, onMount } from 'svelte';
 	import { t } from '$lib/translations';
-	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import {
 		appSession,
 		status,
@@ -140,13 +139,11 @@
 	async function stopApplication() {
 		try {
 			$status.application.initialLoading = true;
-			// $status.application.loading = true;
 			await post(`/applications/${id}/stop`, {});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
 			$status.application.initialLoading = false;
-			// $status.application.loading = false;
 			await getStatus();
 		}
 	}
@@ -154,18 +151,48 @@
 		if ($status.application.loading) return;
 		$status.application.loading = true;
 		const data = await get(`/applications/${id}/status`);
-		$status.application.isRunning = data.isRunning;
-		$status.application.isExited = data.isExited;
-		$status.application.isRestarting = data.isRestarting;
+
+		$status.application.statuses = data;
+		let numberOfApplications = 0;
+		if (application.dockerComposeConfiguration) {
+			numberOfApplications =
+				application.buildPack === 'compose'
+					? Object.entries(JSON.parse(application.dockerComposeConfiguration)).length
+					: 1;
+		} else {
+			numberOfApplications = 1;
+		}
+
+		if ($status.application.statuses.length === 0) {
+			$status.application.overallStatus = 'stopped';
+		} else {
+			if ($status.application.statuses.length !== numberOfApplications) {
+				$status.application.overallStatus = 'degraded';
+			} else {
+				for (const oneStatus of $status.application.statuses) {
+					if (oneStatus.status.isExited || oneStatus.status.isRestarting) {
+						$status.application.overallStatus = 'degraded';
+						break;
+					}
+					if (oneStatus.status.isRunning) {
+						$status.application.overallStatus = 'healthy';
+					}
+					if (
+						!oneStatus.status.isExited &&
+						!oneStatus.status.isRestarting &&
+						!oneStatus.status.isRunning
+					) {
+						$status.application.overallStatus = 'stopped';
+					}
+				}
+			}
+		}
 		$status.application.loading = false;
 		$status.application.initialLoading = false;
 	}
 
 	onDestroy(() => {
 		$status.application.initialLoading = true;
-		$status.application.isRunning = false;
-		$status.application.isExited = false;
-		$status.application.isRestarting = false;
 		$status.application.loading = false;
 		$location = null;
 		$isDeploymentEnabled = false;
@@ -173,15 +200,8 @@
 	});
 	onMount(async () => {
 		setLocation(application, settings);
-		$status.application.isRunning = false;
-		$status.application.isExited = false;
-		$status.application.isRestarting = false;
 		$status.application.loading = false;
-		if (
-			application.gitSourceId &&
-			application.destinationDockerId &&
-			(application.fqdn || application.settings.isBot)
-		) {
+		if ($isDeploymentEnabled) {
 			await getStatus();
 			statusInterval = setInterval(async () => {
 				await getStatus();
@@ -207,11 +227,16 @@
 				<div class="flex justify-center items-center space-x-2">
 					<div>Configurations</div>
 					<div
-						class="badge rounded uppercase"
-						class:text-green-500={$status.application.isRunning}
-						class:text-red-500={!$status.application.isRunning}
+						class="badge badge-lg rounded uppercase"
+						class:text-green-500={$status.application.overallStatus === 'healthy'}
+						class:text-yellow-400={$status.application.overallStatus === 'degraded'}
+						class:text-red-500={$status.application.overallStatus === 'stopped'}
 					>
-						{$status.application.isRunning ? 'Running' : 'Stopped'}
+						{$status.application.overallStatus === 'healthy'
+							? 'Running'
+							: $status.application.overallStatus === 'degraded'
+							? 'Degraded'
+							: 'Stopped'}
 					</div>
 				</div>
 			{/if}
@@ -245,16 +270,15 @@
 	<div
 		class="pt-4 flex flex-row items-start justify-center lg:justify-end space-x-2 order-1 lg:order-2"
 	>
-		{#if $status.application.isExited || $status.application.isRestarting}
+		{#if $status.application.overallStatus === 'degraded' && application.buildPack !== 'compose'}
 			<a
-				id="applicationerror"
 				href={$isDeploymentEnabled ? `/applications/${id}/logs` : null}
-				class="icons bg-transparent text-sm text-error"
+				class="btn btn-sm text-sm gap-2"
 				sveltekit:prefetch
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6"
+					class="w-6 h-6 text-red-500"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentcolor"
@@ -269,14 +293,14 @@
 					<line x1="12" y1="8" x2="12" y2="12" />
 					<line x1="12" y1="16" x2="12.01" y2="16" />
 				</svg>
+				Application Error
 			</a>
-			<Tooltip triggeredBy="#applicationerror">Application exited with an error!</Tooltip>
 		{/if}
 		{#if $status.application.initialLoading}
-			<button class="icons animate-spin bg-transparent duration-500 ease-in-out">
+			<button class="btn btn-ghost btn-sm gap-2">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="h-6 w-6"
+					class="h-6 w-6 animate-spin duration-500 ease-in-out"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
@@ -292,18 +316,18 @@
 					<line x1="7.16" y1="18.37" x2="7.16" y2="18.38" />
 					<line x1="11" y1="19.94" x2="11" y2="19.95" />
 				</svg>
+				Loading...
 			</button>
-		{:else if $status.application.isRunning}
+		{:else if $status.application.overallStatus === 'healthy'}
 			<button
-				id="stop"
 				on:click={stopApplication}
 				type="submit"
 				disabled={!$isDeploymentEnabled}
-				class="icons bg-transparent text-error"
+				class="btn btn-sm btn-error gap-2"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6"
+					class="w-6 h-6 "
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
@@ -314,38 +338,34 @@
 					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
 					<rect x="6" y="5" width="4" height="14" rx="1" />
 					<rect x="14" y="5" width="4" height="14" rx="1" />
-				</svg>
+				</svg> Stop
 			</button>
-			<Tooltip triggeredBy="#stop">Stop</Tooltip>
-
-			<button
-				id="restart"
-				on:click={restartApplication}
-				type="submit"
-				disabled={!$isDeploymentEnabled}
-				class="icons bg-transparent"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6"
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
+			{#if application.buildPack !== 'compose'}
+				<button
+					on:click={restartApplication}
+					type="submit"
+					disabled={!$isDeploymentEnabled}
+					class="btn btn-sm gap-2"
 				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
-					<path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
-				</svg>
-			</button>
-			<Tooltip triggeredBy="#restart">Restart (useful to change secrets)</Tooltip>
-
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
+						<path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
+					</svg> Restart
+				</button>
+			{/if}
 			<button
-				id="forceredeploy"
 				disabled={!$isDeploymentEnabled}
-				class="icons bg-transparent "
+				class="btn btn-sm gap-2"
 				on:click={() => handleDeploySubmit(true)}
 			>
 				<svg
@@ -364,33 +384,80 @@
 						transform="rotate(-45 12 12)"
 					/>
 				</svg>
+
+				Force Redeploy
 			</button>
-			<Tooltip triggeredBy="#forceredeploy">Force Redeploy (without cache)</Tooltip>
 		{:else if $isDeploymentEnabled && !$page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
+			{#if $status.application.overallStatus === 'degraded'}
+				<button
+					on:click={stopApplication}
+					type="submit"
+					disabled={!$isDeploymentEnabled}
+					class="btn btn-sm btn-error gap-2"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6 "
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<rect x="6" y="5" width="4" height="14" rx="1" />
+						<rect x="14" y="5" width="4" height="14" rx="1" />
+					</svg> Stop
+				</button>
+			{/if}
 			<button
-				class="icons flex items-center font-bold"
+				class="btn btn-sm gap-2"
+				class:btn-primary={$status.application.overallStatus !== 'degraded'}
 				disabled={!$isDeploymentEnabled}
 				on:click={() => handleDeploySubmit(false)}
 			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6 mr-2 text-green-500"
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<path d="M7 4v16l13 -8z" />
-				</svg>
-				Deploy
+				{#if $status.application.overallStatus !== 'degraded'}
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path d="M7 4v16l13 -8z" />
+					</svg>
+				{:else}
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path
+							d="M16.3 5h.7a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h5l-2.82 -2.82m0 5.64l2.82 -2.82"
+							transform="rotate(-45 12 12)"
+						/>
+					</svg>
+				{/if}
+				{$status.application.overallStatus === 'degraded'
+					? $status.application.statuses.length === 1
+						? 'Force Redeploy'
+						: 'Redeploy Stack'
+					: 'Deploy'}
 			</button>
 		{/if}
-
-		{#if $location && $status.application.isRunning}
-			<a id="openApplication" href={$location} target="_blank" class="icons bg-transparent "
+		{#if $location && $status.application.overallStatus === 'healthy'}
+			<a href={$location} target="_blank" class="btn btn-sm gap-2 text-sm bg-primary"
 				><svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="h-6 w-6"
@@ -405,9 +472,8 @@
 					<path d="M11 7h-5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-5" />
 					<line x1="10" y1="14" x2="20" y2="4" />
 					<polyline points="15 4 20 4 20 9" />
-				</svg></a
+				</svg>Open</a
 			>
-			<Tooltip triggeredBy="#openApplication">Open Application</Tooltip>
 		{/if}
 	</div>
 </div>

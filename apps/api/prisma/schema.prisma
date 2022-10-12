@@ -94,43 +94,46 @@ model TeamInvitation {
 }
 
 model Application {
-  id                  String                         @id @default(cuid())
-  name                String
-  fqdn                String?
-  repository          String?
-  configHash          String?
-  branch              String?
-  buildPack           String?
-  projectId           Int?
-  port                Int?
-  exposePort          Int?
-  installCommand      String?
-  buildCommand        String?
-  startCommand        String?
-  baseDirectory       String?
-  publishDirectory    String?
-  deploymentType      String?
-  phpModules          String?
-  pythonWSGI          String?
-  pythonModule        String?
-  pythonVariable      String?
-  dockerFileLocation  String?
-  denoMainFile        String?
-  denoOptions         String?
-  createdAt           DateTime                       @default(now())
-  updatedAt           DateTime                       @updatedAt
-  destinationDockerId String?
-  gitSourceId         String?
-  baseImage           String?
-  baseBuildImage      String?
-  gitSource           GitSource?                     @relation(fields: [gitSourceId], references: [id])
-  destinationDocker   DestinationDocker?             @relation(fields: [destinationDockerId], references: [id])
-  persistentStorage   ApplicationPersistentStorage[]
-  settings            ApplicationSettings?
-  secrets             Secret[]
-  teams               Team[]
-  connectedDatabase   ApplicationConnectedDatabase?
-  previewApplication  PreviewApplication[]
+  id                         String                         @id @default(cuid())
+  name                       String
+  fqdn                       String?
+  repository                 String?
+  configHash                 String?
+  branch                     String?
+  buildPack                  String?
+  projectId                  Int?
+  port                       Int?
+  exposePort                 Int?
+  installCommand             String?
+  buildCommand               String?
+  startCommand               String?
+  baseDirectory              String?
+  publishDirectory           String?
+  deploymentType             String?
+  phpModules                 String?
+  pythonWSGI                 String?
+  pythonModule               String?
+  pythonVariable             String?
+  dockerFileLocation         String?
+  denoMainFile               String?
+  denoOptions                String?
+  dockerComposeFile          String?
+  dockerComposeFileLocation  String?
+  dockerComposeConfiguration String?
+  createdAt                  DateTime                       @default(now())
+  updatedAt                  DateTime                       @updatedAt
+  destinationDockerId        String?
+  gitSourceId                String?
+  baseImage                  String?
+  baseBuildImage             String?
+  gitSource                  GitSource?                     @relation(fields: [gitSourceId], references: [id])
+  destinationDocker          DestinationDocker?             @relation(fields: [destinationDockerId], references: [id])
+  persistentStorage          ApplicationPersistentStorage[]
+  settings                   ApplicationSettings?
+  secrets                    Secret[]
+  teams                      Team[]
+  connectedDatabase          ApplicationConnectedDatabase?
+  previewApplication         PreviewApplication[]
 }
 
 model PreviewApplication {

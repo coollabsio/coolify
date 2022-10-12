@@ -468,9 +468,9 @@ export const saveBuildLog = async ({
 		line = line.replace(regex, '<SENSITIVE_DATA_DELETED>@');
 	}
 	const addTimestamp = `[${generateTimestamp()}] ${line}`;
-	const fluentBitUrl = isDev ? 'http://localhost:24224' : 'http://coolify-fluentbit:24224';
+	const fluentBitUrl = isDev ? process.env.COOLIFY_CONTAINER_DEV === 'true' ? 'http://coolify-fluentbit:24224' : 'http://localhost:24224' : 'http://coolify-fluentbit:24224';
 
-	if (isDev) {
+	if (isDev && !process.env.COOLIFY_CONTAINER_DEV) {
 		console.debug(`[${applicationId}] ${addTimestamp}`);
 	}
 	try {
@@ -580,7 +580,8 @@ export async function buildImage({
 	dockerId,
 	isCache = false,
 	debug = false,
-	dockerFileLocation = '/Dockerfile'
+	dockerFileLocation = '/Dockerfile',
+	commit
 }) {
 	if (isCache) {
 		await saveBuildLog({ line: `Building cache image started.`, buildId, applicationId });
@@ -596,7 +597,9 @@ export async function buildImage({
 	}
 	const dockerFile = isCache ? `${dockerFileLocation}-cache` : `${dockerFileLocation}`
 	const cache = `${applicationId}:${tag}${isCache ? '-cache' : ''}`
-	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} ${workdir}` })
+	
+	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })	
+
 	const { status } = await prisma.build.findUnique({ where: { id: buildId } })
 	if (status === 'canceled') {
 		throw new Error('Deployment canceled.')
@@ -634,6 +637,7 @@ export function makeLabelForStandaloneApplication({
 	return [
 		'coolify.managed=true',
 		`coolify.version=${version}`,
+		`coolify.applicationId=${applicationId}`,
 		`coolify.type=standalone-application`,
 		`coolify.configuration=${base64Encode(
 			JSON.stringify({

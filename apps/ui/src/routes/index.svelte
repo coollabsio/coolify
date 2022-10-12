@@ -146,9 +146,29 @@
 		try {
 			numberOfGetStatus++;
 			let isRunning = false;
+			let isDegraded = false;
 			if (buildPack) {
 				const response = await get(`/applications/${id}/status`);
-				isRunning = response.isRunning;
+				if (response.length === 0) {
+					isRunning = false;
+				} else if (response.length === 1) {
+					isRunning = response[0].status.isRunning;
+				} else {
+					let overallStatus = false;
+					for (const oneStatus of response) {
+						if (oneStatus.status.isRunning) {
+							overallStatus = true;
+						} else {
+							isDegraded = true;
+							break;
+						}
+					}
+					if (overallStatus) {
+						isRunning = true;
+					} else {
+						isRunning = false;
+					}
+				}
 			} else if (typeof dualCerts !== 'undefined') {
 				const response = await get(`/services/${id}/status`);
 				isRunning = response.isRunning;
@@ -156,9 +176,13 @@
 				const response = await get(`/databases/${id}/status`);
 				isRunning = response.isRunning;
 			}
+
 			if (isRunning) {
 				status[id] = 'running';
 				return 'running';
+			} else if (isDegraded) {
+				status[id] = 'degraded';
+				return 'degraded';
 			} else {
 				status[id] = 'stopped';
 				return 'stopped';
@@ -213,6 +237,7 @@
 			(application.id && application.id.toLowerCase().includes($search.toLowerCase())) ||
 			(application.name && application.name.toLowerCase().includes($search.toLowerCase())) ||
 			(application.fqdn && application.fqdn.toLowerCase().includes($search.toLowerCase())) ||
+			(application.dockerComposeConfiguration && application.dockerComposeConfiguration.toLowerCase().includes($search.toLowerCase())) ||
 			(application.repository &&
 				application.repository.toLowerCase().includes($search.toLowerCase())) ||
 			(application.buildpack &&
@@ -594,6 +619,11 @@
 										<span class="indicator-item badge bg-yellow-300 badge-sm" />
 									{:else if status[application.id] === 'running'}
 										<span class="indicator-item badge bg-success badge-sm" />
+									{:else if status[application.id] === 'degraded'}
+										<span
+											class="indicator-item indicator-middle indicator-center badge bg-warning  text-black font-bold badge-xl"
+											>Degraded</span
+										>
 									{:else}
 										<span class="indicator-item badge bg-error badge-sm" />
 									{/if}
@@ -613,7 +643,7 @@
 									<div class="h-10 text-xs">
 										{#if application?.fqdn}
 											<h2>{application?.fqdn.replace('https://', '').replace('http://', '')}</h2>
-										{:else if !application.settings?.isBot && !application?.fqdn}
+										{:else if (!application.settings?.isBot && !application?.fqdn) && application.buildPack !== 'compose'}
 											<h2 class="text-red-500">Not configured</h2>
 										{/if}
 										{#if application.destinationDocker?.name}

@@ -49,7 +49,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	Dockerfile.push(`RUN deno cache ${denoMainFile}`);
 	Dockerfile.push(`ENV NO_COLOR true`);
 	Dockerfile.push(`EXPOSE ${port}`);
-	Dockerfile.push(`CMD deno run ${denoOptions ? denoOptions.split(' ') : ''} ${denoMainFile}`);
+	Dockerfile.push(`CMD deno run ${denoOptions || ''} ${denoMainFile}`);
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };
 

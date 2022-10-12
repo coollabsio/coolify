@@ -56,6 +56,7 @@ export const isDeploymentEnabled: Writable<boolean> = writable(false);
 export function checkIfDeploymentEnabledApplications(isAdmin: boolean, application: any) {
     return (
         isAdmin &&
+        (application.buildPack === 'compose') ||
         (application.fqdn || application.settings.isBot) &&
         application.gitSource &&
         application.repository &&
@@ -74,9 +75,8 @@ export function checkIfDeploymentEnabledServices(isAdmin: boolean, service: any)
 }
 export const status: Writable<any> = writable({
     application: {
-        isRunning: false,
-        isExited: false,
-        isRestarting: false,
+        statuses: [],
+        overallStatus: 'stopped',
         loading: false,
         initialLoading: true
     },

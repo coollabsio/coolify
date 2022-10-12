@@ -29,7 +29,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'stable',
 		ports: {
 			main: 8000
-		}
+		},
+		labels: ['analytics', 'plausible', 'plausible-analytics', 'gdpr', 'no-cookie']
 	},
 	{
 		name: 'nocodb',
@@ -39,7 +40,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 8080
-		}
+		},
+		labels: ['nocodb', 'airtable', 'database']
 	},
 	{
 		name: 'minio',
@@ -49,7 +51,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 9001
-		}
+		},
+		labels: ['minio', 's3', 'storage']
 	},
 	{
 		name: 'vscodeserver',
@@ -59,7 +62,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 8080
-		}
+		},
+		labels: ['vscodeserver', 'vscode', 'code-server', 'ide']
 	},
 	{
 		name: 'wordpress',
@@ -70,7 +74,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 80
-		}
+		},
+		labels: ['wordpress', 'blog', 'cms']
 	},
 	{
 		name: 'vaultwarden',
@@ -80,7 +85,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 80
-		}
+		},
+		labels: ['vaultwarden', 'password-manager', 'passwords']
 	},
 	{
 		name: 'languagetool',
@@ -90,7 +96,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 8010
-		}
+		},
+		labels: ['languagetool', 'grammar', 'spell-checker']
 	},
 	{
 		name: 'n8n',
@@ -100,7 +107,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 5678
-		}
+		},
+		labels: ['n8n', 'workflow', 'automation', 'ifttt', 'zapier', 'nodered']
 	},
 	{
 		name: 'uptimekuma',
@@ -110,7 +118,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 3001
-		}
+		},
+		labels: ['uptimekuma', 'uptime', 'monitoring']
 	},
 	{
 		name: 'ghost',
@@ -121,7 +130,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 2368
-		}
+		},
+		labels: ['ghost', 'blog', 'cms']
 	},
 	{
 		name: 'meilisearch',
@@ -132,7 +142,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 7700
-		}
+		},
+		labels: ['meilisearch', 'search', 'search-engine']
 	},
 	{
 		name: 'umami',
@@ -143,7 +154,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'postgresql-latest',
 		ports: {
 			main: 3000
-		}
+		},
+		labels: ['umami', 'analytics', 'gdpr', 'no-cookie']
 	},
 	{
 		name: 'hasura',
@@ -154,7 +166,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'v2.10.0',
 		ports: {
 			main: 8080
-		}
+		},
+		labels: ['hasura', 'graphql', 'database']
 	},
 	{
 		name: 'fider',
@@ -165,7 +178,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'stable',
 		ports: {
 			main: 3000
-		}
+		},
+		labels: ['fider', 'feedback', 'suggestions']
 	},
 	{
 		name: 'appwrite',
@@ -176,7 +190,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: '1.0',
 		ports: {
 			main: 80
-		}
+		},
+		labels: ['appwrite', 'database', 'storage', 'api', 'serverless']
 	},
 	// {
 	//     name: 'moodle',
@@ -198,7 +213,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 8000
-		}
+		},
+		labels: ['glitchtip', 'error-reporting', 'error', 'sentry', 'bugsnag']
 	},
 	{
 		name: 'searxng',
@@ -209,7 +225,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 8080
-		}
+		},
+		labels: ['searxng', 'search', 'search-engine']
 	},
 	{
 		name: 'weblate',
@@ -220,7 +237,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 8080
-		}
+		},
+		labels: ['weblate', 'translation', 'localization']
 	},
 	// {
 	// 	name: 'taiga',
@@ -242,7 +260,8 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 3000
-		}
+		},
+		labels: ['grafana', 'monitoring', 'metrics', 'dashboard']
 	},
 	{
 		name: 'trilium',
@@ -253,6 +272,7 @@ export const supportedServiceTypesAndVersions = [
 		recommendedVersion: 'latest',
 		ports: {
 			main: 8080
-		}
+		},
+		labels: ['trilium', 'notes', 'note-taking', 'wiki']
 	},
 ];
