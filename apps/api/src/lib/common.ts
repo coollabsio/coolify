@@ -264,7 +264,9 @@ export async function isDomainConfigured({
 		where: {
 			OR: [
 				{ fqdn: { endsWith: `//${nakedDomain}` } },
-				{ fqdn: { endsWith: `//www.${nakedDomain}` } }
+				{ fqdn: { endsWith: `//www.${nakedDomain}` } },
+				{ dockerComposeConfiguration: { contains: `//${nakedDomain}` } },
+				{ dockerComposeConfiguration: { contains: `//www.${nakedDomain}` } }
 			],
 			id: { not: id },
 			destinationDocker: {
@@ -598,7 +600,7 @@ export async function executeDockerCmd({ debug, buildId, applicationId, dockerId
 			command = command.replace(/docker compose/gi, 'docker-compose');
 		}
 	}
-	if (command.startsWith(`docker build`) || command.startsWith(`pack build`)|| command.startsWith(`docker compose build`)) {
+	if (command.startsWith(`docker build`) || command.startsWith(`pack build`) || command.startsWith(`docker compose build`)) {
 		return await asyncExecShellStream({ debug, buildId, applicationId, command, engine });
 	}
 	return await execaCommand(command, { env: { DOCKER_BUILDKIT: "1", DOCKER_HOST: engine }, shell: true })

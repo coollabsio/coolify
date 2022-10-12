@@ -243,13 +243,24 @@
 			nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
 			if (application.deploymentType)
 				application.deploymentType = application.deploymentType.toLowerCase();
-			!isBot &&
-				(await post(`/applications/${id}/check`, {
+			if (!isBot) {
+				await post(`/applications/${id}/check`, {
 					fqdn: application.fqdn,
 					forceSave,
 					dualCerts,
 					exposePort: application.exposePort
-				}));
+				});
+				for (const service of dockerComposeServices) {
+					if (dockerComposeConfiguration[service.name].fqdn) {
+						await post(`/applications/${id}/check`, {
+							fqdn: dockerComposeConfiguration[service.name].fqdn,
+							forceSave,
+							dualCerts,
+							exposePort: application.exposePort
+						});
+					}
+				}
+			}
 			await post(`/applications/${id}`, {
 				...application,
 				baseDatabaseBranch,
