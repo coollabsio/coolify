@@ -1074,6 +1074,7 @@
 								readonly={!$appSession.isAdmin}
 								name="port"
 								id="port"
+								required={!!dockerComposeConfiguration[service.name].fqdn}
 								bind:value={dockerComposeConfiguration[service.name].port}
 							/>
 						</div>
