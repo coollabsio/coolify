@@ -96,8 +96,7 @@
 			<button
 				id="streaming"
 				class="btn btn-sm bg-transparent border-none loading absolute top-0 left-0 text-xs"
-				>Fetching usage...</button
-			>
+			/>
 			<Tooltip triggeredBy="#streaming">Streaming logs</Tooltip>
 		{/if}
 		<div class="text-center">
