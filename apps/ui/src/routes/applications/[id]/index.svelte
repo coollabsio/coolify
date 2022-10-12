@@ -33,7 +33,7 @@
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import Select from 'svelte-select';
-	import { get, post } from '$lib/api';
+	import { get, getAPIUrl, post } from '$lib/api';
 	import cuid from 'cuid';
 	import {
 		addToast,
@@ -75,6 +75,7 @@
 	let autodeploy = application.settings.autodeploy;
 	let isBot = application.settings.isBot;
 	let isDBBranching = application.settings.isDBBranching;
+	let htmlUrl = application.gitSource.htmlUrl;
 
 	let dockerComposeFile = JSON.parse(application.dockerComposeFile) || null;
 	let dockerComposeServices: any[] = [];
@@ -321,28 +322,94 @@
 			return false;
 		}
 	}
+	async function getGitlabToken() {
+		return await new Promise<void>((resolve, reject) => {
+			const left = screen.width / 2 - 1020 / 2;
+			const top = screen.height / 2 - 618 / 2;
+			const newWindow = open(
+				`${htmlUrl}/oauth/authorize?client_id=${
+					application.gitSource.gitlabApp.appId
+				}&redirect_uri=${getAPIUrl()}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${
+					$page.params.id
+				}`,
+				'GitLab',
+				'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
+					top +
+					', left=' +
+					left +
+					', toolbar=0, menubar=0, status=0'
+			);
+			const timer = setInterval(() => {
+				if (newWindow?.closed) {
+					clearInterval(timer);
+					$appSession.tokens.gitlab = localStorage.getItem('gitLabToken');
+					localStorage.removeItem('gitLabToken');
+					resolve();
+				}
+			}, 100);
+		});
+	}
 	async function reloadCompose() {
 		try {
-			const headers = isPublicRepository
-				? {}
-				: {
-						Authorization: `token ${$appSession.tokens.github}`
-				  };
-			const data = await get(
-				`${apiUrl}/repos/${repository}/contents/${dockerComposeFileLocation}?ref=${branch}`,
-				{
-					...headers,
-					Accept: 'application/vnd.github.v2.json'
+			if (application.gitSource.type === 'github') {
+				const headers = isPublicRepository
+					? {}
+					: {
+							Authorization: `token ${$appSession.tokens.github}`
+					  };
+				const data = await get(
+					`${apiUrl}/repos/${repository}/contents/${dockerComposeFileLocation}?ref=${branch}`,
+					{
+						...headers,
+						Accept: 'application/vnd.github.v2.json'
+					}
+				);
+				if (data?.content) {
+					const content = atob(data.content);
+					let dockerComposeFileContent = JSON.stringify(yaml.load(content) || null);
+					let dockerComposeFileContentJSON = JSON.parse(dockerComposeFileContent);
+					dockerComposeServices = normalizeDockerServices(dockerComposeFileContentJSON?.services);
+					application.dockerComposeFile = dockerComposeFileContent;
+					await handleSubmit(false);
 				}
-			);
-			if (data?.content) {
-				const content = atob(data.content);
-				let dockerComposeFileContent = JSON.stringify(yaml.load(content) || null);
-				let dockerComposeFileContentJSON = JSON.parse(dockerComposeFileContent);
-				dockerComposeServices = normalizeDockerServices(dockerComposeFileContentJSON?.services);
-				application.dockerComposeFile = dockerComposeFileContent;
-				await handleSubmit(false);
 			}
+			if (application.gitSource.type === 'gitlab') {
+				if (!$appSession.tokens.gitlab) {
+					await getGitlabToken();
+				}
+				const headers = isPublicRepository
+					? {}
+					: {
+							Authorization: `Bearer ${$appSession.tokens.gitlab}`
+					  };
+				const url = isPublicRepository
+					? ``
+					: `/v4/projects/${application.projectId}/repository/tree`;
+				const files = await get(`${apiUrl}${url}`, {
+					...headers
+				});
+				const dockerComposeFileYml = files.find(
+					(file: { name: string; type: string }) =>
+						file.name === dockerComposeFileLocation && file.type === 'blob'
+				);
+				const id = dockerComposeFileYml.id;
+
+				const data = await get(
+					`${apiUrl}/v4/projects/${application.projectId}/repository/blobs/${id}`,
+					{
+						...headers
+					}
+				);
+				if (data?.content) {
+					const content = atob(data.content);
+					let dockerComposeFileContent = JSON.stringify(yaml.load(content) || null);
+					let dockerComposeFileContentJSON = JSON.parse(dockerComposeFileContent);
+					dockerComposeServices = normalizeDockerServices(dockerComposeFileContentJSON?.services);
+					application.dockerComposeFile = dockerComposeFileContent;
+					await handleSubmit(false);
+				}
+			}
+
 			addToast({
 				message: 'Compose file reloaded.',
 				type: 'success'

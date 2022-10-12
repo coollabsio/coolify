@@ -37,7 +37,7 @@
 	import { onMount } from 'svelte';
 
 	import { page } from '$app/stores';
-	import { get } from '$lib/api';
+	import { get, getAPIUrl } from '$lib/api';
 	import { appSession } from '$lib/store';
 	import { t } from '$lib/translations';
 	import { buildPacks, findBuildPack, scanningTemplates } from '$lib/templates';
@@ -46,6 +46,8 @@
 	import yaml from 'js-yaml';
 
 	const { id } = $page.params;
+
+	let htmlUrl = application.gitSource.htmlUrl;
 
 	let scanning: boolean = true;
 	let foundConfig: any = null;
@@ -65,15 +67,47 @@
 			}
 		}
 	}
+	async function getGitlabToken() {
+		return await new Promise<void>((resolve, reject) => {
+			const left = screen.width / 2 - 1020 / 2;
+			const top = screen.height / 2 - 618 / 2;
+			const newWindow = open(
+				`${htmlUrl}/oauth/authorize?client_id=${
+					application.gitSource.gitlabApp.appId
+				}&redirect_uri=${getAPIUrl()}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${
+					$page.params.id
+				}`,
+				'GitLab',
+				'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
+					top +
+					', left=' +
+					left +
+					', toolbar=0, menubar=0, status=0'
+			);
+			const timer = setInterval(() => {
+				if (newWindow?.closed) {
+					clearInterval(timer);
+					$appSession.tokens.gitlab = localStorage.getItem('gitLabToken');
+					localStorage.removeItem('gitLabToken');
+					resolve();
+				}
+			}, 100);
+		});
+	}
 	async function scanRepository(isPublicRepository: boolean): Promise<void> {
 		try {
 			if (type === 'gitlab') {
+				const headers = isPublicRepository
+					? {}
+					: {
+							Authorization: `Bearer ${$appSession.tokens.gitlab}`
+					  };
 				if (isPublicRepository) {
 					return;
 				}
 				const url = isPublicRepository ? `` : `/v4/projects/${projectId}/repository/tree`;
 				const files = await get(`${apiUrl}${url}`, {
-					Authorization: `Bearer ${$appSession.tokens.gitlab}`
+					...headers
 				});
 				const packageJson = files.find(
 					(file: { name: string; type: string }) =>
@@ -126,7 +160,19 @@
 				if (pnpmLock) packageManager = 'pnpm';
 
 				if (dockerComposeFileYml || dockerComposeFileYaml) {
-					foundConfig = findBuildPack('dockercompose', packageManager);
+					foundConfig = findBuildPack('compose', packageManager);
+					const id = dockerComposeFileYml.id || dockerComposeFileYaml.id;
+					const data = await get(`${apiUrl}/v4/projects/${projectId}/repository/blobs/${id}`, {
+						...headers
+					});
+					if (data?.content) {
+						const content = atob(data.content);
+						const dockerComposeJson = yaml.load(content) || null;
+						dockerComposeFile = JSON.stringify(dockerComposeJson);
+						dockerComposeFileLocation = dockerComposeFileYml
+							? 'docker-compose.yml'
+							: 'docker-compose.yaml';
+					}
 				} else if (dockerfile) {
 					foundConfig = findBuildPack('docker', packageManager);
 				} else if (packageJson && !laravel) {
@@ -236,7 +282,7 @@
 					foundConfig = findBuildPack('docker', packageManager);
 				} else if (packageJson && !laravel) {
 					const data: any = await get(`${packageJson.git_url}`, {
-						Authorization: `Bearer ${$appSession.tokens.github}`,
+						...headers,
 						Accept: 'application/vnd.github.v2.raw'
 					});
 					const json = JSON.parse(data) || {};
@@ -264,27 +310,36 @@
 				error.message === '401 Unauthorized'
 			) {
 				if (application.gitSource.gitlabAppId) {
-					let htmlUrl = application.gitSource.htmlUrl;
-					const left = screen.width / 2 - 1020 / 2;
-					const top = screen.height / 2 - 618 / 2;
-					const newWindow = open(
-						`${htmlUrl}/oauth/authorize?client_id=${application.gitSource.gitlabApp.appId}&redirect_uri=${window.location.origin}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${$page.params.id}`,
-						'GitLab',
-						'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
-							top +
-							', left=' +
-							left +
-							', toolbar=0, menubar=0, status=0'
-					);
-					const timer = setInterval(() => {
-						if (newWindow?.closed) {
-							clearInterval(timer);
-							window.location.reload();
-						}
-					}, 100);
+					if (!$appSession.tokens.gitlab) {
+						await getGitlabToken();
+					}
+					scanRepository(isPublicRepository);
+					// let htmlUrl = application.gitSource.htmlUrl;
+					// const left = screen.width / 2 - 1020 / 2;
+					// const top = screen.height / 2 - 618 / 2;
+					// const newWindow = open(
+					// 	`${htmlUrl}/oauth/authorize?client_id=${
+					// 		application.gitSource.gitlabApp.appId
+					// 	}&redirect_uri=${getAPIUrl()}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${
+					// 		$page.params.id
+					// 	}`,
+					// 	'GitLab',
+					// 	'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
+					// 		top +
+					// 		', left=' +
+					// 		left +
+					// 		', toolbar=0, menubar=0, status=0'
+					// );
+					// const timer = setInterval(() => {
+					// 	if (newWindow?.closed) {
+					// 		clearInterval(timer);
+					// 		$appSession.tokens.gitlab = localStorage.getItem('gitLabToken');
+					// 		// localStorage.removeItem('gitLabToken'	);
+
+					// 	}
+					// }, 100);
 				}
-			}
-			if (error.message === 'Bad credentials') {
+			} else if (error.message === 'Bad credentials') {
 				const { token } = await get(`/applications/${id}/configuration/githubToken`);
 				$appSession.tokens.github = token;
 				return await scanRepository(isPublicRepository);
