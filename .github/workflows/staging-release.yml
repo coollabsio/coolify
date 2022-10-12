@@ -59,7 +59,7 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: coollabsio/coolify:next-amd64,coollabsio/coolify:next-test
+          tags: coollabsio/coolify:next-amd64 
           cache-from: type=registry,ref=coollabsio/coolify:buildcache-next-amd64
           cache-to: type=registry,ref=coollabsio/coolify:buildcache-next-amd64,mode=max
   aarch64:
@@ -87,7 +87,7 @@ jobs:
           context: .
           platforms: linux/aarch64
           push: true
-          tags: coollabsio/coolify:next-aarch64,coollabsio/coolify:next-test
+          tags: coollabsio/coolify:next-aarch64
           cache-from: type=registry,ref=coollabsio/coolify:buildcache-next-aarch64
           cache-to: type=registry,ref=coollabsio/coolify:buildcache-next-aarch64,mode=max
   merge-manifest:
