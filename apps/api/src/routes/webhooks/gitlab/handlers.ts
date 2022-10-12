@@ -134,11 +134,12 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                                     previewApplicationId = foundPreviewApplications[0].id
                                 } else {
                                     const protocol = application.fqdn.includes('https://') ? 'https://' : 'http://'
+                                    const previewSeparator = process.env["COOLIFY_PREVIEW_SEPARATOR"] || '.'
                                     const previewApplication = await prisma.previewApplication.create({
                                         data: {
                                             pullmergeRequestId,
                                             sourceBranch,
-                                            customDomain: `${protocol}${pullmergeRequestId}.${getDomain(application.fqdn)}`,
+                                            customDomain: `${protocol}${pullmergeRequestId}${previewSeparator}${getDomain(application.fqdn)}`,
                                             application: { connect: { id: application.id } }
                                         }
                                     })
