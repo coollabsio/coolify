@@ -677,6 +677,24 @@ export async function getUsage(request) {
         return errorHandler({ status, message })
     }
 }
+
+export async function getUsageByContainer(request) {
+    try {
+        const { id, containerId } = request.params
+        const teamId = request.user?.teamId;
+        let usage = {};
+
+        const application: any = await getApplicationFromDB(id, teamId);
+        if (application.destinationDockerId) {
+            [usage] = await Promise.all([getContainerUsage(application.destinationDocker.id, containerId)]);
+        }
+        return {
+            usage
+        }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function deployApplication(request: FastifyRequest<DeployApplication>) {
     try {
         const { id } = request.params

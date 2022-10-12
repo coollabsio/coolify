@@ -125,7 +125,7 @@
 				`${application.id}${service.name ? `-${service.name}` : ''}`}
 			class="w-full rounded p-5 hover:bg-primary font-bold"
 		>
-			Container: {application.id}{service.name ? `-${service.name}` : ''}</button
+			{application.id}{service.name ? `-${service.name}` : ''}</button
 		>
 	{/each}
 </div>
