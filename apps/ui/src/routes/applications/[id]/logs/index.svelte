@@ -93,8 +93,6 @@
 		}
 	}
 	async function selectService(service: any, init: boolean = false) {
-		if (services.length === 1 && init) return;
-
 		if (loadLogsInterval) clearInterval(loadLogsInterval);
 		if (followingInterval) clearInterval(followingInterval);
 
