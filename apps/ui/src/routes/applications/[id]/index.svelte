@@ -838,8 +838,8 @@
 						>
 						<input
 							class="w-full"
-							readonly={!isDisabled}
 							disabled={isDisabled}
+							readonly={!$appSession.isAdmin}
 							name="exposePort"
 							id="exposePort"
 							bind:value={application.exposePort}
