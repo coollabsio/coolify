@@ -39,11 +39,11 @@
 
 	async function addNewSecret() {
 		try {
-			if (!name) return errorNotification({ message: 'Name is required.' });
-			if (!value) return errorNotification({ message: 'Value is required.' });
+			if (!name.trim()) return errorNotification({ message: 'Name is required.' });
+			if (!value.trim()) return errorNotification({ message: 'Value is required.' });
 			await post(`/applications/${id}/secrets`, {
-				name,
-				value,
+				name: name.trim(),
+				value: value.trim(),
 				isBuildSecret
 			});
 			cleanupState();
@@ -64,8 +64,8 @@
 		if (isNewSecret) return;
 		try {
 			await put(`/applications/${id}/secrets`, {
-				name,
-				value,
+				name: name.trim(),
+				value: value.trim(),
 				isBuildSecret: changeIsBuildSecret ? isBuildSecret : undefined
 			});
 			addToast({

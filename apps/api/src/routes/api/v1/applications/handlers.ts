@@ -970,6 +970,10 @@ export async function saveSecret(request: FastifyRequest<SaveSecret>, reply: Fas
     try {
         const { id } = request.params
         const { name, value, isBuildSecret = false } = request.body
+        const found = await prisma.secret.findMany({ where: { applicationId: id, name } })
+        if (found.length > 0) {
+            throw ({ message: 'Secret already exists.' })
+        }
         await prisma.secret.create({
             data: { name, value: encrypt(value.trim()), isBuildSecret, isPRMRSecret: false, application: { connect: { id } } }
         });
