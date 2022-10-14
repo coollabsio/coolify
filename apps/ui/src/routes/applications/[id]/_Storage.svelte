@@ -59,9 +59,8 @@
 	}
 </script>
 
-<div class="w-full font-bold grid gap-2">
+<div class="w-full grid gap-2">
 	<div class="flex flex-col pb-2">
-		
 		<div class="flex flex-col lg:flex-row lg:space-y-0 space-y-2">
 			<input
 				class="w-full lg:w-64"

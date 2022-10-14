@@ -91,7 +91,7 @@
 			required
 			placeholder="EXAMPLE_VARIABLE"
 			readonly={!isNewSecret}
-			class=" w-full"
+			class="w-full"
 			class:bg-coolblack={!isNewSecret}
 			class:border={!isNewSecret}
 			class:border-dashed={!isNewSecret}
@@ -166,7 +166,7 @@
 	</div>
 	<div class="flex flex-row lg:flex-col lg:items-center items-start">
 		{#if (index === 0 && !isNewSecret) || length === 0}
-			<label for="name" class="pb-2 uppercase lg:block hidden">Actions</label>
+			<label for="name" class="pb-2 uppercase lg:block hidden">Action</label>
 		{/if}
 
 		<div class="flex justify-center h-full items-center pt-3">

@@ -135,7 +135,7 @@
 				<div class="text-xl font-bold tracking-tighter">Container not found / exited.</div>
 			{/if}
 		{:else}
-			<div class="relative w-full">
+			<div class="relative w-full"></div>
 				<div class="flex justify-start sticky space-x-2 pb-2">
 					<button
 						on:click={followBuild}
@@ -162,8 +162,9 @@
 						{followingLogs ? 'Following Logs...' : 'Follow Logs'}
 					</button>
 					{#if loadLogsInterval}
-						<button id="streaming" class="btn btn-sm bg-transparent border-none loading" />
-						<Tooltip triggeredBy="#streaming">Streaming logs</Tooltip>
+					<button id="streaming" class="btn btn-sm bg-transparent border-none loading"
+					>Streaming logs</button
+				>
 					{/if}
 				</div>
 				<div

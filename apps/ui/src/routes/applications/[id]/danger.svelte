@@ -61,7 +61,7 @@
 			disabled={!$appSession.isAdmin}
 			class:bg-red-600={$appSession.isAdmin}
 			class:hover:bg-red-500={$appSession.isAdmin}
-			class="btn btn-sm btn-error text-sm"
+			class="btn btn-lg btn-error text-sm"
 		>
 			Force Delete Application
 		</button>

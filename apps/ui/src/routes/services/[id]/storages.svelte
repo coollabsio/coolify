@@ -5,7 +5,6 @@
 			const response = await get(`/services/${params.id}/storages`);
 			return {
 				props: {
-					service: stuff.service,
 					...response
 				}
 			};
@@ -19,14 +18,12 @@
 </script>
 
 <script lang="ts">
-	export let service: any;
 	export let persistentStorages: any;
-    
 	import { page } from '$app/stores';
 	import Storage from './_Storage.svelte';
 	import { get } from '$lib/api';
-	import SimpleExplainer from '$lib/components/SimpleExplainer.svelte';
-	import ServiceLinks from './_ServiceLinks.svelte';
+	import { t } from '$lib/translations';
+	import Explainer from '$lib/components/Explainer.svelte';
 
 	const { id } = $page.params;
 	async function refreshStorage() {
@@ -35,30 +32,22 @@
 	}
 </script>
 
-<div class="mx-auto max-w-6xl rounded-xl px-6 pt-4">
-	<div class="flex justify-center py-4 text-center">
-		<SimpleExplainer
-			customClass="w-full"
-			text={'You can specify any folder that you want to be persistent across restarts. <br>This is useful for storing data for VSCode server or WordPress.'}
-		/>
+<div class="w-full">
+	<div class="mx-auto w-full">
+		<div class="flex flex-row border-b border-coolgray-500 mb-6  space-x-2">
+			<div class="title font-bold pb-3">
+				Persistent Volumes <Explainer
+					position="dropdown-bottom"
+					explanation={$t('application.storage.persistent_storage_explainer')}
+				/>
+			</div>
+		</div>
+		<label for="name" class="pb-2 uppercase font-bold">name</label>
+		{#each persistentStorages as storage}
+			{#key storage.id}
+				<Storage on:refresh={refreshStorage} {storage} />
+			{/key}
+		{/each}
+		<Storage on:refresh={refreshStorage} isNew />
 	</div>
-	<table class="mx-auto border-separate text-left">
-		<thead>
-			<tr class="h-12">
-				<th scope="col">Path</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each persistentStorages as storage}
-				{#key storage.id}
-					<tr>
-						<Storage on:refresh={refreshStorage} {storage} />
-					</tr>
-				{/key}
-			{/each}
-			<tr>
-				<Storage on:refresh={refreshStorage} isNew />
-			</tr>
-		</tbody>
-	</table>
 </div>

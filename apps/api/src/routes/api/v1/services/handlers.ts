@@ -5,6 +5,7 @@ import { prisma, uniqueName, asyncExecShell, getServiceFromDB, getContainerUsage
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, isContainerExited } from '../../../../lib/docker';
 import cuid from 'cuid';
+import templates from '../../../../lib/templates';
 
 import type { OnlyId } from '../../../../types';
 import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetGlitchTipSettings, SetWordpressSettings } from './types';
@@ -73,25 +74,53 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
         let isRestarting = false;
         const service = await getServiceFromDB({ id, teamId });
         const { destinationDockerId, settings } = service;
-
+        let payload = {}
         if (destinationDockerId) {
-            const status = await checkContainer({ dockerId: service.destinationDocker.id, container: id });
-            if (status?.found) {
-                isRunning = status.status.isRunning;
-                isExited = status.status.isExited;
-                isRestarting = status.status.isRestarting
+            const { stdout: containers } = await executeDockerCmd({
+                dockerId: service.destinationDocker.id,
+                command:
+                    `docker ps -a --filter "label=com.docker.compose.project=${id}" --format '{{json .}}'`
+            });
+            const containersArray = containers.trim().split('\n');
+            if (containersArray.length > 0 && containersArray[0] !== '') {
+                for (const container of containersArray) {
+                    let isRunning = false;
+                    let isExited = false;
+                    let isRestarting = false;
+                    const containerObj = JSON.parse(container);
+                    const status = containerObj.State
+                    if (status === 'running') {
+                        isRunning = true;
+                    }
+                    if (status === 'exited') {
+                        isExited = true;
+                    }
+                    if (status === 'restarting') {
+                        isRestarting = true;
+                    }
+                    payload[containerObj.Names] = {
+                        status: {
+                            isRunning,
+                            isExited,
+                            isRestarting
+                        }
+
+                    }
+                }
             }
         }
-        return {
-            isRunning,
-            isExited,
-            settings
-        }
+        return payload
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
+function parseAndFindServiceTemplates(service: any) {
+    const foundTemplate = templates.find(t => t.name === service.type)
+    if (foundTemplate) {
+        return JSON.parse(JSON.stringify(foundTemplate).replaceAll('$$id', service.id).replaceAll('$$fqdn', service.fqdn))
+    }
 
+}
 export async function getService(request: FastifyRequest<OnlyId>) {
     try {
         const teamId = request.user.teamId;
@@ -102,7 +131,8 @@ export async function getService(request: FastifyRequest<OnlyId>) {
         }
         return {
             settings: await listSettings(),
-            service
+            service,
+            template: parseAndFindServiceTemplates(service)
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -111,7 +141,7 @@ export async function getService(request: FastifyRequest<OnlyId>) {
 export async function getServiceType(request: FastifyRequest) {
     try {
         return {
-            types: supportedServiceTypesAndVersions
+            services: templates
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -120,8 +150,21 @@ export async function getServiceType(request: FastifyRequest) {
 export async function saveServiceType(request: FastifyRequest<SaveServiceType>, reply: FastifyReply) {
     try {
         const { id } = request.params;
-        const { type } = request.body;
-        await configureServiceType({ id, type });
+        const { name, variables = [], serviceDefaultVersion = 'latest' } = request.body;
+        if (variables.length > 0) {
+            for (const variable of variables) {
+                const { id: variableId, defaultValue, value = null } = variable;
+                if (variableId.startsWith('$$secret_')) {
+                    const secretName = variableId.replace('$$secret_', '');
+                    let secretValue = defaultValue || value || null;
+                    if (secretValue) secretValue = encrypt(secretValue);
+                    await prisma.serviceSecret.create({
+                        data: { name: secretName, value: secretValue, service: { connect: { id } } }
+                    })
+                }
+            }
+        }
+        await prisma.service.update({ where: { id }, data: { type: name, version: serviceDefaultVersion } })
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })

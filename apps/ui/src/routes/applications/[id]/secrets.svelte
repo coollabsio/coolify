@@ -88,10 +88,6 @@
 		);
 		batchSecrets = '';
 		await refreshSecrets();
-		// addToast({
-		// 	message: 'Secrets saved.',
-		// 	type: 'success'
-		// });
 	}
 </script>
 

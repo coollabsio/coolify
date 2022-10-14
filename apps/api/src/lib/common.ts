@@ -198,7 +198,7 @@ export const encrypt = (text: string) => {
 	if (text) {
 		const iv = crypto.randomBytes(16);
 		const cipher = crypto.createCipheriv(algorithm, process.env['COOLIFY_SECRET_KEY'], iv);
-		const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
+		const encrypted = Buffer.concat([cipher.update(text.trim()), cipher.final()]);
 		return JSON.stringify({
 			iv: iv.toString('hex'),
 			content: encrypted.toString('hex')
@@ -1681,7 +1681,9 @@ export function persistentVolumes(id, persistentStorage, config) {
 		for (const [key, value] of Object.entries(config)) {
 			if (value.volumes) {
 				for (const volume of value.volumes) {
-					volumeSet.add(volume);
+					if (!volume.startsWith('/var/run/docker.sock')) {
+						volumeSet.add(volume);
+					}
 				}
 			}
 		}

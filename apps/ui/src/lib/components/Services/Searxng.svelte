@@ -4,11 +4,11 @@
 	export let service: any;
 </script>
 
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">SearXNG</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">SearXNG</div>
 </div>
 
-<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+<div class="grid grid-cols-2 items-center px-4">
 	<label for="secretKey">Secret Key</label>
 	<CopyPasswordField
 		name="secretKey"
@@ -19,11 +19,11 @@
 		disabled
 	/>
 </div>
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">Redis</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">Redis</div>
 </div>
 
-<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+<div class="grid grid-cols-2 items-center px-4">
 	<label for="redisPassword">{$t('forms.password')}</label>
 	<CopyPasswordField
 		name="redisPassword"

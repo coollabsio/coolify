@@ -233,7 +233,7 @@
 						class:text-red-500={$status.application.overallStatus === 'stopped'}
 					>
 						{$status.application.overallStatus === 'healthy'
-							? 'Running'
+							? 'Healthy'
 							: $status.application.overallStatus === 'degraded'
 							? 'Degraded'
 							: 'Stopped'}

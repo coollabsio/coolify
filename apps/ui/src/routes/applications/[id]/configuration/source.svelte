@@ -244,7 +244,7 @@
 		{/if}
 	</div>
 	<div class="flex flex-row items-center">
-		<div class="title py-4">Public Repository</div>
+		<div class="title py-4 pr-4">Public Repository</div>
 		<DocLink url="https://docs.coollabs.io/coolify/applications/#public-repository" />
 	</div>
 	<PublicRepository />

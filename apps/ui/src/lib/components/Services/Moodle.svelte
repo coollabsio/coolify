@@ -5,10 +5,10 @@
 	export let service: any;
 </script>
 
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">Moodle</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">Moodle</div>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center">
 	<label class="text-base font-bold text-stone-100" for="email">{$t('forms.default_email_address')}</label>
 	<input 
 		class="w-full"
@@ -21,7 +21,7 @@
 		value={service.moodle.defaultEmail}
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center">
 	<label class="text-base font-bold text-stone-100" for="defaultUsername">Default Username</label>
 	<CopyPasswordField
 		id="defaultUsername"
@@ -32,7 +32,7 @@
 		value={service.moodle.defaultUsername}
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center">
 	<label class="text-base font-bold text-stone-100" for="defaultPassword">{$t('forms.default_password')}</label>
 	<CopyPasswordField
 		id="defaultPassword"
@@ -44,10 +44,10 @@
 		value={service.moodle.defaultPassword}
 	/>
 </div>
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">MariaDB</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">MariaDB</div>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center">
 	<label class="text-base font-bold text-stone-100" for="mariadbUser">{$t('forms.username')}</label>
 	<CopyPasswordField
 		name="mariadbUser"
@@ -57,7 +57,7 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center">
 	<label class="text-base font-bold text-stone-100" for="mariadbPassword">{$t('forms.password')}</label>
 	<CopyPasswordField
 		id="mariadbPassword"
@@ -68,7 +68,7 @@
 		value={service.moodle.mariadbPassword}
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center">
 	<label class="text-base font-bold text-stone-100" for="mariadbDatabase">{$t('index.database')}</label>
 	<input 
 		class="w-full"
@@ -81,7 +81,7 @@
 		placeholder="{$t('forms.eg')}: moodle_db"
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center">
 	<label class="text-base font-bold text-stone-100" for="mariadbRootUser">{$t('forms.root_db_user')}</label>
 	<CopyPasswordField
 		id="mariadbRootUser"
@@ -91,7 +91,7 @@
 		value={service.moodle.mariadbRootUser}
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center">
 	<label class="text-base font-bold text-stone-100" for="mariadbRootUserPassword">{$t('forms.root_db_password')}</label>
 	<CopyPasswordField
 		id="mariadbRootUserPassword"

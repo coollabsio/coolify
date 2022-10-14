@@ -4,11 +4,11 @@
 	export let service: any;
 </script>
 
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">Umami</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">Umami</div>
 </div>
-<div class="space-y-2">
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+<div class="space-y-2 px-4">
+	<div class="grid grid-cols-2 items-center ">
 		<label for="adminUser">Admin User</label>
 		<input
 			class="w-full"
@@ -20,7 +20,7 @@
 			readonly
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center ">
 		<label for="umamiAdminPassword"
 			>Initial Admin Password <Explainer
 				explanation="It could be changed in Umami. <br>This is just the password set initially after the first start."

@@ -6,12 +6,12 @@
 	export let readOnly: any;
 </script>
 
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">Appwrite</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">Appwrite</div>
 </div>
 
-<div class="space-y-2">
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+<div class="space-y-2 px-4">
+	<div class="grid grid-cols-2 items-center">
 		<label for="opensslKeyV1">Encryption Key</label>
 		<CopyPasswordField
 			name="opensslKeyV1"
@@ -22,7 +22,7 @@
 			disabled
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="executorSecret">Executor Secret</label>
 		<CopyPasswordField
 			name="executorSecret"
@@ -34,11 +34,11 @@
 		/>
 	</div>
 </div>
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">MariaDB</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">MariaDB</div>
 </div>
-<div class="space-y-2">	
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+<div class="space-y-2 px-4">	
+	<div class="grid grid-cols-2 items-center">
 		<label for="mariadbUser">{$t('forms.username')}</label>
 		<CopyPasswordField
 			name="mariadbUser"
@@ -48,7 +48,7 @@
 			disabled
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2 ">
+	<div class="grid grid-cols-2 items-center ">
 		<label for="mariadbPassword">{$t('forms.password')}</label>
 		<CopyPasswordField
 			id="mariadbPassword"
@@ -59,7 +59,7 @@
 			value={service.appwrite.mariadbPassword}
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="mariadbRootUser">Root User</label>
 		<CopyPasswordField
 			name="mariadbRootUser"
@@ -69,7 +69,7 @@
 			disabled
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2 ">
+	<div class="grid grid-cols-2 items-center ">
 		<label for="mariadbRootUserPassword">Root Password</label>
 		<CopyPasswordField
 			id="mariadbRootUserPassword"
@@ -80,7 +80,7 @@
 			value={service.appwrite.mariadbRootUserPassword}
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="mariadbDatabase">{$t('index.database')}</label>
 		<CopyPasswordField
 			name="mariadbDatabase"

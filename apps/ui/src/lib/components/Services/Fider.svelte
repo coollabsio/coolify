@@ -17,12 +17,12 @@
 	];
 </script>
 
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">Fider</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">Fider</div>
 </div>
 
-<div class="space-y-2">
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+<div class="space-y-2 px-4">
+	<div class="grid grid-cols-2 items-center">
 		<label for="jwtSecret">JWT Secret</label>
 		<CopyPasswordField
 			name="jwtSecret"
@@ -34,7 +34,7 @@
 		/>
 	</div>
 
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="emailNoreply">Noreply Email</label>
 		<input
 			class="w-full"
@@ -49,11 +49,11 @@
 		/>
 	</div>
 </div>
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">Email</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">Email</div>
 </div>
-<div class="space-y-2">
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+<div class="space-y-2 px-4">
+	<div class="grid grid-cols-2 items-center">
 		<label for="emailMailgunApiKey">Mailgun API Key</label>
 		<CopyPasswordField
 			name="emailMailgunApiKey"
@@ -66,7 +66,7 @@
 		/>
 	</div>
 
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="emailMailgunDomain">Mailgun Domain</label>
 		<input
 			class="w-full"
@@ -78,7 +78,7 @@
 			placeholder="{$t('forms.eg')}: yourdomain.com"
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="emailMailgunRegion">Mailgun Region</label>
 		<div class="custom-select-wrapper">
 			<Select
@@ -92,10 +92,10 @@
 		</div>
 	</div>
 
-	<div class="flex space-x-1 py-5 lg:px-10 px-2 font-bold">
+	<div class="flex space-x-1 py-5 font-bold">
 		<div class="text-lg">Or</div>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="emailSmtpHost">SMTP Host</label>
 		<input
 			class="w-full"
@@ -107,7 +107,7 @@
 			placeholder="{$t('forms.eg')}: smtp.yourdomain.com"
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="emailSmtpPort">SMTP Port</label>
 		<input
 			class="w-full"
@@ -119,7 +119,7 @@
 			placeholder="{$t('forms.eg')}: 587"
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="emailSmtpUser">SMTP User</label>
 		<input
 			class="w-full"
@@ -131,7 +131,7 @@
 			placeholder="{$t('forms.eg')}: user@yourdomain.com"
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="emailSmtpPassword">SMTP Password</label>
 		<CopyPasswordField
 			name="emailSmtpPassword"
@@ -143,7 +143,7 @@
 			placeholder="{$t('forms.eg')}: s0m3p4ssw0rd"
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="emailSmtpEnableStartTls">SMTP Start TLS</label>
 		<input
 			class="w-full"
@@ -156,11 +156,11 @@
 		/>
 	</div>
 </div>
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">PostgreSQL</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">PostgreSQL</div>
 </div>
-<div class="space-y-2">
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+<div class="space-y-2 px-4">
+	<div class="grid grid-cols-2 items-center">
 		<label for="postgresqlUser">{$t('forms.username')}</label>
 		<CopyPasswordField
 			name="postgresqlUser"
@@ -170,7 +170,7 @@
 			disabled
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="postgresqlPassword">{$t('forms.password')}</label>
 		<CopyPasswordField
 			id="postgresqlPassword"
@@ -181,7 +181,7 @@
 			value={service.fider.postgresqlPassword}
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="postgresqlDatabase">{$t('index.database')}</label>
 		<CopyPasswordField
 			name="postgresqlDatabase"

@@ -6,82 +6,83 @@ import { ServiceStartStop } from '../../routes/api/v1/services/types';
 import { asyncSleep, ComposeFile, createDirectories, defaultComposeConfiguration, errorHandler, executeDockerCmd, getDomain, getFreePublicPort, getServiceFromDB, getServiceImage, getServiceMainPort, isARM, isDev, makeLabelForServices, persistentVolumes, prisma } from '../common';
 import { defaultServiceConfigurations } from '../services';
 import { OnlyId } from '../../types';
+import templates from '../templates'
 
-export async function startService(request: FastifyRequest<ServiceStartStop>) {
-    try {
-        const { type } = request.params
-        if (type === 'plausibleanalytics') {
-            return await startPlausibleAnalyticsService(request)
-        }
-        if (type === 'nocodb') {
-            return await startNocodbService(request)
-        }
-        if (type === 'minio') {
-            return await startMinioService(request)
-        }
-        if (type === 'vscodeserver') {
-            return await startVscodeService(request)
-        }
-        if (type === 'wordpress') {
-            return await startWordpressService(request)
-        }
-        if (type === 'vaultwarden') {
-            return await startVaultwardenService(request)
-        }
-        if (type === 'languagetool') {
-            return await startLanguageToolService(request)
-        }
-        if (type === 'n8n') {
-            return await startN8nService(request)
-        }
-        if (type === 'uptimekuma') {
-            return await startUptimekumaService(request)
-        }
-        if (type === 'ghost') {
-            return await startGhostService(request)
-        }
-        if (type === 'meilisearch') {
-            return await startMeilisearchService(request)
-        }
-        if (type === 'umami') {
-            return await startUmamiService(request)
-        }
-        if (type === 'hasura') {
-            return await startHasuraService(request)
-        }
-        if (type === 'fider') {
-            return await startFiderService(request)
-        }
-        if (type === 'moodle') {
-            return await startMoodleService(request)
-        }
-        if (type === 'appwrite') {
-            return await startAppWriteService(request)
-        }
-        if (type === 'glitchTip') {
-            return await startGlitchTipService(request)
-        }
-        if (type === 'searxng') {
-            return await startSearXNGService(request)
-        }
-        if (type === 'weblate') {
-            return await startWeblateService(request)
-        }
-        if (type === 'taiga') {
-            return await startTaigaService(request)
-        }
-        if (type === 'grafana') {
-            return await startGrafanaService(request)
-        }
-        if (type === 'trilium') {
-            return await startTriliumService(request)
-        }
+// export async function startService(request: FastifyRequest<ServiceStartStop>) {
+//     try {
+//         const { type } = request.params
+//         if (type === 'plausibleanalytics') {
+//             return await startPlausibleAnalyticsService(request)
+//         }
+//         if (type === 'nocodb') {
+//             return await startNocodbService(request)
+//         }
+//         if (type === 'minio') {
+//             return await startMinioService(request)
+//         }
+//         if (type === 'vscodeserver') {
+//             return await startVscodeService(request)
+//         }
+//         if (type === 'wordpress') {
+//             return await startWordpressService(request)
+//         }
+//         if (type === 'vaultwarden') {
+//             return await startVaultwardenService(request)
+//         }
+//         if (type === 'languagetool') {
+//             return await startLanguageToolService(request)
+//         }
+//         if (type === 'n8n') {
+//             return await startN8nService(request)
+//         }
+//         if (type === 'uptimekuma') {
+//             return await startUptimekumaService(request)
+//         }
+//         if (type === 'ghost') {
+//             return await startGhostService(request)
+//         }
+//         if (type === 'meilisearch') {
+//             return await startMeilisearchService(request)
+//         }
+//         if (type === 'umami') {
+//             return await startUmamiService(request)
+//         }
+//         if (type === 'hasura') {
+//             return await startHasuraService(request)
+//         }
+//         if (type === 'fider') {
+//             return await startFiderService(request)
+//         }
+//         if (type === 'moodle') {
+//             return await startMoodleService(request)
+//         }
+//         if (type === 'appwrite') {
+//             return await startAppWriteService(request)
+//         }
+//         if (type === 'glitchTip') {
+//             return await startGlitchTipService(request)
+//         }
+//         if (type === 'searxng') {
+//             return await startSearXNGService(request)
+//         }
+//         if (type === 'weblate') {
+//             return await startWeblateService(request)
+//         }
+//         if (type === 'taiga') {
+//             return await startTaigaService(request)
+//         }
+//         if (type === 'grafana') {
+//             return await startGrafanaService(request)
+//         }
+//         if (type === 'trilium') {
+//             return await startTriliumService(request)
+//         }
 
-        throw `Service type ${type} not supported.`
-    } catch (error) {
-        throw { status: 500, message: error?.message || error }
-    }
-}
+//         throw `Service type ${type} not supported.`
+//     } catch (error) {
+//         throw { status: 500, message: error?.message || error }
+//     }
+// }
 export async function stopService(request: FastifyRequest<ServiceStartStop>) {
     try {
         return await stopServiceContainers(request)
@@ -684,54 +685,54 @@ async function startLanguageToolService(request: FastifyRequest<ServiceStartStop
     }
 }
 
-async function startN8nService(request: FastifyRequest<ServiceStartStop>) {
+export async function startService(request: FastifyRequest<ServiceStartStop>) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
+
         const service = await getServiceFromDB({ id, teamId });
         const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort, persistentStorage } =
             service;
+
+        let template = templates.find((template) => template.name === type);
+
+        template = JSON.parse(JSON.stringify(template).replaceAll('$$id', id).replaceAll('$$fqdn', service.fqdn))
+
         const network = destinationDockerId && destinationDocker.network;
-        const port = getServiceMainPort('n8n');
 
-        const { workdir } = await createDirectories({ repository: type, buildId: id });
-        const image = getServiceImage(type);
-
-        const config = {
-            n8n: {
-                image: `${image}:${version}`,
-                volumes: [`${id}-n8n:/root/.n8n`],
-                environmentVariables: {
-                    WEBHOOK_URL: `${service.fqdn}`
-                }
+        const config = {};
+        for (const service in template.services) {
+            config[service] = {
+                container_name: id,
+                image: template.services[service].image.replace('$$core_version', version),
+                expose: template.services[service].ports,
+                // ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                volumes: template.services[service].volumes,
+                environment: {},
+                depends_on: template.services[service].depends_on,
+                ulimits: template.services[service].ulimits,
+                labels: makeLabelForServices(type),
+                ...defaultComposeConfiguration(network),
             }
-        };
-        if (serviceSecret.length > 0) {
-            serviceSecret.forEach((secret) => {
-                config.n8n.environmentVariables[secret.name] = secret.value;
-            });
+            if (serviceSecret.length > 0) {
+                serviceSecret.forEach((secret) => {
+                    config[service].environment[secret.name] = secret.value;
+                });
+            }
         }
+        const { workdir } = await createDirectories({ repository: type, buildId: id });
         const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
+
         const composeFile: ComposeFile = {
             version: '3.8',
-            services: {
-                [id]: {
-                    container_name: id,
-                    image: config.n8n.image,
-                    volumes: config.n8n.volumes,
-                    environment: config.n8n.environmentVariables,
-                    labels: makeLabelForServices('n8n'),
-                    ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                    ...defaultComposeConfiguration(network),
-                }
-            },
+            services: config,
             networks: {
                 [network]: {
                     external: true
                 }
             },
             volumes: volumeMounts
-        };
+        }
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         await startServiceContainers(destinationDocker.id, composeFileDestination)

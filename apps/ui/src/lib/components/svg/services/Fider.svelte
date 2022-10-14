@@ -5,7 +5,7 @@
 <svg
 	viewBox="0 0 700 240"
 	xmlns="http://www.w3.org/2000/svg"
-	class={isAbsolute ? 'w-36 absolute top-0 left-0 -m-3 -mt-5' : 'w-full h-10 mx-auto'}
+	class={isAbsolute ? 'w-36 absolute top-0 left-0 -m-3 -mt-5' : 'w-16 h-10'}
 	><path fill="#FDBC3D" d="m90.694 107.498-.981.39-20.608 8.23 6.332 6.547z" /><path
 		fill="#8EC63F"
 		d="M61.139 77.914 46.632 93 56.9 103.547c8.649-7.169 17.832-10.502 18.653-10.789L61.139 77.914z"

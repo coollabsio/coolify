@@ -3,11 +3,11 @@
 	export let service: any;
 </script>
 
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">Weblate</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">Weblate</div>
 </div>
 
-<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+<div class="grid grid-cols-2 items-center px-4">
 	<label for="adminPassword">Admin password</label>
 	<CopyPasswordField
 		name="adminPassword"
@@ -19,12 +19,12 @@
 	/>
 </div>
 
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">PostgreSQL</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">PostgreSQL</div>
 </div>
 <div class="space-y-2">
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
-		<label for="postgresqlHost">PostgreSQL Host</label>
+	<div class="grid grid-cols-2 items-center px-4">
+		<label for="postgresqlHost">Host</label>
 		<CopyPasswordField
 			name="postgresqlHost"
 			id="postgresqlHost"
@@ -33,8 +33,8 @@
 			disabled
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
-		<label for="postgresqlPort">PostgreSQL Port</label>
+	<div class="grid grid-cols-2 items-center px-4">
+		<label for="postgresqlPort">Port</label>
 		<CopyPasswordField
 			name="postgresqlPort"
 			id="postgresqlPort"
@@ -43,8 +43,8 @@
 			disabled
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
-		<label for="postgresqlUser">PostgreSQL User</label>
+	<div class="grid grid-cols-2 items-center px-4">
+		<label for="postgresqlUser">User</label>
 		<CopyPasswordField
 			name="postgresqlUser"
 			id="postgresqlUser"
@@ -53,8 +53,8 @@
 			disabled
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
-		<label for="postgresqlPassword">PostgreSQL Password</label>
+	<div class="grid grid-cols-2 items-center px-4">
+		<label for="postgresqlPassword">Password</label>
 		<CopyPasswordField
 			name="postgresqlPassword"
 			id="postgresqlPassword"

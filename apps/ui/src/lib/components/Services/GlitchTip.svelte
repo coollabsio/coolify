@@ -49,11 +49,11 @@
 	}
 </script>
 
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">GlitchTip</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">GlitchTip</div>
 </div>
 
-<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+<div class="grid grid-cols-2 items-center">
 	<Setting
 		id="enableOpenUserRegistration"
 		bind:setting={service.glitchTip.enableOpenUserRegistration}
@@ -63,19 +63,13 @@
 		title="Enable Open User Registration"
 		description={''}
 	/>
-	<!-- <Setting
-		bind:setting={service.glitchTip.enableOpenUserRegistration}
-		on:click={toggleEnableOpenUserRegistration}
-		title={'Enable Open User Registration'}
-		description={''}
-	/> -->
 </div>
 
-<div class="flex space-x-1 py-2 font-bold">
-	<div class="subtitle">Email settings</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">Email Settings</div>
 </div>
-<div class="space-y-2">
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+<div class="space-y-2 px-4">
+	<div class="grid grid-cols-2 items-center">
 		<Setting
 			id="emailSmtpUseTls"
 			bind:setting={service.glitchTip.emailSmtpUseTls}
@@ -87,7 +81,7 @@
 		/>
 	</div>
 
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<Setting
 			id="emailSmtpUseSsl"
 			bind:setting={service.glitchTip.emailSmtpUseSsl}
@@ -98,7 +92,7 @@
 			description={''}
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="defaultEmailFrom">Default Email From</label>
 		<CopyPasswordField
 			required
@@ -108,7 +102,7 @@
 		/>
 	</div>
 
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="emailSmtpHost">SMTP Host</label>
 		<CopyPasswordField
 			name="emailSmtpHost"
@@ -117,7 +111,7 @@
 		/>
 	</div>
 
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="emailSmtpPort">SMTP Port</label>
 		<CopyPasswordField
 			name="emailSmtpPort"
@@ -126,7 +120,7 @@
 		/>
 	</div>
 
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="emailSmtpUser">SMTP User</label>
 		<CopyPasswordField
 			name="emailSmtpUser"
@@ -135,7 +129,7 @@
 		/>
 	</div>
 
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="emailSmtpPassword">SMTP Password</label>
 		<CopyPasswordField
 			name="emailSmtpPassword"
@@ -145,7 +139,7 @@
 		/>
 	</div>
 
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="emailBackend">Email Backend</label>
 		<CopyPasswordField
 			name="emailBackend"
@@ -154,7 +148,7 @@
 		/>
 	</div>
 
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="mailgunApiKey">Mailgun API Key</label>
 		<CopyPasswordField
 			name="mailgunApiKey"
@@ -163,7 +157,7 @@
 		/>
 	</div>
 
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="sendgridApiKey">SendGrid API Key</label>
 		<CopyPasswordField
 			name="sendgridApiKey"
@@ -176,7 +170,7 @@
 		<div class="subtitle">Default User & Superuser</div>
 	</div>
 
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="defaultEmail">{$t('forms.email')}</label>
 		<CopyPasswordField
 			name="defaultEmail"
@@ -186,7 +180,7 @@
 			disabled
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="defaultUsername">{$t('forms.username')}</label>
 		<CopyPasswordField
 			name="defaultUsername"
@@ -196,7 +190,7 @@
 			disabled
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="defaultPassword">{$t('forms.password')}</label>
 		<CopyPasswordField
 			name="defaultPassword"
@@ -208,11 +202,11 @@
 		/>
 	</div>
 </div>
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">PostgreSQL</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">PostgreSQL</div>
 </div>
-<div class="space-y-2">
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+<div class="space-y-2 px-4">
+	<div class="grid grid-cols-2 items-center">
 		<label for="postgresqlUser">{$t('forms.username')}</label>
 		<CopyPasswordField
 			name="postgresqlUser"
@@ -222,7 +216,7 @@
 			disabled
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="postgresqlPassword">{$t('forms.password')}</label>
 		<CopyPasswordField
 			id="postgresqlPassword"
@@ -233,7 +227,7 @@
 			bind:value={service.glitchTip.postgresqlPassword}
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center">
 		<label for="postgresqlDatabase">{$t('index.database')}</label>
 		<CopyPasswordField
 			name="postgresqlDatabase"

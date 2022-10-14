@@ -38,6 +38,8 @@
 				class={disabledClass}
 				class:pr-10={true}
 				class:pr-20={value && isHttps}
+				class:border={required && !value}
+				class:border-red-500={required && !value}
 				{placeholder}
 				type="text"
 				{id}
@@ -54,6 +56,8 @@
 				type="text"
 				class:pr-10={true}
 				class:pr-20={value && isHttps}
+				class:border={required && !value}
+				class:border-red-500={required && !value}
 				{id}
 				{name}
 				{required}
@@ -70,6 +74,8 @@
 			class={disabledClass}
 			class:pr-10={true}
 			class:pr-20={value && isHttps}
+			class:border={required && !value}
+			class:border-red-500={required && !value}
 			type="password"
 			{id}
 			{name}

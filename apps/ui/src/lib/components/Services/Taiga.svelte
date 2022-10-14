@@ -4,11 +4,11 @@
 	export let service: any;
 </script>
 
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">Taiga</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">Taiga</div>
 </div>
 
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center px-4">
 	<label class="text-base font-bold text-stone-100" for="secretKey">Secret Key</label>
 	<CopyPasswordField
 		name="secretKey"
@@ -20,11 +20,11 @@
 	/>
 </div>
 
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">Django</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">Django</div>
 </div>
 
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center px-4">
 	<label class="text-base font-bold text-stone-100" for="djangoAdminUser">Admin User</label>
 	<CopyPasswordField
 		name="djangoAdminUser"
@@ -34,7 +34,7 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center px-4">
 	<label class="text-base font-bold text-stone-100" for="djangoAdminPassword">Admin Password</label>
 	<CopyPasswordField
 		name="djangoAdminPassword"
@@ -45,11 +45,11 @@
 		disabled
 	/>
 </div>
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">RabbitMQ</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">RabbitMQ</div>
 </div>
 
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center px-4">
 	<label class="text-base font-bold text-stone-100" for="rabbitMQUser">User</label>
 	<CopyPasswordField
 		name="rabbitMQUser"
@@ -59,7 +59,7 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center px-4">
 	<label class="text-base font-bold text-stone-100" for="rabbitMQPassword">Password</label>
 	<CopyPasswordField
 		name="rabbitMQPassword"
@@ -71,11 +71,11 @@
 	/>
 </div>
 
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">PostgreSQL</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">PostgreSQL</div>
 </div>
 
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center px-4">
 	<label class="text-base font-bold text-stone-100" for="postgresqlHost">PostgreSQL Host</label>
 	<CopyPasswordField
 		name="postgresqlHost"
@@ -85,7 +85,7 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center px-4">
 	<label class="text-base font-bold text-stone-100" for="postgresqlPort">PostgreSQL Port</label>
 	<CopyPasswordField
 		name="postgresqlPort"
@@ -95,7 +95,7 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center px-4">
 	<label class="text-base font-bold text-stone-100" for="postgresqlUser">PostgreSQL User</label>
 	<CopyPasswordField
 		name="postgresqlUser"
@@ -105,7 +105,7 @@
 		disabled
 	/>
 </div>
-<div class="grid grid-cols-2 items-center lg:px-10">
+<div class="grid grid-cols-2 items-center px-4">
 	<label class="text-base font-bold text-stone-100" for="postgresqlPassword">PostgreSQL Password</label>
 	<CopyPasswordField
 		name="postgresqlPassword"

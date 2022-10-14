@@ -1,13 +1,8 @@
 //@ts-nocheck
 export { default as Plausibleanalytics } from './PlausibleAnalytics.svelte';
-export { default as Nocodb } from './NocoDB.svelte';
 export { default as Minio } from './MinIO.svelte';
 export { default as Vscodeserver } from './VSCodeServer.svelte';
 export { default as Wordpress } from './Wordpress.svelte';
-export { default as Vaultwarden } from './VaultWarden.svelte';
-export { default as Languagetool } from './LanguageTool.svelte';
-export { default as N8n } from './N8n.svelte';
-export { default as Uptimekuma } from './UptimeKuma.svelte';
 export { default as Ghost } from './Ghost.svelte';
 export { default as Meilisearch } from './MeiliSearch.svelte';
 export { default as Umami } from './Umami.svelte';
@@ -15,8 +10,6 @@ export { default as Hasura } from './Hasura.svelte';
 export { default as Fider } from './Fider.svelte';
 export { default as Appwrite } from './Appwrite.svelte';
 export { default as Moodle } from './Moodle.svelte';
-export { default as Glitchtip }  from './GlitchTip.svelte';
-export { default as Searxng }  from './Searxng.svelte';
-export { default as Weblate }  from './Weblate.svelte';
-export { default as Grafana }  from './Grafana.svelte';
-export { default as Trilium } from './Trilium.svelte'
+export { default as Glitchtip } from './GlitchTip.svelte';
+export { default as Searxng } from './Searxng.svelte';
+export { default as Weblate } from './Weblate.svelte';

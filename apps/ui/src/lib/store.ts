@@ -81,8 +81,8 @@ export const status: Writable<any> = writable({
         initialLoading: true
     },
     service: {
-        isRunning: false,
-        isExited: false,
+        statuses: [],
+        overallStatus: 'stopped',
         loading: false,
         initialLoading: true
     },

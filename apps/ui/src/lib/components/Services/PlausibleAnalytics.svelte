@@ -1,17 +1,34 @@
 <script lang="ts">
+	export let service: any;
+	export let readOnly: any;
+
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { appSession, status } from '$lib/store';
 	import { t } from '$lib/translations';
-	export let service: any;
-	export let readOnly: any;
+	import ServiceStatus from '../ServiceStatus.svelte';
+	let serviceStatus = {
+		isExited: false,
+		isRunning: false,
+		isRestarting: false,
+		isStopped: false
+	};
+
+	$: if (Object.keys($status.service.statuses).length > 0) {
+		let { isExited, isRunning, isRestarting } = $status.service.statuses[service.id].status;
+		serviceStatus.isExited = isExited;
+		serviceStatus.isRunning = isRunning;
+		serviceStatus.isRestarting = isRestarting;
+		serviceStatus.isStopped = !isExited && !isRunning && !isRestarting;
+	}
 </script>
 
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">Plausible Analytics</div>
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">Plausible Analytics</div>
+	<ServiceStatus id={service.id} />
 </div>
-<div class="space-y-2">
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+<div class="space-y-2 px-4">
+	<div class="grid grid-cols-2 items-center ">
 		<label for="scriptName"
 			>Script Name <Explainer
 				explanation="Useful if you would like to rename the collector script to prevent it blocked by AdBlockers."
@@ -28,7 +45,7 @@
 			required
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center ">
 		<label for="email">{$t('forms.email')}</label>
 		<input
 			class="w-full"
@@ -41,7 +58,7 @@
 			required
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center ">
 		<label for="username">{$t('forms.username')}</label>
 		<CopyPasswordField
 			name="username"
@@ -53,7 +70,7 @@
 			required
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center ">
 		<label for="password">{$t('forms.password')}</label>
 		<CopyPasswordField
 			id="password"
@@ -65,11 +82,13 @@
 		/>
 	</div>
 </div>
-<div class="flex space-x-1 py-5 font-bold">
-	<div class="title">PostgreSQL</div>
+
+<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+	<div class="title font-bold pb-3">PostgreSQL</div>
+	<ServiceStatus id={`${service.id}-postgresql`} />
 </div>
-<div class="space-y-2">
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+<div class="space-y-2 px-4">
+	<div class="grid grid-cols-2 items-center ">
 		<label for="postgresqlUser">{$t('forms.username')}</label>
 		<CopyPasswordField
 			name="postgresqlUser"
@@ -79,7 +98,7 @@
 			disabled
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center ">
 		<label for="postgresqlPassword">{$t('forms.password')}</label>
 		<CopyPasswordField
 			id="postgresqlPassword"
@@ -90,7 +109,7 @@
 			value={service.plausibleAnalytics.postgresqlPassword}
 		/>
 	</div>
-	<div class="grid grid-cols-2 items-center lg:px-10 px-2">
+	<div class="grid grid-cols-2 items-center ">
 		<label for="postgresqlDatabase">{$t('index.database')}</label>
 		<CopyPasswordField
 			name="postgresqlDatabase"
@@ -100,4 +119,8 @@
 			disabled
 		/>
 	</div>
+</div>
+<div class="flex flex-row my-6 space-x-2">
+	<div class="title font-bold pb-3">ClickHouse</div>
+	<ServiceStatus id={`${service.id}-clickhouse`} />
 </div>

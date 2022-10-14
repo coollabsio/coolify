@@ -111,13 +111,11 @@ At [here](apps/api/src/lib/services/serviceFields.ts) add details about the inpu
 
 >  SVG is recommended, but you can use PNG as well. It should have the `isAbsolute` variable with the suitable CSS classes, primarily for sizing and positioning.
 
-- At [here](apps/ui/src/lib/components/svg/services/ServiceIcons.svelte) include the new logo with `isAbsolute` property.
-
 - At [here](apps/ui/src/routes/services/[id]/_ServiceLinks.svelte) add links to the documentation of the service.
 
 ### Custom fields on the UI
-By default the URL and name are shown on the UI. Everything else needs to be added [here](apps/ui/src/routes/services/[id]/_Services/_Services.svelte)
+By default the URL and name are shown on the UI. Everything else needs to be added [here](apps/ui/src/lib/components/Services)
 
-> If you need to show more details on the frontend, such as users/passwords, you need to add Svelte component [here](apps/ui/src/routes/services/[id]/_Services) with an underscore. For example, see other [here](apps/ui/src/routes/services/[id]/_Services/_Umami.svelte).
+> If you need to show more details on the frontend, such as users/passwords, you need to add Svelte component [here](apps/ui/src/lib/components/Services). For example, see other [here](apps/ui/src/lib/components/Services/Umami.svelte).
 
 Good job! 👏
