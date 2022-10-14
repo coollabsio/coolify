@@ -111,19 +111,21 @@ export default [
             {
                 "id": "$$secret_name",
                 "label": "Admin Name",
-                "defaultValue": "admin",
+                "defaultValue": "$$generate_username",
                 "description": "This is the admin username. Please change it.",
                 "validRegex": /^([^\s^\/])+$/
             },
             {
                 "id": "$$secret_password",
                 "label": "Admin Password",
+                "defaultValue":"$$generate_password",
                 "description": "This is the admin password. Please change it.",
                 "validRegex": /^([^\s^\/])+$/
             },
             {
                 "id": "$$secret_secret_key_base",
                 "label": "Secret Key Base",
+                "defaultValue":"$$generate_passphrase",
                 "description": "",
                 "validRegex": /^([^\s^\/])+$/
             },
@@ -131,13 +133,6 @@ export default [
                 "id": "$$secret_disable_auth",
                 "label": "Disable Auth",
                 "defaultValue": "false",
-                "description": "",
-                "validRegex": /^([^\s^\/])+$/
-            },
-            {
-                "id": "$$secret_disable_registration",
-                "label": "Disable Registration",
-                "defaultValue": "true",
                 "description": "",
                 "validRegex": /^([^\s^\/])+$/
             },
@@ -158,7 +153,7 @@ export default [
             {
                 "id": "$$secret_postgresql_password",
                 "label": "PostgreSQL Password",
-                "defaultValue": "postgresql",
+                "defaultValue": "$$generate_password",
                 "description": "",
                 "validRegex": /^([^\s^\/])+$/
             }

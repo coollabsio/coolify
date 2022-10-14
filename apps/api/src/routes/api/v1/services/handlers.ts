@@ -157,9 +157,17 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                 if (variableId.startsWith('$$secret_')) {
                     const secretName = variableId.replace('$$secret_', '');
                     let secretValue = defaultValue || value || null;
-                    if (secretValue) secretValue = encrypt(secretValue);
+                    if (defaultValue === '$$generate_password') {
+                        secretValue = generatePassword({});
+                    }
+                    if (defaultValue === '$$generate_username') {
+                        secretValue = cuid();
+                    }
+                    if (defaultValue === '$$generate_passphrase') {
+                        secretValue = cuid();
+                    }
                     await prisma.serviceSecret.create({
-                        data: { name: secretName, value: secretValue, service: { connect: { id } } }
+                        data: { name: secretName, value: encrypt(secretValue), service: { connect: { id } } }
                     })
                 }
             }
