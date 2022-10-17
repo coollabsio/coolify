@@ -159,6 +159,9 @@ export default [
                 "label": "Secret Key Base",
                 "defaultValue": "$$generate_passphrase",
                 "description": "",
+                "details": {
+                    "length":64
+                }
             },
             {
                 "id": "$$config_disable_auth",

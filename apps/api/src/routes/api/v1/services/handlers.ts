@@ -221,9 +221,11 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                     let { id: variableId } = variable;
                     if (variableId.startsWith('$$secret_')) {
                         if (variable.defaultValue === '$$generate_password') {
-                            variable.value = generatePassword({});
+                            const length = variable?.details['length'] || null
+                            variable.value = generatePassword({length});
                         } else if (variable.defaultValue === '$$generate_passphrase') {
-                            variable.value = cuid();
+                            const length = variable?.details['length'] || null
+                            variable.value = generatePassword({length});
                         }
                     }
                     if (variableId.startsWith('$$config_')) {
