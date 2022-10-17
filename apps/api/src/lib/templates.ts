@@ -4,10 +4,10 @@ export default [
         "serviceDefaultVersion": "0.198.1",
         "name": "n8n",
         "displayName": "n8n.io",
-        "isOfficial": true,
         "description": "n8n is a free and open node based Workflow Automation Tool.",
         "services": {
             "$$id": {
+                "name": "N8n",
                 "documentation": "Taken from https://hub.docker.com/r/n8nio/n8n",
                 "depends_on": [],
                 "image": "n8nio/n8n:$$core_version",
@@ -17,24 +17,31 @@ export default [
                     "/var/run/docker.sock:/var/run/docker.sock"
                 ],
                 "environment": [
-                    "WEBHOOK_URL=$$fqdn"
+                    "WEBHOOK_URL=$$config_webhook_url"
                 ],
                 "ports": [
                     "5678"
                 ]
             }
         },
-        "variables": []
+        "variables": [
+            {
+                "id": "$$config_webhook_url",
+                "name": "WEBHOOK_URL",
+                "label": "Webhook URL",
+                "defaultValue": "$$generate_fqdn",
+                "description": "",
+            }]
     },
     {
         "templateVersion": "1.0.0",
         "serviceDefaultVersion": "stable",
         "name": "plausibleanalytics",
         "displayName": "PlausibleAnalytics",
-        "isOfficial": true,
         "description": "Plausible is a lightweight and open-source website analytics tool.",
         "services": {
             "$$id": {
+                "name": "Plausible Analytics",
                 "documentation": "Taken from https://plausible.io/",
                 "command": ['sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh db init-admin && /entrypoint.sh run"'],
                 "depends_on": [
@@ -43,31 +50,33 @@ export default [
                 ],
                 "image": "plausible/analytics:$$core_version",
                 "environment": [
-                    "ADMIN_USER_EMAIL=$$secret_email",
-                    "ADMIN_USER_NAME=$$secret_name",
-                    "ADMIN_USER_PASSWORD=$$secret_password",
-                    "BASE_URL=$$fqdn",
-                    "SECRET_KEY_BASE=$$secret_key_base",
-                    "DISABLE_AUTH=$$secret_disable_auth",
-                    "DISABLE_REGISTRATION=$$secret_disable_registration",
-                    "DATABASE_URL=postgresql://$$secret_postgresql_username:$$secret_postgresql_password@$$id-postgresql:5432/$$secret_postgresql_database",
-                    "CLICKHOUSE_DATABASE_URL=http://$$id-clickhouse:8123/plausible",
+                    "ADMIN_USER_EMAIL=$$config_admin_user_email",
+                    "ADMIN_USER_NAME=$$config_admin_user_name",
+                    "ADMIN_USER_PASSWORD=$$secret_admin_user_password",
+                    "BASE_URL=$$config_base_url",
+                    "SECRET_KEY_BASE=$$secret_secret_key_base",
+                    "DISABLE_AUTH=$$config_disable_auth",
+                    "DISABLE_REGISTRATION=$$config_disable_registration",
+                    "DATABASE_URL=$$secret_database_url",
+                    "CLICKHOUSE_DATABASE_URL=$$secret_clickhouse_database_url",
                 ],
                 "ports": [
                     "8000"
                 ],
             },
             "$$id-postgresql": {
+                "name": "PostgreSQL",
                 "documentation": "Taken from https://plausible.io/",
                 "image": "bitnami/postgresql:13.2.0",
                 "environment": [
                     "POSTGRESQL_PASSWORD=$$secret_postgresql_password",
-                    "POSTGRESQL_USERNAME=$$secret_postgresql_username",
-                    "POSTGRESQL_DATABASE=$$secret_postgresql_database",
+                    "POSTGRESQL_USERNAME=$$config_postgresql_username",
+                    "POSTGRESQL_DATABASE=$$config_postgresql_database",
                 ],
 
             },
             "$$id-clickhouse": {
+                "name": "Clickhouse",
                 "documentation": "Taken from https://plausible.io/",
                 "build": "$$workdir",
                 "image": "yandex/clickhouse-server:21.3.2.5",
@@ -102,69 +111,98 @@ export default [
         },
         "variables": [
             {
-                "id": "$$secret_email",
-                "label": "Admin Email",
+                "id": "$$config_base_url",
+                "name": "BASE_URL",
+                "label": "Base URL",
+                "defaultValue": "$$generate_fqdn",
+                "description": "You must set this to the FQDN of the Plausible Analytics instance. This is used to generate the links to the Plausible Analytics instance.",
+            },
+            {
+                "id": "$$secret_database_url",
+                "name": "DATABASE_URL",
+                "label": "Database URL for PostgreSQL",
+                "defaultValue": "postgresql://$$config_postgresql_username:$$secret_postgresql_password@$$id-postgresql:5432/$$config_postgresql_database",
+                "description": "",
+            },
+            {
+                "id": "$$secret_clickhouse_database_url",
+                "name": "CLICKHOUSE_DATABASE_URL",
+                "label": "Database URL for Clickhouse",
+                "defaultValue": "http://$$id-clickhouse:8123/plausible",
+                "description": "",
+            },
+            {
+                "id": "$$config_admin_user_email",
+                "name": "ADMIN_USER_EMAIL",
+                "label": "Admin Email Address",
                 "defaultValue": "admin@example.com",
                 "description": "This is the admin email. Please change it.",
-                "validRegex": /^([^\s^\/])+$/
             },
             {
-                "id": "$$secret_name",
-                "label": "Admin Name",
+                "id": "$$config_admin_user_name",
+                "name": "ADMIN_USER_NAME",
+                "label": "Admin User Name",
                 "defaultValue": "$$generate_username",
                 "description": "This is the admin username. Please change it.",
-                "validRegex": /^([^\s^\/])+$/
             },
             {
-                "id": "$$secret_password",
-                "label": "Admin Password",
-                "defaultValue":"$$generate_password",
+                "id": "$$secret_admin_user_password",
+                "name": "ADMIN_USER_PASSWORD",
+                "showAsConfiguration": true,
+                "label": "Admin User Password",
+                "defaultValue": "$$generate_password",
                 "description": "This is the admin password. Please change it.",
-                "validRegex": /^([^\s^\/])+$/
             },
             {
                 "id": "$$secret_secret_key_base",
+                "name": "SECRET_KEY_BASE",
                 "label": "Secret Key Base",
-                "defaultValue":"$$generate_passphrase",
+                "defaultValue": "$$generate_passphrase",
                 "description": "",
-                "validRegex": /^([^\s^\/])+$/
             },
             {
-                "id": "$$secret_disable_auth",
-                "label": "Disable Auth",
+                "id": "$$config_disable_auth",
+                "name": "DISABLE_AUTH",
+                "label": "Disable Authentication",
                 "defaultValue": "false",
                 "description": "",
-                "validRegex": /^([^\s^\/])+$/
             },
             {
-                "id": "$$secret_disable_registration",
+                "id": "$$config_disable_registration",
+                "name": "DISABLE_REGISTRATION",
                 "label": "Disable Registration",
                 "defaultValue": "true",
                 "description": "",
-                "validRegex": /^([^\s^\/])+$/
             },
             {
-                "id": "$$secret_postgresql_username",
+                "id": "$$config_postgresql_username",
+                "name": "POSTGRESQL_USERNAME",
                 "label": "PostgreSQL Username",
                 "defaultValue": "postgresql",
                 "description": "",
-                "validRegex": /^([^\s^\/])+$/
             },
             {
                 "id": "$$secret_postgresql_password",
+                "name": "POSTGRESQL_PASSWORD",
                 "label": "PostgreSQL Password",
                 "defaultValue": "$$generate_password",
                 "description": "",
-                "validRegex": /^([^\s^\/])+$/
             }
             ,
             {
-                "id": "$$secret_postgresql_database",
+                "id": "$$config_postgresql_database",
+                "name": "POSTGRESQL_DATABASE",
                 "label": "PostgreSQL Database",
                 "defaultValue": "plausible",
                 "description": "",
-                "validRegex": /^([^\s^\/])+$/
-            }
+            },
+            {
+                "id": "$$config_scriptName",
+                "name": "SCRIPT_NAME",
+                "label": "Custom Script Name",
+                "defaultValue": "plausible.js",
+                "description": "This is the default script name.",
+            },
         ]
     }
 ]

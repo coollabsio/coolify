@@ -1454,7 +1454,6 @@ export async function getServiceFromDB({
 	}
 	let { type } = body;
 	type = fixType(type);
-
 	if (body?.serviceSecret.length > 0) {
 		body.serviceSecret = body.serviceSecret.map((s) => {
 			s.value = decrypt(s.value);
@@ -1462,7 +1461,7 @@ export async function getServiceFromDB({
 		});
 	}
 
-	body[type] = { ...body[type], ...getUpdateableFields(type, body[type]) };
+	// body[type] = { ...body[type], ...getUpdateableFields(type, body[type]) };
 	return { ...body, settings };
 }
 

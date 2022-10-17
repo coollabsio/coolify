@@ -26,7 +26,7 @@
 
 <script lang="ts">
 	export let services: any;
-	
+
 	let search = '';
 	let filteredServices = services;
 
@@ -40,7 +40,7 @@
 
 	async function handleSubmit(service: any) {
 		try {
-			await post(`/services/${id}/configuration/type`, { ...service });
+			await post(`/services/${id}/configuration/type`, { type: service.name });
 			return await goto(from || `/services/${id}`);
 		} catch (error) {
 			return errorNotification(error);

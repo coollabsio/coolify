@@ -23,7 +23,7 @@
 	}
 </script>
 
-<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+<!-- <div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
 	<div class="title font-bold pb-3">Plausible Analytics</div>
 	<ServiceStatus id={service.id} />
 </div>
@@ -123,4 +123,4 @@
 <div class="flex flex-row my-6 space-x-2">
 	<div class="title font-bold pb-3">ClickHouse</div>
 	<ServiceStatus id={`${service.id}-clickhouse`} />
-</div>
+</div> -->

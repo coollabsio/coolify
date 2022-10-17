@@ -7,6 +7,7 @@ import { asyncSleep, ComposeFile, createDirectories, defaultComposeConfiguration
 import { defaultServiceConfigurations } from '../services';
 import { OnlyId } from '../../types';
 import templates from '../templates'
+import { parseAndFindServiceTemplates } from '../../routes/api/v1/services/handlers';
 
 // export async function startService(request: FastifyRequest<ServiceStartStop>) {
 //     try {
@@ -691,36 +692,36 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         const teamId = request.user.teamId;
 
         const service = await getServiceFromDB({ id, teamId });
-        const { type, version, destinationDockerId, destinationDocker, serviceSecret, exposePort, persistentStorage } =
+        const { type, version, destinationDockerId, destinationDocker, serviceSecret,serviceSetting, exposePort, persistentStorage } =
             service;
 
-        let template = templates.find((template) => template.name === type);
-
-        template = JSON.parse(JSON.stringify(template).replaceAll('$$id', id).replaceAll('$$fqdn', service.fqdn))
-
+        const { workdir } = await createDirectories({ repository: type, buildId: id });
+        const template: any = await parseAndFindServiceTemplates(service, workdir, true)
         const network = destinationDockerId && destinationDocker.network;
 
         const config = {};
         for (const service in template.services) {
+            console.log(template.services[service])
             config[service] = {
-                container_name: id,
-                image: template.services[service].image.replace('$$core_version', version),
+                container_name: service,
+                image: template.services[service].image,
                 expose: template.services[service].ports,
                 // ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                 volumes: template.services[service].volumes,
-                environment: {},
+                environment: template.services[service].environment,
                 depends_on: template.services[service].depends_on,
                 ulimits: template.services[service].ulimits,
                 labels: makeLabelForServices(type),
                 ...defaultComposeConfiguration(network),
             }
-            if (serviceSecret.length > 0) {
-                serviceSecret.forEach((secret) => {
-                    config[service].environment[secret.name] = secret.value;
-                });
+          
+            // Generate files for builds
+            if (template.services[service].build) {
+                if (template.services[service]?.extras?.files?.length > 0) {
+                    console.log(template.services[service]?.extras?.files)
+                }
             }
         }
-        const { workdir } = await createDirectories({ repository: type, buildId: id });
         const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
 
         const composeFile: ComposeFile = {

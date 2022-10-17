@@ -6,6 +6,7 @@ export const includeServices: any = {
 	destinationDocker: true,
 	persistentStorage: true,
 	serviceSecret: true,
+	serviceSetting: true,
 	minio: true,
 	plausibleAnalytics: true,
 	vscodeserver: true,
@@ -362,6 +363,7 @@ export async function configureServiceType({
 
 export async function removeService({ id }: { id: string }): Promise<void> {
 	await prisma.serviceSecret.deleteMany({ where: { serviceId: id } });
+	await prisma.serviceSetting.deleteMany({ where: { serviceId: id } });
 	await prisma.servicePersistentStorage.deleteMany({ where: { serviceId: id } });
 	await prisma.meiliSearch.deleteMany({ where: { serviceId: id } });
 	await prisma.fider.deleteMany({ where: { serviceId: id } });

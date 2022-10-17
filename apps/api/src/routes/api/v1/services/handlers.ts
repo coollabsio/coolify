@@ -114,13 +114,70 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
         return errorHandler({ status, message })
     }
 }
-function parseAndFindServiceTemplates(service: any) {
+export async function parseAndFindServiceTemplates(service: any, workdir?: string, isDeploy: boolean = false) {
     const foundTemplate = templates.find(t => t.name === service.type)
+    let parsedTemplate = {}
     if (foundTemplate) {
-        return JSON.parse(JSON.stringify(foundTemplate).replaceAll('$$id', service.id).replaceAll('$$fqdn', service.fqdn))
+        if (!isDeploy) {
+            for (const [key, value] of Object.entries(foundTemplate.services)) {
+                const realKey = key.replace('$$id', service.id)
+                parsedTemplate[realKey] = {
+                    name: value.name,
+                    image: value.image,
+                    environment: []
+                }
+                if (value.environment?.length > 0) {
+                    for (const env of value.environment) {
+                        const [envKey, envValue] = env.split('=')
+                        const label = foundTemplate.variables.find(v => v.name === envKey)?.label
+                        const description = foundTemplate.variables.find(v => v.name === envKey)?.description
+                        const defaultValue = foundTemplate.variables.find(v => v.name === envKey)?.defaultValue
+                        const showAsConfiguration = foundTemplate.variables.find(v => v.name === envKey)?.showAsConfiguration
+                        if (envValue.startsWith('$$config') || showAsConfiguration) {
+                            parsedTemplate[realKey].environment.push(
+                                { name: envKey, value: envValue, label, description, defaultValue }
+                            )
+                        }
+
+                    }
+                }
+            }
+        } else {
+            parsedTemplate = foundTemplate
+        }
+        // replace $$id and $$workdir
+        parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll('$$id', service.id).replaceAll('$$core_version', foundTemplate.serviceDefaultVersion))
+
+        // replace $$fqdn
+        if (workdir) {
+            parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll('$$workdir', workdir))
+        }
+
+        // replace $$config
+        if (service.serviceSetting.length > 0) {
+            for (const setting of service.serviceSetting) {
+                const { name, value } = setting
+                if (service.fqdn && value === '$$generate_fqdn') {
+                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(`$$config_${name.toLowerCase()}`, service.fqdn))
+                } else {
+                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(`$$config_${name.toLowerCase()}`, value))
+
+                }
+            }
+        }
+
+        // replace $$secret
+        if (service.serviceSecret.length > 0) {
+            for (const secret of service.serviceSecret) {
+                const { name, value } = secret
+                parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(`$$secret_${name.toLowerCase()}`, value))
+            }
+        }
     }
+    return parsedTemplate
 
 }
+
 export async function getService(request: FastifyRequest<OnlyId>) {
     try {
         const teamId = request.user.teamId;
@@ -129,10 +186,11 @@ export async function getService(request: FastifyRequest<OnlyId>) {
         if (!service) {
             throw { status: 404, message: 'Service not found.' }
         }
+        const template = await parseAndFindServiceTemplates(service)
         return {
             settings: await listSettings(),
             service,
-            template: parseAndFindServiceTemplates(service)
+            template,
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -150,30 +208,69 @@ export async function getServiceType(request: FastifyRequest) {
 export async function saveServiceType(request: FastifyRequest<SaveServiceType>, reply: FastifyReply) {
     try {
         const { id } = request.params;
-        const { name, variables = [], serviceDefaultVersion = 'latest' } = request.body;
-        if (variables.length > 0) {
-            for (const variable of variables) {
-                const { id: variableId, defaultValue, value = null } = variable;
-                if (variableId.startsWith('$$secret_')) {
-                    const secretName = variableId.replace('$$secret_', '');
-                    let secretValue = defaultValue || value || null;
-                    if (defaultValue === '$$generate_password') {
-                        secretValue = generatePassword({});
+        const { type } = request.body;
+        let foundTemplate = templates.find(t => t.name === type)
+        if (foundTemplate) {
+            let generatedVariables = new Set()
+            let missingVariables = new Set()
+
+            foundTemplate = JSON.parse(JSON.stringify(foundTemplate).replaceAll('$$id', id))
+
+            if (foundTemplate.variables.length > 0) {
+                foundTemplate.variables = foundTemplate.variables.map(variable => {
+                    let { id: variableId } = variable;
+                    if (variableId.startsWith('$$secret_')) {
+                        if (variable.defaultValue === '$$generate_password') {
+                            variable.value = generatePassword({});
+                        } else if (variable.defaultValue === '$$generate_passphrase') {
+                            variable.value = cuid();
+                        }
                     }
-                    if (defaultValue === '$$generate_username') {
-                        secretValue = cuid();
+                    if (variableId.startsWith('$$config_')) {
+                        if (variable.defaultValue === '$$generate_username') {
+                            variable.value = cuid();
+                        } else {
+                            variable.value = variable.defaultValue
+                        }
                     }
-                    if (defaultValue === '$$generate_passphrase') {
-                        secretValue = cuid();
+                    if (variable.value) {
+                        generatedVariables.add(`${variableId}=${variable.value}`)
+                    } else {
+                        missingVariables.add(variableId)
                     }
-                    await prisma.serviceSecret.create({
-                        data: { name: secretName, value: encrypt(secretValue), service: { connect: { id } } }
+                    return variable
+                })
+                if (missingVariables.size > 0) {
+                    foundTemplate.variables = foundTemplate.variables.map(variable => {
+                        if (missingVariables.has(variable.id)) {
+                            variable.value = variable.defaultValue
+                            for (const generatedVariable of generatedVariables) {
+                                let [id, value] = generatedVariable.split('=')
+                                variable.value = variable.value.replaceAll(id, value)
+                            }
+                        }
+                        return variable
                     })
                 }
+                for (const variable of foundTemplate.variables) {
+                    if (variable.id.startsWith('$$secret_')) {
+                        await prisma.serviceSecret.create({
+                            data: { name: variable.name, value: encrypt(variable.value), service: { connect: { id } } }
+                        })
+                    }
+                    if (variable.id.startsWith('$$config_')) {
+                        await prisma.serviceSetting.create({
+                            data: { name: variable.name, value: variable.value, service: { connect: { id } } }
+                        })
+                    }
+                }
             }
+            await prisma.service.update({ where: { id }, data: { type, version: foundTemplate.serviceDefaultVersion } })
+            return reply.code(201).send()
+        } else {
+            throw { status: 404, message: 'Service type not found.' }
         }
-        await prisma.service.update({ where: { id }, data: { type: name, version: serviceDefaultVersion } })
-        return reply.code(201).send()
+
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
@@ -344,23 +441,30 @@ export async function checkService(request: FastifyRequest<CheckService>) {
 export async function saveService(request: FastifyRequest<SaveService>, reply: FastifyReply) {
     try {
         const { id } = request.params;
-        let { name, fqdn, exposePort, type } = request.body;
-
+        let { name, fqdn, exposePort, type, serviceSetting } = request.body;
         if (fqdn) fqdn = fqdn.toLowerCase();
         if (exposePort) exposePort = Number(exposePort);
 
         type = fixType(type)
-        const update = saveUpdateableFields(type, request.body[type])
+        // const update = saveUpdateableFields(type, request.body[type])
         const data = {
             fqdn,
             name,
             exposePort,
         }
-        if (Object.keys(update).length > 0) {
-            data[type] = { update: update }
+        // if (Object.keys(update).length > 0) {
+        //     data[type] = { update: update }
+        // }
+        for (const setting of serviceSetting) {
+            const { id: settingId, value, changed = false } = setting
+            if (setting.changed) {
+                await prisma.serviceSetting.update({ where: { id: settingId }, data: { value } })
+
+            }
         }
         await prisma.service.update({
             where: { id }, data
+
         });
         return reply.code(201).send()
     } catch ({ status, message }) {

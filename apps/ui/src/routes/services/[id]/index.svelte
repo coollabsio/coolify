@@ -10,11 +10,9 @@
 <script lang="ts">
 	export let service: any;
 	export let readOnly: any;
-	export let settings: any;
-
+	export let template: any;
 	import cuid from 'cuid';
 	import { onMount } from 'svelte';
-
 	import { browser } from '$app/env';
 	import { page } from '$app/stores';
 
@@ -31,16 +29,18 @@
 	} from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Setting from '$lib/components/Setting.svelte';
-	import * as Services from '$lib/components/Services';
+	// import * as Services from '$lib/components/Services';
 
 	import DocLink from '$lib/components/DocLink.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
+	import ServiceStatus from '$lib/components/ServiceStatus.svelte';
 
 	const { id } = $page.params;
-	let serviceName: any = service.type && service.type[0].toUpperCase() + service.type.substring(1);
+	// let serviceName: any = service.type && service.type[0].toUpperCase() + service.type.substring(1);
 	$: isDisabled =
 		!$appSession.isAdmin || $status.service.isRunning || $status.service.initialLoading;
 
+	let newConfiguration = null;
 	let forceSave = false;
 	let loading = {
 		save: false,
@@ -69,17 +69,27 @@
 		}
 	}
 
-	async function handleSubmit() {
+	async function handleSubmit(e: any) {
+		const formData = new FormData(e.target);
+		for (let field of formData) {
+			const [key, value] = field;
+			for (const setting of service.serviceSetting) {
+				if (setting.name === key && setting.value !== value) {
+					setting.changed = true;
+					setting.value = value;
+				}
+			}
+		}
 		if (loading.save) return;
 		loading.save = true;
 		try {
-			await post(`/services/${id}/check`, {
-				fqdn: service.fqdn,
-				forceSave,
-				dualCerts,
-				otherFqdns: service.minio?.apiFqdn ? [service.minio?.apiFqdn] : [],
-				exposePort: service.exposePort
-			});
+			// await post(`/services/${id}/check`, {
+			// 	fqdn: service.fqdn,
+			// 	forceSave,
+			// 	dualCerts,
+			// 	otherFqdns: service.minio?.apiFqdn ? [service.minio?.apiFqdn] : [],
+			// 	exposePort: service.exposePort
+			// });
 			await post(`/services/${id}`, { ...service });
 			setLocation(service);
 			forceSave = false;
@@ -174,10 +184,10 @@
 			if (service.type === 'wordpress') {
 				service.wordpress.mysqlDatabase = 'db';
 			}
-			if (service.type === 'plausibleanalytics') {
-				service.plausibleAnalytics.email = 'noreply@demo.com';
-				service.plausibleAnalytics.username = 'admin';
-			}
+			// if (service.type === 'plausibleanalytics') {
+			// 	service.plausibleAnalytics.email = 'noreply@demo.com';
+			// 	service.plausibleAnalytics.username = 'admin';
+			// }
 			if (service.type === 'minio') {
 				service.minio.apiFqdn = `http://${cuid()}.demo.coolify.io`;
 			}
@@ -187,13 +197,13 @@
 			if (service.type === 'fider') {
 				service.fider.emailNoreply = 'noreply@demo.com';
 			}
-			await handleSubmit();
+			// await handleSubmit();
 		}
 	});
 </script>
 
 <div class="w-full">
-	<form on:submit|preventDefault={() => handleSubmit()}>
+	<form on:submit|preventDefault={handleSubmit}>
 		<div class="mx-auto w-full">
 			<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
 				<div class="title font-bold pb-3 ">General</div>
@@ -213,7 +223,7 @@
 							: $t('forms.save')}</button
 					>
 				{/if}
-				{#if service.type === 'plausibleanalytics' && $status.service.isRunning}
+				<!-- {#if service.type === 'plausibleanalytics' && $status.service.isRunning}
 					<div class="btn-group">
 						<button
 							class="btn btn-sm"
@@ -231,7 +241,7 @@
 							class:loading={loading.cleanup}>Cleanup Unnecessary Database Logs</button
 						>
 					</div>
-				{/if}
+				{/if} -->
 				{#if service.type === 'appwrite' && $status.service.isRunning}
 					<button
 						class="btn btn-sm"
@@ -412,6 +422,41 @@
 				/>
 			</div>
 		</div>
-		<svelte:component this={Services[serviceName]} bind:service {readOnly} {settings} />
+		<div />
+		<div>
+			{#each Object.keys(template) as oneService}
+				<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+					<div class="title font-bold pb-3">{template[oneService].name}</div>
+					<ServiceStatus id={template[oneService]} />
+				</div>
+
+				<div class="grid grid-flow-row gap-2 px-4">
+					{#if template[oneService].environment.length > 0}
+						{#each template[oneService].environment as variable}
+							<div class="grid grid-cols-2 items-center">
+								<label for={variable.name}>{variable.label}</label>
+								{#if variable.defaultValue === '$$generate_fqdn'}
+									<input
+										class="w-full"
+										disabled
+										readonly
+										name={variable.name}
+										id={variable.name}
+										value={service.fqdn}
+									/>
+								{:else}
+									<input
+										class="w-full"
+										name={variable.name}
+										id={variable.name}
+										value={variable.value}
+									/>
+								{/if}
+							</div>
+						{/each}
+					{/if}
+				</div>
+			{/each}
+		</div>
 	</form>
 </div>

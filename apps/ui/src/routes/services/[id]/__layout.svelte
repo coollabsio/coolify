@@ -41,6 +41,7 @@
 				},
 				stuff: {
 					service,
+					template,
 					readOnly,
 					settings
 				}
@@ -111,7 +112,7 @@
 		$status.service.initialLoading = true;
 		$status.service.loading = true;
 		try {
-			await post(`/services/${service.id}/${service.type}/start`, {});
+			await post(`/services/${service.id}/start`, {});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
