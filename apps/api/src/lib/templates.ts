@@ -1,6 +1,81 @@
 export default [
     {
         "templateVersion": "1.0.0",
+        "serviceDefaultVersion": "RELEASE.2022-10-15T19-57-03Z",
+        "name": "minio",
+        "displayName": "MinIO",
+        "description": " MinIO is a cloud storage server compatible with Amazon S3",
+        "services": {
+            "$$id": {
+                "name": "MinIO",
+                "command": "server /data --console-address :9001",
+                "documentation": "Taken from https://docs.min.io/docs/minio-docker-quickstart-guide.html",
+                "depends_on": [],
+                "image": "minio/minio:$$core_version",
+                "volumes": [
+                    "$$id-data-write:/files",
+                ],
+                "environment": [
+                    "MINIO_SERVER_URL=$$config_minio_server_url",
+                    "MINIO_BROWSER_REDIRECT_URL=$$config_minio_browser_redirect_url",
+                    "MINIO_DOMAIN=$$config_minio_domain",
+                    "MINIO_ROOT_USER=$$config_minio_root_user",
+                    "MINIO_ROOT_PASSWORD=$$secret_minio_root_user_password",
+                    "MINIO_REGION_NAME=$$config_minio_region_name",
+                ],
+                "ports": [
+                    "9001",
+                    "9000"
+                ]
+            }
+        },
+        "variables": [
+            {
+                "id": "$$config_server_url",
+                "name": "MINIO_SERVER_URL",
+                "label": "Server URL",
+                "defaultValue": "",
+                "description": "",
+            },
+            {
+                "id": "$$config_browser_redirect_url",
+                "name": "MINIO_BROWSER_REDIRECT_URL",
+                "label": "Browser Redirect URL",
+                "defaultValue": "$$generate_fqdn",
+                "description": "",
+            },
+            {
+                "id": "$$config_minio_domain",
+                "name": "MINIO_DOMAIN",
+                "label": "Domain",
+                "defaultValue": "$$generate_domain",
+                "description": "",
+            },
+            {
+                "id": "$$config_minio_root_user",
+                "name": "MINIO_ROOT_USER",
+                "label": "Root User",
+                "defaultValue": "$$generate_username",
+                "description": "",
+            },
+            {
+                "id": "$$secret_minio_root_user_password",
+                "name": "MINIO_ROOT_PASSWORD",
+                "label": "Root User Password",
+                "defaultValue": "$$generate_password",
+                "description": "",
+            },
+            {
+                "id": "$$config_minio_region_name",
+                "name": "MINIO_REGION_NAME",
+                "label": "Region Name",
+                "defaultValue": "us-east-1",
+                "description": "",
+            },
+        ]
+    },
+    {
+        "templateVersion": "1.0.0",
         "serviceDefaultVersion": "0.21.1",
         "name": "fider",
         "displayName": "Fider",

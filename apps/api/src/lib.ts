@@ -9,6 +9,7 @@ export async function migrateServicesToNewTemplate() {
         for (const service of services) {
             if (service.type === 'plausibleanalytics' && service.plausibleAnalytics) await plausibleAnalytics(service)
             if (service.type === 'fider' && service.fider) await fider(service)
+            if (service.type === 'minio' && service.minio) await minio(service)
         }
     } catch (error) {
         console.log(error)
@@ -36,6 +37,25 @@ async function createVolumes(volumes: any[], service: any) {
         const [volumeName, path, containerId] = volume.split('@@@')
         await prisma.servicePersistentStorage.findFirst({ where: { volumeName, serviceId: service.id } }) || await prisma.servicePersistentStorage.create({ data: { volumeName, path, containerId, predefined: true, service: { connect: { id: service.id } } } })
     }
+}
+async function minio(service: any) {
+    const { rootUser, rootUserPassword, apiFqdn } = service.fider
+
+    const secrets = [
+        `MINIO_ROOT_PASSWORD@@@${rootUserPassword}`,
+    ]
+    const settings = [
+        `MINIO_ROOT_USER@@@${rootUser}`,
+        `MINIO_SERVER_URL@@@${apiFqdn}`,
+        `MINIO_BROWSER_REDIRECT_URL@@@$$generate_fqdn`,
+        `MINIO_DOMAIN@@@$$generate_domain`,
+    ]
+    await migrateSettings(settings, service);
+    await migrateSecrets(secrets, service);
+
+    // Remove old service data
+    // await prisma.service.update({ where: { id: service.id }, data: { minio: { delete: true } } })
+
 }
 async function fider(service: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, jwtSecret, emailNoreply, emailMailgunApiKey, emailMailgunDomain, emailMailgunRegion, emailSmtpHost, emailSmtpPort, emailSmtpUser, emailSmtpPassword, emailSmtpEnableStartTls } = service.fider
