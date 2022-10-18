@@ -329,10 +329,9 @@ export async function traefikConfiguration(request, reply) {
 				fqdn,
 				id,
 				type,
-				destinationDocker,
 				destinationDockerId,
 				dualCerts,
-				plausibleAnalytics
+				serviceSetting
 			} = service;
 			if (destinationDockerId) {
 				const found = supportedServiceTypesAndVersions.find((a) => a.name === type);
@@ -348,8 +347,11 @@ export async function traefikConfiguration(request, reply) {
 						if (isRunning) {
 							// Plausible Analytics custom script
 							let scriptName = false;
-							if (type === 'plausibleanalytics' && plausibleAnalytics.scriptName !== 'plausible.js') {
-								scriptName = plausibleAnalytics.scriptName;
+							if (type === 'plausibleanalytics') {
+								const foundScriptName = serviceSetting.find((a) => a.name === 'SCRIPT_NAME')?.value;
+								if (foundScriptName) {
+									scriptName = foundScriptName;
+								}
 							}
 
 							let container = id;

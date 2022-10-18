@@ -8,7 +8,7 @@ import { defaultServiceConfigurations } from '../services';
 import { OnlyId } from '../../types';
 import templates from '../templates'
 import { parseAndFindServiceTemplates } from '../../routes/api/v1/services/handlers';
-
+import path from 'path';
 // export async function startService(request: FastifyRequest<ServiceStartStop>) {
 //     try {
 //         const { type } = request.params
@@ -692,7 +692,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         const teamId = request.user.teamId;
 
         const service = await getServiceFromDB({ id, teamId });
-        const { type, version, destinationDockerId, destinationDocker, serviceSecret,serviceSetting, exposePort, persistentStorage } =
+        const { type, version, destinationDockerId, destinationDocker, serviceSecret, serviceSetting, exposePort, persistentStorage } =
             service;
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -701,9 +701,10 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
 
         const config = {};
         for (const service in template.services) {
-            console.log(template.services[service])
             config[service] = {
                 container_name: service,
+                build: template.services[service].build || undefined,
+                command: template.services[service].command,
                 image: template.services[service].image,
                 expose: template.services[service].ports,
                 // ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
@@ -714,16 +715,23 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                 labels: makeLabelForServices(type),
                 ...defaultComposeConfiguration(network),
             }
-          
+
             // Generate files for builds
             if (template.services[service].build) {
                 if (template.services[service]?.extras?.files?.length > 0) {
-                    console.log(template.services[service]?.extras?.files)
+                    let Dockerfile = `
+                    FROM ${template.services[service].image}`
+                    for (const file of template.services[service].extras.files) {
+                        const { source, destination, content } = file;
+                        await fs.writeFile(source, content);
+                        Dockerfile += `
+                        COPY ./${path.basename(source)} ${destination}`
+                    }
+                    await fs.writeFile(`${workdir}/Dockerfile.${service}`, Dockerfile);
                 }
             }
         }
         const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
-
         const composeFile: ComposeFile = {
             version: '3.8',
             services: config,

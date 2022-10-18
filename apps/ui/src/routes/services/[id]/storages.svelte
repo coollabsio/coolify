@@ -42,8 +42,16 @@
 				/>
 			</div>
 		</div>
-		<label for="name" class="pb-2 uppercase font-bold">name</label>
-		{#each persistentStorages as storage}
+		{#if persistentStorages.filter((s) => s.predefined).length > 0}
+			<div class="text-base font-bold">Predefined Persistent Volumes</div>
+		{/if}
+		{#each persistentStorages.filter((s) => s.predefined) as storage}
+			{#key storage.id}
+				<Storage on:refresh={refreshStorage} {storage} />
+			{/key}
+		{/each}
+		<div class="text-base font-bold" class:pt-10={persistentStorages.filter((s) => s.predefined).length > 0}>User Defined Persistent Volumes</div>
+		{#each persistentStorages.filter((s) => !s.predefined) as storage}
 			{#key storage.id}
 				<Storage on:refresh={refreshStorage} {storage} />
 			{/key}

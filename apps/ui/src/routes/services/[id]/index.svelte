@@ -19,6 +19,7 @@
 	import { get, post } from '$lib/api';
 	import { errorNotification, getDomain } from '$lib/common';
 	import { t } from '$lib/translations';
+	import Select from 'svelte-select';
 	import {
 		appSession,
 		status,
@@ -29,18 +30,18 @@
 	} from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import Setting from '$lib/components/Setting.svelte';
-	// import * as Services from '$lib/components/Services';
 
 	import DocLink from '$lib/components/DocLink.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import ServiceStatus from '$lib/components/ServiceStatus.svelte';
 
 	const { id } = $page.params;
-	// let serviceName: any = service.type && service.type[0].toUpperCase() + service.type.substring(1);
 	$: isDisabled =
-		!$appSession.isAdmin || $status.service.isRunning || $status.service.initialLoading;
+		!$appSession.isAdmin ||
+		$status.service.overallStatus === 'degraded' ||
+		$status.service.overallStatus === 'healthy' ||
+		$status.service.initialLoading;
 
-	let newConfiguration = null;
 	let forceSave = false;
 	let loading = {
 		save: false,
@@ -73,12 +74,13 @@
 		const formData = new FormData(e.target);
 		for (let field of formData) {
 			const [key, value] = field;
-			for (const setting of service.serviceSetting) {
-				if (setting.name === key && setting.value !== value) {
+			service.serviceSetting = service.serviceSetting.map((setting: any) => {
+				if (setting.name === key) {
 					setting.changed = true;
 					setting.value = value;
 				}
-			}
+				return setting;
+			});
 		}
 		if (loading.save) return;
 		loading.save = true;
@@ -203,7 +205,7 @@
 </script>
 
 <div class="w-full">
-	<form on:submit|preventDefault={handleSubmit}>
+	<form id="saveForm" on:submit|preventDefault={handleSubmit}>
 		<div class="mx-auto w-full">
 			<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
 				<div class="title font-bold pb-3 ">General</div>
@@ -425,16 +427,20 @@
 		<div />
 		<div>
 			{#each Object.keys(template) as oneService}
-				<div class="flex flex-row border-b border-coolgray-500 my-6 space-x-2">
+				<div
+					class="flex flex-row my-6 space-x-2"
+					class:border-b={template[oneService].environment.length > 0}
+					class:border-coolgray-500={template[oneService].environment.length > 0}
+				>
 					<div class="title font-bold pb-3">{template[oneService].name}</div>
-					<ServiceStatus id={template[oneService]} />
+					<ServiceStatus id={oneService} />
 				</div>
 
 				<div class="grid grid-flow-row gap-2 px-4">
 					{#if template[oneService].environment.length > 0}
 						{#each template[oneService].environment as variable}
-							<div class="grid grid-cols-2 items-center">
-								<label for={variable.name}>{variable.label}</label>
+							<div class="grid grid-cols-2 items-center gap-2">
+								<label class="h-10" for={variable.name}>{variable.label}</label>
 								{#if variable.defaultValue === '$$generate_fqdn'}
 									<input
 										class="w-full"
@@ -444,9 +450,24 @@
 										id={variable.name}
 										value={service.fqdn}
 									/>
+								{:else if variable.defaultValue === 'true' || variable.defaultValue === 'false'}
+									<select
+										class="w-full font-normal"
+										readonly={isDisabled}
+										disabled={isDisabled}
+										id={variable.name}
+										name={variable.name}
+										bind:value={variable.value}
+										form="saveForm"
+									>
+										<option value="true">true</option>
+										<option value="false"> false</option>
+									</select>
 								{:else}
-									<input
-										class="w-full"
+									<CopyPasswordField
+										isPasswordField={variable.defaultValue === '$$generate_password'}
+										readonly={isDisabled}
+										disabled={isDisabled}
 										name={variable.name}
 										id={variable.name}
 										value={variable.value}

@@ -59,35 +59,76 @@
 	}
 </script>
 
-<div class="w-fullgrid gap-2">
-	<div class="flex flex-col pb-2">
-		<div class="flex flex-col lg:flex-row lg:space-y-0 space-y-2">
-			<input
-				class="w-full lg:w-64"
-				bind:value={storage.path}
-				required
-				placeholder="eg: /sqlite.db"
-			/>
-			{#if isNew}
-				<div class="flex items-center justify-center w-full lg:w-64">
-					<button class="btn btn-sm btn-primary" on:click={() => saveStorage(true)}
-						>{$t('forms.add')}</button
-					>
-				</div>
-			{:else}
-				<div class="flex flex-row items-center justify-center space-x-2 w-full lg:w-64">
-					<div class="flex items-center justify-center">
-						<button class="btn btn-sm btn-primary" on:click={() => saveStorage(false)}
-							>{$t('forms.set')}</button
-						>
-					</div>
-					<div class="flex justify-center">
-						<button class="btn btn-sm btn-error" on:click={removeStorage}
-							>{$t('forms.remove')}</button
-						>
-					</div>
+<div class="w-full lg:px-0 px-4">
+	{#if storage.predefined}
+		<div class="grid grid-col-1 lg:grid-cols-2 pt-2">
+			<div>
+				<input
+					id={storage.id}
+					disabled
+					readonly
+					class="w-full"
+					value={`${storage.id}${storage.path.replace(/\//gi, '-')}:${storage.path}`}
+				/>
+			</div>
+			<div class="lg:px-2">
+				<input
+					id={storage.containerId}
+					disabled
+					readonly
+					class="w-full"
+					value={`${storage.containerId}`}
+				/>
+			</div>
+		</div>
+	{:else}
+		<div class="grid grid-col-1 lg:grid-cols-3 lg:space-x-4" class:pt-8={isNew}>
+			{#if storage.id}
+				<div class="flex flex-col">
+					<input
+						disabled
+						readonly
+						class="w-full"
+						value="{storage.id}{storage.path.replace(/\//gi, '-')}"
+					/>
 				</div>
 			{/if}
+			<div class="flex flex-col">
+				{#if isNew}
+					<label for="name" class="pb-2 uppercase font-bold">Path</label>
+				{/if}
+				<input
+					disabled={storage.predefined}
+					readonly={storage.predefined}
+					class="w-full lg:w-64"
+					bind:value={storage.path}
+					required
+					placeholder="eg: /sqlite.db"
+				/>
+			</div>
+
+			<div class:pt-8={isNew} class:pt-2={!isNew}>
+				{#if isNew}
+					<div class="flex items-center justify-center w-full lg:w-64">
+						<button class="btn btn-sm btn-primary w-full" on:click={() => saveStorage(true)}
+							>{$t('forms.add')}</button
+						>
+					</div>
+				{:else}
+					<div class="flex flex-row items-center justify-center space-x-2 w-full lg:w-64">
+						<div class="flex items-center justify-center">
+							<button class="btn btn-sm btn-primary" on:click={() => saveStorage(false)}
+								>{$t('forms.set')}</button
+							>
+						</div>
+						<div class="flex justify-center">
+							<button class="btn btn-sm btn-error" on:click={removeStorage}
+								>{$t('forms.remove')}</button
+							>
+						</div>
+					</div>
+				{/if}
+			</div>
 		</div>
-	</div>
+	{/if}
 </div>

@@ -43,7 +43,7 @@ export default [
             "$$id": {
                 "name": "Plausible Analytics",
                 "documentation": "Taken from https://plausible.io/",
-                "command": ['sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh db init-admin && /entrypoint.sh run"'],
+                "command": 'sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh db init-admin && /entrypoint.sh run"',
                 "depends_on": [
                     "$$id-postgresql",
                     "$$id-clickhouse"
@@ -52,7 +52,7 @@ export default [
                 "environment": [
                     "ADMIN_USER_EMAIL=$$config_admin_user_email",
                     "ADMIN_USER_NAME=$$config_admin_user_name",
-                    "ADMIN_USER_PASSWORD=$$secret_admin_user_password",
+                    "ADMIN_USER_PWD=$$secret_admin_user_pwd",
                     "BASE_URL=$$config_base_url",
                     "SECRET_KEY_BASE=$$secret_secret_key_base",
                     "DISABLE_AUTH=$$config_disable_auth",
@@ -68,6 +68,9 @@ export default [
                 "name": "PostgreSQL",
                 "documentation": "Taken from https://plausible.io/",
                 "image": "bitnami/postgresql:13.2.0",
+                "volumes": [
+                    '$$id-postgresql-data:/bitnami/postgresql/',
+                ],
                 "environment": [
                     "POSTGRESQL_PASSWORD=$$secret_postgresql_password",
                     "POSTGRESQL_USERNAME=$$config_postgresql_username",
@@ -78,7 +81,13 @@ export default [
             "$$id-clickhouse": {
                 "name": "Clickhouse",
                 "documentation": "Taken from https://plausible.io/",
-                "build": "$$workdir",
+                "build": {
+                    context: "$$workdir",
+                    dockerfile: "Dockerfile.$$id-clickhouse"
+                },
+                "volumes": [
+                    '$$id-clickhouse-data:/var/lib/clickhouse',
+                ],
                 "image": "yandex/clickhouse-server:21.3.2.5",
                 "ulimits": {
                     "nofile": {
@@ -87,21 +96,25 @@ export default [
                     }
                 },
                 "extras": {
-                    "files:": [
+                    "files": [
                         {
-                            location: '$$workdir/clickhouse-config.xml',
+                            source: "$$workdir/clickhouse-config.xml",
+                            destination: '/etc/clickhouse-server/users.d/logging.xml',
                             content: '<yandex><logger><level>warning</level><console>true</console></logger><query_thread_log remove="remove"/><query_log remove="remove"/><text_log remove="remove"/><trace_log remove="remove"/><metric_log remove="remove"/><asynchronous_metric_log remove="remove"/><session_log remove="remove"/><part_log remove="remove"/></yandex>'
                         },
                         {
-                            location: '$$workdir/clickhouse-user-config.xml',
+                            source: "$$workdir/clickhouse-user-config.xml",
+                            destination: '/etc/clickhouse-server/config.d/logging.xml',
                             content: '<yandex><profiles><default><log_queries>0</log_queries><log_query_threads>0</log_query_threads></default></profiles></yandex>'
                         },
                         {
-                            location: '$$workdir/init.query',
+                            source: "$$workdir/init.query",
+                            destination: '/docker-entrypoint-initdb.d/init.query',
                             content: 'CREATE DATABASE IF NOT EXISTS plausible;'
                         },
                         {
-                            location: '$$workdir/init-db.sh',
+                            source: "$$workdir/init-db.sh",
+                            destination: '/docker-entrypoint-initdb.d/init-db.sh',
                             content: 'clickhouse client --queries-file /docker-entrypoint-initdb.d/init.query'
                         }
                     ]
@@ -146,12 +159,14 @@ export default [
                 "description": "This is the admin username. Please change it.",
             },
             {
-                "id": "$$secret_admin_user_password",
-                "name": "ADMIN_USER_PASSWORD",
-                "showAsConfiguration": true,
+                "id": "$$secret_admin_user_pwd",
+                "name": "ADMIN_USER_PWD",
                 "label": "Admin User Password",
                 "defaultValue": "$$generate_password",
                 "description": "This is the admin password. Please change it.",
+                "extras": {
+                    "isVisibleOnUI": true
+                }
             },
             {
                 "id": "$$secret_secret_key_base",
@@ -159,8 +174,8 @@ export default [
                 "label": "Secret Key Base",
                 "defaultValue": "$$generate_passphrase",
                 "description": "",
-                "details": {
-                    "length":64
+                "extras": {
+                    "length": 64
                 }
             },
             {

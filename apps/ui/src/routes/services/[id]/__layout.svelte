@@ -253,27 +253,6 @@
 			</button>
 		{:else if $status.service.overallStatus === 'healthy'}
 			<button
-				on:click={stopService}
-				type="submit"
-				disabled={!$isDeploymentEnabled}
-				class="btn btn-sm btn-error gap-2"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6 "
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<rect x="6" y="5" width="4" height="14" rx="1" />
-					<rect x="14" y="5" width="4" height="14" rx="1" />
-				</svg> Stop
-			</button>
-			<button
 				disabled={!$isDeploymentEnabled}
 				class="btn btn-sm gap-2"
 				on:click={() => startService()}
@@ -296,6 +275,27 @@
 				</svg>
 
 				Force Redeploy
+			</button>
+			<button
+				on:click={stopService}
+				type="submit"
+				disabled={!$isDeploymentEnabled}
+				class="btn btn-sm btn-error gap-2"
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="w-6 h-6 "
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<rect x="5" y="5" width="14" height="14" rx="2" />
+				</svg>
+				Stop
 			</button>
 		{:else if $status.service.overallStatus === 'degraded'}
 			<button

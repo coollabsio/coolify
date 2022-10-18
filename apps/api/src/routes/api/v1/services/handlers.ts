@@ -132,8 +132,8 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                         const label = foundTemplate.variables.find(v => v.name === envKey)?.label
                         const description = foundTemplate.variables.find(v => v.name === envKey)?.description
                         const defaultValue = foundTemplate.variables.find(v => v.name === envKey)?.defaultValue
-                        const showAsConfiguration = foundTemplate.variables.find(v => v.name === envKey)?.showAsConfiguration
-                        if (envValue.startsWith('$$config') || showAsConfiguration) {
+                        const isVisibleOnUI = foundTemplate.variables.find(v => v.name === envKey)?.extras?.isVisibleOnUI
+                        if (envValue.startsWith('$$config') || isVisibleOnUI) {
                             parsedTemplate[realKey].environment.push(
                                 { name: envKey, value: envValue, label, description, defaultValue }
                             )
@@ -220,12 +220,11 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                 foundTemplate.variables = foundTemplate.variables.map(variable => {
                     let { id: variableId } = variable;
                     if (variableId.startsWith('$$secret_')) {
+                        const length = variable?.extras && variable.extras['length']
                         if (variable.defaultValue === '$$generate_password') {
-                            const length = variable?.details['length'] || null
-                            variable.value = generatePassword({length});
+                            variable.value = generatePassword({ length });
                         } else if (variable.defaultValue === '$$generate_passphrase') {
-                            const length = variable?.details['length'] || null
-                            variable.value = generatePassword({length});
+                            variable.value = generatePassword({ length });
                         }
                     }
                     if (variableId.startsWith('$$config_')) {
@@ -264,6 +263,18 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                         await prisma.serviceSetting.create({
                             data: { name: variable.name, value: variable.value, service: { connect: { id } } }
                         })
+                    }
+                }
+            }
+            for (const service of Object.keys(foundTemplate.services)) {
+                if (foundTemplate.services[service].volumes) {
+                    for (const volume of foundTemplate.services[service].volumes) {
+                        const [volumeName, path] = volume.split(':')
+                        if (!volumeName.startsWith('/')) {
+                            await prisma.servicePersistentStorage.create({
+                                data: { volumeName, path, containerId: service, predefined: true, service: { connect: { id } } }
+                            });
+                        }
                     }
                 }
             }
