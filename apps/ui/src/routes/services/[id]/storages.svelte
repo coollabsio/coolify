@@ -43,14 +43,14 @@
 			</div>
 		</div>
 		{#if persistentStorages.filter((s) => s.predefined).length > 0}
-			<div class="text-base font-bold">Predefined Persistent Volumes</div>
+			<div class="text-base font-bold">Predefined</div>
 		{/if}
 		{#each persistentStorages.filter((s) => s.predefined) as storage}
 			{#key storage.id}
 				<Storage on:refresh={refreshStorage} {storage} />
 			{/key}
 		{/each}
-		<div class="text-base font-bold" class:pt-10={persistentStorages.filter((s) => s.predefined).length > 0}>User Defined Persistent Volumes</div>
+		<div class="text-base font-bold" class:pt-10={persistentStorages.filter((s) => s.predefined).length > 0}>User Defined</div>
 		{#each persistentStorages.filter((s) => !s.predefined) as storage}
 			{#key storage.id}
 				<Storage on:refresh={refreshStorage} {storage} />

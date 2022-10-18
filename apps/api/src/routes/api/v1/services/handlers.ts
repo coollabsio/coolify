@@ -171,7 +171,6 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
         }
     }
     return parsedTemplate
-
 }
 
 export async function getService(request: FastifyRequest<OnlyId>) {

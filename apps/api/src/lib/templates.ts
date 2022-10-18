@@ -1,6 +1,160 @@
 export default [
     {
         "templateVersion": "1.0.0",
+        "serviceDefaultVersion": "0.21.1",
+        "name": "fider",
+        "displayName": "Fider",
+        "description": "Fider is a platform to collect and organize customer feedback.",
+        "services": {
+            "$$id": {
+                "name": "Fider",
+                "image": "getfider/fider:$$core_version",
+                "documentation": "Taken from https://hub.docker.com/r/getfider/fider/",
+                "depends_on": [
+                    '$$id-postgresql'
+                ],
+                "environment": [
+                    "BASE_URL=$$config_base_url",
+                    "JWT_SECRET=$$secret_jwt_secret",
+                    "EMAIL_NOREPLY=$$config_email_noreply",
+                    "EMAIL_MAILGUN_API_KEY=$$secret_email_mailgun_api_key",
+                    "EMAIL_MAILGUN_REGION=$$config_email_mailgun_region",
+                    "EMAIL_MAILGUN_DOMAIN=$$config_email_mailgun_domain",
+                    "EMAIL_SMTP_HOST=$$config_email_smtp_host",
+                    "EMAIL_SMTP_PORT=$$config_email_smtp_port",
+                    "EMAIL_SMTP_USER=$$config_email_smtp_user",
+                    "EMAIL_SMTP_PASSWORD=$$secret_email_smtp_password",
+                    "EMAIL_SMTP_ENABLE_STARTTLS=$$config_email_smtp_enable_starttls",
+                ],
+                "ports": [
+                    "3000"
+                ]
+            },
+            "$$id-postgresql": {
+                "name": "PostgreSQL",
+                "documentation": "Taken from https://hub.docker.com/r/getfider/fider/",
+                "depends_on": [],
+                "image": "postgres:12-alpine",
+                "volumes": [
+                    "$$id-postgresql-data:/var/lib/postgresql/data"
+                ],
+                "environment": [
+                    "POSTGRES_USER=$$config_postgres_user",
+                    "POSTGRES_PASSWORD=$$secret_postgres_password",
+                    "POSTGRES_DB=$$config_postgres_db",
+                ]
+            }
+        },
+        "variables": [
+            {
+                "id": "$$config_base_url",
+                "name": "BASE_URL",
+                "label": "Base URL",
+                "defaultValue": "$$generate_fqdn",
+                "description": "",
+            },
+            {
+                "id": "$$secret_database_url",
+                "name": "DATABASE_URL",
+                "label": "Database URL for PostgreSQL",
+                "defaultValue": "postgresql://$$config_postgres_user:$$secret_postgres_password@$$id-postgresql:5432/$$config_postgres_db",
+                "description": "",
+            },
+            {
+                "id": "$$secret_jwt_secret",
+                "name": "JWT_SECRET",
+                "label": "JWT Secret",
+                "defaultValue": "$$generate_passphrase",
+                "description": "",
+            },
+            {
+                "id": "$$config_email_noreply",
+                "name": "EMAIL_NOREPLY",
+                "label": "No Reply Email Address",
+                "defaultValue": "noreply@example.com",
+                "description": "",
+            },
+            {
+                "id": "$$secret_email_mailgun_api_key",
+                "name": "EMAIL_MAILGUN_API_KEY",
+                "label": "Mailgun API Key",
+                "defaultValue": "",
+                "description": "",
+            },
+            {
+                "id": "$$config_email_mailgun_region",
+                "name": "EMAIL_MAILGUN_REGION",
+                "label": "Mailgun Region",
+                "defaultValue": "EU",
+                "description": "",
+            },
+            {
+                "id": "$$config_email_mailgun_domain",
+                "name": "EMAIL_MAILGUN_DOMAIN",
+                "label": "Mailgun Domain",
+                "defaultValue": "",
+                "description": "",
+            },
+            {
+                "id": "$$config_email_smtp_host",
+                "name": "EMAIL_SMTP_HOST",
+                "label": "SMTP Host",
+                "defaultValue": "",
+                "description": "",
+            },
+            {
+                "id": "$$config_email_smtp_port",
+                "name": "EMAIL_SMTP_PORT",
+                "label": "SMTP Port",
+                "defaultValue": "587",
+                "description": "",
+            },
+            {
+                "id": "$$config_email_smtp_user",
+                "name": "EMAIL_SMTP_USER",
+                "label": "SMTP User",
+                "defaultValue": "",
+                "description": "",
+            },
+            {
+                "id": "$$secret_email_smtp_password",
+                "name": "EMAIL_SMTP_PASSWORD",
+                "label": "SMTP Password",
+                "defaultValue": "",
+                "description": "",
+            },
+            {
+                "id": "$$config_email_smtp_enable_starttls",
+                "name": "EMAIL_SMTP_ENABLE_STARTTLS",
+                "label": "SMTP Enable StartTLS",
+                "defaultValue": "false",
+                "description": "",
+            },
+            {
+                "id": "$$config_postgres_user",
+                "name": "POSTGRES_USER",
+                "label": "PostgreSQL User",
+                "defaultValue": "$$generate_username",
+                "description": "",
+            },
+            {
+                "id": "$$secret_postgres_password",
+                "name": "POSTGRES_PASSWORD",
+                "label": "PostgreSQL Password",
+                "defaultValue": "$$generate_password",
+                "description": "",
+            },
+            {
+                "id": "$$config_postgres_db",
+                "name": "POSTGRES_DB",
+                "label": "PostgreSQL Database",
+                "defaultValue": "$$generate_username",
+                "description": "",
+            },
+        ]
+    },
+    {
+        "templateVersion": "1.0.0",
         "serviceDefaultVersion": "0.198.1",
         "name": "n8n",
         "displayName": "n8n.io",
