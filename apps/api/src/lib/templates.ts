@@ -18,9 +18,9 @@ export default [
                 ],
                 "environment": [
                     "WORDPRESS_DB_HOST=$$config_wordpress_db_host",
-                    "WORDPRESS_DB_USER=$$config_wordpress_db_user",
-                    "WORDPRESS_DB_PASSWORD=$$secret_wordpress_db_password",
-                    "WORDPRESS_DB_NAME=$$config_wordpress_db_name",
+                    "WORDPRESS_DB_USER=$$config_mysql_user",
+                    "WORDPRESS_DB_PASSWORD=$$secret_mysql_password",
+                    "WORDPRESS_DB_NAME=$$config_mysql_database",
                     "WORDPRESS_CONFIG_EXTRA=$$config_wordpress_config_extra"
                 ],
                 "ports": [

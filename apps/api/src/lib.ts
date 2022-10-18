@@ -25,22 +25,23 @@ async function wordpress(service: any) {
     const secrets = [
         `MYSQL_ROOT_PASSWORD@@@${mysqlRootUserPassword}`,
         `MYSQL_PASSWORD@@@${mysqlPassword}`,
-        ftpPassword && `FTP_PASSWORD@@@${ftpPassword}`,
-        ftpHostKeyPrivate && `FTP_HOST_KEY_PRIVATE@@@${ftpHostKeyPrivate}`,
-        ftpHostKey && `FTP_HOST_KEY@@@${ftpHostKey}`,
+        ftpPassword && `COOLIFY_FTP_PASSWORD@@@${ftpPassword}`,
+        ftpHostKeyPrivate && `COOLIFY_FTP_HOST_KEY_PRIVATE@@@${ftpHostKeyPrivate}`,
+        ftpHostKey && `COOLIFY_FTP_HOST_KEY@@@${ftpHostKey}`,
     ]
     const settings = [
         `MYSQL_ROOT_USER@@@${mysqlRootUser}`,
         `MYSQL_USER@@@${mysqlUser}`,
         `MYSQL_DATABASE@@@${mysqlDatabase}`,
-        `MYSQL_HOST@@@${mysqlHost}`,
+        `MYSQL_HOST@@@${ownMysql ? mysqlHost : `${service.id}-mysql`}`,
         `MYSQL_PORT@@@${mysqlPort}`,
-        `FTP_ENABLED@@@${ftpEnabled}`,
-        `FTP_USER@@@${ftpUser}`,
-        `FTP_PUBLIC_PORT@@@${ftpPublicPort}`,
         `WORDPRESS_CONFIG_EXTRA@@@${extraConfig}`,
         `WORDPRESS_TABLE_PREFIX@@@${tablePrefix}`,
-        `OWN_MYSQL@@@${ownMysql}`,
+        `WORDPRESS_DB_HOST@@@${ownMysql ? mysqlHost : `${service.id}-mysql`}`,
+        `COOLIFY_OWN_DB@@@${ownMysql}`,
+        `COOLIFY_FTP_ENABLED@@@${ftpEnabled}`,
+        `COOLIFY_FTP_USER@@@${ftpUser}`,
+        `COOLIFY_FTP_PUBLIC_PORT@@@${ftpPublicPort}`,
 
     ]
     await migrateSecrets(secrets, service);
@@ -142,7 +143,7 @@ async function migrateSettings(settings: any[], service: any) {
     for (const setting of settings) {
         if (!setting) continue;
         const [name, value] = setting.split('@@@')
-        console.log('Migrating setting', name, value)
+        console.log('Migrating setting', name, value, 'for service', service.id, ', service name:', service.name)
         await prisma.serviceSetting.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name, value, service: { connect: { id: service.id } } } })
     }
 }
@@ -150,13 +151,14 @@ async function migrateSecrets(secrets: any[], service: any) {
     for (const secret of secrets) {
         if (!secret) continue;
         const [name, value] = secret.split('@@@')
-        console.log('Migrating secret', name, value)
+        console.log('Migrating secret', name, value, 'for service', service.id, ', service name:', service.name)
         await prisma.serviceSecret.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSecret.create({ data: { name, value, service: { connect: { id: service.id } } } })
     }
 }
 async function createVolumes(volumes: any[], service: any) {
     for (const volume of volumes) {
         const [volumeName, path, containerId] = volume.split('@@@')
+        console.log('Creating volume', volumeName, path, containerId, 'for service', service.id, ', service name:', service.name)
         await prisma.servicePersistentStorage.findFirst({ where: { volumeName, serviceId: service.id } }) || await prisma.servicePersistentStorage.create({ data: { volumeName, path, containerId, predefined: true, service: { connect: { id: service.id } } } })
     }
 }
