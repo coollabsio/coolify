@@ -1,4 +1,4 @@
-import { decrypt, encrypt, generatePassword, prisma } from "./lib/common";
+import { decrypt, encrypt, prisma } from "./lib/common";
 import { includeServices } from "./lib/services/common";
 
 
@@ -10,36 +10,27 @@ export async function migrateServicesToNewTemplate() {
             if (service.type === 'plausibleanalytics' && service.plausibleAnalytics) await plausibleAnalytics(service)
             if (service.type === 'fider' && service.fider) await fider(service)
             if (service.type === 'minio' && service.minio) await minio(service)
+            if (service.type === 'vscode' && service.vscodeserver) await vscodeserver(service)
         }
     } catch (error) {
         console.log(error)
 
     }
 }
-async function migrateSettings(settings: any[], service: any) {
-    for (const setting of settings) {
-        if (!setting) continue;
-        const [name, value] = setting.split('@@@')
-        console.log('Migrating setting', name, value)
-        await prisma.serviceSetting.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name, value, service: { connect: { id: service.id } } } })
-    }
-}
-async function migrateSecrets(secrets: any[], service: any) {
-    for (const secret of secrets) {
-        if (!secret) continue;
-        const [name, value] = secret.split('@@@')
-        console.log('Migrating secret', name, value)
-        await prisma.serviceSecret.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSecret.create({ data: { name, value, service: { connect: { id: service.id } } } })
-    }
-}
-async function createVolumes(volumes: any[], service: any) {
-    for (const volume of volumes) {
-        const [volumeName, path, containerId] = volume.split('@@@')
-        await prisma.servicePersistentStorage.findFirst({ where: { volumeName, serviceId: service.id } }) || await prisma.servicePersistentStorage.create({ data: { volumeName, path, containerId, predefined: true, service: { connect: { id: service.id } } } })
-    }
+
+async function vscodeserver(service: any) {
+    const { password } = service.minio
+
+    const secrets = [
+        `PASSWORD@@@${password}`,
+    ]
+    await migrateSecrets(secrets, service);
+
+    // Remove old service data
+    // await prisma.service.update({ where: { id: service.id }, data: { vscodeserver: { delete: true } } })
 }
 async function minio(service: any) {
-    const { rootUser, rootUserPassword, apiFqdn } = service.fider
+    const { rootUser, rootUserPassword, apiFqdn } = service.minio
 
     const secrets = [
         `MINIO_ROOT_PASSWORD@@@${rootUserPassword}`,
@@ -55,7 +46,6 @@ async function minio(service: any) {
 
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { minio: { delete: true } } })
-
 }
 async function fider(service: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, jwtSecret, emailNoreply, emailMailgunApiKey, emailMailgunDomain, emailMailgunRegion, emailSmtpHost, emailSmtpPort, emailSmtpUser, emailSmtpPassword, emailSmtpEnableStartTls } = service.fider
@@ -83,7 +73,7 @@ async function fider(service: any) {
     await migrateSecrets(secrets, service);
 
     // Remove old service data
-    await prisma.service.update({ where: { id: service.id }, data: { fider: { delete: true } } })
+    // await prisma.service.update({ where: { id: service.id }, data: { fider: { delete: true } } })
 
 }
 async function plausibleAnalytics(service: any) {
@@ -114,5 +104,28 @@ async function plausibleAnalytics(service: any) {
     await createVolumes(volumes, service);
 
     // Remove old service data
-    await prisma.service.update({ where: { id: service.id }, data: { plausibleAnalytics: { delete: true } } })
+    // await prisma.service.update({ where: { id: service.id }, data: { plausibleAnalytics: { delete: true } } })
+}
+
+async function migrateSettings(settings: any[], service: any) {
+    for (const setting of settings) {
+        if (!setting) continue;
+        const [name, value] = setting.split('@@@')
+        console.log('Migrating setting', name, value)
+        await prisma.serviceSetting.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name, value, service: { connect: { id: service.id } } } })
+    }
+}
+async function migrateSecrets(secrets: any[], service: any) {
+    for (const secret of secrets) {
+        if (!secret) continue;
+        const [name, value] = secret.split('@@@')
+        console.log('Migrating secret', name, value)
+        await prisma.serviceSecret.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSecret.create({ data: { name, value, service: { connect: { id: service.id } } } })
+    }
+}
+async function createVolumes(volumes: any[], service: any) {
+    for (const volume of volumes) {
+        const [volumeName, path, containerId] = volume.split('@@@')
+        await prisma.servicePersistentStorage.findFirst({ where: { volumeName, serviceId: service.id } }) || await prisma.servicePersistentStorage.create({ data: { volumeName, path, containerId, predefined: true, service: { connect: { id: service.id } } } })
+    }
 }

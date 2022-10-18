@@ -128,10 +128,10 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                         const label = foundTemplate.variables.find(v => v.name === envKey)?.label
                         const description = foundTemplate.variables.find(v => v.name === envKey)?.description
                         const defaultValue = foundTemplate.variables.find(v => v.name === envKey)?.defaultValue
-                        const isVisibleOnUI = foundTemplate.variables.find(v => v.name === envKey)?.extras?.isVisibleOnUI
-                        if (envValue.startsWith('$$config') || isVisibleOnUI) {
+                        const extras = foundTemplate.variables.find(v => v.name === envKey)?.extras
+                        if (envValue.startsWith('$$config')) {
                             parsedTemplate[realKey].environment.push(
-                                { name: envKey, value: envValue, label, description, defaultValue }
+                                { name: envKey, value: envValue, label, description, defaultValue, extras }
                             )
                         }
 
@@ -155,6 +155,8 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                 const { name, value } = setting
                 if (service.fqdn && value === '$$generate_fqdn') {
                     parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(`$$config_${name.toLowerCase()}`, service.fqdn))
+                } else if (service.fqdn && value === '$$generate_domain') {
+                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(`$$config_${name.toLowerCase()}`, getDomain(service.fqdn)))
                 } else {
                     parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(`$$config_${name.toLowerCase()}`, value))
 

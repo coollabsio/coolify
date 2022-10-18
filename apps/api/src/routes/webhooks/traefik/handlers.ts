@@ -359,12 +359,12 @@ export async function traefikConfiguration(request, reply) {
 							let otherNakedDomain = null;
 							let otherIsHttps = null;
 							let otherIsWWW = null;
-
-							if (type === 'minio' && service.minio.apiFqdn) {
-								otherDomain = getDomain(service.minio.apiFqdn);
+							if (type === 'minio') {
+								const domain = service.serviceSetting.find((a) => a.name === 'MINIO_SERVER_URL')?.value
+								otherDomain = getDomain(domain);
 								otherNakedDomain = otherDomain.replace(/^www\./, '');
-								otherIsHttps = service.minio.apiFqdn.startsWith('https://');
-								otherIsWWW = service.minio.apiFqdn.includes('www.');
+								otherIsHttps = domain.startsWith('https://');
+								otherIsWWW = domain.includes('www.');
 							}
 							data.services.push({
 								id,
@@ -480,46 +480,42 @@ export async function traefikOtherConfiguration(request: FastifyRequest<TraefikO
 				} else if (type === 'http') {
 					const service = await prisma.service.findFirst({
 						where: { id },
-						include: { minio: true }
+						include: { serviceSetting: true }
 					});
 					if (service) {
 						if (service.type === 'minio') {
-							if (service?.minio?.apiFqdn) {
-								const {
-									minio: { apiFqdn }
-								} = service;
-								const domain = getDomain(apiFqdn);
-								const isHttps = apiFqdn.startsWith('https://');
-								traefik = {
-									[type]: {
-										routers: {
-											[id]: {
-												entrypoints: [type],
-												rule: `Host(\`${domain}\`)`,
-												service: id
-											}
-										},
-										services: {
-											[id]: {
-												loadbalancer: {
-													servers: [{ url: `http://${id}:${privatePort}` }]
-												}
+							const domainSetting = service.serviceSetting.find((a) => a.name === 'MINIO_SERVER_URL')?.value
+							const domain = getDomain(domainSetting);
+							const isHttps = domainSetting.startsWith('https://');
+							traefik = {
+								[type]: {
+									routers: {
+										[id]: {
+											entrypoints: [type],
+											rule: `Host(\`${domain}\`)`,
+											service: id
+										}
+									},
+									services: {
+										[id]: {
+											loadbalancer: {
+												servers: [{ url: `http://${id}:${privatePort}` }]
 											}
 										}
 									}
-								};
-								if (isHttps) {
-									if (isDev) {
-										traefik[type].routers[id].tls = {
-											domains: {
-												main: `${domain}`
-											}
-										};
-									} else {
-										traefik[type].routers[id].tls = {
-											certresolver: 'letsencrypt'
-										};
-									}
+								}
+							};
+							if (isHttps) {
+								if (isDev) {
+									traefik[type].routers[id].tls = {
+										domains: {
+											main: `${domain}`
+										}
+									};
+								} else {
+									traefik[type].routers[id].tls = {
+										certresolver: 'letsencrypt'
+									};
 								}
 							}
 						} else {
@@ -758,11 +754,18 @@ export async function remoteTraefikConfiguration(request: FastifyRequest<OnlyId>
 							let otherIsHttps = null;
 							let otherIsWWW = null;
 
-							if (type === 'minio' && service.minio.apiFqdn) {
-								otherDomain = getDomain(service.minio.apiFqdn);
+							// if (type === 'minio' && service.minio.apiFqdn) {
+							// 	otherDomain = getDomain(service.minio.apiFqdn);
+							// 	otherNakedDomain = otherDomain.replace(/^www\./, '');
+							// 	otherIsHttps = service.minio.apiFqdn.startsWith('https://');
+							// 	otherIsWWW = service.minio.apiFqdn.includes('www.');
+							// }
+							if (type === 'minio') {
+								const domain = service.serviceSetting.find((a) => a.name === 'MINIO_SERVER_URL')?.value
+								otherDomain = getDomain(domain);
 								otherNakedDomain = otherDomain.replace(/^www\./, '');
-								otherIsHttps = service.minio.apiFqdn.startsWith('https://');
-								otherIsWWW = service.minio.apiFqdn.includes('www.');
+								otherIsHttps = domain.startsWith('https://');
+								otherIsWWW = domain.includes('www.');
 							}
 							data.services.push({
 								id,

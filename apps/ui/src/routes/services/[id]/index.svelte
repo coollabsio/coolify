@@ -259,15 +259,6 @@
 			</div>
 		</div>
 
-		{#if service.type === 'minio' && !service.minio.apiFqdn && $status.service.isRunning}
-			<div class="py-5">
-				<span class="font-bold text-red-500">IMPORTANT!</span> There was a small modification with Minio
-				in the latest version of Coolify. Now you can separate the Console URL from the API URL, so you
-				could use both through SSL. But this proccess cannot be done automatically, so you have to stop
-				your Minio instance, configure the new domain and start it back. Sorry for any inconvenience.
-			</div>
-		{/if}
-
 		<div class="grid grid-flow-row gap-2 px-4">
 			<div class="mt-2 grid grid-cols-2 items-center">
 				<label for="name">{$t('forms.name')}</label>
@@ -307,58 +298,24 @@
 				</div>
 			</div>
 
-			{#if service.type === 'minio'}
-				<div class="grid grid-cols-2 items-center">
-					<label for="fqdn"
-						>Console URL <Explainer explanation={$t('application.https_explainer')} /></label
-					>
-
-					<CopyPasswordField
-						placeholder="eg: https://console.min.io"
-						readonly={isDisabled}
-						disabled={isDisabled}
-						name="fqdn"
-						id="fqdn"
-						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-						bind:value={service.fqdn}
-						required
-					/>
-				</div>
-				<div class="grid grid-cols-2 items-center">
-					<label for="apiFqdn"
-						>API URL <Explainer explanation={$t('application.https_explainer')} /></label
-					>
-					<CopyPasswordField
-						placeholder="eg: https://min.io"
-						readonly={!$appSession.isAdmin && !$status.service.isRunning}
-						disabled={isDisabled}
-						name="apiFqdn"
-						id="apiFqdn"
-						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-						bind:value={service.minio.apiFqdn}
-						required
-					/>
-				</div>
-			{:else}
-				<div class="grid grid-cols-2 items-center">
-					<label for="fqdn"
-						>{$t('application.url_fqdn')}
-						<Explainer explanation={$t('application.https_explainer')} />
-					</label>
-					<CopyPasswordField
-						placeholder="eg: https://analytics.coollabs.io"
-						readonly={!$appSession.isAdmin && !$status.service.isRunning}
-						disabled={!$appSession.isAdmin ||
-							$status.service.isRunning ||
-							$status.service.initialLoading}
-						name="fqdn"
-						id="fqdn"
-						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
-						bind:value={service.fqdn}
-						required
-					/>
-				</div>
-			{/if}
+			<div class="grid grid-cols-2 items-center">
+				<label for="fqdn"
+					>{$t('application.url_fqdn')}
+					<Explainer explanation={$t('application.https_explainer')} />
+				</label>
+				<CopyPasswordField
+					placeholder="eg: https://analytics.coollabs.io"
+					readonly={!$appSession.isAdmin && !$status.service.isRunning}
+					disabled={!$appSession.isAdmin ||
+						$status.service.isRunning ||
+						$status.service.initialLoading}
+					name="fqdn"
+					id="fqdn"
+					pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+					bind:value={service.fqdn}
+					required
+				/>
+			</div>
 		</div>
 		{#if forceSave}
 			<div class="flex-col space-y-2 pt-4 text-center">
@@ -449,6 +406,15 @@
 										id={variable.name}
 										value={service.fqdn}
 									/>
+								{:else if variable.defaultValue === '$$generate_domain'}
+									<input
+										class="w-full"
+										disabled
+										readonly
+										name={variable.name}
+										id={variable.name}
+										value={getDomain(service.fqdn)}
+									/>
 								{:else if variable.defaultValue === 'true' || variable.defaultValue === 'false'}
 									<select
 										class="w-full font-normal"
@@ -473,6 +439,7 @@
 									/>
 								{:else}
 									<CopyPasswordField
+										required={variable?.extras?.required}
 										readonly={isDisabled}
 										disabled={isDisabled}
 										name={variable.name}

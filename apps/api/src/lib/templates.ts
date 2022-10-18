@@ -1,6 +1,43 @@
 export default [
     {
         "templateVersion": "1.0.0",
+        "serviceDefaultVersion": "4.7.1",
+        "name": "codeserver",
+        "displayName": "Code Server",
+        "description": "code-server by Coder is VS Code running on a remote server, accessible through the browser.",
+        "services": {
+            "$$id": {
+                "name": "Code Server",
+                "documentation": "Taken from https://github.com/coder/code-server/. ",
+                "depends_on": [],
+                "image": "codercom/code-server:$$core_version",
+                "volumes": [
+                    "$$id-config-data:/home/coder/.local/share/code-server",
+                    "$$id-vscodeserver-data:/home/coder",
+                    "$$id-keys-directory:/root/.ssh",
+                    "$$id-theme-and-plugin-directory:/root/.local/share/code-server"
+
+                ],
+                "environment": [
+                    "PASSWORD=$$secret_password",
+                ],
+                "ports": [
+                    "8080"
+                ]
+            }
+        },
+        "variables": [
+            {
+                "id": "$$secret_password",
+                "name": "PASSWORD",
+                "label": "Password",
+                "defaultValue": "$$generate_password",
+                "description": ""
+            }
+        ]
+    },
+    {
+        "templateVersion": "1.0.0",
         "serviceDefaultVersion": "RELEASE.2022-10-15T19-57-03Z",
         "name": "minio",
         "displayName": "MinIO",
@@ -20,8 +57,7 @@ export default [
                     "MINIO_BROWSER_REDIRECT_URL=$$config_minio_browser_redirect_url",
                     "MINIO_DOMAIN=$$config_minio_domain",
                     "MINIO_ROOT_USER=$$config_minio_root_user",
-                    "MINIO_ROOT_PASSWORD=$$secret_minio_root_user_password",
-                    "MINIO_REGION_NAME=$$config_minio_region_name",
+                    "MINIO_ROOT_PASSWORD=$$secret_minio_root_user_password"
                 ],
                 "ports": [
                     "9001",
@@ -33,9 +69,12 @@ export default [
             {
                 "id": "$$config_server_url",
                 "name": "MINIO_SERVER_URL",
-                "label": "Server URL",
+                "label": "Server/Console URL",
                 "defaultValue": "",
                 "description": "",
+                "extras": {
+                    "required": true
+                }
             },
             {
                 "id": "$$config_browser_redirect_url",
@@ -64,14 +103,7 @@ export default [
                 "label": "Root User Password",
                 "defaultValue": "$$generate_password",
                 "description": "",
-            },
-            {
-                "id": "$$config_minio_region_name",
-                "name": "MINIO_REGION_NAME",
-                "label": "Region Name",
-                "defaultValue": "us-east-1",
-                "description": "",
-            },
+            }
         ]
     },
     {
