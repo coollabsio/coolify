@@ -435,7 +435,6 @@
 					<div class="title font-bold pb-3">{template[oneService].name}</div>
 					<ServiceStatus id={oneService} />
 				</div>
-
 				<div class="grid grid-flow-row gap-2 px-4">
 					{#if template[oneService].environment.length > 0}
 						{#each template[oneService].environment as variable}
@@ -463,9 +462,17 @@
 										<option value="true">true</option>
 										<option value="false"> false</option>
 									</select>
+								{:else if variable.defaultValue === '$$generate_password'}
+									<CopyPasswordField
+										isPasswordField
+										readonly
+										disabled
+										name={variable.name}
+										id={variable.name}
+										value={variable.value}
+									/>
 								{:else}
 									<CopyPasswordField
-										isPasswordField={variable.defaultValue === '$$generate_password'}
 										readonly={isDisabled}
 										disabled={isDisabled}
 										name={variable.name}
