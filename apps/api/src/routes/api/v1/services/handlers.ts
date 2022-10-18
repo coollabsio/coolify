@@ -68,10 +68,6 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
     try {
         const teamId = request.user.teamId;
         const { id } = request.params;
-
-        let isRunning = false;
-        let isExited = false
-        let isRestarting = false;
         const service = await getServiceFromDB({ id, teamId });
         const { destinationDockerId, settings } = service;
         let payload = {}

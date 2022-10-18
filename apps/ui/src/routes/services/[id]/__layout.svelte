@@ -280,11 +280,11 @@
 				on:click={stopService}
 				type="submit"
 				disabled={!$isDeploymentEnabled}
-				class="btn btn-sm btn-error gap-2"
+				class="btn btn-sm gap-2"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6 "
+					class="w-6 h-6 text-error "
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
@@ -293,7 +293,8 @@
 					stroke-linejoin="round"
 				>
 					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<rect x="5" y="5" width="14" height="14" rx="2" />
+					<rect x="6" y="5" width="4" height="14" rx="1" />
+					<rect x="14" y="5" width="4" height="14" rx="1" />
 				</svg>
 				Stop
 			</button>

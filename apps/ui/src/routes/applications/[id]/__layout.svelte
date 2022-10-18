@@ -323,11 +323,11 @@
 				on:click={stopApplication}
 				type="submit"
 				disabled={!$isDeploymentEnabled}
-				class="btn btn-sm btn-error gap-2"
+				class="btn btn-sm  gap-2"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6 "
+					class="w-6 h-6 text-error"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
@@ -393,11 +393,11 @@
 					on:click={stopApplication}
 					type="submit"
 					disabled={!$isDeploymentEnabled}
-					class="btn btn-sm btn-error gap-2"
+					class="btn btn-sm gap-2"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6 "
+						class="w-6 h-6 text-error"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"

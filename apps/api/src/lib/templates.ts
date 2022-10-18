@@ -69,7 +69,7 @@ export default [
                 "documentation": "Taken from https://plausible.io/",
                 "image": "bitnami/postgresql:13.2.0",
                 "volumes": [
-                    '$$id-postgresql-data:/bitnami/postgresql/',
+                    '$$id-postgresql-data:/bitnami/postgresql',
                 ],
                 "environment": [
                     "POSTGRESQL_PASSWORD=$$secret_postgresql_password",
