@@ -2,12 +2,12 @@ export default [
     {
         "templateVersion": "1.0.0",
         "serviceDefaultVersion": "4.7.1",
-        "name": "codeserver",
-        "displayName": "Code Server",
-        "description": "code-server by Coder is VS Code running on a remote server, accessible through the browser.",
+        "name": "vscodeserver",
+        "displayName": "VSCode Server",
+        "description": "vscode-server by Coder is VS Code running on a remote server, accessible through the browser.",
         "services": {
             "$$id": {
-                "name": "Code Server",
+                "name": "VSCode Server",
                 "documentation": "Taken from https://github.com/coder/code-server/. ",
                 "depends_on": [],
                 "image": "codercom/code-server:$$core_version",
@@ -32,7 +32,10 @@ export default [
                 "name": "PASSWORD",
                 "label": "Password",
                 "defaultValue": "$$generate_password",
-                "description": ""
+                "description": "",
+                "extras": {
+                    "isVisibleOnUI": true,
+                }
             }
         ]
     },

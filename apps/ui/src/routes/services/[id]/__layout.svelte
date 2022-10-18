@@ -323,25 +323,10 @@
 		{:else if $status.service.overallStatus === 'stopped'}
 			<button
 				class="btn btn-sm gap-2"
-				class:btn-primary={$status.application.overallStatus !== 'degraded'}
 				disabled={!$isDeploymentEnabled}
 				on:click={() => startService()}
 			>
-				{#if $status.application.overallStatus !== 'degraded'}
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<path d="M7 4v16l13 -8z" />
-					</svg>
-				{:else}
+				{#if $status.application.overallStatus === 'degraded'}
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="w-6 h-6"
@@ -358,12 +343,23 @@
 							transform="rotate(-45 12 12)"
 						/>
 					</svg>
+					{$status.application.statuses.length === 1 ? 'Force Redeploy' : 'Redeploy Stack'}
+				{:else if $status.application.overallStatus === 'stopped'}
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6 text-pink-500"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path d="M7 4v16l13 -8z" />
+					</svg>
+					Deploy
 				{/if}
-				{$status.application.overallStatus === 'degraded'
-					? $status.application.statuses.length === 1
-						? 'Force Redeploy'
-						: 'Redeploy Stack'
-					: 'Deploy'}
 			</button>
 		{/if}
 	</div>

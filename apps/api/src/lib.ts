@@ -10,7 +10,7 @@ export async function migrateServicesToNewTemplate() {
             if (service.type === 'plausibleanalytics' && service.plausibleAnalytics) await plausibleAnalytics(service)
             if (service.type === 'fider' && service.fider) await fider(service)
             if (service.type === 'minio' && service.minio) await minio(service)
-            if (service.type === 'vscode' && service.vscodeserver) await vscodeserver(service)
+            if (service.type === 'vscodeserver' && service.vscodeserver) await vscodeserver(service)
         }
     } catch (error) {
         console.log(error)
@@ -19,7 +19,7 @@ export async function migrateServicesToNewTemplate() {
 }
 
 async function vscodeserver(service: any) {
-    const { password } = service.minio
+    const { password } = service.vscodeserver
 
     const secrets = [
         `PASSWORD@@@${password}`,

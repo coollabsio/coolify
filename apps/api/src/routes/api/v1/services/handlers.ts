@@ -129,7 +129,7 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                         const description = foundTemplate.variables.find(v => v.name === envKey)?.description
                         const defaultValue = foundTemplate.variables.find(v => v.name === envKey)?.defaultValue
                         const extras = foundTemplate.variables.find(v => v.name === envKey)?.extras
-                        if (envValue.startsWith('$$config')) {
+                        if (envValue.startsWith('$$config') || extras?.isVisibleOnUI) {
                             parsedTemplate[realKey].environment.push(
                                 { name: envKey, value: envValue, label, description, defaultValue, extras }
                             )
