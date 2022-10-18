@@ -1,6 +1,124 @@
 export default [
     {
         "templateVersion": "1.0.0",
+        "serviceDefaultVersion": "php8.1",
+        "name": "wordpress",
+        "displayName": "WordPress",
+        "description": "WordPress is a content management system based on PHP.",
+        "services": {
+            "$$id": {
+                "name": "WordPress",
+                "documentation": " Taken from https://docs.docker.com/compose/wordpress/",
+                "depends_on": [
+                    "$$id_mysql"
+                ],
+                "image": "wordpress:$$core_version",
+                "volumes": [
+                    "$$id-wordpress-data:/var/www/html",
+                ],
+                "environment": [
+                    "WORDPRESS_DB_HOST=$$config_wordpress_db_host",
+                    "WORDPRESS_DB_USER=$$config_wordpress_db_user",
+                    "WORDPRESS_DB_PASSWORD=$$secret_wordpress_db_password",
+                    "WORDPRESS_DB_NAME=$$config_wordpress_db_name",
+                    "WORDPRESS_CONFIG_EXTRA=$$config_wordpress_config_extra"
+                ],
+                "ports": [
+                    "80"
+                ]
+            },
+            "$$id-mysql": {
+                "name": "MySQL",
+                "depends_on": [],
+                "image": "mysql:5.7",
+                "volumes": [
+                    "$$id-mysql-data:/var/lib/mysql",
+                ],
+                "environment": [
+                    "MYSQL_ROOT_PASSWORD=$$secret_mysql_root_password",
+                    "MYSQL_ROOT_USER=$$config_mysql_root_user",
+                    "MYSQL_DATABASE=$$config_mysql_database",
+                    "MYSQL_USER=$$config_mysql_user",
+                    "MYSQL_PASSWORD=$$secret_mysql_password",
+                ],
+                "ports": []
+            }
+        },
+        "variables": [
+            {
+                "id": "$$config_wordpress_db_host",
+                "name": "WORDPRESS_DB_HOST",
+                "label": "WordPress DB Host",
+                "defaultValue": "$$id-mysql",
+                "description": ""
+            },
+            {
+                "id": "$$config_wordpress_db_user",
+                "name": "WORDPRESS_DB_USER",
+                "label": "WordPress DB User",
+                "defaultValue": "$$config_mysql_user",
+                "description": ""
+            },
+            {
+                "id": "$$secret_wordpress_db_password",
+                "name": "WORDPRESS_DB_PASSWORD",
+                "label": "WordPress DB Password",
+                "defaultValue": "$$secret_mysql_password",
+                "description": ""
+            },
+            {
+                "id": "$$config_wordpress_db_name",
+                "name": "WORDPRESS_DB_NAME",
+                "label": "WordPress DB Name",
+                "defaultValue": "$$config_mysql_database",
+                "description": ""
+            },
+            {
+                "id": "$$config_wordpress_config_extra",
+                "name": "WORDPRESS_CONFIG_EXTRA",
+                "label": "WordPress Config Extra",
+                "defaultValue": "",
+                "description": ""
+            },
+            {
+                "id": "$$secret_mysql_root_password",
+                "name": "MYSQL_ROOT_PASSWORD",
+                "label": "MySQL Root Password",
+                "defaultValue": "$$generate_password",
+                "description": ""
+            },
+            {
+                "id": "$$config_mysql_root_user",
+                "name": "MYSQL_ROOT_USER",
+                "label": "MySQL Root User",
+                "defaultValue": "$$generate_username",
+                "description": ""
+            },
+            {
+                "id": "$$config_mysql_database",
+                "name": "MYSQL_DATABASE",
+                "label": "MySQL Database",
+                "defaultValue": "wordpress",
+                "description": ""
+            },
+            {
+                "id": "$$config_mysql_user",
+                "name": "MYSQL_USER",
+                "label": "MySQL User",
+                "defaultValue": "$$generate_username",
+                "description": ""
+            },
+            {
+                "id": "$$secret_mysql_password",
+                "name": "MYSQL_PASSWORD",
+                "label": "MySQL Password",
+                "defaultValue": "$$generate_password",
+                "description": ""
+            }
+        ]
+    },
+    {
+        "templateVersion": "1.0.0",
         "serviceDefaultVersion": "4.7.1",
         "name": "vscodeserver",
         "displayName": "VSCode Server",

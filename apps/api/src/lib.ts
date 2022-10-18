@@ -11,13 +11,44 @@ export async function migrateServicesToNewTemplate() {
             if (service.type === 'fider' && service.fider) await fider(service)
             if (service.type === 'minio' && service.minio) await minio(service)
             if (service.type === 'vscodeserver' && service.vscodeserver) await vscodeserver(service)
+            if (service.type === 'wordpress' && service.wordpress) await wordpress(service)
+
         }
     } catch (error) {
         console.log(error)
 
     }
 }
+async function wordpress(service: any) {
+    const { extraConfig, tablePrefix, ownMysql, mysqlHost, mysqlPort, mysqlUser, mysqlPassword, mysqlRootUser, mysqlRootUserPassword, mysqlDatabase, ftpEnabled, ftpUser, ftpPassword, ftpPublicPort, ftpHostKey, ftpHostKeyPrivate } = service.wordpress
 
+    const secrets = [
+        `MYSQL_ROOT_PASSWORD@@@${mysqlRootUserPassword}`,
+        `MYSQL_PASSWORD@@@${mysqlPassword}`,
+        ftpPassword && `FTP_PASSWORD@@@${ftpPassword}`,
+        ftpHostKeyPrivate && `FTP_HOST_KEY_PRIVATE@@@${ftpHostKeyPrivate}`,
+        ftpHostKey && `FTP_HOST_KEY@@@${ftpHostKey}`,
+    ]
+    const settings = [
+        `MYSQL_ROOT_USER@@@${mysqlRootUser}`,
+        `MYSQL_USER@@@${mysqlUser}`,
+        `MYSQL_DATABASE@@@${mysqlDatabase}`,
+        `MYSQL_HOST@@@${mysqlHost}`,
+        `MYSQL_PORT@@@${mysqlPort}`,
+        `FTP_ENABLED@@@${ftpEnabled}`,
+        `FTP_USER@@@${ftpUser}`,
+        `FTP_PUBLIC_PORT@@@${ftpPublicPort}`,
+        `WORDPRESS_CONFIG_EXTRA@@@${extraConfig}`,
+        `WORDPRESS_TABLE_PREFIX@@@${tablePrefix}`,
+        `OWN_MYSQL@@@${ownMysql}`,
+
+    ]
+    await migrateSecrets(secrets, service);
+    await migrateSettings(settings, service);
+
+    // Remove old service data
+    // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
+}
 async function vscodeserver(service: any) {
     const { password } = service.vscodeserver
 
