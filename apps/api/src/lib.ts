@@ -20,7 +20,7 @@ async function migrateSettings(settings: any[], service: any) {
         if (!setting) continue;
         const [name, value] = setting.split('@@@')
         console.log('Migrating setting', name, value)
-        await prisma.serviceSetting.findFirst({ where: { name } }) || await prisma.serviceSetting.create({ data: { name, value, service: { connect: { id: service.id } } } })
+        await prisma.serviceSetting.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name, value, service: { connect: { id: service.id } } } })
     }
 }
 async function migrateSecrets(secrets: any[], service: any) {
@@ -28,13 +28,13 @@ async function migrateSecrets(secrets: any[], service: any) {
         if (!secret) continue;
         const [name, value] = secret.split('@@@')
         console.log('Migrating secret', name, value)
-        await prisma.serviceSecret.findFirst({ where: { name } }) || await prisma.serviceSecret.create({ data: { name, value, service: { connect: { id: service.id } } } })
+        await prisma.serviceSecret.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSecret.create({ data: { name, value, service: { connect: { id: service.id } } } })
     }
 }
 async function createVolumes(volumes: any[], service: any) {
     for (const volume of volumes) {
         const [volumeName, path, containerId] = volume.split('@@@')
-        await prisma.servicePersistentStorage.findFirst({ where: { volumeName } }) || await prisma.servicePersistentStorage.create({ data: { volumeName, path, containerId, predefined: true, service: { connect: { id: service.id } } } })
+        await prisma.servicePersistentStorage.findFirst({ where: { volumeName, serviceId: service.id } }) || await prisma.servicePersistentStorage.create({ data: { volumeName, path, containerId, predefined: true, service: { connect: { id: service.id } } } })
     }
 }
 async function fider(service: any) {
