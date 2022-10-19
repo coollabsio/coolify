@@ -1,6 +1,81 @@
 export default [
     {
         "templateVersion": "1.0.0",
+        "serviceDefaultVersion": "v2.13.0",
+        "name": "hasura",
+        "displayName": "Hasura",
+        "description": "Instant realtime GraphQL APIs on any Postgres application, existing or new.",
+        "services": {
+            "$$id": {
+                "name": "Hasura",
+                "depends_on": [
+                    "$$id-postgresql"
+                ],
+                "image": "hasura/graphql-engine:$$core_version",
+                "volumes": [],
+                "environment": [
+                    "HASURA_GRAPHQL_METADATA_DATABASE_URL=$$secret_hasura_metadata_database_url",
+                    "HASURA_GRAPHQL_ADMIN_PASSWORD=$$secret_hasura_admin_password",
+                ],
+                "ports": [
+                    "8080"
+                ]
+            },
+            "$$id-postgresql": {
+                "name": "PostgreSQL",
+                "depends_on": [],
+                "image": "postgres:12-alpine",
+                "volumes": [
+                    "$$id-postgresql-data:/var/lib/postgresql/data",
+                ],
+                "environment": [
+                    "POSTGRES_USER=$$config_postgres_user",
+                    "POSTGRES_PASSWORD=$$secret_postgres_password",
+                    "POSTGRES_DB=$$config_postgres_db",
+                ],
+                "ports": []
+            }
+        },
+        "variables": [
+            {
+                "id": "$$secret_hasura_metadata_database_url",
+                "name": "HASURA_GRAPHQL_METADATA_DATABASE_URL",
+                "label": "Hasura Metadata Database URL",
+                "defaultValue": "postgresql://$$config_postgres_user:$$secret_postgres_password@$$id-postgresql:5432/$$config_postgres_db",
+                "description": ""
+            },
+            {
+                "id": "$$secret_hasura_admin_password",
+                "name": "HASURA_GRAPHQL_ADMIN_PASSWORD",
+                "label": "Hasura Admin Password",
+                "defaultValue": "$$generate_password",
+                "description": ""
+            },
+            {
+                "id": "$$config_postgres_user",
+                "name": "POSTGRES_USER",
+                "label": "PostgreSQL User",
+                "defaultValue": "$$generate_username",
+                "description": "",
+            },
+            {
+                "id": "$$secret_postgres_password",
+                "name": "POSTGRES_PASSWORD",
+                "label": "PostgreSQL Password",
+                "defaultValue": "$$generate_password",
+                "description": "",
+            },
+            {
+                "id": "$$config_postgres_db",
+                "name": "POSTGRES_DB",
+                "label": "PostgreSQL Database",
+                "defaultValue": "hasura",
+                "description": "",
+            },
+        ]
+    },
+    {
+        "templateVersion": "1.0.0",
         "serviceDefaultVersion": "postgresql-v1.38.0",
         "name": "umami",
         "displayName": "Umami",
@@ -223,7 +298,7 @@ export default [
             {
                 "id": "$$secret_admin_password",
                 "name": "ADMIN_PASSWORD",
-                "label": "Admin Password",
+                "label": "Initial Admin Password",
                 "defaultValue": "$$generate_password",
                 "description": "",
                 "extras": {

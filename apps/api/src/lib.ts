@@ -15,12 +15,31 @@ export async function migrateServicesToNewTemplate() {
             if (service.type === 'ghost' && service.ghost) await ghost(service)
             if (service.type === 'meilisearch' && service.meiliSearch) await meilisearch(service)
             if (service.type === 'umami' && service.umami) await umami(service)
+            if (service.type === 'hasura' && service.hasura) await hasura(service)
             await createVolumes(service);
         }
     } catch (error) {
         console.log(error)
 
     }
+}
+async function hasura(service: any) {
+    const { postgresqlUser, postgresqlPassword, postgresqlDatabase, graphQLAdminPassword } = service.hasura
+
+    const secrets = [
+        `HASURA_GRAPHQL_ADMIN_PASSWORD@@@${graphQLAdminPassword}`,
+        `HASURA_GRAPHQL_METADATA_DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@$$generate_fqdn:5432/${postgresqlDatabase}`)}`,
+        `POSTGRES_PASSWORD@@@${postgresqlPassword}`,
+    ]
+    const settings = [
+        `POSTGRES_USER@@@${postgresqlUser}`,
+        `POSTGRES_DB@@@${postgresqlDatabase}`,
+    ]
+    await migrateSecrets(secrets, service);
+    await migrateSettings(settings, service);
+
+    // Remove old service data
+    // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
 }
 async function umami(service: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, umamiAdminPassword, hashSalt } = service.umami
@@ -30,10 +49,9 @@ async function umami(service: any) {
         `HASH_SALT@@@${hashSalt}`,
         `POSTGRES_PASSWORD@@@${postgresqlPassword}`,
         `ADMIN_PASSWORD@@@${umamiAdminPassword}`,
-
+        `DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@$$generate_fqdn:5432/${postgresqlDatabase}`)}`,
     ]
     const settings = [
-        `DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@$$generate_fqdn:5432/${postgresqlDatabase}`)}`,
         `POSTGRES_USER@@@${postgresqlUser}`,
         `POSTGRES_DB@@@${postgresqlDatabase}`,
     ]
