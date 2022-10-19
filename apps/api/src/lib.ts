@@ -23,7 +23,7 @@ export async function migrateServicesToNewTemplate() {
     }
 }
 async function umami(service: any) {
-    const { postgresqlUser, postgresqlPassword, postgresqlDatabase, umamiAdminPassword, hashSalt } = service.ghost
+    const { postgresqlUser, postgresqlPassword, postgresqlDatabase, umamiAdminPassword, hashSalt } = service.umami
 
 
     const secrets = [

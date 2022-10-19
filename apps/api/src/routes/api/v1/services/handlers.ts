@@ -12,6 +12,7 @@ import type { OnlyId } from '../../../../types';
 import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetGlitchTipSettings, SetWordpressSettings } from './types';
 import { supportedServiceTypesAndVersions } from '../../../../lib/services/supportedVersions';
 import { configureServiceType, removeService } from '../../../../lib/services/common';
+import { hashPassword } from '../handlers';
 
 export async function listServices(request: FastifyRequest) {
     try {
@@ -169,7 +170,7 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
         if (service.serviceSecret.length > 0) {
             for (const secret of service.serviceSecret) {
                 const { name, value } = secret
-                parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(`$$secret_${name.toLowerCase()}`, value))
+                parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(`$$hashed$$secret_${name.toLowerCase()}`, bcrypt.hashSync(value, 10)).replaceAll(`$$secret_${name.toLowerCase()}`, value))
             }
         }
     }
@@ -223,11 +224,6 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                             variable.value = generatePassword({ length });
                         } else if (variable.defaultValue === '$$generate_passphrase') {
                             variable.value = generatePassword({ length });
-                        } else if (variable.defaultValue === '$$generate_hashed_password') {
-                            variable.value = bcrypt.hashSync(
-                                generatePassword({ length }),
-                                10
-                            );
                         }
                     }
                     if (variableId.startsWith('$$config_')) {

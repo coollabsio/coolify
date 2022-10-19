@@ -1,7 +1,7 @@
 export default [
     {
         "templateVersion": "1.0.0",
-        "serviceDefaultVersion": "postgres:12-alpine",
+        "serviceDefaultVersion": "postgresql-v1.38.0",
         "name": "umami",
         "displayName": "Umami",
         "description": "Umami is a simple, easy to use, self-hosted web analytics solution. The goal is to provide you with a friendly privacy-focused alternative to Google Analytics.",
@@ -15,6 +15,7 @@ export default [
                 "image": "ghcr.io/umami-software/umami:$$core_version",
                 "volumes": [],
                 "environment": [
+                    "ADMIN_PASSWORD=$$secret_admin_password",
                     "DATABASE_URL=$$secret_database_url",
                     "DATABASE_TYPE=postgresql",
                     "HASH_SALT=$$secret_hash_salt",
@@ -26,6 +27,10 @@ export default [
             "$$id-postgresql": {
                 "name": "PostgreSQL",
                 "documentation": "Official docs are [here](https://umami.is/docs/getting-started)",
+                "build": {
+                    context: "$$workdir",
+                    dockerfile: "Dockerfile.$$id-postgresql"
+                },
                 "depends_on": [],
                 "image": "postgres:12-alpine",
                 "volumes": [
@@ -41,7 +46,8 @@ export default [
                     "files": [
                         {
                             source: "$$workdir/schema.postgresql.sql",
-                            destination: `
+                            destination: "/docker-entrypoint-initdb.d/schema.postgresql.sql",
+                            content: `
                             -- CreateTable
                     CREATE TABLE "account" (
                         "user_id" SERIAL NOT NULL,
@@ -172,7 +178,7 @@ export default [
                     -- AddForeignKey
                     ALTER TABLE "website" ADD FOREIGN KEY ("user_id") REFERENCES "account"("user_id") ON DELETE CASCADE ON UPDATE CASCADE;
                     
-                            insert into account (username, password, is_admin) values ('admin', '$$secret_admin_password', true);`
+                            insert into account (username, password, is_admin) values ('admin', '$$hashed$$secret_admin_password', true);`
                         },
                     ]
                 }
@@ -201,7 +207,7 @@ export default [
                 "description": "",
             },
             {
-                "id": "$$config_postgres_password",
+                "id": "$$secret_postgres_password",
                 "name": "POSTGRES_PASSWORD",
                 "label": "PostgreSQL Password",
                 "defaultValue": "$$generate_password",
@@ -218,8 +224,11 @@ export default [
                 "id": "$$secret_admin_password",
                 "name": "ADMIN_PASSWORD",
                 "label": "Admin Password",
-                "defaultValue": "$$generate_hashed_password",
+                "defaultValue": "$$generate_password",
                 "description": "",
+                "extras": {
+                    "isVisibleOnUI": true,
+                }
             },
         ]
     },

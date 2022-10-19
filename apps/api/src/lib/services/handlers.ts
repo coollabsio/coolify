@@ -692,7 +692,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         const teamId = request.user.teamId;
 
         const service = await getServiceFromDB({ id, teamId });
-        const { type, version, destinationDockerId, destinationDocker, serviceSecret, serviceSetting, exposePort, persistentStorage } =
+        const { type, destinationDockerId, destinationDocker, persistentStorage } =
             service;
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
