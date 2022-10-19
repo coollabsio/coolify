@@ -70,6 +70,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import Menu from './_Menu.svelte';
+	import { saveForm } from './utils';
 	const { id } = $page.params;
 
 	$isDeploymentEnabled = checkIfDeploymentEnabledServices($appSession.isAdmin, service);
@@ -112,6 +113,11 @@
 		$status.service.initialLoading = true;
 		$status.service.loading = true;
 		try {
+			const form: any = document.getElementById('saveForm');
+			if (form) {
+				const formData = new FormData(form);
+				service = await saveForm(formData, service);
+			}
 			await post(`/services/${service.id}/start`, {});
 		} catch (error) {
 			return errorNotification(error);

@@ -16,12 +16,46 @@ export async function migrateServicesToNewTemplate() {
             if (service.type === 'meilisearch' && service.meiliSearch) await meilisearch(service)
             if (service.type === 'umami' && service.umami) await umami(service)
             if (service.type === 'hasura' && service.hasura) await hasura(service)
+            if (service.type === 'glitchtip' && service.glitchTip) await glitchtip(service)
             await createVolumes(service);
         }
     } catch (error) {
         console.log(error)
 
     }
+}
+async function glitchtip(service: any) {
+    const { postgresqlUser, postgresqlPassword, postgresqlDatabase, secretKeyBase, defaultEmail, defaultUsername, defaultPassword, defaultEmailFrom, emailSmtpHost, emailSmtpPort, emailSmtpUser, emailSmtpPassword, emailSmtpUseTls, emailSmtpUseSsl, emailBackend, mailgunApiKey, sendgridApiKey, enableOpenUserRegistration } = service.glitchTip
+
+    const secrets = [
+        `POSTGRES_PASSWORD@@@${postgresqlPassword}`,
+        `SECRET_KEY@@@${secretKeyBase}`,
+        `DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@$$generate_fqdn:5432/${postgresqlDatabase}`)}`,
+        `REDIS_URL@@@${encrypt(`redis://$$generate_fqdn:6379`)}`,
+        `EMAIL_HOST_PASSWORD@@@${emailSmtpPassword}`,
+        `MAILGUN_API_KEY@@@${mailgunApiKey}`,
+        `SENDGRID_API_KEY@@@${sendgridApiKey}`,
+        `DJANGO_SUPERUSER_PASSWORD@@@${defaultPassword}`,
+    ]
+    const settings = [
+        `POSTGRES_USER@@@${postgresqlUser}`,
+        `POSTGRES_DB@@@${postgresqlDatabase}`,
+        `DEFAULT_FROM_EMAIL@@@${defaultEmailFrom}`,
+        `EMAIL_HOST@@@${emailSmtpHost}`,
+        `EMAIL_PORT@@@${emailSmtpPort}`,
+        `EMAIL_HOST_USER@@@${emailSmtpUser}`,
+        `EMAIL_USE_TLS@@@${emailSmtpUseTls}`,
+        `EMAIL_USE_SSL@@@${emailSmtpUseSsl}`,
+        `EMAIL_BACKEND@@@${emailBackend}`,
+        `ENABLE_OPEN_USER_REGISTRATION@@@${enableOpenUserRegistration}`,
+        `DJANGO_SUPERUSER_EMAIL@@@${defaultEmail}`,
+        `DJANGO_SUPERUSER_USERNAME@@@${defaultUsername}`,
+    ]
+    await migrateSecrets(secrets, service);
+    await migrateSettings(settings, service);
+
+    // Remove old service data
+    // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
 }
 async function hasura(service: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, graphQLAdminPassword } = service.hasura

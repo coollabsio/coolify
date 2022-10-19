@@ -34,6 +34,7 @@
 	import DocLink from '$lib/components/DocLink.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import ServiceStatus from '$lib/components/ServiceStatus.svelte';
+	import { saveForm } from './utils';
 
 	const { id } = $page.params;
 	$: isDisabled =
@@ -71,30 +72,9 @@
 	}
 
 	async function handleSubmit(e: any) {
-		const formData = new FormData(e.target);
-		const settings = service.serviceSetting.map((setting: { name: string }) => setting.name);
-		const baseCoolifySetting = ['name', 'fqdn', 'exposePort'];
-
-		for (let field of formData) {
-			const [key, value] = field;
-			service.serviceSetting = service.serviceSetting.map((setting: any) => {
-				if (setting.name === key) {
-					setting.changed = true;
-					setting.value = value;
-				}
-				return setting;
-			});
-			if (!settings.includes(key) && !baseCoolifySetting.includes(key)) {
-				service.serviceSetting.push({
-					id: service.id,
-					name: key,
-					value: value,
-					isNew: true
-				});
-			}
-		}
 		if (loading.save) return;
 		loading.save = true;
+
 		try {
 			// await post(`/services/${id}/check`, {
 			// 	fqdn: service.fqdn,
@@ -103,13 +83,10 @@
 			// 	otherFqdns: service.minio?.apiFqdn ? [service.minio?.apiFqdn] : [],
 			// 	exposePort: service.exposePort
 			// });
-			await post(`/services/${id}`, { ...service });
+			const formData = new FormData(e.target);
+			service = await saveForm(formData, service);
 			setLocation(service);
-
-			const reloadServices = await get(`/services/${id}`);
-			service = reloadServices.service
 			forceSave = false;
-			
 			$isDeploymentEnabled = checkIfDeploymentEnabledServices($appSession.isAdmin, service);
 			return addToast({
 				message: 'Configuration saved.',

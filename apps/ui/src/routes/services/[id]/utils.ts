@@ -1,4 +1,4 @@
-import { post } from '$lib/api';
+import { get, post } from '$lib/api';
 import { t } from '$lib/translations';
 import { errorNotification } from '$lib/common';
 
@@ -39,4 +39,31 @@ export async function saveSecret({
 	} catch (error) {
 		throw error
 	}
+}
+
+export async function saveForm(formData: any, service: any) {
+	const settings = service.serviceSetting.map((setting: { name: string }) => setting.name);
+	const baseCoolifySetting = ['name', 'fqdn', 'exposePort'];
+	for (let field of formData) {
+		const [key, value] = field;
+		service.serviceSetting = service.serviceSetting.map((setting: any) => {
+			if (setting.name === key) {
+				setting.changed = true;
+				setting.value = value;
+			}
+			return setting;
+		});
+		if (!settings.includes(key) && !baseCoolifySetting.includes(key)) {
+			service.serviceSetting.push({
+				id: service.id,
+				name: key,
+				value: value,
+				isNew: true
+			});
+		}
+	}
+	await post(`/services/${service.id}`, { ...service });
+	const { service: reloadedService } = await get(`/services/${service.id}`);
+	return reloadedService;
+
 }
