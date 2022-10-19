@@ -1,6 +1,157 @@
 export default [
     {
         "templateVersion": "1.0.0",
+        "serviceDefaultVersion": "latest",
+        "name": "ghost",
+        "displayName": "Ghost",
+        "description": "Ghost is a free and open source blogging platform written in JavaScript and distributed under the MIT License",
+        "services": {
+            "$$id": {
+                "name": "Ghost",
+                "documentation": "Taken from https://docs.ghost.org/",
+                "depends_on": [
+                    "$$id_mysql"
+                ],
+                "image": "bitnami/ghost:$$core_version",
+                "volumes": [
+                    "$$id-ghost:/bitnami/ghost",
+                ],
+                "environment": [
+                    "url=$$config_url",
+                    "GHOST_HOST=$$config_ghost_host",
+                    "GHOST_ENABLE_HTTPS=$$config_ghost_enable_https",
+                    "GHOST_EMAIL=$$config_ghost_email",
+                    "GHOST_DATABASE_HOST=$$config_ghost_database_host",
+                    "GHOST_DATABASE_USER=$$config_mariadb_user",
+                    "GHOST_DATABASE_PASSWORD=$$config_mariadb_password",
+                    "GHOST_DATABASE_NAME=$$config_mariadb_database",
+                    "GHOST_DATABASE_PORT_NUMBER=$$config_mariadb_port",
+
+                ],
+                "ports": [
+                    "2368"
+                ]
+            },
+            "$$id-mariadb": {
+                "name": "MariaDB",
+                "depends_on": [],
+                "image": "bitnami/mariadb:latest",
+                "volumes": [
+                    "$$id-mariadb:/bitnami/mariadb",
+                ],
+                "environment": [
+                    "MARIADB_USER=$$config_mariadb_user",
+                    "MARIADB_PASSWORD=$$secret_mariadb_password",
+                    "MARIADB_DATABASE=$$config_mariadb_database",
+                    "MARIADB_ROOT_USER=$$config_mariadb_root_user",
+                    "MARIADB_ROOT_PASSWORD=$$secret_mariadb_root_password"
+                ],
+                "ports": []
+            }
+        },
+        "variables": [
+            {
+                "id": "$$config_url",
+                "name": "url",
+                "label": "URL",
+                "defaultValue": "$$generate_fqdn",
+                "description": ""
+            },
+            {
+                "id": "$$config_ghost_host",
+                "name": "GHOST_HOST",
+                "label": "Ghost Host",
+                "defaultValue": "",
+                "description": ""
+            },
+            {
+                "id": "$$config_ghost_enable_https",
+                "name": "GHOST_ENABLE_HTTPS",
+                "label": "Ghost Enable HTTPS",
+                "defaultValue": "$$config_mysql_user",
+                "description": ""
+            },
+            {
+                "id": "$$config_ghost_email",
+                "name": "GHOST_EMAIL",
+                "label": "Ghost Email",
+                "defaultValue": "admin@example.com",
+                "description": ""
+            },
+            {
+                "id": "$$config_ghost_database_host",
+                "name": "GHOST_DATABASE_HOST",
+                "label": "Ghost Database Host",
+                "defaultValue": "$$id-mariadb",
+                "description": ""
+            },
+            {
+                "id": "$$config_ghost_database_user",
+                "name": "GHOST_DATABASE_USER",
+                "label": "MariaDB User",
+                "defaultValue": "$$config_mariadb_user",
+                "description": ""
+            },
+            {
+                "id": "$$config_ghost_database_password",
+                "name": "GHOST_DATABASE_PASSWORD",
+                "label": "MariaDB Password",
+                "defaultValue": "$$config_mariadb_password",
+                "description": ""
+            },
+            {
+                "id": "$$config_ghost_database_name",
+                "name": "GHOST_DATABASE_NAME",
+                "label": "MariaDB Database",
+                "defaultValue": "$$config_mariadb_database",
+                "description": ""
+            },
+            {
+                "id": "$$config_ghost_database_port_number",
+                "name": "GHOST_DATABASE_PORT_NUMBER",
+                "label": "MariaDB Port",
+                "defaultValue": "$$config_mariadb_port",
+                "description": ""
+            },
+            {
+                "id": "$$config_mariadb_user",
+                "name": "MARIADB_USER",
+                "label": "MariaDB User",
+                "defaultValue": "$$generate_username",
+                "description": ""
+            },
+            {
+                "id": "$$secret_mariadb_password",
+                "name": "MARIADB_PASSWORD",
+                "label": "MariaDB Password",
+                "defaultValue": "$$generate_password",
+                "description": ""
+            },
+            {
+                "id": "$$config_mariadb_database",
+                "name": "MARIADB_DATABASE",
+                "label": "MariaDB Database",
+                "defaultValue": "ghost",
+                "description": ""
+            },
+            {
+                "id": "$$config_mariadb_root_user",
+                "name": "MARIADB_ROOT_USER",
+                "label": "MariaDB Root User",
+                "defaultValue": "$$generate_username",
+                "description": ""
+            },
+            {
+                "id": "$$secret_mariadb_root_password",
+                "name": "MARIADB_ROOT_PASSWORD",
+                "label": "MariaDB Root Password",
+                "defaultValue": "$$generate_password",
+                "description": ""
+            },
+        ]
+    },
+    {
+        "templateVersion": "1.0.0",
         "serviceDefaultVersion": "php8.1",
         "name": "wordpress",
         "displayName": "WordPress",
