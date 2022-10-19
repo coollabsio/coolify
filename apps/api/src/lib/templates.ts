@@ -21,11 +21,12 @@ export default [
                     "GHOST_HOST=$$config_ghost_host",
                     "GHOST_ENABLE_HTTPS=$$config_ghost_enable_https",
                     "GHOST_EMAIL=$$config_ghost_email",
+                    "GHOST_PASSWORD=$$secret_ghost_password",
                     "GHOST_DATABASE_HOST=$$config_ghost_database_host",
                     "GHOST_DATABASE_USER=$$config_mariadb_user",
-                    "GHOST_DATABASE_PASSWORD=$$config_mariadb_password",
+                    "GHOST_DATABASE_PASSWORD=$$secret_ghost_database_password",
                     "GHOST_DATABASE_NAME=$$config_mariadb_database",
-                    "GHOST_DATABASE_PORT_NUMBER=$$config_mariadb_port",
+                    "GHOST_DATABASE_PORT_NUMBER=3306",
 
                 ],
                 "ports": [
@@ -68,14 +69,21 @@ export default [
                 "id": "$$config_ghost_enable_https",
                 "name": "GHOST_ENABLE_HTTPS",
                 "label": "Ghost Enable HTTPS",
-                "defaultValue": "$$config_mysql_user",
+                "defaultValue": "no",
                 "description": ""
             },
             {
                 "id": "$$config_ghost_email",
                 "name": "GHOST_EMAIL",
-                "label": "Ghost Email",
+                "label": "Ghost Default Email",
                 "defaultValue": "admin@example.com",
+                "description": ""
+            },
+            {
+                "id": "$$secret_ghost_password",
+                "name": "GHOST_PASSWORD",
+                "label": "Ghost Default Password",
+                "defaultValue": "$$generate_password",
                 "description": ""
             },
             {
@@ -93,10 +101,10 @@ export default [
                 "description": ""
             },
             {
-                "id": "$$config_ghost_database_password",
+                "id": "$$secret_ghost_database_password",
                 "name": "GHOST_DATABASE_PASSWORD",
                 "label": "MariaDB Password",
-                "defaultValue": "$$config_mariadb_password",
+                "defaultValue": "$$secret_mariadb_password",
                 "description": ""
             },
             {
@@ -104,13 +112,6 @@ export default [
                 "name": "GHOST_DATABASE_NAME",
                 "label": "MariaDB Database",
                 "defaultValue": "$$config_mariadb_database",
-                "description": ""
-            },
-            {
-                "id": "$$config_ghost_database_port_number",
-                "name": "GHOST_DATABASE_PORT_NUMBER",
-                "label": "MariaDB Port",
-                "defaultValue": "$$config_mariadb_port",
                 "description": ""
             },
             {

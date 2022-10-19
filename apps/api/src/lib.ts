@@ -1,4 +1,4 @@
-import { decrypt, encrypt, prisma } from "./lib/common";
+import { decrypt, encrypt, getDomain, prisma } from "./lib/common";
 import { includeServices } from "./lib/services/common";
 
 
@@ -12,12 +12,44 @@ export async function migrateServicesToNewTemplate() {
             if (service.type === 'minio' && service.minio) await minio(service)
             if (service.type === 'vscodeserver' && service.vscodeserver) await vscodeserver(service)
             if (service.type === 'wordpress' && service.wordpress) await wordpress(service)
+            if (service.type === 'ghost' && service.ghost) await ghost(service)
 
         }
     } catch (error) {
         console.log(error)
 
     }
+}
+async function ghost(service: any) {
+    const { defaultEmail, defaultPassword, mariadbUser, mariadbPassword, mariadbRootUser, mariadbRootUserPassword, mariadbDatabase } = service.ghost
+    const { fqdn } = service
+
+    const isHttps = fqdn.startsWith('https://');
+
+    const secrets = [
+        `GHOST_PASSWORD@@@${defaultPassword}`,
+        `MARIADB_PASSWORD@@@${mariadbPassword}`,
+        `MARIADB_ROOT_PASSWORD@@@${mariadbRootUserPassword}`,
+        `GHOST_DATABASE_PASSWORD@@@${mariadbPassword}`,
+    ]
+    const settings = [
+        `GHOST_EMAIL@@@${defaultEmail}`,
+        `GHOST_DATABASE_HOST@@@${service.id}-mariadb`,
+        `GHOST_DATABASE_USER@@@${mariadbUser}`,
+        `GHOST_DATABASE_NAME@@@${mariadbDatabase}`,
+        `GHOST_DATABASE_PORT_NUMBER@@@3306`,
+        `MARIADB_USER@@@${mariadbUser}`,
+        `MARIADB_DATABASE@@@${mariadbDatabase}`,
+        `MARIADB_ROOT_USER@@@${mariadbRootUser}`,
+        `GHOST_HOST@@@${getDomain(fqdn)}`,
+        `url@@@${fqdn}`,
+        `GHOST_ENABLE_HTTPS@@@${isHttps ? 'yes' : 'no'}`
+    ]
+    await migrateSecrets(secrets, service);
+    await migrateSettings(settings, service);
+
+    // Remove old service data
+    // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
 }
 async function wordpress(service: any) {
     const { extraConfig, tablePrefix, ownMysql, mysqlHost, mysqlPort, mysqlUser, mysqlPassword, mysqlRootUser, mysqlRootUserPassword, mysqlDatabase, ftpEnabled, ftpUser, ftpPassword, ftpPublicPort, ftpHostKey, ftpHostKeyPrivate } = service.wordpress
