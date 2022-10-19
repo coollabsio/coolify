@@ -142,7 +142,7 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
             parsedTemplate = foundTemplate
         }
         // replace $$id and $$workdir
-        parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll('$$id', service.id).replaceAll('$$core_version', foundTemplate.serviceDefaultVersion))
+        parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll('$$id', service.id).replaceAll('$$core_version', service.version || foundTemplate.serviceDefaultVersion))
 
         // replace $$fqdn
         if (workdir) {

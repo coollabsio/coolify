@@ -1,6 +1,6 @@
 import { decrypt, encrypt, getDomain, prisma } from "./lib/common";
 import { includeServices } from "./lib/services/common";
-
+import templates from "./lib/templates";
 
 export async function migrateServicesToNewTemplate() {
     // This function migrates old hardcoded services to the new template based services
@@ -13,8 +13,8 @@ export async function migrateServicesToNewTemplate() {
             if (service.type === 'vscodeserver' && service.vscodeserver) await vscodeserver(service)
             if (service.type === 'wordpress' && service.wordpress) await wordpress(service)
             if (service.type === 'ghost' && service.ghost) await ghost(service)
-            if (service.type === 'meilisearch' && service.meilisearch) await meilisearch(service)
-
+            if (service.type === 'meilisearch' && service.meiliSearch) await meilisearch(service)
+            await createVolumes(service);
         }
     } catch (error) {
         console.log(error)
@@ -23,7 +23,7 @@ export async function migrateServicesToNewTemplate() {
 }
 
 async function meilisearch(service: any) {
-    const { masterKey } = service.meilisearch
+    const { masterKey } = service.meiliSearch
 
     const secrets = [
         `MEILI_MASTER_KEY@@@${masterKey}`,
@@ -173,13 +173,9 @@ async function plausibleAnalytics(service: any) {
         `POSTGRES_PASSWORD@@@${postgresqlPassword}`,
         `DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@$$generate_fqdn:5432/${postgresqlDatabase}`)}`,
     ]
-    const volumes = [
-        `${service.id}-postgresql-data@@@/bitnami/postgresql@@@${service.id}-postgresql`,
-        `${service.id}-clickhouse-data@@@/var/lib/clickhouse/data@@@${service.id}-clickhouse`,
-    ]
     await migrateSettings(settings, service);
     await migrateSecrets(secrets, service);
-    await createVolumes(volumes, service);
+    await createVolumes(service);
 
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { plausibleAnalytics: { delete: true } } })
@@ -189,7 +185,7 @@ async function migrateSettings(settings: any[], service: any) {
     for (const setting of settings) {
         if (!setting) continue;
         const [name, value] = setting.split('@@@')
-        console.log('Migrating setting', name, value, 'for service', service.id, ', service name:', service.name)
+        // console.log('Migrating setting', name, value, 'for service', service.id, ', service name:', service.name)
         await prisma.serviceSetting.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name, value, service: { connect: { id: service.id } } } })
     }
 }
@@ -197,14 +193,29 @@ async function migrateSecrets(secrets: any[], service: any) {
     for (const secret of secrets) {
         if (!secret) continue;
         const [name, value] = secret.split('@@@')
-        console.log('Migrating secret', name, value, 'for service', service.id, ', service name:', service.name)
+        // console.log('Migrating secret', name, value, 'for service', service.id, ', service name:', service.name)
         await prisma.serviceSecret.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSecret.create({ data: { name, value, service: { connect: { id: service.id } } } })
     }
 }
-async function createVolumes(volumes: any[], service: any) {
+async function createVolumes(service: any) {
+    const volumes = [];
+    let template = templates.find(t => t.name === service.type)
+    if (template) {
+        template = JSON.parse(JSON.stringify(template).replaceAll('$$id', service.id))
+        for (const s of Object.keys(template.services)) {
+            if (template.services[s].volumes && template.services[s].volumes.length > 0) {
+                for (const volume of template.services[s].volumes) {
+                    const volumeName = volume.split(':')[0]
+                    const volumePath = volume.split(':')[1]
+                    const volumeService = service.id
+                    volumes.push(`${volumeName}@@@${volumePath}@@@${volumeService}`)
+                }
+            }
+        }
+    }
     for (const volume of volumes) {
         const [volumeName, path, containerId] = volume.split('@@@')
-        console.log('Creating volume', volumeName, path, containerId, 'for service', service.id, ', service name:', service.name)
+        // console.log('Creating volume', volumeName, path, containerId, 'for service', service.id, ', service name:', service.name)
         await prisma.servicePersistentStorage.findFirst({ where: { volumeName, serviceId: service.id } }) || await prisma.servicePersistentStorage.create({ data: { volumeName, path, containerId, predefined: true, service: { connect: { id: service.id } } } })
     }
 }

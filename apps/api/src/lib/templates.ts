@@ -1,7 +1,7 @@
 export default [
     {
         "templateVersion": "1.0.0",
-        "serviceDefaultVersion": "latest",
+        "serviceDefaultVersion": "v0.29.1",
         "name": "meilisearch",
         "displayName": "MeiliSearch",
         "description": "MeiliSearch is a lightning Fast, Ultra Relevant, and Typo-Tolerant Search Engine",
@@ -26,7 +26,6 @@ export default [
                     "7700"
                 ]
             }
-
         },
         "variables": [
             {
@@ -34,7 +33,10 @@ export default [
                 "name": "MEILI_MASTER_KEY",
                 "label": "Master Key",
                 "defaultValue": "$$generate_passphrase",
-                "description": ""
+                "description": "",
+                "extras": {
+                    "isVisibleOnUI": true,
+                }
             }
         ]
     },

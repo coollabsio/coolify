@@ -428,7 +428,7 @@
 										<option value="true">true</option>
 										<option value="false"> false</option>
 									</select>
-								{:else if variable.defaultValue === '$$generate_password'}
+								{:else if variable.defaultValue === '$$generate_password' || variable.defaultValue === '$$generate_passphrase'}
 									<CopyPasswordField
 										isPasswordField
 										readonly

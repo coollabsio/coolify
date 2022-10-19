@@ -64,11 +64,11 @@
 		<div class="grid grid-col-1 lg:grid-cols-2 pt-2">
 			<div>
 				<input
-					id={storage.id}
+					id={storage.volumeName}	
 					disabled
 					readonly
 					class="w-full"
-					value={`${storage.id}${storage.path.replace(/\//gi, '-')}:${storage.path}`}
+					value={`${storage.volumeName}:${storage.path}`}
 				/>
 			</div>
 			<div class="lg:px-2">
