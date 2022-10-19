@@ -2,6 +2,45 @@ export default [
     {
         "templateVersion": "1.0.0",
         "serviceDefaultVersion": "latest",
+        "name": "meilisearch",
+        "displayName": "MeiliSearch",
+        "description": "MeiliSearch is a lightning Fast, Ultra Relevant, and Typo-Tolerant Search Engine",
+        "services": {
+            "$$id": {
+                "name": "MeiliSearch",
+                "documentation": "https://docs.meilisearch.com/",
+                "depends_on": [
+                    "$$id_mysql"
+                ],
+                "image": "getmeili/meilisearch:$$core_version",
+                "volumes": [
+                    "$$id-datams:/meili_data/data.ms",
+                    "$$id-data:/meili_data",
+                    "$$id-snapshot:/snapshot",
+                    "$$id-dump:/dumps"
+                ],
+                "environment": [
+                    "MEILI_MASTER_KEY=$$secret_meili_master_key",
+                ],
+                "ports": [
+                    "7700"
+                ]
+            }
+
+        },
+        "variables": [
+            {
+                "id": "$$secret_meili_master_key",
+                "name": "MEILI_MASTER_KEY",
+                "label": "Master Key",
+                "defaultValue": "$$generate_passphrase",
+                "description": ""
+            }
+        ]
+    },
+    {
+        "templateVersion": "1.0.0",
+        "serviceDefaultVersion": "latest",
         "name": "ghost",
         "displayName": "Ghost",
         "description": "Ghost is a free and open source blogging platform written in JavaScript and distributed under the MIT License",

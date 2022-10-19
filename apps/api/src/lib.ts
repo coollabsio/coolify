@@ -13,12 +13,26 @@ export async function migrateServicesToNewTemplate() {
             if (service.type === 'vscodeserver' && service.vscodeserver) await vscodeserver(service)
             if (service.type === 'wordpress' && service.wordpress) await wordpress(service)
             if (service.type === 'ghost' && service.ghost) await ghost(service)
+            if (service.type === 'meilisearch' && service.meilisearch) await meilisearch(service)
 
         }
     } catch (error) {
         console.log(error)
 
     }
+}
+
+async function meilisearch(service: any) {
+    const { masterKey } = service.meilisearch
+
+    const secrets = [
+        `MEILI_MASTER_KEY@@@${masterKey}`,
+    ]
+
+    await migrateSecrets(secrets, service);
+
+    // Remove old service data
+    // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
 }
 async function ghost(service: any) {
     const { defaultEmail, defaultPassword, mariadbUser, mariadbPassword, mariadbRootUser, mariadbRootUserPassword, mariadbDatabase } = service.ghost
