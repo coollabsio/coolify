@@ -1,6 +1,230 @@
 export default [
     {
         "templateVersion": "1.0.0",
+        "serviceDefaultVersion": "postgres:12-alpine",
+        "name": "umami",
+        "displayName": "Umami",
+        "description": "Umami is a simple, easy to use, self-hosted web analytics solution. The goal is to provide you with a friendly privacy-focused alternative to Google Analytics.",
+        "services": {
+            "$$id": {
+                "name": "Umami",
+                "documentation": "Official docs are [here](https://umami.is/docs/getting-started)",
+                "depends_on": [
+                    "$$id-postgresql"
+                ],
+                "image": "ghcr.io/umami-software/umami:$$core_version",
+                "volumes": [],
+                "environment": [
+                    "DATABASE_URL=$$secret_database_url",
+                    "DATABASE_TYPE=postgresql",
+                    "HASH_SALT=$$secret_hash_salt",
+                ],
+                "ports": [
+                    "3000"
+                ]
+            },
+            "$$id-postgresql": {
+                "name": "PostgreSQL",
+                "documentation": "Official docs are [here](https://umami.is/docs/getting-started)",
+                "depends_on": [],
+                "image": "postgres:12-alpine",
+                "volumes": [
+                    "$$id-postgresql-data:/var/lib/postgresql/data",
+                ],
+                "environment": [
+                    "POSTGRES_USER=$$config_postgres_user",
+                    "POSTGRES_PASSWORD=$$secret_postgres_password",
+                    "POSTGRES_DB=$$config_postgres_db",
+                ],
+                "ports": [],
+                "extras": {
+                    "files": [
+                        {
+                            source: "$$workdir/schema.postgresql.sql",
+                            destination: `
+                            -- CreateTable
+                    CREATE TABLE "account" (
+                        "user_id" SERIAL NOT NULL,
+                        "username" VARCHAR(255) NOT NULL,
+                        "password" VARCHAR(60) NOT NULL,
+                        "is_admin" BOOLEAN NOT NULL DEFAULT false,
+                        "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+                        "updated_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+                    
+                        PRIMARY KEY ("user_id")
+                    );
+                    
+                    -- CreateTable
+                    CREATE TABLE "event" (
+                        "event_id" SERIAL NOT NULL,
+                        "website_id" INTEGER NOT NULL,
+                        "session_id" INTEGER NOT NULL,
+                        "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+                        "url" VARCHAR(500) NOT NULL,
+                        "event_type" VARCHAR(50) NOT NULL,
+                        "event_value" VARCHAR(50) NOT NULL,
+                    
+                        PRIMARY KEY ("event_id")
+                    );
+                    
+                    -- CreateTable
+                    CREATE TABLE "pageview" (
+                        "view_id" SERIAL NOT NULL,
+                        "website_id" INTEGER NOT NULL,
+                        "session_id" INTEGER NOT NULL,
+                        "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+                        "url" VARCHAR(500) NOT NULL,
+                        "referrer" VARCHAR(500),
+                    
+                        PRIMARY KEY ("view_id")
+                    );
+                    
+                    -- CreateTable
+                    CREATE TABLE "session" (
+                        "session_id" SERIAL NOT NULL,
+                        "session_uuid" UUID NOT NULL,
+                        "website_id" INTEGER NOT NULL,
+                        "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+                        "hostname" VARCHAR(100),
+                        "browser" VARCHAR(20),
+                        "os" VARCHAR(20),
+                        "device" VARCHAR(20),
+                        "screen" VARCHAR(11),
+                        "language" VARCHAR(35),
+                        "country" CHAR(2),
+                    
+                        PRIMARY KEY ("session_id")
+                    );
+                    
+                    -- CreateTable
+                    CREATE TABLE "website" (
+                        "website_id" SERIAL NOT NULL,
+                        "website_uuid" UUID NOT NULL,
+                        "user_id" INTEGER NOT NULL,
+                        "name" VARCHAR(100) NOT NULL,
+                        "domain" VARCHAR(500),
+                        "share_id" VARCHAR(64),
+                        "created_at" TIMESTAMPTZ(6) DEFAULT CURRENT_TIMESTAMP,
+                    
+                        PRIMARY KEY ("website_id")
+                    );
+                    
+                    -- CreateIndex
+                    CREATE UNIQUE INDEX "account.username_unique" ON "account"("username");
+                    
+                    -- CreateIndex
+                    CREATE INDEX "event_created_at_idx" ON "event"("created_at");
+                    
+                    -- CreateIndex
+                    CREATE INDEX "event_session_id_idx" ON "event"("session_id");
+                    
+                    -- CreateIndex
+                    CREATE INDEX "event_website_id_idx" ON "event"("website_id");
+                    
+                    -- CreateIndex
+                    CREATE INDEX "pageview_created_at_idx" ON "pageview"("created_at");
+                    
+                    -- CreateIndex
+                    CREATE INDEX "pageview_session_id_idx" ON "pageview"("session_id");
+                    
+                    -- CreateIndex
+                    CREATE INDEX "pageview_website_id_created_at_idx" ON "pageview"("website_id", "created_at");
+                    
+                    -- CreateIndex
+                    CREATE INDEX "pageview_website_id_idx" ON "pageview"("website_id");
+                    
+                    -- CreateIndex
+                    CREATE INDEX "pageview_website_id_session_id_created_at_idx" ON "pageview"("website_id", "session_id", "created_at");
+                    
+                    -- CreateIndex
+                    CREATE UNIQUE INDEX "session.session_uuid_unique" ON "session"("session_uuid");
+                    
+                    -- CreateIndex
+                    CREATE INDEX "session_created_at_idx" ON "session"("created_at");
+                    
+                    -- CreateIndex
+                    CREATE INDEX "session_website_id_idx" ON "session"("website_id");
+                    
+                    -- CreateIndex
+                    CREATE UNIQUE INDEX "website.website_uuid_unique" ON "website"("website_uuid");
+                    
+                    -- CreateIndex
+                    CREATE UNIQUE INDEX "website.share_id_unique" ON "website"("share_id");
+                    
+                    -- CreateIndex
+                    CREATE INDEX "website_user_id_idx" ON "website"("user_id");
+                    
+                    -- AddForeignKey
+                    ALTER TABLE "event" ADD FOREIGN KEY ("session_id") REFERENCES "session"("session_id") ON DELETE CASCADE ON UPDATE CASCADE;
+                    
+                    -- AddForeignKey
+                    ALTER TABLE "event" ADD FOREIGN KEY ("website_id") REFERENCES "website"("website_id") ON DELETE CASCADE ON UPDATE CASCADE;
+                    
+                    -- AddForeignKey
+                    ALTER TABLE "pageview" ADD FOREIGN KEY ("session_id") REFERENCES "session"("session_id") ON DELETE CASCADE ON UPDATE CASCADE;
+                    
+                    -- AddForeignKey
+                    ALTER TABLE "pageview" ADD FOREIGN KEY ("website_id") REFERENCES "website"("website_id") ON DELETE CASCADE ON UPDATE CASCADE;
+                    
+                    -- AddForeignKey
+                    ALTER TABLE "session" ADD FOREIGN KEY ("website_id") REFERENCES "website"("website_id") ON DELETE CASCADE ON UPDATE CASCADE;
+                    
+                    -- AddForeignKey
+                    ALTER TABLE "website" ADD FOREIGN KEY ("user_id") REFERENCES "account"("user_id") ON DELETE CASCADE ON UPDATE CASCADE;
+                    
+                            insert into account (username, password, is_admin) values ('admin', '$$secret_admin_password', true);`
+                        },
+                    ]
+                }
+            }
+        },
+        "variables": [
+            {
+                "id": "$$secret_database_url",
+                "name": "DATABASE_URL",
+                "label": "Database URL for PostgreSQL",
+                "defaultValue": "postgresql://$$config_postgres_user:$$secret_postgres_password@$$id-postgresql:5432/$$config_postgres_db",
+                "description": "",
+            },
+            {
+                "id": "$$secret_hash_salt",
+                "name": "HASH_SALT",
+                "label": "Hash Salt",
+                "defaultValue": "$$generate_passphrase",
+                "description": "",
+            },
+            {
+                "id": "$$config_postgres_user",
+                "name": "POSTGRES_USER",
+                "label": "PostgreSQL User",
+                "defaultValue": "$$generate_username",
+                "description": "",
+            },
+            {
+                "id": "$$config_postgres_password",
+                "name": "POSTGRES_PASSWORD",
+                "label": "PostgreSQL Password",
+                "defaultValue": "$$generate_password",
+                "description": "",
+            },
+            {
+                "id": "$$config_postgres_db",
+                "name": "POSTGRES_DB",
+                "label": "PostgreSQL Database",
+                "defaultValue": "umami",
+                "description": "",
+            },
+            {
+                "id": "$$secret_admin_password",
+                "name": "ADMIN_PASSWORD",
+                "label": "Admin Password",
+                "defaultValue": "$$generate_hashed_password",
+                "description": "",
+            },
+        ]
+    },
+    {
+        "templateVersion": "1.0.0",
         "serviceDefaultVersion": "v0.29.1",
         "name": "meilisearch",
         "displayName": "MeiliSearch",
@@ -9,9 +233,7 @@ export default [
             "$$id": {
                 "name": "MeiliSearch",
                 "documentation": "https://docs.meilisearch.com/",
-                "depends_on": [
-                    "$$id_mysql"
-                ],
+                "depends_on": [],
                 "image": "getmeili/meilisearch:$$core_version",
                 "volumes": [
                     "$$id-datams:/meili_data/data.ms",
@@ -51,7 +273,7 @@ export default [
                 "name": "Ghost",
                 "documentation": "Taken from https://docs.ghost.org/",
                 "depends_on": [
-                    "$$id_mysql"
+                    "$$id-mariadb"
                 ],
                 "image": "bitnami/ghost:$$core_version",
                 "volumes": [
@@ -203,7 +425,7 @@ export default [
                 "name": "WordPress",
                 "documentation": " Taken from https://docs.docker.com/compose/wordpress/",
                 "depends_on": [
-                    "$$id_mysql"
+                    "$$id-mysql"
                 ],
                 "image": "wordpress:$$core_version",
                 "volumes": [

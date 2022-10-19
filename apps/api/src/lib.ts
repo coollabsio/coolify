@@ -14,6 +14,7 @@ export async function migrateServicesToNewTemplate() {
             if (service.type === 'wordpress' && service.wordpress) await wordpress(service)
             if (service.type === 'ghost' && service.ghost) await ghost(service)
             if (service.type === 'meilisearch' && service.meiliSearch) await meilisearch(service)
+            if (service.type === 'umami' && service.umami) await umami(service)
             await createVolumes(service);
         }
     } catch (error) {
@@ -21,7 +22,27 @@ export async function migrateServicesToNewTemplate() {
 
     }
 }
+async function umami(service: any) {
+    const { postgresqlUser, postgresqlPassword, postgresqlDatabase, umamiAdminPassword, hashSalt } = service.ghost
 
+
+    const secrets = [
+        `HASH_SALT@@@${hashSalt}`,
+        `POSTGRES_PASSWORD@@@${postgresqlPassword}`,
+        `ADMIN_PASSWORD@@@${umamiAdminPassword}`,
+
+    ]
+    const settings = [
+        `DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@$$generate_fqdn:5432/${postgresqlDatabase}`)}`,
+        `POSTGRES_USER@@@${postgresqlUser}`,
+        `POSTGRES_DB@@@${postgresqlDatabase}`,
+    ]
+    await migrateSecrets(secrets, service);
+    await migrateSettings(settings, service);
+
+    // Remove old service data
+    // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
+}
 async function meilisearch(service: any) {
     const { masterKey } = service.meiliSearch
 

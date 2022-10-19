@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
+import bcrypt from 'bcryptjs';
 import { prisma, uniqueName, asyncExecShell, getServiceFromDB, getContainerUsage, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, ComposeFile, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, executeDockerCmd, checkDomainsIsValidInDNS, checkExposedPort, listSettings } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, isContainerExited } from '../../../../lib/docker';
@@ -222,6 +223,11 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                             variable.value = generatePassword({ length });
                         } else if (variable.defaultValue === '$$generate_passphrase') {
                             variable.value = generatePassword({ length });
+                        } else if (variable.defaultValue === '$$generate_hashed_password') {
+                            variable.value = bcrypt.hashSync(
+                                generatePassword({ length }),
+                                10
+                            );
                         }
                     }
                     if (variableId.startsWith('$$config_')) {
