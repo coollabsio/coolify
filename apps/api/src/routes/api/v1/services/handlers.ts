@@ -468,10 +468,12 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
         //     data[type] = { update: update }
         // }
         for (const setting of serviceSetting) {
-            const { id: settingId, value, changed = false } = setting
-            if (setting.changed) {
+            const { id: settingId, name, value, changed = false, isNew = false } = setting
+            if (changed) {
                 await prisma.serviceSetting.update({ where: { id: settingId }, data: { value } })
-
+            }
+            if (isNew) {
+                await prisma.serviceSetting.create({ data: { name, value, service: { connect: { id } } } })
             }
         }
         await prisma.service.update({

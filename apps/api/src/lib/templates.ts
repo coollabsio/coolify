@@ -14,8 +14,9 @@ export default [
                 "image": "hasura/graphql-engine:$$core_version",
                 "volumes": [],
                 "environment": [
-                    "HASURA_GRAPHQL_METADATA_DATABASE_URL=$$secret_hasura_metadata_database_url",
-                    "HASURA_GRAPHQL_ADMIN_PASSWORD=$$secret_hasura_admin_password",
+                    "HASURA_GRAPHQL_ENABLE_CONSOLE=$$config_hasura_graphql_enable_console",
+                    "HASURA_GRAPHQL_METADATA_DATABASE_URL=$$secret_hasura_graphql_metadata_database_url",
+                    "HASURA_GRAPHQL_ADMIN_PASSWORD=$$secret_hasura_graphql_admin_password",
                 ],
                 "ports": [
                     "8080"
@@ -38,18 +39,28 @@ export default [
         },
         "variables": [
             {
-                "id": "$$secret_hasura_metadata_database_url",
+                "id": "$$config_hasura_graphql_enable_console",
+                "name": "HASURA_GRAPHQL_ENABLE_CONSOLE",
+                "label": "Enable Hasura Console",
+                "defaultValue": "true",
+                "description": "",
+            },
+            {
+                "id": "$$secret_hasura_graphql_metadata_database_url",
                 "name": "HASURA_GRAPHQL_METADATA_DATABASE_URL",
                 "label": "Hasura Metadata Database URL",
                 "defaultValue": "postgresql://$$config_postgres_user:$$secret_postgres_password@$$id-postgresql:5432/$$config_postgres_db",
                 "description": ""
             },
             {
-                "id": "$$secret_hasura_admin_password",
+                "id": "$$secret_hasura_graphql_admin_password",
                 "name": "HASURA_GRAPHQL_ADMIN_PASSWORD",
                 "label": "Hasura Admin Password",
                 "defaultValue": "$$generate_password",
-                "description": ""
+                "description": "",
+                "extras": {
+                    "isVisibleOnUI": true,
+                }
             },
             {
                 "id": "$$config_postgres_user",

@@ -157,6 +157,7 @@
 		$status.service.initialLoading = true;
 		$status.service.loading = false;
 		$status.service.statuses = [];
+		$status.service.overallStatus = 'stopped';
 		$location = null;
 		$isDeploymentEnabled = false;
 		clearInterval(statusInterval);

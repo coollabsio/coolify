@@ -698,7 +698,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         const { workdir } = await createDirectories({ repository: type, buildId: id });
         const template: any = await parseAndFindServiceTemplates(service, workdir, true)
         const network = destinationDockerId && destinationDocker.network;
-
+        
         const config = {};
         for (const service in template.services) {
             config[service] = {

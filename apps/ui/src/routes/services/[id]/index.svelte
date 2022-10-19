@@ -72,6 +72,9 @@
 
 	async function handleSubmit(e: any) {
 		const formData = new FormData(e.target);
+		const settings = service.serviceSetting.map((setting: { name: string }) => setting.name);
+		const baseCoolifySetting = ['name', 'fqdn', 'exposePort'];
+
 		for (let field of formData) {
 			const [key, value] = field;
 			service.serviceSetting = service.serviceSetting.map((setting: any) => {
@@ -81,6 +84,14 @@
 				}
 				return setting;
 			});
+			if (!settings.includes(key) && !baseCoolifySetting.includes(key)) {
+				service.serviceSetting.push({
+					id: service.id,
+					name: key,
+					value: value,
+					isNew: true
+				});
+			}
 		}
 		if (loading.save) return;
 		loading.save = true;
@@ -94,7 +105,11 @@
 			// });
 			await post(`/services/${id}`, { ...service });
 			setLocation(service);
+
+			const reloadServices = await get(`/services/${id}`);
+			service = reloadServices.service
 			forceSave = false;
+			
 			$isDeploymentEnabled = checkIfDeploymentEnabledServices($appSession.isAdmin, service);
 			return addToast({
 				message: 'Configuration saved.',
@@ -416,18 +431,33 @@
 										value={getDomain(service.fqdn)}
 									/>
 								{:else if variable.defaultValue === 'true' || variable.defaultValue === 'false'}
-									<select
-										class="w-full font-normal"
-										readonly={isDisabled}
-										disabled={isDisabled}
-										id={variable.name}
-										name={variable.name}
-										bind:value={variable.value}
-										form="saveForm"
-									>
-										<option value="true">true</option>
-										<option value="false"> false</option>
-									</select>
+									{#if variable.value === 'true' || variable.value === 'false'}
+										<select
+											class="w-full font-normal"
+											readonly={isDisabled}
+											disabled={isDisabled}
+											id={variable.name}
+											name={variable.name}
+											bind:value={variable.value}
+											form="saveForm"
+										>
+											<option value="true">true</option>
+											<option value="false"> false</option>
+										</select>
+									{:else}
+										<select
+											class="w-full font-normal"
+											readonly={isDisabled}
+											disabled={isDisabled}
+											id={variable.name}
+											name={variable.name}
+											bind:value={variable.defaultValue}
+											form="saveForm"
+										>
+											<option value="true">true</option>
+											<option value="false"> false</option>
+										</select>
+									{/if}
 								{:else if variable.defaultValue === '$$generate_password' || variable.defaultValue === '$$generate_passphrase'}
 									<CopyPasswordField
 										isPasswordField

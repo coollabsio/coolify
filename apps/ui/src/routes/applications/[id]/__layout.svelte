@@ -194,6 +194,8 @@
 	onDestroy(() => {
 		$status.application.initialLoading = true;
 		$status.application.loading = false;
+		$status.application.statuses = [];
+		$status.application.overallStatus = 'stopped';
 		$location = null;
 		$isDeploymentEnabled = false;
 		clearInterval(statusInterval);
