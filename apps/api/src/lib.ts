@@ -21,6 +21,7 @@ export async function migrateServicesToNewTemplate() {
             if (service.type === 'hasura' && service.hasura) await hasura(service)
             if (service.type === 'glitchTip' && service.glitchTip) await glitchtip(service)
             if (service.type === 'searxng' && service.searxng) await searxng(service)
+            if (service.type === 'weblate' && service.weblate) await weblate(service)
 
             await createVolumes(service);
         }
@@ -28,6 +29,28 @@ export async function migrateServicesToNewTemplate() {
         console.log(error)
 
     }
+}
+async function weblate(service: any) {
+    const { adminPassword, postgresqlUser, postgresqlPassword, postgresqlDatabase } = service.weblate
+
+    const secrets = [
+        `WEBLATE_ADMIN_PASSWORD@@@${adminPassword}`,
+        `POSTGRES_PASSWORD@@@${postgresqlPassword}`,
+    ]
+
+    const settings = [
+        `WEBLATE_SITE_DOMAIN@@@$$generate_domain`,
+        `POSTGRES_USER@@@${postgresqlUser}`,
+        `POSTGRES_DATABASE@@@${postgresqlDatabase}`,
+        `POSTGRES_HOST@@@$$id-postgres`,
+        `POSTGRES_PORT@@@5432`,
+        `REDIS_HOST@@@$$id-redis`,
+    ]
+    await migrateSecrets(secrets, service);
+    await migrateSettings(settings, service);
+
+    // Remove old service data
+    // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
 }
 async function searxng(service: any) {
     const { secretKey, redisPassword } = service.searxng
@@ -150,8 +173,8 @@ async function ghost(service: any) {
         `MARIADB_USER@@@${mariadbUser}`,
         `MARIADB_DATABASE@@@${mariadbDatabase}`,
         `MARIADB_ROOT_USER@@@${mariadbRootUser}`,
-        `GHOST_HOST@@@${getDomain(fqdn)}`,
-        `url@@@${fqdn}`,
+        `GHOST_HOST@@@$$generate_domain`,
+        `url@@@$$generate_fqdn`,
         `GHOST_ENABLE_HTTPS@@@${isHttps ? 'yes' : 'no'}`
     ]
     await migrateSecrets(secrets, service);

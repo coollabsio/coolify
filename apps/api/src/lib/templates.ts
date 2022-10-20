@@ -1,6 +1,100 @@
 export default [
     {
         "templateVersion": "1.0.0",
+        "serviceDefaultVersion": "latest",
+        "name": "weblate",
+        "displayName": "Weblate",
+        "description": "",
+        "services": {
+            "$$id": {
+                "name": "Weblate",
+                "depends_on": [
+                    "$$id-postgresql",
+                    "$$id-redis"
+                ],
+                "image": "weblate/weblate:$$core_version",
+                "volumes": [
+                    "$$id-data:/app/data",
+                ],
+                "environment": [
+                    `WEBLATE_SITE_DOMAIN=$$config_weblate_site_domain`,
+                    `WEBLATE_ADMIN_PASSWORD=$$secret_weblate_admin_password`,
+                    `POSTGRES_PASSWORD=$$secret_postgres_password`,
+                    `POSTGRES_USER=$$config_postgres_user`,
+                    `POSTGRES_DATABASE=$$config_postgres_db`,
+                    `POSTGRES_HOST=$$id-postgres`,
+                    `POSTGRES_PORT=5432`,
+                    `REDIS_HOST=$$id-redis`,
+                ],
+                "ports": [
+                    "8080"
+                ]
+            },
+            "$$id-postgresql": {
+                "name": "PostgreSQL",
+                "depends_on": [],
+                "image": "postgres:14-alpine",
+                "volumes": [
+                    "$$id-postgresql-data:/var/lib/postgresql/data",
+                ],
+                "environment": [
+                    "POSTGRES_USER=$$config_postgres_user",
+                    "POSTGRES_PASSWORD=$$secret_postgres_password",
+                    "POSTGRES_DB=$$config_postgres_db",
+                ],
+                "ports": []
+            },
+            "$$id-redis": {
+                "name": "Redis",
+                "depends_on": [],
+                "image": "redis:7-alpine",
+                "volumes": [
+                    "$$id-redis-data:/data",
+                ],
+                "environment": [],
+                "ports": [],
+            }
+        },
+        "variables": [
+            {
+                "id": "$$config_weblate_site_domain",
+                "name": "WEBLATE_SITE_DOMAIN",
+                "label": "Weblate domain",
+                "defaultValue": "$$generate_domain",
+                "description": "",
+            },
+            {
+                "id": "$$secret_weblate_admin_password",
+                "name": "WEBLATE_ADMIN_PASSWORD",
+                "label": "Weblate Admin Password",
+                "defaultValue": "$$generate_password",
+                "description": "",
+            },
+            {
+                "id": "$$config_postgres_user",
+                "name": "POSTGRES_USER",
+                "label": "PostgreSQL User",
+                "defaultValue": "$$generate_username",
+                "description": "",
+            },
+            {
+                "id": "$$secret_postgres_password",
+                "name": "POSTGRES_PASSWORD",
+                "label": "PostgreSQL Password",
+                "defaultValue": "",
+                "description": "",
+            },
+            {
+                "id": "$$config_postgres_db",
+                "name": "POSTGRES_DB",
+                "label": "PostgreSQL Database",
+                "defaultValue": "hasura",
+                "description": "",
+            },
+        ]
+    },
+    {
+        "templateVersion": "1.0.0",
         "serviceDefaultVersion": "2022.10.14-1a5b0965",
         "name": "searxng",
         "displayName": "SearXNG",
