@@ -1,6 +1,89 @@
 export default [
     {
         "templateVersion": "1.0.0",
+        "serviceDefaultVersion": "2022.10.14-1a5b0965",
+        "name": "searxng",
+        "displayName": "SearXNG",
+        "description": "",
+        "services": {
+            "$$id": {
+                "name": "SearXNG",
+                "depends_on": [
+                    "$$id-redis"
+                ],
+                "image": "searxng/searxng:$$core_version",
+                "volumes": [
+                    "$$id-postgresql-searxng:/etc/searxng",
+                ],
+                "environment": [
+                    "SEARXNG_BASE_URL=$$config_searxng_base_url",
+                    "SECRET_KEY=$$secret_secret_key",
+                ],
+                "ports": [
+                    "8080"
+                ],
+                "extras": {
+                    "files": [
+                        {
+                            source: "$$workdir/schema.postgresql.sql",
+                            destination: "/docker-entrypoint-initdb.d/schema.postgresql.sql",
+                            content: `
+                            # see https://docs.searxng.org/admin/engines/settings.html#use-default-settings
+                            use_default_settings: true
+                            server:
+                              secret_key: $$secret_secret_key
+                              limiter: true
+                              image_proxy: true
+                            ui:
+                              static_use_hash: true
+                            redis:
+                              url: redis://:$$secret_redis_password@$$id-redis:6379/0`
+                        }
+                    ]
+                }
+            },
+            "$$id-redis": {
+                "name": "Redis",
+                "command": `redis-server --requirepass $$secret_redis_password --save "" --appendonly "no"`,
+                "depends_on": [],
+                "image": "redis:7-alpine",
+                "volumes": [
+                    "$$id-redis-data:/data",
+                ],
+                "environment": [
+                    "REDIS_PASSWORD=$$secret_redis_password",
+                ],
+                "ports": [],
+                "cap_drop": ['ALL'],
+                "cap_add": ['SETGID', 'SETUID', 'DAC_OVERRIDE'],
+            }
+        },
+        "variables": [
+            {
+                "id": "$$config_searxng_base_url",
+                "name": "SEARXNG_BASE_URL",
+                "label": "SearXNG Base URL",
+                "defaultValue": "$$generate_fqdn",
+                "description": "",
+            },
+            {
+                "id": "$$secret_secret_key",
+                "name": "SECRET_KEY",
+                "label": "Secret Key",
+                "defaultValue": "$$generate_passphrase",
+                "description": "",
+            },
+            {
+                "id": "$$secret_redis_password",
+                "name": "REDIS_PASSWORD",
+                "label": "Redis Password",
+                "defaultValue": "$$generate_password",
+                "description": "",
+            }
+        ]
+    },
+    {
+        "templateVersion": "1.0.0",
         "serviceDefaultVersion": "v2.0.6",
         "name": "glitchtip",
         "displayName": "GlitchTip",
@@ -9,7 +92,8 @@ export default [
             "$$id": {
                 "name": "GlitchTip",
                 "depends_on": [
-                    "$$id-postgresql"
+                    "$$id-postgresql",
+                    "$$id-redis"
                 ],
                 "image": "glitchtip/glitchtip:$$core_version",
                 "volumes": [],
@@ -67,7 +151,7 @@ export default [
             {
                 "id": "$$config_glitchtip_domain",
                 "name": "GLITCHTIP_DOMAIN",
-                "label": "GLITCHTIP_DOMAIN URL",
+                "label": "GlitchTip Domain",
                 "defaultValue": "$$generate_fqdn",
                 "description": "",
             },

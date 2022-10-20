@@ -6,13 +6,13 @@ import { prisma, uniqueName, asyncExecShell, getServiceFromDB, getContainerUsage
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, isContainerExited } from '../../../../lib/docker';
 import cuid from 'cuid';
-import templates from '../../../../lib/templates';
 
 import type { OnlyId } from '../../../../types';
 import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetGlitchTipSettings, SetWordpressSettings } from './types';
 import { supportedServiceTypesAndVersions } from '../../../../lib/services/supportedVersions';
 import { configureServiceType, removeService } from '../../../../lib/services/common';
 import { hashPassword } from '../handlers';
+import templates from '../../../../lib/templates';
 
 export async function listServices(request: FastifyRequest) {
     try {
@@ -113,7 +113,7 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
     }
 }
 export async function parseAndFindServiceTemplates(service: any, workdir?: string, isDeploy: boolean = false) {
-    const foundTemplate = templates.find(t => t.name === service.type)
+    const foundTemplate = templates.find(t => t.name === service.type.toLowerCase())
     let parsedTemplate = {}
     if (foundTemplate) {
         if (!isDeploy) {
@@ -155,12 +155,13 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
         if (service.serviceSetting.length > 0) {
             for (const setting of service.serviceSetting) {
                 const { name, value } = setting
+                const regex = new RegExp(`\\$\\$config_${name}\\"`, 'gi')
                 if (service.fqdn && value === '$$generate_fqdn') {
-                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(`$$config_${name.toLowerCase()}`, service.fqdn))
+                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, service.fqdn + "\""))
                 } else if (service.fqdn && value === '$$generate_domain') {
-                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(`$$config_${name.toLowerCase()}`, getDomain(service.fqdn)))
+                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, getDomain(service.fqdn) + "\""))
                 } else {
-                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(`$$config_${name.toLowerCase()}`, value))
+                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, value + "\""))
 
                 }
             }
@@ -170,7 +171,9 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
         if (service.serviceSecret.length > 0) {
             for (const secret of service.serviceSecret) {
                 const { name, value } = secret
-                parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(`$$hashed$$secret_${name.toLowerCase()}`, bcrypt.hashSync(value, 10)).replaceAll(`$$secret_${name.toLowerCase()}`, value))
+                const regex = new RegExp(`\\$\\$secret_${name}\\"`, 'gi')
+                const regexHashed = new RegExp(`\\$\\$hashed\\$\\$secret_${name}\\"`, 'gi')
+                parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regexHashed, bcrypt.hashSync(value, 10)).replaceAll(regex, value))
             }
         }
     }
@@ -185,13 +188,17 @@ export async function getService(request: FastifyRequest<OnlyId>) {
         if (!service) {
             throw { status: 404, message: 'Service not found.' }
         }
-        const template = await parseAndFindServiceTemplates(service)
+        let template = {}
+        if (service.type) {
+            template = await parseAndFindServiceTemplates(service)
+        }
         return {
             settings: await listSettings(),
             service,
             template,
         }
     } catch ({ status, message }) {
+        console.log(status, message)
         return errorHandler({ status, message })
     }
 }
@@ -218,19 +225,22 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
             if (foundTemplate.variables.length > 0) {
                 foundTemplate.variables = foundTemplate.variables.map(variable => {
                     let { id: variableId } = variable;
+                    console.log(variableId)
                     if (variableId.startsWith('$$secret_')) {
                         const length = variable?.extras && variable.extras['length']
                         if (variable.defaultValue === '$$generate_password') {
                             variable.value = generatePassword({ length });
                         } else if (variable.defaultValue === '$$generate_passphrase') {
                             variable.value = generatePassword({ length });
+                        } else if (!variable.defaultValue) {
+                            variable.defaultValue = undefined
                         }
                     }
                     if (variableId.startsWith('$$config_')) {
                         if (variable.defaultValue === '$$generate_username') {
                             variable.value = cuid();
                         } else {
-                            variable.value = variable.defaultValue
+                            variable.value = variable.defaultValue || ''
                         }
                     }
                     if (variable.value) {
@@ -246,19 +256,28 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                             variable.value = variable.defaultValue
                             for (const generatedVariable of generatedVariables) {
                                 let [id, value] = generatedVariable.split('=')
-                                variable.value = variable.value.replaceAll(id, value)
+                                if (variable.value) {
+                                    variable.value = variable.value.replaceAll(id, value)
+                                }
                             }
                         }
                         return variable
                     })
                 }
+
                 for (const variable of foundTemplate.variables) {
                     if (variable.id.startsWith('$$secret_')) {
+                        if (!variable.value) {
+                            continue;
+                        }
                         await prisma.serviceSecret.create({
                             data: { name: variable.name, value: encrypt(variable.value), service: { connect: { id } } }
                         })
                     }
                     if (variable.id.startsWith('$$config_')) {
+                        if (!variable.value) {
+                            variable.value = '';
+                        }
                         await prisma.serviceSetting.create({
                             data: { name: variable.name, value: variable.value, service: { connect: { id } } }
                         })

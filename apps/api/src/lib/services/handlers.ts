@@ -698,9 +698,15 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         const { workdir } = await createDirectories({ repository: type, buildId: id });
         const template: any = await parseAndFindServiceTemplates(service, workdir, true)
         const network = destinationDockerId && destinationDocker.network;
-        
         const config = {};
         for (const service in template.services) {
+            let newEnviroments = []
+            for (const environment of template.services[service].environment) {
+                const [env, value] = environment.split("=");
+                if (!value.startsWith('$$secret') && value !== '') {
+                    newEnviroments.push(`${env}=${value}`)
+                }
+            }
             config[service] = {
                 container_name: service,
                 build: template.services[service].build || undefined,
@@ -709,9 +715,11 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                 expose: template.services[service].ports,
                 // ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                 volumes: template.services[service].volumes,
-                environment: template.services[service].environment,
+                environment: newEnviroments,
                 depends_on: template.services[service].depends_on,
                 ulimits: template.services[service].ulimits,
+                cap_drop: template.services[service].cap_drop,
+                cap_add: template.services[service].cap_add,
                 labels: makeLabelForServices(type),
                 ...defaultComposeConfiguration(network),
             }

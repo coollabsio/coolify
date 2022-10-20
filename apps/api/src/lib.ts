@@ -7,6 +7,9 @@ export async function migrateServicesToNewTemplate() {
     try {
         const services = await prisma.service.findMany({ include: includeServices })
         for (const service of services) {
+            if (!service.type) {
+                continue;
+            }
             if (service.type === 'plausibleanalytics' && service.plausibleAnalytics) await plausibleAnalytics(service)
             if (service.type === 'fider' && service.fider) await fider(service)
             if (service.type === 'minio' && service.minio) await minio(service)
@@ -16,13 +19,32 @@ export async function migrateServicesToNewTemplate() {
             if (service.type === 'meilisearch' && service.meiliSearch) await meilisearch(service)
             if (service.type === 'umami' && service.umami) await umami(service)
             if (service.type === 'hasura' && service.hasura) await hasura(service)
-            if (service.type === 'glitchtip' && service.glitchTip) await glitchtip(service)
+            if (service.type === 'glitchTip' && service.glitchTip) await glitchtip(service)
+            if (service.type === 'searxng' && service.searxng) await searxng(service)
+
             await createVolumes(service);
         }
     } catch (error) {
         console.log(error)
 
     }
+}
+async function searxng(service: any) {
+    const { secretKey, redisPassword } = service.searxng
+
+    const secrets = [
+        `SECRET_KEY@@@${secretKey}`,
+        `REDIS_PASSWORD@@@${redisPassword}`,
+    ]
+
+    const settings = [
+        `SEARXNG_BASE_URL@@@$$generate_fqdn`
+    ]
+    await migrateSecrets(secrets, service);
+    await migrateSettings(settings, service);
+
+    // Remove old service data
+    // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
 }
 async function glitchtip(service: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, secretKeyBase, defaultEmail, defaultUsername, defaultPassword, defaultEmailFrom, emailSmtpHost, emailSmtpPort, emailSmtpUser, emailSmtpPassword, emailSmtpUseTls, emailSmtpUseSsl, emailBackend, mailgunApiKey, sendgridApiKey, enableOpenUserRegistration } = service.glitchTip
@@ -228,7 +250,7 @@ async function fider(service: any) {
 
 }
 async function plausibleAnalytics(service: any) {
-    const { email = 'admin@example.com', username = 'admin', password, postgresqlUser, postgresqlPassword, postgresqlDatabase, secretKeyBase, scriptName } = service.plausibleAnalytics;
+    const { email, username, password, postgresqlUser, postgresqlPassword, postgresqlDatabase, secretKeyBase, scriptName } = service.plausibleAnalytics;
 
     const settings = [
         `BASE_URL@@@$$generate_fqdn`,
@@ -248,7 +270,6 @@ async function plausibleAnalytics(service: any) {
     ]
     await migrateSettings(settings, service);
     await migrateSecrets(secrets, service);
-    await createVolumes(service);
 
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { plausibleAnalytics: { delete: true } } })
@@ -257,7 +278,10 @@ async function plausibleAnalytics(service: any) {
 async function migrateSettings(settings: any[], service: any) {
     for (const setting of settings) {
         if (!setting) continue;
-        const [name, value] = setting.split('@@@')
+        let [name, value] = setting.split('@@@')
+        if (!value || value === 'null') {
+            continue;
+        }
         // console.log('Migrating setting', name, value, 'for service', service.id, ', service name:', service.name)
         await prisma.serviceSetting.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name, value, service: { connect: { id: service.id } } } })
     }
@@ -265,14 +289,17 @@ async function migrateSettings(settings: any[], service: any) {
 async function migrateSecrets(secrets: any[], service: any) {
     for (const secret of secrets) {
         if (!secret) continue;
-        const [name, value] = secret.split('@@@')
+        let [name, value] = secret.split('@@@')
+        if (!value || value === 'null') {
+            continue
+        }
         // console.log('Migrating secret', name, value, 'for service', service.id, ', service name:', service.name)
         await prisma.serviceSecret.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSecret.create({ data: { name, value, service: { connect: { id: service.id } } } })
     }
 }
 async function createVolumes(service: any) {
     const volumes = [];
-    let template = templates.find(t => t.name === service.type)
+    let template = templates.find(t => t.name === service.type.toLowerCase());
     if (template) {
         template = JSON.parse(JSON.stringify(template).replaceAll('$$id', service.id))
         for (const s of Object.keys(template.services)) {
