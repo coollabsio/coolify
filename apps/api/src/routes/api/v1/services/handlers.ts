@@ -2,6 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { prisma, uniqueName, asyncExecShell, getServiceFromDB, getContainerUsage, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, ComposeFile, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, executeDockerCmd, checkDomainsIsValidInDNS, checkExposedPort, listSettings } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, isContainerExited } from '../../../../lib/docker';
@@ -12,7 +13,7 @@ import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServ
 import { supportedServiceTypesAndVersions } from '../../../../lib/services/supportedVersions';
 import { configureServiceType, removeService } from '../../../../lib/services/common';
 import { hashPassword } from '../handlers';
-import templates from '../../../../lib/templates';
+import { getTemplates } from '../../../../lib/services';
 
 export async function listServices(request: FastifyRequest) {
     try {
@@ -113,6 +114,7 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
     }
 }
 export async function parseAndFindServiceTemplates(service: any, workdir?: string, isDeploy: boolean = false) {
+    const templates = await getTemplates()
     const foundTemplate = templates.find(t => t.name === service.type.toLowerCase())
     let parsedTemplate = {}
     if (foundTemplate) {
@@ -162,7 +164,6 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                     parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, getDomain(service.fqdn) + "\""))
                 } else {
                     parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, value + "\""))
-
                 }
 
             }
@@ -203,7 +204,7 @@ export async function getService(request: FastifyRequest<OnlyId>) {
 export async function getServiceType(request: FastifyRequest) {
     try {
         return {
-            services: templates
+            services: await getTemplates()
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -213,6 +214,7 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
     try {
         const { id } = request.params;
         const { type } = request.body;
+        const templates = await getTemplates()
         let foundTemplate = templates.find(t => t.name === type)
         if (foundTemplate) {
             let generatedVariables = new Set()
@@ -223,22 +225,32 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
             if (foundTemplate.variables.length > 0) {
                 foundTemplate.variables = foundTemplate.variables.map(variable => {
                     let { id: variableId } = variable;
-                    console.log(variableId)
                     if (variableId.startsWith('$$secret_')) {
-                        const length = variable?.extras && variable.extras['length']
-                        if (variable.defaultValue === '$$generate_password') {
-                            variable.value = generatePassword({ length });
-                        } else if (variable.defaultValue === '$$generate_passphrase') {
-                            variable.value = generatePassword({ length });
+                        if (variable.defaultValue.startsWith('$$generate_password')) {
+                            const length = variable.defaultValue.replace('$$generate_password(', '').replace('\)', '') || 16
+                            variable.value = generatePassword({ length: Number(length) });
+                        } else if (variable.defaultValue.startsWith('$$generate_hex')) {
+                            const length = variable.defaultValue.replace('$$generate_hex(', '').replace('\)', '') || 16
+                            variable.value = crypto.randomBytes(Number(length)).toString('hex');
                         } else if (!variable.defaultValue) {
                             variable.defaultValue = undefined
                         }
                     }
                     if (variableId.startsWith('$$config_')) {
-                        if (variable.defaultValue === '$$generate_username') {
-                            variable.value = cuid();
+                        if (variable.defaultValue.startsWith('$$generate_username')) {
+                            const length = variable.defaultValue.replace('$$generate_username(', '').replace('\)', '')
+                            if (length !== '$$generate_username') {
+                                variable.value = crypto.randomBytes(Number(length)).toString('hex');
+                            } else {
+                                variable.value = cuid();
+                            }
                         } else {
-                            variable.value = variable.defaultValue || ''
+                            if (variable.defaultValue.startsWith('$$generate_hex')) {
+                                const length = variable.defaultValue.replace('$$generate_hex(', '').replace('\)', '') || 16
+                                variable.value = crypto.randomBytes(Number(length)).toString('hex');
+                            } else {
+                                variable.value = variable.defaultValue || ''
+                            }
                         }
                     }
                     if (variable.value) {
@@ -268,17 +280,24 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                         if (!variable.value) {
                             continue;
                         }
-                        await prisma.serviceSecret.create({
-                            data: { name: variable.name, value: encrypt(variable.value), service: { connect: { id } } }
-                        })
+                        const found = await prisma.serviceSecret.findFirst({ where: { name: variable.name, serviceId: id } })
+                        if (!found) {
+                            await prisma.serviceSecret.create({
+                                data: { name: variable.name, value: encrypt(variable.value), service: { connect: { id } } }
+                            })
+                        }
+
                     }
                     if (variable.id.startsWith('$$config_')) {
                         if (!variable.value) {
                             variable.value = '';
                         }
-                        await prisma.serviceSetting.create({
-                            data: { name: variable.name, value: variable.value, service: { connect: { id } } }
-                        })
+                        const found = await prisma.serviceSetting.findFirst({ where: { name: variable.name, serviceId: id } })
+                        if (!found) {
+                            await prisma.serviceSetting.create({
+                                data: { name: variable.name, value: variable.value.toString(), service: { connect: { id } } }
+                            })
+                        }
                     }
                 }
             }
@@ -287,9 +306,12 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                     for (const volume of foundTemplate.services[service].volumes) {
                         const [volumeName, path] = volume.split(':')
                         if (!volumeName.startsWith('/')) {
-                            await prisma.servicePersistentStorage.create({
-                                data: { volumeName, path, containerId: service, predefined: true, service: { connect: { id } } }
-                            });
+                            const found = await prisma.servicePersistentStorage.findFirst({ where: { volumeName, serviceId: id } })
+                            if (!found) {
+                                await prisma.servicePersistentStorage.create({
+                                    data: { volumeName, path, containerId: service, predefined: true, service: { connect: { id } } }
+                                });
+                            }
                         }
                     }
                 }

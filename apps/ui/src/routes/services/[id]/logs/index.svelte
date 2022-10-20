@@ -93,7 +93,7 @@
 		<div class="title font-bold pb-3">Service Logs</div>
 	</div>
 </div>
-<div class="flex gap-2 lg:gap-8 pb-4">
+<div class="grid grid-cols-4 gap-2 lg:gap-8 pb-4">
 	{#if template}
 		{#each Object.keys(template) as service}
 			<button

@@ -381,7 +381,8 @@
 					class:border-b={template[oneService].environment.length > 0}
 					class:border-coolgray-500={template[oneService].environment.length > 0}
 				>
-					<div class="title font-bold pb-3">{template[oneService].name}</div>
+					<div class="title font-bold pb-3">{template[oneService].name || oneService.replace(`${id}-`,'').replace(id,service.type)}</div>
+
 					<ServiceStatus id={oneService} />
 				</div>
 				<div class="grid grid-flow-row gap-2 px-4">

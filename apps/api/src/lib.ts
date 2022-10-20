@@ -1,8 +1,7 @@
 import { decrypt, encrypt, getDomain, prisma } from "./lib/common";
 import { includeServices } from "./lib/services/common";
-import templates from "./lib/templates";
 
-export async function migrateServicesToNewTemplate() {
+export async function migrateServicesToNewTemplate(templates: any) {
     // This function migrates old hardcoded services to the new template based services
     try {
         const services = await prisma.service.findMany({ include: includeServices })
@@ -10,20 +9,25 @@ export async function migrateServicesToNewTemplate() {
             if (!service.type) {
                 continue;
             }
-            if (service.type === 'plausibleanalytics' && service.plausibleAnalytics) await plausibleAnalytics(service)
-            if (service.type === 'fider' && service.fider) await fider(service)
-            if (service.type === 'minio' && service.minio) await minio(service)
-            if (service.type === 'vscodeserver' && service.vscodeserver) await vscodeserver(service)
-            if (service.type === 'wordpress' && service.wordpress) await wordpress(service)
-            if (service.type === 'ghost' && service.ghost) await ghost(service)
-            if (service.type === 'meilisearch' && service.meiliSearch) await meilisearch(service)
-            if (service.type === 'umami' && service.umami) await umami(service)
-            if (service.type === 'hasura' && service.hasura) await hasura(service)
-            if (service.type === 'glitchTip' && service.glitchTip) await glitchtip(service)
-            if (service.type === 'searxng' && service.searxng) await searxng(service)
-            if (service.type === 'weblate' && service.weblate) await weblate(service)
+            let template = templates.find(t => t.name === service.type.toLowerCase());
+            if (template) {
+                template = JSON.parse(JSON.stringify(template).replaceAll('$$id', service.id))
+                if (service.type === 'plausibleanalytics' && service.plausibleAnalytics) await plausibleAnalytics(service)
+                if (service.type === 'fider' && service.fider) await fider(service)
+                if (service.type === 'minio' && service.minio) await minio(service)
+                if (service.type === 'vscodeserver' && service.vscodeserver) await vscodeserver(service)
+                if (service.type === 'wordpress' && service.wordpress) await wordpress(service)
+                if (service.type === 'ghost' && service.ghost) await ghost(service)
+                if (service.type === 'meilisearch' && service.meiliSearch) await meilisearch(service)
+                if (service.type === 'umami' && service.umami) await umami(service)
+                if (service.type === 'hasura' && service.hasura) await hasura(service)
+                if (service.type === 'glitchTip' && service.glitchTip) await glitchtip(service)
+                if (service.type === 'searxng' && service.searxng) await searxng(service)
+                if (service.type === 'weblate' && service.weblate) await weblate(service)
 
-            await createVolumes(service);
+                await createVolumes(service, template);
+            }
+
         }
     } catch (error) {
         console.log(error)
@@ -321,19 +325,15 @@ async function migrateSecrets(secrets: any[], service: any) {
         await prisma.serviceSecret.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSecret.create({ data: { name, value, service: { connect: { id: service.id } } } })
     }
 }
-async function createVolumes(service: any) {
+async function createVolumes(service: any, template: any) {
     const volumes = [];
-    let template = templates.find(t => t.name === service.type.toLowerCase());
-    if (template) {
-        template = JSON.parse(JSON.stringify(template).replaceAll('$$id', service.id))
-        for (const s of Object.keys(template.services)) {
-            if (template.services[s].volumes && template.services[s].volumes.length > 0) {
-                for (const volume of template.services[s].volumes) {
-                    const volumeName = volume.split(':')[0]
-                    const volumePath = volume.split(':')[1]
-                    const volumeService = service.id
-                    volumes.push(`${volumeName}@@@${volumePath}@@@${volumeService}`)
-                }
+    for (const s of Object.keys(template.services)) {
+        if (template.services[s].volumes && template.services[s].volumes.length > 0) {
+            for (const volume of template.services[s].volumes) {
+                const volumeName = volume.split(':')[0]
+                const volumePath = volume.split(':')[1]
+                const volumeService = service.id
+                volumes.push(`${volumeName}@@@${volumePath}@@@${volumeService}`)
             }
         }
     }

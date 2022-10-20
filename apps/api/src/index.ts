@@ -11,6 +11,7 @@ import { scheduler } from './lib/scheduler';
 import { compareVersions } from 'compare-versions';
 import Graceful from '@ladjs/graceful'
 import axios from 'axios';
+import yaml from 'js-yaml'
 import fs from 'fs/promises';
 import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handlers';
 import { checkContainer } from './lib/docker';
@@ -123,7 +124,14 @@ const host = '0.0.0.0';
 		}
 	})
 	try {
-		await migrateServicesToNewTemplate()
+		const templateYaml = await axios.get('https://gist.githubusercontent.com/andrasbacsai/701c450ef4272a929215cab11d737e3d/raw/4f021329d22934b90c5d67a0e49839a32bd629fd/template.yaml')
+		const templateJson = yaml.load(templateYaml.data)
+		if (isDev) {
+			await fs.writeFile('./template.json', JSON.stringify(templateJson, null, 2))
+		} else {
+			await fs.writeFile('/app/template.json', JSON.stringify(templateJson, null, 2))
+		}
+		await migrateServicesToNewTemplate(templateJson)
 
 		await fastify.listen({ port, host })
 		console.log(`Coolify's API is listening on ${host}:${port}`);

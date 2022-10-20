@@ -1,5 +1,13 @@
-import { createDirectories, getServiceFromDB, getServiceImage, getServiceMainPort, makeLabelForServices } from "./common";
+import { createDirectories, getServiceFromDB, getServiceImage, getServiceMainPort, isDev, makeLabelForServices } from "./common";
+import fs from 'fs/promises';
+export async function getTemplates() {
+    let templates = [];
+    if (isDev) {
+        templates = JSON.parse((await fs.readFile('./template.json')).toString())
+    }
 
+    return templates
+}
 export async function defaultServiceConfigurations({ id, teamId }) {
     const service = await getServiceFromDB({ id, teamId });
     const { destinationDockerId, destinationDocker, type, serviceSecret } = service;

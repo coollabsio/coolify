@@ -6,7 +6,7 @@ import { ServiceStartStop } from '../../routes/api/v1/services/types';
 import { asyncSleep, ComposeFile, createDirectories, defaultComposeConfiguration, errorHandler, executeDockerCmd, getDomain, getFreePublicPort, getServiceFromDB, getServiceImage, getServiceMainPort, isARM, isDev, makeLabelForServices, persistentVolumes, prisma } from '../common';
 import { defaultServiceConfigurations } from '../services';
 import { OnlyId } from '../../types';
-import templates from '../templates'
+
 import { parseAndFindServiceTemplates } from '../../routes/api/v1/services/handlers';
 import path from 'path';
 // export async function startService(request: FastifyRequest<ServiceStartStop>) {
@@ -711,6 +711,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                 container_name: service,
                 build: template.services[service].build || undefined,
                 command: template.services[service].command,
+                entrypoint: template.services[service]?.entrypoint,
                 image: template.services[service].image,
                 expose: template.services[service].ports,
                 // ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),

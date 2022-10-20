@@ -21,7 +21,7 @@ export default [
                     `WEBLATE_ADMIN_PASSWORD=$$secret_weblate_admin_password`,
                     `POSTGRES_PASSWORD=$$secret_postgres_password`,
                     `POSTGRES_USER=$$config_postgres_user`,
-                    `POSTGRES_DATABASE=$$config_postgres_database`,
+                    `POSTGRES_DATABASE=$$config_postgres_db`,
                     `POSTGRES_HOST=$$id-postgresql`,
                     `POSTGRES_PORT=5432`,
                     `REDIS_HOST=$$id-redis`,
@@ -94,13 +94,7 @@ export default [
                 "defaultValue": "weblate",
                 "description": "",
             },
-            {
-                "id": "$$config_postgres_database",
-                "name": "POSTGRES_DATABASE",
-                "label": "PostgreSQL Database",
-                "defaultValue": "$$config_postgres_db",
-                "description": ""
-            },
+
         ]
     },
     {
@@ -121,7 +115,6 @@ export default [
                 ],
                 "environment": [
                     "SEARXNG_BASE_URL=$$config_searxng_base_url",
-                    "SECRET_KEY=$$secret_secret_key",
                 ],
                 "ports": [
                     "8080"
@@ -1462,9 +1455,7 @@ export default [
                 "label": "Secret Key Base",
                 "defaultValue": "$$generate_passphrase",
                 "description": "",
-                "extras": {
-                    "length": 64
-                }
+             
             },
             {
                 "id": "$$config_disable_auth",
