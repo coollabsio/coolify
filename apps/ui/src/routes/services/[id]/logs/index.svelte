@@ -1,11 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import LoadingLogs from './_Loading.svelte';
 	import { get } from '$lib/api';
-	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import { onDestroy, onMount } from 'svelte';
-	import Tooltip from '$lib/components/Tooltip.svelte';
 
 	let service: any = {};
 	let template: any = null;
@@ -18,41 +15,32 @@
 	let logsEl: any;
 	let position = 0;
 	let selectedService: any = null;
+	let noContainer = false;
+
 	const { id } = $page.params;
 
 	onMount(async () => {
 		const response = await get(`/services/${id}`);
 		template = response.template;
 		service = response.service;
-		loadAllLogs();
-		loadLogsInterval = setInterval(() => {
-			loadLogs();
-		}, 1000);
 	});
 
 	onDestroy(() => {
 		clearInterval(loadLogsInterval);
 		clearInterval(followingInterval);
 	});
-	async function loadAllLogs() {
-		try {
-			logsLoading = true;
-			const data: any = await get(`/services/${id}/logs`);
-			if (data?.logs) {
-				lastLog = data.logs[data.logs.length - 1];
-				logs = data.logs;
-			}
-		} catch (error) {
-			return errorNotification(error);
-		} finally {
-			logsLoading = false;
-		}
-	}
+
 	async function loadLogs() {
 		if (logsLoading) return;
 		try {
-			const newLogs: any = await get(`/services/${id}/logs?since=${lastLog?.split(' ')[0] || 0}`);
-
+			const newLogs: any = await get(
+				`/services/${id}/logs/${selectedService}?since=${lastLog?.split(' ')[0] || 0}`
+			);
+			if (newLogs.noContainer) {
+				noContainer = true;
+			} else {
+				noContainer = false;
+			}
 			if (newLogs?.logs && newLogs.logs[newLogs.logs.length - 1] !== logs[logs.length - 1]) {
 				logs = logs.concat(newLogs.logs);
 				lastLog = newLogs.logs[newLogs.logs.length - 1];
@@ -100,9 +88,14 @@
 	}
 </script>
 
-{#if template}
-	<div class="flex gap-2 lg:gap-8 pb-4">
-		{#each Object.keys(template.services) as service}
+<div class="mx-auto w-full">
+	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
+		<div class="title font-bold pb-3">Service Logs</div>
+	</div>
+</div>
+<div class="flex gap-2 lg:gap-8 pb-4">
+	{#if template}
+		{#each Object.keys(template) as service}
 			<button
 				on:click={() => selectService(service, true)}
 				class:bg-primary={selectedService === service}
@@ -112,21 +105,25 @@
 				{service}</button
 			>
 		{/each}
-	</div>
-{/if}
+	{/if}
+</div>
+
 {#if selectedService}
 	<div class="flex flex-row justify-center space-x-2">
 		{#if logs.length === 0}
-			<div class="text-xl font-bold tracking-tighter">{$t('application.build.waiting_logs')}</div>
+			{#if noContainer}
+				<div class="text-xl font-bold tracking-tighter">Container not found / exited.</div>
+			{/if}
 		{:else}
 			<div class="relative w-full">
 				<div class="flex justify-start sticky space-x-2 pb-2">
-					<button
-						on:click={followBuild}
-						class="btn btn-sm bg-coollabs"
-						class:bg-coolgray-300={followingLogs}
-						class:text-applications={followingLogs}
-					>
+					{#if loadLogsInterval}
+						<button id="streaming" class="btn btn-sm bg-transparent border-none loading"
+							>Streaming logs</button
+						>
+					{/if}
+					<div class="flex-1" />
+					<button on:click={followBuild} class="btn btn-sm " class:bg-coollabs={followingLogs}>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							class="w-6 h-6 mr-2"
@@ -145,11 +142,6 @@
 						</svg>
 						{followingLogs ? 'Following Logs...' : 'Follow Logs'}
 					</button>
-					{#if loadLogsInterval}
-						<button id="streaming" class="btn btn-sm bg-transparent border-none loading"
-							>Streaming logs</button
-						>
-					{/if}
 				</div>
 				<div
 					bind:this={logsEl}

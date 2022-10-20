@@ -42,6 +42,7 @@ async function weblate(service: any) {
         `WEBLATE_SITE_DOMAIN@@@$$generate_domain`,
         `POSTGRES_USER@@@${postgresqlUser}`,
         `POSTGRES_DATABASE@@@${postgresqlDatabase}`,
+        `POSTGRES_DB@@@${postgresqlDatabase}`,
         `POSTGRES_HOST@@@$$id-postgres`,
         `POSTGRES_PORT@@@5432`,
         `REDIS_HOST@@@$$id-redis`,

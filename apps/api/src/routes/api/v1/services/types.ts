@@ -15,9 +15,13 @@ export interface SaveServiceDestination extends OnlyId {
         destinationId: string
     }
 }
-export interface GetServiceLogs extends OnlyId {
+export interface GetServiceLogs{
+    Params: { 
+        id: string,
+        containerId: string
+     },
     Querystring: {
-        since: number
+        since: number,
     }
 }
 export interface SaveServiceSettings extends OnlyId {

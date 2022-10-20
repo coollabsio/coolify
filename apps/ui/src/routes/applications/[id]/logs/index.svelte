@@ -1,10 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { get } from '$lib/api';
-	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import { onMount, onDestroy } from 'svelte';
-	import Tooltip from '$lib/components/Tooltip.svelte';
 
 	let application: any = {};
 	let logsLoading = false;
@@ -137,12 +135,13 @@
 		{:else}
 			<div class="relative w-full" />
 			<div class="flex justify-start sticky space-x-2 pb-2">
-				<button
-					on:click={followBuild}
-					class="btn btn-sm bg-coollabs"
-					class:bg-coolgray-300={followingLogs}
-					class:text-applications={followingLogs}
-				>
+				{#if loadLogsInterval}
+					<button id="streaming" class="btn btn-sm bg-transparent border-none loading"
+						>Streaming logs</button
+					>
+				{/if}
+				<div class="flex-1" />
+				<button on:click={followBuild} class="btn btn-sm " class:bg-coollabs={followingLogs}>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="w-6 h-6 mr-2"
@@ -161,11 +160,6 @@
 					</svg>
 					{followingLogs ? 'Following Logs...' : 'Follow Logs'}
 				</button>
-				{#if loadLogsInterval}
-					<button id="streaming" class="btn btn-sm bg-transparent border-none loading"
-						>Streaming logs</button
-					>
-				{/if}
 			</div>
 			<div
 				bind:this={logsEl}

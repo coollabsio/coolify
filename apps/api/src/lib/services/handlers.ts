@@ -725,18 +725,22 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
             }
 
             // Generate files for builds
-            if (template.services[service].build) {
-                if (template.services[service]?.extras?.files?.length > 0) {
-                    let Dockerfile = `
-                    FROM ${template.services[service].image}`
-                    for (const file of template.services[service].extras.files) {
-                        const { source, destination, content } = file;
-                        await fs.writeFile(source, content);
-                        Dockerfile += `
-                        COPY ./${path.basename(source)} ${destination}`
+            if (template.services[service]?.extras?.files?.length > 0) {
+                if (!template.services[service].build) {
+                    template.services[service].build = {
+                        context: workdir,
+                        dockerfile: `Dockerfile.${service}`
                     }
-                    await fs.writeFile(`${workdir}/Dockerfile.${service}`, Dockerfile);
                 }
+                let Dockerfile = `
+                    FROM ${template.services[service].image}`
+                for (const file of template.services[service].extras.files) {
+                    const { source, destination, content } = file;
+                    await fs.writeFile(source, content);
+                    Dockerfile += `
+                        COPY ./${path.basename(source)} ${destination}`
+                }
+                await fs.writeFile(`${workdir}/Dockerfile.${service}`, Dockerfile);
             }
         }
         const { volumeMounts } = persistentVolumes(id, persistentStorage, config)

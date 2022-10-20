@@ -157,9 +157,9 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                 const { name, value } = setting
                 const regex = new RegExp(`\\$\\$config_${name}\\"`, 'gi')
                 if (service.fqdn && value === '$$generate_fqdn') {
-                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, service.fqdn+ "\""))
+                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, service.fqdn + "\""))
                 } else if (service.fqdn && value === '$$generate_domain') {
-                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, getDomain(service.fqdn)+ "\""))
+                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, getDomain(service.fqdn) + "\""))
                 } else {
                     parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, value + "\""))
 
@@ -363,7 +363,7 @@ export async function getServiceUsage(request: FastifyRequest<OnlyId>) {
 }
 export async function getServiceLogs(request: FastifyRequest<GetServiceLogs>) {
     try {
-        const { id } = request.params;
+        const { id, containerId } = request.params;
         let { since = 0 } = request.query
         if (since !== 0) {
             since = day(since).unix();
@@ -374,10 +374,8 @@ export async function getServiceLogs(request: FastifyRequest<GetServiceLogs>) {
         });
         if (destinationDockerId) {
             try {
-                // const found = await checkContainer({ dockerId, container: id })
-                // if (found) {
                 const { default: ansi } = await import('strip-ansi')
-                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
+                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${containerId}` })
                 const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const logs = stripLogsStderr.concat(stripLogsStdout)
@@ -385,7 +383,10 @@ export async function getServiceLogs(request: FastifyRequest<GetServiceLogs>) {
                 return { logs: sortedLogs }
                 // }
             } catch (error) {
-                const { statusCode } = error;
+                const { statusCode, stderr } = error;
+                if (stderr.startsWith('Error: No such container')) {
+                    return { logs: [], noContainer: true }
+                }
                 if (statusCode === 404) {
                     return {
                         logs: []

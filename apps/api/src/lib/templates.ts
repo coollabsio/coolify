@@ -21,8 +21,8 @@ export default [
                     `WEBLATE_ADMIN_PASSWORD=$$secret_weblate_admin_password`,
                     `POSTGRES_PASSWORD=$$secret_postgres_password`,
                     `POSTGRES_USER=$$config_postgres_user`,
-                    `POSTGRES_DATABASE=$$config_postgres_db`,
-                    `POSTGRES_HOST=$$id-postgres`,
+                    `POSTGRES_DATABASE=$$config_postgres_database`,
+                    `POSTGRES_HOST=$$id-postgresql`,
                     `POSTGRES_PORT=5432`,
                     `REDIS_HOST=$$id-redis`,
                 ],
@@ -59,7 +59,7 @@ export default [
             {
                 "id": "$$config_weblate_site_domain",
                 "name": "WEBLATE_SITE_DOMAIN",
-                "label": "Weblate domain",
+                "label": "Weblate Domain",
                 "defaultValue": "$$generate_domain",
                 "description": "",
             },
@@ -69,6 +69,9 @@ export default [
                 "label": "Weblate Admin Password",
                 "defaultValue": "$$generate_password",
                 "description": "",
+                "extras": {
+                    "isVisibleOnUI": true,
+                }
             },
             {
                 "id": "$$config_postgres_user",
@@ -81,15 +84,22 @@ export default [
                 "id": "$$secret_postgres_password",
                 "name": "POSTGRES_PASSWORD",
                 "label": "PostgreSQL Password",
-                "defaultValue": "",
+                "defaultValue": "$$generate_password",
                 "description": "",
             },
             {
                 "id": "$$config_postgres_db",
                 "name": "POSTGRES_DB",
                 "label": "PostgreSQL Database",
-                "defaultValue": "hasura",
+                "defaultValue": "weblate",
                 "description": "",
+            },
+            {
+                "id": "$$config_postgres_database",
+                "name": "POSTGRES_DATABASE",
+                "label": "PostgreSQL Database",
+                "defaultValue": "$$config_postgres_db",
+                "description": ""
             },
         ]
     },
@@ -102,10 +112,6 @@ export default [
         "services": {
             "$$id": {
                 "name": "SearXNG",
-                "build": {
-                    context: "$$workdir",
-                    dockerfile: "Dockerfile.$$id"
-                },
                 "depends_on": [
                     "$$id-redis"
                 ],
@@ -511,10 +517,6 @@ export default [
             "$$id-postgresql": {
                 "name": "PostgreSQL",
                 "documentation": "Official docs are [here](https://umami.is/docs/getting-started)",
-                "build": {
-                    context: "$$workdir",
-                    dockerfile: "Dockerfile.$$id-postgresql"
-                },
                 "depends_on": [],
                 "image": "postgres:12-alpine",
                 "volumes": [
@@ -1371,10 +1373,6 @@ export default [
             "$$id-clickhouse": {
                 "name": "Clickhouse",
                 "documentation": "Taken from https://plausible.io/",
-                "build": {
-                    context: "$$workdir",
-                    dockerfile: "Dockerfile.$$id-clickhouse"
-                },
                 "volumes": [
                     '$$id-clickhouse-data:/var/lib/clickhouse',
                 ],
@@ -1455,7 +1453,7 @@ export default [
                 "defaultValue": "$$generate_password",
                 "description": "This is the admin password. Please change it.",
                 "extras": {
-                    "isVisibleOnUI": true
+                    "isVisibleOnUI": true,
                 }
             },
             {
