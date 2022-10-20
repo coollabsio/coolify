@@ -8,12 +8,16 @@ export default [
         "services": {
             "$$id": {
                 "name": "SearXNG",
+                "build": {
+                    context: "$$workdir",
+                    dockerfile: "Dockerfile.$$id"
+                },
                 "depends_on": [
                     "$$id-redis"
                 ],
                 "image": "searxng/searxng:$$core_version",
                 "volumes": [
-                    "$$id-postgresql-searxng:/etc/searxng",
+                    "$$id-searxng:/etc/searxng",
                 ],
                 "environment": [
                     "SEARXNG_BASE_URL=$$config_searxng_base_url",
@@ -22,11 +26,13 @@ export default [
                 "ports": [
                     "8080"
                 ],
+                "cap_drop": ['ALL'],
+                "cap_add": ['CHOWN', 'SETGID', 'SETUID', 'DAC_OVERRIDE'],
                 "extras": {
                     "files": [
                         {
-                            source: "$$workdir/schema.postgresql.sql",
-                            destination: "/docker-entrypoint-initdb.d/schema.postgresql.sql",
+                            source: "$$workdir/settings.yml",
+                            destination: "/etc/searxng/settings.yml",
                             content: `
                             # see https://docs.searxng.org/admin/engines/settings.html#use-default-settings
                             use_default_settings: true

@@ -716,10 +716,10 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                 // ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                 volumes: template.services[service].volumes,
                 environment: newEnviroments,
-                depends_on: template.services[service].depends_on,
-                ulimits: template.services[service].ulimits,
-                cap_drop: template.services[service].cap_drop,
-                cap_add: template.services[service].cap_add,
+                depends_on: template.services[service]?.depends_on,
+                ulimits: template.services[service]?.ulimits,
+                cap_drop: template.services[service]?.cap_drop,
+                cap_add: template.services[service]?.cap_add,
                 labels: makeLabelForServices(type),
                 ...defaultComposeConfiguration(network),
             }
@@ -752,6 +752,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         }
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
+        console.log(composeFileDestination)
         await startServiceContainers(destinationDocker.id, composeFileDestination)
         return {}
     } catch ({ status, message }) {

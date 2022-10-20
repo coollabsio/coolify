@@ -157,23 +157,21 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                 const { name, value } = setting
                 const regex = new RegExp(`\\$\\$config_${name}\\"`, 'gi')
                 if (service.fqdn && value === '$$generate_fqdn') {
-                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, service.fqdn + "\""))
+                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, service.fqdn+ "\""))
                 } else if (service.fqdn && value === '$$generate_domain') {
-                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, getDomain(service.fqdn) + "\""))
+                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, getDomain(service.fqdn)+ "\""))
                 } else {
                     parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, value + "\""))
 
                 }
+
             }
         }
-
         // replace $$secret
         if (service.serviceSecret.length > 0) {
             for (const secret of service.serviceSecret) {
                 const { name, value } = secret
-                const regex = new RegExp(`\\$\\$secret_${name}\\"`, 'gi')
-                const regexHashed = new RegExp(`\\$\\$hashed\\$\\$secret_${name}\\"`, 'gi')
-                parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regexHashed, bcrypt.hashSync(value, 10)).replaceAll(regex, value))
+                parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(`$$hashed$$secret_${name.toLowerCase()}`, bcrypt.hashSync(value, 10)).replaceAll(`$$secret_${name.toLowerCase()}`, value))
             }
         }
     }
