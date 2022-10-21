@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
 import { ServiceStartStop } from '../../routes/api/v1/services/types';
-import { asyncSleep, ComposeFile, createDirectories, defaultComposeConfiguration, errorHandler, executeDockerCmd, getDomain, getFreePublicPort, getServiceFromDB, getServiceImage, getServiceMainPort, isARM, isDev, makeLabelForServices, persistentVolumes, prisma } from '../common';
+import { asyncSleep, ComposeFile, createDirectories, decrypt, defaultComposeConfiguration, errorHandler, executeDockerCmd, getDomain, getFreePublicPort, getServiceFromDB, getServiceImage, getServiceMainPort, isARM, isDev, makeLabelForServices, persistentVolumes, prisma } from '../common';
 import { defaultServiceConfigurations } from '../services';
 import { OnlyId } from '../../types';
 
@@ -706,6 +706,16 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                 if (!value.startsWith('$$secret') && value !== '') {
                     newEnviroments.push(`${env}=${value}`)
                 }
+
+            }
+            const secrets = await prisma.serviceSecret.findMany({ where: { serviceId: id } })
+            for (const secret of secrets) {
+                const { name, value } = secret
+                if (value) {
+                    if (template.services[service].environment.find(env => env.startsWith(`${name}=`)) && !newEnviroments.find(env => env.startsWith(`${name}=`))) {
+                        newEnviroments.push(`${name}=${decrypt(value)}`)
+                    }
+                }
             }
             config[service] = {
                 container_name: service,
@@ -757,7 +767,6 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         }
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        console.log(composeFileDestination)
         await startServiceContainers(destinationDocker.id, composeFileDestination)
         return {}
     } catch ({ status, message }) {

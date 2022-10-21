@@ -93,6 +93,10 @@
 			}
 		}
 	}
+	async function restartService() {
+		await stopService();
+		await startService();
+	}
 	async function stopService() {
 		const sure = confirm($t('database.confirm_stop', { name: service.name }));
 		if (sure) {
@@ -256,14 +260,14 @@
 			<button
 				disabled={!$isDeploymentEnabled}
 				class="btn btn-sm gap-2"
-				on:click={() => startService()}
+				on:click={() => restartService()}
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="w-6 h-6"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
-					stroke="currentColor"
+					stroke="currentColor"	
 					fill="none"
 					stroke-linecap="round"
 					stroke-linejoin="round"
@@ -322,12 +326,12 @@
 				</svg> Stop
 			</button>
 		{:else if $status.service.overallStatus === 'stopped'}
-			<button
-				class="btn btn-sm gap-2"
-				disabled={!$isDeploymentEnabled}
-				on:click={() => startService()}
-			>
-				{#if $status.application.overallStatus === 'degraded'}
+			{#if $status.service.overallStatus === 'degraded'}
+				<button
+					class="btn btn-sm gap-2"
+					disabled={!$isDeploymentEnabled}
+					on:click={() => restartService()}
+				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="w-6 h-6"
@@ -345,7 +349,13 @@
 						/>
 					</svg>
 					{$status.application.statuses.length === 1 ? 'Force Redeploy' : 'Redeploy Stack'}
-				{:else if $status.application.overallStatus === 'stopped'}
+				</button>
+			{:else if $status.service.overallStatus === 'stopped'}
+				<button
+					class="btn btn-sm gap-2"
+					disabled={!$isDeploymentEnabled}
+					on:click={() => startService()}
+				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						class="w-6 h-6 text-pink-500"
@@ -360,8 +370,8 @@
 						<path d="M7 4v16l13 -8z" />
 					</svg>
 					Deploy
-				{/if}
-			</button>
+				</button>
+			{/if}
 		{/if}
 	</div>
 </div>

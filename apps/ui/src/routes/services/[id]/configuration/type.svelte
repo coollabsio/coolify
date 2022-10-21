@@ -94,7 +94,7 @@
 				<form on:submit|preventDefault={() => handleSubmit(service)}>
 					<button type="submit" class="box-selection relative text-xl font-bold hover:bg-primary">
 						<!-- <ServiceIcons type={service.name} /> -->
-						{service.displayName}
+						{service.name}
 					</button>
 				</form>
 			</div>

@@ -422,13 +422,14 @@ model Service {
 }
 
 model ServiceSetting {
-  id        String   @id @default(cuid())
-  serviceId String
-  name      String
-  value     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  service   Service  @relation(fields: [serviceId], references: [id])
+  id           String   @id @default(cuid())
+  serviceId    String
+  name         String
+  value        String
+  variableName String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  service      Service  @relation(fields: [serviceId], references: [id])
 
   @@unique([serviceId, name])
 }

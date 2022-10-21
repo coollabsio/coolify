@@ -308,6 +308,14 @@
 					required
 				/>
 			</div>
+			{#each Object.keys(template) as oneService}
+				{#each template[oneService].environment.filter( (a) => a.name.startsWith('COOLIFY_FQDN_') ) as variable}
+					<div class="grid grid-cols-2 items-center">
+						<label class="h-10" for={variable.name}>{variable.label || variable.name}</label>
+						<input class="w-full" name={variable.name} id={variable.name} value={variable.value} />
+					</div>
+				{/each}
+			{/each}
 		</div>
 		{#if forceSave}
 			<div class="flex-col space-y-2 pt-4 text-center">
@@ -373,6 +381,7 @@
 				/>
 			</div>
 		</div>
+
 		<div />
 		<div>
 			{#each Object.keys(template) as oneService}
@@ -381,15 +390,18 @@
 					class:border-b={template[oneService].environment.length > 0}
 					class:border-coolgray-500={template[oneService].environment.length > 0}
 				>
-					<div class="title font-bold pb-3">{template[oneService].name || oneService.replace(`${id}-`,'').replace(id,service.type)}</div>
+					<div class="title font-bold pb-3 capitalize">
+						{template[oneService].name ||
+							oneService.replace(`${id}-`, '').replace(id, service.type)}
+					</div>
 
 					<ServiceStatus id={oneService} />
 				</div>
 				<div class="grid grid-flow-row gap-2 px-4">
 					{#if template[oneService].environment.length > 0}
-						{#each template[oneService].environment as variable}
+						{#each template[oneService].environment.filter((a) => !a.name.startsWith('COOLIFY_FQDN_')) as variable}
 							<div class="grid grid-cols-2 items-center gap-2">
-								<label class="h-10" for={variable.name}>{variable.label}</label>
+								<label class="h-10" for={variable.name}>{variable.label || variable.name}</label>
 								{#if variable.defaultValue === '$$generate_fqdn'}
 									<input
 										class="w-full"
@@ -407,6 +419,15 @@
 										name={variable.name}
 										id={variable.name}
 										value={getDomain(service.fqdn)}
+									/>
+								{:else if variable.defaultValue === '$$generate_network'}
+									<input
+										class="w-full"
+										disabled
+										readonly
+										name={variable.name}
+										id={variable.name}
+										value={service.destinationDocker.network}
 									/>
 								{:else if variable.defaultValue === 'true' || variable.defaultValue === 'false'}
 									{#if variable.value === 'true' || variable.value === 'false'}

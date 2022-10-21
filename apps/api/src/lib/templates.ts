@@ -1,7 +1,7 @@
 export default [
     {
         "templateVersion": "1.0.0",
-        "serviceDefaultVersion": "latest",
+        "defaultVersion": "latest",
         "name": "weblate",
         "displayName": "Weblate",
         "description": "",
@@ -99,7 +99,7 @@ export default [
     },
     {
         "templateVersion": "1.0.0",
-        "serviceDefaultVersion": "2022.10.14-1a5b0965",
+        "defaultVersion": "2022.10.14-1a5b0965",
         "name": "searxng",
         "displayName": "SearXNG",
         "description": "",
@@ -183,7 +183,7 @@ export default [
     },
     {
         "templateVersion": "1.0.0",
-        "serviceDefaultVersion": "v2.0.6",
+        "defaultVersion": "v2.0.6",
         "name": "glitchtip",
         "displayName": "GlitchTip",
         "description": "",
@@ -398,7 +398,7 @@ export default [
     },
     {
         "templateVersion": "1.0.0",
-        "serviceDefaultVersion": "v2.13.0",
+        "defaultVersion": "v2.13.0",
         "name": "hasura",
         "displayName": "Hasura",
         "description": "Instant realtime GraphQL APIs on any Postgres application, existing or new.",
@@ -484,7 +484,7 @@ export default [
     },
     {
         "templateVersion": "1.0.0",
-        "serviceDefaultVersion": "postgresql-v1.38.0",
+        "defaultVersion": "postgresql-v1.38.0",
         "name": "umami",
         "displayName": "Umami",
         "description": "Umami is a simple, easy to use, self-hosted web analytics solution. The goal is to provide you with a friendly privacy-focused alternative to Google Analytics.",
@@ -713,7 +713,7 @@ export default [
     },
     {
         "templateVersion": "1.0.0",
-        "serviceDefaultVersion": "v0.29.1",
+        "defaultVersion": "v0.29.1",
         "name": "meilisearch",
         "displayName": "MeiliSearch",
         "description": "MeiliSearch is a lightning Fast, Ultra Relevant, and Typo-Tolerant Search Engine",
@@ -752,7 +752,7 @@ export default [
     },
     {
         "templateVersion": "1.0.0",
-        "serviceDefaultVersion": "latest",
+        "defaultVersion": "latest",
         "name": "ghost",
         "displayName": "Ghost",
         "description": "Ghost is a free and open source blogging platform written in JavaScript and distributed under the MIT License",
@@ -904,7 +904,7 @@ export default [
     },
     {
         "templateVersion": "1.0.0",
-        "serviceDefaultVersion": "php8.1",
+        "defaultVersion": "php8.1",
         "name": "wordpress",
         "displayName": "WordPress",
         "description": "WordPress is a content management system based on PHP.",
@@ -1022,7 +1022,7 @@ export default [
     },
     {
         "templateVersion": "1.0.0",
-        "serviceDefaultVersion": "4.7.1",
+        "defaultVersion": "4.7.1",
         "name": "vscodeserver",
         "displayName": "VSCode Server",
         "description": "vscode-server by Coder is VS Code running on a remote server, accessible through the browser.",
@@ -1062,7 +1062,7 @@ export default [
     },
     {
         "templateVersion": "1.0.0",
-        "serviceDefaultVersion": "RELEASE.2022-10-15T19-57-03Z",
+        "defaultVersion": "RELEASE.2022-10-15T19-57-03Z",
         "name": "minio",
         "displayName": "MinIO",
         "description": " MinIO is a cloud storage server compatible with Amazon S3",
@@ -1132,7 +1132,7 @@ export default [
     },
     {
         "templateVersion": "1.0.0",
-        "serviceDefaultVersion": "0.21.1",
+        "defaultVersion": "0.21.1",
         "name": "fider",
         "displayName": "Fider",
         "description": "Fider is a platform to collect and organize customer feedback.",
@@ -1286,7 +1286,7 @@ export default [
     },
     {
         "templateVersion": "1.0.0",
-        "serviceDefaultVersion": "0.198.1",
+        "defaultVersion": "0.198.1",
         "name": "n8n",
         "displayName": "n8n.io",
         "description": "n8n is a free and open node based Workflow Automation Tool.",
@@ -1320,7 +1320,7 @@ export default [
     },
     {
         "templateVersion": "1.0.0",
-        "serviceDefaultVersion": "stable",
+        "defaultVersion": "stable",
         "name": "plausibleanalytics",
         "displayName": "PlausibleAnalytics",
         "description": "Plausible is a lightweight and open-source website analytics tool.",

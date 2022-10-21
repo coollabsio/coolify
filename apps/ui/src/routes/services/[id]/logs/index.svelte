@@ -93,8 +93,9 @@
 		<div class="title font-bold pb-3">Service Logs</div>
 	</div>
 </div>
-<div class="grid grid-cols-4 gap-2 lg:gap-8 pb-4">
-	{#if template}
+
+{#if template}
+	<div class="grid grid-cols-3 gap-2 lg:gap-8 pb-4">
 		{#each Object.keys(template) as service}
 			<button
 				on:click={() => selectService(service, true)}
@@ -102,11 +103,17 @@
 				class:bg-coolgray-200={selectedService !== service}
 				class="w-full rounded p-5 hover:bg-primary font-bold"
 			>
-				{service}</button
-			>
+				{#if template[service].name}
+					{template[service].name || ''} <br /><span class="text-xs">({service})</span>
+				{:else}
+					<span>{service}</span>
+				{/if}
+			</button>
 		{/each}
-	{/if}
-</div>
+	</div>
+{:else}
+	<div class="w-full flex justify-center font-bold text-xl">Loading components...</div>
+{/if}
 
 {#if selectedService}
 	<div class="flex flex-row justify-center space-x-2">
@@ -117,12 +124,6 @@
 		{:else}
 			<div class="relative w-full">
 				<div class="flex justify-start sticky space-x-2 pb-2">
-					{#if loadLogsInterval}
-						<button id="streaming" class="btn btn-sm bg-transparent border-none loading"
-							>Streaming logs</button
-						>
-					{/if}
-					<div class="flex-1" />
 					<button on:click={followBuild} class="btn btn-sm " class:bg-coollabs={followingLogs}>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -142,6 +143,11 @@
 						</svg>
 						{followingLogs ? 'Following Logs...' : 'Follow Logs'}
 					</button>
+					{#if loadLogsInterval}
+						<button id="streaming" class="btn btn-sm bg-transparent border-none loading"
+							>Streaming logs</button
+						>
+					{/if}
 				</div>
 				<div
 					bind:this={logsEl}

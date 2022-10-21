@@ -115,7 +115,7 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
 }
 export async function parseAndFindServiceTemplates(service: any, workdir?: string, isDeploy: boolean = false) {
     const templates = await getTemplates()
-    const foundTemplate = templates.find(t => t.name === service.type.toLowerCase())
+    const foundTemplate = templates.find(t => t.name.toLowerCase() === service.type.toLowerCase())
     let parsedTemplate = {}
     if (foundTemplate) {
         if (!isDeploy) {
@@ -124,57 +124,87 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                 parsedTemplate[realKey] = {
                     name: value.name,
                     image: value.image,
-                    environment: []
+                    environment: [],
+                    proxy: {}
                 }
                 if (value.environment?.length > 0) {
                     for (const env of value.environment) {
                         const [envKey, envValue] = env.split('=')
-                        const label = foundTemplate.variables.find(v => v.name === envKey)?.label
-                        const description = foundTemplate.variables.find(v => v.name === envKey)?.description
-                        const defaultValue = foundTemplate.variables.find(v => v.name === envKey)?.defaultValue
-                        const extras = foundTemplate.variables.find(v => v.name === envKey)?.extras
+                        const variable = foundTemplate.variables.find(v => v.name === envKey) || foundTemplate.variables.find(v => v.id === envValue)
+                        const label = variable?.label
+                        const description = variable?.description
+                        const defaultValue = variable?.defaultValue
+                        const extras = variable?.extras
                         if (envValue.startsWith('$$config') || extras?.isVisibleOnUI) {
+                            if (envValue.startsWith('$$config_coolify')) {
+                                console.log({envValue,envKey})
+                            }
                             parsedTemplate[realKey].environment.push(
                                 { name: envKey, value: envValue, label, description, defaultValue, extras }
                             )
                         }
+                    }
+                }
+                // TODO: seconday domains are not working - kinda working
+                if (value?.proxy?.traefik?.configurations) {
+                    for (const proxyValue of value.proxy.traefik.configurations) {
+                        if (proxyValue.domain) {
+                            const variable = foundTemplate.variables.find(v => v.id === proxyValue.domain) 
+                            if (variable) {
+                                const { name, label,  description, defaultValue, extras } = variable
+                                const found = await prisma.serviceSetting.findFirst({where: {variableName: proxyValue.domain}})
+                                parsedTemplate[realKey].environment.push(
+                                    { name, value: found.value || '', label, description, defaultValue, extras }
+                                )
+                            }
 
+                        }
                     }
                 }
             }
         } else {
             parsedTemplate = foundTemplate
         }
+        let strParsedTemplate = JSON.stringify(parsedTemplate)
+
         // replace $$id and $$workdir
-        parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll('$$id', service.id).replaceAll('$$core_version', service.version || foundTemplate.serviceDefaultVersion))
+        strParsedTemplate = strParsedTemplate.replaceAll('$$id', service.id)
+        strParsedTemplate = strParsedTemplate.replaceAll('$$core_version', service.version || foundTemplate.defaultVersion)
 
         // replace $$fqdn
         if (workdir) {
-            parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll('$$workdir', workdir))
+            strParsedTemplate = strParsedTemplate.replaceAll('$$workdir', workdir)
         }
 
         // replace $$config
         if (service.serviceSetting.length > 0) {
             for (const setting of service.serviceSetting) {
-                const { name, value } = setting
-                const regex = new RegExp(`\\$\\$config_${name}\\"`, 'gi')
+                const { value, variableName } = setting
                 if (service.fqdn && value === '$$generate_fqdn') {
-                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, service.fqdn + "\""))
+                    strParsedTemplate = strParsedTemplate.replaceAll(variableName, service.fqdn)
                 } else if (service.fqdn && value === '$$generate_domain') {
-                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, getDomain(service.fqdn) + "\""))
+                    strParsedTemplate = strParsedTemplate.replaceAll(variableName, getDomain(service.fqdn))
+                } else if (service.destinationDocker?.network && value === '$$generate_network') {
+                    strParsedTemplate = strParsedTemplate.replaceAll(variableName, service.destinationDocker.network)
                 } else {
-                    parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(regex, value + "\""))
+                    strParsedTemplate = strParsedTemplate.replaceAll(variableName, value)
                 }
-
             }
         }
+
         // replace $$secret
         if (service.serviceSecret.length > 0) {
             for (const secret of service.serviceSecret) {
                 const { name, value } = secret
-                parsedTemplate = JSON.parse(JSON.stringify(parsedTemplate).replaceAll(`$$hashed$$secret_${name.toLowerCase()}`, bcrypt.hashSync(value, 10)).replaceAll(`$$secret_${name.toLowerCase()}`, value))
+                const regexHashed = new RegExp(`\\$\\$hashed\\$\\$secret_${name}\\"`, 'gi')
+                const regex = new RegExp(`\\$\\$secret_${name}\\"`, 'gi')
+                if (value) {
+                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, bcrypt.hashSync(value, 10) + "\"")
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value + "\"")
+                }
             }
         }
+        parsedTemplate = JSON.parse(strParsedTemplate)
     }
     return parsedTemplate
 }
@@ -217,89 +247,42 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
         const templates = await getTemplates()
         let foundTemplate = templates.find(t => t.name === type)
         if (foundTemplate) {
-            let generatedVariables = new Set()
-            let missingVariables = new Set()
-
             foundTemplate = JSON.parse(JSON.stringify(foundTemplate).replaceAll('$$id', id))
-
             if (foundTemplate.variables.length > 0) {
-                foundTemplate.variables = foundTemplate.variables.map(variable => {
-                    let { id: variableId } = variable;
-                    if (variableId.startsWith('$$secret_')) {
-                        if (variable.defaultValue.startsWith('$$generate_password')) {
-                            const length = variable.defaultValue.replace('$$generate_password(', '').replace('\)', '') || 16
-                            variable.value = generatePassword({ length: Number(length) });
-                        } else if (variable.defaultValue.startsWith('$$generate_hex')) {
-                            const length = variable.defaultValue.replace('$$generate_hex(', '').replace('\)', '') || 16
-                            variable.value = crypto.randomBytes(Number(length)).toString('hex');
-                        } else if (!variable.defaultValue) {
-                            variable.defaultValue = undefined
-                        }
-                    }
-                    if (variableId.startsWith('$$config_')) {
-                        if (variable.defaultValue.startsWith('$$generate_username')) {
-                            const length = variable.defaultValue.replace('$$generate_username(', '').replace('\)', '')
-                            if (length !== '$$generate_username') {
-                                variable.value = crypto.randomBytes(Number(length)).toString('hex');
-                            } else {
-                                variable.value = cuid();
-                            }
-                        } else {
-                            if (variable.defaultValue.startsWith('$$generate_hex')) {
-                                const length = variable.defaultValue.replace('$$generate_hex(', '').replace('\)', '') || 16
-                                variable.value = crypto.randomBytes(Number(length)).toString('hex');
-                            } else {
-                                variable.value = variable.defaultValue || ''
-                            }
-                        }
-                    }
-                    if (variable.value) {
-                        generatedVariables.add(`${variableId}=${variable.value}`)
-                    } else {
-                        missingVariables.add(variableId)
-                    }
-                    return variable
-                })
-                if (missingVariables.size > 0) {
-                    foundTemplate.variables = foundTemplate.variables.map(variable => {
-                        if (missingVariables.has(variable.id)) {
-                            variable.value = variable.defaultValue
-                            for (const generatedVariable of generatedVariables) {
-                                let [id, value] = generatedVariable.split('=')
-                                if (variable.value) {
-                                    variable.value = variable.value.replaceAll(id, value)
-                                }
-                            }
-                        }
-                        return variable
-                    })
-                }
-
                 for (const variable of foundTemplate.variables) {
-                    if (variable.id.startsWith('$$secret_')) {
-                        if (!variable.value) {
-                            continue;
-                        }
-                        const found = await prisma.serviceSecret.findFirst({ where: { name: variable.name, serviceId: id } })
-                        if (!found) {
-                            await prisma.serviceSecret.create({
-                                data: { name: variable.name, value: encrypt(variable.value), service: { connect: { id } } }
-                            })
-                        }
-
-                    }
-                    if (variable.id.startsWith('$$config_')) {
-                        if (!variable.value) {
-                            variable.value = '';
-                        }
-                        const found = await prisma.serviceSetting.findFirst({ where: { name: variable.name, serviceId: id } })
-                        if (!found) {
-                            await prisma.serviceSetting.create({
-                                data: { name: variable.name, value: variable.value.toString(), service: { connect: { id } } }
-                            })
-                        }
+                    const { defaultValue } = variable;
+                    const regex = /^\$\$.*\((\d+)\)$/g;
+                    const length = Number(regex.exec(defaultValue)?.[1]) || undefined
+                    if (variable.defaultValue.startsWith('$$generate_password')) {
+                        variable.value = generatePassword({ length });
+                    } else if (variable.defaultValue.startsWith('$$generate_hex')) {
+                        variable.value = generatePassword({ length, isHex: true });
+                    } else if (variable.defaultValue.startsWith('$$generate_username')) {
+                        variable.value = cuid();
+                    } else {
+                        variable.value = variable.defaultValue || '';
                     }
                 }
+            }
+            for (const variable of foundTemplate.variables) {
+                if (variable.id.startsWith('$$secret_')) {
+                    const found = await prisma.serviceSecret.findFirst({ where: { name: variable.name, serviceId: id } })
+                    if (!found) {
+                        await prisma.serviceSecret.create({
+                            data: { name: variable.name, value: encrypt(variable.value) || '', service: { connect: { id } } }
+                        })
+                    }
+
+                }
+                if (variable.id.startsWith('$$config_')) {
+                    const found = await prisma.serviceSetting.findFirst({ where: { name: variable.name, serviceId: id } })
+                    if (!found) {
+                        await prisma.serviceSetting.create({
+                            data: { name: variable.name, value: variable.value.toString(), variableName: variable.id, service: { connect: { id } } }
+                        })
+                    }
+                }
+
             }
             for (const service of Object.keys(foundTemplate.services)) {
                 if (foundTemplate.services[service].volumes) {
@@ -316,7 +299,7 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                     }
                 }
             }
-            await prisma.service.update({ where: { id }, data: { type, version: foundTemplate.serviceDefaultVersion } })
+            await prisma.service.update({ where: { id }, data: { type, version: foundTemplate.defaultVersion } })
             return reply.code(201).send()
         } else {
             throw { status: 404, message: 'Service type not found.' }

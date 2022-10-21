@@ -4,7 +4,50 @@ import { supportedServiceTypesAndVersions } from "../../../lib/services/supporte
 import { includeServices } from "../../../lib/services/common";
 import { TraefikOtherConfiguration } from "./types";
 import { OnlyId } from "../../../types";
+import { getTemplates } from "../../../lib/services";
 
+function generateLoadBalancerService(id, port) {
+	return {
+		loadbalancer: {
+			servers: [
+				{
+					url: `http://${id}:${port}`
+				}
+			]
+		}
+	};
+}
+function generateHttpRouter(id, nakedDomain, pathPrefix) {
+	return {
+		entrypoints: ['web'],
+		rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`${pathPrefix}\`)`,
+		service: `${id}`,
+		middlewares: []
+	}
+}
+function generateProtocolRedirectRouter(id, nakedDomain, pathPrefix, fromTo) {
+	if (fromTo === 'https-to-http') {
+		return {
+			entrypoints: ['websecure'],
+			rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`${pathPrefix}\`)`,
+			service: `${id}`,
+			tls: {
+				domains: {
+					main: `${nakedDomain}`
+				}
+			},
+			middlewares: ['redirect-to-http']
+		}
+	} else if (fromTo === 'http-to-https') {
+		return {
+			entrypoints: ['web'],
+			rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`${pathPrefix}\`)`,
+			service: `${id}`,
+			middlewares: ['redirect-to-https']
+		};
+	}
+
+}
 function configureMiddleware(
 	{ id, container, port, domain, nakedDomain, isHttps, isWWW, isDualCerts, scriptName, type, isCustomSSL },
 	traefik
@@ -325,71 +368,127 @@ export async function traefikConfiguration(request, reply) {
 		});
 
 		for (const service of services) {
-			const {
+			let {
 				fqdn,
 				id,
 				type,
 				destinationDockerId,
 				dualCerts,
-				serviceSetting
 			} = service;
 			if (destinationDockerId) {
-				const found = supportedServiceTypesAndVersions.find((a) => a.name === type);
+				const templates = await getTemplates();
+				let found = templates.find((a) => a.name === type);
+				type = type.toLowerCase();
 				if (found) {
-					const port = found.ports.main;
-					const publicPort = service[type]?.publicPort;
-					const isRunning = true;
-					if (fqdn) {
-						const domain = getDomain(fqdn);
-						const nakedDomain = domain.replace(/^www\./, '');
-						const isHttps = fqdn.startsWith('https://');
-						const isWWW = fqdn.includes('www.');
-						if (isRunning) {
-							// Plausible Analytics custom script
-							let scriptName = false;
-							if (type === 'plausibleanalytics') {
-								const foundScriptName = serviceSetting.find((a) => a.name === 'SCRIPT_NAME')?.value;
-								if (foundScriptName) {
-									scriptName = foundScriptName;
+					found = JSON.parse(JSON.stringify(found).replaceAll('$$id', id));
+					for (const oneService of Object.keys(found.services)) {
+						const isProxyConfiguration = found.services[oneService].proxy;
+						if (isProxyConfiguration) {
+							const { proxy: { traefik: { configurations } } } = found.services[oneService];
+							for (const configuration of configurations) {
+								const publicPort = service[type]?.publicPort;
+								if (fqdn) {
+									data.services.push({
+										id: oneService,
+										publicPort,
+										fqdn,
+										dualCerts,
+										configuration
+									});
 								}
 							}
 
-							let container = id;
-							let otherDomain = null;
-							let otherNakedDomain = null;
-							let otherIsHttps = null;
-							let otherIsWWW = null;
-							if (type === 'minio') {
-								const domain = service.serviceSetting.find((a) => a.name === 'MINIO_SERVER_URL')?.value
-								otherDomain = getDomain(domain);
-								otherNakedDomain = otherDomain.replace(/^www\./, '');
-								otherIsHttps = domain.startsWith('https://');
-								otherIsWWW = domain.includes('www.');
-							}
-							data.services.push({
-								id,
-								container,
-								type,
-								otherDomain,
-								otherNakedDomain,
-								otherIsHttps,
-								otherIsWWW,
-								port,
-								publicPort,
-								domain,
-								nakedDomain,
-								isRunning,
-								isHttps,
-								isWWW,
-								isDualCerts: dualCerts,
-								scriptName
-							});
 						}
 					}
 				}
 			}
 		}
+		for (const service of data.services) {
+			const { id, fqdn, dualCerts, configuration: { port, pathPrefix = '/' }, isCustomSSL = false } = service
+			const domain = getDomain(fqdn);
+			const nakedDomain = domain.replace(/^www\./, '');
+			const isHttps = fqdn.startsWith('https://');
+			const isWWW = fqdn.includes('www.');
+			if (isHttps) {
+				traefik.http.routers[id] = generateHttpRouter(id, nakedDomain, pathPrefix)
+				traefik.http.routers[`${id}-secure`] = generateProtocolRedirectRouter(id, nakedDomain, pathPrefix, 'http-to-https')
+				traefik.http.services[id] = generateLoadBalancerService(id, port)
+				if (dualCerts) {
+					traefik.http.routers[`${id}-secure`] = {
+						entrypoints: ['websecure'],
+						rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`${pathPrefix}\`)`,
+						service: `${id}`,
+						tls: isCustomSSL ? true : {
+							certresolver: 'letsencrypt'
+						},
+						middlewares: []
+					};
+				} else {
+					if (isWWW) {
+						traefik.http.routers[`${id}-secure-www`] = {
+							entrypoints: ['websecure'],
+							rule: `Host(\`www.${nakedDomain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+							service: `${id}`,
+							tls: isCustomSSL ? true : {
+								certresolver: 'letsencrypt'
+							},
+							middlewares: []
+						};
+						traefik.http.routers[`${id}-secure`] = {
+							entrypoints: ['websecure'],
+							rule: `Host(\`${nakedDomain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+							service: `${id}`,
+							tls: {
+								domains: {
+									main: `${domain}`
+								}
+							},
+							middlewares: ['redirect-to-www']
+						};
+						traefik.http.routers[`${id}`].middlewares.push('redirect-to-www');
+					} else {
+						traefik.http.routers[`${id}-secure-www`] = {
+							entrypoints: ['websecure'],
+							rule: `Host(\`www.${nakedDomain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+							service: `${id}`,
+							tls: {
+								domains: {
+									main: `${domain}`
+								}
+							},
+							middlewares: ['redirect-to-non-www']
+						};
+						traefik.http.routers[`${id}-secure`] = {
+							entrypoints: ['websecure'],
+							rule: `Host(\`${domain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+							service: `${id}`,
+							tls: isCustomSSL ? true : {
+								certresolver: 'letsencrypt'
+							},
+							middlewares: []
+						};
+						traefik.http.routers[`${id}`].middlewares.push('redirect-to-non-www');
+					}
+				}
+			} else {
+				traefik.http.routers[id] = generateHttpRouter(id, nakedDomain, pathPrefix)
+				traefik.http.routers[`${id}-secure`] = generateProtocolRedirectRouter(id, nakedDomain, pathPrefix, 'https-to-http')
+				traefik.http.services[id] = generateLoadBalancerService(id, port)
 
+				if (!dualCerts) {
+					if (isWWW) {
+						traefik.http.routers[`${id}`].middlewares.push('redirect-to-www');
+						traefik.http.routers[`${id}-secure`].middlewares.push('redirect-to-www');
+					} else {
+						traefik.http.routers[`${id}`].middlewares.push('redirect-to-non-www');
+						traefik.http.routers[`${id}-secure`].middlewares.push('redirect-to-non-www');
+					}
+				}
+			}
+		}
+		return {
+			...traefik
+		}
 		const { fqdn, dualCerts } = await prisma.setting.findFirst();
 		if (fqdn) {
 			const domain = getDomain(fqdn);

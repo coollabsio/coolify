@@ -5,9 +5,8 @@ const template = yaml.load(templateYml)
 
 const newTemplate = {
     "templateVersion": "1.0.0",
-    "serviceDefaultVersion": "latest",
+    "defaultVersion": "latest",
     "name": "",
-    "displayName": "",
     "description": "",
     "services": {
 
@@ -16,13 +15,13 @@ const newTemplate = {
 }
 const version = template.caproverOneClickApp.variables.find(v => v.id === '$$cap_APP_VERSION').defaultValue || 'latest'
 
-newTemplate.displayName = template.caproverOneClickApp.displayName
-newTemplate.name = template.caproverOneClickApp.displayName.toLowerCase()
+newTemplate.name = template.caproverOneClickApp.displayName
 newTemplate.documentation = template.caproverOneClickApp.documentation
 newTemplate.description = template.caproverOneClickApp.description
-newTemplate.serviceDefaultVersion = version
+newTemplate.defaultVersion = version
 
 const varSet = new Set()
+
 const caproverVariables = template.caproverOneClickApp.variables
 for (const service of Object.keys(template.services)) {
     const serviceTemplate = template.services[service]
@@ -61,18 +60,20 @@ for (const service of Object.keys(template.services)) {
 
     if (serviceTemplate.environment && Object.keys(serviceTemplate.environment).length > 0) {
         for (const env of Object.keys(serviceTemplate.environment)) {
+            const foundCaproverVariable = caproverVariables.find((item) => item.id === serviceTemplate.environment[env])
+
+            let value = null;
+            let defaultValue = foundCaproverVariable?.defaultValue ? foundCaproverVariable?.defaultValue.toString()?.replace('$$cap_gen_random_hex', '$$$generate_hex') : ''
+
             if (serviceTemplate.environment[env].startsWith('srv-captain--$$cap_appname')) {
-                continue;
+                value = `$$config_${env}`.toLowerCase()
+                defaultValue = serviceTemplate.environment[env].replaceAll('srv-captain--$$cap_appname', '$$$id').replace('$$cap', '').replaceAll('captain-overlay-network', `$$$config_${env}`).toLowerCase()
+            } else {
+                value = '$$config_' + serviceTemplate.environment[env].replaceAll('srv-captain--$$cap_appname', '$$$id').replace('$$cap', '').replaceAll('captain-overlay-network', `$$$config_${env}`).toLowerCase()
             }
-            const value = '$$config_' + serviceTemplate.environment[env].replaceAll('srv-captain--$$cap_appname', '$$$id').replace('$$cap', '').replaceAll('captain-overlay-network', `$$$config_${env}`).toLowerCase()
             newService.environment.push(`${env}=${value}`)
             const foundVariable = varSet.has(env)
             if (!foundVariable) {
-                const foundCaproverVariable = caproverVariables.find((item) => item.id === serviceTemplate.environment[env])
-                const defaultValue = foundCaproverVariable?.defaultValue ? foundCaproverVariable?.defaultValue.toString()?.replace('$$cap_gen_random_hex', '$$$generate_hex') : ''
-                if (defaultValue && defaultValue !== foundCaproverVariable?.defaultValue) {
-                    console.log('changed')
-                }
                 newTemplate.variables.push({
                     "id": value,
                     "name": env,
@@ -84,12 +85,23 @@ for (const service of Object.keys(template.services)) {
             varSet.add(env)
         }
     }
+
     if (serviceTemplate.volumes && serviceTemplate.volumes.length > 0) {
         for (const volume of serviceTemplate.volumes) {
             const [source, target] = volume.split(':')
+            if (source === '/var/run/docker.sock' || source === '/tmp') {
+                continue;
+            }
             newService.volumes.push(`${source.replaceAll('$$cap_appname-', '$$$id-')}:${target}`)
         }
     }
+
     newTemplate.services[newServiceName] = newService
+    const services = { ...newTemplate.services }
+    newTemplate.services = {}
+    for (const key of Object.keys(services).sort()) {
+        newTemplate.services[key] = services[key]
+    }
 }
 await fs.writeFile('./caprover_new.yml', yaml.dump([{ ...newTemplate }]))
+await fs.writeFile('./caprover_new.json', JSON.stringify([{ ...newTemplate }], null, 2))
