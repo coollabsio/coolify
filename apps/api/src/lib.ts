@@ -1,31 +1,87 @@
-import { decrypt, encrypt, getDomain, prisma } from "./lib/common";
+import cuid from "cuid";
+import { decrypt, encrypt, generatePassword, getDomain, prisma } from "./lib/common";
 import { includeServices } from "./lib/services/common";
 
 export async function migrateServicesToNewTemplate(templates: any) {
     // This function migrates old hardcoded services to the new template based services
     try {
-        const services = await prisma.service.findMany({ include: includeServices })
+        const services: any = await prisma.service.findMany({ include: includeServices })
         for (const service of services) {
+            const { id } = service
             if (!service.type) {
                 continue;
             }
-            let template = templates.find(t => t.name === service.type.toLowerCase());
+            let template = templates.find(t => t.name.toLowerCase() === service.type.toLowerCase());
             if (template) {
+                console.log(template.variables.find(v => v.name === "_APP_REDIS_HOST"))
                 template = JSON.parse(JSON.stringify(template).replaceAll('$$id', service.id))
-                if (service.type === 'plausibleanalytics' && service.plausibleAnalytics) await plausibleAnalytics(service)
-                if (service.type === 'fider' && service.fider) await fider(service)
-                if (service.type === 'minio' && service.minio) await minio(service)
-                if (service.type === 'vscodeserver' && service.vscodeserver) await vscodeserver(service)
-                if (service.type === 'wordpress' && service.wordpress) await wordpress(service)
-                if (service.type === 'ghost' && service.ghost) await ghost(service)
-                if (service.type === 'meilisearch' && service.meiliSearch) await meilisearch(service)
-                if (service.type === 'umami' && service.umami) await umami(service)
-                if (service.type === 'hasura' && service.hasura) await hasura(service)
-                if (service.type === 'glitchTip' && service.glitchTip) await glitchtip(service)
-                if (service.type === 'searxng' && service.searxng) await searxng(service)
-                if (service.type === 'weblate' && service.weblate) await weblate(service)
+                if (service.type === 'plausibleanalytics' && service.plausibleAnalytics) await plausibleAnalytics(service, template)
+                if (service.type === 'fider' && service.fider) await fider(service, template)
+                if (service.type === 'minio' && service.minio) await minio(service, template)
+                if (service.type === 'vscodeserver' && service.vscodeserver) await vscodeserver(service, template)
+                if (service.type === 'wordpress' && service.wordpress) await wordpress(service, template)
+                if (service.type === 'ghost' && service.ghost) await ghost(service, template)
+                if (service.type === 'meilisearch' && service.meiliSearch) await meilisearch(service, template)
+                if (service.type === 'umami' && service.umami) await umami(service, template)
+                if (service.type === 'hasura' && service.hasura) await hasura(service, template)
+                if (service.type === 'glitchTip' && service.glitchTip) await glitchtip(service, template)
+                if (service.type === 'searxng' && service.searxng) await searxng(service, template)
+                if (service.type === 'weblate' && service.weblate) await weblate(service, template)
+                if (service.type === 'appwrite' && service.appwrite) await appwrite(service, template)
 
                 await createVolumes(service, template);
+
+                if (template.variables.length > 0) {
+                    for (const variable of template.variables) {
+                        const { defaultValue } = variable;
+                        const regex = /^\$\$.*\((\d+)\)$/g;
+                        const length = Number(regex.exec(defaultValue)?.[1]) || undefined
+                        if (variable.defaultValue.startsWith('$$generate_password')) {
+                            variable.value = generatePassword({ length });
+                        } else if (variable.defaultValue.startsWith('$$generate_hex')) {
+                            variable.value = generatePassword({ length, isHex: true });
+                        } else if (variable.defaultValue.startsWith('$$generate_username')) {
+                            variable.value = cuid();
+                        } else {
+                            variable.value = variable.defaultValue || '';
+                        }
+                    }
+                }
+                for (const variable of template.variables) {
+                    if (variable.id.startsWith('$$secret_')) {
+                        const found = await prisma.serviceSecret.findFirst({ where: { name: variable.name, serviceId: id } })
+                        if (!found) {
+                            await prisma.serviceSecret.create({
+                                data: { name: variable.name, value: encrypt(variable.value) || '', service: { connect: { id } } }
+                            })
+                        }
+
+                    }
+                    if (variable.id.startsWith('$$config_')) {
+                        const found = await prisma.serviceSetting.findFirst({ where: { name: variable.name, serviceId: id } })
+                        if (!found) {
+                            await prisma.serviceSetting.create({
+                                data: { name: variable.name, value: variable.value.toString(), variableName: variable.id, service: { connect: { id } } }
+                            })
+                        }
+                    }
+                }
+                for (const service of Object.keys(template.services)) {
+                    if (template.services[service].volumes) {
+                        for (const volume of template.services[service].volumes) {
+                            const [volumeName, path] = volume.split(':')
+                            if (!volumeName.startsWith('/')) {
+                                const found = await prisma.servicePersistentStorage.findFirst({ where: { volumeName, serviceId: id } })
+                                if (!found) {
+                                    await prisma.servicePersistentStorage.create({
+                                        data: { volumeName, path, containerId: service, predefined: true, service: { connect: { id } } }
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                await prisma.service.update({ where: { id }, data: { templateVersion: template.templateVersion } })
             }
 
         }
@@ -34,7 +90,28 @@ export async function migrateServicesToNewTemplate(templates: any) {
 
     }
 }
-async function weblate(service: any) {
+async function appwrite(service: any, template: any) {
+    const { opensslKeyV1, executorSecret, redisPassword, mariadbUser, mariadbPassword, mariadbRootUserPassword, mariadbDatabase } = service.appwrite
+
+    const secrets = [
+        `_APP_EXECUTOR_SECRET@@@${executorSecret}`,
+        `_APP_OPENSSL_KEY_V1@@@${opensslKeyV1}`,
+        `_APP_REDIS_PASS@@@${redisPassword}`,
+        `MARIADB_PASSWORD@@@${mariadbPassword}`,
+        `MARIADB_ROOT_PASSWORD@@@${mariadbRootUserPassword}`,
+    ]
+
+    const settings = [
+        `MARIADB_USER@@@${mariadbUser}`,
+        `MARIADB_DATABASE@@@${mariadbDatabase}`,
+    ]
+    await migrateSecrets(secrets, service);
+    await migrateSettings(settings, service, template);
+
+    // Remove old service data
+    // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
+}
+async function weblate(service: any, template: any) {
     const { adminPassword, postgresqlUser, postgresqlPassword, postgresqlDatabase } = service.weblate
 
     const secrets = [
@@ -51,13 +128,13 @@ async function weblate(service: any) {
         `POSTGRES_PORT@@@5432`,
         `REDIS_HOST@@@$$id-redis`,
     ]
+    await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
-    await migrateSettings(settings, service);
 
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
 }
-async function searxng(service: any) {
+async function searxng(service: any, template: any) {
     const { secretKey, redisPassword } = service.searxng
 
     const secrets = [
@@ -68,13 +145,13 @@ async function searxng(service: any) {
     const settings = [
         `SEARXNG_BASE_URL@@@$$generate_fqdn`
     ]
+    await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
-    await migrateSettings(settings, service);
 
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
 }
-async function glitchtip(service: any) {
+async function glitchtip(service: any, template: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, secretKeyBase, defaultEmail, defaultUsername, defaultPassword, defaultEmailFrom, emailSmtpHost, emailSmtpPort, emailSmtpUser, emailSmtpPassword, emailSmtpUseTls, emailSmtpUseSsl, emailBackend, mailgunApiKey, sendgridApiKey, enableOpenUserRegistration } = service.glitchTip
 
     const secrets = [
@@ -101,13 +178,13 @@ async function glitchtip(service: any) {
         `DJANGO_SUPERUSER_EMAIL@@@${defaultEmail}`,
         `DJANGO_SUPERUSER_USERNAME@@@${defaultUsername}`,
     ]
+    await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
-    await migrateSettings(settings, service);
 
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
 }
-async function hasura(service: any) {
+async function hasura(service: any, template: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, graphQLAdminPassword } = service.hasura
 
     const secrets = [
@@ -119,13 +196,13 @@ async function hasura(service: any) {
         `POSTGRES_USER@@@${postgresqlUser}`,
         `POSTGRES_DB@@@${postgresqlDatabase}`,
     ]
+    await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
-    await migrateSettings(settings, service);
 
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
 }
-async function umami(service: any) {
+async function umami(service: any, template: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, umamiAdminPassword, hashSalt } = service.umami
 
 
@@ -139,25 +216,26 @@ async function umami(service: any) {
         `POSTGRES_USER@@@${postgresqlUser}`,
         `POSTGRES_DB@@@${postgresqlDatabase}`,
     ]
+    await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
-    await migrateSettings(settings, service);
 
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
 }
-async function meilisearch(service: any) {
+async function meilisearch(service: any, template: any) {
     const { masterKey } = service.meiliSearch
 
     const secrets = [
         `MEILI_MASTER_KEY@@@${masterKey}`,
     ]
 
+    // await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
 
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
 }
-async function ghost(service: any) {
+async function ghost(service: any, template: any) {
     const { defaultEmail, defaultPassword, mariadbUser, mariadbPassword, mariadbRootUser, mariadbRootUserPassword, mariadbDatabase } = service.ghost
     const { fqdn } = service
 
@@ -182,13 +260,13 @@ async function ghost(service: any) {
         `url@@@$$generate_fqdn`,
         `GHOST_ENABLE_HTTPS@@@${isHttps ? 'yes' : 'no'}`
     ]
+    await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
-    await migrateSettings(settings, service);
 
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
 }
-async function wordpress(service: any) {
+async function wordpress(service: any, template: any) {
     const { extraConfig, tablePrefix, ownMysql, mysqlHost, mysqlPort, mysqlUser, mysqlPassword, mysqlRootUser, mysqlRootUserPassword, mysqlDatabase, ftpEnabled, ftpUser, ftpPassword, ftpPublicPort, ftpHostKey, ftpHostKeyPrivate } = service.wordpress
 
     const secrets = [
@@ -213,13 +291,13 @@ async function wordpress(service: any) {
         `COOLIFY_FTP_PUBLIC_PORT@@@${ftpPublicPort}`,
 
     ]
+    await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
-    await migrateSettings(settings, service);
 
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
 }
-async function vscodeserver(service: any) {
+async function vscodeserver(service: any, template: any) {
     const { password } = service.vscodeserver
 
     const secrets = [
@@ -230,7 +308,7 @@ async function vscodeserver(service: any) {
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { vscodeserver: { delete: true } } })
 }
-async function minio(service: any) {
+async function minio(service: any, template: any) {
     const { rootUser, rootUserPassword, apiFqdn } = service.minio
 
     const secrets = [
@@ -242,13 +320,13 @@ async function minio(service: any) {
         `MINIO_BROWSER_REDIRECT_URL@@@$$generate_fqdn`,
         `MINIO_DOMAIN@@@$$generate_domain`,
     ]
-    await migrateSettings(settings, service);
+    await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
 
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { minio: { delete: true } } })
 }
-async function fider(service: any) {
+async function fider(service: any, template: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, jwtSecret, emailNoreply, emailMailgunApiKey, emailMailgunDomain, emailMailgunRegion, emailSmtpHost, emailSmtpPort, emailSmtpUser, emailSmtpPassword, emailSmtpEnableStartTls } = service.fider
 
     const secrets = [
@@ -270,14 +348,14 @@ async function fider(service: any) {
         `POSTGRES_USER@@@${postgresqlUser}`,
         `POSTGRES_DB@@@${postgresqlDatabase}`,
     ]
-    await migrateSettings(settings, service);
+    await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
 
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { fider: { delete: true } } })
 
 }
-async function plausibleAnalytics(service: any) {
+async function plausibleAnalytics(service: any, template: any) {
     const { email, username, password, postgresqlUser, postgresqlPassword, postgresqlDatabase, secretKeyBase, scriptName } = service.plausibleAnalytics;
 
     const settings = [
@@ -296,14 +374,14 @@ async function plausibleAnalytics(service: any) {
         `POSTGRES_PASSWORD@@@${postgresqlPassword}`,
         `DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@$$generate_fqdn:5432/${postgresqlDatabase}`)}`,
     ]
-    await migrateSettings(settings, service);
+    await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
 
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { plausibleAnalytics: { delete: true } } })
 }
 
-async function migrateSettings(settings: any[], service: any) {
+async function migrateSettings(settings: any[], service: any, template: any) {
     for (const setting of settings) {
         if (!setting) continue;
         let [name, value] = setting.split('@@@')
@@ -311,7 +389,8 @@ async function migrateSettings(settings: any[], service: any) {
             continue;
         }
         // console.log('Migrating setting', name, value, 'for service', service.id, ', service name:', service.name)
-        await prisma.serviceSetting.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name, value, service: { connect: { id: service.id } } } })
+        const variableName = template.variables.find((v: any) => v.name === name)?.id
+        await prisma.serviceSetting.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name, value, variableName, service: { connect: { id: service.id } } } })
     }
 }
 async function migrateSecrets(secrets: any[], service: any) {

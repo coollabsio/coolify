@@ -282,7 +282,6 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                         })
                     }
                 }
-
             }
             for (const service of Object.keys(foundTemplate.services)) {
                 if (foundTemplate.services[service].volumes) {
@@ -299,7 +298,7 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                     }
                 }
             }
-            await prisma.service.update({ where: { id }, data: { type, version: foundTemplate.defaultVersion } })
+            await prisma.service.update({ where: { id }, data: { type, version: foundTemplate.defaultVersion, templateVersion: foundTemplate.templateVersion } })
             return reply.code(201).send()
         } else {
             throw { status: 404, message: 'Service type not found.' }

@@ -16,6 +16,7 @@ import fs from 'fs/promises';
 import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handlers';
 import { checkContainer } from './lib/docker';
 import { migrateServicesToNewTemplate } from './lib';
+import { getTemplates } from './lib/services';
 declare module 'fastify' {
 	interface FastifyInstance {
 		config: {
@@ -124,13 +125,13 @@ const host = '0.0.0.0';
 		}
 	})
 	try {
-		const templateYaml = await axios.get('https://gist.githubusercontent.com/andrasbacsai/701c450ef4272a929215cab11d737e3d/raw/4f021329d22934b90c5d67a0e49839a32bd629fd/template.yaml')
-		const templateJson = yaml.load(templateYaml.data)
+		const templateJson = await getTemplates()
 		if (isDev) {
 			await fs.writeFile('./template.json', JSON.stringify(templateJson, null, 2))
 		} else {
 			await fs.writeFile('/app/template.json', JSON.stringify(templateJson, null, 2))
 		}
+
 		await migrateServicesToNewTemplate(templateJson)
 
 		await fastify.listen({ port, host })
