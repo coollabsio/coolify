@@ -834,7 +834,7 @@ export async function getTemplates() {
                 "id": "$$config__app_redis_user",
                 "name": "_APP_REDIS_USER",
                 "label": "Redis | _APP_REDIS_USER",
-                "defaultValue": "",
+                "defaultValue": "$$generate_username",
                 "description": "Redis server user. This is an optional variable. Default value is an empty string."
             },
             {
