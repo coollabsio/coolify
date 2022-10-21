@@ -54,7 +54,9 @@
 	let nonWWWDomain = service.fqdn && getDomain(service.fqdn).replace(/^www\./, '');
 	let isNonWWWDomainOK = false;
 	let isWWWDomainOK = false;
-
+	let secondaryFQDNs = service.serviceSetting.filter((setting) =>
+		setting.name.startsWith('COOLIFY_FQDN')
+	);
 	async function isDNSValid(domain: any, isWWW: any) {
 		try {
 			await get(`/services/${id}/check?domain=${domain}`);
@@ -308,13 +310,12 @@
 					required
 				/>
 			</div>
-			{#each Object.keys(template) as oneService}
-				{#each template[oneService].environment.filter( (a) => a.name.startsWith('COOLIFY_FQDN_') ) as variable}
-					<div class="grid grid-cols-2 items-center">
-						<label class="h-10" for={variable.name}>{variable.label || variable.name}</label>
-						<input class="w-full" name={variable.name} id={variable.name} value={variable.value} />
-					</div>
-				{/each}
+			{#each secondaryFQDNs as fqdn}
+				{JSON.stringify(fqdn)}
+				<div class="grid grid-cols-2 items-center">
+					<label class="h-10" for={fqdn.name}>{fqdn.label || fqdn.name}</label>
+					<input class="w-full" name={fqdn.name} id={fqdn.name} value={fqdn.value} />
+				</div>
 			{/each}
 		</div>
 		{#if forceSave}
@@ -399,7 +400,7 @@
 				</div>
 				<div class="grid grid-flow-row gap-2 px-4">
 					{#if template[oneService].environment.length > 0}
-						{#each template[oneService].environment.filter((a) => !a.name.startsWith('COOLIFY_FQDN_')) as variable}
+						{#each template[oneService].environment as variable}
 							<div class="grid grid-cols-2 items-center gap-2">
 								<label class="h-10" for={variable.name}>{variable.label || variable.name}</label>
 								{#if variable.defaultValue === '$$generate_fqdn'}

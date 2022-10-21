@@ -137,6 +137,7 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                         const extras = variable?.extras
                         if (envValue.startsWith('$$config') || extras?.isVisibleOnUI) {
                             if (envValue.startsWith('$$config_coolify')) {
+                                continue
                                 console.log({ envValue, envKey })
                             }
                             parsedTemplate[realKey].environment.push(
@@ -180,6 +181,9 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
         if (service.serviceSetting.length > 0) {
             for (const setting of service.serviceSetting) {
                 const { value, variableName } = setting
+                if (variableName.startsWith('$$config_coolify')) {
+                    continue;
+                }
                 if (service.fqdn && value === '$$generate_fqdn') {
                     strParsedTemplate = strParsedTemplate.replaceAll(variableName, service.fqdn)
                 } else if (service.fqdn && value === '$$generate_domain') {
