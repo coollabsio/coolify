@@ -384,8 +384,8 @@ export async function traefikConfiguration(request, reply) {
 					for (const oneService of Object.keys(found.services)) {
 						const isProxyConfiguration = found.services[oneService].proxy;
 						if (isProxyConfiguration) {
-							const { proxy: { traefik: { configurations } } } = found.services[oneService];
-							for (const configuration of configurations) {
+							const { proxy } = found.services[oneService];
+							for (const configuration of proxy) {
 								const publicPort = service[type]?.publicPort;
 								if (fqdn) {
 									data.services.push({

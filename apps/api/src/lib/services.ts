@@ -226,16 +226,12 @@ export async function getTemplates() {
                 "ports": [
                     "80"
                 ],
-                "proxy": {
-                    "traefik": {
-                        "configurations": [
-                            {
-                                "domain":"$$config_coolify_fqdn_appwrite",
-                                "port": "80"
-                            }
-                        ]
+                "proxy": [
+                    {
+                        "domain": "$$config_coolify_fqdn_appwrite",
+                        "port": "80"
                     }
-                }
+                ]
             },
             "$$id-executor": {
                 "image": "appwrite/appwrite:$$core_version",
@@ -352,16 +348,12 @@ export async function getTemplates() {
                 ],
                 "volumes": [],
                 "entrypoint": "realtime",
-                "proxy": {
-                    "traefik": {
-                        "configurations": [
-                            {
-                                "port": "80",
-                                "pathPrefix": "/v1/realtime"
-                            }
-                        ]
+                "proxy": [
+                    {
+                        "port": "80",
+                        "pathPrefix": "/v1/realtime"
                     }
-                }
+                ]
             },
             "$$id-redis": {
                 "image": "redis:7.0.4-alpine",

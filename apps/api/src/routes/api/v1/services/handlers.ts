@@ -137,7 +137,7 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                         const extras = variable?.extras
                         if (envValue.startsWith('$$config') || extras?.isVisibleOnUI) {
                             if (envValue.startsWith('$$config_coolify')) {
-                                console.log({envValue,envKey})
+                                console.log({ envValue, envKey })
                             }
                             parsedTemplate[realKey].environment.push(
                                 { name: envKey, value: envValue, label, description, defaultValue, extras }
@@ -146,13 +146,13 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                     }
                 }
                 // TODO: seconday domains are not working - kinda working
-                if (value?.proxy?.traefik?.configurations) {
-                    for (const proxyValue of value.proxy.traefik.configurations) {
+                if (value?.proxy && value.proxy.length > 0) {
+                    for (const proxyValue of value.proxy) {
                         if (proxyValue.domain) {
-                            const variable = foundTemplate.variables.find(v => v.id === proxyValue.domain) 
+                            const variable = foundTemplate.variables.find(v => v.id === proxyValue.domain)
                             if (variable) {
-                                const { name, label,  description, defaultValue, extras } = variable
-                                const found = await prisma.serviceSetting.findFirst({where: {variableName: proxyValue.domain}})
+                                const { name, label, description, defaultValue, extras } = variable
+                                const found = await prisma.serviceSetting.findFirst({ where: { variableName: proxyValue.domain } })
                                 parsedTemplate[realKey].environment.push(
                                     { name, value: found.value || '', label, description, defaultValue, extras }
                                 )
