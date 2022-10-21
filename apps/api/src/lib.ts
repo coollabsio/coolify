@@ -13,7 +13,6 @@ export async function migrateServicesToNewTemplate(templates: any) {
             }
             let template = templates.find(t => t.name.toLowerCase() === service.type.toLowerCase());
             if (template) {
-                console.log(template.variables.find(v => v.name === "_APP_REDIS_HOST"))
                 template = JSON.parse(JSON.stringify(template).replaceAll('$$id', service.id))
                 if (service.type === 'plausibleanalytics' && service.plausibleAnalytics) await plausibleAnalytics(service, template)
                 if (service.type === 'fider' && service.fider) await fider(service, template)

@@ -700,11 +700,11 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         const network = destinationDockerId && destinationDocker.network;
         const config = {};
         for (const service in template.services) {
-            let newEnviroments = []
+            let newEnvironments = []
             for (const environment of template.services[service].environment) {
                 const [env, value] = environment.split("=");
                 if (!value.startsWith('$$secret') && value !== '') {
-                    newEnviroments.push(`${env}=${value}`)
+                    newEnvironments.push(`${env}=${value}`)
                 }
 
             }
@@ -712,8 +712,8 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
             for (const secret of secrets) {
                 const { name, value } = secret
                 if (value) {
-                    if (template.services[service].environment.find(env => env.startsWith(`${name}=`)) && !newEnviroments.find(env => env.startsWith(`${name}=`))) {
-                        newEnviroments.push(`${name}=${decrypt(value)}`)
+                    if (template.services[service].environment.find(env => env.startsWith(`${name}=`)) && !newEnvironments.find(env => env.startsWith(`${name}=`))) {
+                        newEnvironments.push(`${name}=${decrypt(value)}`)
                     }
                 }
             }
@@ -726,7 +726,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                 expose: template.services[service].ports,
                 // ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                 volumes: template.services[service].volumes,
-                environment: newEnviroments,
+                environment: newEnvironments,
                 depends_on: template.services[service]?.depends_on,
                 ulimits: template.services[service]?.ulimits,
                 cap_drop: template.services[service]?.cap_drop,
@@ -766,6 +766,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
             volumes: volumeMounts
         }
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
+        console.log(composeFileDestination)
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         await startServiceContainers(destinationDocker.id, composeFileDestination)
         return {}
