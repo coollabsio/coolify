@@ -90,12 +90,11 @@ export async function migrateServicesToNewTemplate(templates: any) {
     }
 }
 async function appwrite(service: any, template: any) {
-    const { opensslKeyV1, executorSecret, redisPassword, mariadbUser, mariadbPassword, mariadbRootUserPassword, mariadbDatabase } = service.appwrite
+    const { opensslKeyV1, executorSecret, mariadbUser, mariadbPassword, mariadbRootUserPassword, mariadbDatabase } = service.appwrite
 
     const secrets = [
         `_APP_EXECUTOR_SECRET@@@${executorSecret}`,
         `_APP_OPENSSL_KEY_V1@@@${opensslKeyV1}`,
-        `_APP_REDIS_PASS@@@${redisPassword}`,
         `MARIADB_PASSWORD@@@${mariadbPassword}`,
         `MARIADB_ROOT_PASSWORD@@@${mariadbRootUserPassword}`,
     ]
