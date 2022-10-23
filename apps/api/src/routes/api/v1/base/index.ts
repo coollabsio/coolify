@@ -2,6 +2,14 @@ import { FastifyPluginAsync } from 'fastify';
 import { errorHandler, listSettings, version } from '../../../../lib/common';
 
 const root: FastifyPluginAsync = async (fastify): Promise<void> => {
+    fastify.addHook('onRequest', async (request) => {
+        try {
+            return await request.jwtVerify();
+        } catch(error){
+            return {};
+        }
+    })
+
     fastify.get('/', async (request) => {
         const teamId = request.user?.teamId;
         const settings = await listSettings()
