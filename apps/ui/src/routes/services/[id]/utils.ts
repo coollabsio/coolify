@@ -53,14 +53,14 @@ export async function saveForm(formData: any, service: any) {
 			}
 			return setting;
 		});
-		// if (!settings.includes(key) && !baseCoolifySetting.includes(key)) {
-		// 	service.serviceSetting.push({
-		// 		id: service.id,
-		// 		name: key,
-		// 		value: value,
-		// 		isNew: true
-		// 	});
-		// }
+		if (!settings.includes(key) && !baseCoolifySetting.includes(key)) {
+			service.serviceSetting.push({
+				id: service.id,
+				name: key,
+				value: value,
+				isNew: true
+			});
+		}
 	}
 	await post(`/services/${service.id}`, { ...service });
 	const { service: reloadedService } = await get(`/services/${service.id}`);

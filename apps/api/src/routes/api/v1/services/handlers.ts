@@ -153,10 +153,10 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                         if (proxyValue.domain) {
                             const variable = foundTemplate.variables.find(v => v.id === proxyValue.domain)
                             if (variable) {
-                                const { name, label, description, defaultValue, extras } = variable
+                                const { id, name, label, description, defaultValue, extras } = variable
                                 const found = await prisma.serviceSetting.findFirst({ where: { variableName: proxyValue.domain } })
                                 parsedTemplate[realKey].fqdns.push(
-                                    { name, value: found.value || '', label, description, defaultValue, extras }
+                                    { id, name, value: found?.value || '', label, description, defaultValue, extras }
                                 )
                             }
 
@@ -485,27 +485,29 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
         if (fqdn) fqdn = fqdn.toLowerCase();
         if (exposePort) exposePort = Number(exposePort);
         type = fixType(type)
-        // const update = saveUpdateableFields(type, request.body[type])
+
         const data = {
             fqdn,
             name,
             exposePort,
         }
-        // if (Object.keys(update).length > 0) {
-        //     data[type] = { update: update }
-        // }
+        const templates = await getTemplates()
+        const service = await prisma.service.findUnique({ where: { id } })
+        const foundTemplate = templates.find(t => t.name.toLowerCase() === service.type.toLowerCase())
         for (const setting of serviceSetting) {
-            const { id: settingId, name, value, changed = false, isNew = false, variableName } = setting
+            let { id: settingId, name, value, changed = false, isNew = false, variableName } = setting
             if (changed) {
                 await prisma.serviceSetting.update({ where: { id: settingId }, data: { value } })
             }
             if (isNew) {
+                if (!variableName) {
+                    variableName = foundTemplate.variables.find(v => v.name === name).id
+                }
                 await prisma.serviceSetting.create({ data: { name, value, variableName, service: { connect: { id } } } })
             }
         }
         await prisma.service.update({
             where: { id }, data
-
         });
         return reply.code(201).send()
     } catch ({ status, message }) {

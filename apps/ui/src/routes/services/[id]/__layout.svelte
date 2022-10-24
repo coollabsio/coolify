@@ -65,7 +65,8 @@
 		status,
 		location,
 		setLocation,
-		checkIfDeploymentEnabledServices
+		checkIfDeploymentEnabledServices,
+		addToast
 	} from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
 	import { goto } from '$app/navigation';
@@ -76,6 +77,9 @@
 	$isDeploymentEnabled = checkIfDeploymentEnabledServices($appSession.isAdmin, service);
 
 	let statusInterval: any;
+	let loading = {
+		refreshTemplates: false
+	};
 
 	async function deleteService() {
 		const sure = confirm($t('application.confirm_to_delete', { name: service.name }));
@@ -96,6 +100,20 @@
 	async function restartService() {
 		await stopService();
 		await startService();
+	}
+	async function refreshTemplate() {
+		try {
+			loading.refreshTemplates = true;
+			await post(`/internal/refreshTemplates`, {});
+			addToast({
+				message: 'Services refreshed.',
+				type: 'success'
+			});
+		} catch (error) {
+			return errorNotification(error);
+		} finally {
+			loading.refreshTemplates = false;
+		}
 	}
 	async function stopService() {
 		const sure = confirm($t('database.confirm_stop', { name: service.name }));
@@ -187,7 +205,7 @@
 </script>
 
 <div class="mx-auto max-w-screen-2xl px-6 grid grid-cols-1 lg:grid-cols-2">
-	<nav class="header flex flex-row order-2 lg:order-1 px-0 lg:px-4 items-start">
+	<nav class="header flex flex-col lg:flex-row order-2 lg:order-1 px-0 lg:px-4 items-start">
 		<div class="title lg:pb-10">
 			<div class="flex justify-center items-center space-x-2">
 				<div>
@@ -217,8 +235,8 @@
 				</div>
 			</div>
 		</div>
-		{#if $page.url.pathname.startsWith(`/services/${id}/configuration/`)}
-			<div class="px-2">
+		<div class="flex flex-row space-x-2 lg:px-2">
+			{#if $page.url.pathname.startsWith(`/services/${id}/configuration/`)}
 				<button
 					on:click={() => deleteService()}
 					disabled={!$appSession.isAdmin}
@@ -228,8 +246,16 @@
 				>
 					Delete Service
 				</button>
-			</div>
-		{/if}
+			{/if}
+			{#if $page.url.pathname === `/services/${id}/configuration/type`}
+				<button
+					disabled={loading.refreshTemplates}
+					class:loading={loading.refreshTemplates}
+					class="btn btn-sm btn-primary text-sm"
+					on:click={refreshTemplate}>Refresh Services List</button
+				>
+			{/if}
+		</div>
 	</nav>
 	<div
 		class="pt-4 flex flex-row items-start justify-center lg:justify-end space-x-2 order-1 lg:order-2"
@@ -267,7 +293,7 @@
 					class="w-6 h-6"
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
-					stroke="currentColor"	
+					stroke="currentColor"
 					fill="none"
 					stroke-linecap="round"
 					stroke-linejoin="round"

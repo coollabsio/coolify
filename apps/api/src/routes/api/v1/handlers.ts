@@ -2,6 +2,8 @@ import axios from "axios";
 import { compareVersions } from "compare-versions";
 import cuid from "cuid";
 import bcrypt from "bcryptjs";
+import fs from 'fs/promises';
+import yaml from 'js-yaml';
 import {
 	asyncExecShell,
 	asyncSleep,
@@ -31,6 +33,30 @@ export async function cleanupManually(request: FastifyRequest) {
 			where: { id: serverId },
 		});
 		await cleanupDockerStorage(destination.id, true, true);
+		return {};
+	} catch ({ status, message }) {
+		return errorHandler({ status, message });
+	}
+}
+export async function refreshTemplates(request: FastifyRequest) {
+	try {
+		const { default: got } = await import('got')
+		let templates = {}
+		try {
+			const response = await got.get('https://get.coollabs.io/coolify/service-templates.yaml').text()
+			templates = yaml.load(response)
+		} catch (error) {
+			throw {
+				status: 500,
+				message: 'Could not fetch templates from get.coollabs.io'
+			};
+		}
+
+		if (isDev) {
+			await fs.writeFile('./template.json', JSON.stringify(templates, null, 2))
+		} else {
+			await fs.writeFile('/app/template.json', JSON.stringify(templates, null, 2))
+		}
 		return {};
 	} catch ({ status, message }) {
 		return errorHandler({ status, message });
