@@ -1,3 +1,5 @@
+// Convert caprover format to coolify format
+
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 const templateYml = await fs.readFile('./caprover.yml', 'utf8')

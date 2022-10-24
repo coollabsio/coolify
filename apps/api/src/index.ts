@@ -106,32 +106,44 @@ const host = '0.0.0.0';
 	});
 	fastify.register(cookie)
 	fastify.register(cors);
-	fastify.addHook('onRequest', async (request, reply) => {
-		let allowedList = ['coolify:3000'];
-		const { ipv4, ipv6, fqdn } = await prisma.setting.findFirst({})
+	// To detect allowed origins
+	// fastify.addHook('onRequest', async (request, reply) => {
+	// 	let allowedList = ['coolify:3000'];
+	// 	const { ipv4, ipv6, fqdn } = await prisma.setting.findFirst({})
 
-		ipv4 && allowedList.push(`${ipv4}:3000`);
-		ipv6 && allowedList.push(ipv6);
-		fqdn && allowedList.push(getDomain(fqdn));
-		isDev && allowedList.push('localhost:3000') && allowedList.push('localhost:3001') && allowedList.push('host.docker.internal:3001');
-		const remotes = await prisma.destinationDocker.findMany({ where: { remoteEngine: true, remoteVerified: true } })
-		if (remotes.length > 0) {
-			remotes.forEach(remote => {
-				allowedList.push(`${remote.remoteIpAddress}:3000`);
-			})
-		}
-		if (!allowedList.includes(request.headers.host)) {
-			// console.log('not allowed', request.headers.host)
-		}
-	})
+	// 	ipv4 && allowedList.push(`${ipv4}:3000`);
+	// 	ipv6 && allowedList.push(ipv6);
+	// 	fqdn && allowedList.push(getDomain(fqdn));
+	// 	isDev && allowedList.push('localhost:3000') && allowedList.push('localhost:3001') && allowedList.push('host.docker.internal:3001');
+	// 	const remotes = await prisma.destinationDocker.findMany({ where: { remoteEngine: true, remoteVerified: true } })
+	// 	if (remotes.length > 0) {
+	// 		remotes.forEach(remote => {
+	// 			allowedList.push(`${remote.remoteIpAddress}:3000`);
+	// 		})
+	// 	}
+	// 	if (!allowedList.includes(request.headers.host)) {
+	// 		// console.log('not allowed', request.headers.host)
+	// 	}
+	// })
+
+
 	try {
-		const templateJson = await getTemplates()
-		if (isDev) {
-			await fs.writeFile('./template.json', JSON.stringify(templateJson, null, 2))
-		} else {
-			await fs.writeFile('/app/template.json', JSON.stringify(templateJson, null, 2))
+		const { default: got } = await import('got')
+		let templates = {}
+		try {
+			const response = await got.get('https://get.coollabs.io/coolify/service-templates.yaml').text()
+			templates = yaml.load(response)
+		} catch (error) {
+			console.log("Couldn't get latest templates.")
+			console.log(error)
 		}
 
+		if (isDev) {
+			await fs.writeFile('./template.json', JSON.stringify(templates, null, 2))
+		} else {
+			await fs.writeFile('/app/template.json', JSON.stringify(templates, null, 2))
+		}
+		const templateJson = await getTemplates()
 		await migrateServicesToNewTemplate(templateJson)
 
 		await fastify.listen({ port, host })

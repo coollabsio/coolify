@@ -484,7 +484,7 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
         let { name, fqdn, exposePort, type, serviceSetting } = request.body;
         if (fqdn) fqdn = fqdn.toLowerCase();
         if (exposePort) exposePort = Number(exposePort);
-
+        console.log({ serviceSetting })
         type = fixType(type)
         // const update = saveUpdateableFields(type, request.body[type])
         const data = {
@@ -496,12 +496,12 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
         //     data[type] = { update: update }
         // }
         for (const setting of serviceSetting) {
-            const { id: settingId, name, value, changed = false, isNew = false } = setting
+            const { id: settingId, name, value, changed = false, isNew = false, variableName } = setting
             if (changed) {
                 await prisma.serviceSetting.update({ where: { id: settingId }, data: { value } })
             }
             if (isNew) {
-                await prisma.serviceSetting.create({ data: { name, value, service: { connect: { id } } } })
+                await prisma.serviceSetting.create({ data: { name, value, variableName, service: { connect: { id } } } })
             }
         }
         await prisma.service.update({
@@ -510,6 +510,7 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
         });
         return reply.code(201).send()
     } catch ({ status, message }) {
+        console.log({ status, message })
         return errorHandler({ status, message })
     }
 }
