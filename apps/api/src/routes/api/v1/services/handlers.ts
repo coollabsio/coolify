@@ -125,6 +125,7 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                     name: value.name,
                     image: value.image,
                     environment: [],
+                    fqdns: [],
                     proxy: {}
                 }
                 if (value.environment?.length > 0) {
@@ -134,14 +135,14 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                         const label = variable?.label
                         const description = variable?.description
                         const defaultValue = variable?.defaultValue
+                        const main = variable?.main || '$$id'
                         const extras = variable?.extras
                         if (envValue.startsWith('$$config') || extras?.isVisibleOnUI) {
                             if (envValue.startsWith('$$config_coolify')) {
                                 continue
-                                console.log({ envValue, envKey })
                             }
                             parsedTemplate[realKey].environment.push(
-                                { name: envKey, value: envValue, label, description, defaultValue, extras }
+                                { name: envKey, value: envValue, main, label, description, defaultValue, extras }
                             )
                         }
                     }
@@ -154,7 +155,7 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                             if (variable) {
                                 const { name, label, description, defaultValue, extras } = variable
                                 const found = await prisma.serviceSetting.findFirst({ where: { variableName: proxyValue.domain } })
-                                parsedTemplate[realKey].environment.push(
+                                parsedTemplate[realKey].fqdns.push(
                                     { name, value: found.value || '', label, description, defaultValue, extras }
                                 )
                             }
@@ -163,6 +164,7 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                     }
                 }
             }
+
         } else {
             parsedTemplate = foundTemplate
         }

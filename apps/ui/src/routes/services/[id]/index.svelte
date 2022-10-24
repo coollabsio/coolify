@@ -9,7 +9,6 @@
 
 <script lang="ts">
 	export let service: any;
-	export let readOnly: any;
 	export let template: any;
 	import cuid from 'cuid';
 	import { onMount } from 'svelte';
@@ -19,7 +18,6 @@
 	import { get, post } from '$lib/api';
 	import { errorNotification, getDomain } from '$lib/common';
 	import { t } from '$lib/translations';
-	import Select from 'svelte-select';
 	import {
 		appSession,
 		status,
@@ -54,9 +52,7 @@
 	let nonWWWDomain = service.fqdn && getDomain(service.fqdn).replace(/^www\./, '');
 	let isNonWWWDomainOK = false;
 	let isWWWDomainOK = false;
-	let secondaryFQDNs = service.serviceSetting.filter((setting) =>
-		setting.name.startsWith('COOLIFY_FQDN')
-	);
+
 	async function isDNSValid(domain: any, isWWW: any) {
 		try {
 			await get(`/services/${id}/check?domain=${domain}`);
@@ -76,7 +72,6 @@
 	async function handleSubmit(e: any) {
 		if (loading.save) return;
 		loading.save = true;
-
 		try {
 			// await post(`/services/${id}/check`, {
 			// 	fqdn: service.fqdn,
@@ -310,12 +305,13 @@
 					required
 				/>
 			</div>
-			{#each secondaryFQDNs as fqdn}
-				{JSON.stringify(fqdn)}
-				<div class="grid grid-cols-2 items-center">
-					<label class="h-10" for={fqdn.name}>{fqdn.label || fqdn.name}</label>
-					<input class="w-full" name={fqdn.name} id={fqdn.name} value={fqdn.value} />
-				</div>
+			{#each Object.keys(template) as oneService}
+				{#each template[oneService].fqdns as fqdn}
+					<div class="grid grid-cols-2 items-center py-1">
+						<label for={fqdn.name}>{fqdn.label || fqdn.name}</label>
+						<input class="w-full" name={fqdn.name} id={fqdn.name} bind:value={fqdn.value} />
+					</div>
+				{/each}
 			{/each}
 		</div>
 		{#if forceSave}
@@ -401,83 +397,85 @@
 				<div class="grid grid-flow-row gap-2 px-4">
 					{#if template[oneService].environment.length > 0}
 						{#each template[oneService].environment as variable}
-							<div class="grid grid-cols-2 items-center gap-2">
-								<label class="h-10" for={variable.name}>{variable.label || variable.name}</label>
-								{#if variable.defaultValue === '$$generate_fqdn'}
-									<input
-										class="w-full"
-										disabled
-										readonly
-										name={variable.name}
-										id={variable.name}
-										value={service.fqdn}
-									/>
-								{:else if variable.defaultValue === '$$generate_domain'}
-									<input
-										class="w-full"
-										disabled
-										readonly
-										name={variable.name}
-										id={variable.name}
-										value={getDomain(service.fqdn)}
-									/>
-								{:else if variable.defaultValue === '$$generate_network'}
-									<input
-										class="w-full"
-										disabled
-										readonly
-										name={variable.name}
-										id={variable.name}
-										value={service.destinationDocker.network}
-									/>
-								{:else if variable.defaultValue === 'true' || variable.defaultValue === 'false'}
-									{#if variable.value === 'true' || variable.value === 'false'}
-										<select
-											class="w-full font-normal"
-											readonly={isDisabled}
-											disabled={isDisabled}
-											id={variable.name}
+							{#if variable.main === oneService}
+								<div class="grid grid-cols-2 items-center gap-2">
+									<label class="h-10" for={variable.name}>{variable.label || variable.name}</label>
+									{#if variable.defaultValue === '$$generate_fqdn'}
+										<input
+											class="w-full"
+											disabled
+											readonly
 											name={variable.name}
-											bind:value={variable.value}
-											form="saveForm"
-										>
-											<option value="true">true</option>
-											<option value="false"> false</option>
-										</select>
+											id={variable.name}
+											value={service.fqdn}
+										/>
+									{:else if variable.defaultValue === '$$generate_domain'}
+										<input
+											class="w-full"
+											disabled
+											readonly
+											name={variable.name}
+											id={variable.name}
+											value={getDomain(service.fqdn)}
+										/>
+									{:else if variable.defaultValue === '$$generate_network'}
+										<input
+											class="w-full"
+											disabled
+											readonly
+											name={variable.name}
+											id={variable.name}
+											value={service.destinationDocker.network}
+										/>
+									{:else if variable.defaultValue === 'true' || variable.defaultValue === 'false'}
+										{#if variable.value === 'true' || variable.value === 'false'}
+											<select
+												class="w-full font-normal"
+												readonly={isDisabled}
+												disabled={isDisabled}
+												id={variable.name}
+												name={variable.name}
+												bind:value={variable.value}
+												form="saveForm"
+											>
+												<option value="true">true</option>
+												<option value="false"> false</option>
+											</select>
+										{:else}
+											<select
+												class="w-full font-normal"
+												readonly={isDisabled}
+												disabled={isDisabled}
+												id={variable.name}
+												name={variable.name}
+												bind:value={variable.defaultValue}
+												form="saveForm"
+											>
+												<option value="true">true</option>
+												<option value="false"> false</option>
+											</select>
+										{/if}
+									{:else if variable.defaultValue === '$$generate_password' || variable.defaultValue === '$$generate_passphrase'}
+										<CopyPasswordField
+											isPasswordField
+											readonly
+											disabled
+											name={variable.name}
+											id={variable.name}
+											value={variable.value}
+										/>
 									{:else}
-										<select
-											class="w-full font-normal"
+										<CopyPasswordField
+											required={variable?.extras?.required}
 											readonly={isDisabled}
 											disabled={isDisabled}
-											id={variable.name}
 											name={variable.name}
-											bind:value={variable.defaultValue}
-											form="saveForm"
-										>
-											<option value="true">true</option>
-											<option value="false"> false</option>
-										</select>
+											id={variable.name}
+											value={variable.value}
+										/>
 									{/if}
-								{:else if variable.defaultValue === '$$generate_password' || variable.defaultValue === '$$generate_passphrase'}
-									<CopyPasswordField
-										isPasswordField
-										readonly
-										disabled
-										name={variable.name}
-										id={variable.name}
-										value={variable.value}
-									/>
-								{:else}
-									<CopyPasswordField
-										required={variable?.extras?.required}
-										readonly={isDisabled}
-										disabled={isDisabled}
-										name={variable.name}
-										id={variable.name}
-										value={variable.value}
-									/>
-								{/if}
-							</div>
+								</div>
+							{/if}
 						{/each}
 					{/if}
 				</div>

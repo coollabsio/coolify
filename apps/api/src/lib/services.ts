@@ -60,6 +60,7 @@ export async function getTemplates() {
         "variables": [
             {
                 "id": "$$config_weblate_site_domain",
+                "main":"$$id",
                 "name": "WEBLATE_SITE_DOMAIN",
                 "label": "Weblate Domain",
                 "defaultValue": "$$generate_domain",
@@ -67,6 +68,7 @@ export async function getTemplates() {
             },
             {
                 "id": "$$secret_weblate_admin_password",
+                "main":"$$id",
                 "name": "WEBLATE_ADMIN_PASSWORD",
                 "label": "Weblate Admin Password",
                 "defaultValue": "$$generate_password",
@@ -84,6 +86,7 @@ export async function getTemplates() {
             },
             {
                 "id": "$$config_postgres_user",
+                "main":"$$id-postgresql",
                 "name": "POSTGRES_USER",
                 "label": "PostgreSQL User",
                 "defaultValue": "$$generate_username",
@@ -91,6 +94,7 @@ export async function getTemplates() {
             },
             {
                 "id": "$$secret_postgres_password",
+                "main":"$$id-postgresql",
                 "name": "POSTGRES_PASSWORD",
                 "label": "PostgreSQL Password",
                 "defaultValue": "$$generate_password(32)",
@@ -112,6 +116,7 @@ export async function getTemplates() {
             },
             {
                 "id": "$$config_postgres_db",
+                "main":"$$id-postgresql",
                 "name": "POSTGRES_DB",
                 "label": "PostgreSQL Database",
                 "defaultValue": "weblate",
@@ -700,7 +705,7 @@ export async function getTemplates() {
             {
                 "id": "$$config__app_influxdb_host",
                 "name": "_APP_INFLUXDB_HOST",
-                "label": "",
+                "label": "InfluxDB | _APP_INFLUXDB_HOST",
                 "defaultValue": "$$id-influxdb",
                 "description": ""
             },
@@ -818,7 +823,7 @@ export async function getTemplates() {
             },
             {
                 "id": "$$config__app_redis_host",
-                "name": "_APP_REDIS_HOST",
+                "name": "Redis | _APP_REDIS_HOST",
                 "label": "",
                 "defaultValue": "$$id-redis",
                 "description": ""
@@ -846,7 +851,7 @@ export async function getTemplates() {
             },
             {
                 "id": "$$config__app_db_host",
-                "name": "_APP_DB_HOST",
+                "name": "MariaDB | _APP_DB_HOST",
                 "label": "",
                 "defaultValue": "$$id-mariadb",
                 "description": ""
