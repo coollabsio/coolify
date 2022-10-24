@@ -484,7 +484,6 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
         let { name, fqdn, exposePort, type, serviceSetting } = request.body;
         if (fqdn) fqdn = fqdn.toLowerCase();
         if (exposePort) exposePort = Number(exposePort);
-        console.log({ serviceSetting })
         type = fixType(type)
         // const update = saveUpdateableFields(type, request.body[type])
         const data = {
