@@ -19,6 +19,7 @@ export interface SaveApplication extends OnlyId {
         denoMainFile: string,
         denoOptions: string,
         baseImage: string,
+        gitCommitHash: string,
         baseBuildImage: string,
         deploymentType: string,
         baseDatabaseBranch: string,
