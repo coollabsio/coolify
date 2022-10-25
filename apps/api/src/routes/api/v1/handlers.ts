@@ -41,10 +41,14 @@ export async function cleanupManually(request: FastifyRequest) {
 export async function refreshTemplates() {
 	try {
 		const { default: got } = await import('got')
-		let templates = {}
 		try {
-			const response = await got.get('https://get.coollabs.io/coolify/service-templates.yaml').text()
-			templates = yaml.load(response)
+			if (isDev) {
+				const response = await fs.readFile('./devTemplates.yaml', 'utf8')
+				await fs.writeFile('./template.json', JSON.stringify(yaml.load(response), null, 2))
+			} else {
+				const response = await got.get('https://get.coollabs.io/coolify/service-templates.yaml').text()
+				await fs.writeFile('/app/template.json', JSON.stringify(yaml.load(response), null, 2))
+			}
 		} catch (error) {
 			throw {
 				status: 500,
@@ -52,11 +56,6 @@ export async function refreshTemplates() {
 			};
 		}
 
-		if (isDev) {
-			await fs.writeFile('./template.json', JSON.stringify(templates, null, 2))
-		} else {
-			await fs.writeFile('/app/template.json', JSON.stringify(templates, null, 2))
-		}
 		return {};
 	} catch ({ status, message }) {
 		return errorHandler({ status, message });

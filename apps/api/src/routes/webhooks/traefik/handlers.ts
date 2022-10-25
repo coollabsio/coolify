@@ -20,7 +20,7 @@ function generateLoadBalancerService(id, port) {
 function generateHttpRouter(id, nakedDomain, pathPrefix) {
 	return {
 		entrypoints: ['web'],
-		rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`${pathPrefix}\`)`,
+		rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? `&& PathPrefix(\`${pathPrefix}\`)` : ''}`,
 		service: `${id}`,
 		middlewares: []
 	}
@@ -29,7 +29,7 @@ function generateProtocolRedirectRouter(id, nakedDomain, pathPrefix, fromTo) {
 	if (fromTo === 'https-to-http') {
 		return {
 			entrypoints: ['websecure'],
-			rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`${pathPrefix}\`)`,
+			rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? `&& PathPrefix(\`${pathPrefix}\`)` : ''}`,
 			service: `${id}`,
 			tls: {
 				domains: {
@@ -41,7 +41,7 @@ function generateProtocolRedirectRouter(id, nakedDomain, pathPrefix, fromTo) {
 	} else if (fromTo === 'http-to-https') {
 		return {
 			entrypoints: ['web'],
-			rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`${pathPrefix}\`)`,
+			rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? `&& PathPrefix(\`${pathPrefix}\`)` : ''}`,
 			service: `${id}`,
 			middlewares: ['redirect-to-https']
 		};
@@ -409,7 +409,7 @@ export async function traefikConfiguration(request, reply) {
 			}
 		}
 		for (const service of data.services) {
-			let { id, fqdn, dualCerts, configuration: { port, pathPrefix = '/', domain: customDomain }, isCustomSSL = false } = service
+			let { id, fqdn, dualCerts, configuration: { port, pathPrefix, domain: customDomain }, isCustomSSL = false } = service
 			if (customDomain) {
 				fqdn = customDomain
 			}
