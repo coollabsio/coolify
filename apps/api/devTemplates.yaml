@@ -1892,8 +1892,8 @@
         - '9001'
       proxy:
       - port: '9000'
-        domain: $$coolify_fqdn_minio_console
       - port: '9001'
+        domain: $$coolify_fqdn_minio_console
   variables:
     - id: $$coolify_fqdn_minio_console
       name: MINIO_SERVER_URL
