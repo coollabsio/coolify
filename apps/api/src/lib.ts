@@ -1,10 +1,12 @@
 import cuid from "cuid";
 import { decrypt, encrypt, generatePassword, getDomain, prisma } from "./lib/common";
+import { getTemplates } from "./lib/services";
 import { includeServices } from "./lib/services/common";
 
-export async function migrateServicesToNewTemplate(templates: any) {
+export async function migrateServicesToNewTemplate() {
     // This function migrates old hardcoded services to the new template based services
     try {
+        let templates = await getTemplates()
         const services: any = await prisma.service.findMany({ include: includeServices })
         for (const service of services) {
             const { id } = service

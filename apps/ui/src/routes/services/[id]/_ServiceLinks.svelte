@@ -2,7 +2,6 @@
 	import DocLink from '$lib/components/DocLink.svelte';
 	export let service: any;
 	export let linkToDocs: boolean = false;
-	import ExternalLink from '$lib/components/ExternalLink.svelte';
 	import * as Icons from '$lib/components/svg/services';
 	const name: any = service.type && service.type[0].toUpperCase() + service.type.substring(1);
 
@@ -31,15 +30,8 @@
 </script>
 
 {#if linkToDocs}
-	<DocLink url={links[service.type]} text={`Open documentation`} isExternal={true} />
+	<DocLink url={links[service.type]} text={`Documentation`} isExternal={true} />
 {:else}
 	<svelte:component this={Icons[name]} />
 {/if}
-<!-- <a href={links[service.type]} target="_blank" class="no-underline">
-	{#if linkToDocs}
-		Open Documentation
-		<ExternalLink />
-	{:else}
-		
-	{/if}
-</a> -->
+

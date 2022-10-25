@@ -38,7 +38,7 @@ export async function cleanupManually(request: FastifyRequest) {
 		return errorHandler({ status, message });
 	}
 }
-export async function refreshTemplates(request: FastifyRequest) {
+export async function refreshTemplates() {
 	try {
 		const { default: got } = await import('got')
 		let templates = {}

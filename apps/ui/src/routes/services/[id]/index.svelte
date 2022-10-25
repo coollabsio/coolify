@@ -293,7 +293,7 @@
 					<Explainer explanation={$t('application.https_explainer')} />
 				</label>
 				<CopyPasswordField
-					placeholder="eg: https://analytics.coollabs.io"
+					placeholder="eg: https://coollabs.io"
 					readonly={!$appSession.isAdmin && !$status.service.isRunning}
 					disabled={!$appSession.isAdmin ||
 						$status.service.isRunning ||
@@ -309,7 +309,13 @@
 				{#each template[oneService].fqdns as fqdn}
 					<div class="grid grid-cols-2 items-center py-1">
 						<label for={fqdn.name}>{fqdn.label || fqdn.name}</label>
-						<input class="w-full" name={fqdn.name} id={fqdn.name} bind:value={fqdn.value} />
+						<CopyPasswordField
+							placeholder="eg: https://coolify.io"
+							required={fqdn.required}
+							name={fqdn.name}
+							id={fqdn.name}
+							bind:value={fqdn.value}
+						/>
 					</div>
 				{/each}
 			{/each}
@@ -416,7 +422,7 @@
 											readonly
 											name={variable.name}
 											id={variable.name}
-											value={getDomain(service.fqdn)}
+											value={getDomain(service.fqdn) || ''}
 										/>
 									{:else if variable.defaultValue === '$$generate_network'}
 										<input
@@ -466,7 +472,7 @@
 										/>
 									{:else}
 										<CopyPasswordField
-											required={variable?.extras?.required}
+											required={variable?.required}
 											readonly={isDisabled}
 											disabled={isDisabled}
 											name={variable.name}

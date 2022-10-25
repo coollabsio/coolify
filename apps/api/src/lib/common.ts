@@ -244,7 +244,11 @@ export async function isDNSValid(hostname: any, domain: string): Promise<any> {
 }
 
 export function getDomain(domain: string): string {
-	return domain?.replace('https://', '').replace('http://', '');
+	if (domain) {
+		return domain?.replace('https://', '').replace('http://', '');
+	} else {
+		return '';
+	}
 }
 
 export async function isDomainConfigured({

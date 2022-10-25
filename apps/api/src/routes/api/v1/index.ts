@@ -58,7 +58,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 
 	fastify.post('/internal/refreshTemplates', {
 		onRequest: [fastify.authenticate]
-	}, async (request) => await refreshTemplates(request));
+	}, async () => await refreshTemplates());
 };
 
 export default root;

@@ -136,13 +136,12 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                         const description = variable?.description
                         const defaultValue = variable?.defaultValue
                         const main = variable?.main || '$$id'
-                        const extras = variable?.extras
-                        if (envValue.startsWith('$$config') || extras?.isVisibleOnUI) {
+                        if (envValue.startsWith('$$config') || variable?.showOnUI) {
                             if (envValue.startsWith('$$config_coolify')) {
                                 continue
                             }
                             parsedTemplate[realKey].environment.push(
-                                { name: envKey, value: envValue, main, label, description, defaultValue, extras }
+                                { name: envKey, value: envValue, main, label, description, defaultValue }
                             )
                         }
                     }
@@ -153,10 +152,10 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                         if (proxyValue.domain) {
                             const variable = foundTemplate.variables.find(v => v.id === proxyValue.domain)
                             if (variable) {
-                                const { id, name, label, description, defaultValue, extras } = variable
+                                const { id, name, label, description, defaultValue, required = false } = variable
                                 const found = await prisma.serviceSetting.findFirst({ where: { variableName: proxyValue.domain } })
                                 parsedTemplate[realKey].fqdns.push(
-                                    { id, name, value: found?.value || '', label, description, defaultValue, extras }
+                                    { id, name, value: found?.value || '', label, description, defaultValue, required }
                                 )
                             }
 
@@ -186,9 +185,9 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                 if (variableName.startsWith('$$config_coolify')) {
                     continue;
                 }
-                if (service.fqdn && value === '$$generate_fqdn') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(variableName, service.fqdn)
-                } else if (service.fqdn && value === '$$generate_domain') {
+                if (value === '$$generate_fqdn') {
+                    strParsedTemplate = strParsedTemplate.replaceAll(variableName, service.fqdn || '')
+                } else if (value === '$$generate_domain') {
                     strParsedTemplate = strParsedTemplate.replaceAll(variableName, getDomain(service.fqdn))
                 } else if (service.destinationDocker?.network && value === '$$generate_network') {
                     strParsedTemplate = strParsedTemplate.replaceAll(variableName, service.destinationDocker.network)
@@ -260,7 +259,9 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                     const regex = /^\$\$.*\((\d+)\)$/g;
                     const length = Number(regex.exec(defaultValue)?.[1]) || undefined
                     if (variable.defaultValue.startsWith('$$generate_password')) {
+                        console.log(variable)
                         variable.value = generatePassword({ length });
+                        console.log(variable.value)
                     } else if (variable.defaultValue.startsWith('$$generate_hex')) {
                         variable.value = generatePassword({ length, isHex: true });
                     } else if (variable.defaultValue.startsWith('$$generate_username')) {

@@ -17,6 +17,7 @@ import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handler
 import { checkContainer } from './lib/docker';
 import { migrateServicesToNewTemplate } from './lib';
 import { getTemplates } from './lib/services';
+import { refreshTemplates } from './routes/api/v1/handlers';
 declare module 'fastify' {
 	interface FastifyInstance {
 		config: {
@@ -129,22 +130,21 @@ const host = '0.0.0.0';
 
 	try {
 		const { default: got } = await import('got')
-		let templates = {}
 		try {
-			const response = await got.get('https://get.coollabs.io/coolify/service-templates.yaml').text()
-			templates = yaml.load(response)
+			if (isDev) {
+				const response = await fs.readFile('./devTemplates.yaml', 'utf8')
+				await fs.writeFile('./template.json', JSON.stringify(yaml.load(response), null, 2))
+			} else {
+				const response = await got.get('https://get.coollabs.io/coolify/service-templates.yaml').text()
+				await fs.writeFile('/app/template.json', JSON.stringify(yaml.load(response), null, 2))
+			}
+
 		} catch (error) {
 			console.log("Couldn't get latest templates.")
 			console.log(error)
 		}
 
-		if (isDev) {
-			await fs.writeFile('./template.json', JSON.stringify(templates, null, 2))
-		} else {
-			await fs.writeFile('/app/template.json', JSON.stringify(templates, null, 2))
-		}
-		const templateJson = await getTemplates()
-		await migrateServicesToNewTemplate(templateJson)
+		await migrateServicesToNewTemplate()
 
 		await fastify.listen({ port, host })
 		console.log(`Coolify's API is listening on ${host}:${port}`);
@@ -169,10 +169,11 @@ const host = '0.0.0.0';
 			await cleanupStorage()
 		}, 60000 * 10)
 
-		// checkProxies and checkFluentBit
+		// checkProxies, checkFluentBit & refresh templates
 		setInterval(async () => {
 			await checkProxies();
 			await checkFluentBit();
+			await refreshTemplates()
 		}, 10000)
 
 		setInterval(async () => {
