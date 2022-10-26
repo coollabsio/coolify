@@ -1457,8 +1457,8 @@ export async function getServiceFromDB({
 	if (!body) {
 		return null
 	}
-	let { type } = body;
-	type = fixType(type);
+	body.type = fixType(body.type);
+
 	if (body?.serviceSecret.length > 0) {
 		body.serviceSecret = body.serviceSecret.map((s) => {
 			s.value = decrypt(s.value);
@@ -1466,7 +1466,6 @@ export async function getServiceFromDB({
 		});
 	}
 
-	// body[type] = { ...body[type], ...getUpdateableFields(type, body[type]) };
 	return { ...body, settings };
 }
 
@@ -1532,10 +1531,7 @@ export function getUpdateableFields(type: string, data: any) {
 }
 
 export function fixType(type) {
-	// Hack to fix the type case sensitivity...
-	if (type === 'plausibleanalytics') type = 'plausibleAnalytics';
-	if (type === 'meilisearch') type = 'meiliSearch';
-	return type;
+	return type?.replaceAll(' ', '').toLowerCase() || null;
 }
 
 export const getServiceMainPort = (service: string) => {

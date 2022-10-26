@@ -115,7 +115,7 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
 }
 export async function parseAndFindServiceTemplates(service: any, workdir?: string, isDeploy: boolean = false) {
     const templates = await getTemplates()
-    const foundTemplate = templates.find(t => t.name.toLowerCase() === service.type.toLowerCase())
+    const foundTemplate = templates.find(t => fixType(t.name) === service.type)
     let parsedTemplate = {}
     if (foundTemplate) {
         if (!isDeploy) {
@@ -249,7 +249,7 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
         const { id } = request.params;
         const { type } = request.body;
         const templates = await getTemplates()
-        let foundTemplate = templates.find(t => t.name === type)
+        let foundTemplate = templates.find(t => fixType(t.name) === fixType(type))
         if (foundTemplate) {
             foundTemplate = JSON.parse(JSON.stringify(foundTemplate).replaceAll('$$id', id))
             if (foundTemplate.variables.length > 0) {
@@ -495,7 +495,7 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
         }
         const templates = await getTemplates()
         const service = await prisma.service.findUnique({ where: { id } })
-        const foundTemplate = templates.find(t => t.name.toLowerCase() === service.type.toLowerCase())
+        const foundTemplate = templates.find(t => fixType(t.name) === service.type)
         for (const setting of serviceSetting) {
             let { id: settingId, name, value, changed = false, isNew = false, variableName } = setting
             if (changed) {
@@ -679,14 +679,17 @@ export async function activatePlausibleUsers(request: FastifyRequest<OnlyId>, re
         const {
             destinationDockerId,
             destinationDocker,
-            plausibleAnalytics: { postgresqlUser, postgresqlPassword, postgresqlDatabase }
+            serviceSecret
         } = await getServiceFromDB({ id, teamId });
         if (destinationDockerId) {
-            await executeDockerCmd({
-                dockerId: destinationDocker.id,
-                command: `docker exec ${id}-postgresql psql -H postgresql://${postgresqlUser}:${postgresqlPassword}@localhost:5432/${postgresqlDatabase} -c "UPDATE users SET email_verified = true;"`
-            })
-            return await reply.code(201).send()
+            const databaseUrl = serviceSecret.find((secret) => secret.name === 'DATABASE_URL');
+            if (databaseUrl) {
+                await executeDockerCmd({
+                    dockerId: destinationDocker.id,
+                    command: `docker exec ${id}-postgresql psql -H ${databaseUrl.value} -c "UPDATE users SET email_verified = true;"`
+                })
+                return await reply.code(201).send()
+            }
         }
         throw { status: 500, message: 'Could not activate users.' }
     } catch ({ status, message }) {

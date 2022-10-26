@@ -1,5 +1,5 @@
 import { FastifyRequest } from "fastify";
-import { errorHandler, getDomain, isDev, prisma, executeDockerCmd } from "../../../lib/common";
+import { errorHandler, getDomain, isDev, prisma, executeDockerCmd, fixType } from "../../../lib/common";
 import { supportedServiceTypesAndVersions } from "../../../lib/services/supportedVersions";
 import { includeServices } from "../../../lib/services/common";
 import { TraefikOtherConfiguration } from "./types";
@@ -378,8 +378,7 @@ export async function traefikConfiguration(request, reply) {
 			} = service;
 			if (destinationDockerId) {
 				const templates = await getTemplates();
-				let found = templates.find((a) => a.name === type);
-				type = type.toLowerCase();
+				let found = templates.find((a) => fixType(a.name) === fixType(type));
 				if (found) {
 					found = JSON.parse(JSON.stringify(found).replaceAll('$$id', id));
 					for (const oneService of Object.keys(found.services)) {

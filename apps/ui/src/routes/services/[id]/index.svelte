@@ -157,7 +157,7 @@
 		try {
 			await post(`/services/${id}/${service.type}/cleanup`, { id: service.id });
 			return addToast({
-				message: 'Cleared DB Logs',
+				message: 'Cleared unnecessary database logs.',
 				type: 'success'
 			});
 		} catch (error) {
@@ -166,28 +166,25 @@
 			loading.cleanup = false;
 		}
 	}
-	function doNothing() {
-		return;
-	}
 	onMount(async () => {
 		if (browser && window.location.hostname === 'demo.coolify.io' && !service.fqdn) {
 			service.fqdn = `http://${cuid()}.demo.coolify.io`;
-			if (service.type === 'wordpress') {
-				service.wordpress.mysqlDatabase = 'db';
-			}
+			// if (service.type === 'wordpress') {
+			// 	service.wordpress.mysqlDatabase = 'db';
+			// }
 			// if (service.type === 'plausibleanalytics') {
 			// 	service.plausibleAnalytics.email = 'noreply@demo.com';
 			// 	service.plausibleAnalytics.username = 'admin';
 			// }
-			if (service.type === 'minio') {
-				service.minio.apiFqdn = `http://${cuid()}.demo.coolify.io`;
-			}
-			if (service.type === 'ghost') {
-				service.ghost.mariadbDatabase = 'db';
-			}
-			if (service.type === 'fider') {
-				service.fider.emailNoreply = 'noreply@demo.com';
-			}
+			// if (service.type === 'minio') {
+			// 	service.minio.apiFqdn = `http://${cuid()}.demo.coolify.io`;
+			// }
+			// if (service.type === 'ghost') {
+			// 	service.ghost.mariadbDatabase = 'db';
+			// }
+			// if (service.type === 'fider') {
+			// 	service.fider.emailNoreply = 'noreply@demo.com';
+			// }
 			// await handleSubmit();
 		}
 	});
@@ -214,8 +211,7 @@
 							: $t('forms.save')}</button
 					>
 				{/if}
-				<!-- {#if service.type === 'plausibleanalytics' && $status.service.isRunning}
-					<div class="btn-group">
+				{#if service.type === 'plausibleanalytics' && $status.service.overallStatus === 'healthy'}
 						<button
 							class="btn btn-sm"
 							on:click|preventDefault={setEmailsToVerified}
@@ -231,8 +227,7 @@
 							disabled={loading.cleanup}
 							class:loading={loading.cleanup}>Cleanup Unnecessary Database Logs</button
 						>
-					</div>
-				{/if} -->
+				{/if}
 				{#if service.type === 'appwrite' && $status.service.isRunning}
 					<button
 						class="btn btn-sm"
@@ -384,8 +379,6 @@
 				/>
 			</div>
 		</div>
-
-		<div />
 		<div>
 			{#each Object.keys(template) as oneService}
 				<div

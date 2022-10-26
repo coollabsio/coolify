@@ -1,5 +1,5 @@
 import cuid from "cuid";
-import { decrypt, encrypt, generatePassword, getDomain, prisma } from "./lib/common";
+import { decrypt, encrypt, fixType, generatePassword, getDomain, prisma } from "./lib/common";
 import { getTemplates } from "./lib/services";
 import { includeServices } from "./lib/services/common";
 
@@ -13,7 +13,7 @@ export async function migrateServicesToNewTemplate() {
             if (!service.type) {
                 continue;
             }
-            let template = templates.find(t => t.name.toLowerCase() === service.type.toLowerCase());
+            let template = templates.find(t => fixType(t.name) === fixType(service.type));
             if (template) {
                 template = JSON.parse(JSON.stringify(template).replaceAll('$$id', service.id))
                 if (service.type === 'plausibleanalytics' && service.plausibleAnalytics) await plausibleAnalytics(service, template)
