@@ -141,3 +141,12 @@ export async function getTemplates() {
     // }
     return templates
 }
+export async function getTags(type?: string) {
+    let tags: any = [];
+    if (isDev) {
+        tags = JSON.parse(await (await fs.readFile('./tags.json')).toString())
+    } else {
+        tags = JSON.parse(await (await fs.readFile('/app/tags.json')).toString())
+    }
+    return tags.find((tag: any) => tag.name.includes(type))
+}

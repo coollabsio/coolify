@@ -16,3 +16,4 @@ apps/api/core*
 logs
 others/certificates
 apps/api/template.json
+apps/api/tags.json

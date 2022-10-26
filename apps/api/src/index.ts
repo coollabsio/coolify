@@ -17,7 +17,7 @@ import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handler
 import { checkContainer } from './lib/docker';
 import { migrateServicesToNewTemplate } from './lib';
 import { getTemplates } from './lib/services';
-import { refreshTemplates } from './routes/api/v1/handlers';
+import { refreshTags, refreshTemplates } from './routes/api/v1/handlers';
 declare module 'fastify' {
 	interface FastifyInstance {
 		config: {
@@ -131,12 +131,17 @@ const host = '0.0.0.0';
 	try {
 		const { default: got } = await import('got')
 		try {
+			const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text()
+
 			if (isDev) {
-				const response = await fs.readFile('./devTemplates.yaml', 'utf8')
-				await fs.writeFile('./template.json', JSON.stringify(yaml.load(response), null, 2))
+				const templates = await fs.readFile('./devTemplates.yaml', 'utf8')
+				await fs.writeFile('./template.json', JSON.stringify(yaml.load(templates)))
+				const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text()
+				await fs.writeFile('./tags.json', tags)
 			} else {
 				const response = await got.get('https://get.coollabs.io/coolify/service-templates.yaml').text()
-				await fs.writeFile('/app/template.json', JSON.stringify(yaml.load(response), null, 2))
+				await fs.writeFile('/app/template.json', JSON.stringify(yaml.load(response)))
+				await fs.writeFile('/app/tags.json', tags)
 			}
 
 		} catch (error) {
@@ -173,18 +178,18 @@ const host = '0.0.0.0';
 		setInterval(async () => {
 			await checkProxies();
 			await checkFluentBit();
-
-		}, 10000)
+		}, 60000)
 
 		// Refresh and check templates
 		setInterval(async () => {
 			await refreshTemplates()
+			await refreshTags()
 			await migrateServicesToNewTemplate()
-		}, 10000)
+		}, 60000)
 
 		setInterval(async () => {
 			await copySSLCertificates();
-		}, 2000)
+		}, 10000)
 
 		await Promise.all([
 			getArch(),

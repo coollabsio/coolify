@@ -43,7 +43,7 @@ export async function saveSecret({
 
 export async function saveForm(formData: any, service: any) {
 	const settings = service.serviceSetting.map((setting: { name: string }) => setting.name);
-	const baseCoolifySetting = ['name', 'fqdn', 'exposePort'];
+	const baseCoolifySetting = ['name', 'fqdn', 'exposePort', 'version'];
 	for (let field of formData) {
 		const [key, value] = field;
 		service.serviceSetting = service.serviceSetting.map((setting: any) => {
@@ -60,6 +60,9 @@ export async function saveForm(formData: any, service: any) {
 				value: value,
 				isNew: true
 			});
+		}
+		if (baseCoolifySetting.includes(key)) {
+			service[key] = value;
 		}
 	}
 	await post(`/services/${service.id}`, { ...service });

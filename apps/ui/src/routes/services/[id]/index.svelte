@@ -10,6 +10,7 @@
 <script lang="ts">
 	export let service: any;
 	export let template: any;
+	export let tags: any;
 	import cuid from 'cuid';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/env';
@@ -33,6 +34,7 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import ServiceStatus from '$lib/components/ServiceStatus.svelte';
 	import { saveForm } from './utils';
+	import Select from 'svelte-select';
 
 	const { id } = $page.params;
 	$: isDisabled =
@@ -53,6 +55,9 @@
 	let isNonWWWDomainOK = false;
 	let isWWWDomainOK = false;
 
+	function containerClass() {
+		return 'text-white bg-transparent font-thin px-0 w-full border border-dashed border-coolgray-200';
+	}
 	async function isDNSValid(domain: any, isWWW: any) {
 		try {
 			await get(`/services/${id}/check?domain=${domain}`);
@@ -166,6 +171,9 @@
 			loading.cleanup = false;
 		}
 	}
+	async function selectTag(event: any) {
+		service.version = event.detail.value;
+	}
 	onMount(async () => {
 		if (browser && window.location.hostname === 'demo.coolify.io' && !service.fqdn) {
 			service.fqdn = `http://${cuid()}.demo.coolify.io`;
@@ -250,19 +258,19 @@
 			</div>
 			<div class="grid grid-cols-2 items-center">
 				<label for="version">Version / Tag</label>
-				<a
-					href={isDisabled ? `/services/${id}/configuration/version?from=/services/${id}` : ''}
-					class="no-underline"
-				>
-					<input
-						class="w-full"
+				<div class="custom-select-wrapper w-full">
+					<Select
+						form="saveForm"
+						containerClasses={isDisabled && containerClass()}
+						{isDisabled}
+						id="version"
+						showIndicator={!isDisabled}
+						items={[...tags.tags]}
+						on:select={selectTag}
 						value={service.version}
-						id="service"
-						readonly={isDisabled}
-						disabled={isDisabled}
-						class:cursor-pointer={!$status.service.isRunning}
-					/></a
-				>
+						isClearable={false}
+					/>
+				</div>
 			</div>
 			<div class="grid grid-cols-2 items-center">
 				<label for="destination">{$t('application.destination')}</label>
@@ -439,8 +447,8 @@
 												bind:value={variable.value}
 												form="saveForm"
 											>
-												<option value="true">true</option>
-												<option value="false"> false</option>
+												<option value="true">enabled</option>
+												<option value="false">disabled</option>
 											</select>
 										{:else}
 											<select

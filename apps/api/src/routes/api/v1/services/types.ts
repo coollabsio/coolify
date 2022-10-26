@@ -48,6 +48,8 @@ export interface SaveService extends OnlyId {
         name: string,
         fqdn: string,
         exposePort: number,
+        version: string,
+        serviceSetting: any
         type: string
     }
 }

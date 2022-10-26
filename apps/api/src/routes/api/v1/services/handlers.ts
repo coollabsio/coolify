@@ -2,17 +2,16 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
-import { prisma, uniqueName, asyncExecShell, getServiceFromDB, getContainerUsage, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, ComposeFile, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, executeDockerCmd, checkDomainsIsValidInDNS, checkExposedPort, listSettings } from '../../../../lib/common';
-import { day } from '../../../../lib/dayjs';
-import { checkContainer, isContainerExited } from '../../../../lib/docker';
 import cuid from 'cuid';
 
-import type { OnlyId } from '../../../../types';
+import { prisma, uniqueName, asyncExecShell, getServiceFromDB, getContainerUsage, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, ComposeFile, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, executeDockerCmd, checkDomainsIsValidInDNS, checkExposedPort, listSettings } from '../../../../lib/common';
+import { day } from '../../../../lib/dayjs';
+import { checkContainer, } from '../../../../lib/docker';
+import { removeService } from '../../../../lib/services/common';
+import { getTags, getTemplates } from '../../../../lib/services';
+
 import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetGlitchTipSettings, SetWordpressSettings } from './types';
-import { configureServiceType, removeService } from '../../../../lib/services/common';
-import { hashPassword } from '../handlers';
-import { getTemplates } from '../../../../lib/services';
+import type { OnlyId } from '../../../../types';
 
 export async function listServices(request: FastifyRequest) {
     try {
@@ -224,10 +223,12 @@ export async function getService(request: FastifyRequest<OnlyId>) {
         if (service.type) {
             template = await parseAndFindServiceTemplates(service)
         }
+        const tags = await getTags(service.type)
         return {
             settings: await listSettings(),
             service,
             template,
+            tags
         }
     } catch ({ status, message }) {
         console.log(status, message)
@@ -470,7 +471,7 @@ export async function checkService(request: FastifyRequest<CheckService>) {
 export async function saveService(request: FastifyRequest<SaveService>, reply: FastifyReply) {
     try {
         const { id } = request.params;
-        let { name, fqdn, exposePort, type, serviceSetting } = request.body;
+        let { name, fqdn, exposePort, type, serviceSetting, version } = request.body;
         if (fqdn) fqdn = fqdn.toLowerCase();
         if (exposePort) exposePort = Number(exposePort);
         type = fixType(type)
@@ -479,6 +480,7 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
             fqdn,
             name,
             exposePort,
+            version,
         }
         const templates = await getTemplates()
         const service = await prisma.service.findUnique({ where: { id } })

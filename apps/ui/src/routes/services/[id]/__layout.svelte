@@ -13,7 +13,7 @@
 		try {
 			let readOnly = false;
 			const response = await get(`/services/${params.id}`);
-			const { service, settings, template } = await response;
+			const { service, settings, template, tags } = await response;
 			if (!service || Object.entries(service).length === 0) {
 				return {
 					status: 302,
@@ -43,7 +43,8 @@
 					service,
 					template,
 					readOnly,
-					settings
+					settings,
+					tags
 				}
 			};
 		} catch (error) {

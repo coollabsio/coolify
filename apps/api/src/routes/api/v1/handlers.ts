@@ -37,18 +37,42 @@ export async function cleanupManually(request: FastifyRequest) {
 		return errorHandler({ status, message });
 	}
 }
+export async function refreshTags() {
+	try {
+		const { default: got } = await import('got')
+		try {
+			const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text()
+			if (isDev) {
+				await fs.writeFile('./tags.json', tags)
+			} else {
+				await fs.writeFile('/app/tags.json', tags)
+			}
+		} catch (error) {
+			console.log(error)
+			throw {
+				status: 500,
+				message: 'Could not fetch templates from get.coollabs.io'
+			};
+		}
+
+		return {};
+	} catch ({ status, message }) {
+		return errorHandler({ status, message });
+	}
+}
 export async function refreshTemplates() {
 	try {
 		const { default: got } = await import('got')
 		try {
 			if (isDev) {
 				const response = await fs.readFile('./devTemplates.yaml', 'utf8')
-				await fs.writeFile('./template.json', JSON.stringify(yaml.load(response), null, 2))
+				await fs.writeFile('./template.json', JSON.stringify(yaml.load(response)))
 			} else {
 				const response = await got.get('https://get.coollabs.io/coolify/service-templates.yaml').text()
-				await fs.writeFile('/app/template.json', JSON.stringify(yaml.load(response), null, 2))
+				await fs.writeFile('/app/template.json', JSON.stringify(yaml.load(response)))
 			}
 		} catch (error) {
+			console.log(error)
 			throw {
 				status: 500,
 				message: 'Could not fetch templates from get.coollabs.io'
