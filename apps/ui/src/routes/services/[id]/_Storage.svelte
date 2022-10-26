@@ -56,14 +56,20 @@
 			return errorNotification(error);
 		}
 	}
-	async function removeStorage(path: string) {
+	async function removeStorage(removableStorage: any) {
 		try {
-			await del(`/services/${id}/storages`, { path: storage.path });
-			dispatch('refresh');
-			addToast({
-				message: $t('application.storage.storage_deleted'),
-				type: 'success'
-			});
+			const { id: storageId, volumeName, path } = removableStorage;
+			const sure = confirm(
+				`Are you sure you want to delete this storage ${volumeName + ':' + path}?`
+			);
+			if (sure) {
+				await del(`/services/${id}/storages`, { storageId });
+				dispatch('refresh');
+				addToast({
+					message: $t('application.storage.storage_deleted'),
+					type: 'success'
+				});
+			}
 		} catch (error) {
 			return errorNotification(error);
 		}
@@ -97,13 +103,13 @@
 	{:else if isNew}
 		<form id="saveVolumesForm" on:submit|preventDefault={saveStorage}>
 			<div class="grid grid-col-1 lg:grid-cols-2 lg:space-x-4 pt-8">
-				<div class="flex flex-row gap-2">
-					<div class="flex flex-col">
+				<div class="flex flex-row">
+					<div class="flex flex-col w-full">
 						<label for="name" class="pb-2 uppercase font-bold">Container</label>
 						<select
 							form="saveVolumesForm"
 							name="containerId"
-							class="w-full lg:w-64 font-normal"
+							class="w-full lg:w-64"
 							disabled={storage.predefined}
 							readonly={storage.predefined}
 							bind:value={storage.containerId}
@@ -125,7 +131,7 @@
 							{/if}
 						</select>
 					</div>
-					<div class="flex flex-col">
+					<div class="flex flex-col w-full">
 						<label for="name" class="pb-2 uppercase font-bold">Path</label>
 						<input
 							name="path"
@@ -138,21 +144,25 @@
 						/>
 					</div>
 				</div>
-
 				<div class="pt-8">
-					<div class="flex items-center justify-center w-full lg:w-64">
-						<button type="submit" class="btn btn-sm btn-primary w-full">{$t('forms.add')}</button>
-					</div>
+					<button type="submit" class="btn btn-sm btn-primary w-full lg:w-64"
+						>{$t('forms.add')}</button
+					>
 				</div>
 			</div>
 		</form>
 	{:else}
 		<div class="flex lg:flex-row flex-col items-center gap-2 py-1">
-			<input disabled readonly class="w-full" value={`${storage.containerId}`} />
+			<input
+				disabled
+				readonly
+				class="w-full"
+				value={`${services.find((s) => s.id === storage.containerId).name || storage.containerId}`}
+			/>
 			<input disabled readonly class="w-full" value={`${storage.volumeName}:${storage.path}`} />
 			<button
 				class="btn btn-sm btn-error"
-				on:click|stopPropagation|preventDefault={() => removeStorage(storage.path)}
+				on:click|stopPropagation|preventDefault={() => removeStorage(storage)}
 				>{$t('forms.remove')}</button
 			>
 		</div>

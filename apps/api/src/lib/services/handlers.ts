@@ -75,12 +75,12 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                     }
                 }
             }
-            const customVolumes = await prisma.servicePersistentStorage.findMany({ where: { serviceId: service } })
+            const customVolumes = await prisma.servicePersistentStorage.findMany({ where: { serviceId: id } })
             let volumes = arm ? template.services[service].volumesArm : template.services[service].volumes
             if (customVolumes.length > 0) {
                 for (const customVolume of customVolumes) {
-                    const { volumeName, path } = customVolume
-                    if (!volumes.includes(`${volumeName}:${path}`)) {
+                    const { volumeName, path, containerId } = customVolume
+                    if (!volumes.includes(`${volumeName}:${path}`) && containerId === service) {
                         volumes.push(`${volumeName}:${path}`)
                     }
                 }
@@ -102,7 +102,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                 labels: makeLabelForServices(type),
                 ...defaultComposeConfiguration(network),
             }
-   
+
             // Generate files for builds
             if (template.services[service]?.files?.length > 0) {
                 if (!template.services[service].build) {

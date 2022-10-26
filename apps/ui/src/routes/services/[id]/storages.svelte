@@ -62,20 +62,29 @@
 					<div class="font-bold uppercase">Volume ID : Mount Dir</div>
 				</div>
 			</div>
+
+			{#each persistentStorages.filter((s) => s.predefined) as storage}
+				{#key storage.id}
+					<Storage on:refresh={refreshStorage} {storage} {services} />
+				{/key}
+			{/each}
 		{/if}
-		{#each persistentStorages.filter((s) => s.predefined) as storage}
-			{#key storage.id}
-				<Storage on:refresh={refreshStorage} {storage} {services} />
-			{/key}
-		{/each}
+
+		{#if persistentStorages.filter((s) => !s.predefined).length > 0}
+			<div class="title" class:pt-10={persistentStorages.filter((s) => s.predefined).length > 0}>
+				Custom Volumes
+			</div>
+
+			{#each persistentStorages.filter((s) => !s.predefined) as storage}
+				{#key storage.id}
+					<Storage on:refresh={refreshStorage} {storage} {services} />
+				{/key}
+			{/each}
+		{/if}
+
 		<div class="title" class:pt-10={persistentStorages.filter((s) => s.predefined).length > 0}>
-			Custom Volumes
+			Add New Volume
 		</div>
-		{#each persistentStorages.filter((s) => !s.predefined) as storage}
-			{#key storage.id}
-				<Storage on:refresh={refreshStorage} {storage} />
-			{/key}
-		{/each}
 		<Storage on:refresh={refreshStorage} isNew {services} />
 	</div>
 </div>

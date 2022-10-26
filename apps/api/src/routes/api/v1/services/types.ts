@@ -74,7 +74,7 @@ export interface SaveServiceStorage extends OnlyId {
 
 export interface DeleteServiceStorage extends OnlyId {
     Body: {
-        path: string,
+        storageId: string,
     }
 }
 export interface ServiceStartStop {

@@ -613,9 +613,8 @@ export async function saveServiceStorage(request: FastifyRequest<SaveServiceStor
 
 export async function deleteServiceStorage(request: FastifyRequest<DeleteServiceStorage>) {
     try {
-        const { id } = request.params
-        const { path } = request.body
-        await prisma.servicePersistentStorage.deleteMany({ where: { serviceId: id, path } });
+        const { storageId } = request.body
+        await prisma.servicePersistentStorage.deleteMany({ where: { id: storageId } });
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
