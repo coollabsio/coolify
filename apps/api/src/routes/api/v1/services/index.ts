@@ -70,11 +70,9 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.post<SaveServiceDestination>('/:id/configuration/destination', async (request, reply) => await saveServiceDestination(request, reply));
 
     fastify.get<OnlyId>('/:id/usage', async (request) => await getServiceUsage(request));
-    // fastify.get<GetServiceLogs>('/:id/logs', async (request) => await getServiceLogs(request));
     fastify.get<GetServiceLogs>('/:id/logs/:containerId', async (request) => await getServiceLogs(request));
 
     fastify.post<ServiceStartStop>('/:id/start', async (request) => await startService(request));
-    fastify.post<ServiceStartStop>('/:id/:type/start', async (request) => await startService(request));
     fastify.post<ServiceStartStop>('/:id/:type/stop', async (request) => await stopService(request));
     fastify.post<ServiceStartStop & SetWordpressSettings & SetGlitchTipSettings>('/:id/:type/settings', async (request, reply) => await setSettingsService(request, reply));
 

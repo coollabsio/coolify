@@ -1,7 +1,6 @@
 import { FastifyRequest } from "fastify";
 import { errorHandler, getDomain, isDev, prisma, executeDockerCmd, fixType } from "../../../lib/common";
 import { supportedServiceTypesAndVersions } from "../../../lib/services/supportedVersions";
-import { includeServices } from "../../../lib/services/common";
 import { TraefikOtherConfiguration } from "./types";
 import { OnlyId } from "../../../types";
 import { getTemplates } from "../../../lib/services";
@@ -363,7 +362,12 @@ export async function traefikConfiguration(request, reply) {
 		}
 		const services: any = await prisma.service.findMany({
 			where: { destinationDocker: { remoteEngine: false } },
-			include: includeServices,
+			include: {
+				destinationDocker: true,
+				persistentStorage: true,
+				serviceSecret: true,
+				serviceSetting: true,
+			},
 			orderBy: { createdAt: 'desc' },
 		});
 
@@ -849,7 +853,12 @@ export async function remoteTraefikConfiguration(request: FastifyRequest<OnlyId>
 		}
 		const services: any = await prisma.service.findMany({
 			where: { destinationDocker: { id } },
-			include: includeServices,
+			include: {
+				destinationDocker: true,
+				persistentStorage: true,
+				serviceSecret: true,
+				serviceSetting: true,
+			},
 			orderBy: { createdAt: 'desc' }
 		});
 

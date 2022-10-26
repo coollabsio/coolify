@@ -1771,8 +1771,11 @@
     $$id-mysql:
       name: MySQL
       depends_on: []
-      image: 'mysql:5.7'
+      image: 'bitnami/mysql:5.7'
+      imageArm : 'mysql:5.7'
       volumes:
+        - '$$id-mysql-data:/bitnami/mysql/data'
+      volumesArm:
         - '$$id-mysql-data:/var/lib/mysql'
       environment:
         - MYSQL_ROOT_PASSWORD=$$secret_mysql_root_password
@@ -1780,7 +1783,6 @@
         - MYSQL_DATABASE=$$config_mysql_database
         - MYSQL_USER=$$config_mysql_user
         - MYSQL_PASSWORD=$$secret_mysql_password
-      ports: []
   variables:
     - id: $$config_wordpress_db_host
       name: WORDPRESS_DB_HOST

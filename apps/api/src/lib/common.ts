@@ -17,8 +17,6 @@ import { day } from './dayjs';
 import * as serviceFields from './services/serviceFields';
 import { saveBuildLog } from './buildPacks/common';
 import { scheduler } from './scheduler';
-import { supportedServiceTypesAndVersions } from './services/supportedVersions';
-import { includeServices } from './services/common';
 
 export const version = '3.10.16';
 export const isDev = process.env.NODE_ENV === 'development';
@@ -400,12 +398,6 @@ export function generateTimestamp(): string {
 	return `${day().format('HH:mm:ss.SSS')}`;
 }
 
-export async function listServicesWithIncludes(): Promise<any> {
-	return await prisma.service.findMany({
-		include: includeServices,
-		orderBy: { createdAt: 'desc' }
-	});
-}
 
 export const supportedDatabaseTypesAndVersions = [
 	{
@@ -1452,7 +1444,12 @@ export async function getServiceFromDB({
 	const settings = await prisma.setting.findFirst();
 	const body = await prisma.service.findFirst({
 		where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-		include: includeServices
+		include: {
+			destinationDocker: true,
+			persistentStorage: true,
+			serviceSecret: true,
+			serviceSetting: true,
+		}
 	});
 	if (!body) {
 		return null
@@ -1467,22 +1464,6 @@ export async function getServiceFromDB({
 	}
 
 	return { ...body, settings };
-}
-
-export function getServiceImage(type: string): string {
-	const found = supportedServiceTypesAndVersions.find((t) => t.name === type);
-	if (found) {
-		return found.baseImage;
-	}
-	return '';
-}
-
-export function getServiceImages(type: string): string[] {
-	const found = supportedServiceTypesAndVersions.find((t) => t.name === type);
-	if (found) {
-		return found.images;
-	}
-	return [];
 }
 
 export function saveUpdateableFields(type: string, data: any) {
@@ -1533,14 +1514,6 @@ export function getUpdateableFields(type: string, data: any) {
 export function fixType(type) {
 	return type?.replaceAll(' ', '').toLowerCase() || null;
 }
-
-export const getServiceMainPort = (service: string) => {
-	const serviceType = supportedServiceTypesAndVersions.find((s) => s.name === service);
-	if (serviceType) {
-		return serviceType.ports.main;
-	}
-	return null;
-};
 
 export function makeLabelForServices(type) {
 	return [

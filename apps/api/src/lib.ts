@@ -1,13 +1,34 @@
 import cuid from "cuid";
 import { decrypt, encrypt, fixType, generatePassword, getDomain, prisma } from "./lib/common";
 import { getTemplates } from "./lib/services";
-import { includeServices } from "./lib/services/common";
 
 export async function migrateServicesToNewTemplate() {
     // This function migrates old hardcoded services to the new template based services
     try {
         let templates = await getTemplates()
-        const services: any = await prisma.service.findMany({ include: includeServices })
+        const services: any = await prisma.service.findMany({
+            include: {
+                destinationDocker: true,
+                persistentStorage: true,
+                serviceSecret: true,
+                serviceSetting: true,
+                minio: true,
+                plausibleAnalytics: true,
+                vscodeserver: true,
+                wordpress: true,
+                ghost: true,
+                meiliSearch: true,
+                umami: true,
+                hasura: true,
+                fider: true,
+                moodle: true,
+                appwrite: true,
+                glitchTip: true,
+                searxng: true,
+                weblate: true,
+                taiga: true,
+            }
+        })
         for (const service of services) {
             const { id } = service
             if (!service.type) {

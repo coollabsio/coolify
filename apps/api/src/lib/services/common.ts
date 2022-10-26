@@ -2,27 +2,6 @@
 import cuid from 'cuid';
 import { encrypt, generatePassword, prisma } from '../common';
 
-export const includeServices: any = {
-	destinationDocker: true,
-	persistentStorage: true,
-	serviceSecret: true,
-	serviceSetting: true,
-	minio: true,
-	plausibleAnalytics: true,
-	vscodeserver: true,
-	wordpress: true,
-	ghost: true,
-	meiliSearch: true,
-	umami: true,
-	hasura: true,
-	fider: true,
-	moodle: true,
-	appwrite: true,
-	glitchTip: true,
-	searxng: true,
-	weblate: true,
-	taiga: true,
-};
 export async function configureServiceType({
 	id,
 	type

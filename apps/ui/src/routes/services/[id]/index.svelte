@@ -228,7 +228,7 @@
 							class:loading={loading.cleanup}>Cleanup Unnecessary Database Logs</button
 						>
 				{/if}
-				{#if service.type === 'appwrite' && $status.service.isRunning}
+				{#if service.type === 'appwrite' && $status.service.overallStatus === 'healthy'}
 					<button
 						class="btn btn-sm"
 						on:click|preventDefault={migrateAppwriteDB}
