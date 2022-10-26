@@ -101,7 +101,6 @@
       image: appwrite/appwrite:$$core_version
       environment:
       - _APP_ENV=$$config__app_env
-      - _APP_VERSION=$$config__app_version
       - _APP_FUNCTIONS_TIMEOUT=$$config__app_functions_timeout
       - _APP_FUNCTIONS_BUILD_TIMEOUT=$$config__app_functions_build_timeout
       - _APP_FUNCTIONS_CONTAINERS=$$config__app_functions_containers
@@ -997,11 +996,6 @@
     defaultValue: ''
     description: Phone number used for sending out messages. Must start with a leading
       '+' and maximum of 15 digits without spaces (+123456789).
-  - id: "$$config__app_version"
-    name: _APP_VERSION
-    label: Version Tag
-    defaultValue: 1.0.3
-    description: Check out their valid tags at https://hub.docker.com/r/appwrite/appwrite/tags
   - id: "$$config__app_functions_inactive_threshold"
     name: _APP_FUNCTIONS_INACTIVE_THRESHOLD
     label: Functions | _APP_FUNCTIONS_INACTIVE_THRESHOLD
@@ -2061,8 +2055,14 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: stable
-  name: PlausibleAnalytics
+  name: Plausible Analytics
   description: Plausible is a lightweight and open-source website analytics tool.
+  labels:
+    - analytics
+    - plausible
+    - gdpr
+    - no-cookie
+    - privacy
   services:
     $$id:
       name: Plausible Analytics
@@ -2199,3 +2199,78 @@
       label: Custom Script Name
       defaultValue: plausible.js
       description: This is the default script name.
+- templateVersion: 1.0.0
+  defaultVersion: 0.98.1
+  name: NocoDB
+  description: >-
+    The Open Source Airtable Alternative - Turns any MySQL, PostgreSQL, SQL
+    Server, SQLite & MariaDB into a smart-spreadsheet.
+  services:
+    $$id:
+      image: nocodb/nocodb:$$core_version
+      environment:
+        - PORT=$$config_port
+        - NC_DB=$$config_nc_db
+        - DATABASE_URL=$$secret_database_url
+        - NC_PUBLIC_URL=$$config_public_url
+        - NC_AUTH_JWT_SECRET=$$secret_auth_jwt_secret
+        - NC_SENTRY_DSN=$$secret_sentry_dsn
+        - >-
+          NC_CONNECT_TO_EXTERNAL_DB_DISABLED=$$config_connect_to_external_db_disabled
+        - NC_DISABLE_TELE=$$config_disable_tele
+      volumes:
+        - $$id-data:/usr/app/data
+      ports:
+        - '8080'
+  variables:
+    - id: $$config_nc_db
+      name: NC_DB
+      label: Database
+      defaultValue: ''
+      description: >-
+        MySQL, PostgreSQL and MSSQL connection urls supported. If absent: A
+        local SQLite will be created in root folder.
+    - id: $$config_port
+      name: PORT
+      label: Port
+      defaultValue: '8080'
+      description: >-
+       	For setting app running port.
+    - id: $$secret_database_url
+      name: DATABASE_URL
+      label: Database URL
+      defaultValue: ''
+      description: >-
+        JDBC URL Format. Can be used instead of NC_DB. Used in 1-Click Heroku
+        deployment.
+    - id: $$config_public_url
+      name: NC_PUBLIC_URL
+      label: Public URL
+      defaultValue: ''
+      description: >-
+        Used for sending Email invitations. If absent: Best guess from http
+        request params.
+    - id: $$secret_auth_jwt_secret
+      name: NC_AUTH_JWT_SECRET
+      label: Auth JWT Secret
+      defaultValue: $$generate_hex(64)
+      description: >-
+        JWT secret used for auth and storing other secrets. If absent: A Random
+        secret will be generated.
+    - id: $$secret_sentry_dsn
+      name: NC_SENTRY_DSN
+      label: Sentry DSN
+      defaultValue: ''
+      description: For Sentry monitoring.
+    - id: $$config_connect_to_external_db_disabled
+      name: NC_CONNECT_TO_EXTERNAL_DB_DISABLED
+      label: Disable External Database
+      defaultValue: '0'
+      description: Disable Project creation with external database. (Enter "1" to disable).
+    - id: $$config_disable_tele
+      name: NC_DISABLE_TELE
+      label: NocoDB Disable Telemetry
+      defaultValue: '1'
+      description: Disable telemetry (Enter "1" to disable).
+  documentation: See https://github.com/nocodb/nocodb
+

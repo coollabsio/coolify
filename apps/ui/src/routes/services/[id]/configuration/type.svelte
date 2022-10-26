@@ -34,6 +34,7 @@
 	import { goto } from '$app/navigation';
 	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
+	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -48,9 +49,9 @@
 	}
 	function doSearch() {
 		filteredServices = services.filter(
-			(type: any) =>
-				type.name.toLowerCase().includes(search.toLowerCase()) ||
-				type.labels.some((label: string) => label.toLowerCase().includes(search.toLowerCase()))
+			(service: any) =>
+			service.name.toLowerCase().includes(search.toLowerCase()) ||
+			service.labels?.some((label: string) => label.toLowerCase().includes(search.toLowerCase()))
 		);
 	}
 	function cleanupSearch() {
@@ -93,7 +94,7 @@
 			<div class="p-2">
 				<form on:submit|preventDefault={() => handleSubmit(service)}>
 					<button type="submit" class="box-selection relative text-xl font-bold hover:bg-primary">
-						<!-- <ServiceIcons type={service.name} /> -->
+						<ServiceIcons type={service.name} />
 						{service.name}
 					</button>
 				</form>

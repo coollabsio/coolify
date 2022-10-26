@@ -173,7 +173,13 @@ const host = '0.0.0.0';
 		setInterval(async () => {
 			await checkProxies();
 			await checkFluentBit();
+
+		}, 10000)
+
+		// Refresh and check templates
+		setInterval(async () => {
 			await refreshTemplates()
+			await migrateServicesToNewTemplate()
 		}, 10000)
 
 		setInterval(async () => {

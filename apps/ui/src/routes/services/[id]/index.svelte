@@ -389,9 +389,13 @@
 		<div>
 			{#each Object.keys(template) as oneService}
 				<div
-					class="flex flex-row my-6 space-x-2"
-					class:border-b={template[oneService].environment.length > 0}
-					class:border-coolgray-500={template[oneService].environment.length > 0}
+					class="flex flex-row my-2 space-x-2"
+					class:my-6={template[oneService].environment.length > 0 &&
+						template[oneService].environment.find((env) => env.main === oneService)}
+					class:border-b={template[oneService].environment.length > 0 &&
+						template[oneService].environment.find((env) => env.main === oneService)}
+					class:border-coolgray-500={template[oneService].environment.length > 0 &&
+						template[oneService].environment.find((env) => env.main === oneService)}
 				>
 					<div class="title font-bold pb-3 capitalize">
 						{template[oneService].name ||
@@ -405,10 +409,15 @@
 						{#each template[oneService].environment as variable}
 							{#if variable.main === oneService}
 								<div class="grid grid-cols-2 items-center gap-2">
-									<label class="h-10" for={variable.name}>{variable.label || variable.name}</label>
+									<label class="h-10" for={variable.name}
+										>{variable.label || variable.name}
+										{#if variable.description}
+											<Explainer explanation={variable.description} />
+										{/if}</label
+									>
+
 									{#if variable.defaultValue === '$$generate_fqdn'}
-										<input
-											class="w-full"
+										<CopyPasswordField
 											disabled
 											readonly
 											name={variable.name}
@@ -416,8 +425,7 @@
 											value={service.fqdn}
 										/>
 									{:else if variable.defaultValue === '$$generate_domain'}
-										<input
-											class="w-full"
+										<CopyPasswordField
 											disabled
 											readonly
 											name={variable.name}
@@ -425,8 +433,7 @@
 											value={getDomain(service.fqdn) || ''}
 										/>
 									{:else if variable.defaultValue === '$$generate_network'}
-										<input
-											class="w-full"
+										<CopyPasswordField
 											disabled
 											readonly
 											name={variable.name}
@@ -472,6 +479,7 @@
 										/>
 									{:else}
 										<CopyPasswordField
+											placeholder={variable.defaultValue || 'optional'}
 											required={variable?.required}
 											readonly={isDisabled}
 											disabled={isDisabled}

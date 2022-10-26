@@ -146,7 +146,6 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                         }
                     }
                 }
-                // TODO: seconday domains are not working - kinda working
                 if (value?.proxy && value.proxy.length > 0) {
                     for (const proxyValue of value.proxy) {
                         if (proxyValue.domain) {

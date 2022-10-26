@@ -5,4 +5,4 @@
 	const name: any = type && type[0].toUpperCase() + type.substring(1).toLowerCase();
 </script>
 
-<svelte:component this={Icons[name]} {isAbsolute} />
+<svelte:component this={Icons[name.replace('.','').replaceAll(' ','')]} {isAbsolute} />

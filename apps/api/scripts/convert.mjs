@@ -2,7 +2,7 @@
 
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
-const templateYml = await fs.readFile('./caprover.yml', 'utf8')
+const templateYml = await fs.readFile('./convert.yaml', 'utf8')
 const template = yaml.load(templateYml)
 
 const newTemplate = {
@@ -15,7 +15,8 @@ const newTemplate = {
     },
     "variables": []
 }
-const version = template.caproverOneClickApp.variables.find(v => v.id === '$$cap_APP_VERSION').defaultValue || 'latest'
+console.log(template.caproverOneClickApp.variables)
+const version = template.caproverOneClickApp.variables.find(v => v.id === '$$cap_APP_VERSION' || v.id === '$$cap_version').defaultValue || 'latest'
 
 newTemplate.name = template.caproverOneClickApp.displayName
 newTemplate.documentation = template.caproverOneClickApp.documentation
@@ -36,9 +37,9 @@ for (const service of Object.keys(template.services)) {
     }
     const FROM = serviceTemplate.caproverExtra?.dockerfileLines?.find((line) => line.startsWith('FROM'))
     if (serviceTemplate.image) {
-        newService.image = serviceTemplate.image.replaceAll('cap_APP_VERSION', 'core_version')
+        newService.image = serviceTemplate.image.replaceAll('cap_APP_VERSION', 'core_version').replaceAll('cap_version', 'core_version')
     } else if (FROM) {
-        newService.image = FROM.split(' ')[1].replaceAll('cap_APP_VERSION', 'core_version')
+        newService.image = FROM.split(' ')[1].replaceAll('cap_APP_VERSION', 'core_version').replaceAll('cap_version', 'core_version')
     }
 
     const CMD = serviceTemplate.caproverExtra?.dockerfileLines?.find((line) => line.startsWith('CMD'))
@@ -69,9 +70,9 @@ for (const service of Object.keys(template.services)) {
 
             if (serviceTemplate.environment[env].startsWith('srv-captain--$$cap_appname')) {
                 value = `$$config_${env}`.toLowerCase()
-                defaultValue = serviceTemplate.environment[env].replaceAll('srv-captain--$$cap_appname', '$$$id').replace('$$cap', '').replaceAll('captain-overlay-network', `$$$config_${env}`).toLowerCase()
+                defaultValue = serviceTemplate.environment[env].replaceAll('srv-captain--$$cap_appname', '$$$id').replace('$$cap_', '').replaceAll('captain-overlay-network', `$$$config_${env}`).toLowerCase()
             } else {
-                value = '$$config_' + serviceTemplate.environment[env].replaceAll('srv-captain--$$cap_appname', '$$$id').replace('$$cap', '').replaceAll('captain-overlay-network', `$$$config_${env}`).toLowerCase()
+                value = '$$config_' + serviceTemplate.environment[env].replaceAll('srv-captain--$$cap_appname', '$$$id').replace('$$cap_', '').replaceAll('captain-overlay-network', `$$$config_${env}`).toLowerCase()
             }
             newService.environment.push(`${env}=${value}`)
             const foundVariable = varSet.has(env)

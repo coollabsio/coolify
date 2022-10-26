@@ -386,11 +386,15 @@ export async function traefikConfiguration(request, reply) {
 						const isProxyConfiguration = found.services[oneService].proxy;
 						if (isProxyConfiguration) {
 							const { proxy } = found.services[oneService];
-							for (const configuration of proxy) {
+							for (let configuration of proxy) {
 								const publicPort = service[type]?.publicPort;
 								if (configuration.domain) {
 									const setting = serviceSetting.find((a) => a.variableName === configuration.domain);
 									configuration.domain = configuration.domain.replace(configuration.domain, setting.value);
+								}
+								const foundPortVariable = serviceSetting.find((a) => a.name.toLowerCase() === 'port')
+								if (foundPortVariable) {
+									configuration.port = foundPortVariable.value
 								}
 								if (fqdn) {
 									data.services.push({
@@ -402,14 +406,35 @@ export async function traefikConfiguration(request, reply) {
 									});
 								}
 							}
-
+						} else {
+							let port = found.services[oneService].ports[0]
+							const foundPortVariable = serviceSetting.find((a) => a.name.toLowerCase() === 'port')
+							if (foundPortVariable) {
+								port = foundPortVariable.value
+							}
+							if (fqdn) {
+								data.services.push({
+									id: oneService,
+									configuration: {
+										port
+									},
+									fqdn,
+									dualCerts,
+								});
+							}
 						}
 					}
 				}
 			}
 		}
 		for (const service of data.services) {
-			let { id, fqdn, dualCerts, configuration: { port, pathPrefix, domain: customDomain }, isCustomSSL = false } = service
+			let { id, fqdn, dualCerts, configuration, isCustomSSL = false } = service
+			let port, pathPrefix, customDomain;
+			if (configuration) {
+				port = configuration?.port;
+				pathPrefix = configuration?.pathPrefix;
+				customDomain = configuration?.domain;
+			}
 			if (customDomain) {
 				fqdn = customDomain
 			}

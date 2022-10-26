@@ -6,7 +6,7 @@ export { default as Vscodeserver } from './VSCodeServer.svelte';
 export { default as Wordpress } from './Wordpress.svelte';
 export { default as Vaultwarden } from './VaultWarden.svelte';
 export { default as Languagetool } from './LanguageTool.svelte';
-export { default as N8n } from './N8n.svelte';
+export { default as N8nio } from './N8n.svelte';
 export { default as Uptimekuma } from './UptimeKuma.svelte';
 export { default as Ghost } from './Ghost.svelte';
 export { default as Meilisearch } from './MeiliSearch.svelte';
