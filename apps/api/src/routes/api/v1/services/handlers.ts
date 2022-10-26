@@ -258,15 +258,17 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                     const regex = /^\$\$.*\((\d+)\)$/g;
                     const length = Number(regex.exec(defaultValue)?.[1]) || undefined
                     if (variable.defaultValue.startsWith('$$generate_password')) {
-                        console.log(variable)
                         variable.value = generatePassword({ length });
-                        console.log(variable.value)
                     } else if (variable.defaultValue.startsWith('$$generate_hex')) {
                         variable.value = generatePassword({ length, isHex: true });
                     } else if (variable.defaultValue.startsWith('$$generate_username')) {
                         variable.value = cuid();
                     } else {
                         variable.value = variable.defaultValue || '';
+                    }
+                    const foundVariableSomewhereElse = foundTemplate.variables.find(v => v.defaultValue.includes(variable.id))
+                    if (foundVariableSomewhereElse) {
+                        foundVariableSomewhereElse.value = foundVariableSomewhereElse.value.replaceAll(variable.id, variable.value)
                     }
                 }
             }

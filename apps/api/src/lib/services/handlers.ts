@@ -701,18 +701,21 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         const config = {};
         for (const service in template.services) {
             let newEnvironments = []
-            for (const environment of template.services[service].environment) {
-                const [env, value] = environment.split("=");
-                if (!value.startsWith('$$secret') && value !== '') {
-                    newEnvironments.push(`${env}=${value}`)
+            if (template.services[service]?.environment?.length > 0) {
+                for (const environment of template.services[service].environment) {
+                    const [env, value] = environment.split("=");
+                    if (!value.startsWith('$$secret') && value !== '') {
+                        newEnvironments.push(`${env}=${value}`)
+                    }
                 }
-
             }
             const secrets = await prisma.serviceSecret.findMany({ where: { serviceId: id } })
             for (const secret of secrets) {
                 const { name, value } = secret
                 if (value) {
-                    if (template.services[service].environment.find(env => env.startsWith(`${name}=`)) && !newEnvironments.find(env => env.startsWith(`${name}=`))) {
+                    const foundEnv = !!template.services[service].environment?.find(env => env.startsWith(`${name}=`))
+                    const foundNewEnv = !!newEnvironments?.find(env => env.startsWith(`${name}=`))
+                    if (foundEnv && !foundNewEnv) {
                         newEnvironments.push(`${name}=${decrypt(value)}`)
                     }
                 }
@@ -736,7 +739,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
             }
 
             // Generate files for builds
-            if (template.services[service]?.extras?.files?.length > 0) {
+            if (template.services[service]?.files?.length > 0) {
                 if (!template.services[service].build) {
                     template.services[service].build = {
                         context: workdir,
@@ -745,7 +748,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                 }
                 let Dockerfile = `
                     FROM ${template.services[service].image}`
-                for (const file of template.services[service].extras.files) {
+                for (const file of template.services[service].files) {
                     const { source, destination, content } = file;
                     await fs.writeFile(source, content);
                     Dockerfile += `
@@ -754,6 +757,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                 await fs.writeFile(`${workdir}/Dockerfile.${service}`, Dockerfile);
             }
         }
+
         const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',
@@ -766,7 +770,6 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
             volumes: volumeMounts
         }
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
-        console.log(composeFileDestination)
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         await startServiceContainers(destinationDocker.id, composeFileDestination)
         return {}

@@ -415,7 +415,7 @@
 				</button>
 			{/if}
 			<button
-				class="btn btn-sm gap-2"
+				class="btn btn-sm btn-ghost gap-2"
 				class:btn-primary={$status.application.overallStatus !== 'degraded'}
 				disabled={!$isDeploymentEnabled}
 				on:click={() => handleDeploySubmit(false)}

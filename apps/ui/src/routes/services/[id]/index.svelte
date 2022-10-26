@@ -415,7 +415,6 @@
 											<Explainer explanation={variable.description} />
 										{/if}</label
 									>
-
 									{#if variable.defaultValue === '$$generate_fqdn'}
 										<CopyPasswordField
 											disabled
@@ -468,7 +467,7 @@
 												<option value="false"> false</option>
 											</select>
 										{/if}
-									{:else if variable.defaultValue === '$$generate_password' || variable.defaultValue === '$$generate_passphrase'}
+									{:else if variable.defaultValue === '$$generate_password'}
 										<CopyPasswordField
 											isPasswordField
 											readonly

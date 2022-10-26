@@ -15,7 +15,6 @@ const newTemplate = {
     },
     "variables": []
 }
-console.log(template.caproverOneClickApp.variables)
 const version = template.caproverOneClickApp.variables.find(v => v.id === '$$cap_APP_VERSION' || v.id === '$$cap_version').defaultValue || 'latest'
 
 newTemplate.name = template.caproverOneClickApp.displayName

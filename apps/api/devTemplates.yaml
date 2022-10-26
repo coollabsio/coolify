@@ -1130,11 +1130,10 @@
         - SETGID
         - SETUID
         - DAC_OVERRIDE
-      extras:
-        files:
-          - source: $$workdir/settings.yml
-            destination: /etc/searxng/settings.yml
-            content: |2-
+      files:
+        - source: $$workdir/settings.yml
+          destination: /etc/searxng/settings.yml
+          content: |2-
 
                                           # see https://docs.searxng.org/admin/engines/settings.html#use-default-settings
                                           use_default_settings: true
@@ -1173,7 +1172,7 @@
     - id: $$secret_secret_key
       name: SECRET_KEY
       label: Secret Key
-      defaultValue: $$generate_passphrase
+      defaultValue: $$generate_hex(64)
       description: ''
     - id: $$secret_redis_password
       name: REDIS_PASSWORD
@@ -1439,11 +1438,10 @@
         - POSTGRES_PASSWORD=$$secret_postgres_password
         - POSTGRES_DB=$$config_postgres_db
       ports: []
-      extras:
-        files:
-          - source: $$workdir/schema.postgresql.sql
-            destination: /docker-entrypoint-initdb.d/schema.postgresql.sql
-            content: |2-
+      files:
+        - source: $$workdir/schema.postgresql.sql
+          destination: /docker-entrypoint-initdb.d/schema.postgresql.sql
+          content: |2-
 
                                           -- CreateTable
                                   CREATE TABLE "account" (
@@ -1586,7 +1584,7 @@
     - id: $$secret_hash_salt
       name: HASH_SALT
       label: Hash Salt
-      defaultValue: $$generate_passphrase
+      defaultValue: $$generate_hex(64)
       description: ''
     - id: $$config_postgres_user
       name: POSTGRES_USER
@@ -1634,7 +1632,7 @@
     - id: $$secret_meili_master_key
       name: MEILI_MASTER_KEY
       label: Master Key
-      defaultValue: $$generate_passphrase
+      defaultValue: $$generate_hex(64)
       description: ''
       showOnUI: true
 - templateVersion: 1.0.0
@@ -1967,7 +1965,7 @@
     - id: $$secret_jwt_secret
       name: JWT_SECRET
       label: JWT Secret
-      defaultValue: $$generate_passphrase
+      defaultValue: $$generate_hex(64)
       description: ''
     - id: $$config_email_noreply
       name: EMAIL_NOREPLY
@@ -2057,12 +2055,6 @@
   defaultVersion: stable
   name: Plausible Analytics
   description: Plausible is a lightweight and open-source website analytics tool.
-  labels:
-    - analytics
-    - plausible
-    - gdpr
-    - no-cookie
-    - privacy
   services:
     $$id:
       name: Plausible Analytics
@@ -2106,27 +2098,26 @@
         nofile:
           soft: 262144
           hard: 262144
-      extras:
-        files:
-          - source: $$workdir/clickhouse-config.xml
-            destination: /etc/clickhouse-server/users.d/logging.xml
-            content: >-
+      files:
+        - source: $$workdir/clickhouse-config.xml
+          destination: /etc/clickhouse-server/users.d/logging.xml
+          content: >-
               <yandex><logger><level>warning</level><console>true</console></logger><query_thread_log
               remove="remove"/><query_log remove="remove"/><text_log
               remove="remove"/><trace_log remove="remove"/><metric_log
               remove="remove"/><asynchronous_metric_log
               remove="remove"/><session_log remove="remove"/><part_log
               remove="remove"/></yandex>
-          - source: $$workdir/clickhouse-user-config.xml
-            destination: /etc/clickhouse-server/config.d/logging.xml
-            content: >-
+        - source: $$workdir/clickhouse-user-config.xml
+          destination: /etc/clickhouse-server/config.d/logging.xml
+          content: >-
               <yandex><profiles><default><log_queries>0</log_queries><log_query_threads>0</log_query_threads></default></profiles></yandex>
-          - source: $$workdir/init.query
-            destination: /docker-entrypoint-initdb.d/init.query
-            content: CREATE DATABASE IF NOT EXISTS plausible;
-          - source: $$workdir/init-db.sh
-            destination: /docker-entrypoint-initdb.d/init-db.sh
-            content: >-
+        - source: $$workdir/init.query
+          destination: /docker-entrypoint-initdb.d/init.query
+          content: CREATE DATABASE IF NOT EXISTS plausible;
+        - source: $$workdir/init-db.sh
+          destination: /docker-entrypoint-initdb.d/init-db.sh
+          content: >-
               clickhouse client --queries-file
               /docker-entrypoint-initdb.d/init.query
   variables:
@@ -2167,7 +2158,7 @@
     - id: $$secret_secret_key_base
       name: SECRET_KEY_BASE
       label: Secret Key Base
-      defaultValue: $$generate_passphrase
+      defaultValue: $$generate_hex(64)
       description: ''
     - id: $$config_disable_auth
       name: DISABLE_AUTH
@@ -2180,16 +2171,20 @@
       defaultValue: 'true'
       description: ''
     - id: $$config_postgresql_username
+      main: $$id-postgresql
       name: POSTGRESQL_USERNAME
       label: PostgreSQL Username
       defaultValue: postgresql
       description: ''
     - id: $$secret_postgresql_password
+      main: $$id-postgresql
       name: POSTGRESQL_PASSWORD
       label: PostgreSQL Password
       defaultValue: $$generate_password
       description: ''
+      showOnUI: true
     - id: $$config_postgresql_database
+      main: $$id-postgresql
       name: POSTGRESQL_DATABASE
       label: PostgreSQL Database
       defaultValue: plausible
