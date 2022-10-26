@@ -407,20 +407,22 @@ export async function traefikConfiguration(request, reply) {
 								}
 							}
 						} else {
-							let port = found.services[oneService].ports[0]
-							const foundPortVariable = serviceSetting.find((a) => a.name.toLowerCase() === 'port')
-							if (foundPortVariable) {
-								port = foundPortVariable.value
-							}
-							if (fqdn) {
-								data.services.push({
-									id: oneService,
-									configuration: {
-										port
-									},
-									fqdn,
-									dualCerts,
-								});
+							if (found.services[oneService].ports) {
+								let port = found.services[oneService].ports[0]
+								const foundPortVariable = serviceSetting.find((a) => a.name.toLowerCase() === 'port')
+								if (foundPortVariable) {
+									port = foundPortVariable.value
+								}
+								if (fqdn) {
+									data.services.push({
+										id: oneService,
+										configuration: {
+											port
+										},
+										fqdn,
+										dualCerts,
+									});
+								}
 							}
 						}
 					}
