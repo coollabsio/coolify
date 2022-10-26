@@ -2271,4 +2271,3 @@
       defaultValue: '1'
       description: Disable telemetry (Enter "1" to disable).
   documentation: See https://github.com/nocodb/nocodb
-
