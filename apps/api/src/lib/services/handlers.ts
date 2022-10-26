@@ -35,7 +35,6 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
         const arm = isARM(service.arch)
-        console.log(arm)
         const { type, destinationDockerId, destinationDocker, persistentStorage } =
             service;
 
@@ -76,6 +75,16 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                     }
                 }
             }
+            const customVolumes = await prisma.servicePersistentStorage.findMany({ where: { serviceId: service } })
+            let volumes = arm ? template.services[service].volumesArm : template.services[service].volumes
+            if (customVolumes.length > 0) {
+                for (const customVolume of customVolumes) {
+                    const { volumeName, path } = customVolume
+                    if (!volumes.includes(`${volumeName}:${path}`)) {
+                        volumes.push(`${volumeName}:${path}`)
+                    }
+                }
+            }
             config[service] = {
                 container_name: service,
                 build: template.services[service].build || undefined,
@@ -84,7 +93,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                 image: arm ? template.services[service].imageArm : template.services[service].image,
                 expose: template.services[service].ports,
                 // ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
-                volumes: arm ? template.services[service].volumesArm : template.services[service].volumes,
+                volumes,
                 environment: newEnvironments,
                 depends_on: template.services[service]?.depends_on,
                 ulimits: template.services[service]?.ulimits,
@@ -93,7 +102,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                 labels: makeLabelForServices(type),
                 ...defaultComposeConfiguration(network),
             }
-
+   
             // Generate files for builds
             if (template.services[service]?.files?.length > 0) {
                 if (!template.services[service].build) {
@@ -113,7 +122,6 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                 await fs.writeFile(`${workdir}/Dockerfile.${service}`, Dockerfile);
             }
         }
-
         const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
         const composeFile: ComposeFile = {
             version: '3.8',

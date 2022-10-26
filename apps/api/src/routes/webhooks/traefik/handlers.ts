@@ -1,6 +1,5 @@
 import { FastifyRequest } from "fastify";
 import { errorHandler, getDomain, isDev, prisma, executeDockerCmd, fixType } from "../../../lib/common";
-import { supportedServiceTypesAndVersions } from "../../../lib/services/supportedVersions";
 import { TraefikOtherConfiguration } from "./types";
 import { OnlyId } from "../../../types";
 import { getTemplates } from "../../../lib/services";
@@ -873,7 +872,8 @@ export async function remoteTraefikConfiguration(request: FastifyRequest<OnlyId>
 				plausibleAnalytics
 			} = service;
 			if (destinationDockerId) {
-				const found = supportedServiceTypesAndVersions.find((a) => a.name === type);
+				const templates = await getTemplates();
+				let found = templates.find((a) => fixType(a.name) === fixType(type));
 				if (found) {
 					const port = found.ports.main;
 					const publicPort = service[type]?.publicPort;

@@ -16,7 +16,6 @@ import {
     getServiceStorages,
     getServiceType,
     getServiceUsage,
-    getServiceVersions,
     listServices,
     newService,
     saveService,
@@ -64,7 +63,6 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.get('/:id/configuration/type', async (request) => await getServiceType(request));
     fastify.post<SaveServiceType>('/:id/configuration/type', async (request, reply) => await saveServiceType(request, reply));
 
-    fastify.get<OnlyId>('/:id/configuration/version', async (request) => await getServiceVersions(request));
     fastify.post<SaveServiceVersion>('/:id/configuration/version', async (request, reply) => await saveServiceVersion(request, reply));
 
     fastify.post<SaveServiceDestination>('/:id/configuration/destination', async (request, reply) => await saveServiceDestination(request, reply));

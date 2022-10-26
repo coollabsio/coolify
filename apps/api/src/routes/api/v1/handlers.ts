@@ -15,7 +15,6 @@ import {
 	uniqueName,
 	version,
 } from "../../../lib/common";
-import { supportedServiceTypesAndVersions } from "../../../lib/services/supportedVersions";
 import { scheduler } from "../../../lib/scheduler";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Login, Update } from ".";
@@ -382,7 +381,6 @@ export async function getCurrentUser(
 	return {
 		settings: await prisma.setting.findFirst(),
 		pendingInvitations,
-		supportedServiceTypesAndVersions,
 		token,
 		...request.user,
 	};

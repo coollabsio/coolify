@@ -1,9 +1,7 @@
 <script lang="ts">
 	export let isNew = false;
-	export let storage: any = {
-		id: null,
-		path: null
-	};
+	export let storage: any = {};
+	export let services: any = [];
 	import { del, post } from '$lib/api';
 	import { page } from '$app/stores';
 	import { createEventDispatcher } from 'svelte';
@@ -14,23 +12,36 @@
 	const { id } = $page.params;
 
 	const dispatch = createEventDispatcher();
-	async function saveStorage(newStorage = false) {
+	async function saveStorage(e: any) {
 		try {
-			if (!storage.path) return errorNotification($t('application.storage.path_is_required'));
-			storage.path = storage.path.startsWith('/') ? storage.path : `/${storage.path}`;
-			storage.path = storage.path.endsWith('/') ? storage.path.slice(0, -1) : storage.path;
-			storage.path.replace(/\/\//g, '/');
+			const formData = new FormData(e.target);
+			let isNewStorage = true;
+			let newStorage: any = {
+				id: null,
+				containerId: null,
+				path: null
+			};
+			for (let field of formData) {
+				const [key, value] = field;
+				newStorage[key] = value;
+			}
+			newStorage.path = newStorage.path.startsWith('/') ? newStorage.path : `/${newStorage.path}`;
+			newStorage.path = newStorage.path.endsWith('/')
+				? newStorage.path.slice(0, -1)
+				: newStorage.path;
+			newStorage.path.replace(/\/\//g, '/');
 			await post(`/services/${id}/storages`, {
-				path: storage.path,
-				storageId: storage.id,
-				newStorage
+				path: newStorage.path,
+				storageId: newStorage.id,
+				containerId: newStorage.containerId,
+				isNewStorage
 			});
 			dispatch('refresh');
 			if (isNew) {
 				storage.path = null;
 				storage.id = null;
 			}
-			if (newStorage) {
+			if (isNewStorage) {
 				addToast({
 					message: $t('application.storage.storage_saved'),
 					type: 'success'
@@ -45,7 +56,7 @@
 			return errorNotification(error);
 		}
 	}
-	async function removeStorage() {
+	async function removeStorage(path: string) {
 		try {
 			await del(`/services/${id}/storages`, { path: storage.path });
 			dispatch('refresh');
@@ -61,74 +72,89 @@
 
 <div class="w-full lg:px-0 px-4">
 	{#if storage.predefined}
-		<div class="grid grid-col-1 lg:grid-cols-2 pt-2">
+		<div class="grid grid-col-1 lg:grid-cols-2 pt-2 gap-2">
 			<div>
 				<input
-					id={storage.volumeName}	
+					id={storage.containerId}
+					disabled
+					readonly
+					class="w-full"
+					value={`${
+						services.find((s) => s.id === storage.containerId).name || storage.containerId
+					}`}
+				/>
+			</div>
+			<div>
+				<input
+					id={storage.volumeName}
 					disabled
 					readonly
 					class="w-full"
 					value={`${storage.volumeName}:${storage.path}`}
 				/>
 			</div>
-			<div class="lg:px-2">
-				<input
-					id={storage.containerId}
-					disabled
-					readonly
-					class="w-full"
-					value={`${storage.containerId}`}
-				/>
-			</div>
 		</div>
-	{:else}
-		<div class="grid grid-col-1 lg:grid-cols-3 lg:space-x-4" class:pt-8={isNew}>
-			{#if storage.id}
-				<div class="flex flex-col">
-					<input
-						disabled
-						readonly
-						class="w-full"
-						value="{storage.id}{storage.path.replace(/\//gi, '-')}"
-					/>
-				</div>
-			{/if}
-			<div class="flex flex-col">
-				{#if isNew}
-					<label for="name" class="pb-2 uppercase font-bold">Path</label>
-				{/if}
-				<input
-					disabled={storage.predefined}
-					readonly={storage.predefined}
-					class="w-full lg:w-64"
-					bind:value={storage.path}
-					required
-					placeholder="eg: /sqlite.db"
-				/>
-			</div>
-
-			<div class:pt-8={isNew} class:pt-2={!isNew}>
-				{#if isNew}
-					<div class="flex items-center justify-center w-full lg:w-64">
-						<button class="btn btn-sm btn-primary w-full" on:click={() => saveStorage(true)}
-							>{$t('forms.add')}</button
+	{:else if isNew}
+		<form id="saveVolumesForm" on:submit|preventDefault={saveStorage}>
+			<div class="grid grid-col-1 lg:grid-cols-2 lg:space-x-4 pt-8">
+				<div class="flex flex-row gap-2">
+					<div class="flex flex-col">
+						<label for="name" class="pb-2 uppercase font-bold">Container</label>
+						<select
+							form="saveVolumesForm"
+							name="containerId"
+							class="w-full lg:w-64 font-normal"
+							disabled={storage.predefined}
+							readonly={storage.predefined}
+							bind:value={storage.containerId}
 						>
+							{#if services.length === 1}
+								{#if services[0].name}
+									<option selected value={services[0].id}>{services[0].name}</option>
+								{:else}
+									<option selected value={services[0]}>{services[0]}</option>
+								{/if}
+							{:else}
+								{#each services as service}
+									{#if service.name}
+										<option value={service.id}>{service.name}</option>
+									{:else}
+										<option value={service}>{service}</option>
+									{/if}
+								{/each}
+							{/if}
+						</select>
 					</div>
-				{:else}
-					<div class="flex flex-row items-center justify-center space-x-2 w-full lg:w-64">
-						<div class="flex items-center justify-center">
-							<button class="btn btn-sm btn-primary" on:click={() => saveStorage(false)}
-								>{$t('forms.set')}</button
-							>
-						</div>
-						<div class="flex justify-center">
-							<button class="btn btn-sm btn-error" on:click={removeStorage}
-								>{$t('forms.remove')}</button
-							>
-						</div>
+					<div class="flex flex-col">
+						<label for="name" class="pb-2 uppercase font-bold">Path</label>
+						<input
+							name="path"
+							disabled={storage.predefined}
+							readonly={storage.predefined}
+							class="w-full lg:w-64"
+							bind:value={storage.path}
+							required
+							placeholder="eg: /sqlite.db"
+						/>
 					</div>
-				{/if}
+				</div>
+
+				<div class="pt-8">
+					<div class="flex items-center justify-center w-full lg:w-64">
+						<button type="submit" class="btn btn-sm btn-primary w-full">{$t('forms.add')}</button>
+					</div>
+				</div>
 			</div>
+		</form>
+	{:else}
+		<div class="flex lg:flex-row flex-col items-center gap-2 py-1">
+			<input disabled readonly class="w-full" value={`${storage.containerId}`} />
+			<input disabled readonly class="w-full" value={`${storage.volumeName}:${storage.path}`} />
+			<button
+				class="btn btn-sm btn-error"
+				on:click|stopPropagation|preventDefault={() => removeStorage(storage.path)}
+				>{$t('forms.remove')}</button
+			>
 		</div>
 	{/if}
 </div>

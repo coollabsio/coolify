@@ -10,7 +10,6 @@ import cuid from 'cuid';
 
 import type { OnlyId } from '../../../../types';
 import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetGlitchTipSettings, SetWordpressSettings } from './types';
-import { supportedServiceTypesAndVersions } from '../../../../lib/services/supportedVersions';
 import { configureServiceType, removeService } from '../../../../lib/services/common';
 import { hashPassword } from '../handlers';
 import { getTemplates } from '../../../../lib/services';
@@ -316,19 +315,7 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
         return errorHandler({ status, message })
     }
 }
-export async function getServiceVersions(request: FastifyRequest<OnlyId>) {
-    try {
-        const teamId = request.user.teamId;
-        const { id } = request.params;
-        const { type } = await getServiceFromDB({ id, teamId });
-        return {
-            type,
-            versions: supportedServiceTypesAndVersions.find((name) => name.name === type).versions
-        }
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
+
 export async function saveServiceVersion(request: FastifyRequest<SaveServiceVersion>, reply: FastifyReply) {
     try {
         const { id } = request.params;
@@ -601,16 +588,21 @@ export async function getServiceStorages(request: FastifyRequest<OnlyId>) {
 export async function saveServiceStorage(request: FastifyRequest<SaveServiceStorage>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        const { path, newStorage, storageId } = request.body
+        const { path, isNewStorage, storageId, containerId } = request.body
 
-        if (newStorage) {
+        if (isNewStorage) {
+            const volumeName = `${id}-custom${path.replace(/\//gi, '-')}`
+            const found = await prisma.servicePersistentStorage.findFirst({ where: { path, containerId } });
+            if (found) {
+                throw { status: 500, message: 'Persistent storage already exists for this container and path.' }
+            }
             await prisma.servicePersistentStorage.create({
-                data: { path, service: { connect: { id } } }
+                data: { path, volumeName, containerId, service: { connect: { id } } }
             });
         } else {
             await prisma.servicePersistentStorage.update({
                 where: { id: storageId },
-                data: { path }
+                data: { path, containerId }
             });
         }
         return reply.code(201).send()

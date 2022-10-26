@@ -81,7 +81,7 @@
 			// 	exposePort: service.exposePort
 			// });
 			const formData = new FormData(e.target);
-			service = await saveForm(formData, service);
+			if (formData) service = await saveForm(formData, service);
 			setLocation(service);
 			forceSave = false;
 			$isDeploymentEnabled = checkIfDeploymentEnabledServices($appSession.isAdmin, service);

@@ -5,6 +5,7 @@
 			const response = await get(`/services/${params.id}/storages`);
 			return {
 				props: {
+					template: stuff.template,
 					...response
 				}
 			};
@@ -19,6 +20,7 @@
 
 <script lang="ts">
 	export let persistentStorages: any;
+	export let template: any;
 	import { page } from '$app/stores';
 	import Storage from './_Storage.svelte';
 	import { get } from '$lib/api';
@@ -30,6 +32,16 @@
 		const data = await get(`/services/${id}/storages`);
 		persistentStorages = [...data.persistentStorages];
 	}
+	let services = Object.keys(template).map((service) => {
+		if (template[service]?.name) {
+			return {
+				name: template[service].name,
+				id: service
+			};
+		} else {
+			return service;
+		}
+	});
 </script>
 
 <div class="w-full">
@@ -43,19 +55,27 @@
 			</div>
 		</div>
 		{#if persistentStorages.filter((s) => s.predefined).length > 0}
-			<div class="text-base font-bold">Predefined</div>
+			<div class="title">Predefined Volumes</div>
+			<div class="w-full lg:px-0 px-4">
+				<div class="grid grid-col-1 lg:grid-cols-2 pt-2 gap-2">
+					<div class="font-bold uppercase">Container</div>
+					<div class="font-bold uppercase">Volume ID : Mount Dir</div>
+				</div>
+			</div>
 		{/if}
 		{#each persistentStorages.filter((s) => s.predefined) as storage}
 			{#key storage.id}
-				<Storage on:refresh={refreshStorage} {storage} />
+				<Storage on:refresh={refreshStorage} {storage} {services} />
 			{/key}
 		{/each}
-		<div class="text-base font-bold" class:pt-10={persistentStorages.filter((s) => s.predefined).length > 0}>User Defined</div>
+		<div class="title" class:pt-10={persistentStorages.filter((s) => s.predefined).length > 0}>
+			Custom Volumes
+		</div>
 		{#each persistentStorages.filter((s) => !s.predefined) as storage}
 			{#key storage.id}
 				<Storage on:refresh={refreshStorage} {storage} />
 			{/key}
 		{/each}
-		<Storage on:refresh={refreshStorage} isNew />
+		<Storage on:refresh={refreshStorage} isNew {services} />
 	</div>
 </div>

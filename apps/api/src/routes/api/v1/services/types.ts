@@ -66,8 +66,9 @@ export interface DeleteServiceSecret extends OnlyId {
 export interface SaveServiceStorage extends OnlyId {
     Body: {
         path: string,
-        newStorage: string,
+        containerId: string,
         storageId: string,
+        isNewStorage: boolean,
     }
 }
 

@@ -65,7 +65,6 @@
 
 <script lang="ts">
 	export let baseSettings: any;
-	export let supportedServiceTypesAndVersions: any;
 	export let pendingInvitations: any = 0;
 
 	$appSession.isRegistrationEnabled = baseSettings.isRegistrationEnabled;
@@ -74,7 +73,6 @@
 	$appSession.version = baseSettings.version;
 	$appSession.whiteLabeled = baseSettings.whiteLabeled;
 	$appSession.whiteLabeledDetails.icon = baseSettings.whiteLabeledIcon;
-	$appSession.supportedServiceTypesAndVersions = supportedServiceTypesAndVersions;
 
 	$appSession.pendingInvitations = pendingInvitations;
 
