@@ -212,21 +212,21 @@
 					>
 				{/if}
 				{#if service.type === 'plausibleanalytics' && $status.service.overallStatus === 'healthy'}
-						<button
-							class="btn btn-sm"
-							on:click|preventDefault={setEmailsToVerified}
-							disabled={loading.verification}
-							class:loading={loading.verification}
-							>{loading.verification
-								? $t('forms.verifying')
-								: $t('forms.verify_emails_without_smtp')}</button
-						>
-						<button
-							class="btn btn-sm"
-							on:click|preventDefault={cleanupLogs}
-							disabled={loading.cleanup}
-							class:loading={loading.cleanup}>Cleanup Unnecessary Database Logs</button
-						>
+					<button
+						class="btn btn-sm"
+						on:click|preventDefault={setEmailsToVerified}
+						disabled={loading.verification}
+						class:loading={loading.verification}
+						>{loading.verification
+							? $t('forms.verifying')
+							: $t('forms.verify_emails_without_smtp')}</button
+					>
+					<button
+						class="btn btn-sm"
+						on:click|preventDefault={cleanupLogs}
+						disabled={loading.cleanup}
+						class:loading={loading.cleanup}>Cleanup Unnecessary Database Logs</button
+					>
 				{/if}
 				{#if service.type === 'appwrite' && $status.service.overallStatus === 'healthy'}
 					<button
@@ -251,17 +251,15 @@
 			<div class="grid grid-cols-2 items-center">
 				<label for="version">Version / Tag</label>
 				<a
-					href={$appSession.isAdmin && !$status.service.isRunning && !$status.service.initialLoading
-						? `/services/${id}/configuration/version?from=/services/${id}`
-						: ''}
+					href={isDisabled ? `/services/${id}/configuration/version?from=/services/${id}` : ''}
 					class="no-underline"
 				>
 					<input
 						class="w-full"
 						value={service.version}
 						id="service"
-						readonly
-						disabled={$status.service.isRunning || $status.service.initialLoading}
+						readonly={isDisabled}
+						disabled={isDisabled}
 						class:cursor-pointer={!$status.service.isRunning}
 					/></a
 				>
@@ -289,10 +287,8 @@
 				</label>
 				<CopyPasswordField
 					placeholder="eg: https://coollabs.io"
-					readonly={!$appSession.isAdmin && !$status.service.isRunning}
-					disabled={!$appSession.isAdmin ||
-						$status.service.isRunning ||
-						$status.service.initialLoading}
+					readonly={isDisabled}
+					disabled={isDisabled}
 					name="fqdn"
 					id="fqdn"
 					pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
@@ -306,6 +302,8 @@
 						<label for={fqdn.name}>{fqdn.label || fqdn.name}</label>
 						<CopyPasswordField
 							placeholder="eg: https://coolify.io"
+							readonly={isDisabled}
+							disabled={isDisabled}
 							required={fqdn.required}
 							name={fqdn.name}
 							id={fqdn.name}
@@ -368,10 +366,8 @@
 				>
 				<input
 					class="w-full"
-					readonly={!$appSession.isAdmin && !$status.service.isRunning}
-					disabled={!$appSession.isAdmin ||
-						$status.service.isRunning ||
-						$status.service.initialLoading}
+					readonly={isDisabled}
+					disabled={isDisabled}
 					name="exposePort"
 					id="exposePort"
 					bind:value={service.exposePort}

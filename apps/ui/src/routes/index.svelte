@@ -171,7 +171,24 @@
 				}
 			} else if (typeof dualCerts !== 'undefined') {
 				const response = await get(`/services/${id}/status`);
-				isRunning = response.isRunning;
+				if (Object.keys(response).length === 0) {
+					isRunning = false;
+				} else {
+					let overallStatus = false;
+					for (const oneStatus of Object.keys(response)) {
+						if (response[oneStatus].status.isRunning) {
+							overallStatus = true;
+						} else {
+							isDegraded = true;
+							break;
+						}
+					}
+					if (overallStatus) {
+						isRunning = true;
+					} else {
+						isRunning = false;
+					}
+				}
 			} else {
 				const response = await get(`/databases/${id}/status`);
 				isRunning = response.isRunning;
@@ -237,7 +254,8 @@
 			(application.id && application.id.toLowerCase().includes($search.toLowerCase())) ||
 			(application.name && application.name.toLowerCase().includes($search.toLowerCase())) ||
 			(application.fqdn && application.fqdn.toLowerCase().includes($search.toLowerCase())) ||
-			(application.dockerComposeConfiguration && application.dockerComposeConfiguration.toLowerCase().includes($search.toLowerCase())) ||
+			(application.dockerComposeConfiguration &&
+				application.dockerComposeConfiguration.toLowerCase().includes($search.toLowerCase())) ||
 			(application.repository &&
 				application.repository.toLowerCase().includes($search.toLowerCase())) ||
 			(application.buildpack &&
@@ -643,7 +661,7 @@
 									<div class="h-10 text-xs">
 										{#if application?.fqdn}
 											<h2>{application?.fqdn.replace('https://', '').replace('http://', '')}</h2>
-										{:else if (!application.settings?.isBot && !application?.fqdn) && application.buildPack !== 'compose'}
+										{:else if !application.settings?.isBot && !application?.fqdn && application.buildPack !== 'compose'}
 											<h2 class="text-red-500">Not configured</h2>
 										{/if}
 										{#if application.destinationDocker?.name}

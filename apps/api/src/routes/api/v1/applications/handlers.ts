@@ -124,7 +124,7 @@ export async function getApplicationStatus(request: FastifyRequest<OnlyId>) {
                     for (const container of containersArray) {
                         let isRunning = false;
                         let isExited = false;
-                        let isRestarting = false;
+                        let isRestarting = false; 
                         const containerObj = JSON.parse(container);
                         const status = containerObj.State
                         if (status === 'running') {
