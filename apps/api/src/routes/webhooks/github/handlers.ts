@@ -1,4 +1,3 @@
-import axios from "axios";
 import cuid from "cuid";
 import crypto from "crypto";
 import { encrypt, errorHandler, getDomain, getUIUrl, isDev, prisma } from "../../../lib/common";
@@ -32,13 +31,14 @@ export async function installGithub(request: FastifyRequest<InstallGithub>, repl
 }
 export async function configureGitHubApp(request, reply) {
     try {
+        const { default: got } = await import('got')
         const { code, state } = request.query;
         const { apiUrl } = await prisma.gitSource.findFirst({
             where: { id: state },
             include: { githubApp: true, gitlabApp: true }
         });
 
-        const { data }: any = await axios.post(`${apiUrl}/app-manifests/${code}/conversions`);
+        const data: any = await got.post(`${apiUrl}/app-manifests/${code}/conversions`).json()
         const { id, client_id, slug, client_secret, pem, webhook_secret } = data
 
         const encryptedClientSecret = encrypt(client_secret);

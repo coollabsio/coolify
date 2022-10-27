@@ -10,13 +10,11 @@ import { asyncExecShell, cleanupDockerStorage, createRemoteEngineConfiguration, 
 import { scheduler } from './lib/scheduler';
 import { compareVersions } from 'compare-versions';
 import Graceful from '@ladjs/graceful'
-import axios from 'axios';
 import yaml from 'js-yaml'
 import fs from 'fs/promises';
 import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handlers';
 import { checkContainer } from './lib/docker';
 import { migrateServicesToNewTemplate } from './lib';
-import { getTemplates } from './lib/services';
 import { refreshTags, refreshTemplates } from './routes/api/v1/handlers';
 declare module 'fastify' {
 	interface FastifyInstance {
@@ -129,30 +127,10 @@ const host = '0.0.0.0';
 
 
 	try {
-		const { default: got } = await import('got')
-		try {
-			const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text()
-
-			if (isDev) {
-				const templates = await fs.readFile('./devTemplates.yaml', 'utf8')
-				await fs.writeFile('./template.json', JSON.stringify(yaml.load(templates)))
-				const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text()
-				await fs.writeFile('./tags.json', tags)
-			} else {
-				const response = await got.get('https://get.coollabs.io/coolify/service-templates.yaml').text()
-				await fs.writeFile('/app/template.json', JSON.stringify(yaml.load(response)))
-				await fs.writeFile('/app/tags.json', tags)
-			}
-
-		} catch (error) {
-			console.log("Couldn't get latest templates.")
-			console.log(error)
-		}
-
-		await migrateServicesToNewTemplate()
-
 		await fastify.listen({ port, host })
 		console.log(`Coolify's API is listening on ${host}:${port}`);
+
+		await migrateServicesToNewTemplate()
 		await initServer();
 
 		const graceful = new Graceful({ brees: [scheduler] });
@@ -192,11 +170,12 @@ const host = '0.0.0.0';
 		}, 10000)
 
 		await Promise.all([
+			getTagsTemplates(),
 			getArch(),
 			getIPAddress(),
 			configureRemoteDockers(),
-
 		])
+
 	} catch (error) {
 		console.error(error);
 		process.exit(1);
@@ -222,6 +201,27 @@ async function getIPAddress() {
 
 	} catch (error) { }
 }
+async function getTagsTemplates() {
+	const { default: got } = await import('got')
+	try {
+		const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text()
+		if (isDev) {
+			const templates = await fs.readFile('./devTemplates.yaml', 'utf8')
+			await fs.writeFile('./templates.json', JSON.stringify(yaml.load(templates)))
+			await fs.writeFile('./tags.json', tags)
+			console.log('Tags and templates loaded in dev mode...')
+		} else {
+			const response = await got.get('https://get.coollabs.io/coolify/service-templates.yaml').text()
+			await fs.writeFile('/app/templates.json', JSON.stringify(yaml.load(response)))
+			await fs.writeFile('/app/tags.json', tags)
+			console.log('Tags and templates loaded...')
+		}
+
+	} catch (error) {
+		console.log("Couldn't get latest templates.")
+		console.log(error)
+	}
+}
 async function initServer() {
 	try {
 		console.log(`Initializing server...`);
@@ -234,6 +234,7 @@ async function initServer() {
 		}
 	} catch (error) { }
 }
+
 async function getArch() {
 	try {
 		const settings = await prisma.setting.findFirst({})
@@ -263,17 +264,15 @@ async function configureRemoteDockers() {
 
 async function autoUpdater() {
 	try {
+		const { default: got } = await import('got')
 		const currentVersion = version;
-		const { data: versions } = await axios
-			.get(
-				`https://get.coollabs.io/versions.json`
-				, {
-					params: {
-						appId: process.env['COOLIFY_APP_ID'] || undefined,
-						version: currentVersion
-					}
-				})
-		const latestVersion = versions['coolify'].main.version;
+		const { coolify } = await got.get('https://get.coollabs.io/versions.json', {
+			searchParams: {
+				appId: process.env['COOLIFY_APP_ID'] || undefined,
+				version: currentVersion
+			}
+		}).json()
+		const latestVersion = coolify.main.version;
 		const isUpdateAvailable = compareVersions(latestVersion, currentVersion);
 		if (isUpdateAvailable === 1) {
 			const activeCount = 0
@@ -295,7 +294,9 @@ async function autoUpdater() {
 				}
 			}
 		}
-	} catch (error) { }
+	} catch (error) {
+		console.log(error)
+	}
 }
 
 async function checkFluentBit() {

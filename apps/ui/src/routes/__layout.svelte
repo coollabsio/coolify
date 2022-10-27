@@ -257,6 +257,7 @@
 							</svg>
 						</a>
 
+						<!-- svelte-ignore a11y-click-events-have-key-events -->
 						<div
 							id="logout"
 							class="icons bg-coolgray-200 hover:text-error cursor-pointer"
@@ -285,7 +286,7 @@
 							<a
 								class="text-[10px] no-underline"
 								href={`https://github.com/coollabsio/coolify/releases/tag/v${$appSession.version}`}
-								target="_blank">v{$appSession.version}</a
+								target="_blank noreferrer">v{$appSession.version}</a
 							>
 						</div>
 					</div>
@@ -293,7 +294,7 @@
 			</nav>
 			{#if $appSession.whiteLabeled}
 				<span class="fixed bottom-0 left-[50px] z-50 m-2 px-4 text-xs text-stone-700"
-					>Powered by <a href="https://coolify.io" target="_blank">Coolify</a></span
+					>Powered by <a href="https://coolify.io" target="_blank noreferrer">Coolify</a></span
 				>
 			{/if}
 		{/if}
@@ -434,6 +435,7 @@
 				<UpdateAvailable />
 			</div>
 			<li>
+				<!-- svelte-ignore a11y-click-events-have-key-events -->
 				<div class="no-underline icons hover:bg-error" on:click={logout}>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -458,7 +460,7 @@
 				<a
 					class="text-xs hover:bg-coolgray-200 no-underline hover:text-white text-right"
 					href={`https://github.com/coollabsio/coolify/releases/tag/v${$appSession.version}`}
-					target="_blank">v{$appSession.version}</a
+					target="_blank noreferrer">v{$appSession.version}</a
 				>
 			</li>
 		</ul>

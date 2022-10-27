@@ -31,6 +31,7 @@
 	</div>
 </div>
 <div class:text-center={isCenter} class={`flex justify-center ${customClass}`}>
+	<!-- svelte-ignore a11y-click-events-have-key-events -->
 	<div
 		on:click
 		aria-pressed="false"

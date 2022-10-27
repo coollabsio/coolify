@@ -91,6 +91,7 @@
 	<div class="absolute top-0 right-0 flex justify-center items-center h-full cursor-pointer text-stone-600 hover:text-white mr-3">
 		<div class="flex space-x-2">
 			{#if isPasswordField}
+				<!-- svelte-ignore a11y-click-events-have-key-events -->
 				<div on:click={() => (showPassword = !showPassword)}>
 					{#if showPassword}
 						<svg
@@ -132,6 +133,7 @@
 				</div>
 			{/if}
 			{#if value && isHttps}
+				<!-- svelte-ignore a11y-click-events-have-key-events -->
 				<div on:click={copyToClipboard}>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"

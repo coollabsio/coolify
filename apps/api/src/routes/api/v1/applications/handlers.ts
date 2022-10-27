@@ -1,16 +1,15 @@
 import cuid from 'cuid';
 import crypto from 'node:crypto'
 import jsonwebtoken from 'jsonwebtoken';
-import axios from 'axios';
 import { FastifyReply } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import csv from 'csvtojson';
 
 import { day } from '../../../../lib/dayjs';
-import { makeLabelForStandaloneApplication, setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
-import { checkDomainsIsValidInDNS, checkDoubleBranch, checkExposedPort, createDirectories, decrypt, defaultComposeConfiguration, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, isDev, isDomainConfigured, listSettings, prisma, stopBuild, uniqueName } from '../../../../lib/common';
-import { checkContainer, formatLabelsOnDocker, isContainerExited, removeContainer } from '../../../../lib/docker';
+import { setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
+import { checkDomainsIsValidInDNS, checkExposedPort, createDirectories, decrypt, defaultComposeConfiguration, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, isDev, isDomainConfigured, listSettings, prisma, stopBuild, uniqueName } from '../../../../lib/common';
+import { checkContainer, formatLabelsOnDocker, removeContainer } from '../../../../lib/docker';
 
 import type { FastifyRequest } from 'fastify';
 import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain, StopPreviewApplication, RestartPreviewApplication, GetBuilds } from './types';
@@ -124,7 +123,7 @@ export async function getApplicationStatus(request: FastifyRequest<OnlyId>) {
                     for (const container of containersArray) {
                         let isRunning = false;
                         let isExited = false;
-                        let isRestarting = false; 
+                        let isRestarting = false;
                         const containerObj = JSON.parse(container);
                         const status = containerObj.State
                         if (status === 'running') {
@@ -771,6 +770,7 @@ export async function saveApplicationSource(request: FastifyRequest<SaveApplicat
 
 export async function getGitHubToken(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
     try {
+        const { default: got } = await import('got')
         const { id } = request.params
         const { teamId } = request.user
         const application: any = await getApplicationFromDB(id, teamId);
@@ -782,13 +782,13 @@ export async function getGitHubToken(request: FastifyRequest<OnlyId>, reply: Fas
         const githubToken = jsonwebtoken.sign(payload, application.gitSource.githubApp.privateKey, {
             algorithm: 'RS256'
         });
-        const { data } = await axios.post(`${application.gitSource.apiUrl}/app/installations/${application.gitSource.githubApp.installationId}/access_tokens`, {}, {
+        const { token } = await got.post(`${application.gitSource.apiUrl}/app/installations/${application.gitSource.githubApp.installationId}/access_tokens`, {
             headers: {
-                Authorization: `Bearer ${githubToken}`
+                'Authorization': `Bearer ${githubToken}`,
             }
-        })
+        }).json()
         return reply.code(201).send({
-            token: data.token
+            token
         })
     } catch ({ status, message }) {
         return errorHandler({ status, message })

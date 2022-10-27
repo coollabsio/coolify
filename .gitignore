@@ -15,5 +15,3 @@ apps/api/db/migration.db-journal
 apps/api/core*
 logs
 others/certificates
-apps/api/template.json
-apps/api/tags.json

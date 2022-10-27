@@ -1,7 +1,6 @@
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import got from 'got';
-import semverSort from 'semver-sort';
 
 const repositories = [];
 const templates = await fs.readFile('../devTemplates.yaml', 'utf8');
@@ -31,9 +30,6 @@ for (const repository of repositories) {
             if (!tags.includes('latest')) {
                 tags.push('latest')
             }
-            try {
-                tags = semverSort.desc(tags)
-            } catch (error) { }
             services.push({ name: repository.name, image: repository.image, tags })
         }
     } else {
@@ -48,15 +44,6 @@ for (const repository of repositories) {
         if (!tags.includes('latest')) {
             tags.push('latest')
         }
-        try {
-            tags = semverSort.desc(tags)
-        } catch (error) { }
-
-        console.log({
-            name: repository.name,
-            image: repository.image,
-            tags
-        })
         services.push({
             name: repository.name,
             image: repository.image,

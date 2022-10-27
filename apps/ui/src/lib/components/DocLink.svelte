@@ -16,7 +16,7 @@
 <a
 	{id}
 	href={url}
-	target="_blank"
+	target="_blank noreferrer"
 	class="flex no-underline inline-block cursor-pointer"
 	class:icons={!text}
 >
