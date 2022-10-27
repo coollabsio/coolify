@@ -301,7 +301,6 @@ export async function isDomainConfigured({
 		},
 		select: { fqdn: true }
 	});
-	console.log({foundApp, foundService})
 	return !!(foundApp || foundService || coolifyFqdn);
 }
 
