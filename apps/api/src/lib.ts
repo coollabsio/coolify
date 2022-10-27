@@ -81,7 +81,6 @@ export async function migrateServicesToNewTemplate() {
                     }
                     if (variable.id.startsWith('$$config_')) {
                         const found = await prisma.serviceSetting.findFirst({ where: { name: variable.name, serviceId: id } })
-                        console.log({variableNameAtConfig: variable.id})
                         if (!found) {
                             await prisma.serviceSetting.create({
                                 data: { name: variable.name, value: variable.value.toString(), variableName: variable.id, service: { connect: { id } } }
@@ -158,6 +157,7 @@ async function weblate(service: any, template: any) {
 }
 async function searxng(service: any, template: any) {
     const { secretKey, redisPassword } = service.searxng
+    const { fqdn } = service
 
     const secrets = [
         `SECRET_KEY@@@${secretKey}`,
@@ -165,7 +165,7 @@ async function searxng(service: any, template: any) {
     ]
 
     const settings = [
-        `SEARXNG_BASE_URL@@@$$generate_fqdn`
+        `SEARXNG_BASE_URL@@@${fqdn || '$$generate_fqdn'}`
     ]
     await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
@@ -175,12 +175,13 @@ async function searxng(service: any, template: any) {
 }
 async function glitchtip(service: any, template: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, secretKeyBase, defaultEmail, defaultUsername, defaultPassword, defaultEmailFrom, emailSmtpHost, emailSmtpPort, emailSmtpUser, emailSmtpPassword, emailSmtpUseTls, emailSmtpUseSsl, emailBackend, mailgunApiKey, sendgridApiKey, enableOpenUserRegistration } = service.glitchTip
+    const { id } = service
 
     const secrets = [
         `POSTGRES_PASSWORD@@@${postgresqlPassword}`,
         `SECRET_KEY@@@${secretKeyBase}`,
-        `DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@$$generate_fqdn:5432/${postgresqlDatabase}`)}`,
-        `REDIS_URL@@@${encrypt(`redis://$$generate_fqdn:6379`)}`,
+        `DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@${id}-postgresql:5432/${postgresqlDatabase}`)}`,
+        `REDIS_URL@@@${encrypt(`redis://${id}-redis:6379`)}`,
         `EMAIL_HOST_PASSWORD@@@${emailSmtpPassword}`,
         `MAILGUN_API_KEY@@@${mailgunApiKey}`,
         `SENDGRID_API_KEY@@@${sendgridApiKey}`,
@@ -208,10 +209,11 @@ async function glitchtip(service: any, template: any) {
 }
 async function hasura(service: any, template: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, graphQLAdminPassword } = service.hasura
+    const { id } = service
 
     const secrets = [
         `HASURA_GRAPHQL_ADMIN_PASSWORD@@@${graphQLAdminPassword}`,
-        `HASURA_GRAPHQL_METADATA_DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@$$generate_fqdn:5432/${postgresqlDatabase}`)}`,
+        `HASURA_GRAPHQL_METADATA_DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@${id}-postgresql:5432/${postgresqlDatabase}`)}`,
         `POSTGRES_PASSWORD@@@${postgresqlPassword}`,
     ]
     const settings = [
@@ -226,13 +228,13 @@ async function hasura(service: any, template: any) {
 }
 async function umami(service: any, template: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, umamiAdminPassword, hashSalt } = service.umami
-
+    const { id } = service
 
     const secrets = [
         `HASH_SALT@@@${hashSalt}`,
         `POSTGRES_PASSWORD@@@${postgresqlPassword}`,
         `ADMIN_PASSWORD@@@${umamiAdminPassword}`,
-        `DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@$$generate_fqdn:5432/${postgresqlDatabase}`)}`,
+        `DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@${id}-postgresql:5432/${postgresqlDatabase}`)}`,
     ]
     const settings = [
         `POSTGRES_USER@@@${postgresqlUser}`,
@@ -278,8 +280,8 @@ async function ghost(service: any, template: any) {
         `MARIADB_USER@@@${mariadbUser}`,
         `MARIADB_DATABASE@@@${mariadbDatabase}`,
         `MARIADB_ROOT_USER@@@${mariadbRootUser}`,
-        `GHOST_HOST@@@$$generate_domain`,
-        `url@@@$$generate_fqdn`,
+        `GHOST_HOST@@@${getDomain(fqdn) || '$$generate_fqdn'}`,
+        `url@@@${fqdn || '$$generate_fqdn'}`,
         `GHOST_ENABLE_HTTPS@@@${isHttps ? 'yes' : 'no'}`
     ]
     await migrateSettings(settings, service, template);
@@ -332,6 +334,7 @@ async function vscodeserver(service: any, template: any) {
 }
 async function minio(service: any, template: any) {
     const { rootUser, rootUserPassword, apiFqdn } = service.minio
+    const { fqdn } = service
 
     const secrets = [
         `MINIO_ROOT_PASSWORD@@@${rootUserPassword}`,
@@ -339,8 +342,8 @@ async function minio(service: any, template: any) {
     const settings = [
         `MINIO_ROOT_USER@@@${rootUser}`,
         `MINIO_SERVER_URL@@@${apiFqdn}`,
-        `MINIO_BROWSER_REDIRECT_URL@@@$$generate_fqdn`,
-        `MINIO_DOMAIN@@@$$generate_domain`,
+        `MINIO_BROWSER_REDIRECT_URL@@@${fqdn || '$$generate_fqdn'}`,
+        `MINIO_DOMAIN@@@${getDomain(fqdn) || '$$generate_fqdn'}`,
     ]
     await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
@@ -350,7 +353,7 @@ async function minio(service: any, template: any) {
 }
 async function fider(service: any, template: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, jwtSecret, emailNoreply, emailMailgunApiKey, emailMailgunDomain, emailMailgunRegion, emailSmtpHost, emailSmtpPort, emailSmtpUser, emailSmtpPassword, emailSmtpEnableStartTls } = service.fider
-
+    const { fqdn } = service
     const secrets = [
         `JWT_SECRET@@@${jwtSecret}`,
         emailMailgunApiKey && `EMAIL_MAILGUN_API_KEY@@@${emailMailgunApiKey}`,
@@ -358,7 +361,7 @@ async function fider(service: any, template: any) {
         `POSTGRES_PASSWORD@@@${postgresqlPassword}`,
     ]
     const settings = [
-        `BASE_URL@@@$$generate_fqdn`,
+        `BASE_URL@@@${fqdn || '$$generate_fqdn'}`,
         `EMAIL_NOREPLY@@@${emailNoreply || 'noreply@example.com'}`,
         `EMAIL_MAILGUN_DOMAIN@@@${emailMailgunDomain || ''}`,
         `EMAIL_MAILGUN_REGION@@@${emailMailgunRegion || ''}`,
@@ -379,9 +382,10 @@ async function fider(service: any, template: any) {
 }
 async function plausibleAnalytics(service: any, template: any) {
     const { email, username, password, postgresqlUser, postgresqlPassword, postgresqlDatabase, secretKeyBase, scriptName } = service.plausibleAnalytics;
+    const { id, fqdn } = service
 
     const settings = [
-        `BASE_URL@@@$$generate_fqdn`,
+        `BASE_URL@@@${fqdn || '$$generate_fqdn'}`,
         `ADMIN_USER_EMAIL@@@${email}`,
         `ADMIN_USER_NAME@@@${username}`,
         `DISABLE_AUTH@@@false`,
@@ -394,7 +398,7 @@ async function plausibleAnalytics(service: any, template: any) {
         `ADMIN_USER_PWD@@@${password}`,
         `SECRET_KEY_BASE@@@${secretKeyBase}`,
         `POSTGRES_PASSWORD@@@${postgresqlPassword}`,
-        `DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@$$generate_fqdn:5432/${postgresqlDatabase}`)}`,
+        `DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@${id}-postgresql:5432/${postgresqlDatabase}`)}`,
     ]
     await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
@@ -412,7 +416,6 @@ async function migrateSettings(settings: any[], service: any, template: any) {
         }
         // console.log('Migrating setting', name, value, 'for service', service.id, ', service name:', service.name)
         const variableName = template.variables.find((v: any) => v.name === name)?.id
-        console.log({variableName})
         await prisma.serviceSetting.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name, value, variableName, service: { connect: { id: service.id } } } })
     }
 }
