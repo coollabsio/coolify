@@ -436,10 +436,17 @@ export async function checkServiceDomain(request: FastifyRequest<CheckServiceDom
 export async function checkService(request: FastifyRequest<CheckService>) {
     try {
         const { id } = request.params;
-        let { fqdn, exposePort, forceSave, otherFqdns, dualCerts } = request.body;
-
+        let { fqdn, exposePort, forceSave, dualCerts } = request.body;
+        const otherFqdns = await prisma.serviceSetting.findMany({where: { variableName: {startsWith: '$$coolify_fqdn'}}})
+        let domainsList = []
         if (fqdn) fqdn = fqdn.toLowerCase();
-        if (otherFqdns && otherFqdns.length > 0) otherFqdns = otherFqdns.map((f) => f.toLowerCase());
+        if (otherFqdns && otherFqdns.length > 0) {
+            domainsList = otherFqdns.filter((f) => { 
+                if(f.serviceId !== id) {
+                return f
+                }
+            });
+        }
         if (exposePort) exposePort = Number(exposePort);
 
         const { destinationDocker: { remoteIpAddress, remoteEngine, engine }, exposePort: configuredPort } = await prisma.service.findUnique({ where: { id }, include: { destinationDocker: true } })
@@ -449,13 +456,8 @@ export async function checkService(request: FastifyRequest<CheckService>) {
         if (found) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
-        if (otherFqdns && otherFqdns.length > 0) {
-            for (const ofqdn of otherFqdns) {
-                found = await isDomainConfigured({ id, fqdn: ofqdn, remoteIpAddress });
-                if (found) {
-                    throw { status: 500, message: `Domain ${getDomain(ofqdn).replace('www.', '')} is already in use!` }
-                }
-            }
+        if (domainsList.find(d => getDomain(d.value) === getDomain(fqdn))) {
+            throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
         if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, engine, remoteEngine, remoteIpAddress })
         if (isDNSCheckEnabled && !isDev && !forceSave) {
@@ -484,7 +486,7 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
         }
         const templates = await getTemplates()
         const service = await prisma.service.findUnique({ where: { id } })
-        const foundTemplate = templates.find(t => fixType(t.name) === service.type)
+        const foundTemplate = templates.find(t => fixType(t.name) === fixType(service.type))
         for (const setting of serviceSetting) {
             let { id: settingId, name, value, changed = false, isNew = false, variableName } = setting
             if (changed) {

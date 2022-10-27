@@ -281,9 +281,7 @@ export async function isDomainConfigured({
 		where: {
 			OR: [
 				{ fqdn: { endsWith: `//${nakedDomain}` } },
-				{ fqdn: { endsWith: `//www.${nakedDomain}` } },
-				{ minio: { apiFqdn: { endsWith: `//${nakedDomain}` } } },
-				{ minio: { apiFqdn: { endsWith: `//www.${nakedDomain}` } } }
+				{ fqdn: { endsWith: `//www.${nakedDomain}` } }
 			],
 			id: { not: checkOwn ? undefined : id },
 			destinationDocker: {
@@ -303,6 +301,7 @@ export async function isDomainConfigured({
 		},
 		select: { fqdn: true }
 	});
+	console.log({foundApp, foundService})
 	return !!(foundApp || foundService || coolifyFqdn);
 }
 

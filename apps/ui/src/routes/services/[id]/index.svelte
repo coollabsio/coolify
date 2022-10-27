@@ -78,13 +78,12 @@
 		if (loading.save) return;
 		loading.save = true;
 		try {
-			// await post(`/services/${id}/check`, {
-			// 	fqdn: service.fqdn,
-			// 	forceSave,
-			// 	dualCerts,
-			// 	otherFqdns: service.minio?.apiFqdn ? [service.minio?.apiFqdn] : [],
-			// 	exposePort: service.exposePort
-			// });
+			await post(`/services/${id}/check`, {
+				fqdn: service.fqdn,
+				forceSave,
+				dualCerts,
+				exposePort: service.exposePort
+			});
 			const formData = new FormData(e.target);
 			if (formData) service = await saveForm(formData, service);
 			setLocation(service);
