@@ -1929,6 +1929,7 @@
         - $$id-postgresql
       environment:
         - BASE_URL=$$config_base_url
+        - DATABASE_URL=$$secret_database_url
         - JWT_SECRET=$$secret_jwt_secret
         - EMAIL_NOREPLY=$$config_email_noreply
         - EMAIL_MAILGUN_API=$$secret_email_mailgun_api

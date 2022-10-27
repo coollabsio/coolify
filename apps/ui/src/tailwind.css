@@ -88,7 +88,7 @@ label {
 	@apply inline-block;
 }
 .btn {
-	@apply text-white text-base min-w-fit;
+	@apply text-white text-base min-w-fit no-animation;
 }
 
 a {

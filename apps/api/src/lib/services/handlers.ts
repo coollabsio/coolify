@@ -35,7 +35,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
         const arm = isARM(service.arch)
-        const { type, destinationDockerId, destinationDocker, persistentStorage } =
+        const { type, destinationDockerId, destinationDocker, persistentStorage, exposePort } =
             service;
 
         const { workdir } = await createDirectories({ repository: type, buildId: id });
@@ -80,7 +80,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
             if (customVolumes.length > 0) {
                 for (const customVolume of customVolumes) {
                     const { volumeName, path, containerId } = customVolume
-                    if (!volumes.includes(`${volumeName}:${path}`) && containerId === service) {
+                    if (volumes && volumes.length > 0 && !volumes.includes(`${volumeName}:${path}`) && containerId === service) {
                         volumes.push(`${volumeName}:${path}`)
                     }
                 }
@@ -92,7 +92,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                 entrypoint: template.services[service]?.entrypoint,
                 image: arm ? template.services[service].imageArm : template.services[service].image,
                 expose: template.services[service].ports,
-                // ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                ...(exposePort ? { ports: [`${exposePort}:${exposePort}`] } : {}),
                 volumes,
                 environment: newEnvironments,
                 depends_on: template.services[service]?.depends_on,
