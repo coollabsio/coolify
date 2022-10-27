@@ -91,6 +91,7 @@
 <div class="container lg:mx-auto lg:pt-20 lg:p-0 px-8 pt-20">
 	<div class="flex flex-wrap justify-center  gap-8">
 		{#each filteredServices as service}
+		{#key service.name}
 			<div class="p-2">
 				<form on:submit|preventDefault={() => handleSubmit(service)}>
 					<button type="submit" class="box-selection relative text-xl font-bold hover:bg-primary">
@@ -99,6 +100,7 @@
 					</button>
 				</form>
 			</div>
+			{/key}
 		{/each}
 	</div>
 </div>

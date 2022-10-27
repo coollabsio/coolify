@@ -460,7 +460,7 @@
 			</button>
 		{/if}
 		{#if $location && $status.application.overallStatus === 'healthy'}
-			<a href={$location} target="_blank" class="btn btn-sm gap-2 text-sm bg-primary"
+			<a href={$location} target="_blank noreferrer" class="btn btn-sm gap-2 text-sm bg-primary"
 				><svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="h-6 w-6"

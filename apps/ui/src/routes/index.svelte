@@ -674,7 +674,7 @@
 
 									<div class="flex justify-end items-end space-x-2 h-10">
 										{#if application?.fqdn}
-											<a href={application?.fqdn} target="_blank" class="icons hover:bg-green-500">
+											<a href={application?.fqdn} target="_blank noreferrer" class="icons hover:bg-green-500">
 												<svg
 													xmlns="http://www.w3.org/2000/svg"
 													class="h-6 w-6"
@@ -698,7 +698,7 @@
 												href={`http://${dev ? 'localhost' : settings.ipv4}:${
 													application.exposePort
 												}`}
-												target="_blank"
+												target="_blank noreferrer"
 												class="icons hover:bg-green-500"
 											>
 												<svg
@@ -780,7 +780,7 @@
 
 								<div class="flex justify-end items-end space-x-2 h-10">
 									{#if application?.fqdn}
-										<a href={application?.fqdn} target="_blank" class="icons hover:bg-green-500">
+										<a href={application?.fqdn} target="_blank noreferrer" class="icons hover:bg-green-500">
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
 												class="h-6 w-6"
@@ -802,7 +802,7 @@
 									{#if application.settings?.isBot && application.exposePort}
 										<a
 											href={`http://${dev ? 'localhost' : settings.ipv4}:${application.exposePort}`}
-											target="_blank"
+											target="_blank noreferrer"
 											class="icons hover:bg-green-500"
 										>
 											<svg
@@ -889,7 +889,7 @@
 									</div>
 									<div class="flex justify-end items-end space-x-2 h-10">
 										{#if service?.fqdn}
-											<a href={service?.fqdn} target="_blank" class="icons hover:bg-pink-500">
+											<a href={service?.fqdn} target="_blank noreferrer" class="icons hover:bg-pink-500">
 												<svg
 													xmlns="http://www.w3.org/2000/svg"
 													class="h-6 w-6"
@@ -962,7 +962,7 @@
 								</div>
 								<div class="flex justify-end items-end space-x-2 h-10">
 									{#if service?.fqdn}
-										<a href={service?.fqdn} target="_blank" class="icons hover:bg-pink-500">
+										<a href={service?.fqdn} target="_blank noreferrer" class="icons hover:bg-pink-500">
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
 												class="h-6 w-6"
