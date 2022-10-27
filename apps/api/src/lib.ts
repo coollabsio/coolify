@@ -81,6 +81,7 @@ export async function migrateServicesToNewTemplate() {
                     }
                     if (variable.id.startsWith('$$config_')) {
                         const found = await prisma.serviceSetting.findFirst({ where: { name: variable.name, serviceId: id } })
+                        console.log({variableNameAtConfig: variable.id})
                         if (!found) {
                             await prisma.serviceSetting.create({
                                 data: { name: variable.name, value: variable.value.toString(), variableName: variable.id, service: { connect: { id } } }
@@ -411,6 +412,7 @@ async function migrateSettings(settings: any[], service: any, template: any) {
         }
         // console.log('Migrating setting', name, value, 'for service', service.id, ', service name:', service.name)
         const variableName = template.variables.find((v: any) => v.name === name)?.id
+        console.log({variableName})
         await prisma.serviceSetting.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name, value, variableName, service: { connect: { id: service.id } } } })
     }
 }
