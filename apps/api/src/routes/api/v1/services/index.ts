@@ -71,7 +71,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.get<GetServiceLogs>('/:id/logs/:containerId', async (request) => await getServiceLogs(request));
 
     fastify.post<ServiceStartStop>('/:id/start', async (request) => await startService(request));
-    fastify.post<ServiceStartStop>('/:id/:type/stop', async (request) => await stopService(request));
+    fastify.post<ServiceStartStop>('/:id/stop', async (request) => await stopService(request));
     fastify.post<ServiceStartStop & SetWordpressSettings & SetGlitchTipSettings>('/:id/:type/settings', async (request, reply) => await setSettingsService(request, reply));
 
     fastify.post<OnlyId>('/:id/plausibleanalytics/activate', async (request, reply) => await activatePlausibleUsers(request, reply));

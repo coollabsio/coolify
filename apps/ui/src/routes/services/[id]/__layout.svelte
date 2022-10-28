@@ -122,7 +122,13 @@
 			$status.service.initialLoading = true;
 			$status.service.loading = true;
 			try {
-				await post(`/services/${service.id}/${service.type}/stop`, {});
+				await post(`/services/${service.id}/stop`, {});
+				if (service.type.startsWith('wordpress')) {
+					await post(`/services/${id}/wordpress/ftp`, {
+						ftpEnabled: false
+					});
+					window.location.reload()
+				}
 			} catch (error) {
 				return errorNotification(error);
 			} finally {
