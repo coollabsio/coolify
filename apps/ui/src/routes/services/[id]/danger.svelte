@@ -35,7 +35,7 @@
 			$status.service.initialLoading = true;
 			try {
 				if (service.type && $status.service.isRunning) {
-					await post(`/services/${service.id}/${service.type}/stop`, {});
+					await post(`/services/${service.id}/stop`, {});
 				}
 				await del(`/services/${service.id}`, { id: service.id });
 				return await goto('/');
