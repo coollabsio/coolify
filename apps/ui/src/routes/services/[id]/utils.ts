@@ -43,27 +43,36 @@ export async function saveSecret({
 
 export async function saveForm(formData: any, service: any) {
 	const settings = service.serviceSetting.map((setting: { name: string }) => setting.name);
+	const secrets = service.serviceSecret.map((secret: { name: string }) => secret.name);
 	const baseCoolifySetting = ['name', 'fqdn', 'exposePort', 'version'];
 	for (let field of formData) {
 		const [key, value] = field;
-		service.serviceSetting = service.serviceSetting.map((setting: any) => {
-			if (setting.name === key) {
-				setting.changed = true;
-				setting.value = value;
-			}
-			return setting;
-		});
-		if (!settings.includes(key) && !baseCoolifySetting.includes(key)) {
-			service.serviceSetting.push({
-				id: service.id,
+		if (secrets.includes(key)) {
+			await post(`/services/${service.id}/secrets`, {
 				name: key,
-				value: value,
-				isNew: true
+				value,
 			});
+		} else {
+			service.serviceSetting = service.serviceSetting.map((setting: any) => {
+				if (setting.name === key) {
+					setting.changed = true;
+					setting.value = value;
+				}
+				return setting;
+			});
+			if (!settings.includes(key) && !baseCoolifySetting.includes(key)) {
+				service.serviceSetting.push({
+					id: service.id,
+					name: key,
+					value: value,
+					isNew: true
+				});
+			}
+			if (baseCoolifySetting.includes(key)) {
+				service[key] = value;
+			}
 		}
-		if (baseCoolifySetting.includes(key)) {
-			service[key] = value;
-		}
+
 	}
 	await post(`/services/${service.id}`, { ...service });
 	const { service: reloadedService } = await get(`/services/${service.id}`);

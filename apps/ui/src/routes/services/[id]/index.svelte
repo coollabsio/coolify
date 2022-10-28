@@ -35,6 +35,7 @@
 	import ServiceStatus from '$lib/components/ServiceStatus.svelte';
 	import { saveForm } from './utils';
 	import Select from 'svelte-select';
+	import Wordpress from './_Services/wordpress.svelte';
 
 	const { id } = $page.params;
 	$: isDisabled =
@@ -86,7 +87,7 @@
 				exposePort: service.exposePort
 			});
 			for (const setting of service.serviceSetting) {
-				if (setting.variableName.startsWith('$$coolify_fqdn') && setting.value) {
+				if (setting.variableName?.startsWith('$$coolify_fqdn') && setting.value) {
 					for (let field of formData) {
 						const [key, value] = field;
 						if (setting.name === key) {
@@ -413,7 +414,6 @@
 						{template[oneService].name ||
 							oneService.replace(`${id}-`, '').replace(id, service.type)}
 					</div>
-
 					<ServiceStatus id={oneService} />
 				</div>
 				<div class="grid grid-flow-row gap-2 px-4">
@@ -434,6 +434,8 @@
 											name={variable.name}
 											id={variable.name}
 											value={service.fqdn}
+											placeholder={variable.placeholder}
+											required={variable?.required}
 										/>
 									{:else if variable.defaultValue === '$$generate_domain'}
 										<CopyPasswordField
@@ -442,6 +444,8 @@
 											name={variable.name}
 											id={variable.name}
 											value={getDomain(service.fqdn) || ''}
+											placeholder={variable.placeholder}
+											required={variable?.required}
 										/>
 									{:else if variable.defaultValue === '$$generate_network'}
 										<CopyPasswordField
@@ -450,6 +454,8 @@
 											name={variable.name}
 											id={variable.name}
 											value={service.destinationDocker.network}
+											placeholder={variable.placeholder}
+											required={variable?.required}
 										/>
 									{:else if variable.defaultValue === 'true' || variable.defaultValue === 'false'}
 										{#if variable.value === 'true' || variable.value === 'false'}
@@ -461,6 +467,8 @@
 												name={variable.name}
 												bind:value={variable.value}
 												form="saveForm"
+												placeholder={variable.placeholder}
+												required={variable?.required}
 											>
 												<option value="true">enabled</option>
 												<option value="false">disabled</option>
@@ -474,6 +482,8 @@
 												name={variable.name}
 												bind:value={variable.defaultValue}
 												form="saveForm"
+												placeholder={variable.placeholder}
+												required={variable?.required}
 											>
 												<option value="true">true</option>
 												<option value="false"> false</option>
@@ -487,21 +497,40 @@
 											name={variable.name}
 											id={variable.name}
 											value={variable.value}
+											placeholder={variable.placeholder}
+											required={variable?.required}
+										/>
+									{:else if variable.type === 'textarea'}
+										<textarea
+											class="w-full"
+											value={variable.value}
+											readonly={isDisabled}
+											disabled={isDisabled}
+											class:resize-none={$status.service.overallStatus === 'healthy'}
+											rows="5"
+											name={variable.name}
+											id={variable.name}
+											placeholder={variable.placeholder}
+											required={variable?.required}
 										/>
 									{:else}
 										<CopyPasswordField
-											placeholder={variable.defaultValue || 'optional'}
+											isPasswordField={variable.id.startsWith('secret')}
 											required={variable?.required}
-											readonly={isDisabled}
-											disabled={isDisabled}
+											readonly={variable.readonly || isDisabled}
+											disabled={variable.readonly || isDisabled}
 											name={variable.name}
 											id={variable.name}
 											value={variable.value}
+											placeholder={variable.placeholder}
 										/>
 									{/if}
 								</div>
 							{/if}
 						{/each}
+						{#if template[oneService].name.toLowerCase() === 'wordpress' && service.type.startsWith('wordpress')}
+							<Wordpress {service} />
+						{/if}
 					{/if}
 				</div>
 			{/each}

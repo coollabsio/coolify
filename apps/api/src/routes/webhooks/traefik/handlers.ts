@@ -381,7 +381,7 @@ export async function traefikConfiguration(request, reply) {
 			} = service;
 			if (destinationDockerId) {
 				const templates = await getTemplates();
-				let found = templates.find((a) => fixType(a.name) === fixType(type));
+				let found = templates.find((a) => a.type === type);
 				if (found) {
 					found = JSON.parse(JSON.stringify(found).replaceAll('$$id', id));
 					for (const oneService of Object.keys(found.services)) {
@@ -509,7 +509,7 @@ export async function traefikConfiguration(request, reply) {
 				}
 			} else {
 				traefik.http.routers[`${id}-${port || 'default'}`] = generateHttpRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix)
-				traefik.http.routers[`${id}-${port || 'default'}-secure`] = generateProtocolRedirectRouter(`${id}-${port || 'default'}-secure`, nakedDomain, pathPrefix, 'https-to-http')
+				traefik.http.routers[`${id}-${port || 'default'}-secure`] = generateProtocolRedirectRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix, 'https-to-http')
 				traefik.http.services[`${id}-${port || 'default'}`] = generateLoadBalancerService(id, port)
 
 				if (!dualCerts) {
@@ -873,7 +873,7 @@ export async function remoteTraefikConfiguration(request: FastifyRequest<OnlyId>
 			} = service;
 			if (destinationDockerId) {
 				const templates = await getTemplates();
-				let found = templates.find((a) => fixType(a.name) === fixType(type));
+				let found = templates.find((a) => a.type === type);
 				if (found) {
 					const port = found.ports.main;
 					const publicPort = service[type]?.publicPort;

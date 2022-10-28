@@ -42,11 +42,16 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         const template: any = await parseAndFindServiceTemplates(service, workdir, true)
         const network = destinationDockerId && destinationDocker.network;
         const config = {};
-        for (const service in template.services) {
+        const isWordpress = type === 'wordpress';
+        for (const s in template.services) {
+            if (isWordpress && service.wordpress.ownMysql && s.name === 'MySQL') {
+                console.log('skipping predefined mysql')
+                continue;
+            }
             let newEnvironments = []
             if (arm) {
-                if (template.services[service]?.environmentArm?.length > 0) {
-                    for (const environment of template.services[service].environmentArm) {
+                if (template.services[s]?.environmentArm?.length > 0) {
+                    for (const environment of template.services[s].environmentArm) {
                         const [env, value] = environment.split("=");
                         if (!value.startsWith('$$secret') && value !== '') {
                             newEnvironments.push(`${env}=${value}`)
@@ -54,8 +59,8 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                     }
                 }
             } else {
-                if (template.services[service]?.environment?.length > 0) {
-                    for (const environment of template.services[service].environment) {
+                if (template.services[s]?.environment?.length > 0) {
+                    for (const environment of template.services[s].environment) {
                         const [env, value] = environment.split("=");
                         if (!value.startsWith('$$secret') && value !== '') {
                             newEnvironments.push(`${env}=${value}`)
@@ -68,7 +73,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
             for (const secret of secrets) {
                 const { name, value } = secret
                 if (value) {
-                    const foundEnv = !!template.services[service].environment?.find(env => env.startsWith(`${name}=`))
+                    const foundEnv = !!template.services[s].environment?.find(env => env.startsWith(`${name}=`))
                     const foundNewEnv = !!newEnvironments?.find(env => env.startsWith(`${name}=`))
                     if (foundEnv && !foundNewEnv) {
                         newEnvironments.push(`${name}=${decrypt(value)}`)
@@ -76,7 +81,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                 }
             }
             const customVolumes = await prisma.servicePersistentStorage.findMany({ where: { serviceId: id } })
-            let volumes = arm ? template.services[service].volumesArm : template.services[service].volumes
+            let volumes = arm ? template.services[s].volumesArm : template.services[s].volumes
             if (customVolumes.length > 0) {
                 for (const customVolume of customVolumes) {
                     const { volumeName, path, containerId } = customVolume
@@ -85,41 +90,58 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                     }
                 }
             }
-            config[service] = {
-                container_name: service,
-                build: template.services[service].build || undefined,
-                command: template.services[service].command,
-                entrypoint: template.services[service]?.entrypoint,
-                image: arm ? template.services[service].imageArm : template.services[service].image,
-                expose: template.services[service].ports,
+            if (isWordpress) {
+                const { wordpress: { mysqlHost, mysqlPort, mysqlUser, mysqlPassword, mysqlDatabase, ownMysql } } = service
+                console.log({ mysqlHost, mysqlPort, mysqlUser, mysqlPassword, mysqlDatabase, ownMysql })
+                if (ownMysql) {
+                    let envsToRemove = ['WORDPRESS_DB_HOST', 'WORDPRESS_DB_USER', 'WORDPRESS_DB_PASSWORD', 'WORDPRESS_DB_NAME']
+                    for (const env of newEnvironments) {
+                        if (envsToRemove.includes(env.split('=')[0])) {
+                            console.log('removing', env)
+                            newEnvironments = newEnvironments.filter(e => e !== env)
+                        }
+                    }
+                    newEnvironments.push(`WORDPRESS_DB_HOST=${mysqlHost}:${mysqlPort}`)
+                    newEnvironments.push(`WORDPRESS_DB_USER=${mysqlUser}`)
+                    newEnvironments.push(`WORDPRESS_DB_PASSWORD=${mysqlPassword}`)
+                    newEnvironments.push(`WORDPRESS_DB_NAME=${mysqlDatabase}`)
+                }
+            }
+            config[s] = {
+                container_name: s,
+                build: template.services[s].build || undefined,
+                command: template.services[s].command,
+                entrypoint: template.services[s]?.entrypoint,
+                image: arm ? template.services[s].imageArm : template.services[s].image,
+                expose: template.services[s].ports,
                 ...(exposePort ? { ports: [`${exposePort}:${exposePort}`] } : {}),
                 volumes,
                 environment: newEnvironments,
-                depends_on: template.services[service]?.depends_on,
-                ulimits: template.services[service]?.ulimits,
-                cap_drop: template.services[service]?.cap_drop,
-                cap_add: template.services[service]?.cap_add,
+                depends_on: template.services[s]?.depends_on,
+                ulimits: template.services[s]?.ulimits,
+                cap_drop: template.services[s]?.cap_drop,
+                cap_add: template.services[s]?.cap_add,
                 labels: makeLabelForServices(type),
                 ...defaultComposeConfiguration(network),
             }
 
             // Generate files for builds
-            if (template.services[service]?.files?.length > 0) {
-                if (!template.services[service].build) {
-                    template.services[service].build = {
+            if (template.services[s]?.files?.length > 0) {
+                if (!template.services[s].build) {
+                    template.services[s].build = {
                         context: workdir,
-                        dockerfile: `Dockerfile.${service}`
+                        dockerfile: `Dockerfile.${s}`
                     }
                 }
                 let Dockerfile = `
-                    FROM ${template.services[service].image}`
-                for (const file of template.services[service].files) {
+                    FROM ${template.services[s].image}`
+                for (const file of template.services[s].files) {
                     const { source, destination, content } = file;
                     await fs.writeFile(source, content);
                     Dockerfile += `
                         COPY ./${path.basename(source)} ${destination}`
                 }
-                await fs.writeFile(`${workdir}/Dockerfile.${service}`, Dockerfile);
+                await fs.writeFile(`${workdir}/Dockerfile.${servsice}`, Dockerfile);
             }
         }
         const { volumeMounts } = persistentVolumes(id, persistentStorage, config)

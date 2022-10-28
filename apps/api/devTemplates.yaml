@@ -1,5 +1,6 @@
 - templateVersion: 1.0.0
   defaultVersion: 1.0.3
+  type: appwrite
   name: Appwrite
   documentation: https://appwrite.io/docs
   description: Secure Backend Server for Web, Mobile & Flutter Developers.
@@ -1035,6 +1036,7 @@
       The default value is 15 minutes.
 - templateVersion: 1.0.0
   defaultVersion: latest
+  type: weblate
   name: Weblate
   description: ''
   services:
@@ -1087,7 +1089,7 @@
       label: Weblate Admin Password
       defaultValue: $$generate_password
       description: ''
-      showOnUI: true
+      showOnConfiguration: true
     - id: $$config_postgres_user
       main: $$id-postgresql
       name: POSTGRES_USER
@@ -1100,7 +1102,7 @@
       label: PostgreSQL Password
       defaultValue: $$generate_password
       description: ''
-      showOnUI: true
+      showOnConfiguration: true
     - id: $$config_postgres_db
       main: $$id-postgresql
       name: POSTGRES_DB
@@ -1109,6 +1111,7 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: 2022.10.14-1a5b0965
+  type: searxng
   name: SearXNG
   description: ''
   services:
@@ -1181,6 +1184,7 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: v2.0.6
+  type: glitchtip
   name: GlitchTip
   description: ''
   services:
@@ -1344,6 +1348,7 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: v2.13.0
+  type: hasura
   name: Hasura
   description: 'Instant realtime GraphQL APIs on any Postgres application, existing or new.'
   services:
@@ -1388,7 +1393,7 @@
       label: Hasura Admin Password
       defaultValue: $$generate_password
       description: ''
-      showOnUI: true
+      showOnConfiguration: true
     - id: $$config_postgres_user
       name: POSTGRES_USER
       label: PostgreSQL User
@@ -1406,6 +1411,7 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: postgresql-v1.38.0
+  type: umami
   name: Umami
   description: >-
     Umami is a simple, easy to use, self-hosted web analytics solution. The goal
@@ -1606,9 +1612,10 @@
       label: Initial Admin Password
       defaultValue: $$generate_password
       description: ''
-      showOnUI: true
+      showOnConfiguration: true
 - templateVersion: 1.0.0
   defaultVersion: v0.29.1
+  type: meilisearch
   name: MeiliSearch
   description: >-
     MeiliSearch is a lightning Fast, Ultra Relevant, and Typo-Tolerant Search
@@ -1634,9 +1641,10 @@
       label: Master Key
       defaultValue: $$generate_hex(64)
       description: ''
-      showOnUI: true
+      showOnConfiguration: true
 - templateVersion: 1.0.0
   defaultVersion: latest
+  type: ghost
   name: Ghost
   description: >-
     Ghost is a free and open source blogging platform written in JavaScript and
@@ -1749,8 +1757,9 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: php8.1
-  name: WordPress
-  description: WordPress is a content management system based on PHP.
+  type: wordpress
+  name: WordPress (with MySQL)
+  description: WordPress is a content management system based on PHP with new MySQL database.
   services:
     $$id:
       name: WordPress
@@ -1789,53 +1798,138 @@
       label: WordPress DB Host
       defaultValue: $$id-mysql
       description: ''
+      readonly: true
     - id: $$config_wordpress_db_user
       name: WORDPRESS_DB_USER
       label: WordPress DB User
       defaultValue: $$config_mysql_user
       description: ''
+      readonly: true
     - id: $$secret_wordpress_db_password
       name: WORDPRESS_DB_PASSWORD
       label: WordPress DB Password
       defaultValue: $$secret_mysql_password
       description: ''
+      readonly: true
     - id: $$config_wordpress_db_name
       name: WORDPRESS_DB_NAME
       label: WordPress DB Name
       defaultValue: $$config_mysql_database
       description: ''
+      readonly: true
     - id: $$config_wordpress_config_extra
       name: WORDPRESS_CONFIG_EXTRA
       label: WordPress Config Extra
       defaultValue: ''
       description: ''
+      type: 'textarea'
+      placeholder: |
+        define('WP_DEBUG', true);
+        define('WP_DEBUG_LOG', true);
+        define('WP_DEBUG_DISPLAY', false);
+        @ini_set('display_errors', 0);
     - id: $$secret_mysql_root_password
       name: MYSQL_ROOT_PASSWORD
       label: MySQL Root Password
       defaultValue: $$generate_password
       description: ''
+      readonly: true
     - id: $$config_mysql_root_user
       name: MYSQL_ROOT_USER
       label: MySQL Root User
       defaultValue: $$generate_username
       description: ''
+      readonly: true
     - id: $$config_mysql_database
       name: MYSQL_DATABASE
       label: MySQL Database
       defaultValue: wordpress
       description: ''
+      readonly: true
     - id: $$config_mysql_user
       name: MYSQL_USER
       label: MySQL User
       defaultValue: $$generate_username
       description: ''
+      readonly: true
     - id: $$secret_mysql_password
       name: MYSQL_PASSWORD
       label: MySQL Password
       defaultValue: $$generate_password
       description: ''
+      readonly: true
+- templateVersion: 1.0.0
+  defaultVersion: php8.1
+  type: wordpress-only
+  name: WordPress (without MySQL)
+  description: WordPress is a content management system based on PHP without MySQL.
+  services:
+    $$id:
+      name: WordPress
+      documentation: 'Taken from https://docs.docker.com/compose/wordpress/'
+      image: 'wordpress:$$core_version'
+      volumes:
+        - '$$id-wordpress-data:/var/www/html'
+      environment:
+        - WORDPRESS_DB_HOST=$$config_wordpress_db_host
+        - WORDPRESS_DB_PORT=$$config_wordpress_db_port
+        - WORDPRESS_DB_USER=$$config_wordpress_db_user
+        - WORDPRESS_DB_PASSWORD=$$secret_wordpress_db_password
+        - WORDPRESS_DB_NAME=$$config_wordpress_db_name
+        - WORDPRESS_CONFIG_EXTRA=$$config_wordpress_config_extra
+      ports:
+        - '80'
+  variables:
+    - id: $$config_wordpress_db_host
+      name: WORDPRESS_DB_HOST
+      label: Database Host
+      defaultValue: ''
+      description: ''
+      placeholder: 'db.coollabs.io'
+      required: true
+    - id: $$config_wordpress_db_port
+      name: WORDPRESS_DB_PORT
+      label: Database Port
+      defaultValue: ''
+      description: ''
+      placeholder: '3306'
+      required: true
+    - id: $$config_wordpress_db_user
+      name: WORDPRESS_DB_USER
+      label: Database User
+      defaultValue: ''
+      description: ''
+      placeholder: 'wordpress'
+      required: true
+    - id: $$secret_wordpress_db_password
+      name: WORDPRESS_DB_PASSWORD
+      label: Database Password
+      defaultValue: ''
+      description: ''
+      placeholder: 'supers3cr3tpassw0rd!'
+      required: true
+      showOnConfiguration: true
+    - id: $$config_wordpress_db_name
+      name: WORDPRESS_DB_NAME
+      label: Database Name
+      defaultValue: ''
+      description: ''
+      placeholder: 'wordpress'
+      required: true
+    - id: $$config_wordpress_config_extra
+      name: WORDPRESS_CONFIG_EXTRA
+      label: Extra Config
+      defaultValue: ''
+      description: ''
+      type: 'textarea'
+      placeholder: |
+        define('WP_DEBUG', true);
+        define('WP_DEBUG_LOG', true);
+        define('WP_DEBUG_DISPLAY', false);
+        @ini_set('display_errors', 0);
 - templateVersion: 1.0.0
   defaultVersion: 4.7.1
+  type: vscodeserver
   name: VSCode Server
   description: >-
     vscode-server by Coder is VS Code running on a remote server, accessible
@@ -1861,9 +1955,10 @@
       label: Password
       defaultValue: $$generate_password
       description: ''
-      showOnUI: true
+      showOnConfiguration: true
 - templateVersion: 1.0.0
   defaultVersion: RELEASE.2022-10-15T19-57-03Z
+  type: minio
   name: MinIO
   description: ' MinIO is a cloud storage server compatible with Amazon S3'
   services:
@@ -1915,9 +2010,10 @@
       label: Root User Password
       defaultValue: $$generate_password
       description: ''
-      showOnUI: true
+      showOnConfiguration: true
 - templateVersion: 1.0.0
   defaultVersion: 0.21.1
+  type: fider
   name: Fider
   description: Fider is a platform to collect and organize customer feedback.
   services:
@@ -2032,6 +2128,7 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: 0.198.1
+  type: n8nio
   name: n8n.io
   description: n8n is a free and open node based Workflow Automation Tool.
   services:
@@ -2056,6 +2153,7 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: stable
+  type: plausibleanalytics
   name: Plausible Analytics
   description: Plausible is a lightweight and open-source website analytics tool.
   services:
@@ -2157,7 +2255,7 @@
       label: Admin User Password
       defaultValue: $$generate_password
       description: This is the admin password. Please change it.
-      showOnUI: true
+      showOnConfiguration: true
     - id: $$secret_secret_key_base
       name: SECRET_KEY_BASE
       label: Secret Key Base
@@ -2185,7 +2283,7 @@
       label: PostgreSQL Password
       defaultValue: $$generate_password
       description: ''
-      showOnUI: true
+      showOnConfiguration: true
     - id: $$config_postgresql_database
       main: $$id-postgresql
       name: POSTGRESQL_DATABASE
@@ -2199,6 +2297,7 @@
       description: This is the default script name.
 - templateVersion: 1.0.0
   defaultVersion: 0.98.1
+  type: nocodb
   name: NocoDB
   description: >-
     The Open Source Airtable Alternative - Turns any MySQL, PostgreSQL, SQL

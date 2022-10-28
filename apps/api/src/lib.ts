@@ -317,7 +317,9 @@ async function wordpress(service: any, template: any) {
     ]
     await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
-
+    if (ownMysql) {
+        await prisma.service.update({ where: { id: service.id }, data: { type: "wordpress-only" } })
+    }
     // Remove old service data
     // await prisma.service.update({ where: { id: service.id }, data: { wordpress: { delete: true } } })
 }

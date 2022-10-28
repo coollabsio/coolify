@@ -113,7 +113,7 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
 }
 export async function parseAndFindServiceTemplates(service: any, workdir?: string, isDeploy: boolean = false) {
     const templates = await getTemplates()
-    const foundTemplate = templates.find(t => fixType(t.name) === service.type)
+    const foundTemplate = templates.find(t => fixType(t.type) === service.type)
     let parsedTemplate = {}
     if (foundTemplate) {
         if (!isDeploy) {
@@ -130,16 +130,21 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                     for (const env of value.environment) {
                         const [envKey, envValue] = env.split('=')
                         const variable = foundTemplate.variables.find(v => v.name === envKey) || foundTemplate.variables.find(v => v.id === envValue)
+                        const id = variable.id.replaceAll('$$', '')
                         const label = variable?.label
                         const description = variable?.description
                         const defaultValue = variable?.defaultValue
                         const main = variable?.main || '$$id'
-                        if (envValue.startsWith('$$config') || variable?.showOnUI) {
+                        const type = variable?.type || 'input'
+                        const placeholder = variable?.placeholder || ''
+                        const readonly = variable?.readonly || false
+                        const required = variable?.required || false
+                        if (envValue.startsWith('$$config') || variable?.showOnConfiguration) {
                             if (envValue.startsWith('$$config_coolify')) {
                                 continue
                             }
                             parsedTemplate[realKey].environment.push(
-                                { name: envKey, value: envValue, main, label, description, defaultValue }
+                                { id, name: envKey, value: envValue, main, label, description, defaultValue, type, placeholder, required, readonly }
                             )
                         }
                     }
@@ -203,6 +208,9 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                 if (value) {
                     strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, bcrypt.hashSync(value, 10) + "\"")
                     strParsedTemplate = strParsedTemplate.replaceAll(regex, value + "\"")
+                } else {
+                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, "\"")
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, "\"")
                 }
             }
         }
@@ -249,7 +257,7 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
         const { id } = request.params;
         const { type } = request.body;
         const templates = await getTemplates()
-        let foundTemplate = templates.find(t => fixType(t.name) === fixType(type))
+        let foundTemplate = templates.find(t => fixType(t.type) === fixType(type))
         if (foundTemplate) {
             foundTemplate = JSON.parse(JSON.stringify(foundTemplate).replaceAll('$$id', id))
             if (foundTemplate.variables.length > 0) {
@@ -307,6 +315,10 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                 }
             }
             await prisma.service.update({ where: { id }, data: { type, version: foundTemplate.defaultVersion, templateVersion: foundTemplate.templateVersion } })
+
+            if (type.startsWith('wordpress')) {
+                await prisma.service.update({ where: { id }, data: { wordpress: { create: {} } } })
+            }
             return reply.code(201).send()
         } else {
             throw { status: 404, message: 'Service type not found.' }
@@ -480,7 +492,7 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
         }
         const templates = await getTemplates()
         const service = await prisma.service.findUnique({ where: { id } })
-        const foundTemplate = templates.find(t => fixType(t.name) === fixType(service.type))
+        const foundTemplate = templates.find(t => fixType(t.type) === fixType(service.type))
         for (const setting of serviceSetting) {
             let { id: settingId, name, value, changed = false, isNew = false, variableName } = setting
             if (changed) {
@@ -506,11 +518,19 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
 export async function getServiceSecrets(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
+        const teamId = request.user.teamId;
+        const service = await getServiceFromDB({ id, teamId });
         let secrets = await prisma.serviceSecret.findMany({
             where: { serviceId: id },
             orderBy: { createdAt: 'desc' }
         });
+        const templates = await getTemplates()
+        const foundTemplate = templates.find(t => fixType(t.type) === service.type)
         secrets = secrets.map((secret) => {
+            const foundVariable = foundTemplate?.variables.find(v => v.name === secret.name) || null
+            if (foundVariable) {
+                secret.readonly = foundVariable.readonly
+            }
             secret.value = decrypt(secret.value);
             return secret;
         });

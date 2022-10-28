@@ -20,7 +20,6 @@
 
 <script lang="ts">
 	export let secrets: any;
-	export let service: any;
 	import Secret from './_Secret.svelte';
 	import { page } from '$app/stores';
 	import { get } from '$lib/api';
@@ -84,7 +83,7 @@
 				{#each secrets as secret}
 					{#key secret.id}
 						<tr>
-							<Secret name={secret.name} value={secret.value} on:refresh={refreshSecrets} />
+							<Secret name={secret.name} value={secret.value} readonly={secret.readonly} on:refresh={refreshSecrets} />
 						</tr>
 					{/key}
 				{/each}

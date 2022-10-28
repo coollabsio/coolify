@@ -1,6 +1,7 @@
 <script lang="ts">
 	export let name = '';
 	export let value = '';
+	export let readonly = false;
 	export let isNewSecret = false;
 
 	import { page } from '$app/stores';
@@ -55,19 +56,20 @@
 		bind:value={name}
 		required
 		placeholder="EXAMPLE_VARIABLE"
-		readonly={!isNewSecret}
+		readonly={!isNewSecret || readonly}
 		class="w-full"
 		class:bg-coolblack={!isNewSecret}
 		class:border={!isNewSecret}
 		class:border-dashed={!isNewSecret}
 		class:border-coolgray-300={!isNewSecret}
-		class:cursor-not-allowed={!isNewSecret}
 	/>
 </td>
 <td>
 	<CopyPasswordField
 		id={isNewSecret ? 'secretValue' : 'secretValueNew'}
 		name={isNewSecret ? 'secretValue' : 'secretValueNew'}
+		disabled={readonly}
+		{readonly}
 		isPasswordField={true}
 		bind:value
 		placeholder="J$#@UIO%HO#$U%H"
@@ -80,7 +82,7 @@
 		<div class="flex items-center justify-center">
 			<button class="btn btn-sm btn-primary" on:click={() => saveSecret(true)}>Add</button>
 		</div>
-	{:else}
+	{:else if !readonly}
 		<div class="flex flex-row justify-center space-x-2">
 			<div class="flex items-center justify-center">
 				<button class="btn btn-sm btn-primary" on:click={() => saveSecret(false)}>Set</button>

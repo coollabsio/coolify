@@ -8,6 +8,7 @@ const template = yaml.load(templateYml)
 const newTemplate = {
     "templateVersion": "1.0.0",
     "defaultVersion": "latest",
+    "type": "",
     "name": "",
     "description": "",
     "services": {
@@ -18,6 +19,7 @@ const newTemplate = {
 const version = template.caproverOneClickApp.variables.find(v => v.id === '$$cap_APP_VERSION' || v.id === '$$cap_version').defaultValue || 'latest'
 
 newTemplate.name = template.caproverOneClickApp.displayName
+newTemplate.type = template.caproverOneClickApp.displayName.replaceAll(' ', '').toLowerCase()
 newTemplate.documentation = template.caproverOneClickApp.documentation
 newTemplate.description = template.caproverOneClickApp.description
 newTemplate.defaultVersion = version

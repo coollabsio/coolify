@@ -41,7 +41,7 @@
 
 	async function handleSubmit(service: any) {
 		try {
-			await post(`/services/${id}/configuration/type`, { type: service.name });
+			await post(`/services/${id}/configuration/type`, { type: service.type });
 			return await goto(from || `/services/${id}`);
 		} catch (error) {
 			return errorNotification(error);
@@ -50,8 +50,8 @@
 	function doSearch() {
 		filteredServices = services.filter(
 			(service: any) =>
-			service.name.toLowerCase().includes(search.toLowerCase()) ||
-			service.labels?.some((label: string) => label.toLowerCase().includes(search.toLowerCase()))
+				service.name.toLowerCase().includes(search.toLowerCase()) ||
+				service.labels?.some((label: string) => label.toLowerCase().includes(search.toLowerCase()))
 		);
 	}
 	function cleanupSearch() {
@@ -62,6 +62,7 @@
 
 <div class="container lg:mx-auto lg:p-0 px-8 pt-5">
 	<div class="input-group flex w-full">
+		<!-- svelte-ignore a11y-click-events-have-key-events -->
 		<div class="btn btn-square cursor-default no-animation hover:bg-error" on:click={cleanupSearch}>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -91,15 +92,15 @@
 <div class="container lg:mx-auto lg:pt-20 lg:p-0 px-8 pt-20">
 	<div class="flex flex-wrap justify-center  gap-8">
 		{#each filteredServices as service}
-		{#key service.name}
-			<div class="p-2">
-				<form on:submit|preventDefault={() => handleSubmit(service)}>
-					<button type="submit" class="box-selection relative text-xl font-bold hover:bg-primary">
-						<ServiceIcons type={service.name} />
-						{service.name}
-					</button>
-				</form>
-			</div>
+			{#key service.name}
+				<div class="p-2">
+					<form on:submit|preventDefault={() => handleSubmit(service)}>
+						<button type="submit" class="box-selection relative text-xl font-bold hover:bg-primary">
+							<ServiceIcons type={service.type} />
+							{service.name}
+						</button>
+					</form>
+				</div>
 			{/key}
 		{/each}
 	</div>

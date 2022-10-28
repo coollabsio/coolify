@@ -7,19 +7,32 @@ const templates = await fs.readFile('../devTemplates.yaml', 'utf8');
 const devTemplates = yaml.load(templates);
 for (const template of devTemplates) {
     let image = template.services['$$id'].image.replaceAll(':$$core_version', '');
-    const name = template.name
     if (!image.includes('/')) {
         image = `library/${image}`;
     }
-    repositories.push({ image, name: name.toLowerCase().replaceAll(' ', '') });
+    repositories.push({ image, name: template.type });
 }
 const services = []
-
 const numberOfTags = 30;
 // const semverRegex = new RegExp(/^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/g)
-const semverRegex = new RegExp(/^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/g)
 for (const repository of repositories) {
     console.log('Querying', repository.name, 'at', repository.image);
+    let semverRegex = new RegExp(/^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/g)
+    if (repository.name.startsWith('wordpress')) {
+        semverRegex = new RegExp(/^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-php(0|[1-9]\d*)$/g)
+    }
+    if (repository.name.startsWith('minio')) {
+        semverRegex = new RegExp(/^RELEASE.*$/g)
+    }
+    if (repository.name.startsWith('fider')) {
+        semverRegex = new RegExp(/^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-([0-9]+)$/g)
+    }
+    if (repository.name.startsWith('searxng')) {
+        semverRegex = new RegExp(/^\d{4}[\.\-](0?[1-9]|[12][0-9]|3[01])[\.\-](0?[1-9]|1[012]).*$/)
+    }
+    if (repository.name.startsWith('umami')) {
+        semverRegex = new RegExp(/^postgresql-v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-([0-9]+)$/g)
+    }
     if (repository.image.includes('ghcr.io')) {
         const { execaCommand } = await import('execa');
         const { stdout } = await execaCommand(`docker run --rm quay.io/skopeo/stable list-tags docker://${repository.image}`);

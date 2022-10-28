@@ -42,7 +42,7 @@ export function getAPIUrl() {
 	if (process.env.CODESANDBOX_HOST) {
 		return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/, '3001')}`;
 	}
-	return isDev ? 'http://localhost:3001' : 'http://localhost:3000';
+	return isDev ? 'http://host.docker.internal:3001' : 'http://localhost:3000';
 }
 
 export function getUIUrl() {
@@ -1447,18 +1447,22 @@ export async function getServiceFromDB({
 			persistentStorage: true,
 			serviceSecret: true,
 			serviceSetting: true,
+			wordpress: true
 		}
 	});
 	if (!body) {
 		return null
 	}
-	body.type = fixType(body.type);
+	// body.type = fixType(body.type);
 
 	if (body?.serviceSecret.length > 0) {
 		body.serviceSecret = body.serviceSecret.map((s) => {
 			s.value = decrypt(s.value);
 			return s;
 		});
+	}
+	if (body.wordpress) {
+		body.wordpress.ftpPassword = decrypt(body.wordpress.ftpPassword);
 	}
 
 	return { ...body, settings };

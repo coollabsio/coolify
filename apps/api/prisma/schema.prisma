@@ -480,10 +480,10 @@ model Wordpress {
   ownMysql              Boolean  @default(false)
   mysqlHost             String?
   mysqlPort             Int?
-  mysqlUser             String
-  mysqlPassword         String
-  mysqlRootUser         String
-  mysqlRootUserPassword String
+  mysqlUser             String?
+  mysqlPassword         String?
+  mysqlRootUser         String?
+  mysqlRootUserPassword String?
   mysqlDatabase         String?
   mysqlPublicPort       Int?
   ftpEnabled            Boolean  @default(false)
