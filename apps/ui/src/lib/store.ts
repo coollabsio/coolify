@@ -172,7 +172,7 @@ export const state = writable<State>({
 export const connect = () => {
     const token = Cookies.get('token')
     if (token) {
-        let url = "ws://localhost:3000/realtime"
+        let url = `ws://${window.location.hostname}/realtime`
         if (dev) {
             url = "ws://localhost:3001/realtime"
         }
