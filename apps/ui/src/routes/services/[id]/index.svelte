@@ -78,13 +78,29 @@
 		if (loading.save) return;
 		loading.save = true;
 		try {
+			const formData = new FormData(e.target);
 			await post(`/services/${id}/check`, {
 				fqdn: service.fqdn,
 				forceSave,
 				dualCerts,
 				exposePort: service.exposePort
 			});
-			const formData = new FormData(e.target);
+			for (const setting of service.serviceSetting) {
+				if (setting.variableName.startsWith('$$coolify_fqdn') && setting.value) {
+					for (let field of formData) {
+						const [key, value] = field;
+						if (setting.name === key) {
+							if (setting.value !== value) {
+								await post(`/services/${id}/check`, {
+									fqdn: value,
+									otherFqdn: true
+								});
+							}
+						}
+					}
+				}
+			}
+
 			if (formData) service = await saveForm(formData, service);
 			setLocation(service);
 			forceSave = false;

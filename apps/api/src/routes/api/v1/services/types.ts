@@ -40,7 +40,7 @@ export interface CheckService extends OnlyId {
         forceSave: boolean,
         dualCerts: boolean,
         exposePort: number,
-        otherFqdns: Array<string>
+        otherFqdn: boolean
     }
 }
 export interface SaveService extends OnlyId {

@@ -436,23 +436,17 @@ export async function checkServiceDomain(request: FastifyRequest<CheckServiceDom
 export async function checkService(request: FastifyRequest<CheckService>) {
     try {
         const { id } = request.params;
-        let { fqdn, exposePort, forceSave, dualCerts } = request.body;
-        const otherFqdns = await prisma.serviceSetting.findMany({where: { variableName: {startsWith: '$$coolify_fqdn'}}})
-        let domainsList = []
+        let { fqdn, exposePort, forceSave, dualCerts, otherFqdn = false } = request.body;
+
+        const domainsList = await prisma.serviceSetting.findMany({ where: { variableName: { startsWith: '$$coolify_fqdn' } } })
+
         if (fqdn) fqdn = fqdn.toLowerCase();
-        if (otherFqdns && otherFqdns.length > 0) {
-            domainsList = otherFqdns.filter((f) => { 
-                if(f.serviceId !== id) {
-                return f
-                }
-            });
-        }
         if (exposePort) exposePort = Number(exposePort);
 
         const { destinationDocker: { remoteIpAddress, remoteEngine, engine }, exposePort: configuredPort } = await prisma.service.findUnique({ where: { id }, include: { destinationDocker: true } })
         const { isDNSCheckEnabled } = await prisma.setting.findFirst({});
 
-        let found = await isDomainConfigured({ id, fqdn, remoteIpAddress });
+        let found = await isDomainConfigured({ id, fqdn, remoteIpAddress, checkOwn: otherFqdn });
         if (found) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }

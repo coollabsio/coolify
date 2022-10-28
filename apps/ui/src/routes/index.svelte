@@ -541,6 +541,7 @@
 		</div>
 		<div class="form-control">
 			<div class="input-group flex w-full">
+				<!-- svelte-ignore a11y-click-events-have-key-events -->
 				<div
 					class="btn btn-square cursor-default no-animation hover:bg-error"
 					on:click={() => doSearch('')}
