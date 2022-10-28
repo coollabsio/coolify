@@ -1,6 +1,8 @@
 import { dev } from '$app/env';
 import cuid from 'cuid';
 import Cookies from 'js-cookie';
+import {getAPIUrl} from '$lib/api';
+import {getDomain} from '$lib/common'
 import { writable, readable, type Writable } from 'svelte/store';
 
 interface AppSession {
@@ -174,7 +176,8 @@ export const connect = () => {
     if (token) {
         let url = `wss://${window.location.hostname}/realtime`
         if (dev) {
-            url = "ws://localhost:3001/realtime"
+            const apiUrl = getDomain(getAPIUrl())
+            url = `ws://${apiUrl}/realtime`
         }
         const ws = new WebSocket(url);
         ws.addEventListener("message", (message: any) => {

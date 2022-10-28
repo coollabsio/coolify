@@ -47,7 +47,7 @@ export async function saveForm(formData: any, service: any) {
 	const baseCoolifySetting = ['name', 'fqdn', 'exposePort', 'version'];
 	for (let field of formData) {
 		const [key, value] = field;
-		if (secrets.includes(key)) {
+		if (secrets.includes(key) && value) {
 			await post(`/services/${service.id}/secrets`, {
 				name: key,
 				value,

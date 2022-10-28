@@ -128,7 +128,8 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                 }
                 if (value.environment?.length > 0) {
                     for (const env of value.environment) {
-                        const [envKey, envValue] = env.split('=')
+                        let [envKey, ...envValue] = env.split('=')
+                        envValue = envValue.join("=")
                         const variable = foundTemplate.variables.find(v => v.name === envKey) || foundTemplate.variables.find(v => v.id === envValue)
                         const id = variable.id.replaceAll('$$', '')
                         const label = variable?.label
@@ -495,14 +496,16 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
         const foundTemplate = templates.find(t => fixType(t.type) === fixType(service.type))
         for (const setting of serviceSetting) {
             let { id: settingId, name, value, changed = false, isNew = false, variableName } = setting
-            if (changed) {
-                await prisma.serviceSetting.update({ where: { id: settingId }, data: { value } })
-            }
-            if (isNew) {
-                if (!variableName) {
-                    variableName = foundTemplate.variables.find(v => v.name === name).id
+            if (value) {
+                if (changed) {
+                    await prisma.serviceSetting.update({ where: { id: settingId }, data: { value } })
                 }
-                await prisma.serviceSetting.create({ data: { name, value, variableName, service: { connect: { id } } } })
+                if (isNew) {
+                    if (!variableName) {
+                        variableName = foundTemplate.variables.find(v => v.name === name).id
+                    }
+                    await prisma.serviceSetting.create({ data: { name, value, variableName, service: { connect: { id } } } })
+                }
             }
         }
         await prisma.service.update({
@@ -547,7 +550,6 @@ export async function saveServiceSecret(request: FastifyRequest<SaveServiceSecre
     try {
         const { id } = request.params
         let { name, value, isNew } = request.body
-
         if (isNew) {
             const found = await prisma.serviceSecret.findFirst({ where: { name, serviceId: id } });
             if (found) {

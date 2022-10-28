@@ -2059,7 +2059,7 @@
       name: DATABASE_URL
       label: Database URL for PostgreSQL
       defaultValue: >-
-        postgresql://$$config_postgres_user:$$secret_postgres_password@$$id-postgresql:5432/$$config_postgres_db
+        postgresql://$$config_postgres_user:$$secret_postgres_password@$$id-postgresql:5432/$$config_postgres_db?sslmode=disable
       description: ''
     - id: $$secret_jwt_secret
       name: JWT_SECRET
@@ -2076,6 +2076,7 @@
       label: Mailgun API Key
       defaultValue: ''
       description: ''
+      showOnConfiguration: true
     - id: $$config_email_mailgun_region
       name: EMAIL_MAILGUN_REGION
       label: Mailgun Region
@@ -2106,6 +2107,7 @@
       label: SMTP Password
       defaultValue: ''
       description: ''
+      showOnConfiguration: true
     - id: $$config_email_smtp_enable_starttls
       name: EMAIL_SMTP_ENABLE_STARTTLS
       label: SMTP Enable StartTLS

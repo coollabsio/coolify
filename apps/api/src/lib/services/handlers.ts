@@ -47,7 +47,8 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
             if (arm) {
                 if (template.services[s]?.environmentArm?.length > 0) {
                     for (const environment of template.services[s].environmentArm) {
-                        const [env, value] = environment.split("=");
+                        let [env, ...value] = environment.split("=");
+                        value = value.join("=")
                         if (!value.startsWith('$$secret') && value !== '') {
                             newEnvironments.push(`${env}=${value}`)
                         }
@@ -56,7 +57,8 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
             } else {
                 if (template.services[s]?.environment?.length > 0) {
                     for (const environment of template.services[s].environment) {
-                        const [env, value] = environment.split("=");
+                        let [env, ...value] = environment.split("=");
+                        value = value.join("=")
                         if (!value.startsWith('$$secret') && value !== '') {
                             newEnvironments.push(`${env}=${value}`)
                         }
