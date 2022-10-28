@@ -1,5 +1,6 @@
 import { dev } from '$app/env';
 import cuid from 'cuid';
+import Cookies from 'js-cookie';
 import { writable, readable, type Writable } from 'svelte/store';
 
 interface AppSession {
@@ -82,6 +83,7 @@ export const status: Writable<any> = writable({
         statuses: [],
         overallStatus: 'stopped',
         loading: false,
+        startup: {},
         initialLoading: true
     },
     database: {
@@ -160,3 +162,56 @@ export const addToast = (toast: AddToast) => {
 }
 
 export const selectedBuildId: any = writable(null)
+
+type State = {
+    requests: Array<Request>;
+};
+export const state = writable<State>({
+    requests: [],
+});
+export const connect = () => {
+    const token = Cookies.get('token')
+    if (token) {
+        let url = "ws://localhost:3000/realtime"
+        if (dev) {
+            url = "ws://localhost:3001/realtime"
+        }
+        const ws = new WebSocket(url);
+        ws.addEventListener("message", (message: any) => {
+            appSession.subscribe((session: any) => {
+                const data: Request = { ...JSON.parse(message.data), timestamp: message.timeStamp };
+                if (data.teamId === session.teamId) {
+                    if (data.type === 'service') {
+                        const ending = data.message === "ending"
+                        status.update((status: any) => ({
+                            ...status,
+                            service: {
+                                ...status.service,
+                                startup: {
+                                    ...status.service.startup,
+                                    ...(ending ? { [data.id]: undefined } : { [data.id]: data.message })
+                                }
+                            }
+                        }))
+
+                    }
+                }
+            })
+
+        });
+        ws.addEventListener('open', (event) => {
+            ws.send(JSON.stringify({ type: 'subscribe', message: 'ping' }))
+        });
+        ws.addEventListener('error', (event) => {
+            console.log('error with ws');
+            console.log(event)
+        });
+        ws.addEventListener('close', (event) => {
+            if (!ws || ws.readyState == 3) {
+                setTimeout(() => {
+                    connect()
+                }, 1000)
+            }
+        });
+    }
+};

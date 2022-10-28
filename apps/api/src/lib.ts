@@ -293,28 +293,47 @@ async function ghost(service: any, template: any) {
 async function wordpress(service: any, template: any) {
     const { extraConfig, tablePrefix, ownMysql, mysqlHost, mysqlPort, mysqlUser, mysqlPassword, mysqlRootUser, mysqlRootUserPassword, mysqlDatabase, ftpEnabled, ftpUser, ftpPassword, ftpPublicPort, ftpHostKey, ftpHostKeyPrivate } = service.wordpress
 
-    const secrets = [
-        `MYSQL_ROOT_PASSWORD@@@${mysqlRootUserPassword}`,
-        `MYSQL_PASSWORD@@@${mysqlPassword}`,
-        ftpPassword && `COOLIFY_FTP_PASSWORD@@@${ftpPassword}`,
-        ftpHostKeyPrivate && `COOLIFY_FTP_HOST_KEY_PRIVATE@@@${ftpHostKeyPrivate}`,
-        ftpHostKey && `COOLIFY_FTP_HOST_KEY@@@${ftpHostKey}`,
-    ]
-    const settings = [
-        `MYSQL_ROOT_USER@@@${mysqlRootUser}`,
-        `MYSQL_USER@@@${mysqlUser}`,
-        `MYSQL_DATABASE@@@${mysqlDatabase}`,
-        `MYSQL_HOST@@@${ownMysql ? mysqlHost : `${service.id}-mysql`}`,
-        `MYSQL_PORT@@@${mysqlPort}`,
-        `WORDPRESS_CONFIG_EXTRA@@@${extraConfig}`,
-        `WORDPRESS_TABLE_PREFIX@@@${tablePrefix}`,
-        `WORDPRESS_DB_HOST@@@${ownMysql ? mysqlHost : `${service.id}-mysql`}`,
-        `COOLIFY_OWN_DB@@@${ownMysql}`,
-        `COOLIFY_FTP_ENABLED@@@${ftpEnabled}`,
-        `COOLIFY_FTP_USER@@@${ftpUser}`,
-        `COOLIFY_FTP_PUBLIC_PORT@@@${ftpPublicPort}`,
 
-    ]
+    let settings = []
+    let secrets = []
+    if (ownMysql) {
+        secrets = [
+            `WORDPRESS_DB_PASSWORD@@@${mysqlPassword}`,
+            ftpPassword && `COOLIFY_FTP_PASSWORD@@@${ftpPassword}`,
+            ftpHostKeyPrivate && `COOLIFY_FTP_HOST_KEY_PRIVATE@@@${ftpHostKeyPrivate}`,
+            ftpHostKey && `COOLIFY_FTP_HOST_KEY@@@${ftpHostKey}`,
+        ]
+        settings = [
+            `WORDPRESS_CONFIG_EXTRA@@@${extraConfig}`,
+            `WORDPRESS_DB_HOST@@@${mysqlHost}`,
+            `WORDPRESS_DB_PORT@@@${mysqlPort}`,
+            `WORDPRESS_DB_USER@@@${mysqlUser}`,
+            `WORDPRESS_DB_NAME@@@${mysqlDatabase}`,
+        ]
+    } else {
+        secrets = [
+            `MYSQL_ROOT_PASSWORD@@@${mysqlRootUserPassword}`,
+            `MYSQL_PASSWORD@@@${mysqlPassword}`,
+            ftpPassword && `COOLIFY_FTP_PASSWORD@@@${ftpPassword}`,
+            ftpHostKeyPrivate && `COOLIFY_FTP_HOST_KEY_PRIVATE@@@${ftpHostKeyPrivate}`,
+            ftpHostKey && `COOLIFY_FTP_HOST_KEY@@@${ftpHostKey}`,
+        ]
+        settings = [
+            `MYSQL_ROOT_USER@@@${mysqlRootUser}`,
+            `MYSQL_USER@@@${mysqlUser}`,
+            `MYSQL_DATABASE@@@${mysqlDatabase}`,
+            `MYSQL_HOST@@@${service.id}-mysql`,
+            `MYSQL_PORT@@@${mysqlPort}`,
+            `WORDPRESS_CONFIG_EXTRA@@@${extraConfig}`,
+            `WORDPRESS_TABLE_PREFIX@@@${tablePrefix}`,
+            `WORDPRESS_DB_HOST@@@${service.id}-mysql`,
+            `COOLIFY_OWN_DB@@@${ownMysql}`,
+            `COOLIFY_FTP_ENABLED@@@${ftpEnabled}`,
+            `COOLIFY_FTP_USER@@@${ftpUser}`,
+            `COOLIFY_FTP_PUBLIC_PORT@@@${ftpPublicPort}`,
+        ]
+    }
+
     await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
     if (ownMysql) {

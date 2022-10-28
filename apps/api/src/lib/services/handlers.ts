@@ -29,7 +29,7 @@ export async function stopService(request: FastifyRequest<ServiceStartStop>) {
         return errorHandler({ status, message })
     }
 }
-export async function startService(request: FastifyRequest<ServiceStartStop>) {
+export async function startService(request: FastifyRequest<ServiceStartStop>, fastify: any) {
     try {
         const { id } = request.params;
         const teamId = request.user.teamId;
@@ -42,12 +42,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         const template: any = await parseAndFindServiceTemplates(service, workdir, true)
         const network = destinationDockerId && destinationDocker.network;
         const config = {};
-        const isWordpress = type === 'wordpress';
         for (const s in template.services) {
-            if (isWordpress && service.wordpress.ownMysql && s.name === 'MySQL') {
-                console.log('skipping predefined mysql')
-                continue;
-            }
             let newEnvironments = []
             if (arm) {
                 if (template.services[s]?.environmentArm?.length > 0) {
@@ -90,23 +85,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                     }
                 }
             }
-            if (isWordpress) {
-                const { wordpress: { mysqlHost, mysqlPort, mysqlUser, mysqlPassword, mysqlDatabase, ownMysql } } = service
-                console.log({ mysqlHost, mysqlPort, mysqlUser, mysqlPassword, mysqlDatabase, ownMysql })
-                if (ownMysql) {
-                    let envsToRemove = ['WORDPRESS_DB_HOST', 'WORDPRESS_DB_USER', 'WORDPRESS_DB_PASSWORD', 'WORDPRESS_DB_NAME']
-                    for (const env of newEnvironments) {
-                        if (envsToRemove.includes(env.split('=')[0])) {
-                            console.log('removing', env)
-                            newEnvironments = newEnvironments.filter(e => e !== env)
-                        }
-                    }
-                    newEnvironments.push(`WORDPRESS_DB_HOST=${mysqlHost}:${mysqlPort}`)
-                    newEnvironments.push(`WORDPRESS_DB_USER=${mysqlUser}`)
-                    newEnvironments.push(`WORDPRESS_DB_PASSWORD=${mysqlPassword}`)
-                    newEnvironments.push(`WORDPRESS_DB_NAME=${mysqlDatabase}`)
-                }
-            }
+
             config[s] = {
                 container_name: s,
                 build: template.services[s].build || undefined,
@@ -141,7 +120,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
                     Dockerfile += `
                         COPY ./${path.basename(source)} ${destination}`
                 }
-                await fs.writeFile(`${workdir}/Dockerfile.${servsice}`, Dockerfile);
+                await fs.writeFile(`${workdir}/Dockerfile.${service}`, Dockerfile);
             }
         }
         const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
@@ -157,21 +136,26 @@ export async function startService(request: FastifyRequest<ServiceStartStop>) {
         }
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        await startServiceContainers(destinationDocker.id, composeFileDestination)
+        await startServiceContainers(fastify, id, teamId, destinationDocker.id, composeFileDestination)
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
-async function startServiceContainers(dockerId, composeFileDestination) {
+async function startServiceContainers(fastify, id, teamId, dockerId, composeFileDestination) {
     try {
+        fastify.wssend({ teamId, type: 'service', id, message: 'Pulling images...' })
         await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} pull` })
     } catch (error) { }
+    fastify.wssend({ teamId, type: 'service', id, message: 'Building...' })
     await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} build --no-cache` })
+    fastify.wssend({ teamId, type: 'service', id, message: 'Creating containers...' })
     await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} create` })
+    fastify.wssend({ teamId, type: 'service', id, message: 'Starting containers...' })
     await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} start` })
     await asyncSleep(1000);
     await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} up -d` })
+    fastify.wssend({ teamId, type: 'service', id, message: 'ending' })
 }
 export async function migrateAppwriteDB(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
     try {

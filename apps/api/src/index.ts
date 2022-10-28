@@ -6,6 +6,8 @@ import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
+import websocket from '@fastify/websocket';
+
 import { asyncExecShell, cleanupDockerStorage, createRemoteEngineConfiguration, decrypt, encrypt, executeDockerCmd, executeSSHCmd, generateDatabaseConfiguration, getDomain, isDev, listSettings, prisma, startTraefikProxy, startTraefikTCPProxy, version } from './lib/common';
 import { scheduler } from './lib/scheduler';
 import { compareVersions } from 'compare-versions';
@@ -16,6 +18,8 @@ import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handler
 import { checkContainer } from './lib/docker';
 import { migrateServicesToNewTemplate } from './lib';
 import { refreshTags, refreshTemplates } from './routes/api/v1/handlers';
+import { realtime } from './routes/realtime';
+import cuid from 'cuid';
 declare module 'fastify' {
 	interface FastifyInstance {
 		config: {
@@ -105,6 +109,23 @@ const host = '0.0.0.0';
 	});
 	fastify.register(cookie)
 	fastify.register(cors);
+	fastify.register(websocket, {
+		options: {
+			clientTracking: true,
+			verifyClient: async (info, next) => {
+				try {
+					const token = info.req.headers?.cookie.split('; ').find((cookie) => cookie.startsWith('token')).split('=')[1];
+					if (!token) {
+						return next(false)
+					}
+					fastify.jwt.verify(token)
+				} catch (error) {
+					return next(false)
+				}
+				next(true)
+			}
+		}
+	})
 	// To detect allowed origins
 	// fastify.addHook('onRequest', async (request, reply) => {
 	// 	let allowedList = ['coolify:3000'];
@@ -127,6 +148,19 @@ const host = '0.0.0.0';
 
 
 	try {
+		fastify.decorate('wssend', function (data: any) {
+			fastify.websocketServer.clients.forEach((client) => {
+				client.send(JSON.stringify(data));
+			})
+		})
+		fastify.register(async function (fastify) {
+			fastify.get('/realtime', { websocket: true }, (connection) => {
+				// connection.socket.on('message', message => {
+				// 	realtime(fastify, connection, message)
+				// })
+			})
+		})
+
 		await fastify.listen({ port, host })
 		console.log(`Coolify's API is listening on ${host}:${port}`);
 

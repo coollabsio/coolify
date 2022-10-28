@@ -399,10 +399,10 @@
 				/>
 			</div>
 		</div>
-		<div>
+		<div class="pt-6">
 			{#each Object.keys(template) as oneService}
 				<div
-					class="flex flex-row my-2 space-x-2"
+					class="flex flex-row my-2 space-x-2 mb-6"
 					class:my-6={template[oneService].environment.length > 0 &&
 						template[oneService].environment.find((env) => env.main === oneService)}
 					class:border-b={template[oneService].environment.length > 0 &&
@@ -420,7 +420,7 @@
 					{#if template[oneService].environment.length > 0}
 						{#each template[oneService].environment as variable}
 							{#if variable.main === oneService}
-								<div class="grid grid-cols-2 items-center gap-2">
+								<div class="grid grid-cols-2 items-center gap-2" >
 									<label class="h-10" for={variable.name}
 										>{variable.label || variable.name}
 										{#if variable.description}

@@ -127,7 +127,7 @@
 					await post(`/services/${id}/wordpress/ftp`, {
 						ftpEnabled: false
 					});
-					window.location.reload()
+					service.wordpress?.ftpEnabled && window.location.reload()
 				}
 			} catch (error) {
 				return errorNotification(error);
@@ -287,7 +287,7 @@
 					<line x1="7.16" y1="18.37" x2="7.16" y2="18.38" />
 					<line x1="11" y1="19.94" x2="11" y2="19.95" />
 				</svg>
-				Loading...
+				{$status.service.startup[id] || 'Loading...'}
 			</button>
 		{:else if $status.service.overallStatus === 'healthy'}
 			<button

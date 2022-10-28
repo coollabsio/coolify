@@ -1795,25 +1795,25 @@
   variables:
     - id: $$config_wordpress_db_host
       name: WORDPRESS_DB_HOST
-      label: WordPress DB Host
+      label: Database Host
       defaultValue: $$id-mysql
       description: ''
       readonly: true
     - id: $$config_wordpress_db_user
       name: WORDPRESS_DB_USER
-      label: WordPress DB User
+      label: Database User
       defaultValue: $$config_mysql_user
       description: ''
       readonly: true
     - id: $$secret_wordpress_db_password
       name: WORDPRESS_DB_PASSWORD
-      label: WordPress DB Password
+      label: Database Password
       defaultValue: $$secret_mysql_password
       description: ''
       readonly: true
     - id: $$config_wordpress_db_name
       name: WORDPRESS_DB_NAME
-      label: WordPress DB Name
+      label: Database Name
       defaultValue: $$config_mysql_database
       description: ''
       readonly: true

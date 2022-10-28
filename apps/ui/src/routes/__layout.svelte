@@ -81,6 +81,7 @@
 	export let permission: string;
 	export let isAdmin: boolean;
 
+	import{ status, connect } from '$lib/store';
 	import '../tailwind.css';
 	import Cookies from 'js-cookie';
 	import { fade } from 'svelte/transition';
@@ -93,6 +94,7 @@
 	import { appSession } from '$lib/store';
 	import Toasts from '$lib/components/Toasts.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import { onMount } from 'svelte';
 
 	if (userId) $appSession.userId = userId;
 	if (teamId) $appSession.teamId = teamId;
@@ -107,6 +109,9 @@
 			return errorNotification(error);
 		}
 	}
+	onMount(async () => {
+		connect();
+	});
 </script>
 
 <svelte:head>
