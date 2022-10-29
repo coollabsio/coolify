@@ -2334,7 +2334,6 @@ async function startWeblateService(request: FastifyRequest<ServiceStartStop>) {
                     container_name: `${id}-postgresql`,
                     image: config.postgresql.image,
                     environment: config.postgresql.environmentVariables,
-                    ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     volumes: config.postgresql.volumes,
                     labels: makeLabelForServices('weblate'),
                     ...defaultComposeConfiguration(network),
@@ -2342,7 +2341,6 @@ async function startWeblateService(request: FastifyRequest<ServiceStartStop>) {
                 [`${id}-redis`]: {
                     container_name: `${id}-redis`,
                     image: config.redis.image,
-                    ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                     volumes: config.redis.volumes,
                     labels: makeLabelForServices('weblate'),
                     ...defaultComposeConfiguration(network),
