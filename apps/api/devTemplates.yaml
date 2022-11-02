@@ -1325,6 +1325,17 @@
       environment: []
       ports: []
   variables:
+    - id: $$config_django_superuser_username
+      name: DJANGO_SUPERUSER_USERNAME
+      label: Django Superuser Username
+      defaultValue: $$generate_username
+      description: ''
+    - id: $$secret_django_superuser_password
+      name: DJANGO_SUPERUSER_PASSWORD
+      label: Django Superuser Password
+      defaultValue: $$generate_password
+      description: ''
+      showOnConfiguration: true
     - id: $$config_port
       name: PORT
       label: GlitchTip Port
@@ -1424,16 +1435,6 @@
       name: DJANGO_SUPERUSER_EMAIL
       label: Django Superuser Email
       defaultValue: noreply@example.com
-      description: ''
-    - id: $$config_django_superuser_username
-      name: DJANGO_SUPERUSER_USERNAME
-      label: Django Superuser Username
-      defaultValue: $$generate_username
-      description: ''
-    - id: $$secret_django_superuser_password
-      name: DJANGO_SUPERUSER_PASSWORD
-      label: Django Superuser Password
-      defaultValue: $$generate_password
       description: ''
     - id: $$config_postgres_user
       main: $$id-postgresql
