@@ -262,7 +262,9 @@
 							? 'Migrating... it may take a while...'
 							: "Migrate Appwrite's Database"}</button
 					>
-					<DocLink url="https://appwrite.io/docs/upgrade#run-the-migration" />
+					<div>
+						<DocLink url="https://appwrite.io/docs/upgrade#run-the-migration" />
+					</div>
 				{/if}
 			</div>
 		</div>

@@ -556,26 +556,6 @@
       volumes: []
       entrypoint: worker-webhooks
   variables:
-  - id: "$$secret__app_db_root_pass"
-    name: MARIADB_ROOT_PASSWORD
-    label: MariaDB | _APP_DB_ROOT_PASS
-    defaultValue: $$generate_hex(16)
-    description: MariaDB server root password.
-  - id: "$$config__app_db_schema"
-    name: MARIADB_DATABASE
-    label: MariaDB | _APP_DB_SCHEMA
-    defaultValue: appwrite
-    description: MariaDB server database schema.
-  - id: "$$config__app_db_user"
-    name: MARIADB_USER
-    label: MariaDB | _APP_DB_USER
-    defaultValue: user
-    description: MariaDB server user name.
-  - id: "$$secret__app_db_pass"
-    name: MARIADB_PASSWORD
-    label: MariaDB | _APP_DB_PASS
-    defaultValue: $$generate_hex(16)
-    description: MariaDB server user password.
   - id: "$$config__app_influxdb_host"
     name: _APP_INFLUXDB_HOST
     label: InfluxDB | _APP_INFLUXDB_HOST

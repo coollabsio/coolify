@@ -177,14 +177,14 @@ async function searxng(service: any, template: any) {
 async function glitchtip(service: any, template: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, secretKeyBase, defaultEmail, defaultUsername, defaultPassword, defaultEmailFrom, emailSmtpHost, emailSmtpPort, emailSmtpUser, emailSmtpPassword, emailSmtpUseTls, emailSmtpUseSsl, emailBackend, mailgunApiKey, sendgridApiKey, enableOpenUserRegistration } = service.glitchTip
     const { id } = service
-
+    
     const secrets = [
         `POSTGRES_PASSWORD@@@${postgresqlPassword}`,
         `SECRET_KEY@@@${secretKeyBase}`,
         `MAILGUN_API_KEY@@@${mailgunApiKey}`,
         `SENDGRID_API_KEY@@@${sendgridApiKey}`,
         `DJANGO_SUPERUSER_PASSWORD@@@${defaultPassword}`,
-        `EMAIL_URL@@@${encrypt(`smtp://${emailSmtpUser}:${decrypt(emailSmtpPassword)}@${emailSmtpHost}:${emailSmtpPort}`)}`,
+        emailSmtpUser && emailSmtpPassword && emailSmtpHost && emailSmtpPort && `EMAIL_URL@@@${encrypt(`smtp://${emailSmtpUser}:${decrypt(emailSmtpPassword)}@${emailSmtpHost}:${emailSmtpPort}`)} || ''`,
         `DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@${id}-postgresql:5432/${postgresqlDatabase}`)}`,
         `REDIS_URL@@@${encrypt(`redis://${id}-redis:6379`)}`
     ]
