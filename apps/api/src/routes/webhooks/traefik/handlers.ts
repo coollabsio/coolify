@@ -523,9 +523,7 @@ export async function traefikConfiguration(request, reply) {
 				}
 			}
 		}
-		return {
-			...traefik
-		}
+		
 		const { fqdn, dualCerts } = await prisma.setting.findFirst();
 		if (fqdn) {
 			const domain = getDomain(fqdn);
@@ -546,30 +544,30 @@ export async function traefikConfiguration(request, reply) {
 		for (const application of data.applications) {
 			configureMiddleware(application, traefik);
 		}
-		for (const service of data.services) {
-			const { id, scriptName } = service;
+		// for (const service of data.services) {
+		// 	const { id, scriptName } = service;
 
-			configureMiddleware(service, traefik);
-			if (service.type === 'minio') {
-				service.id = id + '-minio';
-				service.container = id;
-				service.domain = service.otherDomain;
-				service.nakedDomain = service.otherNakedDomain;
-				service.isHttps = service.otherIsHttps;
-				service.isWWW = service.otherIsWWW;
-				service.port = 9000;
-				configureMiddleware(service, traefik);
-			}
+		// 	configureMiddleware(service, traefik);
+		// 	if (service.type === 'minio') {
+		// 		service.id = id + '-minio';
+		// 		service.container = id;
+		// 		service.domain = service.otherDomain;
+		// 		service.nakedDomain = service.otherNakedDomain;
+		// 		service.isHttps = service.otherIsHttps;
+		// 		service.isWWW = service.otherIsWWW;
+		// 		service.port = 9000;
+		// 		configureMiddleware(service, traefik);
+		// 	}
 
-			if (scriptName) {
-				traefik.http.middlewares[`${id}-redir`] = {
-					replacepathregex: {
-						regex: `/js/${scriptName}`,
-						replacement: '/js/plausible.js'
-					}
-				};
-			}
-		}
+		// 	if (scriptName) {
+		// 		traefik.http.middlewares[`${id}-redir`] = {
+		// 			replacepathregex: {
+		// 				regex: `/js/${scriptName}`,
+		// 				replacement: '/js/plausible.js'
+		// 			}
+		// 		};
+		// 	}
+		// }
 		for (const coolify of data.coolify) {
 			configureMiddleware(coolify, traefik);
 		}

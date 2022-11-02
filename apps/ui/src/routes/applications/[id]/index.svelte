@@ -644,7 +644,7 @@
 			</div>
 			{#if application.buildPack !== 'compose'}
 				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
-					Build & Deploy
+					Configuration
 				</div>
 				<div class="grid grid-flow-row gap-2 px-4 pr-5">
 					{#if application.buildCommand || application.buildPack === 'rust' || application.buildPack === 'laravel'}

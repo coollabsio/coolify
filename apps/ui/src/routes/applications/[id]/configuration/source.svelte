@@ -68,7 +68,9 @@
 </script>
 
 <div class="max-w-screen-2xl mx-auto px-9">
-	<div class="title pb-8">Git App</div>
+	{#if !filteredSources}
+		<div class="title pb-8">Git App</div>
+	{/if}
 	<div class="flex flex-wrap justify-center">
 		{#if !filteredSources}
 			<div class="flex-col">

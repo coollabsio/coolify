@@ -415,15 +415,14 @@
 				</button>
 			{/if}
 			<button
-				class="btn btn-sm btn-ghost gap-2"
-				class:btn-primary={$status.application.overallStatus !== 'degraded'}
+				class="btn btn-sm gap-2"
 				disabled={!$isDeploymentEnabled}
 				on:click={() => handleDeploySubmit(false)}
 			>
 				{#if $status.application.overallStatus !== 'degraded'}
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6"
+						class="w-6 h-6 text-pink-500"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
