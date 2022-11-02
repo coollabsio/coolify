@@ -80,11 +80,28 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
             });
             const containersArray = containers.trim().split('\n');
             if (containersArray.length > 0 && containersArray[0] !== '') {
+                const templates = await getTemplates();
+                let template = templates.find(t => t.type === service.type);
+                template = JSON.parse(JSON.stringify(template).replaceAll('$$id', service.id));
                 for (const container of containersArray) {
                     let isRunning = false;
                     let isExited = false;
                     let isRestarting = false;
+                    let isExcluded = false;
                     const containerObj = JSON.parse(container);
+                    const exclude = template.services[containerObj.Names]?.exclude;
+                    if (exclude) {
+                        payload[containerObj.Names] = {
+                            status: {
+                                isExcluded: true,
+                                isRunning: false,
+                                isExited: false,
+                                isRestarting: false,
+                            }
+                        }
+                        continue;
+                    }
+
                     const status = containerObj.State
                     if (status === 'running') {
                         isRunning = true;
@@ -97,11 +114,11 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
                     }
                     payload[containerObj.Names] = {
                         status: {
+                            isExcluded,
                             isRunning,
                             isExited,
                             isRestarting
                         }
-
                     }
                 }
             }
@@ -119,8 +136,20 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
         if (!isDeploy) {
             for (const [key, value] of Object.entries(foundTemplate.services)) {
                 const realKey = key.replace('$$id', service.id)
+                let name = value.name
+                if (!name) {
+                    if (Object.keys(foundTemplate.services).length === 1) {
+                        name = foundTemplate.name || service.name.toLowerCase()
+                    } else {
+                        if (key === '$$id') {
+                            name = foundTemplate.name || key.replaceAll('$$id-', '') || service.name.toLowerCase()
+                        } else {
+                            name = key.replaceAll('$$id-', '') || service.name.toLowerCase()
+                        }
+                    }
+                }
                 parsedTemplate[realKey] = {
-                    name: value.name,
+                    name,
                     image: value.image,
                     environment: [],
                     fqdns: [],
@@ -131,23 +160,26 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                         let [envKey, ...envValue] = env.split('=')
                         envValue = envValue.join("=")
                         const variable = foundTemplate.variables.find(v => v.name === envKey) || foundTemplate.variables.find(v => v.id === envValue)
-                        const id = variable.id.replaceAll('$$', '')
-                        const label = variable?.label
-                        const description = variable?.description
-                        const defaultValue = variable?.defaultValue
-                        const main = variable?.main || '$$id'
-                        const type = variable?.type || 'input'
-                        const placeholder = variable?.placeholder || ''
-                        const readonly = variable?.readonly || false
-                        const required = variable?.required || false
-                        if (envValue.startsWith('$$config') || variable?.showOnConfiguration) {
-                            if (envValue.startsWith('$$config_coolify')) {
-                                continue
+                        if (variable) {
+                            const id = variable.id.replaceAll('$$', '')
+                            const label = variable?.label
+                            const description = variable?.description
+                            const defaultValue = variable?.defaultValue
+                            const main = variable?.main || '$$id'
+                            const type = variable?.type || 'input'
+                            const placeholder = variable?.placeholder || ''
+                            const readonly = variable?.readonly || false
+                            const required = variable?.required || false
+                            if (envValue.startsWith('$$config') || variable?.showOnConfiguration) {
+                                if (envValue.startsWith('$$config_coolify')) {
+                                    continue
+                                }
+                                parsedTemplate[realKey].environment.push(
+                                    { id, name: envKey, value: envValue, main, label, description, defaultValue, type, placeholder, required, readonly }
+                                )
                             }
-                            parsedTemplate[realKey].environment.push(
-                                { id, name: envKey, value: envValue, main, label, description, defaultValue, type, placeholder, required, readonly }
-                            )
                         }
+
                     }
                 }
                 if (value?.proxy && value.proxy.length > 0) {
@@ -170,6 +202,7 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
         } else {
             parsedTemplate = foundTemplate
         }
+
         let strParsedTemplate = JSON.stringify(parsedTemplate)
 
         // replace $$id and $$workdir
@@ -185,17 +218,18 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
         if (service.serviceSetting.length > 0) {
             for (const setting of service.serviceSetting) {
                 const { value, variableName } = setting
+                const regex = new RegExp(`\\$\\$config_${variableName.replace('$$config_','')}\\"`, 'gi')
                 if (variableName.startsWith('$$config_coolify')) {
                     continue;
                 }
                 if (value === '$$generate_fqdn') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(variableName, service.fqdn || '')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn || '' + "\"")
                 } else if (value === '$$generate_domain') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(variableName, getDomain(service.fqdn))
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, getDomain(service.fqdn) + "\"")
                 } else if (service.destinationDocker?.network && value === '$$generate_network') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(variableName, service.destinationDocker.network)
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.destinationDocker.network + "\"")
                 } else {
-                    strParsedTemplate = strParsedTemplate.replaceAll(variableName, value)
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value + "\"")
                 }
             }
         }
@@ -207,8 +241,8 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                 const regexHashed = new RegExp(`\\$\\$hashed\\$\\$secret_${name}\\"`, 'gi')
                 const regex = new RegExp(`\\$\\$secret_${name}\\"`, 'gi')
                 if (value) {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, bcrypt.hashSync(value, 10) + "\"")
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value + "\"")
+                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, bcrypt.hashSync(value.replaceAll("\"", "\\\""), 10) + "\"")
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value.replaceAll("\"", "\\\"") + "\"")
                 } else {
                     strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, "\"")
                     strParsedTemplate = strParsedTemplate.replaceAll(regex, "\"")
@@ -229,10 +263,11 @@ export async function getService(request: FastifyRequest<OnlyId>) {
             throw { status: 404, message: 'Service not found.' }
         }
         let template = {}
+        let tags = []
         if (service.type) {
             template = await parseAndFindServiceTemplates(service)
+            tags = await getTags(service.type)
         }
-        const tags = await getTags(service.type)
         return {
             settings: await listSettings(),
             service,
@@ -240,7 +275,6 @@ export async function getService(request: FastifyRequest<OnlyId>) {
             tags
         }
     } catch ({ status, message }) {
-        console.log(status, message)
         return errorHandler({ status, message })
     }
 }
@@ -291,7 +325,7 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                     }
 
                 }
-                if (variable.id.startsWith('$$config_')) {
+                if (variable.id.startsWith('$$config_') || variable.id.startsWith('$$coolify_fqdn_')) {
                     const found = await prisma.serviceSetting.findFirst({ where: { name: variable.name, serviceId: id } })
                     if (!found) {
                         await prisma.serviceSetting.create({
@@ -513,7 +547,6 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
         });
         return reply.code(201).send()
     } catch ({ status, message }) {
-        console.log({ status, message })
         return errorHandler({ status, message })
     }
 }

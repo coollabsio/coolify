@@ -34,7 +34,7 @@
 		if (sure) {
 			$status.service.initialLoading = true;
 			try {
-				if (service.type && $status.service.isRunning) {
+				if (service.type && $status.service.overallStatus !== 'stopped') {
 					await post(`/services/${service.id}/stop`, {});
 				}
 				await del(`/services/${service.id}`, { id: service.id });
@@ -61,6 +61,6 @@
 		class:hover:bg-red-500={$appSession.isAdmin}
 		class="btn btn-lg btn-error text-sm"
 	>
-		Delete Application
+		Delete Service
 	</button>
 </div>

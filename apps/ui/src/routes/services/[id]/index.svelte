@@ -420,7 +420,7 @@
 					{#if template[oneService].environment.length > 0}
 						{#each template[oneService].environment as variable}
 							{#if variable.main === oneService}
-								<div class="grid grid-cols-2 items-center gap-2" >
+								<div class="grid grid-cols-2 items-center gap-2">
 									<label class="h-10" for={variable.name}
 										>{variable.label || variable.name}
 										{#if variable.description}

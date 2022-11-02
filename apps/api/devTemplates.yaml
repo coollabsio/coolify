@@ -1,4 +1,60 @@
 - templateVersion: 1.0.0
+  defaultVersion: 0.56.2
+  type: trilium
+  name: Trilium Notes
+  services:
+    $$id:
+      image: zadam/trilium:$$core_version
+      environment: []
+      volumes:
+        - $$id-trilium:/home/node/trilium-data
+      ports:
+        - '8080'
+  variables: []
+  documentation: https://hub.docker.com/r/zadam/trilium
+- templateVersion: 1.0.0
+  defaultVersion: 1.9.2
+  type: uptimekuma
+  name: UptimeKuma
+  services:
+    $$id:
+      image: louislam/uptime-kuma:$$core_version
+      environment: []
+      volumes:
+        - $$id-uptimekuma:/app/data
+      ports:
+        - '3001'
+  variables: []
+  documentation: https://hub.docker.com/r/louislam/uptime-kuma
+- templateVersion: 1.0.0
+  defaultVersion: 5.8
+  type: languagetool
+  name: LanguageTool
+  services:
+    $$id:
+      image: silviof/docker-languagetool:$$core_version
+      environment: []
+      volumes:
+        - $$id-ngrams:/ngrams
+      ports:
+        - '8010'
+  variables: []
+  documentation: https://hub.docker.com/r/silviof/docker-languagetool
+- templateVersion: 1.0.0
+  defaultVersion: 1.26.0
+  type: vaultwarden
+  name: VaultWarden
+  services:
+    $$id:
+      image: vaultwarden/server:$$core_version
+      environment: []
+      volumes:
+        - $$id-data:/data
+      ports:
+        - '80'
+  variables: []
+  documentation: https://hub.docker.com/r/vaultwarden/server
+- templateVersion: 1.0.0
   defaultVersion: 9.2.3
   type: grafana
   name: Grafana
@@ -39,8 +95,8 @@
       - _APP_OPTIONS_ABUSE=$$config__app_options_abuse
       - _APP_OPTIONS_FORCE_HTTPS=$$config__app_options_force_https
       - _APP_OPENSSL_KEY_V1=$$secret__app_openssl_key_v1
-      - _APP_DOMAIN=$$generate_fqdn
-      - _APP_DOMAIN_TARGET=$$generate_fqdn
+      - _APP_DOMAIN=$$config__app_domain
+      - _APP_DOMAIN_TARGET=$$config__app_domain_target
       - _APP_REDIS_HOST=$$config__app_redis_host
       - _APP_REDIS_PORT=$$config__app_redis_port
       - _APP_REDIS_USER=$$config__app_redis_user
@@ -170,8 +226,8 @@
       environment:
       - _APP_ENV=$$config__app_env
       - _APP_OPENSSL_KEY_V1=$$secret__app_openssl_key_v1
-      - _APP_DOMAIN=$$generate_fqdn
-      - _APP_DOMAIN_TARGET=$$generate_fqdn
+      - _APP_DOMAIN=$$config__app_domain
+      - _APP_DOMAIN_TARGET=$$config__app_domain_target
       - _APP_REDIS_HOST=$$config__app_redis_host
       - _APP_REDIS_PORT=$$config__app_redis_port
       - _APP_REDIS_USER=$$config__app_redis_user
@@ -272,7 +328,7 @@
       - OPEN_RUNTIMES_NETWORK=$$config_open_runtimes_network
       volumes: []
       entrypoint: usage --type database
-    "$$id-usage-timeseries":
+    "$$id-usage":
       image: appwrite/appwrite:$$core_version
       environment:
       - _APP_ENV=$$config__app_env
@@ -340,8 +396,8 @@
       environment:
       - _APP_ENV=$$config__app_env
       - _APP_OPENSSL_KEY_V1=$$secret__app_openssl_key_v1
-      - _APP_DOMAIN=$$generate_fqdn
-      - _APP_DOMAIN_TARGET=$$generate_fqdn
+      - _APP_DOMAIN=$$config__app_domain
+      - _APP_DOMAIN_TARGET=$$config__app_domain_target
       - _APP_SYSTEM_SECURITY_EMAIL_ADDRESS=$$config__app_system_security_email_address
       - _APP_REDIS_HOST=$$config__app_redis_host
       - _APP_REDIS_PORT=$$config__app_redis_port
@@ -503,7 +559,7 @@
   - id: "$$secret__app_db_root_pass"
     name: MARIADB_ROOT_PASSWORD
     label: MariaDB | _APP_DB_ROOT_PASS
-    defaultValue: "$$generate_hex(16)"
+    defaultValue: $$generate_hex(16)
     description: MariaDB server root password.
   - id: "$$config__app_db_schema"
     name: MARIADB_DATABASE
@@ -518,7 +574,7 @@
   - id: "$$secret__app_db_pass"
     name: MARIADB_PASSWORD
     label: MariaDB | _APP_DB_PASS
-    defaultValue: "$$generate_hex(16)"
+    defaultValue: $$generate_hex(16)
     description: MariaDB server user password.
   - id: "$$config__app_influxdb_host"
     name: _APP_INFLUXDB_HOST
@@ -622,18 +678,18 @@
       sensitive data on your server. Appwrite server encrypts all secret data on your
       server like webhooks, HTTP passwords, user sessions, and storage files. Keep
       it a secret and have a backup for it.
-  - id: "$$generate_fqdn"
+  - id: "$$config__app_domain"
     name: _APP_DOMAIN
     label: General | _APP_DOMAIN
-    defaultValue: localhost
+    defaultValue: $$generate_domain
     description: Your Appwrite domain address. When setting a public suffix domain,
       Appwrite will attempt to issue a valid SSL certificate automatically. When used
       with a dev domain, Appwrite will assign a self-signed SSL certificate. The default
       value is 'localhost'.
-  - id: "$$generate_fqdn"
+  - id: "$$config__app_domain_target"
     name: _APP_DOMAIN_TARGET
     label: General | _APP_DOMAIN_TARGET
-    defaultValue: localhost
+    defaultValue: $$generate_fqdn
     description: A DNS A record hostname to serve as a CNAME target for your Appwrite
       custom domains. You can use the same value as used for the Appwrite '_APP_DOMAIN'
       variable. The default value is 'localhost'.
@@ -1214,12 +1270,12 @@
       image: 'glitchtip/glitchtip:$$core_version'
       volumes: []
       environment:
-        - PORT=3000
         - GLITCHTIP_DOMAIN=$$config_glitchtip_domain
         - SECRET_KEY=$$secret_secret_key
         - DATABASE_URL=$$secret_database_url
         - REDIS_URL=$$secret_redis_url
         - DEFAULT_FROM_EMAIL=$$config_default_from_email
+        - EMAIL_URL=$$secret_email_url
         - EMAIL_HOST=$$config_email_host
         - EMAIL_PORT=$$config_email_port
         - EMAIL_HOST_USER=$$config_email_host_user
@@ -1233,8 +1289,41 @@
         - DJANGO_SUPERUSER_EMAIL=$$config_django_superuser_email
         - DJANGO_SUPERUSER_PASSWORD=$$secret_django_superuser_password
         - DJANGO_SUPERUSER_USERNAME=$$config_django_superuser_username
+        - CELERY_WORKER_CONCURRENCY=$$config_celery_worker_concurrency
       ports:
-        - '8000'
+        - '8080'
+    $$id-worker:
+      name: Celery Worker
+      command: ./bin/run-celery-with-beat.sh
+      depends_on:
+        - $$id-postgresql
+        - $$id-redis
+      image: 'glitchtip/glitchtip:$$core_version'
+      environment:
+        - GLITCHTIP_DOMAIN=$$config_glitchtip_domain
+        - SECRET_KEY=$$secret_secret_key
+        - DATABASE_URL=$$secret_database_url
+        - REDIS_URL=$$secret_redis_url
+        - DEFAULT_FROM_EMAIL=$$config_default_from_email
+        - EMAIL_URL=$$secret_email_url
+        - CELERY_WORKER_CONCURRENCY=$$config_celery_worker_concurrency
+      ports: []
+    $$id-migrate:
+      exclude: true
+      name: Migrate
+      command: ./manage.py migrate
+      depends_on:
+        - $$id-postgresql
+        - $$id-redis
+      image: 'glitchtip/glitchtip:$$core_version'
+      environment:
+        - GLITCHTIP_DOMAIN=$$config_glitchtip_domain
+        - SECRET_KEY=$$secret_secret_key
+        - DATABASE_URL=$$secret_database_url
+        - REDIS_URL=$$secret_redis_url
+        - DEFAULT_FROM_EMAIL=$$config_default_from_email
+        - EMAIL_URL=$$secret_email_url
+      ports: []
     $$id-postgresql:
       name: PostgreSQL
       depends_on: []
@@ -1255,10 +1344,22 @@
       environment: []
       ports: []
   variables:
+    - id: $$config_celery_worker_concurrency
+      main: $$id-worker
+      name: CELERY_WORKER_CONCURRENCY
+      label: Celery Worker Concurrency
+      defaultValue: '2'
+      description: ''
     - id: $$config_glitchtip_domain
       name: GLITCHTIP_DOMAIN
       label: GlitchTip Domain
       defaultValue: $$generate_fqdn
+      description: ''
+    - id: $$secret_email_url
+      name: EMAIL_URL
+      label: SMTP Email URL
+      defaultValue: >-
+        smtp://$$config_email_host_user:$$secret_email_host_password@$$config_email_host:$$config_email_port
       description: ''
     - id: $$secret_database_url
       name: DATABASE_URL
@@ -1321,11 +1422,13 @@
       label: Mailgun API Key
       defaultValue: ''
       description: ''
+      showOnConfiguration: true
     - id: $$secret_sendgrid_api_key
       name: SENDGRID_API_KEY
       label: Sendgrid API Key
       defaultValue: ''
       description: ''
+      showOnConfiguration: true
     - id: $$config_enable_open_user_registration
       name: ENABLE_OPEN_USER_REGISTRATION
       label: Enable Open User Registration
@@ -1334,12 +1437,12 @@
     - id: $$config_django_superuser_email
       name: DJANGO_SUPERUSER_EMAIL
       label: Django Superuser Email
-      defaultValue: ''
+      defaultValue: noreply@example.com
       description: ''
     - id: $$config_django_superuser_username
       name: DJANGO_SUPERUSER_USERNAME
       label: Django Superuser Username
-      defaultValue: ''
+      defaultValue: $$generate_username
       description: ''
     - id: $$secret_django_superuser_password
       name: DJANGO_SUPERUSER_PASSWORD
@@ -1356,13 +1459,13 @@
       main: $$id-postgresql
       name: POSTGRES_PASSWORD
       label: PostgreSQL Password
-      defaultValue: ''
+      defaultValue: $$generate_password
       description: ''
     - id: $$config_postgres_db
       main: $$id-postgresql
       name: POSTGRES_DB
       label: PostgreSQL Database
-      defaultValue: hasura
+      defaultValue: glitchtip
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: v2.13.0
@@ -1429,8 +1532,8 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: postgresql-v1.38.0
-  type: umami
-  name: Umami
+  type: umami-postgresql
+  name: Umami (PostgreSQL)
   description: >-
     Umami is a simple, easy to use, self-hosted web analytics solution. The goal
     is to provide you with a friendly privacy-focused alternative to Google
@@ -1446,7 +1549,7 @@
       environment:
         - ADMIN_PASSWORD=$$secret_admin_password
         - DATABASE_URL=$$secret_database_url
-        - DATABASE_TYPE=postgresql
+        - DATABASE_TYPE=$$config_database_type
         - HASH_SALT=$$secret_hash_salt
       ports:
         - '3000'
@@ -1610,6 +1713,11 @@
       label: Hash Salt
       defaultValue: $$generate_hex(64)
       description: ''
+    - id: $$config_database_type
+      name: DATABASE_TYPE
+      label: Database Type
+      defaultValue: 'postgresql'
+      description: ''
     - id: $$config_postgres_user
       name: POSTGRES_USER
       label: PostgreSQL User
@@ -1711,7 +1819,7 @@
     - id: $$config_ghost_host
       name: GHOST_HOST
       label: Ghost Host
-      defaultValue: ''
+      defaultValue: $$generate_domain
       description: ''
     - id: $$config_ghost_enable_https
       name: GHOST_ENABLE_HTTPS
@@ -1728,6 +1836,7 @@
       label: Ghost Default Password
       defaultValue: $$generate_password
       description: ''
+      showOnConfiguration: true
     - id: $$config_ghost_database_host
       name: GHOST_DATABASE_HOST
       label: Ghost Database Host
@@ -1879,7 +1988,7 @@
 - templateVersion: 1.0.0
   defaultVersion: php8.1
   type: wordpress-only
-  name: WordPress (without MySQL)
+  name: WordPress Only (No Database)
   description: WordPress is a content management system based on PHP without MySQL.
   services:
     $$id:
@@ -2148,7 +2257,7 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: 0.198.1
-  type: n8nio
+  type: n8n
   name: n8n.io
   description: n8n is a free and open node based Workflow Automation Tool.
   services:

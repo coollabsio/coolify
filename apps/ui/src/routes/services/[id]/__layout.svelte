@@ -127,7 +127,7 @@
 					await post(`/services/${id}/wordpress/ftp`, {
 						ftpEnabled: false
 					});
-					service.wordpress?.ftpEnabled && window.location.reload()
+					service.wordpress?.ftpEnabled && window.location.reload();
 				}
 			} catch (error) {
 				return errorNotification(error);

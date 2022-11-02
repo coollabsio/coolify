@@ -81,12 +81,11 @@
 		<span>Logs</span>
 	</li>
 	<li
-		class:text-stone-600={$status.service.overallStatus === 'stopped'}
 		class="rounded"
 		class:bg-coollabs={$page.url.pathname === `/services/${$page.params.id}/logs`}
 	>
 		<a
-			href={$status.service.overallStatus !== 'stopped' ? `/services/${$page.params.id}/logs` : ''}
+			href={`/services/${$page.params.id}/logs`}
 			class="no-underline w-full"
 			><svg
 				xmlns="http://www.w3.org/2000/svg"
