@@ -175,7 +175,7 @@ const host = '0.0.0.0';
 			await refreshTags()
 			await migrateServicesToNewTemplate()
 		}, 60000)
-
+	
 		setInterval(async () => {
 			await copySSLCertificates();
 		}, 10000)

@@ -12,6 +12,8 @@
       volumes:
         - $$id-config:/etc/grafana
         - $$id-grafana:/var/lib/grafana
+      ports:
+        - '3000'
   variables: []
   documentation: https://hub.docker.com/r/grafana/grafana
 - templateVersion: 1.0.0
