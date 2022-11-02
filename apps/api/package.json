@@ -23,7 +23,6 @@
     "@fastify/jwt": "6.3.2",
     "@fastify/multipart": "7.3.0",
     "@fastify/static": "6.5.0",
-    "@fastify/websocket": "^7.1.0",
     "@iarna/toml": "2.2.5",
     "@ladjs/graceful": "3.0.2",
     "@prisma/client": "4.5.0",
@@ -40,6 +39,7 @@
     "execa": "6.1.0",
     "fastify": "4.9.2",
     "fastify-plugin": "4.3.0",
+    "fastify-socket.io": "4.0.0",
     "generate-password": "1.7.0",
     "got": "12.5.2",
     "is-ip": "5.0.0",
@@ -52,7 +52,8 @@
     "p-throttle": "5.0.0",
     "prisma": "4.5.0",
     "public-ip": "6.0.1",
-    "pump": "^3.0.0",
+    "pump": "3.0.0",
+    "socket.io": "4.5.3",
     "ssh-config": "4.1.6",
     "strip-ansi": "7.0.1",
     "unique-names-generator": "4.7.1"
@@ -60,7 +61,6 @@
   "devDependencies": {
     "@types/node": "18.11.6",
     "@types/node-os-utils": "1.3.0",
-    "@types/ws": "^8.5.3",
     "@typescript-eslint/eslint-plugin": "5.41.0",
     "@typescript-eslint/parser": "5.41.0",
     "esbuild": "0.15.12",
@@ -71,6 +71,7 @@
     "prettier": "2.7.1",
     "rimraf": "3.0.2",
     "tsconfig-paths": "4.1.0",
+    "types-fastify-socket.io": "0.0.1",
     "typescript": "4.8.4"
   },
   "prisma": {

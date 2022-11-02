@@ -1,10 +1,13 @@
 import { dev } from '$app/env';
 import cuid from 'cuid';
 import Cookies from 'js-cookie';
-import {getAPIUrl} from '$lib/api';
-import {getDomain} from '$lib/common'
+import { getAPIUrl } from '$lib/api';
+import { getDomain } from '$lib/common'
 import { writable, readable, type Writable } from 'svelte/store';
+import { io as ioClient } from 'socket.io-client';
+const socket = ioClient(getAPIUrl(), { auth: { token: Cookies.get('token') }, autoConnect: false });
 
+export const io = socket;
 interface AppSession {
     isRegistrationEnabled: boolean;
     ipv4: string | null,
@@ -171,50 +174,3 @@ type State = {
 export const state = writable<State>({
     requests: [],
 });
-export const connect = () => {
-    const token = Cookies.get('token')
-    if (token) {
-        let url = `wss://${window.location.hostname}/realtime`
-        if (dev) {
-            const apiUrl = getDomain(getAPIUrl())
-            url = `ws://${apiUrl}/realtime`
-        }
-        const ws = new WebSocket(url);
-        ws.addEventListener("message", (message: any) => {
-            appSession.subscribe((session: any) => {
-                const data: Request = { ...JSON.parse(message.data), timestamp: message.timeStamp };
-                if (data.teamId === session.teamId) {
-                    if (data.type === 'service') {
-                        const ending = data.message === "ending"
-                        status.update((status: any) => ({
-                            ...status,
-                            service: {
-                                ...status.service,
-                                startup: {
-                                    ...status.service.startup,
-                                    ...(ending ? { [data.id]: undefined } : { [data.id]: data.message })
-                                }
-                            }
-                        }))
-
-                    }
-                }
-            })
-
-        });
-        ws.addEventListener('open', (event) => {
-            ws.send(JSON.stringify({ type: 'subscribe', message: 'ping' }))
-        });
-        ws.addEventListener('error', (event) => {
-            console.log('error with ws');
-            console.log(event)
-        });
-        ws.addEventListener('close', (event) => {
-            if (!ws || ws.readyState == 3) {
-                setTimeout(() => {
-                    connect()
-                }, 1000)
-            }
-        });
-    }
-};

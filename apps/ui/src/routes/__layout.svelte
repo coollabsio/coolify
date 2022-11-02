@@ -81,7 +81,7 @@
 	export let permission: string;
 	export let isAdmin: boolean;
 
-	import{ status, connect } from '$lib/store';
+	import { status, io } from '$lib/store';
 	import '../tailwind.css';
 	import Cookies from 'js-cookie';
 	import { fade } from 'svelte/transition';
@@ -110,7 +110,14 @@
 		}
 	}
 	onMount(async () => {
-		connect();
+		io.connect();
+		io.on('start-service', (message) => {
+			const { serviceId, state } = message;
+			$status.service.startup[serviceId] = state;
+			if (state === 0 || state === 1) {
+				delete $status.service.startup[serviceId];
+			}
+		});
 	});
 </script>
 

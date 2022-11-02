@@ -146,18 +146,18 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
 }
 async function startServiceContainers(fastify, id, teamId, dockerId, composeFileDestination) {
     try {
-        fastify.wssend({ teamId, type: 'service', id, message: 'Pulling images...' })
+        fastify.io.to(teamId).emit(`start-service`, { serviceId: id, state: 'Pulling images...' })
         await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} pull` })
     } catch (error) { }
-    fastify.wssend({ teamId, type: 'service', id, message: 'Building...' })
+    fastify.io.to(teamId).emit(`start-service`, { serviceId: id, state: 'Building images...' })
     await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} build --no-cache` })
-    fastify.wssend({ teamId, type: 'service', id, message: 'Creating containers...' })
+    fastify.io.to(teamId).emit(`start-service`, { serviceId: id, state: 'Creating containers...' })
     await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} create` })
-    fastify.wssend({ teamId, type: 'service', id, message: 'Starting containers...' })
+    fastify.io.to(teamId).emit(`start-service`, { serviceId: id, state: 'Starting containers...' })
     await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} start` })
     await asyncSleep(1000);
     await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} up -d` })
-    fastify.wssend({ teamId, type: 'service', id, message: 'ending' })
+    fastify.io.to(teamId).emit(`start-service`, { serviceId: id, state: 0 })
 }
 export async function migrateAppwriteDB(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
     try {

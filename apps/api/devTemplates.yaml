@@ -1,4 +1,20 @@
 - templateVersion: 1.0.0
+  defaultVersion: 9.2.3
+  type: grafana
+  name: Grafana
+  description: >-
+    Grafana allows you to query, visualize, alert on and understand your metrics
+    no matter where they are stored.
+  services:
+    $$id:
+      image: grafana/grafana:$$core_version
+      environment: []
+      volumes:
+        - $$id-config:/etc/grafana
+        - $$id-grafana:/var/lib/grafana
+  variables: []
+  documentation: https://hub.docker.com/r/grafana/grafana
+- templateVersion: 1.0.0
   defaultVersion: 1.0.3
   type: appwrite
   name: Appwrite
