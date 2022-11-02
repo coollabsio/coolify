@@ -198,11 +198,9 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                     }
                 }
             }
-
         } else {
             parsedTemplate = foundTemplate
         }
-
         let strParsedTemplate = JSON.stringify(parsedTemplate)
 
         // replace $$id and $$workdir
@@ -223,7 +221,7 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                     continue;
                 }
                 if (value === '$$generate_fqdn') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn || '' + "\"")
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn  + "\"" || ''  + "\"")
                 } else if (value === '$$generate_domain') {
                     strParsedTemplate = strParsedTemplate.replaceAll(regex, getDomain(service.fqdn) + "\"")
                 } else if (service.destinationDocker?.network && value === '$$generate_network') {

@@ -1270,6 +1270,7 @@
       image: 'glitchtip/glitchtip:$$core_version'
       volumes: []
       environment:
+        - PORT=$$config_port
         - GLITCHTIP_DOMAIN=$$config_glitchtip_domain
         - SECRET_KEY=$$secret_secret_key
         - DATABASE_URL=$$secret_database_url
@@ -1291,7 +1292,7 @@
         - DJANGO_SUPERUSER_USERNAME=$$config_django_superuser_username
         - CELERY_WORKER_CONCURRENCY=$$config_celery_worker_concurrency
       ports:
-        - '8080'
+        - '8000'
     $$id-worker:
       name: Celery Worker
       command: ./bin/run-celery-with-beat.sh
@@ -1327,7 +1328,7 @@
     $$id-postgresql:
       name: PostgreSQL
       depends_on: []
-      image: 'postgres:12-alpine'
+      image: 'postgres:14-alpine'
       volumes:
         - '$$id-postgresql-data:/var/lib/postgresql/data'
       environment:
@@ -1344,6 +1345,11 @@
       environment: []
       ports: []
   variables:
+    - id: $$config_port
+      name: PORT
+      label: GlitchTip Port
+      defaultValue: '8000'
+      description: ''
     - id: $$config_celery_worker_concurrency
       main: $$id-worker
       name: CELERY_WORKER_CONCURRENCY

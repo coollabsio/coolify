@@ -409,7 +409,7 @@ export async function traefikConfiguration(request, reply) {
 								}
 							}
 						} else {
-							if (found.services[oneService].ports) {
+							if (found.services[oneService].ports && found.services[oneService].ports.length > 0) {
 								let port = found.services[oneService].ports[0]
 								const foundPortVariable = serviceSetting.find((a) => a.name.toLowerCase() === 'port')
 								if (foundPortVariable) {
