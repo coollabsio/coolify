@@ -2104,7 +2104,7 @@
       volumes:
         - '$$id-data-write:/files'
       environment:
-        - MINIO_SERVER_URL=$$coolify_fqdn_minio_console
+        - MINIO_SERVER_URL=$$config_coolify_fqdn_minio_console
         - MINIO_BROWSER_REDIRECT_URL=$$config_minio_browser_redirect_url
         - MINIO_DOMAIN=$$config_minio_domain
         - MINIO_ROOT_USER=$$config_minio_root_user
@@ -2114,10 +2114,10 @@
         - '9001'
       proxy:
       - port: '9000'
-        domain: $$coolify_fqdn_minio_console
+        domain: $$config_coolify_fqdn_minio_console
       - port: '9001'
   variables:
-    - id: $$coolify_fqdn_minio_console
+    - id: $$config_coolify_fqdn_minio_console
       name: MINIO_SERVER_URL
       label: MinIO Server URL
       defaultValue: ''

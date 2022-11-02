@@ -87,7 +87,7 @@
 				exposePort: service.exposePort
 			});
 			for (const setting of service.serviceSetting) {
-				if (setting.variableName?.startsWith('$$coolify_fqdn') && setting.value) {
+				if (setting.variableName?.startsWith('$$config_coolify_fqdn') && setting.value) {
 					for (let field of formData) {
 						const [key, value] = field;
 						if (setting.name === key) {

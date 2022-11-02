@@ -217,9 +217,6 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
             for (const setting of service.serviceSetting) {
                 const { value, variableName } = setting
                 const regex = new RegExp(`\\$\\$config_${variableName.replace('$$config_','')}\\"`, 'gi')
-                if (variableName.startsWith('$$config_coolify')) {
-                    continue;
-                }
                 if (value === '$$generate_fqdn') {
                     strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn  + "\"" || ''  + "\"")
                 } else if (value === '$$generate_domain') {
@@ -323,7 +320,7 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
                     }
 
                 }
-                if (variable.id.startsWith('$$config_') || variable.id.startsWith('$$coolify_fqdn_')) {
+                if (variable.id.startsWith('$$config_')) {
                     const found = await prisma.serviceSetting.findFirst({ where: { name: variable.name, serviceId: id } })
                     if (!found) {
                         await prisma.serviceSetting.create({
@@ -483,7 +480,7 @@ export async function checkService(request: FastifyRequest<CheckService>) {
         const { id } = request.params;
         let { fqdn, exposePort, forceSave, dualCerts, otherFqdn = false } = request.body;
 
-        const domainsList = await prisma.serviceSetting.findMany({ where: { variableName: { startsWith: '$$coolify_fqdn' } } })
+        const domainsList = await prisma.serviceSetting.findMany({ where: { variableName: { startsWith: '$$config_coolify_fqdn' } } })
 
         if (fqdn) fqdn = fqdn.toLowerCase();
         if (exposePort) exposePort = Number(exposePort);

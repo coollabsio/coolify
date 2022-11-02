@@ -38,6 +38,12 @@
 			);
 			if (newLogs.noContainer) {
 				noContainer = true;
+				logs = [];
+				if (logs.length > 0) {
+					clearInterval(loadLogsInterval);
+					selectedService = null;
+				}
+				return;
 			} else {
 				noContainer = false;
 			}
