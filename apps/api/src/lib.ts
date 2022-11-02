@@ -461,7 +461,7 @@ async function createVolumes(service: any, template: any) {
             for (const volume of template.services[s].volumes) {
                 const volumeName = volume.split(':')[0]
                 const volumePath = volume.split(':')[1]
-                const volumeService = service.id
+                const volumeService = s
                 volumes.push(`${volumeName}@@@${volumePath}@@@${volumeService}`)
             }
         }
