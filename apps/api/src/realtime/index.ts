@@ -12,14 +12,14 @@ export default async (fastify) => {
         const { token } = socket.handshake.auth;
         const { teamId } = fastify.jwt.decode(token);
         socket.join(teamId);
-        console.info('Socket connected!', socket.id)
-        console.info('Socket joined team!', teamId)
-        socket.on('message', (message) => {
-            console.log(message)
-        })
-        socket.on('error', (err) => {
-            console.log(err)
-        })
+        // console.info('Socket connected!', socket.id)
+        // console.info('Socket joined team!', teamId)
+        // socket.on('message', (message) => {
+        //     console.log(message)
+        // })
+        // socket.on('error', (err) => {
+        //     console.log(err)
+        // })
     })
     // fastify.io.on("error", (err) => {
     //     if (err && err.message === "unauthorized event") {
