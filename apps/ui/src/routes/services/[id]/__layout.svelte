@@ -55,7 +55,7 @@
 
 <script lang="ts">
 	export let service: any;
-
+	export let template: any;
 	import { page } from '$app/stores';
 	import { del, get, post } from '$lib/api';
 	import { t } from '$lib/translations';
@@ -415,7 +415,7 @@
 >
 	{#if !$page.url.pathname.startsWith(`/services/${id}/configuration/`)}
 		<nav class="header flex flex-col lg:pt-0 ">
-			<Menu {service} />
+			<Menu {service} {template} />
 		</nav>
 	{/if}
 	<div class="pt-0 col-span-0 lg:col-span-3 pb-24 px-4 lg:px-0">

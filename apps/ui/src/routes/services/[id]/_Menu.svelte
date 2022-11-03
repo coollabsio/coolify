@@ -1,6 +1,6 @@
 <script lang="ts">
 	export let service: any;
-	import { status } from '$lib/store';
+	export let template: any;
 	import { page } from '$app/stores';
 	import ServiceLinks from './_ServiceLinks.svelte';
 </script>
@@ -10,7 +10,7 @@
 		<span>General</span>
 	</li>
 	<li class="rounded">
-		<ServiceLinks {service} linkToDocs={true} />
+		<ServiceLinks {template} {service} linkToDocs={true} />
 	</li>
 	<li class="rounded" class:bg-coollabs={$page.url.pathname === `/services/${$page.params.id}`}>
 		<a href={`/services/${$page.params.id}`} class="no-underline w-full"

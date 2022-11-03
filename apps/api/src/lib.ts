@@ -432,10 +432,10 @@ async function plausibleAnalytics(service: any, template: any) {
 async function migrateSettings(settings: any[], service: any, template: any) {
     for (const setting of settings) {
         if (!setting) continue;
+        console.log(setting)
         let [name, value] = setting.split('@@@')
-        let minio = null
+        let minio = name
         if (name === 'MINIO_SERVER_URL') {
-            minio = name
             name = 'coolify_fqdn_minio_console'
         }
         if (!value || value === 'null') {

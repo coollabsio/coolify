@@ -1,5 +1,6 @@
 - templateVersion: 1.0.0
   defaultVersion: v1.8.6
+  documentation: https://docs.appsmith.com/getting-started/setup/instance-configuration/
   type: appsmith
   name: Appsmith
   services:
@@ -12,7 +13,7 @@
       volumes:
         - $$id-stacks-data:/appsmith-stacks
       ports:
-        - '8080'
+        - '80'
   variables:
     - id: $$config_appsmith_mail_enabled
       name: APPSMITH_MAIL_ENABLED
@@ -29,9 +30,9 @@
       label: Disable Intercom
       defaultValue: 'true'
       description: ''
-  documentation: https://hub.docker.com/r/zadam/trilium
 - templateVersion: 1.0.0
   defaultVersion: 0.56.2
+  documentation: https://hub.docker.com/r/zadam/trilium
   type: trilium
   name: Trilium Notes
   services:
@@ -43,9 +44,9 @@
       ports:
         - '8080'
   variables: []
-  documentation: https://hub.docker.com/r/zadam/trilium
 - templateVersion: 1.0.0
   defaultVersion: 1.9.2
+  documentation: https://hub.docker.com/r/louislam/uptime-kuma
   type: uptimekuma
   name: UptimeKuma
   services:
@@ -57,9 +58,9 @@
       ports:
         - '3001'
   variables: []
-  documentation: https://hub.docker.com/r/louislam/uptime-kuma
 - templateVersion: 1.0.0
   defaultVersion: 5.8
+  documentation: https://hub.docker.com/r/silviof/docker-languagetool
   type: languagetool
   name: LanguageTool
   services:
@@ -71,9 +72,9 @@
       ports:
         - '8010'
   variables: []
-  documentation: https://hub.docker.com/r/silviof/docker-languagetool
 - templateVersion: 1.0.0
   defaultVersion: 1.26.0
+  documentation: https://hub.docker.com/r/vaultwarden/server
   type: vaultwarden
   name: VaultWarden
   services:
@@ -85,9 +86,9 @@
       ports:
         - '80'
   variables: []
-  documentation: https://hub.docker.com/r/vaultwarden/server
 - templateVersion: 1.0.0
   defaultVersion: 9.2.3
+  documentation: https://hub.docker.com/r/grafana/grafana
   type: grafana
   name: Grafana
   description: >-
@@ -103,12 +104,11 @@
       ports:
         - '3000'
   variables: []
-  documentation: https://hub.docker.com/r/grafana/grafana
 - templateVersion: 1.0.0
   defaultVersion: 1.0.3
+  documentation: https://appwrite.io/docs
   type: appwrite
   name: Appwrite
-  documentation: https://appwrite.io/docs
   description: Secure Backend Server for Web, Mobile & Flutter Developers.
   services:
     "$$id":
@@ -1122,6 +1122,7 @@
       The default value is 15 minutes.
 - templateVersion: 1.0.0
   defaultVersion: latest
+  documentation: https://docs.weblate.org/en/latest/admin/install/docker.html
   type: weblate
   name: Weblate
   description: ''
@@ -1197,6 +1198,7 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: 2022.10.14-1a5b0965
+  documentation: https://docs.searxng.org/
   type: searxng
   name: SearXNG
   description: ''
@@ -1270,6 +1272,7 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: v2.0.6
+  documentation: https://glitchtip.com/documentation
   type: glitchtip
   name: GlitchTip
   description: ''
@@ -1488,6 +1491,7 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: v2.13.0
+  documentation: https://hasura.io/docs/latest/index/
   type: hasura
   name: Hasura
   description: 'Instant realtime GraphQL APIs on any Postgres application, existing or new.'
@@ -1551,6 +1555,7 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: postgresql-v1.38.0
+  documentation: https://umami.is/docs/getting-started
   type: umami-postgresql
   name: Umami (PostgreSQL)
   description: >-
@@ -1760,6 +1765,7 @@
       showOnConfiguration: true
 - templateVersion: 1.0.0
   defaultVersion: v0.29.1
+  documentation: https://docs.meilisearch.com/learn/getting_started/quick_start.html
   type: meilisearch
   name: MeiliSearch
   description: >-
@@ -1789,6 +1795,7 @@
       showOnConfiguration: true
 - templateVersion: 1.0.0
   defaultVersion: latest
+  documentation: https://ghost.org/resources/
   type: ghost-mariadb
   name: Ghost (MariaDB)
   description: >-
@@ -1903,6 +1910,7 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: '5.22'
+  documentation: https://ghost.org/resources/
   type: ghost-only
   name: Ghost Only (No Database)
   description: >-
@@ -1967,6 +1975,7 @@
       required: true
 - templateVersion: 1.0.0
   defaultVersion: '5.22'
+  documentation: https://ghost.org/resources/
   type: ghost-mysql
   name: Ghost (MySQL)
   description: >-
@@ -2044,6 +2053,7 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: php8.1
+  documentation: https://wordpress.org/
   type: wordpress
   name: WordPress (with MySQL)
   description: WordPress is a content management system based on PHP with new MySQL database.
@@ -2129,6 +2139,7 @@
       readOnly: true
 - templateVersion: 1.0.0
   defaultVersion: php8.1
+  documentation: https://wordpress.org/
   type: wordpress-only
   name: WordPress Only (No Database)
   description: WordPress is a content management system based on PHP without MySQL.
@@ -2198,6 +2209,7 @@
         @ini_set('display_errors', 0);
 - templateVersion: 1.0.0
   defaultVersion: 4.7.1
+  documentation: https://coder.com/docs/coder-oss/latest
   type: vscodeserver
   name: VSCode Server
   description: >-
@@ -2227,6 +2239,7 @@
       showOnConfiguration: true
 - templateVersion: 1.0.0
   defaultVersion: RELEASE.2022-10-15T19-57-03Z
+  documentation: https://min.io/docs/minio
   type: minio
   name: MinIO
   description: ' MinIO is a cloud storage server compatible with Amazon S3'
@@ -2282,6 +2295,7 @@
       showOnConfiguration: true
 - templateVersion: 1.0.0
   defaultVersion: 0.21.1
+  documentation: https://fider.io/docs
   type: fider
   name: Fider
   description: Fider is a platform to collect and organize customer feedback.
@@ -2399,6 +2413,7 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: 0.198.1
+  documentation: https://docs.n8n.io
   type: n8n
   name: n8n.io
   description: n8n is a free and open node based Workflow Automation Tool.
@@ -2424,6 +2439,7 @@
       description: ''
 - templateVersion: 1.0.0
   defaultVersion: stable
+  documentation: https://plausible.io/doc/
   type: plausibleanalytics
   name: Plausible Analytics
   description: Plausible is a lightweight and open-source website analytics tool.
@@ -2568,6 +2584,7 @@
       description: This is the default script name.
 - templateVersion: 1.0.0
   defaultVersion: 0.98.1
+  documentation: https://docs.nocodb.com
   type: nocodb
   name: NocoDB
   description: >-
@@ -2641,4 +2658,3 @@
       label: NocoDB Disable Telemetry
       defaultValue: '1'
       description: Disable telemetry (Enter "1" to disable).
-  documentation: See https://github.com/nocodb/nocodb

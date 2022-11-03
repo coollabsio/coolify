@@ -150,6 +150,7 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                 }
                 parsedTemplate[realKey] = {
                     name,
+                    documentation: value.documentation || foundTemplate.documentation || 'https://docs.coollabs.io',
                     image: value.image,
                     environment: [],
                     fqdns: [],
@@ -216,9 +217,9 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
         if (service.serviceSetting.length > 0) {
             for (const setting of service.serviceSetting) {
                 const { value, variableName } = setting
-                const regex = new RegExp(`\\$\\$config_${variableName.replace('$$config_','')}\\"`, 'gi')
+                const regex = new RegExp(`\\$\\$config_${variableName.replace('$$config_', '')}\\"`, 'gi')
                 if (value === '$$generate_fqdn') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn  + "\"" || ''  + "\"")
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn + "\"" || '' + "\"")
                 } else if (value === '$$generate_domain') {
                     strParsedTemplate = strParsedTemplate.replaceAll(regex, getDomain(service.fqdn) + "\"")
                 } else if (service.destinationDocker?.network && value === '$$generate_network') {
