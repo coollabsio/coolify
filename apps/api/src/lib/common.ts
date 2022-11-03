@@ -537,13 +537,16 @@ export async function createRemoteEngineConfiguration(id: string) {
 	const config = sshConfig.parse('');
 	const Host = `${remoteIpAddress}-remote`
 
-	await asyncExecShell(`ssh-keygen -R ${Host}`);
-	await asyncExecShell(`ssh-keygen -R ${remoteIpAddress}`);
-	await asyncExecShell(`ssh-keygen -R localhost:${localPort}`);
+	try {
+		await asyncExecShell(`ssh-keygen -R ${Host}`);
+		await asyncExecShell(`ssh-keygen -R ${remoteIpAddress}`);
+		await asyncExecShell(`ssh-keygen -R localhost:${localPort}`);
+	} catch (error) { }
+
 
 	const found = config.find({ Host });
 	const foundIp = config.find({ Host: remoteIpAddress });
-	
+
 	if (found) config.remove({ Host })
 	if (foundIp) config.remove({ Host: remoteIpAddress })
 
