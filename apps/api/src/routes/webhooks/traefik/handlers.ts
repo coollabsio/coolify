@@ -20,178 +20,189 @@ async function applicationConfiguration(traefik: any, remoteId: string | null = 
 	const configurableApplications = []
 	if (applications.length > 0) {
 		for (const application of applications) {
-			const {
-				fqdn,
-				id,
-				port,
-				buildPack,
-				dockerComposeConfiguration,
-				destinationDocker,
-				destinationDockerId,
-				settings: { previews, dualCerts, isCustomSSL }
-			} = application;
-			if (destinationDockerId) {
-				const { network, id: dockerId } = destinationDocker;
-				const isRunning = true;
-				if (buildPack === 'compose') {
-					console.log(dockerComposeConfiguration)
-					const services = Object.entries(JSON.parse(dockerComposeConfiguration))
-					console.log(services)
-					if (services.length > 0) {
-						for (const service of services) {
-							const [key, value] = service
-							if (key && value && value.fqdn) {
-								const { fqdn } = value
-								const domain = getDomain(fqdn);
-								const nakedDomain = domain.replace(/^www\./, '');
-								const isHttps = fqdn.startsWith('https://');
-								const isWWW = fqdn.includes('www.');
-								configurableApplications.push({
-									id: `${id}-${key}`,
-									container: `${id}-${key}`,
-									port: value.customPort ? value.customPort : port || 3000,
-									domain,
-									nakedDomain,
-									isRunning,
-									isHttps,
-									isWWW,
-									isDualCerts: dualCerts,
-									isCustomSSL,
-									pathPrefix: '/'
-								});
+			try {
+				const {
+					fqdn,
+					id,
+					port,
+					buildPack,
+					dockerComposeConfiguration,
+					destinationDocker,
+					destinationDockerId,
+					settings: { previews, dualCerts, isCustomSSL }
+				} = application;
+				if (destinationDockerId) {
+					const { network, id: dockerId } = destinationDocker;
+					const isRunning = true;
+					if (buildPack === 'compose') {
+						console.log(dockerComposeConfiguration)
+						const services = Object.entries(JSON.parse(dockerComposeConfiguration))
+						console.log(services)
+						if (services.length > 0) {
+							for (const service of services) {
+								const [key, value] = service
+								if (key && value && value.fqdn) {
+									const { fqdn } = value
+									const domain = getDomain(fqdn);
+									const nakedDomain = domain.replace(/^www\./, '');
+									const isHttps = fqdn.startsWith('https://');
+									const isWWW = fqdn.includes('www.');
+									configurableApplications.push({
+										id: `${id}-${key}`,
+										container: `${id}-${key}`,
+										port: value.customPort ? value.customPort : port || 3000,
+										domain,
+										nakedDomain,
+										isRunning,
+										isHttps,
+										isWWW,
+										isDualCerts: dualCerts,
+										isCustomSSL,
+										pathPrefix: '/'
+									});
+								}
+							}
+						}
+						continue;
+					}
+					if (fqdn) {
+						const domain = getDomain(fqdn);
+						const nakedDomain = domain.replace(/^www\./, '');
+						const isHttps = fqdn.startsWith('https://');
+						const isWWW = fqdn.includes('www.');
+						if (isRunning) {
+							configurableApplications.push({
+								id,
+								container: id,
+								port: port || 3000,
+								domain,
+								nakedDomain,
+								isRunning,
+								isHttps,
+								isWWW,
+								isDualCerts: dualCerts,
+								isCustomSSL,
+								pathPrefix: '/'
+							});
+						}
+						if (previews) {
+							const { stdout } = await executeDockerCmd({ dockerId, command: `docker container ls --filter="status=running" --filter="network=${network}" --filter="name=${id}-" --format="{{json .Names}}"` })
+							const containers = stdout
+								.trim()
+								.split('\n')
+								.filter((a) => a)
+								.map((c) => c.replace(/"/g, ''));
+							if (containers.length > 0) {
+								for (const container of containers) {
+									const previewDomain = `${container.split('-')[1]}.${domain}`;
+									const nakedDomain = previewDomain.replace(/^www\./, '');
+									configurableApplications.push({
+										id: container,
+										container,
+										port: port || 3000,
+										domain: previewDomain,
+										isRunning,
+										nakedDomain,
+										isHttps,
+										isWWW,
+										isDualCerts: dualCerts,
+										isCustomSSL,
+										pathPrefix: '/'
+									});
+								}
 							}
 						}
 					}
-					continue;
 				}
-				if (fqdn) {
-					const domain = getDomain(fqdn);
-					const nakedDomain = domain.replace(/^www\./, '');
-					const isHttps = fqdn.startsWith('https://');
-					const isWWW = fqdn.includes('www.');
-					if (isRunning) {
-						configurableApplications.push({
-							id,
-							container: id,
-							port: port || 3000,
-							domain,
-							nakedDomain,
-							isRunning,
-							isHttps,
-							isWWW,
-							isDualCerts: dualCerts,
-							isCustomSSL,
-							pathPrefix: '/'
-						});
-					}
-					if (previews) {
-						const { stdout } = await executeDockerCmd({ dockerId, command: `docker container ls --filter="status=running" --filter="network=${network}" --filter="name=${id}-" --format="{{json .Names}}"` })
-						const containers = stdout
-							.trim()
-							.split('\n')
-							.filter((a) => a)
-							.map((c) => c.replace(/"/g, ''));
-						if (containers.length > 0) {
-							for (const container of containers) {
-								const previewDomain = `${container.split('-')[1]}.${domain}`;
-								const nakedDomain = previewDomain.replace(/^www\./, '');
-								configurableApplications.push({
-									id: container,
-									container,
-									port: port || 3000,
-									domain: previewDomain,
-									isRunning,
-									nakedDomain,
-									isHttps,
-									isWWW,
-									isDualCerts: dualCerts,
-									isCustomSSL,
-									pathPrefix: '/'
-								});
-							}
-						}
-					}
-				}
+			} catch (error) {
+				console.log('cannot create traefik configuration for application', application.id)
+				console.log(error)
 			}
 		}
 		for (const application of configurableApplications) {
 			let { id, port, isCustomSSL, pathPrefix, isHttps, nakedDomain, isWWW, domain, dualCerts } = application
-			if (isHttps) {
-				traefik.http.routers[`${id}-${port || 'default'}`] = generateHttpRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix)
-				traefik.http.routers[`${id}-${port || 'default'}-secure`] = generateProtocolRedirectRouter(`${id}-${port || 'default'}-secure`, nakedDomain, pathPrefix, 'http-to-https')
-				traefik.http.services[`${id}-${port || 'default'}`] = generateLoadBalancerService(id, port)
-				if (dualCerts) {
-					traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
-						entrypoints: ['websecure'],
-						rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-						service: `${id}`,
-						tls: isCustomSSL ? true : {
-							certresolver: 'letsencrypt'
-						},
-						middlewares: []
-					};
+			try {
+				if (isHttps) {
+					traefik.http.routers[`${id}-${port || 'default'}`] = generateHttpRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix)
+					traefik.http.routers[`${id}-${port || 'default'}-secure`] = generateProtocolRedirectRouter(`${id}-${port || 'default'}-secure`, nakedDomain, pathPrefix, 'http-to-https')
+					traefik.http.services[`${id}-${port || 'default'}`] = generateLoadBalancerService(id, port)
+					if (dualCerts) {
+						traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
+							entrypoints: ['websecure'],
+							rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
+							service: `${id}`,
+							tls: isCustomSSL ? true : {
+								certresolver: 'letsencrypt'
+							},
+							middlewares: []
+						};
+					} else {
+						if (isWWW) {
+							traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
+								entrypoints: ['websecure'],
+								rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
+								service: `${id}`,
+								tls: isCustomSSL ? true : {
+									certresolver: 'letsencrypt'
+								},
+								middlewares: []
+							};
+							traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
+								entrypoints: ['websecure'],
+								rule: `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
+								service: `${id}`,
+								tls: {
+									domains: {
+										main: `${domain}`
+									}
+								},
+								middlewares: ['redirect-to-www']
+							};
+							traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-www');
+						} else {
+							traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
+								entrypoints: ['websecure'],
+								rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
+								service: `${id}`,
+								tls: {
+									domains: {
+										main: `${domain}`
+									}
+								},
+								middlewares: ['redirect-to-non-www']
+							};
+							traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
+								entrypoints: ['websecure'],
+								rule: `Host(\`${domain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
+								service: `${id}`,
+								tls: isCustomSSL ? true : {
+									certresolver: 'letsencrypt'
+								},
+								middlewares: []
+							};
+							traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-non-www');
+						}
+					}
 				} else {
-					if (isWWW) {
-						traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
-							entrypoints: ['websecure'],
-							rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-							service: `${id}`,
-							tls: isCustomSSL ? true : {
-								certresolver: 'letsencrypt'
-							},
-							middlewares: []
-						};
-						traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
-							entrypoints: ['websecure'],
-							rule: `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-							service: `${id}`,
-							tls: {
-								domains: {
-									main: `${domain}`
-								}
-							},
-							middlewares: ['redirect-to-www']
-						};
-						traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-www');
-					} else {
-						traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
-							entrypoints: ['websecure'],
-							rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-							service: `${id}`,
-							tls: {
-								domains: {
-									main: `${domain}`
-								}
-							},
-							middlewares: ['redirect-to-non-www']
-						};
-						traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
-							entrypoints: ['websecure'],
-							rule: `Host(\`${domain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-							service: `${id}`,
-							tls: isCustomSSL ? true : {
-								certresolver: 'letsencrypt'
-							},
-							middlewares: []
-						};
-						traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-non-www');
-					}
-				}
-			} else {
-				traefik.http.routers[`${id}-${port || 'default'}`] = generateHttpRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix)
-				traefik.http.routers[`${id}-${port || 'default'}-secure`] = generateProtocolRedirectRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix, 'https-to-http')
-				traefik.http.services[`${id}-${port || 'default'}`] = generateLoadBalancerService(id, port)
+					traefik.http.routers[`${id}-${port || 'default'}`] = generateHttpRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix)
+					traefik.http.routers[`${id}-${port || 'default'}-secure`] = generateProtocolRedirectRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix, 'https-to-http')
+					traefik.http.services[`${id}-${port || 'default'}`] = generateLoadBalancerService(id, port)
 
-				if (!dualCerts) {
-					if (isWWW) {
-						traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-www');
-						traefik.http.routers[`${id}-${port || 'default'}-secure`].middlewares.push('redirect-to-www');
-					} else {
-						traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-non-www');
-						traefik.http.routers[`${id}-${port || 'default'}-secure`].middlewares.push('redirect-to-non-www');
+					if (!dualCerts) {
+						if (isWWW) {
+							traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-www');
+							traefik.http.routers[`${id}-${port || 'default'}-secure`].middlewares.push('redirect-to-www');
+						} else {
+							traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-non-www');
+							traefik.http.routers[`${id}-${port || 'default'}-secure`].middlewares.push('redirect-to-non-www');
+						}
 					}
 				}
+			} catch (error) {
+				console.log('Error generating traefik config for ' + id);
+				console.log(error)
 			}
+
 		}
 	}
 }
@@ -224,82 +235,185 @@ async function serviceConfiguration(traefik: any, remoteId: string | null = null
 	const configurableServices = []
 	if (services.length > 0) {
 		for (const service of services) {
-			let {
-				fqdn,
-				id,
-				type,
-				destinationDockerId,
-				dualCerts,
-				serviceSetting
-			} = service;
-			if (destinationDockerId) {
-				const templates = await getTemplates();
-				let found = templates.find((a) => a.type === type);
-				if (found) {
-					found = JSON.parse(JSON.stringify(found).replaceAll('$$id', id));
-					for (const oneService of Object.keys(found.services)) {
-						const isProxyConfiguration = found.services[oneService].proxy;
-						if (isProxyConfiguration) {
-							const { proxy } = found.services[oneService];
-							for (let configuration of proxy) {
-								const publicPort = service[type]?.publicPort;
-								if (configuration.domain) {
-									const setting = serviceSetting.find((a) => a.variableName === configuration.domain);
-									configuration.domain = configuration.domain.replace(configuration.domain, setting.value);
+			try {
+				let {
+					fqdn,
+					id,
+					type,
+					destinationDockerId,
+					dualCerts,
+					serviceSetting
+				} = service;
+				if (destinationDockerId) {
+					const templates = await getTemplates();
+					let found = templates.find((a) => a.type === type);
+					if (found) {
+						found = JSON.parse(JSON.stringify(found).replaceAll('$$id', id));
+						for (const oneService of Object.keys(found.services)) {
+							const isProxyConfiguration = found.services[oneService].proxy;
+							if (isProxyConfiguration) {
+								const { proxy } = found.services[oneService];
+								for (let configuration of proxy) {
+									const publicPort = service[type]?.publicPort;
+									if (configuration.domain) {
+										const setting = serviceSetting.find((a) => a.variableName === configuration.domain);
+										configuration.domain = configuration.domain.replace(configuration.domain, setting.value);
+									}
+									const foundPortVariable = serviceSetting.find((a) => a.name.toLowerCase() === 'port')
+									if (foundPortVariable) {
+										configuration.port = foundPortVariable.value
+									}
+									if (fqdn) {
+										configurableServices.push({
+											id: oneService,
+											publicPort,
+											fqdn,
+											dualCerts,
+											configuration,
+										});
+									}
 								}
-								const foundPortVariable = serviceSetting.find((a) => a.name.toLowerCase() === 'port')
-								if (foundPortVariable) {
-									configuration.port = foundPortVariable.value
-								}
-								if (fqdn) {
-									configurableServices.push({
-										id: oneService,
-										publicPort,
-										fqdn,
-										dualCerts,
-										configuration,
-									});
-								}
-							}
-						} else {
-							if (found.services[oneService].ports && found.services[oneService].ports.length > 0) {
-								let port = found.services[oneService].ports[0]
-								const foundPortVariable = serviceSetting.find((a) => a.name.toLowerCase() === 'port')
-								if (foundPortVariable) {
-									port = foundPortVariable.value
-								}
-								if (fqdn) {
-									configurableServices.push({
-										id: oneService,
-										configuration: {
-											port
-										},
-										fqdn,
-										dualCerts,
-									});
+							} else {
+								if (found.services[oneService].ports && found.services[oneService].ports.length > 0) {
+									let port = found.services[oneService].ports[0]
+									const foundPortVariable = serviceSetting.find((a) => a.name.toLowerCase() === 'port')
+									if (foundPortVariable) {
+										port = foundPortVariable.value
+									}
+									if (fqdn) {
+										configurableServices.push({
+											id: oneService,
+											configuration: {
+												port
+											},
+											fqdn,
+											dualCerts,
+										});
+									}
 								}
 							}
 						}
 					}
 				}
+			} catch (error) {
+				console.log('Error generating traefik config for ' + service.id);
+				console.log(error)
 			}
 		}
 
 		for (const service of configurableServices) {
 			let { id, fqdn, dualCerts, configuration, isCustomSSL = false } = service
-			let port, pathPrefix, customDomain;
-			if (configuration) {
-				port = configuration?.port;
-				pathPrefix = configuration?.pathPrefix || null;
-				customDomain = configuration?.domain;
+			try {
+				let port, pathPrefix, customDomain;
+				if (configuration) {
+					port = configuration?.port;
+					pathPrefix = configuration?.pathPrefix || null;
+					customDomain = configuration?.domain;
+				}
+				if (customDomain) {
+					fqdn = customDomain
+				}
+				const domain = getDomain(fqdn);
+				const nakedDomain = domain.replace(/^www\./, '');
+				const isHttps = fqdn.startsWith('https://');
+				const isWWW = fqdn.includes('www.');
+				if (isHttps) {
+					traefik.http.routers[`${id}-${port || 'default'}`] = generateHttpRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix)
+					traefik.http.routers[`${id}-${port || 'default'}-secure`] = generateProtocolRedirectRouter(`${id}-${port || 'default'}-secure`, nakedDomain, pathPrefix, 'http-to-https')
+					traefik.http.services[`${id}-${port || 'default'}`] = generateLoadBalancerService(id, port)
+					if (dualCerts) {
+						traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
+							entrypoints: ['websecure'],
+							rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
+							service: `${id}`,
+							tls: isCustomSSL ? true : {
+								certresolver: 'letsencrypt'
+							},
+							middlewares: []
+						};
+					} else {
+						if (isWWW) {
+							traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
+								entrypoints: ['websecure'],
+								rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
+								service: `${id}`,
+								tls: isCustomSSL ? true : {
+									certresolver: 'letsencrypt'
+								},
+								middlewares: []
+							};
+							traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
+								entrypoints: ['websecure'],
+								rule: `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
+								service: `${id}`,
+								tls: {
+									domains: {
+										main: `${domain}`
+									}
+								},
+								middlewares: ['redirect-to-www']
+							};
+							traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-www');
+						} else {
+							traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
+								entrypoints: ['websecure'],
+								rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
+								service: `${id}`,
+								tls: {
+									domains: {
+										main: `${domain}`
+									}
+								},
+								middlewares: ['redirect-to-non-www']
+							};
+							traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
+								entrypoints: ['websecure'],
+								rule: `Host(\`${domain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
+								service: `${id}`,
+								tls: isCustomSSL ? true : {
+									certresolver: 'letsencrypt'
+								},
+								middlewares: []
+							};
+							traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-non-www');
+						}
+					}
+				} else {
+					traefik.http.routers[`${id}-${port || 'default'}`] = generateHttpRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix)
+					traefik.http.routers[`${id}-${port || 'default'}-secure`] = generateProtocolRedirectRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix, 'https-to-http')
+					traefik.http.services[`${id}-${port || 'default'}`] = generateLoadBalancerService(id, port)
+
+					if (!dualCerts) {
+						if (isWWW) {
+							traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-www');
+							traefik.http.routers[`${id}-${port || 'default'}-secure`].middlewares.push('redirect-to-www');
+						} else {
+							traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-non-www');
+							traefik.http.routers[`${id}-${port || 'default'}-secure`].middlewares.push('redirect-to-non-www');
+						}
+					}
+				}
+			} catch (error) {
+				console.log('Error generating router for', id);
+				console.log(error)
 			}
-			if (customDomain) {
-				fqdn = customDomain
-			}
+
+		}
+	}
+}
+async function coolifyConfiguration(traefik: any) {
+	try {
+		const { fqdn, dualCerts } = await prisma.setting.findFirst();
+		if (fqdn) {
 			const domain = getDomain(fqdn);
 			const nakedDomain = domain.replace(/^www\./, '');
 			const isHttps = fqdn.startsWith('https://');
 			const isWWW = fqdn.includes('www.');
+			const id = isDev ? 'host.docker.internal' : 'coolify'
+			const container = isDev ? 'host.docker.internal' : 'coolify'
+			const port = 3000
+			const pathPrefix = '/'
+			const isCustomSSL = false
 			if (isHttps) {
 				traefik.http.routers[`${id}-${port || 'default'}`] = generateHttpRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix)
 				traefik.http.routers[`${id}-${port || 'default'}-secure`] = generateProtocolRedirectRouter(`${id}-${port || 'default'}-secure`, nakedDomain, pathPrefix, 'http-to-https')
@@ -377,108 +491,10 @@ async function serviceConfiguration(traefik: any, remoteId: string | null = null
 				}
 			}
 		}
-	}
-}
-async function coolifyConfiguration(traefik: any) {
-	const { fqdn, dualCerts } = await prisma.setting.findFirst();
-	let coolifyConfigurations = []
-	if (fqdn) {
-		const domain = getDomain(fqdn);
-		const nakedDomain = domain.replace(/^www\./, '');
-		const isHttps = fqdn.startsWith('https://');
-		const isWWW = fqdn.includes('www.');
-		coolifyConfigurations.push({
-			id: isDev ? 'host.docker.internal' : 'coolify',
-			container: isDev ? 'host.docker.internal' : 'coolify',
-			port: 3000,
-			domain,
-			nakedDomain,
-			isHttps,
-			isWWW,
-			isDualCerts: dualCerts,
-			pathPrefix: '/'
-		});
-	}
 
-
-	for (const coolify of coolifyConfigurations) {
-		const { id, pathPrefix, port, domain, nakedDomain, isHttps, isWWW, isDualCerts, scriptName, type, isCustomSSL } = coolify;
-		if (isHttps) {
-			traefik.http.routers[`${id}-${port || 'default'}`] = generateHttpRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix)
-			traefik.http.routers[`${id}-${port || 'default'}-secure`] = generateProtocolRedirectRouter(`${id}-${port || 'default'}-secure`, nakedDomain, pathPrefix, 'http-to-https')
-			traefik.http.services[`${id}-${port || 'default'}`] = generateLoadBalancerService(id, port)
-			if (dualCerts) {
-				traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
-					entrypoints: ['websecure'],
-					rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-					service: `${id}`,
-					tls: isCustomSSL ? true : {
-						certresolver: 'letsencrypt'
-					},
-					middlewares: []
-				};
-			} else {
-				if (isWWW) {
-					traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
-						entrypoints: ['websecure'],
-						rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-						service: `${id}`,
-						tls: isCustomSSL ? true : {
-							certresolver: 'letsencrypt'
-						},
-						middlewares: []
-					};
-					traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
-						entrypoints: ['websecure'],
-						rule: `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-						service: `${id}`,
-						tls: {
-							domains: {
-								main: `${domain}`
-							}
-						},
-						middlewares: ['redirect-to-www']
-					};
-					traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-www');
-				} else {
-					traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
-						entrypoints: ['websecure'],
-						rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-						service: `${id}`,
-						tls: {
-							domains: {
-								main: `${domain}`
-							}
-						},
-						middlewares: ['redirect-to-non-www']
-					};
-					traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
-						entrypoints: ['websecure'],
-						rule: `Host(\`${domain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-						service: `${id}`,
-						tls: isCustomSSL ? true : {
-							certresolver: 'letsencrypt'
-						},
-						middlewares: []
-					};
-					traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-non-www');
-				}
-			}
-		} else {
-			traefik.http.routers[`${id}-${port || 'default'}`] = generateHttpRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix)
-			traefik.http.routers[`${id}-${port || 'default'}-secure`] = generateProtocolRedirectRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix, 'https-to-http')
-			traefik.http.services[`${id}-${port || 'default'}`] = generateLoadBalancerService(id, port)
-
-			if (!dualCerts) {
-				if (isWWW) {
-					traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-www');
-					traefik.http.routers[`${id}-${port || 'default'}-secure`].middlewares.push('redirect-to-www');
-				} else {
-					traefik.http.routers[`${id}-${port || 'default'}`].middlewares.push('redirect-to-non-www');
-					traefik.http.routers[`${id}-${port || 'default'}-secure`].middlewares.push('redirect-to-non-www');
-				}
-			}
-		}
+	} catch (error) {
+		console.log('Cannot generate traefik config for Coolify.')
+		console.log(error)
 	}
 }
 function generateLoadBalancerService(id, port) {
