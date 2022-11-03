@@ -120,7 +120,7 @@ async function applicationConfiguration(traefik: any, remoteId: string | null = 
 				if (dualCerts) {
 					traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 						entrypoints: ['websecure'],
-						rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`${pathPrefix}\`)`,
+						rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 						service: `${id}`,
 						tls: isCustomSSL ? true : {
 							certresolver: 'letsencrypt'
@@ -131,7 +131,7 @@ async function applicationConfiguration(traefik: any, remoteId: string | null = 
 					if (isWWW) {
 						traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
 							entrypoints: ['websecure'],
-							rule: `Host(\`www.${nakedDomain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+							rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 							service: `${id}`,
 							tls: isCustomSSL ? true : {
 								certresolver: 'letsencrypt'
@@ -140,7 +140,7 @@ async function applicationConfiguration(traefik: any, remoteId: string | null = 
 						};
 						traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 							entrypoints: ['websecure'],
-							rule: `Host(\`${nakedDomain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+							rule: `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 							service: `${id}`,
 							tls: {
 								domains: {
@@ -153,7 +153,7 @@ async function applicationConfiguration(traefik: any, remoteId: string | null = 
 					} else {
 						traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
 							entrypoints: ['websecure'],
-							rule: `Host(\`www.${nakedDomain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+							rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 							service: `${id}`,
 							tls: {
 								domains: {
@@ -164,7 +164,7 @@ async function applicationConfiguration(traefik: any, remoteId: string | null = 
 						};
 						traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 							entrypoints: ['websecure'],
-							rule: `Host(\`${domain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+							rule: `Host(\`${domain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 							service: `${id}`,
 							tls: isCustomSSL ? true : {
 								certresolver: 'letsencrypt'
@@ -304,7 +304,7 @@ async function serviceConfiguration(traefik: any, remoteId: string | null = null
 				if (dualCerts) {
 					traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 						entrypoints: ['websecure'],
-						rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`${pathPrefix}\`)`,
+						rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 						service: `${id}`,
 						tls: isCustomSSL ? true : {
 							certresolver: 'letsencrypt'
@@ -315,7 +315,7 @@ async function serviceConfiguration(traefik: any, remoteId: string | null = null
 					if (isWWW) {
 						traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
 							entrypoints: ['websecure'],
-							rule: `Host(\`www.${nakedDomain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+							rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 							service: `${id}`,
 							tls: isCustomSSL ? true : {
 								certresolver: 'letsencrypt'
@@ -324,7 +324,7 @@ async function serviceConfiguration(traefik: any, remoteId: string | null = null
 						};
 						traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 							entrypoints: ['websecure'],
-							rule: `Host(\`${nakedDomain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+							rule: `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 							service: `${id}`,
 							tls: {
 								domains: {
@@ -337,7 +337,7 @@ async function serviceConfiguration(traefik: any, remoteId: string | null = null
 					} else {
 						traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
 							entrypoints: ['websecure'],
-							rule: `Host(\`www.${nakedDomain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+							rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 							service: `${id}`,
 							tls: {
 								domains: {
@@ -348,7 +348,7 @@ async function serviceConfiguration(traefik: any, remoteId: string | null = null
 						};
 						traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 							entrypoints: ['websecure'],
-							rule: `Host(\`${domain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+							rule: `Host(\`${domain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 							service: `${id}`,
 							tls: isCustomSSL ? true : {
 								certresolver: 'letsencrypt'
@@ -407,7 +407,7 @@ async function coolifyConfiguration(traefik: any) {
 			if (dualCerts) {
 				traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 					entrypoints: ['websecure'],
-					rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`)) && PathPrefix(\`${pathPrefix}\`)`,
+					rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 					service: `${id}`,
 					tls: isCustomSSL ? true : {
 						certresolver: 'letsencrypt'
@@ -418,7 +418,7 @@ async function coolifyConfiguration(traefik: any) {
 				if (isWWW) {
 					traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
 						entrypoints: ['websecure'],
-						rule: `Host(\`www.${nakedDomain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+						rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 						service: `${id}`,
 						tls: isCustomSSL ? true : {
 							certresolver: 'letsencrypt'
@@ -427,7 +427,7 @@ async function coolifyConfiguration(traefik: any) {
 					};
 					traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 						entrypoints: ['websecure'],
-						rule: `Host(\`${nakedDomain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+						rule: `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 						service: `${id}`,
 						tls: {
 							domains: {
@@ -440,7 +440,7 @@ async function coolifyConfiguration(traefik: any) {
 				} else {
 					traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
 						entrypoints: ['websecure'],
-						rule: `Host(\`www.${nakedDomain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+						rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 						service: `${id}`,
 						tls: {
 							domains: {
@@ -451,7 +451,7 @@ async function coolifyConfiguration(traefik: any) {
 					};
 					traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 						entrypoints: ['websecure'],
-						rule: `Host(\`${domain}\`) && PathPrefix(\`${pathPrefix}\`)`,
+						rule: `Host(\`${domain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 						service: `${id}`,
 						tls: isCustomSSL ? true : {
 							certresolver: 'letsencrypt'
@@ -492,7 +492,7 @@ function generateLoadBalancerService(id, port) {
 function generateHttpRouter(id, nakedDomain, pathPrefix) {
 	return {
 		entrypoints: ['web'],
-		rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? `&& PathPrefix(\`${pathPrefix}\`)` : ''}`,
+		rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 		service: `${id}`,
 		middlewares: []
 	}
@@ -501,7 +501,7 @@ function generateProtocolRedirectRouter(id, nakedDomain, pathPrefix, fromTo) {
 	if (fromTo === 'https-to-http') {
 		return {
 			entrypoints: ['websecure'],
-			rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? `&& PathPrefix(\`${pathPrefix}\`)` : ''}`,
+			rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 			service: `${id}`,
 			tls: {
 				domains: {
@@ -513,7 +513,7 @@ function generateProtocolRedirectRouter(id, nakedDomain, pathPrefix, fromTo) {
 	} else if (fromTo === 'http-to-https') {
 		return {
 			entrypoints: ['web'],
-			rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? `&& PathPrefix(\`${pathPrefix}\`)` : ''}`,
+			rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 			service: `${id}`,
 			middlewares: ['redirect-to-https']
 		};
