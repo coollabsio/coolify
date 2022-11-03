@@ -34,7 +34,6 @@ export async function migrateServicesToNewTemplate() {
             if (!service.type) {
                 continue;
             }
-            console.log(service.type)
             let template = templates.find(t => fixType(t.type) === fixType(service.type));
             if (template) {
                 template = JSON.parse(JSON.stringify(template).replaceAll('$$id', service.id))

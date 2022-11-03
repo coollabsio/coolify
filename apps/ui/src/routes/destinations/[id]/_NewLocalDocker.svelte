@@ -31,7 +31,7 @@
 
 <div class="flex justify-center px-6 pb-8">
 	<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
-		<div class="flex items-start lg:items-center space-x-0 lg:space-x-4 pb-5 flex-col space-y-4 lg:space-y-0">
+		<div class="flex items-start lg:items-center space-x-0 lg:space-x-4 pb-5 flex-col lg:flex-row space-y-4 lg:space-y-0">
 			<div class="title font-bold">{$t('forms.configuration')}</div>
 			<button type="submit" class="btn btn-sm bg-destinations w-full lg:w-fit" class:loading disabled={loading}
 				>{loading

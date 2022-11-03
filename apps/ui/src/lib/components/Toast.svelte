@@ -4,7 +4,7 @@
 	export let type = 'info';
 	function success() {
 		if (type === 'success') {
-			return 'bg-coollabs';
+			return 'bg-dark lg:bg-primary';
 		}
 	}
 </script>

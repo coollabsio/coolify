@@ -505,56 +505,59 @@ export async function createRemoteEngineConfiguration(id: string) {
 	const localPort = await getFreeSSHLocalPort(id);
 	const {
 		sshKey: { privateKey },
+		network,
 		remoteIpAddress,
 		remotePort,
 		remoteUser
 	} = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } });
 	await fs.writeFile(sshKeyFile, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 });
 	// Needed for remote docker compose
-	const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(
-		`ps ax | grep [s]sh-agent | grep coolify-ssh-agent.pid | grep -v grep | wc -l`
-	);
-	if (numberOfSSHAgentsRunning !== '' && Number(numberOfSSHAgentsRunning.trim()) == 0) {
-		try {
-			await fs.stat(`/tmp/coolify-ssh-agent.pid`);
-			await fs.rm(`/tmp/coolify-ssh-agent.pid`);
-		} catch (error) { }
-		await asyncExecShell(`eval $(ssh-agent -sa /tmp/coolify-ssh-agent.pid)`);
-	}
-	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh-add -q ${sshKeyFile}`);
+	// const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(
+	// 	`ps ax | grep [s]sh-agent | grep coolify-ssh-agent.pid | grep -v grep | wc -l`
+	// );
+	// if (numberOfSSHAgentsRunning !== '' && Number(numberOfSSHAgentsRunning.trim()) == 0) {
+	// 	try {
+	// 		await fs.stat(`/tmp/coolify-ssh-agent.pid`);
+	// 		await fs.rm(`/tmp/coolify-ssh-agent.pid`);
+	// 	} catch (error) { }
+	// 	await asyncExecShell(`eval $(ssh-agent -sa /tmp/coolify-ssh-agent.pid)`);
+	// }
+	// await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh-add -q ${sshKeyFile}`);
 
-	const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(
-		`ps ax | grep 'ssh -F /dev/null -o StrictHostKeyChecking no -fNL ${localPort}:localhost:${remotePort}' | grep -v grep | wc -l`
-	);
-	if (numberOfSSHTunnelsRunning !== '' && Number(numberOfSSHTunnelsRunning.trim()) == 0) {
-		try {
-			await asyncExecShell(
-				`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh -F /dev/null -o "StrictHostKeyChecking no" -fNL ${localPort}:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`
-			);
-		} catch (error) { }
-	}
+	// const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(
+	// 	`ps ax | grep 'ssh -F /dev/null -o StrictHostKeyChecking no -fNL ${localPort}:localhost:${remotePort}' | grep -v grep | wc -l`
+	// );
+	// if (numberOfSSHTunnelsRunning !== '' && Number(numberOfSSHTunnelsRunning.trim()) == 0) {
+	// 	try {
+	// 		await asyncExecShell(
+	// 			`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh -F /dev/null -o "StrictHostKeyChecking no" -fNL ${localPort}:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`
+	// 		);
+	// 	} catch (error) { }
+	// }
 	const config = sshConfig.parse('');
-	const foundWildcard = config.find({ Host: '*' });
-	if (!foundWildcard) {
-		config.append({
-			Host: '*',
-			StrictHostKeyChecking: 'no',
-			ControlMaster: 'auto',
-			ControlPath: `${homedir}/.ssh/coolify-%r@%h:%p`,
-			ControlPersist: '10m'
-		})
-	}
-	const found = config.find({ Host: remoteIpAddress });
-	if (!found) {
-		config.append({
-			Host: remoteIpAddress,
-			Hostname: 'localhost',
-			Port: localPort.toString(),
-			User: remoteUser,
-			IdentityFile: sshKeyFile,
-			StrictHostKeyChecking: 'no'
-		});
-	}
+	const Host = `${remoteIpAddress}-remote`
+
+	await asyncExecShell(`ssh-keygen -R ${Host}`);
+	await asyncExecShell(`ssh-keygen -R ${remoteIpAddress}`);
+	await asyncExecShell(`ssh-keygen -R localhost:${localPort}`);
+
+	const found = config.find({ Host });
+	const foundIp = config.find({ Host: remoteIpAddress });
+	
+	if (found) config.remove({ Host })
+	if (foundIp) config.remove({ Host: remoteIpAddress })
+
+	config.append({
+		Host,
+		Hostname: remoteIpAddress,
+		Port: remotePort.toString(),
+		User: remoteUser,
+		StrictHostKeyChecking: 'no',
+		IdentityFile: sshKeyFile,
+		ControlMaster: 'auto',
+		ControlPath: `${homedir}/.ssh/coolify-${remoteIpAddress}-%r@%h:%p`,
+		ControlPersist: '10m'
+	});
 
 	try {
 		await fs.stat(`${homedir}/.ssh/`);
@@ -565,27 +568,23 @@ export async function createRemoteEngineConfiguration(id: string) {
 }
 export async function executeSSHCmd({ dockerId, command }) {
 	const { execaCommand } = await import('execa')
-	let { remoteEngine, remoteIpAddress, engine, remoteUser } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
+	let { remoteEngine, remoteIpAddress } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
 	if (remoteEngine) {
 		await createRemoteEngineConfiguration(dockerId)
-		engine = `ssh://${remoteIpAddress}`
-	} else {
-		engine = 'unix:///var/run/docker.sock'
 	}
 	if (process.env.CODESANDBOX_HOST) {
 		if (command.startsWith('docker compose')) {
 			command = command.replace(/docker compose/gi, 'docker-compose')
 		}
 	}
-	command = `ssh ${remoteIpAddress} ${command}`
-	return await execaCommand(command)
+	return await execaCommand(`ssh ${remoteIpAddress}-remote ${command}`)
 }
 export async function executeDockerCmd({ debug, buildId, applicationId, dockerId, command }: { debug?: boolean, buildId?: string, applicationId?: string, dockerId: string, command: string }): Promise<any> {
 	const { execaCommand } = await import('execa')
-	let { remoteEngine, remoteIpAddress, engine, remoteUser } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
+	let { remoteEngine, remoteIpAddress, engine } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
 	if (remoteEngine) {
 		await createRemoteEngineConfiguration(dockerId);
-		engine = `ssh://${remoteIpAddress}`;
+		engine = `ssh://${remoteIpAddress}-remote`;
 	} else {
 		engine = 'unix:///var/run/docker.sock';
 	}

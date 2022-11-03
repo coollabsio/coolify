@@ -184,14 +184,16 @@
 					? 'Verify Remote Docker Engine'
 					: 'Check Remote Docker Engine'}</button
 			>
-
-			<button
-				class="btn btn-sm"
-				class:loading={loading.restart}
-				class:bg-error={!loading.restart}
-				disabled={loading.restart}
-				on:click|preventDefault={forceRestartProxy}>{$t('destination.force_restart_proxy')}</button
-			>
+			{#if destination.remoteVerified}
+				<button
+					class="btn btn-sm"
+					class:loading={loading.restart}
+					class:bg-error={!loading.restart}
+					disabled={loading.restart}
+					on:click|preventDefault={forceRestartProxy}
+					>{$t('destination.force_restart_proxy')}</button
+				>
+			{/if}
 		{/if}
 	</div>
 	<div class="grid grid-cols-2 items-center px-10 ">
