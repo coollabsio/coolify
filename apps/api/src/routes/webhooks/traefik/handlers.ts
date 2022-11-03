@@ -34,33 +34,36 @@ async function applicationConfiguration(traefik: any, remoteId: string | null = 
 				const { network, id: dockerId } = destinationDocker;
 				const isRunning = true;
 				if (buildPack === 'compose') {
+					console.log(dockerComposeConfiguration)
 					const services = Object.entries(JSON.parse(dockerComposeConfiguration))
-					for (const service of services) {
-						const [key, value] = service
-						if (value.fqdn) {
-							const { fqdn } = value
-							const domain = getDomain(fqdn);
-							const nakedDomain = domain.replace(/^www\./, '');
-							const isHttps = fqdn.startsWith('https://');
-							const isWWW = fqdn.includes('www.');
-							configurableApplications.push({
-								id: `${id}-${key}`,
-								container: `${id}-${key}`,
-								port: value.customPort ? value.customPort : port || 3000,
-								domain,
-								nakedDomain,
-								isRunning,
-								isHttps,
-								isWWW,
-								isDualCerts: dualCerts,
-								isCustomSSL,
-								pathPrefix: '/'
-							});
+					console.log(services)
+					if (services.length > 0) {
+						for (const service of services) {
+							const [key, value] = service
+							if (key && value && value.fqdn) {
+								const { fqdn } = value
+								const domain = getDomain(fqdn);
+								const nakedDomain = domain.replace(/^www\./, '');
+								const isHttps = fqdn.startsWith('https://');
+								const isWWW = fqdn.includes('www.');
+								configurableApplications.push({
+									id: `${id}-${key}`,
+									container: `${id}-${key}`,
+									port: value.customPort ? value.customPort : port || 3000,
+									domain,
+									nakedDomain,
+									isRunning,
+									isHttps,
+									isWWW,
+									isDualCerts: dualCerts,
+									isCustomSSL,
+									pathPrefix: '/'
+								});
+							}
 						}
 					}
 					continue;
 				}
-
 				if (fqdn) {
 					const domain = getDomain(fqdn);
 					const nakedDomain = domain.replace(/^www\./, '');
