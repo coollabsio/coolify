@@ -132,7 +132,7 @@ async function appwrite(service: any, template: any) {
     await migrateSettings(settings, service, template);
 
     // Disconnect old service data
-    await prisma.service.update({ where: { id: service.id }, data: { appwrite: { disconnect: true } } })
+    // await prisma.service.update({ where: { id: service.id }, data: { appwrite: { disconnect: true } } })
 }
 async function weblate(service: any, template: any) {
     const { adminPassword, postgresqlUser, postgresqlPassword, postgresqlDatabase } = service.weblate
@@ -155,7 +155,7 @@ async function weblate(service: any, template: any) {
     await migrateSecrets(secrets, service);
 
     // Disconnect old service data
-    await prisma.service.update({ where: { id: service.id }, data: { weblate: { disconnect: true } } })
+    // await prisma.service.update({ where: { id: service.id }, data: { weblate: { disconnect: true } } })
 }
 async function searxng(service: any, template: any) {
     const { secretKey, redisPassword } = service.searxng
@@ -172,7 +172,7 @@ async function searxng(service: any, template: any) {
     await migrateSecrets(secrets, service);
 
     // Disconnect old service data
-    await prisma.service.update({ where: { id: service.id }, data: { searxng: { disconnect: true } } })
+    // await prisma.service.update({ where: { id: service.id }, data: { searxng: { disconnect: true } } })
 }
 async function glitchtip(service: any, template: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, secretKeyBase, defaultEmail, defaultUsername, defaultPassword, defaultEmailFrom, emailSmtpHost, emailSmtpPort, emailSmtpUser, emailSmtpPassword, emailSmtpUseTls, emailSmtpUseSsl, emailBackend, mailgunApiKey, sendgridApiKey, enableOpenUserRegistration } = service.glitchTip
@@ -204,7 +204,7 @@ async function glitchtip(service: any, template: any) {
 
     await prisma.service.update({ where: { id: service.id }, data: { type: 'glitchtip' } })
     // Disconnect old service data
-    await prisma.service.update({ where: { id: service.id }, data: { glitchTip: { disconnect: true } } })
+    // await prisma.service.update({ where: { id: service.id }, data: { glitchTip: { disconnect: true } } })
 }
 async function hasura(service: any, template: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, graphQLAdminPassword } = service.hasura
@@ -223,7 +223,7 @@ async function hasura(service: any, template: any) {
     await migrateSecrets(secrets, service);
 
     // Disconnect old service data
-    await prisma.service.update({ where: { id: service.id }, data: { hasura: { disconnect: true } } })
+    // await prisma.service.update({ where: { id: service.id }, data: { hasura: { disconnect: true } } })
 }
 async function umami(service: any, template: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, umamiAdminPassword, hashSalt } = service.umami
@@ -244,7 +244,7 @@ async function umami(service: any, template: any) {
     await migrateSecrets(secrets, service);
 
     // Disconnect old service data
-    await prisma.service.update({ where: { id: service.id }, data: { umami: { disconnect: true } } })
+    // await prisma.service.update({ where: { id: service.id }, data: { umami: { disconnect: true } } })
 }
 async function meilisearch(service: any, template: any) {
     const { masterKey } = service.meiliSearch
@@ -257,7 +257,7 @@ async function meilisearch(service: any, template: any) {
     await migrateSecrets(secrets, service);
 
     // Disconnect old service data
-    await prisma.service.update({ where: { id: service.id }, data: { meiliSearch: { disconnect: true } } })
+    // await prisma.service.update({ where: { id: service.id }, data: { meiliSearch: { disconnect: true } } })
 }
 async function ghost(service: any, template: any) {
     const { defaultEmail, defaultPassword, mariadbUser, mariadbPassword, mariadbRootUser, mariadbRootUserPassword, mariadbDatabase } = service.ghost
@@ -290,7 +290,7 @@ async function ghost(service: any, template: any) {
     await prisma.service.update({ where: { id: service.id }, data: { type: "ghost-mariadb" } })
 
     // Disconnect old service data
-    await prisma.service.update({ where: { id: service.id }, data: { ghost: { disconnect: true } } })
+    // await prisma.service.update({ where: { id: service.id }, data: { ghost: { disconnect: true } } })
 }
 async function wordpress(service: any, template: any) {
     const { extraConfig, tablePrefix, ownMysql, mysqlHost, mysqlPort, mysqlUser, mysqlPassword, mysqlRootUser, mysqlRootUserPassword, mysqlDatabase, ftpEnabled, ftpUser, ftpPassword, ftpPublicPort, ftpHostKey, ftpHostKeyPrivate } = service.wordpress
@@ -370,7 +370,7 @@ async function minio(service: any, template: any) {
     await migrateSecrets(secrets, service);
 
     // Disconnect old service data
-    await prisma.service.update({ where: { id: service.id }, data: { minio: { disconnect: true } } })
+    // await prisma.service.update({ where: { id: service.id }, data: { minio: { disconnect: true } } })
 }
 async function fider(service: any, template: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, jwtSecret, emailNoreply, emailMailgunApiKey, emailMailgunDomain, emailMailgunRegion, emailSmtpHost, emailSmtpPort, emailSmtpUser, emailSmtpPassword, emailSmtpEnableStartTls } = service.fider
@@ -399,7 +399,7 @@ async function fider(service: any, template: any) {
     await migrateSecrets(secrets, service);
 
     // Disconnect old service data
-    await prisma.service.update({ where: { id: service.id }, data: { fider: { disconnect: true } } })
+    // await prisma.service.update({ where: { id: service.id }, data: { fider: { disconnect: true } } })
 
 }
 async function plausibleAnalytics(service: any, template: any) {
@@ -426,7 +426,7 @@ async function plausibleAnalytics(service: any, template: any) {
     await migrateSecrets(secrets, service);
 
     // Disconnect old service data
-    await prisma.service.update({ where: { id: service.id }, data: { plausibleAnalytics: { disconnect: true } } })
+    // await prisma.service.update({ where: { id: service.id }, data: { plausibleAnalytics: { disconnect: true } } })
 }
 
 async function migrateSettings(settings: any[], service: any, template: any) {
