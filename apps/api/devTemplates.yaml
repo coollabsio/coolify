@@ -6,9 +6,9 @@
     $$id:
       image: appsmith/appsmith-ce:$$core_version
       environment: 
-        - APPSMITH_MAIL_ENABLED: $$config_appsmith_mail_enabled
-        - APPSMITH_DISABLE_TELEMETRY: $$config_appsmith_disable_telemetry
-        - APPSMITH_DISABLE_INTERCOM: $$config_appsmith_disable_intercom
+      - APPSMITH_MAIL_ENABLED=$$config_appsmith_mail_enabled
+      - APPSMITH_DISABLE_TELEMETRY=$$config_appsmith_disable_telemetry
+      - APPSMITH_DISABLE_INTERCOM=$$config_appsmith_disable_intercom
       volumes:
         - $$id-stacks-data:/appsmith-stacks
       ports:
@@ -17,17 +17,17 @@
     - id: $$config_appsmith_mail_enabled
       name: APPSMITH_MAIL_ENABLED
       label: Enable Mail
-      defaultValue: false
+      defaultValue: 'false'
       description: ''
     - id: $$config_appsmith_disable_telemetry
       name: APPSMITH_DISABLE_TELEMETRY
       label: Disable Telemetry
-      defaultValue: true
+      defaultValue: 'true'
       description: ''
     - id: $$config_appsmith_disable_intercom
       name: APPSMITH_DISABLE_INTERCOM
       label: Disable Intercom
-      defaultValue: true
+      defaultValue: 'true'
       description: ''
   documentation: https://hub.docker.com/r/zadam/trilium
 - templateVersion: 1.0.0

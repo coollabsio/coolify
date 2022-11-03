@@ -40,10 +40,11 @@ export async function refreshTags() {
 	try {
 		const { default: got } = await import('got')
 		try {
-			const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text()
 			if (isDev) {
+				const tags = await fs.readFile('./devTags.json', 'utf8')
 				await fs.writeFile('./tags.json', tags)
 			} else {
+				const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text()
 				await fs.writeFile('/app/tags.json', tags)
 			}
 		} catch (error) {

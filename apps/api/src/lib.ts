@@ -356,7 +356,7 @@ async function vscodeserver(service: any, template: any) {
 }
 async function minio(service: any, template: any) {
     const { rootUser, rootUserPassword, apiFqdn } = service.minio
-
+    console.log(apiFqdn)
     const secrets = [
         `MINIO_ROOT_PASSWORD@@@${rootUserPassword}`,
     ]
@@ -433,6 +433,11 @@ async function migrateSettings(settings: any[], service: any, template: any) {
     for (const setting of settings) {
         if (!setting) continue;
         let [name, value] = setting.split('@@@')
+        let minio = null
+        if (name === 'MINIO_SERVER_URL') {
+            minio = name
+            name = 'coolify_fqdn_minio_console'
+        }
         if (!value || value === 'null') {
             continue;
         }
@@ -440,9 +445,9 @@ async function migrateSettings(settings: any[], service: any, template: any) {
         if (!variableName) {
             variableName = `$$config_${name.toLowerCase()}`
         }
-        // console.log('Migrating setting', name, value, 'for service', service.id, ', service name:', service.name, 'variableName: ', variableName)
+        console.log('Migrating setting', name, value, 'for service', service.id, ', service name:', service.name, 'variableName: ', variableName)
 
-        await prisma.serviceSetting.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name, value, variableName, service: { connect: { id: service.id } } } })
+        await prisma.serviceSetting.findFirst({ where: { name: minio, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name: minio, value, variableName, service: { connect: { id: service.id } } } })
     }
 }
 async function migrateSecrets(secrets: any[], service: any) {
