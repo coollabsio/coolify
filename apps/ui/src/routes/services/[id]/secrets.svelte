@@ -83,7 +83,7 @@
 				{#each secrets as secret}
 					{#key secret.id}
 						<tr>
-							<Secret name={secret.name} value={secret.value} readonly={secret.readonly} on:refresh={refreshSecrets} />
+							<Secret name={secret.name} value={secret.value} readonly={secret.readOnly} on:refresh={refreshSecrets} />
 						</tr>
 					{/key}
 				{/each}

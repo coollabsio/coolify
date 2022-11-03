@@ -519,8 +519,8 @@
 										<CopyPasswordField
 											isPasswordField={variable.id.startsWith('secret')}
 											required={variable?.required}
-											readonly={variable.readonly || isDisabled}
-											disabled={variable.readonly || isDisabled}
+											readonly={variable.readOnly || isDisabled}
+											disabled={variable.readOnly || isDisabled}
 											name={variable.name}
 											id={variable.name}
 											value={variable.value}

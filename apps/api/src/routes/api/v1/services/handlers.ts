@@ -168,14 +168,14 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                             const main = variable?.main || '$$id'
                             const type = variable?.type || 'input'
                             const placeholder = variable?.placeholder || ''
-                            const readonly = variable?.readonly || false
+                            const readOnly = variable?.readOnly || false
                             const required = variable?.required || false
                             if (envValue.startsWith('$$config') || variable?.showOnConfiguration) {
                                 if (envValue.startsWith('$$config_coolify')) {
                                     continue
                                 }
                                 parsedTemplate[realKey].environment.push(
-                                    { id, name: envKey, value: envValue, main, label, description, defaultValue, type, placeholder, required, readonly }
+                                    { id, name: envKey, value: envValue, main, label, description, defaultValue, type, placeholder, required, readOnly }
                                 )
                             }
                         }
@@ -560,7 +560,7 @@ export async function getServiceSecrets(request: FastifyRequest<OnlyId>) {
         secrets = secrets.map((secret) => {
             const foundVariable = foundTemplate?.variables.find(v => v.name === secret.name) || null
             if (foundVariable) {
-                secret.readonly = foundVariable.readonly
+                secret.readOnly = foundVariable.readOnly
             }
             secret.value = decrypt(secret.value);
             return secret;
