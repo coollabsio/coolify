@@ -819,7 +819,7 @@ export async function saveRepository(request, reply) {
         let { repository, branch, projectId, autodeploy, webhookToken, isPublicRepository = false } = request.body
 
         repository = repository.toLowerCase();
-        branch = branch.toLowerCase();
+        
         projectId = Number(projectId);
         if (webhookToken) {
             await prisma.application.update({
