@@ -6,7 +6,7 @@
 
 {#if $toasts.length > 0}
 	<section>
-		<article class="toast toast-top toast-end rounded-none px-10" role="alert">
+		<article class="toast toast-top toast-center rounded-none min-w-[18rem]" role="alert">
 			{#each $toasts as toast (toast.id)}
 				<Toast
 					type={toast.type}
