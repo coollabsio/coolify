@@ -289,7 +289,7 @@ async function serviceConfiguration(traefik: any, remoteId: string | null = null
 			let port, pathPrefix, customDomain;
 			if (configuration) {
 				port = configuration?.port;
-				pathPrefix = configuration?.pathPrefix;
+				pathPrefix = configuration?.pathPrefix || null;
 				customDomain = configuration?.domain;
 			}
 			if (customDomain) {
