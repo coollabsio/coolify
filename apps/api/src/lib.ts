@@ -352,7 +352,7 @@ async function vscodeserver(service: any, template: any) {
     await migrateSecrets(secrets, service);
 
     // Disconnect old service data
-    await prisma.service.update({ where: { id: service.id }, data: { vscodeserver: { disconnect: true } } })
+    // await prisma.service.update({ where: { id: service.id }, data: { vscodeserver: { disconnect: true } } })
 }
 async function minio(service: any, template: any) {
     const { rootUser, rootUserPassword, apiFqdn } = service.minio

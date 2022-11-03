@@ -141,7 +141,7 @@ const host = '0.0.0.0';
 		await socketIOServer(fastify)
 		console.log(`Coolify's API is listening on ${host}:${port}`);
 
-		await migrateServicesToNewTemplate()
+		migrateServicesToNewTemplate()
 		await initServer();
 
 		const graceful = new Graceful({ brees: [scheduler] });
