@@ -3,7 +3,7 @@ import yaml from 'js-yaml';
 import got from 'got';
 
 const repositories = [];
-const templates = await fs.readFile('../devTemplates.yaml', 'utf8');
+const templates = await fs.readFile('./apps/api/devTemplates.yaml', 'utf8');
 const devTemplates = yaml.load(templates);
 for (const template of devTemplates) {
     let image = template.services['$$id'].image.replaceAll(':$$core_version', '');
@@ -64,4 +64,4 @@ for (const repository of repositories) {
         })
     }
 }
-await fs.writeFile('./tags.json', JSON.stringify(services));
+await fs.writeFile('./apps/api/devTags.json', JSON.stringify(services));

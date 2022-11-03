@@ -175,7 +175,7 @@ const host = '0.0.0.0';
 			await refreshTags()
 			await migrateServicesToNewTemplate()
 		}, 60000)
-	
+
 		setInterval(async () => {
 			await copySSLCertificates();
 		}, 10000)
@@ -215,13 +215,14 @@ async function getIPAddress() {
 async function getTagsTemplates() {
 	const { default: got } = await import('got')
 	try {
-		const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text()
 		if (isDev) {
 			const templates = await fs.readFile('./devTemplates.yaml', 'utf8')
+			const tags = await fs.readFile('./devTags.json', 'utf8')
 			await fs.writeFile('./templates.json', JSON.stringify(yaml.load(templates)))
 			await fs.writeFile('./tags.json', tags)
 			console.log('Tags and templates loaded in dev mode...')
 		} else {
+			const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text()
 			const response = await got.get('https://get.coollabs.io/coolify/service-templates.yaml').text()
 			await fs.writeFile('/app/templates.json', JSON.stringify(yaml.load(response)))
 			await fs.writeFile('/app/tags.json', tags)
@@ -387,17 +388,17 @@ async function checkProxies() {
 		}
 
 		// HTTP Proxies
-		const minioInstances = await prisma.minio.findMany({
-			where: { publicPort: { not: null } },
-			include: { service: { include: { destinationDocker: true } } }
-		});
-		for (const minio of minioInstances) {
-			const { service, publicPort } = minio;
-			const { destinationDockerId, destinationDocker, id } = service;
-			if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-				await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
-			}
-		}
+		// const minioInstances = await prisma.minio.findMany({
+		// 	where: { publicPort: { not: null } },
+		// 	include: { service: { include: { destinationDocker: true } } }
+		// });
+		// for (const minio of minioInstances) {
+		// 	const { service, publicPort } = minio;
+		// 	const { destinationDockerId, destinationDocker, id } = service;
+		// 	if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
+		// 		await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
+		// 	}
+		// }
 	} catch (error) {
 
 	}

@@ -35,9 +35,7 @@ async function applicationConfiguration(traefik: any, remoteId: string | null = 
 					const { network, id: dockerId } = destinationDocker;
 					const isRunning = true;
 					if (buildPack === 'compose') {
-						console.log(dockerComposeConfiguration)
 						const services = Object.entries(JSON.parse(dockerComposeConfiguration))
-						console.log(services)
 						if (services.length > 0) {
 							for (const service of services) {
 								const [key, value] = service
@@ -637,80 +635,40 @@ export async function traefikOtherConfiguration(request: FastifyRequest<TraefikO
 					};
 				} else if (type === 'http') {
 					const service = await prisma.service.findFirst({
-						where: { id },
-						include: { serviceSetting: true }
+						where: { id }
 					});
-					if (service) {
-						if (service.type === 'minio') {
-							const domainSetting = service.serviceSetting.find((a) => a.name === 'MINIO_SERVER_URL')?.value
-							const domain = getDomain(domainSetting);
-							const isHttps = domainSetting.startsWith('https://');
-							traefik = {
-								[type]: {
-									routers: {
-										[id]: {
-											entrypoints: [type],
-											rule: `Host(\`${domain}\`)`,
-											service: id
-										}
-									},
-									services: {
-										[id]: {
-											loadbalancer: {
-												servers: [{ url: `http://${id}:${privatePort}` }]
-											}
+					if (service && service?.fqdn) {
+						const domain = getDomain(service.fqdn);
+						const isHttps = service.fqdn.startsWith('https://');
+						traefik = {
+							[type]: {
+								routers: {
+									[id]: {
+										entrypoints: [type],
+										rule: `Host(\`${domain}:${privatePort}\`)`,
+										service: id
+									}
+								},
+								services: {
+									[id]: {
+										loadbalancer: {
+											servers: [{ url: `http://${id}:${privatePort}` }]
 										}
 									}
-								}
-							};
-							if (isHttps) {
-								if (isDev) {
-									traefik[type].routers[id].tls = {
-										domains: {
-											main: `${domain}`
-										}
-									};
-								} else {
-									traefik[type].routers[id].tls = {
-										certresolver: 'letsencrypt'
-									};
 								}
 							}
-						} else {
-							if (service?.fqdn) {
-								const domain = getDomain(service.fqdn);
-								const isHttps = service.fqdn.startsWith('https://');
-								traefik = {
-									[type]: {
-										routers: {
-											[id]: {
-												entrypoints: [type],
-												rule: `Host(\`${domain}:${privatePort}\`)`,
-												service: id
-											}
-										},
-										services: {
-											[id]: {
-												loadbalancer: {
-													servers: [{ url: `http://${id}:${privatePort}` }]
-												}
-											}
-										}
+						};
+						if (isHttps) {
+							if (isDev) {
+								traefik[type].routers[id].tls = {
+									domains: {
+										main: `${domain}`
 									}
 								};
-								if (isHttps) {
-									if (isDev) {
-										traefik[type].routers[id].tls = {
-											domains: {
-												main: `${domain}`
-											}
-										};
-									} else {
-										traefik[type].routers[id].tls = {
-											certresolver: 'letsencrypt'
-										};
-									}
-								}
+							} else {
+								traefik[type].routers[id].tls = {
+									certresolver: 'letsencrypt'
+								};
 							}
 						}
 					} else {
