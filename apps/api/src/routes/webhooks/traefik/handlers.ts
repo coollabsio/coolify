@@ -21,6 +21,7 @@ async function applicationConfiguration(traefik: any, remoteId: string | null = 
 	const configurableApplications = []
 	if (applications.length > 0) {
 		for (const application of applications) {
+			console.log(application)
 			const {
 				fqdn,
 				id,
@@ -113,6 +114,7 @@ async function applicationConfiguration(traefik: any, remoteId: string | null = 
 			}
 		}
 		for (const application of configurableApplications) {
+			console.log(application.id)
 			let { id, port, isCustomSSL, pathPrefix, isHttps, nakedDomain, isWWW, domain, dualCerts } = application
 			if (isHttps) {
 				traefik.http.routers[`${id}-${port || 'default'}`] = generateHttpRouter(`${id}-${port || 'default'}`, nakedDomain, pathPrefix)
