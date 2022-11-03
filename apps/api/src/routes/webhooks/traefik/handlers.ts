@@ -128,7 +128,7 @@ async function applicationConfiguration(traefik: any, remoteId: string | null = 
 						traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 							entrypoints: ['websecure'],
 							rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-							service: `${id}`,
+							service: `${id}-${port || 'default'}`,
 							tls: isCustomSSL ? true : {
 								certresolver: 'letsencrypt'
 							},
@@ -139,7 +139,7 @@ async function applicationConfiguration(traefik: any, remoteId: string | null = 
 							traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
 								entrypoints: ['websecure'],
 								rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-								service: `${id}`,
+								service: `${id}-${port || 'default'}`,
 								tls: isCustomSSL ? true : {
 									certresolver: 'letsencrypt'
 								},
@@ -148,7 +148,7 @@ async function applicationConfiguration(traefik: any, remoteId: string | null = 
 							traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 								entrypoints: ['websecure'],
 								rule: `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-								service: `${id}`,
+								service: `${id}-${port || 'default'}`,
 								tls: {
 									domains: {
 										main: `${domain}`
@@ -161,7 +161,7 @@ async function applicationConfiguration(traefik: any, remoteId: string | null = 
 							traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
 								entrypoints: ['websecure'],
 								rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-								service: `${id}`,
+								service: `${id}-${port || 'default'}`,
 								tls: {
 									domains: {
 										main: `${domain}`
@@ -172,7 +172,7 @@ async function applicationConfiguration(traefik: any, remoteId: string | null = 
 							traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 								entrypoints: ['websecure'],
 								rule: `Host(\`${domain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-								service: `${id}`,
+								service: `${id}-${port || 'default'}`,
 								tls: isCustomSSL ? true : {
 									certresolver: 'letsencrypt'
 								},
@@ -323,7 +323,7 @@ async function serviceConfiguration(traefik: any, remoteId: string | null = null
 						traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 							entrypoints: ['websecure'],
 							rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-							service: `${id}`,
+							service: `${id}-${port || 'default'}`,
 							tls: isCustomSSL ? true : {
 								certresolver: 'letsencrypt'
 							},
@@ -334,7 +334,7 @@ async function serviceConfiguration(traefik: any, remoteId: string | null = null
 							traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
 								entrypoints: ['websecure'],
 								rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-								service: `${id}`,
+								service: `${id}-${port || 'default'}`,
 								tls: isCustomSSL ? true : {
 									certresolver: 'letsencrypt'
 								},
@@ -343,7 +343,7 @@ async function serviceConfiguration(traefik: any, remoteId: string | null = null
 							traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 								entrypoints: ['websecure'],
 								rule: `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-								service: `${id}`,
+								service: `${id}-${port || 'default'}`,
 								tls: {
 									domains: {
 										main: `${domain}`
@@ -356,7 +356,7 @@ async function serviceConfiguration(traefik: any, remoteId: string | null = null
 							traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
 								entrypoints: ['websecure'],
 								rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-								service: `${id}`,
+								service: `${id}-${port || 'default'}`,
 								tls: {
 									domains: {
 										main: `${domain}`
@@ -367,7 +367,7 @@ async function serviceConfiguration(traefik: any, remoteId: string | null = null
 							traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 								entrypoints: ['websecure'],
 								rule: `Host(\`${domain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-								service: `${id}`,
+								service: `${id}-${port || 'default'}`,
 								tls: isCustomSSL ? true : {
 									certresolver: 'letsencrypt'
 								},
@@ -420,7 +420,7 @@ async function coolifyConfiguration(traefik: any) {
 					traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 						entrypoints: ['websecure'],
 						rule: `(Host(\`${nakedDomain}\`) || Host(\`www.${nakedDomain}\`))${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-						service: `${id}`,
+						service: `${id}-${port || 'default'}`,
 						tls: isCustomSSL ? true : {
 							certresolver: 'letsencrypt'
 						},
@@ -431,7 +431,7 @@ async function coolifyConfiguration(traefik: any) {
 						traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
 							entrypoints: ['websecure'],
 							rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-							service: `${id}`,
+							service: `${id}-${port || 'default'}`,
 							tls: isCustomSSL ? true : {
 								certresolver: 'letsencrypt'
 							},
@@ -440,7 +440,7 @@ async function coolifyConfiguration(traefik: any) {
 						traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 							entrypoints: ['websecure'],
 							rule: `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-							service: `${id}`,
+							service: `${id}-${port || 'default'}`,
 							tls: {
 								domains: {
 									main: `${domain}`
@@ -453,7 +453,7 @@ async function coolifyConfiguration(traefik: any) {
 						traefik.http.routers[`${id}-${port || 'default'}-secure-www`] = {
 							entrypoints: ['websecure'],
 							rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-							service: `${id}`,
+							service: `${id}-${port || 'default'}`,
 							tls: {
 								domains: {
 									main: `${domain}`
@@ -464,7 +464,7 @@ async function coolifyConfiguration(traefik: any) {
 						traefik.http.routers[`${id}-${port || 'default'}-secure`] = {
 							entrypoints: ['websecure'],
 							rule: `Host(\`${domain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
-							service: `${id}`,
+							service: `${id}-${port || 'default'}`,
 							tls: isCustomSSL ? true : {
 								certresolver: 'letsencrypt'
 							},

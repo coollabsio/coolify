@@ -2,7 +2,7 @@ import { promises as dns } from 'dns';
 import { X509Certificate } from 'node:crypto';
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { asyncExecShell, checkDomainsIsValidInDNS, decrypt, encrypt, errorHandler, isDNSValid, isDomainConfigured, listSettings, prisma } from '../../../../lib/common';
+import { asyncExecShell, checkDomainsIsValidInDNS, decrypt, encrypt, errorHandler, isDev, isDNSValid, isDomainConfigured, listSettings, prisma } from '../../../../lib/common';
 import { CheckDNS, CheckDomain, DeleteDomain, OnlyIdInBody, SaveSettings, SaveSSHKey } from './types';
 
 
@@ -91,7 +91,7 @@ export async function checkDomain(request: FastifyRequest<CheckDomain>) {
         if (found) {
             throw "Domain already configured";
         }
-        if (isDNSCheckEnabled && !forceSave) {
+        if (isDNSCheckEnabled && !forceSave && !isDev) {
             const hostname = request.hostname.split(':')[0]
             return await checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts });
         }
