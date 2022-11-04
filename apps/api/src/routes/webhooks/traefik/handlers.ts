@@ -345,7 +345,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 								const pathPrefix = '/'
 
 								traefik.http.routers = { ...traefik.http.routers, ...generateRouters(`${container}-${port || 'default'}`, domain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
-								traefik.http.services = { ...traefik.http.services, ...generateServices(id, container, port) }
+								traefik.http.services = { ...traefik.http.services, ...generateServices(id, `${container}-${port || 'default'}`, port) }
 							}
 						}
 					}
