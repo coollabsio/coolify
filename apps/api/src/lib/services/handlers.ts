@@ -141,6 +141,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
         await startServiceContainers(fastify, id, teamId, destinationDocker.id, composeFileDestination)
         if (service.type === 'minio') {
             await stopTcpHttpProxy(id, destinationDocker, 9000);
+            
         }
         return {}
     } catch ({ status, message }) {
