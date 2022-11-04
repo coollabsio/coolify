@@ -173,14 +173,14 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 		const { id = null } = request.params;
 		const settings = await prisma.setting.findFirst();
 		if (settings.isTraefikUsed && settings.proxyDefaultRedirect) {
-			traefik.http.routers['catchall'] = {
+			traefik.http.routers['catchall-http'] = {
 				entrypoints: ["web"],
 				rule: "HostRegexp(`{catchall:.*}`)",
 				service: "noop",
 				priority: 1,
 				middlewares: ["redirect-regexp"]
 			}
-			traefik.http.routers['catchall'] = {
+			traefik.http.routers['catchall-https'] = {
 				entrypoints: ["websecure"],
 				rule: "HostRegexp(`{catchall:.*}`)",
 				service: "noop",
