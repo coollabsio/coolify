@@ -356,7 +356,6 @@ async function vscodeserver(service: any, template: any) {
 }
 async function minio(service: any, template: any) {
     const { rootUser, rootUserPassword, apiFqdn } = service.minio
-    console.log(apiFqdn)
     const secrets = [
         `MINIO_ROOT_PASSWORD@@@${rootUserPassword}`,
     ]
@@ -432,7 +431,6 @@ async function plausibleAnalytics(service: any, template: any) {
 async function migrateSettings(settings: any[], service: any, template: any) {
     for (const setting of settings) {
         if (!setting) continue;
-        console.log(setting)
         let [name, value] = setting.split('@@@')
         let minio = name
         if (name === 'MINIO_SERVER_URL') {

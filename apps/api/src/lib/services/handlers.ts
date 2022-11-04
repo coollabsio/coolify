@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import path from 'path';
-import { asyncSleep, ComposeFile, createDirectories, decrypt, defaultComposeConfiguration, errorHandler, executeDockerCmd, getServiceFromDB, isARM, makeLabelForServices, persistentVolumes, prisma } from '../common';
+import { asyncSleep, ComposeFile, createDirectories, decrypt, defaultComposeConfiguration, errorHandler, executeDockerCmd, getServiceFromDB, isARM, makeLabelForServices, persistentVolumes, prisma, stopTcpHttpProxy } from '../common';
 import { parseAndFindServiceTemplates } from '../../routes/api/v1/services/handlers';
 
 import { ServiceStartStop } from '../../routes/api/v1/services/types';
@@ -139,6 +139,9 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         await startServiceContainers(fastify, id, teamId, destinationDocker.id, composeFileDestination)
+        if (service.type === 'minio') {
+            await stopTcpHttpProxy(id, destinationDocker, 9000);
+        }
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
