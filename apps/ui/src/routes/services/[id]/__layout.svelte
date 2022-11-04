@@ -73,6 +73,7 @@
 	import { goto } from '$app/navigation';
 	import Menu from './_Menu.svelte';
 	import { saveForm } from './utils';
+	import { dev } from '$app/env';
 	const { id } = $page.params;
 
 	$isDeploymentEnabled = checkIfDeploymentEnabledServices($appSession.isAdmin, service);
@@ -254,7 +255,7 @@
 					Delete Service
 				</button>
 			{/if}
-			{#if $page.url.pathname === `/services/${id}/configuration/type`}
+			{#if $page.url.pathname === `/services/${id}/configuration/type` && dev}
 				<button
 					disabled={loading.refreshTemplates}
 					class:loading={loading.refreshTemplates}

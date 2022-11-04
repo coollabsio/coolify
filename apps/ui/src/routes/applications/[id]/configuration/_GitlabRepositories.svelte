@@ -195,27 +195,11 @@
 		}
 	}
 
-	async function isBranchAlreadyUsed(event) {
+	async function selectBranch(event: any) {
 		selected.branch = event.detail;
-		try {
-			// const data = await get(
-			// 	`/applications/${id}/configuration/repository?repository=${selected.project.path_with_namespace}&branch=${selected.branch.name}`
-			// );
-			// if (data.used) {
-			// 	const sure = confirm($t('application.configuration.branch_already_in_use'));
-			// 	if (sure) {
-			// 		autodeploy = false;
-			// 		showSave = true;
-			// 		return true;
-			// 	}
-			// 	showSave = false;
-			// 	return true;
-			// }
-			showSave = true;
-		} catch (error) {
-			return errorNotification(error);
-		}
+		showSave = true;
 	}
+
 	async function checkSSHKey(sshkeyUrl: any) {
 		try {
 			return await post(sshkeyUrl, {});
@@ -394,7 +378,7 @@
 				showIndicator={!loading.branches}
 				isWaiting={loading.branches}
 				isDisabled={loading.branches || !selected.project}
-				on:select={isBranchAlreadyUsed}
+				on:select={selectBranch}
 				on:clear={() => {
 					showSave = false;
 					selected.branch = null;
@@ -414,7 +398,6 @@
 			class="btn btn-wide"
 			type="submit"
 			disabled={!showSave || loading.save}
-			class:bg-applications={showSave && !loading.save}
 			>{loading.save ? $t('forms.saving') : $t('forms.save')}</button
 		>
 		{#if tryAgain}
@@ -423,7 +406,7 @@
 				configuration <a href={`/sources/${application.gitSource.id}`}>here.</a>
 			</div>
 			<button
-				class="btn btn-sm w-40 bg-green-600"
+				class="btn btn-sm w-40 btn-primary"
 				on:click|stopPropagation|preventDefault={() => window.location.reload()}
 			>
 				Try again
