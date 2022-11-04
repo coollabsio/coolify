@@ -180,6 +180,13 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 				priority: 1,
 				middlewares: ["redirect-regexp"]
 			}
+			traefik.http.routers['catchall'] = {
+				entrypoints: ["websecure"],
+				rule: "HostRegexp(`{catchall:.*}`)",
+				service: "noop",
+				priority: 1,
+				middlewares: ["redirect-regexp"]
+			}
 			traefik.http.middlewares['redirect-regexp'] = {
 				redirectregex: {
 					regex: '(.*)',
