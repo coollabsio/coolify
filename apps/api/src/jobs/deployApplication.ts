@@ -131,7 +131,6 @@ import * as buildpacks from '../lib/buildPacks';
 								try {
 									dockerComposeConfiguration = JSON.parse(dockerComposeConfiguration)
 								} catch (error) { }
-								
 								let deployNeeded = true;
 								let destinationType;
 
@@ -313,11 +312,11 @@ import * as buildpacks from '../lib/buildPacks';
 										try {
 											await executeDockerCmd({
 												dockerId: destinationDockerId,
-												command: `docker ps -a --filter 'label=com.docker.compose.service=${applicationId}' --format {{.ID}}|xargs -r -n 1 docker stop -t 0`
+												command: `docker ps -a --filter 'label=com.docker.compose.service=${pullmergeRequestId ? imageId : applicationId}' --format {{.ID}}|xargs -r -n 1 docker stop -t 0`
 											})
 											await executeDockerCmd({
 												dockerId: destinationDockerId,
-												command: `docker ps -a --filter 'label=com.docker.compose.service=${applicationId}' --format {{.ID}}|xargs -r -n 1 docker rm --force`
+												command: `docker ps -a --filter 'label=com.docker.compose.service=${pullmergeRequestId ? imageId : applicationId}' --format {{.ID}}|xargs -r -n 1 docker rm --force`
 											})
 										} catch (error) {
 											//
