@@ -20,12 +20,14 @@ function generateRouters(id, domain, nakedDomain, pathPrefix, isHttps, isWWW, is
 		entrypoints: ['web'],
 		rule: `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 		service: `${id}`,
+		priority: 2,
 		middlewares: []
 	}
 	let https: any = {
 		entrypoints: ['websecure'],
 		rule: `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 		service: `${id}`,
+		priority: 2,
 		tls: {
 			certresolver: 'letsencrypt'
 		},
@@ -35,12 +37,14 @@ function generateRouters(id, domain, nakedDomain, pathPrefix, isHttps, isWWW, is
 		entrypoints: ['web'],
 		rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 		service: `${id}`,
+		priority: 2,
 		middlewares: []
 	}
 	let httpsWWW: any = {
 		entrypoints: ['websecure'],
 		rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
 		service: `${id}`,
+		priority: 2,
 		tls: {
 			certresolver: 'letsencrypt'
 		},
@@ -54,6 +58,7 @@ function generateRouters(id, domain, nakedDomain, pathPrefix, isHttps, isWWW, is
 		httpWWW.middlewares.push('redirect-to-non-www');
 		httpsWWW.middlewares.push('redirect-to-non-www');
 		delete https.tls
+		delete httpsWWW.tls
 	}
 
 	// 3. http + www only 
@@ -64,6 +69,7 @@ function generateRouters(id, domain, nakedDomain, pathPrefix, isHttps, isWWW, is
 		http.middlewares.push('redirect-to-www');
 		https.middlewares.push('redirect-to-www');
 		delete https.tls
+		delete httpsWWW.tls
 	}
 	// 5. https + non-www only
 	if (isHttps && !isWWW) {
@@ -164,6 +170,32 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 	};
 	try {
 		const { id = null } = request.params;
+		const settings = await prisma.setting.findFirst();
+		if (settings.isTraefikUsed && settings.proxyDefaultRedirect) {
+			traefik.http.routers['catchall'] = {
+				entrypoints: ["web"],
+				rule: "HostRegexp(`{catchall:.*}`)",
+				service: "noop",
+				priority: 1,
+				middlewares: ["redirect-regexp"]
+			}
+			traefik.http.middlewares['redirect-regexp'] = {
+				redirectregex: {
+					regex: '(.*)',
+					replacement: settings.proxyDefaultRedirect,
+					permanent: false
+				}
+			}
+			traefik.http.services['noop'] = {
+				loadBalancer: {
+					servers: [
+						{
+							url: ''
+						}
+					]
+				}
+			}
+		}
 		const sslpath = '/etc/traefik/acme/custom';
 
 		let certificates = await prisma.certificate.findMany({ where: { team: { applications: { some: { settings: { isCustomSSL: true } } }, destinationDocker: { some: { remoteEngine: false, isCoolifyProxyUsed: true } } } } })
@@ -306,7 +338,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 				const port = 3000
 				const pathPrefix = '/'
 				const isCustomSSL = false
-				
+
 				traefik.http.routers = { ...traefik.http.routers, ...generateRouters(`${id}-${port || 'default'}`, domain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
 				traefik.http.services = { ...traefik.http.services, ...generateServices(id, container, port) }
 			}

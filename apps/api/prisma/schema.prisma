@@ -29,6 +29,7 @@ model Setting {
   proxyPassword         String
   proxyUser             String
   proxyHash             String?
+  proxyDefaultRedirect  String?
   isAutoUpdateEnabled   Boolean  @default(false)
   isDNSCheckEnabled     Boolean  @default(true)
   DNSServers            String?

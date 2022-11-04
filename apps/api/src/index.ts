@@ -111,12 +111,13 @@ const host = '0.0.0.0';
 	fastify.register(cors);
 	fastify.register(socketIO, {
 		cors: {
-			origin: "http://localhost:3000"
+			origin: isDev ? "*" : ''
 		}
 	})
 
 	// To detect allowed origins
 	// fastify.addHook('onRequest', async (request, reply) => {
+	// 	console.log(request.headers.host)
 	// 	let allowedList = ['coolify:3000'];
 	// 	const { ipv4, ipv6, fqdn } = await prisma.setting.findFirst({})
 

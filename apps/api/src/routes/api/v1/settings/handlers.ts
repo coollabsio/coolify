@@ -44,16 +44,18 @@ export async function saveSettings(request: FastifyRequest<SaveSettings>, reply:
             maxPort,
             isAutoUpdateEnabled,
             isDNSCheckEnabled,
-            DNSServers
+            DNSServers,
+            proxyDefaultRedirect
         } = request.body
         const { id } = await listSettings();
         await prisma.setting.update({
             where: { id },
-            data: { isRegistrationEnabled, dualCerts, isAutoUpdateEnabled, isDNSCheckEnabled, DNSServers, isAPIDebuggingEnabled }
+            data: { isRegistrationEnabled, dualCerts, isAutoUpdateEnabled, isDNSCheckEnabled, DNSServers, isAPIDebuggingEnabled, }
         });
         if (fqdn) {
             await prisma.setting.update({ where: { id }, data: { fqdn } });
         }
+        await prisma.setting.update({ where: { id }, data: { proxyDefaultRedirect } });
         if (minPort && maxPort) {
             await prisma.setting.update({ where: { id }, data: { minPort, maxPort } });
         }
