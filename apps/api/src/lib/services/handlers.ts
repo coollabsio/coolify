@@ -140,8 +140,22 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         await startServiceContainers(fastify, id, teamId, destinationDocker.id, composeFileDestination)
         if (service.type === 'minio') {
-            await stopTcpHttpProxy(id, destinationDocker, 9000);
-            
+            try {
+                await executeDockerCmd({
+                    dockerId: destinationDocker.id,
+                    command:
+                        `docker container ls -a --filter 'name=${id}-' --format {{.ID}}|xargs -r -n 1 docker container stop -t 0`
+                });
+
+            } catch (error) { }
+            try {
+                await executeDockerCmd({
+                    dockerId: destinationDocker.id,
+                    command:
+                        `docker container ls -a --filter 'name=${id}-' --format {{.ID}}|xargs -r -n 1 docker container rm -f`
+                });
+            } catch (error) { }
+
         }
         return {}
     } catch ({ status, message }) {

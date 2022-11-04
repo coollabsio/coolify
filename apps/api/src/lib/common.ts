@@ -14,7 +14,6 @@ import sshConfig from 'ssh-config';
 
 import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
-import * as serviceFields from './services/serviceFields';
 import { saveBuildLog } from './buildPacks/common';
 import { scheduler } from './scheduler';
 
@@ -1470,50 +1469,6 @@ export async function getServiceFromDB({
 	return { ...body, settings };
 }
 
-export function saveUpdateableFields(type: string, data: any) {
-	const update = {};
-	if (type && serviceFields[type]) {
-		serviceFields[type].map((k) => {
-			let temp = data[k.name];
-			if (temp) {
-				if (k.isEncrypted) {
-					temp = encrypt(temp);
-				}
-				if (k.isLowerCase) {
-					temp = temp.toLowerCase();
-				}
-				if (k.isNumber) {
-					temp = Number(temp);
-				}
-				if (k.isBoolean) {
-					temp = Boolean(temp);
-				}
-			}
-			if (k.isNumber && temp === '') {
-				temp = null;
-			}
-			update[k.name] = temp;
-		});
-	}
-	return update;
-}
-
-export function getUpdateableFields(type: string, data: any) {
-	const update = {};
-	if (type && serviceFields[type]) {
-		serviceFields[type].map((k) => {
-			let temp = data[k.name];
-			if (temp) {
-				if (k.isEncrypted) {
-					temp = decrypt(temp);
-				}
-				update[k.name] = temp;
-			}
-			update[k.name] = temp;
-		});
-	}
-	return update;
-}
 
 export function fixType(type) {
 	return type?.replaceAll(' ', '').toLowerCase() || null;

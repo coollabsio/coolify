@@ -443,7 +443,7 @@ async function migrateSettings(settings: any[], service: any, template: any) {
         if (!variableName) {
             variableName = `$$config_${name.toLowerCase()}`
         }
-        console.log('Migrating setting', name, value, 'for service', service.id, ', service name:', service.name, 'variableName: ', variableName)
+        // console.log('Migrating setting', name, value, 'for service', service.id, ', service name:', service.name, 'variableName: ', variableName)
 
         await prisma.serviceSetting.findFirst({ where: { name: minio, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name: minio, value, variableName, service: { connect: { id: service.id } } } })
     }
