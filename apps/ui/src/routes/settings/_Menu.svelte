@@ -3,7 +3,7 @@
 	import { appSession } from '$lib/store';
 </script>
 
-<ul class="menu border bg-coolgray-100 border-coolgray-200 rounded-box p-2 space-y-2">
+<ul class="menu border bg-coolgray-100 border-coolgray-200 rounded p-2 space-y-2">
 	{#if $appSession.teamId === '0'}
 		<li class="menu-title">
 			<span>General</span>

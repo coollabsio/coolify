@@ -1557,7 +1557,8 @@
   defaultVersion: postgresql-v1.38.0
   documentation: https://umami.is/docs/getting-started
   type: umami-postgresql
-  name: Umami (PostgreSQL)
+  name: Umami
+  subname: (with PostgreSQL)
   description: >-
     Umami is a simple, easy to use, self-hosted web analytics solution. The goal
     is to provide you with a friendly privacy-focused alternative to Google
@@ -1797,7 +1798,8 @@
   defaultVersion: latest
   documentation: https://ghost.org/resources/
   type: ghost-mariadb
-  name: Ghost (MariaDB)
+  name: Ghost
+  subname: (MariaDB)
   description: >-
     Ghost is a free and open source blogging platform written in JavaScript and
     distributed under the MIT License
@@ -1912,7 +1914,8 @@
   defaultVersion: '5.22'
   documentation: https://ghost.org/resources/
   type: ghost-only
-  name: Ghost Only (No Database)
+  name: Ghost
+  subname: (without Database)
   description: >-
     Ghost is a free and open source blogging platform written in JavaScript and
     distributed under the MIT License
@@ -1977,7 +1980,8 @@
   defaultVersion: '5.22'
   documentation: https://ghost.org/resources/
   type: ghost-mysql
-  name: Ghost (MySQL)
+  name: Ghost
+  subname: (with MySQL)
   description: >-
     Ghost is a free and open source blogging platform written in JavaScript and
     distributed under the MIT License
@@ -2055,7 +2059,8 @@
   defaultVersion: php8.1
   documentation: https://wordpress.org/
   type: wordpress
-  name: WordPress (with MySQL)
+  name: WordPress
+  subname: (with MySQL)
   description: WordPress is a content management system based on PHP with new MySQL database.
   services:
     $$id:
@@ -2141,7 +2146,8 @@
   defaultVersion: php8.1
   documentation: https://wordpress.org/
   type: wordpress-only
-  name: WordPress Only (No Database)
+  name: WordPress
+  subname: (without DB)
   description: WordPress is a content management system based on PHP without MySQL.
   services:
     $$id:

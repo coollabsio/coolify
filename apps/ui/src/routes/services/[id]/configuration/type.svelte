@@ -58,6 +58,20 @@
 		search = '';
 		filteredServices = services;
 	}
+	function sortMe(data: any) {
+		return data.sort((a, b) => {
+			let fa = a.name.toLowerCase(),
+				fb = b.name.toLowerCase();
+
+			if (fa < fb) {
+				return -1;
+			}
+			if (fa > fb) {
+				return 1;
+			}
+			return 0;
+		});
+	}
 </script>
 
 <div class="container lg:mx-auto lg:p-0 px-8 pt-5">
@@ -89,18 +103,20 @@
 		/>
 	</div>
 </div>
-<div class="container lg:mx-auto lg:pt-20 lg:p-0 px-8 pt-20">
-	<div class="flex flex-wrap justify-center  gap-8">
-		{#each filteredServices as service}
+<div class=" lg:pt-20 lg:p-0 px-8 pt-20">
+	<div class="grid grid-flow-rows grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+		{#each sortMe(filteredServices) as service}
 			{#key service.name}
-				<div class="p-2">
-					<form on:submit|preventDefault={() => handleSubmit(service)}>
-						<button type="submit" class="box-selection relative text-xl font-bold hover:bg-primary">
-							<ServiceIcons type={service.type} />
-							{service.name}
-						</button>
-					</form>
-				</div>
+				<button
+					on:click={() => handleSubmit(service)}
+					class="box-selection relative text-xl font-bold hover:bg-primary h-24"
+				>
+					<ServiceIcons type={service.type} />
+					{service.name}
+					{#if service.subname}
+						<div class="text-sm font-mono">{service.subname}</div>
+					{/if}
+				</button>
 			{/key}
 		{/each}
 	</div>
