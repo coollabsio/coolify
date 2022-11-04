@@ -1,6 +1,5 @@
 import { FastifyRequest } from "fastify";
 import { errorHandler, getDomain, isDev, prisma, executeDockerCmd, fixType } from "../../../lib/common";
-import { TraefikOtherConfiguration } from "./types";
 import { OnlyId } from "../../../types";
 
 function generateServices(id, containerId, port) {
@@ -292,15 +291,40 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 					console.log(error)
 				}
 			}
+			if (!remote) {
+				const { fqdn, dualCerts } = await prisma.setting.findFirst();
+				if (!fqdn) {
+					return
+				}
+
+				const domain = getDomain(fqdn);
+				const nakedDomain = domain.replace(/^www\./, '');
+				const isHttps = fqdn.startsWith('https://');
+				const isWWW = fqdn.includes('www.');
+				const id = isDev ? 'host.docker.internal' : 'coolify'
+				const container = isDev ? 'host.docker.internal' : 'coolify'
+				const port = 3000
+				const pathPrefix = '/'
+				const isCustomSSL = false
+				
+				traefik.http.routers = { ...traefik.http.routers, ...generateRouters(`${id}-${port || 'default'}`, domain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
+				traefik.http.services = { ...traefik.http.services, ...generateServices(id, container, port) }
+			}
 		}
 	} catch (error) {
 		console.log(error)
 	} finally {
+		if (Object.keys(traefik.http.routers).length === 0) {
+			traefik.http.routers = null;
+		}
+		if (Object.keys(traefik.http.services).length === 0) {
+			traefik.http.services = null;
+		}
 		return traefik;
 	}
 }
 
-export async function traefikOtherConfiguration(request: FastifyRequest<TraefikOtherConfiguration>) {
+export async function otherProxyConfiguration(request: FastifyRequest<TraefikOtherConfiguration>) {
 	try {
 		const { id } = request.query
 		if (id) {
