@@ -1,5 +1,6 @@
 import { FastifyRequest } from "fastify";
 import { errorHandler, getDomain, isDev, prisma, executeDockerCmd, fixType } from "../../../lib/common";
+import { getTemplates } from "../../../lib/services";
 import { OnlyId } from "../../../types";
 
 function generateServices(id, containerId, port) {
@@ -215,18 +216,40 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 			traefik.tls.certificates = parsedCertificates
 		}
 
-		let applications = []
+		let applications = [];
+		let services = [];
 		if (id) {
 			applications = await prisma.application.findMany({
 				where: { destinationDocker: { id } },
 				include: { destinationDocker: true, settings: true }
+			});
+			services = await prisma.service.findMany({
+				where: { destinationDocker: { id } },
+				include: {
+					destinationDocker: true,
+					persistentStorage: true,
+					serviceSecret: true,
+					serviceSetting: true,
+				},
+				orderBy: { createdAt: 'desc' }
 			});
 		} else {
 			applications = await prisma.application.findMany({
 				where: { destinationDocker: { remoteEngine: false } },
 				include: { destinationDocker: true, settings: true }
 			});
+			services = await prisma.service.findMany({
+				where: { destinationDocker: { remoteEngine: false } },
+				include: {
+					destinationDocker: true,
+					persistentStorage: true,
+					serviceSecret: true,
+					serviceSetting: true,
+				},
+				orderBy: { createdAt: 'desc' },
+			});
 		}
+
 
 		if (applications.length > 0) {
 			const dockerIds = new Set()
@@ -323,25 +346,122 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 					console.log(error)
 				}
 			}
-			if (!remote) {
-				const { fqdn, dualCerts } = await prisma.setting.findFirst();
-				if (!fqdn) {
-					return
+		}
+		if (services.length > 0) {
+			const dockerIds = new Set()
+			const runningContainers = {}
+			services.forEach((app) => dockerIds.add(app.destinationDocker.id));
+			for (const dockerId of dockerIds) {
+				const { stdout: container } = await executeDockerCmd({ dockerId, command: `docker container ls --filter 'label=coolify.managed=true' --format '{{ .Names}}'` })
+				const containersArray = container.trim().split('\n');
+				if (containersArray.length > 0) {
+					runningContainers[dockerId] = containersArray
 				}
-
-				const domain = getDomain(fqdn);
-				const nakedDomain = domain.replace(/^www\./, '');
-				const isHttps = fqdn.startsWith('https://');
-				const isWWW = fqdn.includes('www.');
-				const id = isDev ? 'host.docker.internal' : 'coolify'
-				const container = isDev ? 'host.docker.internal' : 'coolify'
-				const port = 3000
-				const pathPrefix = '/'
-				const isCustomSSL = false
-
-				traefik.http.routers = { ...traefik.http.routers, ...generateRouters(`${id}-${port || 'default'}`, domain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
-				traefik.http.services = { ...traefik.http.services, ...generateServices(id, container, port) }
 			}
+			for (const service of services) {
+				try {
+					let {
+						fqdn,
+						id,
+						type,
+						destinationDockerId,
+						dualCerts,
+						serviceSetting
+					} = service;
+					if (!fqdn) {
+						continue;
+					}
+					if (!destinationDockerId) {
+						continue;
+					}
+					if (
+						!runningContainers[destinationDockerId] ||
+						runningContainers[destinationDockerId].length === 0 ||
+						!runningContainers[destinationDockerId].includes(id)
+					) {
+						continue
+					}
+					const templates = await getTemplates();
+					let found = templates.find((a) => a.type === type);
+					if (!found) {
+						continue;
+					}
+					found = JSON.parse(JSON.stringify(found).replaceAll('$$id', id));
+					for (const oneService of Object.keys(found.services)) {
+						const isProxyConfiguration = found.services[oneService].proxy;
+						if (isProxyConfiguration) {
+							const { proxy } = found.services[oneService];
+							for (let configuration of proxy) {
+								if (configuration.domain) {
+									const setting = serviceSetting.find((a) => a.variableName === configuration.domain);
+									if (setting) {
+										configuration.domain = configuration.domain.replace(configuration.domain, setting.value);
+									}
+								}
+								const foundPortVariable = serviceSetting.find((a) => a.name.toLowerCase() === 'port')
+								if (foundPortVariable) {
+									configuration.port = foundPortVariable.value
+								}
+								let port, pathPrefix, customDomain;
+								if (configuration) {
+									port = configuration?.port;
+									pathPrefix = configuration?.pathPrefix || null;
+									customDomain = configuration?.domain
+								}
+								if (customDomain) {
+									fqdn = customDomain
+								} else {
+									fqdn = service.fqdn
+								}
+								const domain = getDomain(fqdn);
+								const nakedDomain = domain.replace(/^www\./, '');
+								const isHttps = fqdn.startsWith('https://');
+								const isWWW = fqdn.includes('www.');
+								const isCustomSSL = false;
+								traefik.http.routers = { ...traefik.http.routers, ...generateRouters(`${id}-${port || 'default'}`, domain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
+								traefik.http.services = { ...traefik.http.services, ...generateServices(id, id, port) }
+							}
+						} else {
+							if (found.services[oneService].ports && found.services[oneService].ports.length > 0) {
+								let port = found.services[oneService].ports[0]
+								const foundPortVariable = serviceSetting.find((a) => a.name.toLowerCase() === 'port')
+								if (foundPortVariable) {
+									port = foundPortVariable.value
+								}
+								const domain = getDomain(fqdn);
+								const nakedDomain = domain.replace(/^www\./, '');
+								const isHttps = fqdn.startsWith('https://');
+								const isWWW = fqdn.includes('www.');
+								const pathPrefix = '/'
+								const isCustomSSL = false
+								
+								traefik.http.routers = { ...traefik.http.routers, ...generateRouters(`${id}-${port || 'default'}`, domain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
+								traefik.http.services = { ...traefik.http.services, ...generateServices(id, id, port) }
+							}
+						}
+					}
+				} catch (error) {
+					console.log(error)
+				}
+			}
+		}
+		if (!remote) {
+			const { fqdn, dualCerts } = await prisma.setting.findFirst();
+			if (!fqdn) {
+				return
+			}
+			const domain = getDomain(fqdn);
+			const nakedDomain = domain.replace(/^www\./, '');
+			const isHttps = fqdn.startsWith('https://');
+			const isWWW = fqdn.includes('www.');
+			const id = isDev ? 'host.docker.internal' : 'coolify'
+			const container = isDev ? 'host.docker.internal' : 'coolify'
+			const port = 3000
+			const pathPrefix = '/'
+			const isCustomSSL = false
+
+			traefik.http.routers = { ...traefik.http.routers, ...generateRouters(`${id}-${port || 'default'}`, domain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
+			traefik.http.services = { ...traefik.http.services, ...generateServices(id, container, port) }
 		}
 	} catch (error) {
 		console.log(error)
