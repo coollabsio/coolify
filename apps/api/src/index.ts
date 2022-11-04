@@ -389,17 +389,17 @@ async function checkProxies() {
 		}
 
 		// HTTP Proxies
-		const minioInstances = await prisma.minio.findMany({
-			where: { publicPort: { not: null } },
-			include: { service: { include: { destinationDocker: true } } }
-		});
-		for (const minio of minioInstances) {
-			const { service, publicPort } = minio;
-			const { destinationDockerId, destinationDocker, id } = service;
-			if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-				await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
-			}
-		}
+		// const minioInstances = await prisma.minio.findMany({
+		// 	where: { publicPort: { not: null } },
+		// 	include: { service: { include: { destinationDocker: true } } }
+		// });
+		// for (const minio of minioInstances) {
+		// 	const { service, publicPort } = minio;
+		// 	const { destinationDockerId, destinationDocker, id } = service;
+		// 	if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
+		// 		await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
+		// 	}
+		// }
 	} catch (error) {
 
 	}
