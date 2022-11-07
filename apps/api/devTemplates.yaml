@@ -55,7 +55,7 @@
   defaultVersion: 1.9.2
   documentation: https://hub.docker.com/r/louislam/uptime-kuma
   description: A free & fancy self-hosted monitoring tool.
-  labels: 
+  labels:
     - uptime
   type: uptimekuma
   name: UptimeKuma
@@ -108,7 +108,7 @@
   name: Grafana
   description: >-
     Grafana allows you to query, visualize, alert on and understand your metrics.
-  labels: 
+  labels:
     - monitoring
     - metrics
     - dashboard
@@ -128,7 +128,7 @@
   type: appwrite
   name: Appwrite
   description: Secure Backend Server for Web, Mobile & Flutter Developers.
-  labels: 
+  labels:
     - serverless
     - backend
     - storage
@@ -1365,7 +1365,7 @@
   type: glitchtip
   name: GlitchTip
   description: "Simple, open source error tracking."
-  labels: 
+  labels:
     - sentry
     - bugsnag
   services:
@@ -1587,7 +1587,7 @@
   type: hasura
   name: Hasura
   description: "Instant realtime GraphQL APIs on any Postgres application, existing or new."
-  labels: 
+  labels:
     - graphql
     - database
   services:
@@ -2410,7 +2410,7 @@
   type: fider
   name: Fider
   description: A platform to collect and organize customer feedback.
-  labels: 
+  labels:
     - suggestion
     - feedback
   services:
