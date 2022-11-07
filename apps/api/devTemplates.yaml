@@ -2361,6 +2361,7 @@
       depends_on: []
       image: "minio/minio:$$core_version"
       volumes:
+        - "$$id-minio-data:/data"
         - "$$id-data-write:/files"
       environment:
         - MINIO_SERVER_URL=$$config_coolify_fqdn_minio_console
