@@ -6,7 +6,7 @@
 You can ask for guidance anytime on our 
 [Discord server](https://coollabs.io/discord) in the `#contribution` channel.
 
-You'll need a set of skills go [get started](docs/contribution/GettingStarted.md).
+You'll need a set of skills to [get started](docs/contribution/GettingStarted.md).
 
 ## 1) Setup your development environment
 
