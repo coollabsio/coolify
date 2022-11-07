@@ -100,8 +100,11 @@
 		}
 	}
 	async function restartService() {
-		await stopService();
-		await startService();
+		const sure = confirm('Are you sure you want to restart this service?');
+		if (sure) {
+			await stopService();
+			await startService();
+		}
 	}
 	async function refreshTemplate() {
 		try {
