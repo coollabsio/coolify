@@ -41,6 +41,7 @@
 	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
 	import { dev } from '$app/env';
 	import NewResource from './_NewResource.svelte';
+	import { onMount } from 'svelte';
 
 	let numberOfGetStatus = 0;
 	let status: any = {};
@@ -54,8 +55,13 @@
 		services: false,
 		databases: false
 	};
+	let searchInput: HTMLInputElement;
 	doSearch();
-
+	onMount(() => {
+		setTimeout(() => {
+			searchInput.focus();
+		}, 100);
+	});
 	async function refreshStatusApplications() {
 		noInitialStatus.applications = false;
 		numberOfGetStatus = 0;
@@ -563,6 +569,7 @@
 				</div>
 
 				<input
+					bind:this={searchInput}
 					id="search"
 					type="text"
 					placeholder="Search: You can search for names, domains, types, database types, version, servers etc..."

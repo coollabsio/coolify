@@ -1,6 +1,6 @@
 <script lang="ts">
 	export let type: string;
-	export let isAbsolute = true;
+	export let isAbsolute = false;
 
 	let extension = 'png';
 	let svgs = [
@@ -35,7 +35,7 @@
 			case 'weblate':
 				return 'w-12 h-12 -mt-3';
 			default:
-				return isAbsolute ? 'w-10 h-10' : 'w-8 h-8 mx-auto';
+				return isAbsolute ? 'w-10 h-10 absolute -m-4 -mt-9 left-0' : 'w-10 h-10';
 		}
 	}
 </script>

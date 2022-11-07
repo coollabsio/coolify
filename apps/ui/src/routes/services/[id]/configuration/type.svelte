@@ -30,15 +30,22 @@
 	let search = '';
 	let filteredServices = services;
 
-	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
+	import { onMount } from 'svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
+	let searchInput: HTMLInputElement;
 
+	onMount(() => {
+		setTimeout(() => {
+			searchInput.focus();
+		}, 100);
+	});
 	async function handleSubmit(service: any) {
 		try {
 			await post(`/services/${id}/configuration/type`, { type: service.type });
@@ -51,8 +58,10 @@
 		filteredServices = services.filter(
 			(service: any) =>
 				service.name.toLowerCase().includes(search.toLowerCase()) ||
-				service.labels?.some((label: string) => label.toLowerCase().includes(search.toLowerCase())) ||
-				service.description.toLowerCase().includes(search.toLowerCase()) 
+				service.labels?.some((label: string) =>
+					label.toLowerCase().includes(search.toLowerCase())
+				) ||
+				service.description.toLowerCase().includes(search.toLowerCase())
 		);
 	}
 	function cleanupSearch() {
@@ -95,8 +104,9 @@
 			</svg>
 		</div>
 		<input
+			bind:this={searchInput}
 			id="search"
-			class="input w-full"
+			class="input w-full input-primary"
 			type="text"
 			placeholder="Search for services"
 			bind:value={search}
@@ -110,7 +120,7 @@
 			{#key service.name}
 				<button
 					on:click={() => handleSubmit(service)}
-					class="box-selection relative text-xl font-bold hover:bg-primary	"
+					class="box-selection relative text-xl font-bold hover:bg-primary"
 				>
 					<div class="flex flex-col">
 						<div class="flex justify-center items-center gap-2 pb-4">

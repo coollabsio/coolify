@@ -189,7 +189,7 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                             const variable = foundTemplate.variables.find(v => v.id === proxyValue.domain)
                             if (variable) {
                                 const { id, name, label, description, defaultValue, required = false } = variable
-                                const found = await prisma.serviceSetting.findFirst({ where: { variableName: proxyValue.domain } })
+                                const found = await prisma.serviceSetting.findFirst({ where: { serviceId: service.id , variableName: proxyValue.domain } })
                                 parsedTemplate[realKey].fqdns.push(
                                     { id, name, value: found?.value || '', label, description, defaultValue, required }
                                 )
