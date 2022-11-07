@@ -20,13 +20,11 @@
 
 <script lang="ts">
 	export let secrets: any;
-	export let service: any;
 	import Secret from './_Secret.svelte';
 	import { page } from '$app/stores';
 	import { get } from '$lib/api';
 	import { t } from '$lib/translations';
 	import pLimit from 'p-limit';
-	import ServiceLinks from './_ServiceLinks.svelte';
 	import { addToast } from '$lib/store';
 	import { saveSecret } from './utils';
 	const limit = pLimit(1);
@@ -38,8 +36,8 @@
 		const data = await get(`/services/${id}/secrets`);
 		secrets = [...data.secrets];
 	}
-	async function getValues(e: any) {
-		e.preventDefault();
+	async function getValues() {
+		if (!batchSecrets) return;
 		const eachValuePair = batchSecrets.split('\n');
 		const batchSecretsPairs = eachValuePair
 			.filter((secret) => !secret.startsWith('#') && secret)
@@ -48,8 +46,8 @@
 				const value = rest.join('=');
 				const cleanValue = value?.replaceAll('"', '') || '';
 				return {
-					name,
-					value: cleanValue,
+					name: name.trim(),
+					value: cleanValue.trim(),
 					isNew: !secrets.find((secret: any) => name === secret.name)
 				};
 			});
@@ -68,21 +66,24 @@
 	}
 </script>
 
-<div class="mx-auto max-w-6xl rounded-xl px-6 pt-4">
+<div class="mx-auto w-full">
+	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
+		<div class="title font-bold pb-3">Secrets</div>
+	</div>
 	<div class="overflow-x-auto">
 		<table class="w-full border-separate text-left">
 			<thead>
-				<tr class="h-12">
+				<tr class="uppercase">
 					<th scope="col">{$t('forms.name')}</th>
-					<th scope="col">{$t('forms.value')}</th>
-					<th scope="col" class="w-96 text-center">{$t('forms.action')}</th>
+					<th scope="col uppercase">{$t('forms.value')}</th>
+					<th scope="col uppercase" class="w-96 text-center">{$t('forms.action')}</th>
 				</tr>
 			</thead>
-			<tbody>
+			<tbody class="space-y-2">
 				{#each secrets as secret}
 					{#key secret.id}
 						<tr>
-							<Secret name={secret.name} value={secret.value} on:refresh={refreshSecrets} />
+							<Secret name={secret.name} value={secret.value} readonly={secret.readOnly} on:refresh={refreshSecrets} />
 						</tr>
 					{/key}
 				{/each}
@@ -92,9 +93,18 @@
 			</tbody>
 		</table>
 	</div>
-	<h2 class="title my-6 font-bold">Paste .env file</h2>
 	<form on:submit|preventDefault={getValues} class="mb-12 w-full">
-		<textarea bind:value={batchSecrets} class="mb-2 min-h-[200px] w-full" />
-		<button class="btn btn-sm bg-services" type="submit">Batch add secrets</button>
+		<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2 pt-10">
+			<div class="flex flex-row space-x-2">
+				<div class="title font-bold pb-3 ">Paste <code>.env</code> file</div>
+				<button type="submit" class="btn btn-sm bg-primary">Add Secrets in Batch</button>
+			</div>
+		</div>
+
+		<textarea
+			placeholder={`PORT=1337\nPASSWORD=supersecret`}
+			bind:value={batchSecrets}
+			class="mb-2 min-h-[200px] w-full"
+		/>
 	</form>
 </div>

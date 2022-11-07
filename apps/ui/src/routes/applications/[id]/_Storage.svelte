@@ -59,19 +59,33 @@
 	}
 </script>
 
-<div class="w-full font-bold grid gap-2">
-	<div class="flex flex-col pb-2">
-		
-		<div class="flex flex-col lg:flex-row lg:space-y-0 space-y-2">
+<div class="w-full lg:px-0 px-4">
+	<div class="grid grid-col-1 lg:grid-cols-3 lg:space-x-4" class:pt-8={isNew}>
+		{#if storage.id}
+			<div class="flex flex-col">
+				<label for="name" class="pb-2 uppercase font-bold">Volume name</label>
+				<input
+					disabled
+					readonly
+					class="w-full lg:w-64"
+					value="{storage.id}{storage.path.replace(/\//gi, '-')}"
+				/>
+			</div>
+		{/if}
+		<div class="flex flex-col">
+			<label for="name" class="pb-2 uppercase font-bold">{isNew ? 'New Path' : 'Path'}</label>
 			<input
 				class="w-full lg:w-64"
 				bind:value={storage.path}
 				required
 				placeholder="eg: /sqlite.db"
 			/>
+		</div>
+
+		<div class="pt-8">
 			{#if isNew}
 				<div class="flex items-center justify-center w-full lg:w-64">
-					<button class="btn btn-sm btn-primary" on:click={() => saveStorage(true)}
+					<button class="btn btn-sm btn-primary w-full" on:click={() => saveStorage(true)}
 						>{$t('forms.add')}</button
 					>
 				</div>

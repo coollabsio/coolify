@@ -15,9 +15,13 @@ export interface SaveServiceDestination extends OnlyId {
         destinationId: string
     }
 }
-export interface GetServiceLogs extends OnlyId {
+export interface GetServiceLogs{
+    Params: { 
+        id: string,
+        containerId: string
+     },
     Querystring: {
-        since: number
+        since: number,
     }
 }
 export interface SaveServiceSettings extends OnlyId {
@@ -36,7 +40,7 @@ export interface CheckService extends OnlyId {
         forceSave: boolean,
         dualCerts: boolean,
         exposePort: number,
-        otherFqdns: Array<string>
+        otherFqdn: boolean
     }
 }
 export interface SaveService extends OnlyId {
@@ -44,6 +48,8 @@ export interface SaveService extends OnlyId {
         name: string,
         fqdn: string,
         exposePort: number,
+        version: string,
+        serviceSetting: any
         type: string
     }
 }
@@ -62,14 +68,15 @@ export interface DeleteServiceSecret extends OnlyId {
 export interface SaveServiceStorage extends OnlyId {
     Body: {
         path: string,
-        newStorage: string,
+        containerId: string,
         storageId: string,
+        isNewStorage: boolean,
     }
 }
 
 export interface DeleteServiceStorage extends OnlyId {
     Body: {
-        path: string,
+        storageId: string,
     }
 }
 export interface ServiceStartStop {

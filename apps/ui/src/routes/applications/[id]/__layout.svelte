@@ -75,7 +75,7 @@
 
 	let statusInterval: any;
 	let forceDelete = false;
-
+	let stopping = false;
 	const { id } = $page.params;
 	$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
 
@@ -138,17 +138,17 @@
 	}
 	async function stopApplication() {
 		try {
-			$status.application.initialLoading = true;
+			stopping = true;
 			await post(`/applications/${id}/stop`, {});
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
-			$status.application.initialLoading = false;
+			stopping = false;
 			await getStatus();
 		}
 	}
 	async function getStatus() {
-		if ($status.application.loading) return;
+		if ($status.application.loading && stopping) return;
 		$status.application.loading = true;
 		const data = await get(`/applications/${id}/status`);
 
@@ -194,6 +194,8 @@
 	onDestroy(() => {
 		$status.application.initialLoading = true;
 		$status.application.loading = false;
+		$status.application.statuses = [];
+		$status.application.overallStatus = 'stopped';
 		$location = null;
 		$isDeploymentEnabled = false;
 		clearInterval(statusInterval);
@@ -233,7 +235,7 @@
 						class:text-red-500={$status.application.overallStatus === 'stopped'}
 					>
 						{$status.application.overallStatus === 'healthy'
-							? 'Running'
+							? 'Healthy'
 							: $status.application.overallStatus === 'degraded'
 							? 'Degraded'
 							: 'Stopped'}
@@ -296,7 +298,29 @@
 				Application Error
 			</a>
 		{/if}
-		{#if $status.application.initialLoading}
+		{#if stopping}
+			<button class="btn btn-ghost btn-sm gap-2">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-6 w-6 animate-spin duration-500 ease-in-out"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<path d="M9 4.55a8 8 0 0 1 6 14.9m0 -4.45v5h5" />
+					<line x1="5.63" y1="7.16" x2="5.63" y2="7.17" />
+					<line x1="4.06" y1="11" x2="4.06" y2="11.01" />
+					<line x1="4.63" y1="15.1" x2="4.63" y2="15.11" />
+					<line x1="7.16" y1="18.37" x2="7.16" y2="18.38" />
+					<line x1="11" y1="19.94" x2="11" y2="19.95" />
+				</svg>
+				Stopping...
+			</button>
+		{:else if $status.application.initialLoading}
 			<button class="btn btn-ghost btn-sm gap-2">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -319,27 +343,6 @@
 				Loading...
 			</button>
 		{:else if $status.application.overallStatus === 'healthy'}
-			<button
-				on:click={stopApplication}
-				type="submit"
-				disabled={!$isDeploymentEnabled}
-				class="btn btn-sm btn-error gap-2"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="w-6 h-6 "
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					fill="none"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-					<rect x="6" y="5" width="4" height="14" rx="1" />
-					<rect x="14" y="5" width="4" height="14" rx="1" />
-				</svg> Stop
-			</button>
 			{#if application.buildPack !== 'compose'}
 				<button
 					on:click={restartApplication}
@@ -387,17 +390,38 @@
 
 				Force Redeploy
 			</button>
+			<button
+				on:click={stopApplication}
+				type="submit"
+				disabled={!$isDeploymentEnabled}
+				class="btn btn-sm  gap-2"
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="w-6 h-6 text-error"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<rect x="6" y="5" width="4" height="14" rx="1" />
+					<rect x="14" y="5" width="4" height="14" rx="1" />
+				</svg> Stop
+			</button>
 		{:else if $isDeploymentEnabled && !$page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
 			{#if $status.application.overallStatus === 'degraded'}
 				<button
 					on:click={stopApplication}
 					type="submit"
 					disabled={!$isDeploymentEnabled}
-					class="btn btn-sm btn-error gap-2"
+					class="btn btn-sm gap-2"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6 "
+						class="w-6 h-6 text-error"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -413,14 +437,13 @@
 			{/if}
 			<button
 				class="btn btn-sm gap-2"
-				class:btn-primary={$status.application.overallStatus !== 'degraded'}
 				disabled={!$isDeploymentEnabled}
 				on:click={() => handleDeploySubmit(false)}
 			>
 				{#if $status.application.overallStatus !== 'degraded'}
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6"
+						class="w-6 h-6 text-pink-500"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"
@@ -457,7 +480,7 @@
 			</button>
 		{/if}
 		{#if $location && $status.application.overallStatus === 'healthy'}
-			<a href={$location} target="_blank" class="btn btn-sm gap-2 text-sm bg-primary"
+			<a href={$location} target="_blank noreferrer" class="btn btn-sm gap-2 text-sm bg-primary"
 				><svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="h-6 w-6"

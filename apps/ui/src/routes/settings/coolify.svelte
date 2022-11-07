@@ -18,16 +18,12 @@
 
 <script lang="ts">
 	export let settings: any;
-	export let certificates: any;
 	import Setting from '$lib/components/Setting.svelte';
 	import { del, get, post } from '$lib/api';
-	import { browser } from '$app/env';
 	import { t } from '$lib/translations';
 	import { addToast, appSession, features } from '$lib/store';
 	import { asyncSleep, errorNotification, getDomain } from '$lib/common';
-	import Menu from './_Menu.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
-	import Upload from '$lib/components/Upload.svelte';
 
 	let isAPIDebuggingEnabled = settings.isAPIDebuggingEnabled;
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
@@ -37,6 +33,7 @@
 	let DNSServers = settings.DNSServers;
 	let minPort = settings.minPort;
 	let maxPort = settings.maxPort;
+	let proxyDefaultRedirect = settings.proxyDefaultRedirect;
 
 	let forceSave = false;
 	let fqdn = settings.fqdn;
@@ -106,6 +103,9 @@
 				await post(`/settings/check`, { fqdn, forceSave, dualCerts, isDNSCheckEnabled });
 				await post(`/settings`, { fqdn });
 				return window.location.reload();
+			}
+			if (proxyDefaultRedirect !== settings.proxyDefaultRedirect) {
+				await post(`/settings`, { proxyDefaultRedirect });
 			}
 			if (minPort !== settings.minPort || maxPort !== settings.maxPort) {
 				await post(`/settings`, { minPort, maxPort });
@@ -228,7 +228,7 @@
 			</div>
 		</div>
 		<div class="flex lg:flex-row flex-col">
-			<div class="grid grid-flow-row gap-2  px-4 pr-5">
+			<div class="grid grid-flow-row gap-2 px-4 pr-5">
 				<div class="grid grid-cols-2 items-center">
 					<div>
 						{$t('application.url_fqdn')}
@@ -280,6 +280,25 @@
 							{/if}
 						</div>
 					{/if}
+				</div>
+				<div class="grid grid-cols-2 items-center">
+					<div>
+						Default Redirect URL
+						<Explainer
+							position="dropdown-bottom"
+							explanation="You can specify where to redirect all requests that does not have a running resource."
+						/>
+					</div>
+					<input
+						class="w-full"
+						bind:value={proxyDefaultRedirect}
+						readonly={!$appSession.isAdmin}
+						disabled={!$appSession.isAdmin}
+						name="proxyDefaultRedirect"
+						id="proxyDefaultRedirect"
+						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+						placeholder="{$t('forms.eg')}: https://coolify.io"
+					/>
 				</div>
 				<div class="grid grid-cols-2 items-center">
 					<Setting

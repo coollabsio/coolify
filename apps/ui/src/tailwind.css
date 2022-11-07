@@ -88,7 +88,7 @@ label {
 	@apply inline-block;
 }
 .btn {
-	@apply text-white text-base min-w-fit;
+	@apply text-white text-base min-w-fit no-animation;
 }
 
 a {
@@ -156,7 +156,7 @@ a {
 }
 
 .box-selection {
-	@apply min-w-[16rem] max-w-[24rem] justify-center rounded border-transparent bg-coolgray-200 p-6 hover:border-transparent hover:bg-coolgray-400;
+	@apply min-w-[16rem]  justify-center rounded border-transparent bg-coolgray-200 p-6 hover:border-transparent hover:bg-coolgray-400;
 }
 
 .lds-heart {

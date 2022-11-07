@@ -5,5 +5,5 @@
 <img
 	alt="docker compose logo"
 	class={isAbsolute ? 'w-16 h-16 absolute top-0 left-0 -m-8' : 'w-8 h-8 mx-auto'}
-	src="/docker-compose.png"
+	src="/icons/compose.png"
 />

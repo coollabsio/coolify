@@ -5,7 +5,7 @@
 			const response = await get(`/services/${params.id}/storages`);
 			return {
 				props: {
-					service: stuff.service,
+					template: stuff.template,
 					...response
 				}
 			};
@@ -19,46 +19,72 @@
 </script>
 
 <script lang="ts">
-	export let service: any;
 	export let persistentStorages: any;
-    
+	export let template: any;
 	import { page } from '$app/stores';
 	import Storage from './_Storage.svelte';
 	import { get } from '$lib/api';
-	import SimpleExplainer from '$lib/components/SimpleExplainer.svelte';
-	import ServiceLinks from './_ServiceLinks.svelte';
+	import { t } from '$lib/translations';
+	import Explainer from '$lib/components/Explainer.svelte';
 
 	const { id } = $page.params;
 	async function refreshStorage() {
 		const data = await get(`/services/${id}/storages`);
 		persistentStorages = [...data.persistentStorages];
 	}
+	let services = Object.keys(template).map((service) => {
+		if (template[service]?.name) {
+			return {
+				name: template[service].name,
+				id: service
+			};
+		} else {
+			return service;
+		}
+	});
 </script>
 
-<div class="mx-auto max-w-6xl rounded-xl px-6 pt-4">
-	<div class="flex justify-center py-4 text-center">
-		<SimpleExplainer
-			customClass="w-full"
-			text={'You can specify any folder that you want to be persistent across restarts. <br>This is useful for storing data for VSCode server or WordPress.'}
-		/>
-	</div>
-	<table class="mx-auto border-separate text-left">
-		<thead>
-			<tr class="h-12">
-				<th scope="col">Path</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each persistentStorages as storage}
+<div class="w-full">
+	<div class="mx-auto w-full">
+		<div class="flex flex-row border-b border-coolgray-500 mb-6  space-x-2">
+			<div class="title font-bold pb-3">
+				Persistent Volumes <Explainer
+					position="dropdown-bottom"
+					explanation={$t('application.storage.persistent_storage_explainer')}
+				/>
+			</div>
+		</div>
+		{#if persistentStorages.filter((s) => s.predefined).length > 0}
+			<div class="title">Predefined Volumes</div>
+			<div class="w-full lg:px-0 px-4">
+				<div class="grid grid-col-1 lg:grid-cols-2 pt-2 gap-2">
+					<div class="font-bold uppercase">Container</div>
+					<div class="font-bold uppercase">Volume ID : Mount Dir</div>
+				</div>
+			</div>
+
+			{#each persistentStorages.filter((s) => s.predefined) as storage}
 				{#key storage.id}
-					<tr>
-						<Storage on:refresh={refreshStorage} {storage} />
-					</tr>
+					<Storage on:refresh={refreshStorage} {storage} {services} />
 				{/key}
 			{/each}
-			<tr>
-				<Storage on:refresh={refreshStorage} isNew />
-			</tr>
-		</tbody>
-	</table>
+		{/if}
+
+		{#if persistentStorages.filter((s) => !s.predefined).length > 0}
+			<div class="title" class:pt-10={persistentStorages.filter((s) => s.predefined).length > 0}>
+				Custom Volumes
+			</div>
+
+			{#each persistentStorages.filter((s) => !s.predefined) as storage}
+				{#key storage.id}
+					<Storage on:refresh={refreshStorage} {storage} {services} />
+				{/key}
+			{/each}
+		{/if}
+
+		<div class="title" class:pt-10={persistentStorages.filter((s) => s.predefined).length > 0}>
+			Add New Volume
+		</div>
+		<Storage on:refresh={refreshStorage} isNew {services} />
+	</div>
 </div>

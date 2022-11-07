@@ -88,31 +88,111 @@
 			</div>
 		</div>
 	{:else}
-		<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row mx-auto">
+		<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row mx-auto gap-4">
 			{#each ownDestinations as destination}
-				<div class="p-2">
-					<form on:submit|preventDefault={() => handleSubmit(destination.id)}>
-						<button type="submit" class="box-selection hover:bg-sky-700 font-bold">
-							<div class="font-bold text-xl text-center truncate">{destination.name}</div>
-							<div class="text-center truncate">{destination.network}</div>
-						</button>
-					</form>
-				</div>
+				<button
+					on:click={() => handleSubmit(destination.id)}
+					class="box-selection hover:bg-primary font-bold relative"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="absolute top-0 left-0 -m-4 h-12 w-12 text-sky-500"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path
+							d="M22 12.54c-1.804 -.345 -2.701 -1.08 -3.523 -2.94c-.487 .696 -1.102 1.568 -.92 2.4c.028 .238 -.32 1.002 -.557 1h-14c0 5.208 3.164 7 6.196 7c4.124 .022 7.828 -1.376 9.854 -5c1.146 -.101 2.296 -1.505 2.95 -2.46z"
+						/>
+						<path d="M5 10h3v3h-3z" />
+						<path d="M8 10h3v3h-3z" />
+						<path d="M11 10h3v3h-3z" />
+						<path d="M8 7h3v3h-3z" />
+						<path d="M11 7h3v3h-3z" />
+						<path d="M11 4h3v3h-3z" />
+						<path d="M4.571 18c1.5 0 2.047 -.074 2.958 -.78" />
+						<line x1="10" y1="16" x2="10" y2="16.01" />
+					</svg>
+					{#if destination.remoteEngine}
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="absolute top-0 left-9 -m-2 h-6 w-6 text-sky-500 rotate-45"
+							viewBox="0 0 24 24"
+							stroke-width="3"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<line x1="12" y1="18" x2="12.01" y2="18" />
+							<path d="M9.172 15.172a4 4 0 0 1 5.656 0" />
+							<path d="M6.343 12.343a8 8 0 0 1 11.314 0" />
+							<path d="M3.515 9.515c4.686 -4.687 12.284 -4.687 17 0" />
+						</svg>
+					{/if}
+					<div class="font-bold text-xl text-center truncate">{destination.name}</div>
+					<div class="text-center truncate">{destination.network}</div>
+				</button>
 			{/each}
 		</div>
 		{#if otherDestinations.length > 0 && $appSession.teamId === '0'}
 			<div class="px-6 pb-5 pt-10 title">Other Destinations</div>
 		{/if}
-		<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row mx-auto">
+		<div class="flex flex-col flex-wrap justify-center px-2 md:flex-row mx-auto gap-4">
 			{#each otherDestinations as destination}
-				<div class="p-2">
-					<form on:submit|preventDefault={() => handleSubmit(destination.id)}>
-						<button type="submit" class="box-selection hover:bg-sky-700 font-bold">
-							<div class="font-bold text-xl text-center truncate">{destination.name}</div>
-							<div class="text-center truncate">{destination.network}</div>
-						</button>
-					</form>
-				</div>
+				<button
+					class="box-selection hover:bg-sky-700 font-bold relative"
+					on:click={() => handleSubmit(destination.id)}
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="absolute top-0 left-0 -m-4 h-12 w-12 text-sky-500"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<path
+							d="M22 12.54c-1.804 -.345 -2.701 -1.08 -3.523 -2.94c-.487 .696 -1.102 1.568 -.92 2.4c.028 .238 -.32 1.002 -.557 1h-14c0 5.208 3.164 7 6.196 7c4.124 .022 7.828 -1.376 9.854 -5c1.146 -.101 2.296 -1.505 2.95 -2.46z"
+						/>
+						<path d="M5 10h3v3h-3z" />
+						<path d="M8 10h3v3h-3z" />
+						<path d="M11 10h3v3h-3z" />
+						<path d="M8 7h3v3h-3z" />
+						<path d="M11 7h3v3h-3z" />
+						<path d="M11 4h3v3h-3z" />
+						<path d="M4.571 18c1.5 0 2.047 -.074 2.958 -.78" />
+						<line x1="10" y1="16" x2="10" y2="16.01" />
+					</svg>
+					{#if destination.remoteEngine}
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="absolute top-0 left-9 -m-2 h-6 w-6 text-sky-500 rotate-45"
+							viewBox="0 0 24 24"
+							stroke-width="3"
+							stroke="currentColor"
+							fill="none"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<line x1="12" y1="18" x2="12.01" y2="18" />
+							<path d="M9.172 15.172a4 4 0 0 1 5.656 0" />
+							<path d="M6.343 12.343a8 8 0 0 1 11.314 0" />
+							<path d="M3.515 9.515c4.686 -4.687 12.284 -4.687 17 0" />
+						</svg>
+					{/if}
+					<div class="font-bold text-xl text-center truncate">{destination.name}</div>
+					<div class="text-center truncate">{destination.network}</div>
+				</button>
 			{/each}
 		</div>
 	{/if}

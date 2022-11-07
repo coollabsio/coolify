@@ -459,7 +459,7 @@
 	<form on:submit|preventDefault={() => handleSubmit()}>
 		<div class="mx-auto w-full">
 			<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
-				<div class="title font-bold pb-3 ">General</div>
+				<div class="title font-bold pb-3">General</div>
 				{#if $appSession.isAdmin}
 					<button
 						class="btn btn-sm  btn-primary"
@@ -644,7 +644,7 @@
 			</div>
 			{#if application.buildPack !== 'compose'}
 				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
-					Build & Deploy
+					Configuration
 				</div>
 				<div class="grid grid-flow-row gap-2 px-4 pr-5">
 					{#if application.buildCommand || application.buildPack === 'rust' || application.buildPack === 'laravel'}
@@ -838,8 +838,8 @@
 						>
 						<input
 							class="w-full"
-							readonly={!isDisabled}
 							disabled={isDisabled}
+							readonly={!$appSession.isAdmin}
 							name="exposePort"
 							id="exposePort"
 							bind:value={application.exposePort}
