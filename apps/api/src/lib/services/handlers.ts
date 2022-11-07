@@ -78,12 +78,28 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
                 }
             }
             const customVolumes = await prisma.servicePersistentStorage.findMany({ where: { serviceId: id } })
-            let volumes = arm ? template.services[s].volumesArm : template.services[s].volumes
+            let volumes = new Set()
+            if (arm) {
+                template.services[s]?.volumesArm && template.services[s].volumesArm.length > 0 && template.services[s].volumesArm.forEach(v => volumes.add(v))
+            } else {
+                template.services[s]?.volumes && template.services[s].volumes.length > 0 && template.services[s].volumes.forEach(v => volumes.add(v))
+            }
+
+            // Workaround: old plausible analytics service wrong volume id name
+            if (service.type === 'plausibleanalytics' && service.plausibleAnalytics?.id) {
+                let temp = Array.from(volumes)
+                temp.forEach(a => {
+                    const t = a.replace(service.id, service.plausibleAnalytics.id)
+                    volumes.delete(a)
+                    volumes.add(t)
+                })
+            }
+
             if (customVolumes.length > 0) {
                 for (const customVolume of customVolumes) {
                     const { volumeName, path, containerId } = customVolume
-                    if (volumes && volumes.length > 0 && !volumes.includes(`${volumeName}:${path}`) && containerId === service) {
-                        volumes.push(`${volumeName}:${path}`)
+                    if (volumes && volumes.size > 0 && !volumes.has(`${volumeName}:${path}`) && containerId === service) {
+                        volumes.add(`${volumeName}:${path}`)
                     }
                 }
             }
@@ -96,7 +112,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
                 image: arm ? template.services[s].imageArm : template.services[s].image,
                 expose: template.services[s].ports,
                 ...(exposePort ? { ports: [`${exposePort}:${exposePort}`] } : {}),
-                volumes,
+                volumes: Array.from(volumes),
                 environment: newEnvironments,
                 depends_on: template.services[s]?.depends_on,
                 ulimits: template.services[s]?.ulimits,
@@ -141,6 +157,8 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
         await startServiceContainers(fastify, id, teamId, destinationDocker.id, composeFileDestination)
+
+        // Workaround: Stop old minio proxies
         if (service.type === 'minio') {
             try {
                 await executeDockerCmd({

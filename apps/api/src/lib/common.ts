@@ -1448,7 +1448,8 @@ export async function getServiceFromDB({
 			persistentStorage: true,
 			serviceSecret: true,
 			serviceSetting: true,
-			wordpress: true
+			wordpress: true,
+			plausibleAnalytics: true,
 		}
 	});
 	if (!body) {

@@ -88,15 +88,18 @@ export async function migrateServicesToNewTemplate() {
                         }
                     }
                 }
-                for (const service of Object.keys(template.services)) {
-                    if (template.services[service].volumes) {
-                        for (const volume of template.services[service].volumes) {
+                for (const s of Object.keys(template.services)) {
+                    if (service.type === 'plausibleanalytics') {
+                        continue;
+                    }
+                    if (template.services[s].volumes) {
+                        for (const volume of template.services[s].volumes) {
                             const [volumeName, path] = volume.split(':')
                             if (!volumeName.startsWith('/')) {
                                 const found = await prisma.servicePersistentStorage.findFirst({ where: { volumeName, serviceId: id } })
                                 if (!found) {
                                     await prisma.servicePersistentStorage.create({
-                                        data: { volumeName, path, containerId: service, predefined: true, service: { connect: { id } } }
+                                        data: { volumeName, path, containerId: s, predefined: true, service: { connect: { id } } }
                                     });
                                 }
                             }
@@ -464,9 +467,13 @@ async function createVolumes(service: any, template: any) {
     for (const s of Object.keys(template.services)) {
         if (template.services[s].volumes && template.services[s].volumes.length > 0) {
             for (const volume of template.services[s].volumes) {
-                const volumeName = volume.split(':')[0]
+                let volumeName = volume.split(':')[0]
                 const volumePath = volume.split(':')[1]
-                const volumeService = s
+                let volumeService = s
+                if (service.type === 'plausibleanalytics' && service.plausibleAnalytics?.id) {
+                    let volumeId = volumeName.split('-')[0]
+                    volumeName = volumeName.replace(volumeId, service.plausibleAnalytics.id)
+                }
                 volumes.push(`${volumeName}@@@${volumePath}@@@${volumeService}`)
             }
         }
