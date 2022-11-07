@@ -2597,7 +2597,7 @@
       documentation: "Taken from https://plausible.io/"
       image: "bitnami/postgresql:13.2.0"
       volumes:
-        - "$$id-postgresql-data:/bitnami/postgresql"
+        - "$$id-postgresql:/bitnami/postgresql"
       environment:
         - POSTGRESQL_PASSWORD=$$secret_postgresql_password
         - POSTGRESQL_USERNAME=$$config_postgresql_username
@@ -2606,7 +2606,7 @@
       name: Clickhouse
       documentation: "Taken from https://plausible.io/"
       volumes:
-        - "$$id-clickhouse-data:/var/lib/clickhouse"
+        - "$$id-clickhouse:/var/lib/clickhouse"
       image: "yandex/clickhouse-server:21.3.2.5"
       ulimits:
         nofile:
