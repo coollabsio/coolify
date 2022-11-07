@@ -1312,8 +1312,7 @@
         - SETUID
         - DAC_OVERRIDE
       files:
-        - source: $$workdir/settings.yml
-          destination: /etc/searxng/settings.yml
+        - location: /etc/searxng/settings.yml
           content: |2-
 
                                           # see https://docs.searxng.org/admin/engines/settings.html#use-default-settings
@@ -1685,8 +1684,7 @@
         - POSTGRES_DB=$$config_postgres_db
       ports: []
       files:
-        - source: $$workdir/schema.postgresql.sql
-          destination: /docker-entrypoint-initdb.d/schema.postgresql.sql
+        - location: /docker-entrypoint-initdb.d/schema.postgresql.sql
           content: |2-
 
                                           -- CreateTable
@@ -2615,8 +2613,7 @@
           soft: 262144
           hard: 262144
       files:
-        - source: $$workdir/clickhouse-config.xml
-          destination: /etc/clickhouse-server/users.d/logging.xml
+        - location: /etc/clickhouse-server/users.d/logging.xml
           content: >-
             <yandex><logger><level>warning</level><console>true</console></logger><query_thread_log
             remove="remove"/><query_log remove="remove"/><text_log
@@ -2624,15 +2621,12 @@
             remove="remove"/><asynchronous_metric_log
             remove="remove"/><session_log remove="remove"/><part_log
             remove="remove"/></yandex>
-        - source: $$workdir/clickhouse-user-config.xml
-          destination: /etc/clickhouse-server/config.d/logging.xml
+        - location: /etc/clickhouse-server/config.d/logging.xml
           content: >-
             <yandex><profiles><default><log_queries>0</log_queries><log_query_threads>0</log_query_threads></default></profiles></yandex>
-        - source: $$workdir/init.query
-          destination: /docker-entrypoint-initdb.d/init.query
+        - location: /docker-entrypoint-initdb.d/init.query
           content: CREATE DATABASE IF NOT EXISTS plausible;
-        - source: $$workdir/init-db.sh
-          destination: /docker-entrypoint-initdb.d/init-db.sh
+        - location: /docker-entrypoint-initdb.d/init-db.sh
           content: >-
             clickhouse client --queries-file
             /docker-entrypoint-initdb.d/init.query

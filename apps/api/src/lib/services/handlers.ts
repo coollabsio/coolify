@@ -108,8 +108,8 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
 
             // Generate files for builds
             if (template.services[s]?.files?.length > 0) {
-                if (!template.services[s].build) {
-                    template.services[s].build = {
+                if (!config[s].build) {
+                    config[s].build = {
                         context: workdir,
                         dockerfile: `Dockerfile.${s}`
                     }
@@ -117,12 +117,14 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
                 let Dockerfile = `
                     FROM ${template.services[s].image}`
                 for (const file of template.services[s].files) {
-                    const { source, destination, content } = file;
+                    const { location, content } = file;
+                    const source = path.join(workdir, location);
+                    await fs.mkdir(path.dirname(source), { recursive: true });
                     await fs.writeFile(source, content);
                     Dockerfile += `
-                        COPY ./${path.basename(source)} ${destination}`
+                        COPY .${location} ${location}`
                 }
-                await fs.writeFile(`${workdir}/Dockerfile.${service}`, Dockerfile);
+                await fs.writeFile(`${workdir}/Dockerfile.${s}`, Dockerfile);
             }
         }
         const { volumeMounts } = persistentVolumes(id, persistentStorage, config)
