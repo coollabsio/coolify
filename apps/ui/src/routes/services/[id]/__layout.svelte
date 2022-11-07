@@ -102,7 +102,7 @@
 	async function restartService() {
 		const sure = confirm('Are you sure you want to restart this service?');
 		if (sure) {
-			await stopService();
+			await stopService(true);
 			await startService();
 		}
 	}
@@ -120,7 +120,27 @@
 			loading.refreshTemplates = false;
 		}
 	}
-	async function stopService() {
+	async function stopService(skip = false) {
+		if (skip) {
+			$status.service.initialLoading = true;
+			$status.service.loading = true;
+			try {
+				await post(`/services/${service.id}/stop`, {});
+				if (service.type.startsWith('wordpress')) {
+					await post(`/services/${id}/wordpress/ftp`, {
+						ftpEnabled: false
+					});
+					service.wordpress?.ftpEnabled && window.location.reload();
+				}
+			} catch (error) {
+				return errorNotification(error);
+			} finally {
+				$status.service.initialLoading = false;
+				$status.service.loading = false;
+				await getStatus();
+			}
+			return;
+		}
 		const sure = confirm($t('database.confirm_stop', { name: service.name }));
 		if (sure) {
 			$status.service.initialLoading = true;
@@ -319,7 +339,7 @@
 				Force Redeploy
 			</button>
 			<button
-				on:click={stopService}
+				on:click={() => stopService(false)}
 				type="submit"
 				disabled={!$isDeploymentEnabled}
 				class="btn btn-sm gap-2"
