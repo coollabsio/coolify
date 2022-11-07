@@ -3,6 +3,7 @@
   documentation: https://docs.appsmith.com/getting-started/setup/instance-configuration/
   type: appsmith
   name: Appsmith
+  description: "Fastest way to build internal apps over any database or API."
   services:
     $$id:
       image: appsmith/appsmith-ce:$$core_version
@@ -33,6 +34,12 @@
 - templateVersion: 1.0.0
   defaultVersion: 0.56.2
   documentation: https://hub.docker.com/r/zadam/trilium
+  description: "A hierarchical note taking application with focus on building large personal knowledge bases."
+  labels:
+    - personal
+    - knowledge
+    - notes
+    - wiki
   type: trilium
   name: Trilium Notes
   services:
@@ -47,6 +54,9 @@
 - templateVersion: 1.0.0
   defaultVersion: 1.9.2
   documentation: https://hub.docker.com/r/louislam/uptime-kuma
+  description: A free & fancy self-hosted monitoring tool.
+  labels: 
+    - uptime
   type: uptimekuma
   name: UptimeKuma
   services:
@@ -61,6 +71,7 @@
 - templateVersion: 1.0.0
   defaultVersion: "5.8"
   documentation: https://hub.docker.com/r/silviof/docker-languagetool
+  description: "A multilingual grammar, style and spell checker."
   type: languagetool
   name: LanguageTool
   services:
@@ -75,8 +86,12 @@
 - templateVersion: 1.0.0
   defaultVersion: 1.26.0
   documentation: https://hub.docker.com/r/vaultwarden/server
+  description: "Bitwarden compatible server written in Rust."
   type: vaultwarden
   name: VaultWarden
+  labels:
+    - bitwarden
+    - password manager
   services:
     $$id:
       image: vaultwarden/server:$$core_version
@@ -92,8 +107,11 @@
   type: grafana
   name: Grafana
   description: >-
-    Grafana allows you to query, visualize, alert on and understand your metrics
-    no matter where they are stored.
+    Grafana allows you to query, visualize, alert on and understand your metrics.
+  labels: 
+    - monitoring
+    - metrics
+    - dashboard
   services:
     $$id:
       image: grafana/grafana:$$core_version
@@ -110,6 +128,11 @@
   type: appwrite
   name: Appwrite
   description: Secure Backend Server for Web, Mobile & Flutter Developers.
+  labels: 
+    - serverless
+    - backend
+    - storage
+    - api
   services:
     "$$id":
       image: appwrite/appwrite:$$core_version
@@ -1187,9 +1210,12 @@
 - templateVersion: 1.0.0
   defaultVersion: latest
   documentation: https://docs.weblate.org/en/latest/admin/install/docker.html
+  description: "A copylefted libre software web-based continuous localization system."
   type: weblate
   name: Weblate
-  description: ""
+  labels:
+    - translate
+    - localization
   services:
     $$id:
       name: Weblate
@@ -1265,7 +1291,7 @@
   documentation: https://docs.searxng.org/
   type: searxng
   name: SearXNG
-  description: ""
+  description: "Free internet metasearch engine which aggregates results from more than 70 search services."
   services:
     $$id:
       name: SearXNG
@@ -1339,7 +1365,10 @@
   documentation: https://glitchtip.com/documentation
   type: glitchtip
   name: GlitchTip
-  description: ""
+  description: "Simple, open source error tracking."
+  labels: 
+    - sentry
+    - bugsnag
   services:
     $$id:
       name: GlitchTip
@@ -1559,6 +1588,9 @@
   type: hasura
   name: Hasura
   description: "Instant realtime GraphQL APIs on any Postgres application, existing or new."
+  labels: 
+    - graphql
+    - database
   services:
     $$id:
       name: Hasura
@@ -1622,11 +1654,9 @@
   documentation: https://umami.is/docs/getting-started
   type: umami-postgresql
   name: Umami
-  subname: (with PostgreSQL)
+  subname: (PostgreSQL)
   description: >-
-    Umami is a simple, easy to use, self-hosted web analytics solution. The goal
-    is to provide you with a friendly privacy-focused alternative to Google
-    Analytics.
+    A simple, easy to use, self-hosted web analytics solution.
   services:
     $$id:
       name: Umami
@@ -1834,8 +1864,7 @@
   type: meilisearch
   name: MeiliSearch
   description: >-
-    MeiliSearch is a lightning Fast, Ultra Relevant, and Typo-Tolerant Search
-    Engine
+    A lightning Fast, Ultra Relevant, and Typo-Tolerant Search Engine.
   services:
     $$id:
       name: MeiliSearch
@@ -1865,8 +1894,10 @@
   name: Ghost
   subname: (MariaDB)
   description: >-
-    Ghost is a free and open source blogging platform written in JavaScript and
-    distributed under the MIT License
+    Free and open source blogging platform.
+  labels:
+    - cms
+    - blog
   services:
     $$id:
       name: Ghost
@@ -1981,8 +2012,7 @@
   name: Ghost
   subname: (without Database)
   description: >-
-    Ghost is a free and open source blogging platform written in JavaScript and
-    distributed under the MIT License
+    Free and open source blogging platform.
   services:
     $$id:
       name: Ghost
@@ -2045,10 +2075,9 @@
   documentation: https://ghost.org/resources/
   type: ghost-mysql
   name: Ghost
-  subname: (with MySQL)
+  subname: (MySQL)
   description: >-
-    Ghost is a free and open source blogging platform written in JavaScript and
-    distributed under the MIT License
+    Ghost is a free and open source blogging platform.
   services:
     $$id:
       name: Ghost
@@ -2124,8 +2153,12 @@
   documentation: https://wordpress.org/
   type: wordpress
   name: WordPress
-  subname: (with MySQL)
-  description: WordPress is a content management system based on PHP with new MySQL database.
+  subname: (MySQL)
+  description: A content management system based on PHP.
+  labels:
+    - "wordpress"
+    - "php"
+    - "cms"
   services:
     $$id:
       name: WordPress
@@ -2212,7 +2245,11 @@
   type: wordpress-only
   name: WordPress
   subname: (without DB)
-  description: WordPress is a content management system based on PHP without MySQL.
+  description: A content management system based on PHP.
+  labels:
+    - "wordpress"
+    - "php"
+    - "cms"
   services:
     $$id:
       name: WordPress
@@ -2283,8 +2320,10 @@
   type: vscodeserver
   name: VSCode Server
   description: >-
-    vscode-server by Coder is VS Code running on a remote server, accessible
-    through the browser.
+    Visual Studio Code on a remote server, accessible through the browser.
+  labels:
+    - vscode
+    - ide
   services:
     $$id:
       name: VSCode Server
@@ -2312,7 +2351,10 @@
   documentation: https://min.io/docs/minio
   type: minio
   name: MinIO
-  description: " MinIO is a cloud storage server compatible with Amazon S3"
+  description: "A cloud storage server compatible with Amazon S3."
+  labels:
+    - storage
+    - s3
   services:
     $$id:
       name: MinIO
@@ -2368,7 +2410,10 @@
   documentation: https://fider.io/docs
   type: fider
   name: Fider
-  description: Fider is a platform to collect and organize customer feedback.
+  description: A platform to collect and organize customer feedback.
+  labels: 
+    - suggestion
+    - feedback
   services:
     $$id:
       name: Fider
@@ -2486,7 +2531,13 @@
   documentation: https://docs.n8n.io
   type: n8n
   name: n8n.io
-  description: n8n is a free and open node based Workflow Automation Tool.
+  description: A free and open node based Workflow Automation Tool.
+  labels:
+    - workflow
+    - automation
+    - ifttt
+    - zapier
+    - nodered
   services:
     $$id:
       name: N8n
@@ -2512,7 +2563,14 @@
   documentation: https://plausible.io/doc/
   type: plausibleanalytics
   name: Plausible Analytics
-  description: Plausible is a lightweight and open-source website analytics tool.
+  description: A lightweight and open-source website analytics tool.
+  labels:
+    - analytics
+    - statistics
+    - plausible
+    - gdpr
+    - no-cookie
+    - google analytics
   services:
     $$id:
       name: Plausible Analytics
@@ -2658,8 +2716,11 @@
   type: nocodb
   name: NocoDB
   description: >-
-    The Open Source Airtable Alternative - Turns any MySQL, PostgreSQL, SQL
-    Server, SQLite & MariaDB into a smart-spreadsheet.
+    Turns any MySQL, PostgreSQL, SQL Server, SQLite & MariaDB into a smart-spreadsheet.
+  labels:
+    - database
+    - airtable
+    - spreadsheet
   services:
     $$id:
       name: NocoDB

@@ -51,7 +51,8 @@
 		filteredServices = services.filter(
 			(service: any) =>
 				service.name.toLowerCase().includes(search.toLowerCase()) ||
-				service.labels?.some((label: string) => label.toLowerCase().includes(search.toLowerCase()))
+				service.labels?.some((label: string) => label.toLowerCase().includes(search.toLowerCase())) ||
+				service.description.toLowerCase().includes(search.toLowerCase()) 
 		);
 	}
 	function cleanupSearch() {
@@ -104,18 +105,26 @@
 	</div>
 </div>
 <div class=" lg:pt-20 lg:p-0 px-8 pt-20">
-	<div class="grid grid-flow-rows grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+	<div class="grid grid-flow-rows grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
 		{#each sortMe(filteredServices) as service}
 			{#key service.name}
 				<button
 					on:click={() => handleSubmit(service)}
-					class="box-selection relative text-xl font-bold hover:bg-primary h-24"
+					class="box-selection relative text-xl font-bold hover:bg-primary	"
 				>
-					<ServiceIcons type={service.type} />
-					{service.name}
-					{#if service.subname}
-						<div class="text-sm font-mono">{service.subname}</div>
-					{/if}
+					<div class="flex flex-col">
+						<div class="flex justify-center items-center gap-2 pb-4">
+							<ServiceIcons type={service.type} />
+							<div>{service.name}</div>
+							{#if service.subname}
+								<div class="text-sm">{service.subname}</div>
+							{/if}
+						</div>
+
+						{#if service.description}
+							<div class="text-sm font-mono">{service.description}</div>
+						{/if}
+					</div>
 				</button>
 			{/key}
 		{/each}
