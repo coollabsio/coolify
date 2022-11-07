@@ -17,6 +17,9 @@ You can ask for guidance anytime on our
 ## 2) Basic requirements
 
 - [Install Pnpm](https://pnpm.io/installation)
+- [Install Docker Engine](https://docs.docker.com/engine/install/)
+- [Setup Docker Compose Plugin](https://docs.docker.com/compose/install/compose-plugin/)
+- [Setup GIT LFS Support](https://git-lfs.github.com/)
 
 ## 3) Setup Coolify
 
