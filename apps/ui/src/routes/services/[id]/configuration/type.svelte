@@ -116,7 +116,7 @@
 </div>
 <div class=" lg:pt-20 lg:p-0 px-8 pt-20">
 	<div class="grid grid-flow-rows grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-		{#each sortMe(filteredServices) as service}
+		{#each sortMe(filteredServices).filter(s=> !s.ignore) as service}
 			{#key service.name}
 				<button
 					on:click={() => handleSubmit(service)}
