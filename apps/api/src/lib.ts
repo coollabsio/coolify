@@ -30,85 +30,92 @@ export async function migrateServicesToNewTemplate() {
             }
         })
         for (const service of services) {
-            const { id } = service
-            if (!service.type) {
-                continue;
-            }
-            let template = templates.find(t => fixType(t.type) === fixType(service.type));
-            if (template) {
-                template = JSON.parse(JSON.stringify(template).replaceAll('$$id', service.id))
-                if (service.type === 'plausibleanalytics' && service.plausibleAnalytics) await plausibleAnalytics(service, template)
-                if (service.type === 'fider' && service.fider) await fider(service, template)
-                if (service.type === 'minio' && service.minio) await minio(service, template)
-                if (service.type === 'vscodeserver' && service.vscodeserver) await vscodeserver(service, template)
-                if (service.type === 'wordpress' && service.wordpress) await wordpress(service, template)
-                if (service.type === 'ghost' && service.ghost) await ghost(service, template)
-                if (service.type === 'meilisearch' && service.meiliSearch) await meilisearch(service, template)
-                if (service.type === 'umami' && service.umami) await umami(service, template)
-                if (service.type === 'hasura' && service.hasura) await hasura(service, template)
-                if (service.type === 'glitchTip' && service.glitchTip) await glitchtip(service, template)
-                if (service.type === 'searxng' && service.searxng) await searxng(service, template)
-                if (service.type === 'weblate' && service.weblate) await weblate(service, template)
-                if (service.type === 'appwrite' && service.appwrite) await appwrite(service, template)
+            try {
+                const { id } = service
+                if (!service.type) {
+                    continue;
+                }
+                let template = templates.find(t => fixType(t.type) === fixType(service.type));
+                if (template) {
+                    template = JSON.parse(JSON.stringify(template).replaceAll('$$id', service.id))
+                    if (service.type === 'plausibleanalytics' && service.plausibleAnalytics) await plausibleAnalytics(service, template)
+                    if (service.type === 'fider' && service.fider) await fider(service, template)
+                    if (service.type === 'minio' && service.minio) await minio(service, template)
+                    if (service.type === 'vscodeserver' && service.vscodeserver) await vscodeserver(service, template)
+                    if (service.type === 'wordpress' && service.wordpress) await wordpress(service, template)
+                    if (service.type === 'ghost' && service.ghost) await ghost(service, template)
+                    if (service.type === 'meilisearch' && service.meiliSearch) await meilisearch(service, template)
+                    if (service.type === 'umami' && service.umami) await umami(service, template)
+                    if (service.type === 'hasura' && service.hasura) await hasura(service, template)
+                    if (service.type === 'glitchTip' && service.glitchTip) await glitchtip(service, template)
+                    if (service.type === 'searxng' && service.searxng) await searxng(service, template)
+                    if (service.type === 'weblate' && service.weblate) await weblate(service, template)
+                    if (service.type === 'appwrite' && service.appwrite) await appwrite(service, template)
 
-                await createVolumes(service, template);
+                    try {
+                        await createVolumes(service, template);
+                    } catch (error) {
+                        console.log(error)
+                    }
 
-                if (template.variables.length > 0) {
+                    if (template.variables.length > 0) {
+                        for (const variable of template.variables) {
+                            const { defaultValue } = variable;
+                            const regex = /^\$\$.*\((\d+)\)$/g;
+                            const length = Number(regex.exec(defaultValue)?.[1]) || undefined
+                            if (variable.defaultValue.startsWith('$$generate_password')) {
+                                variable.value = generatePassword({ length });
+                            } else if (variable.defaultValue.startsWith('$$generate_hex')) {
+                                variable.value = generatePassword({ length, isHex: true });
+                            } else if (variable.defaultValue.startsWith('$$generate_username')) {
+                                variable.value = cuid();
+                            } else {
+                                variable.value = variable.defaultValue || '';
+                            }
+                        }
+                    }
                     for (const variable of template.variables) {
-                        const { defaultValue } = variable;
-                        const regex = /^\$\$.*\((\d+)\)$/g;
-                        const length = Number(regex.exec(defaultValue)?.[1]) || undefined
-                        if (variable.defaultValue.startsWith('$$generate_password')) {
-                            variable.value = generatePassword({ length });
-                        } else if (variable.defaultValue.startsWith('$$generate_hex')) {
-                            variable.value = generatePassword({ length, isHex: true });
-                        } else if (variable.defaultValue.startsWith('$$generate_username')) {
-                            variable.value = cuid();
-                        } else {
-                            variable.value = variable.defaultValue || '';
-                        }
-                    }
-                }
-                for (const variable of template.variables) {
-                    if (variable.id.startsWith('$$secret_')) {
-                        const found = await prisma.serviceSecret.findFirst({ where: { name: variable.name, serviceId: id } })
-                        if (!found) {
-                            await prisma.serviceSecret.create({
-                                data: { name: variable.name, value: encrypt(variable.value) || '', service: { connect: { id } } }
-                            })
-                        }
+                        if (variable.id.startsWith('$$secret_')) {
+                            const found = await prisma.serviceSecret.findFirst({ where: { name: variable.name, serviceId: id } })
+                            if (!found) {
+                                await prisma.serviceSecret.create({
+                                    data: { name: variable.name, value: encrypt(variable.value) || '', service: { connect: { id } } }
+                                })
+                            }
 
-                    }
-                    if (variable.id.startsWith('$$config_')) {
-                        const found = await prisma.serviceSetting.findFirst({ where: { name: variable.name, serviceId: id } })
-                        if (!found) {
-                            await prisma.serviceSetting.create({
-                                data: { name: variable.name, value: variable.value.toString(), variableName: variable.id, service: { connect: { id } } }
-                            })
+                        }
+                        if (variable.id.startsWith('$$config_')) {
+                            const found = await prisma.serviceSetting.findFirst({ where: { name: variable.name, serviceId: id } })
+                            if (!found) {
+                                await prisma.serviceSetting.create({
+                                    data: { name: variable.name, value: variable.value.toString(), variableName: variable.id, service: { connect: { id } } }
+                                })
+                            }
                         }
                     }
-                }
-                for (const s of Object.keys(template.services)) {
-                    if (service.type === 'plausibleanalytics') {
-                        continue;
-                    }
-                    if (template.services[s].volumes) {
-                        for (const volume of template.services[s].volumes) {
-                            const [volumeName, path] = volume.split(':')
-                            if (!volumeName.startsWith('/')) {
-                                const found = await prisma.servicePersistentStorage.findFirst({ where: { volumeName, serviceId: id } })
-                                if (!found) {
-                                    await prisma.servicePersistentStorage.create({
-                                        data: { volumeName, path, containerId: s, predefined: true, service: { connect: { id } } }
-                                    });
+                    for (const s of Object.keys(template.services)) {
+                        if (service.type === 'plausibleanalytics') {
+                            continue;
+                        }
+                        if (template.services[s].volumes) {
+                            for (const volume of template.services[s].volumes) {
+                                const [volumeName, path] = volume.split(':')
+                                if (!volumeName.startsWith('/')) {
+                                    const found = await prisma.servicePersistentStorage.findFirst({ where: { volumeName, serviceId: id } })
+                                    if (!found) {
+                                        await prisma.servicePersistentStorage.create({
+                                            data: { volumeName, path, containerId: s, predefined: true, service: { connect: { id } } }
+                                        });
+                                    }
                                 }
                             }
                         }
                     }
+                    await prisma.service.update({ where: { id }, data: { templateVersion: template.templateVersion } })
                 }
-                await prisma.service.update({ where: { id }, data: { templateVersion: template.templateVersion } })
+            } catch (error) {
+                console.log(error)
             }
-
         }
     } catch (error) {
         console.log(error)
