@@ -173,7 +173,13 @@ const host = '0.0.0.0';
 		// Refresh and check templates
 		setInterval(async () => {
 			await refreshTemplates()
+		}, 60000)
+
+		setInterval(async () => {
 			await refreshTags()
+		}, 60000)
+
+		setInterval(async () => {
 			await migrateServicesToNewTemplate()
 		}, 60000)
 
