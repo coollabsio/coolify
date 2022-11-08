@@ -238,7 +238,6 @@ async function hasura(service: any, template: any) {
 async function umami(service: any, template: any) {
     const { postgresqlUser, postgresqlPassword, postgresqlDatabase, umamiAdminPassword, hashSalt } = service.umami
     const { id } = service
-
     const secrets = [
         `HASH_SALT@@@${hashSalt}`,
         `POSTGRES_PASSWORD@@@${postgresqlPassword}`,
