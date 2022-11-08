@@ -1,5 +1,5 @@
 import cuid from "cuid";
-import { decrypt, encrypt, fixType, generatePassword, getDomain, prisma } from "./lib/common";
+import { decrypt, encrypt, fixType, generatePassword, prisma } from "./lib/common";
 import { getTemplates } from "./lib/services";
 
 export async function migrateServicesToNewTemplate() {
@@ -253,6 +253,8 @@ async function umami(service: any, template: any) {
     await migrateSettings(settings, service, template);
     await migrateSecrets(secrets, service);
 
+    await prisma.service.update({ where: { id: service.id }, data: { type: "umami-postgresql" } })
+
     // Disconnect old service data
     // await prisma.service.update({ where: { id: service.id }, data: { umami: { disconnect: true } } })
 }
@@ -440,33 +442,41 @@ async function plausibleAnalytics(service: any, template: any) {
 
 async function migrateSettings(settings: any[], service: any, template: any) {
     for (const setting of settings) {
-        if (!setting) continue;
-        let [name, value] = setting.split('@@@')
-        let minio = name
-        if (name === 'MINIO_SERVER_URL') {
-            name = 'coolify_fqdn_minio_console'
+        try {
+            if (!setting) continue;
+            let [name, value] = setting.split('@@@')
+            let minio = name
+            if (name === 'MINIO_SERVER_URL') {
+                name = 'coolify_fqdn_minio_console'
+            }
+            if (!value || value === 'null') {
+                continue;
+            }
+            let variableName = template.variables.find((v: any) => v.name === name)?.id
+            if (!variableName) {
+                variableName = `$$config_${name.toLowerCase()}`
+            }
+            // console.log('Migrating setting', name, value, 'for service', service.id, ', service name:', service.name, 'variableName: ', variableName)
+    
+            await prisma.serviceSetting.findFirst({ where: { name: minio, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name: minio, value, variableName, service: { connect: { id: service.id } } } })
+        } catch(error) {
+            console.log(error)
         }
-        if (!value || value === 'null') {
-            continue;
-        }
-        let variableName = template.variables.find((v: any) => v.name === name)?.id
-        if (!variableName) {
-            variableName = `$$config_${name.toLowerCase()}`
-        }
-        // console.log('Migrating setting', name, value, 'for service', service.id, ', service name:', service.name, 'variableName: ', variableName)
-
-        await prisma.serviceSetting.findFirst({ where: { name: minio, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name: minio, value, variableName, service: { connect: { id: service.id } } } })
     }
 }
 async function migrateSecrets(secrets: any[], service: any) {
     for (const secret of secrets) {
-        if (!secret) continue;
-        let [name, value] = secret.split('@@@')
-        if (!value || value === 'null') {
-            continue
+        try {
+            if (!secret) continue;
+            let [name, value] = secret.split('@@@')
+            if (!value || value === 'null') {
+                continue
+            }
+            // console.log('Migrating secret', name, value, 'for service', service.id, ', service name:', service.name)
+            await prisma.serviceSecret.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSecret.create({ data: { name, value, service: { connect: { id: service.id } } } })
+        } catch(error) {
+            console.log(error)
         }
-        // console.log('Migrating secret', name, value, 'for service', service.id, ', service name:', service.name)
-        await prisma.serviceSecret.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSecret.create({ data: { name, value, service: { connect: { id: service.id } } } })
     }
 }
 async function createVolumes(service: any, template: any) {

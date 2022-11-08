@@ -79,9 +79,7 @@
 	$isDeploymentEnabled = checkIfDeploymentEnabledServices($appSession.isAdmin, service);
 
 	let statusInterval: any;
-	let loading = {
-		refreshTemplates: false
-	};
+	
 
 	async function deleteService() {
 		const sure = confirm($t('application.confirm_to_delete', { name: service.name }));
@@ -104,20 +102,6 @@
 		if (sure) {
 			await stopService(true);
 			await startService();
-		}
-	}
-	async function refreshTemplate() {
-		try {
-			loading.refreshTemplates = true;
-			await post(`/internal/refreshTemplates`, {});
-			addToast({
-				message: 'Services refreshed.',
-				type: 'success'
-			});
-		} catch (error) {
-			return errorNotification(error);
-		} finally {
-			loading.refreshTemplates = false;
 		}
 	}
 	async function stopService(skip = false) {
@@ -277,14 +261,6 @@
 				>
 					Delete Service
 				</button>
-			{/if}
-			{#if $page.url.pathname === `/services/${id}/configuration/type` && dev}
-				<button
-					disabled={loading.refreshTemplates}
-					class:loading={loading.refreshTemplates}
-					class="btn btn-sm btn-primary text-sm"
-					on:click={refreshTemplate}>Refresh Services List</button
-				>
 			{/if}
 		</div>
 	</nav>

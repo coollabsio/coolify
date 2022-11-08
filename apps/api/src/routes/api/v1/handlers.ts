@@ -49,10 +49,6 @@ export async function refreshTags() {
 			}
 		} catch (error) {
 			console.log(error)
-			throw {
-				status: 500,
-				message: 'Could not fetch templates from get.coollabs.io'
-			};
 		}
 
 		return {};
@@ -73,12 +69,7 @@ export async function refreshTemplates() {
 			}
 		} catch (error) {
 			console.log(error)
-			throw {
-				status: 500,
-				message: 'Could not fetch templates from get.coollabs.io'
-			};
 		}
-
 		return {};
 	} catch ({ status, message }) {
 		return errorHandler({ status, message });
