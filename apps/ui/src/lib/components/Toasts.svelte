@@ -4,11 +4,11 @@
 	import { dismissToast, pauseToast, resumeToast, toasts } from '$lib/store';
 </script>
 
-{#if $toasts}
+{#if $toasts.length > 0}
 	<section>
-		<article class="toast toast-top toast-end rounded-none px-10" role="alert" >
+		<article class="toast toast-top toast-center rounded-none w-2/3 lg:w-[20rem]" role="alert">
 			{#each $toasts as toast (toast.id)}
-				<Toast	
+				<Toast
 					type={toast.type}
 					on:resume={() => resumeToast(toast.id)}
 					on:pause={() => pauseToast(toast.id)}

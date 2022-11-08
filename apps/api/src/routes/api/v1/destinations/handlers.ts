@@ -204,8 +204,8 @@ export async function assignSSHKey(request: FastifyRequest) {
 }
 export async function verifyRemoteDockerEngineFn(id: string) {
     await createRemoteEngineConfiguration(id);
-    const { remoteIpAddress, remoteUser, network, isCoolifyProxyUsed } = await prisma.destinationDocker.findFirst({ where: { id } })
-    const host = `ssh://${remoteUser}@${remoteIpAddress}`
+    const { remoteIpAddress, network, isCoolifyProxyUsed } = await prisma.destinationDocker.findFirst({ where: { id } })
+    const host = `ssh://${remoteIpAddress}-remote`
     const { stdout } = await asyncExecShell(`DOCKER_HOST=${host} docker network ls --filter 'name=${network}' --no-trunc --format "{{json .}}"`);
     if (!stdout) {
         await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable ${network}`);
@@ -215,8 +215,8 @@ export async function verifyRemoteDockerEngineFn(id: string) {
         await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable coolify-infra`);
     }
     if (isCoolifyProxyUsed) await startTraefikProxy(id);
-    const { stdout: daemonJson } = await executeSSHCmd({ dockerId: id, command: `cat /etc/docker/daemon.json` });
     try {
+        const { stdout: daemonJson } = await executeSSHCmd({ dockerId: id, command: `cat /etc/docker/daemon.json` });
         let daemonJsonParsed = JSON.parse(daemonJson);
         let isUpdated = false;
         if (!daemonJsonParsed['live-restore'] || daemonJsonParsed['live-restore'] !== true) {

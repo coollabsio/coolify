@@ -68,12 +68,6 @@
 </script>
 
 <div class="w-full relative p-5 ">
-	{#if loading.usage}
-		<span class="indicator-item badge bg-yellow-500 badge-sm" />
-	{:else}
-		<span class="indicator-item badge bg-success badge-sm" />
-	{/if}
-
 	<div class="w-full flex flex-col lg:flex-row space-y-4 lg:space-y-0 space-x-4">
 		<div class="flex flex-col">
 			<h1 class="font-bold text-lg lg:text-xl truncate">
@@ -97,6 +91,11 @@
 				class:loading={loading.cleanup}
 				class:bg-coollabs={!loading.cleanup}
 				class="btn btn-sm">Cleanup Storage</button
+			>
+		{/if}
+		{#if loading.usage}
+			<button id="streaming" class=" btn btn-sm bg-transparent border-none loading"
+				>Getting data...</button
 			>
 		{/if}
 	</div>

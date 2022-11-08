@@ -38,6 +38,8 @@
 				class={disabledClass}
 				class:pr-10={true}
 				class:pr-20={value && isHttps}
+				class:border={required && !value}
+				class:border-red-500={required && !value}
 				{placeholder}
 				type="text"
 				{id}
@@ -54,6 +56,8 @@
 				type="text"
 				class:pr-10={true}
 				class:pr-20={value && isHttps}
+				class:border={required && !value}
+				class:border-red-500={required && !value}
 				{id}
 				{name}
 				{required}
@@ -70,6 +74,8 @@
 			class={disabledClass}
 			class:pr-10={true}
 			class:pr-20={value && isHttps}
+			class:border={required && !value}
+			class:border-red-500={required && !value}
 			type="password"
 			{id}
 			{name}
@@ -85,6 +91,7 @@
 	<div class="absolute top-0 right-0 flex justify-center items-center h-full cursor-pointer text-stone-600 hover:text-white mr-3">
 		<div class="flex space-x-2">
 			{#if isPasswordField}
+				<!-- svelte-ignore a11y-click-events-have-key-events -->
 				<div on:click={() => (showPassword = !showPassword)}>
 					{#if showPassword}
 						<svg
@@ -126,6 +133,7 @@
 				</div>
 			{/if}
 			{#if value && isHttps}
+				<!-- svelte-ignore a11y-click-events-have-key-events -->
 				<div on:click={copyToClipboard}>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"

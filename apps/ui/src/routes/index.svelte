@@ -41,6 +41,7 @@
 	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
 	import { dev } from '$app/env';
 	import NewResource from './_NewResource.svelte';
+	import { onMount } from 'svelte';
 
 	let numberOfGetStatus = 0;
 	let status: any = {};
@@ -54,8 +55,13 @@
 		services: false,
 		databases: false
 	};
+	let searchInput: HTMLInputElement;
 	doSearch();
-
+	onMount(() => {
+		setTimeout(() => {
+			searchInput.focus();
+		}, 100);
+	});
 	async function refreshStatusApplications() {
 		noInitialStatus.applications = false;
 		numberOfGetStatus = 0;
@@ -171,7 +177,24 @@
 				}
 			} else if (typeof dualCerts !== 'undefined') {
 				const response = await get(`/services/${id}/status`);
-				isRunning = response.isRunning;
+				if (Object.keys(response).length === 0) {
+					isRunning = false;
+				} else {
+					let overallStatus = false;
+					for (const oneStatus of Object.keys(response)) {
+						if (response[oneStatus].status.isRunning) {
+							overallStatus = true;
+						} else {
+							isDegraded = true;
+							break;
+						}
+					}
+					if (overallStatus) {
+						isRunning = true;
+					} else {
+						isRunning = false;
+					}
+				}
 			} else {
 				const response = await get(`/databases/${id}/status`);
 				isRunning = response.isRunning;
@@ -237,7 +260,8 @@
 			(application.id && application.id.toLowerCase().includes($search.toLowerCase())) ||
 			(application.name && application.name.toLowerCase().includes($search.toLowerCase())) ||
 			(application.fqdn && application.fqdn.toLowerCase().includes($search.toLowerCase())) ||
-			(application.dockerComposeConfiguration && application.dockerComposeConfiguration.toLowerCase().includes($search.toLowerCase())) ||
+			(application.dockerComposeConfiguration &&
+				application.dockerComposeConfiguration.toLowerCase().includes($search.toLowerCase())) ||
 			(application.repository &&
 				application.repository.toLowerCase().includes($search.toLowerCase())) ||
 			(application.buildpack &&
@@ -523,6 +547,7 @@
 		</div>
 		<div class="form-control">
 			<div class="input-group flex w-full">
+				<!-- svelte-ignore a11y-click-events-have-key-events -->
 				<div
 					class="btn btn-square cursor-default no-animation hover:bg-error"
 					on:click={() => doSearch('')}
@@ -544,6 +569,7 @@
 				</div>
 
 				<input
+					bind:this={searchInput}
 					id="search"
 					type="text"
 					placeholder="Search: You can search for names, domains, types, database types, version, servers etc..."
@@ -643,7 +669,7 @@
 									<div class="h-10 text-xs">
 										{#if application?.fqdn}
 											<h2>{application?.fqdn.replace('https://', '').replace('http://', '')}</h2>
-										{:else if (!application.settings?.isBot && !application?.fqdn) && application.buildPack !== 'compose'}
+										{:else if !application.settings?.isBot && !application?.fqdn && application.buildPack !== 'compose'}
 											<h2 class="text-red-500">Not configured</h2>
 										{/if}
 										{#if application.destinationDocker?.name}
@@ -656,7 +682,7 @@
 
 									<div class="flex justify-end items-end space-x-2 h-10">
 										{#if application?.fqdn}
-											<a href={application?.fqdn} target="_blank" class="icons hover:bg-green-500">
+											<a href={application?.fqdn} target="_blank noreferrer" class="icons hover:bg-green-500">
 												<svg
 													xmlns="http://www.w3.org/2000/svg"
 													class="h-6 w-6"
@@ -680,7 +706,7 @@
 												href={`http://${dev ? 'localhost' : settings.ipv4}:${
 													application.exposePort
 												}`}
-												target="_blank"
+												target="_blank noreferrer"
 												class="icons hover:bg-green-500"
 											>
 												<svg
@@ -762,7 +788,7 @@
 
 								<div class="flex justify-end items-end space-x-2 h-10">
 									{#if application?.fqdn}
-										<a href={application?.fqdn} target="_blank" class="icons hover:bg-green-500">
+										<a href={application?.fqdn} target="_blank noreferrer" class="icons hover:bg-green-500">
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
 												class="h-6 w-6"
@@ -784,7 +810,7 @@
 									{#if application.settings?.isBot && application.exposePort}
 										<a
 											href={`http://${dev ? 'localhost' : settings.ipv4}:${application.exposePort}`}
-											target="_blank"
+											target="_blank noreferrer"
 											class="icons hover:bg-green-500"
 										>
 											<svg
@@ -871,7 +897,7 @@
 									</div>
 									<div class="flex justify-end items-end space-x-2 h-10">
 										{#if service?.fqdn}
-											<a href={service?.fqdn} target="_blank" class="icons hover:bg-pink-500">
+											<a href={service?.fqdn} target="_blank noreferrer" class="icons hover:bg-pink-500">
 												<svg
 													xmlns="http://www.w3.org/2000/svg"
 													class="h-6 w-6"
@@ -944,7 +970,7 @@
 								</div>
 								<div class="flex justify-end items-end space-x-2 h-10">
 									{#if service?.fqdn}
-										<a href={service?.fqdn} target="_blank" class="icons hover:bg-pink-500">
+										<a href={service?.fqdn} target="_blank noreferrer" class="icons hover:bg-pink-500">
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
 												class="h-6 w-6"

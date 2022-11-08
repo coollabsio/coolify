@@ -1,7 +1,7 @@
 {
   "name": "coolify",
   "description": "An open-source & self-hostable Heroku / Netlify alternative.",
-  "version": "3.10.15",
+  "version": "3.11.2",
   "license": "Apache-2.0",
   "repository": "github:coollabsio/coolify",
   "scripts": {
@@ -25,7 +25,7 @@
     "build:api": "NODE_ENV=production pnpm run --filter api build",
     "build:ui": "NODE_ENV=production pnpm run --filter ui build",
     "dockerlogin": "echo $DOCKER_PASS | docker login --username=$DOCKER_USER --password-stdin",
-    "release:staging:amd": "cross-var docker buildx build --platform linux/amd64 -t coollabsio/coolify:$npm_package_version --push .",
+    "release:staging:amd": "docker build -t coollabsio/coolify:next . && docker push coollabsio/coolify:next",
     "release:local": "rm -fr ./local-serve && mkdir ./local-serve && pnpm build && cp -Rp apps/api/build/* ./local-serve && cp -Rp apps/ui/build/ ./local-serve/public && cp -Rp apps/api/prisma/ ./local-serve/prisma && cp -Rp apps/api/package.json ./local-serve && env | grep '^COOLIFY_' > ./local-serve/.env && cd ./local-serve && pnpm install . && pnpm start"
   },
   "devDependencies": {

@@ -1,9 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { checkUpdate, login, showDashboard, update, resetQueue, getCurrentUser, cleanupManually, restartCoolify } from './handlers';
 import { GetCurrentUser } from './types';
-import pump from 'pump'
-import fs from 'fs'
-import { asyncExecShell, encrypt, errorHandler, prisma } from '../../../lib/common';
 
 export interface Update {
 	Body: { latestVersion: string }

@@ -6,7 +6,7 @@
 
 <ul class="menu border bg-coolgray-100 border-coolgray-200 rounded p-2 space-y-2 sticky top-4">
 	<li class="menu-title">
-		<span>Configuration</span>
+		<span>General</span>
 	</li>
 	{#if application.gitSource?.htmlUrl && application.repository && application.branch}
 		<li>
@@ -86,7 +86,7 @@
 				<path
 					d="M7 10h3v-3l-3.5 -3.5a6 6 0 0 1 8 8l6 6a2 2 0 0 1 -3 3l-6 -6a6 6 0 0 1 -8 -8l3.5 3.5"
 				/>
-			</svg>Build & Deploy</a
+			</svg>Configuration</a
 		>
 	</li>
 	<li

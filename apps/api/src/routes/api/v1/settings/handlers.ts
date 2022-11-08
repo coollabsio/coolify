@@ -2,7 +2,7 @@ import { promises as dns } from 'dns';
 import { X509Certificate } from 'node:crypto';
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { asyncExecShell, checkDomainsIsValidInDNS, decrypt, encrypt, errorHandler, isDNSValid, isDomainConfigured, listSettings, prisma } from '../../../../lib/common';
+import { asyncExecShell, checkDomainsIsValidInDNS, decrypt, encrypt, errorHandler, isDev, isDNSValid, isDomainConfigured, listSettings, prisma } from '../../../../lib/common';
 import { CheckDNS, CheckDomain, DeleteDomain, OnlyIdInBody, SaveSettings, SaveSSHKey } from './types';
 
 
@@ -44,16 +44,18 @@ export async function saveSettings(request: FastifyRequest<SaveSettings>, reply:
             maxPort,
             isAutoUpdateEnabled,
             isDNSCheckEnabled,
-            DNSServers
+            DNSServers,
+            proxyDefaultRedirect
         } = request.body
         const { id } = await listSettings();
         await prisma.setting.update({
             where: { id },
-            data: { isRegistrationEnabled, dualCerts, isAutoUpdateEnabled, isDNSCheckEnabled, DNSServers, isAPIDebuggingEnabled }
+            data: { isRegistrationEnabled, dualCerts, isAutoUpdateEnabled, isDNSCheckEnabled, DNSServers, isAPIDebuggingEnabled, }
         });
         if (fqdn) {
             await prisma.setting.update({ where: { id }, data: { fqdn } });
         }
+        await prisma.setting.update({ where: { id }, data: { proxyDefaultRedirect } });
         if (minPort && maxPort) {
             await prisma.setting.update({ where: { id }, data: { minPort, maxPort } });
         }
@@ -91,7 +93,7 @@ export async function checkDomain(request: FastifyRequest<CheckDomain>) {
         if (found) {
             throw "Domain already configured";
         }
-        if (isDNSCheckEnabled && !forceSave) {
+        if (isDNSCheckEnabled && !forceSave && !isDev) {
             const hostname = request.hostname.split(':')[0]
             return await checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts });
         }

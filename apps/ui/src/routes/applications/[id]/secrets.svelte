@@ -48,10 +48,10 @@
 			.map((secret) => {
 				const [name, ...rest] = secret.split('=');
 				const value = rest.join('=');
-				const cleanValue = value?.replaceAll('"', '') || '';
+				const cleanValue = (value?.replaceAll('"', '') || '').trim();
 				return {
-					name,
-					value: cleanValue,
+					name: name.trim(),
+					value: cleanValue.trim(),
 					createSecret: !secrets.find((secret: any) => name === secret.name)
 				};
 			});
@@ -60,6 +60,7 @@
 			batchSecretsPairs.map(({ name, value, createSecret }) =>
 				limit(async () => {
 					try {
+						if (!name || !value) return;
 						if (createSecret) {
 							await post(`/applications/${id}/secrets`, {
 								name,
@@ -87,10 +88,6 @@
 		);
 		batchSecrets = '';
 		await refreshSecrets();
-		addToast({
-			message: 'Secrets saved.',
-			type: 'success'
-		});
 	}
 </script>
 

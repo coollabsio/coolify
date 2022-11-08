@@ -1,15 +1,17 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
-import { prisma, uniqueName, asyncExecShell, getServiceFromDB, getContainerUsage, isDomainConfigured, saveUpdateableFields, fixType, decrypt, encrypt, ComposeFile, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, executeDockerCmd, checkDomainsIsValidInDNS, checkExposedPort, listSettings } from '../../../../lib/common';
-import { day } from '../../../../lib/dayjs';
-import { checkContainer, isContainerExited } from '../../../../lib/docker';
+import bcrypt from 'bcryptjs';
 import cuid from 'cuid';
 
-import type { OnlyId } from '../../../../types';
+import { prisma, uniqueName, asyncExecShell, getServiceFromDB, getContainerUsage, isDomainConfigured, fixType, decrypt, encrypt, ComposeFile, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, executeDockerCmd, checkDomainsIsValidInDNS, checkExposedPort, listSettings } from '../../../../lib/common';
+import { day } from '../../../../lib/dayjs';
+import { checkContainer, } from '../../../../lib/docker';
+import { removeService } from '../../../../lib/services/common';
+import { getTags, getTemplates } from '../../../../lib/services';
+
 import type { ActivateWordpressFtp, CheckService, CheckServiceDomain, DeleteServiceSecret, DeleteServiceStorage, GetServiceLogs, SaveService, SaveServiceDestination, SaveServiceSecret, SaveServiceSettings, SaveServiceStorage, SaveServiceType, SaveServiceVersion, ServiceStartStop, SetGlitchTipSettings, SetWordpressSettings } from './types';
-import { supportedServiceTypesAndVersions } from '../../../../lib/services/supportedVersions';
-import { configureServiceType, removeService } from '../../../../lib/services/common';
+import type { OnlyId } from '../../../../types';
 
 export async function listServices(request: FastifyRequest) {
     try {
@@ -67,29 +69,185 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
     try {
         const teamId = request.user.teamId;
         const { id } = request.params;
-
-        let isRunning = false;
-        let isExited = false
-        let isRestarting = false;
         const service = await getServiceFromDB({ id, teamId });
         const { destinationDockerId, settings } = service;
-
+        let payload = {}
         if (destinationDockerId) {
-            const status = await checkContainer({ dockerId: service.destinationDocker.id, container: id });
-            if (status?.found) {
-                isRunning = status.status.isRunning;
-                isExited = status.status.isExited;
-                isRestarting = status.status.isRestarting
+            const { stdout: containers } = await executeDockerCmd({
+                dockerId: service.destinationDocker.id,
+                command:
+                    `docker ps -a --filter "label=com.docker.compose.project=${id}" --format '{{json .}}'`
+            });
+            const containersArray = containers.trim().split('\n');
+            if (containersArray.length > 0 && containersArray[0] !== '') {
+                const templates = await getTemplates();
+                let template = templates.find(t => t.type === service.type);
+                template = JSON.parse(JSON.stringify(template).replaceAll('$$id', service.id));
+                for (const container of containersArray) {
+                    let isRunning = false;
+                    let isExited = false;
+                    let isRestarting = false;
+                    let isExcluded = false;
+                    const containerObj = JSON.parse(container);
+                    const exclude = template.services[containerObj.Names]?.exclude;
+                    if (exclude) {
+                        payload[containerObj.Names] = {
+                            status: {
+                                isExcluded: true,
+                                isRunning: false,
+                                isExited: false,
+                                isRestarting: false,
+                            }
+                        }
+                        continue;
+                    }
+
+                    const status = containerObj.State
+                    if (status === 'running') {
+                        isRunning = true;
+                    }
+                    if (status === 'exited') {
+                        isExited = true;
+                    }
+                    if (status === 'restarting') {
+                        isRestarting = true;
+                    }
+                    payload[containerObj.Names] = {
+                        status: {
+                            isExcluded,
+                            isRunning,
+                            isExited,
+                            isRestarting
+                        }
+                    }
+                }
             }
         }
-        return {
-            isRunning,
-            isExited,
-            settings
-        }
+        return payload
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
+}
+export async function parseAndFindServiceTemplates(service: any, workdir?: string, isDeploy: boolean = false) {
+    const templates = await getTemplates()
+    const foundTemplate = templates.find(t => fixType(t.type) === service.type)
+    let parsedTemplate = {}
+    if (foundTemplate) {
+        if (!isDeploy) {
+            for (const [key, value] of Object.entries(foundTemplate.services)) {
+                const realKey = key.replace('$$id', service.id)
+                let name = value.name
+                if (!name) {
+                    if (Object.keys(foundTemplate.services).length === 1) {
+                        name = foundTemplate.name || service.name.toLowerCase()
+                    } else {
+                        if (key === '$$id') {
+                            name = foundTemplate.name || key.replaceAll('$$id-', '') || service.name.toLowerCase()
+                        } else {
+                            name = key.replaceAll('$$id-', '') || service.name.toLowerCase()
+                        }
+                    }
+                }
+                parsedTemplate[realKey] = {
+                    name,
+                    documentation: value.documentation || foundTemplate.documentation || 'https://docs.coollabs.io',
+                    image: value.image,
+                    environment: [],
+                    fqdns: [],
+                    proxy: {}
+                }
+                if (value.environment?.length > 0) {
+                    for (const env of value.environment) {
+                        let [envKey, ...envValue] = env.split('=')
+                        envValue = envValue.join("=")
+                        const variable = foundTemplate.variables.find(v => v.name === envKey) || foundTemplate.variables.find(v => v.id === envValue)
+                        if (variable) {
+                            const id = variable.id.replaceAll('$$', '')
+                            const label = variable?.label
+                            const description = variable?.description
+                            const defaultValue = variable?.defaultValue
+                            const main = variable?.main || '$$id'
+                            const type = variable?.type || 'input'
+                            const placeholder = variable?.placeholder || ''
+                            const readOnly = variable?.readOnly || false
+                            const required = variable?.required || false
+                            if (envValue.startsWith('$$config') || variable?.showOnConfiguration) {
+                                if (envValue.startsWith('$$config_coolify')) {
+                                    continue
+                                }
+                                parsedTemplate[realKey].environment.push(
+                                    { id, name: envKey, value: envValue, main, label, description, defaultValue, type, placeholder, required, readOnly }
+                                )
+                            }
+                        }
+
+                    }
+                }
+                if (value?.proxy && value.proxy.length > 0) {
+                    for (const proxyValue of value.proxy) {
+                        if (proxyValue.domain) {
+                            const variable = foundTemplate.variables.find(v => v.id === proxyValue.domain)
+                            if (variable) {
+                                const { id, name, label, description, defaultValue, required = false } = variable
+                                const found = await prisma.serviceSetting.findFirst({ where: { serviceId: service.id , variableName: proxyValue.domain } })
+                                parsedTemplate[realKey].fqdns.push(
+                                    { id, name, value: found?.value || '', label, description, defaultValue, required }
+                                )
+                            }
+
+                        }
+                    }
+                }
+            }
+        } else {
+            parsedTemplate = foundTemplate
+        }
+        let strParsedTemplate = JSON.stringify(parsedTemplate)
+
+        // replace $$id and $$workdir
+        strParsedTemplate = strParsedTemplate.replaceAll('$$id', service.id)
+        strParsedTemplate = strParsedTemplate.replaceAll('$$core_version', service.version || foundTemplate.defaultVersion)
+
+        // replace $$fqdn
+        if (workdir) {
+            strParsedTemplate = strParsedTemplate.replaceAll('$$workdir', workdir)
+        }
+
+        // replace $$config
+        if (service.serviceSetting.length > 0) {
+            for (const setting of service.serviceSetting) {
+                const { value, variableName } = setting
+                const regex = new RegExp(`\\$\\$config_${variableName.replace('$$config_', '')}\\"`, 'gi')
+                if (value === '$$generate_fqdn') {
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn + "\"" || '' + "\"")
+                } else if (value === '$$generate_domain') {
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, getDomain(service.fqdn) + "\"")
+                } else if (service.destinationDocker?.network && value === '$$generate_network') {
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.destinationDocker.network + "\"")
+                } else {
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value + "\"")
+                }
+            }
+        }
+
+        // replace $$secret
+        if (service.serviceSecret.length > 0) {
+            for (const secret of service.serviceSecret) {
+                const { name, value } = secret
+                const regexHashed = new RegExp(`\\$\\$hashed\\$\\$secret_${name}\\"`, 'gi')
+                const regex = new RegExp(`\\$\\$secret_${name}\\"`, 'gi')
+                if (value) {
+                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, bcrypt.hashSync(value.replaceAll("\"", "\\\""), 10) + "\"")
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value.replaceAll("\"", "\\\"") + "\"")
+                } else {
+                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, "\"")
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, "\"")
+                }
+            }
+        }
+        parsedTemplate = JSON.parse(strParsedTemplate)
+    }
+    return parsedTemplate
 }
 
 export async function getService(request: FastifyRequest<OnlyId>) {
@@ -100,9 +258,17 @@ export async function getService(request: FastifyRequest<OnlyId>) {
         if (!service) {
             throw { status: 404, message: 'Service not found.' }
         }
+        let template = {}
+        let tags = []
+        if (service.type) {
+            template = await parseAndFindServiceTemplates(service)
+            tags = await getTags(service.type)
+        }
         return {
             settings: await listSettings(),
-            service
+            service,
+            template,
+            tags
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -111,7 +277,7 @@ export async function getService(request: FastifyRequest<OnlyId>) {
 export async function getServiceType(request: FastifyRequest) {
     try {
         return {
-            types: supportedServiceTypesAndVersions
+            services: await getTemplates()
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -121,25 +287,79 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
     try {
         const { id } = request.params;
         const { type } = request.body;
-        await configureServiceType({ id, type });
-        return reply.code(201).send()
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
-    }
-}
-export async function getServiceVersions(request: FastifyRequest<OnlyId>) {
-    try {
-        const teamId = request.user.teamId;
-        const { id } = request.params;
-        const { type } = await getServiceFromDB({ id, teamId });
-        return {
-            type,
-            versions: supportedServiceTypesAndVersions.find((name) => name.name === type).versions
+        const templates = await getTemplates()
+        let foundTemplate = templates.find(t => fixType(t.type) === fixType(type))
+        if (foundTemplate) {
+            foundTemplate = JSON.parse(JSON.stringify(foundTemplate).replaceAll('$$id', id))
+            if (foundTemplate.variables.length > 0) {
+                for (const variable of foundTemplate.variables) {
+                    const { defaultValue } = variable;
+                    const regex = /^\$\$.*\((\d+)\)$/g;
+                    const length = Number(regex.exec(defaultValue)?.[1]) || undefined
+                    if (variable.defaultValue.startsWith('$$generate_password')) {
+                        variable.value = generatePassword({ length });
+                    } else if (variable.defaultValue.startsWith('$$generate_hex')) {
+                        variable.value = generatePassword({ length, isHex: true });
+                    } else if (variable.defaultValue.startsWith('$$generate_username')) {
+                        variable.value = cuid();
+                    } else {
+                        variable.value = variable.defaultValue || '';
+                    }
+                    const foundVariableSomewhereElse = foundTemplate.variables.find(v => v.defaultValue.includes(variable.id))
+                    if (foundVariableSomewhereElse) {
+                        foundVariableSomewhereElse.value = foundVariableSomewhereElse.value.replaceAll(variable.id, variable.value)
+                    }
+                }
+            }
+            for (const variable of foundTemplate.variables) {
+                if (variable.id.startsWith('$$secret_')) {
+                    const found = await prisma.serviceSecret.findFirst({ where: { name: variable.name, serviceId: id } })
+                    if (!found) {
+                        await prisma.serviceSecret.create({
+                            data: { name: variable.name, value: encrypt(variable.value) || '', service: { connect: { id } } }
+                        })
+                    }
+
+                }
+                if (variable.id.startsWith('$$config_')) {
+                    const found = await prisma.serviceSetting.findFirst({ where: { name: variable.name, serviceId: id } })
+                    if (!found) {
+                        await prisma.serviceSetting.create({
+                            data: { name: variable.name, value: variable.value.toString(), variableName: variable.id, service: { connect: { id } } }
+                        })
+                    }
+                }
+            }
+            for (const service of Object.keys(foundTemplate.services)) {
+                if (foundTemplate.services[service].volumes) {
+                    for (const volume of foundTemplate.services[service].volumes) {
+                        const [volumeName, path] = volume.split(':')
+                        if (!volumeName.startsWith('/')) {
+                            const found = await prisma.servicePersistentStorage.findFirst({ where: { volumeName, serviceId: id } })
+                            if (!found) {
+                                await prisma.servicePersistentStorage.create({
+                                    data: { volumeName, path, containerId: service, predefined: true, service: { connect: { id } } }
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            await prisma.service.update({ where: { id }, data: { type, version: foundTemplate.defaultVersion, templateVersion: foundTemplate.templateVersion } })
+
+            if (type.startsWith('wordpress')) {
+                await prisma.service.update({ where: { id }, data: { wordpress: { create: {} } } })
+            }
+            return reply.code(201).send()
+        } else {
+            throw { status: 404, message: 'Service type not found.' }
         }
+
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
 }
+
 export async function saveServiceVersion(request: FastifyRequest<SaveServiceVersion>, reply: FastifyReply) {
     try {
         const { id } = request.params;
@@ -186,7 +406,7 @@ export async function getServiceUsage(request: FastifyRequest<OnlyId>) {
 }
 export async function getServiceLogs(request: FastifyRequest<GetServiceLogs>) {
     try {
-        const { id } = request.params;
+        const { id, containerId } = request.params;
         let { since = 0 } = request.query
         if (since !== 0) {
             since = day(since).unix();
@@ -197,10 +417,8 @@ export async function getServiceLogs(request: FastifyRequest<GetServiceLogs>) {
         });
         if (destinationDockerId) {
             try {
-                // const found = await checkContainer({ dockerId, container: id })
-                // if (found) {
                 const { default: ansi } = await import('strip-ansi')
-                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
+                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${containerId}` })
                 const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const logs = stripLogsStderr.concat(stripLogsStdout)
@@ -208,7 +426,10 @@ export async function getServiceLogs(request: FastifyRequest<GetServiceLogs>) {
                 return { logs: sortedLogs }
                 // }
             } catch (error) {
-                const { statusCode } = error;
+                const { statusCode, stderr } = error;
+                if (stderr.startsWith('Error: No such container')) {
+                    return { logs: [], noContainer: true }
+                }
                 if (statusCode === 404) {
                     return {
                         logs: []
@@ -258,26 +479,22 @@ export async function checkServiceDomain(request: FastifyRequest<CheckServiceDom
 export async function checkService(request: FastifyRequest<CheckService>) {
     try {
         const { id } = request.params;
-        let { fqdn, exposePort, forceSave, otherFqdns, dualCerts } = request.body;
+        let { fqdn, exposePort, forceSave, dualCerts, otherFqdn = false } = request.body;
+
+        const domainsList = await prisma.serviceSetting.findMany({ where: { variableName: { startsWith: '$$config_coolify_fqdn' } } })
 
         if (fqdn) fqdn = fqdn.toLowerCase();
-        if (otherFqdns && otherFqdns.length > 0) otherFqdns = otherFqdns.map((f) => f.toLowerCase());
         if (exposePort) exposePort = Number(exposePort);
 
         const { destinationDocker: { remoteIpAddress, remoteEngine, engine }, exposePort: configuredPort } = await prisma.service.findUnique({ where: { id }, include: { destinationDocker: true } })
         const { isDNSCheckEnabled } = await prisma.setting.findFirst({});
 
-        let found = await isDomainConfigured({ id, fqdn, remoteIpAddress });
+        let found = await isDomainConfigured({ id, fqdn, remoteIpAddress, checkOwn: otherFqdn });
         if (found) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
-        if (otherFqdns && otherFqdns.length > 0) {
-            for (const ofqdn of otherFqdns) {
-                found = await isDomainConfigured({ id, fqdn: ofqdn, remoteIpAddress });
-                if (found) {
-                    throw { status: 500, message: `Domain ${getDomain(ofqdn).replace('www.', '')} is already in use!` }
-                }
-            }
+        if (domainsList.find(d => getDomain(d.value) === getDomain(fqdn))) {
+            throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
         if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, engine, remoteEngine, remoteIpAddress })
         if (isDNSCheckEnabled && !isDev && !forceSave) {
@@ -293,20 +510,33 @@ export async function checkService(request: FastifyRequest<CheckService>) {
 export async function saveService(request: FastifyRequest<SaveService>, reply: FastifyReply) {
     try {
         const { id } = request.params;
-        let { name, fqdn, exposePort, type } = request.body;
-
+        let { name, fqdn, exposePort, type, serviceSetting, version } = request.body;
         if (fqdn) fqdn = fqdn.toLowerCase();
         if (exposePort) exposePort = Number(exposePort);
-
         type = fixType(type)
-        const update = saveUpdateableFields(type, request.body[type])
+
         const data = {
             fqdn,
             name,
             exposePort,
+            version,
         }
-        if (Object.keys(update).length > 0) {
-            data[type] = { update: update }
+        const templates = await getTemplates()
+        const service = await prisma.service.findUnique({ where: { id } })
+        const foundTemplate = templates.find(t => fixType(t.type) === fixType(service.type))
+        for (const setting of serviceSetting) {
+            let { id: settingId, name, value, changed = false, isNew = false, variableName } = setting
+            if (value) {
+                if (changed) {
+                    await prisma.serviceSetting.update({ where: { id: settingId }, data: { value } })
+                }
+                if (isNew) {
+                    if (!variableName) {
+                        variableName = foundTemplate.variables.find(v => v.name === name).id
+                    }
+                    await prisma.serviceSetting.create({ data: { name, value, variableName, service: { connect: { id } } } })
+                }
+            }
         }
         await prisma.service.update({
             where: { id }, data
@@ -320,11 +550,19 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
 export async function getServiceSecrets(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
+        const teamId = request.user.teamId;
+        const service = await getServiceFromDB({ id, teamId });
         let secrets = await prisma.serviceSecret.findMany({
             where: { serviceId: id },
             orderBy: { createdAt: 'desc' }
         });
+        const templates = await getTemplates()
+        const foundTemplate = templates.find(t => fixType(t.type) === service.type)
         secrets = secrets.map((secret) => {
+            const foundVariable = foundTemplate?.variables.find(v => v.name === secret.name) || null
+            if (foundVariable) {
+                secret.readOnly = foundVariable.readOnly
+            }
             secret.value = decrypt(secret.value);
             return secret;
         });
@@ -341,7 +579,6 @@ export async function saveServiceSecret(request: FastifyRequest<SaveServiceSecre
     try {
         const { id } = request.params
         let { name, value, isNew } = request.body
-
         if (isNew) {
             const found = await prisma.serviceSecret.findFirst({ where: { name, serviceId: id } });
             if (found) {
@@ -400,16 +637,21 @@ export async function getServiceStorages(request: FastifyRequest<OnlyId>) {
 export async function saveServiceStorage(request: FastifyRequest<SaveServiceStorage>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        const { path, newStorage, storageId } = request.body
+        const { path, isNewStorage, storageId, containerId } = request.body
 
-        if (newStorage) {
+        if (isNewStorage) {
+            const volumeName = `${id}-custom${path.replace(/\//gi, '-')}`
+            const found = await prisma.servicePersistentStorage.findFirst({ where: { path, containerId } });
+            if (found) {
+                throw { status: 500, message: 'Persistent storage already exists for this container and path.' }
+            }
             await prisma.servicePersistentStorage.create({
-                data: { path, service: { connect: { id } } }
+                data: { path, volumeName, containerId, service: { connect: { id } } }
             });
         } else {
             await prisma.servicePersistentStorage.update({
                 where: { id: storageId },
-                data: { path }
+                data: { path, containerId }
             });
         }
         return reply.code(201).send()
@@ -420,9 +662,8 @@ export async function saveServiceStorage(request: FastifyRequest<SaveServiceStor
 
 export async function deleteServiceStorage(request: FastifyRequest<DeleteServiceStorage>) {
     try {
-        const { id } = request.params
-        const { path } = request.body
-        await prisma.servicePersistentStorage.deleteMany({ where: { serviceId: id, path } });
+        const { storageId } = request.body
+        await prisma.servicePersistentStorage.deleteMany({ where: { id: storageId } });
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -478,14 +719,17 @@ export async function activatePlausibleUsers(request: FastifyRequest<OnlyId>, re
         const {
             destinationDockerId,
             destinationDocker,
-            plausibleAnalytics: { postgresqlUser, postgresqlPassword, postgresqlDatabase }
+            serviceSecret
         } = await getServiceFromDB({ id, teamId });
         if (destinationDockerId) {
-            await executeDockerCmd({
-                dockerId: destinationDocker.id,
-                command: `docker exec ${id}-postgresql psql -H postgresql://${postgresqlUser}:${postgresqlPassword}@localhost:5432/${postgresqlDatabase} -c "UPDATE users SET email_verified = true;"`
-            })
-            return await reply.code(201).send()
+            const databaseUrl = serviceSecret.find((secret) => secret.name === 'DATABASE_URL');
+            if (databaseUrl) {
+                await executeDockerCmd({
+                    dockerId: destinationDocker.id,
+                    command: `docker exec ${id}-postgresql psql -H ${databaseUrl.value} -c "UPDATE users SET email_verified = true;"`
+                })
+                return await reply.code(201).send()
+            }
         }
         throw { status: 500, message: 'Could not activate users.' }
     } catch ({ status, message }) {

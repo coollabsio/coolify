@@ -42,7 +42,7 @@
 				/>
 			</div>
 		</div>
-		<label for="name" class="pb-2 uppercase font-bold">name</label>
+		
 		{#each persistentStorages as storage}
 			{#key storage.id}
 				<Storage on:refresh={refreshStorage} {storage} />

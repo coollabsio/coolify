@@ -105,6 +105,10 @@ A fresh installation is necessary. v2 and v3 are not compatible with v1.
 - Email: [andras@coollabs.io](mailto:andras@coollabs.io)
 - Discord: [Invitation](https://coollabs.io/discord)
 
+## Development Contributions
+
+Coolify is developed under the Apache License and you can help to make it grow &rarr; [Start coding!](./CONTRIBUTION.md)
+
 ## Financial Contributors
 
 Become a financial contributor and help us sustain our community. [[Contribute](https://opencollective.com/coollabsio/contribute)]

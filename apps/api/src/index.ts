@@ -6,14 +6,20 @@ import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
-import { asyncExecShell, cleanupDockerStorage, createRemoteEngineConfiguration, decrypt, executeDockerCmd, executeSSHCmd, generateDatabaseConfiguration, getDomain, isDev, listSettings, prisma, startTraefikProxy, startTraefikTCPProxy, version } from './lib/common';
+import socketIO from 'fastify-socket.io'
+import socketIOServer from './realtime'
+
+import { asyncExecShell, cleanupDockerStorage, createRemoteEngineConfiguration, decrypt, encrypt, executeDockerCmd, executeSSHCmd, generateDatabaseConfiguration, isDev, listSettings, prisma, startTraefikProxy, startTraefikTCPProxy, version } from './lib/common';
 import { scheduler } from './lib/scheduler';
 import { compareVersions } from 'compare-versions';
 import Graceful from '@ladjs/graceful'
-import axios from 'axios';
+import yaml from 'js-yaml'
 import fs from 'fs/promises';
 import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handlers';
 import { checkContainer } from './lib/docker';
+import { migrateServicesToNewTemplate } from './lib';
+import { refreshTags, refreshTemplates } from './routes/api/v1/handlers';
+
 declare module 'fastify' {
 	interface FastifyInstance {
 		config: {
@@ -103,27 +109,40 @@ const host = '0.0.0.0';
 	});
 	fastify.register(cookie)
 	fastify.register(cors);
-	fastify.addHook('onRequest', async (request, reply) => {
-		let allowedList = ['coolify:3000'];
-		const { ipv4, ipv6, fqdn } = await prisma.setting.findFirst({})
-
-		ipv4 && allowedList.push(`${ipv4}:3000`);
-		ipv6 && allowedList.push(ipv6);
-		fqdn && allowedList.push(getDomain(fqdn));
-		isDev && allowedList.push('localhost:3000') && allowedList.push('localhost:3001') && allowedList.push('host.docker.internal:3001');
-		const remotes = await prisma.destinationDocker.findMany({ where: { remoteEngine: true, remoteVerified: true } })
-		if (remotes.length > 0) {
-			remotes.forEach(remote => {
-				allowedList.push(`${remote.remoteIpAddress}:3000`);
-			})
-		}
-		if (!allowedList.includes(request.headers.host)) {
-			// console.log('not allowed', request.headers.host)
+	fastify.register(socketIO, {
+		cors: {
+			origin: isDev ? "*" : ''
 		}
 	})
+
+	// To detect allowed origins
+	// fastify.addHook('onRequest', async (request, reply) => {
+	// 	console.log(request.headers.host)
+	// 	let allowedList = ['coolify:3000'];
+	// 	const { ipv4, ipv6, fqdn } = await prisma.setting.findFirst({})
+
+	// 	ipv4 && allowedList.push(`${ipv4}:3000`);
+	// 	ipv6 && allowedList.push(ipv6);
+	// 	fqdn && allowedList.push(getDomain(fqdn));
+	// 	isDev && allowedList.push('localhost:3000') && allowedList.push('localhost:3001') && allowedList.push('host.docker.internal:3001');
+	// 	const remotes = await prisma.destinationDocker.findMany({ where: { remoteEngine: true, remoteVerified: true } })
+	// 	if (remotes.length > 0) {
+	// 		remotes.forEach(remote => {
+	// 			allowedList.push(`${remote.remoteIpAddress}:3000`);
+	// 		})
+	// 	}
+	// 	if (!allowedList.includes(request.headers.host)) {
+	// 		// console.log('not allowed', request.headers.host)
+	// 	}
+	// })
+
+
 	try {
 		await fastify.listen({ port, host })
+		await socketIOServer(fastify)
 		console.log(`Coolify's API is listening on ${host}:${port}`);
+
+		migrateServicesToNewTemplate()
 		await initServer();
 
 		const graceful = new Graceful({ brees: [scheduler] });
@@ -145,21 +164,36 @@ const host = '0.0.0.0';
 			await cleanupStorage()
 		}, 60000 * 10)
 
-		// checkProxies and checkFluentBit
+		// checkProxies, checkFluentBit & refresh templates
 		setInterval(async () => {
 			await checkProxies();
 			await checkFluentBit();
-		}, 10000)
+		}, 60000)
+
+		// Refresh and check templates
+		setInterval(async () => {
+			await refreshTemplates()
+		}, 60000)
+
+		setInterval(async () => {
+			await refreshTags()
+		}, 60000)
+
+		setInterval(async () => {
+			await migrateServicesToNewTemplate()
+		}, 60000)
 
 		setInterval(async () => {
 			await copySSLCertificates();
-		}, 2000)
+		}, 10000)
 
 		await Promise.all([
+			getTagsTemplates(),
 			getArch(),
 			getIPAddress(),
 			configureRemoteDockers(),
 		])
+
 	} catch (error) {
 		console.error(error);
 		process.exit(1);
@@ -185,6 +219,28 @@ async function getIPAddress() {
 
 	} catch (error) { }
 }
+async function getTagsTemplates() {
+	const { default: got } = await import('got')
+	try {
+		if (isDev) {
+			const templates = await fs.readFile('./devTemplates.yaml', 'utf8')
+			const tags = await fs.readFile('./devTags.json', 'utf8')
+			await fs.writeFile('./templates.json', JSON.stringify(yaml.load(templates)))
+			await fs.writeFile('./tags.json', tags)
+			console.log('Tags and templates loaded in dev mode...')
+		} else {
+			const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text()
+			const response = await got.get('https://get.coollabs.io/coolify/service-templates.yaml').text()
+			await fs.writeFile('/app/templates.json', JSON.stringify(yaml.load(response)))
+			await fs.writeFile('/app/tags.json', tags)
+			console.log('Tags and templates loaded...')
+		}
+
+	} catch (error) {
+		console.log("Couldn't get latest templates.")
+		console.log(error)
+	}
+}
 async function initServer() {
 	try {
 		console.log(`Initializing server...`);
@@ -197,6 +253,7 @@ async function initServer() {
 		}
 	} catch (error) { }
 }
+
 async function getArch() {
 	try {
 		const settings = await prisma.setting.findFirst({})
@@ -226,17 +283,15 @@ async function configureRemoteDockers() {
 
 async function autoUpdater() {
 	try {
+		const { default: got } = await import('got')
 		const currentVersion = version;
-		const { data: versions } = await axios
-			.get(
-				`https://get.coollabs.io/versions.json`
-				, {
-					params: {
-						appId: process.env['COOLIFY_APP_ID'] || undefined,
-						version: currentVersion
-					}
-				})
-		const latestVersion = versions['coolify'].main.version;
+		const { coolify } = await got.get('https://get.coollabs.io/versions.json', {
+			searchParams: {
+				appId: process.env['COOLIFY_APP_ID'] || undefined,
+				version: currentVersion
+			}
+		}).json()
+		const latestVersion = coolify.main.version;
 		const isUpdateAvailable = compareVersions(latestVersion, currentVersion);
 		if (isUpdateAvailable === 1) {
 			const activeCount = 0
@@ -258,7 +313,9 @@ async function autoUpdater() {
 				}
 			}
 		}
-	} catch (error) { }
+	} catch (error) {
+		console.log(error)
+	}
 }
 
 async function checkFluentBit() {
@@ -338,17 +395,17 @@ async function checkProxies() {
 		}
 
 		// HTTP Proxies
-		const minioInstances = await prisma.minio.findMany({
-			where: { publicPort: { not: null } },
-			include: { service: { include: { destinationDocker: true } } }
-		});
-		for (const minio of minioInstances) {
-			const { service, publicPort } = minio;
-			const { destinationDockerId, destinationDocker, id } = service;
-			if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-				await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
-			}
-		}
+		// const minioInstances = await prisma.minio.findMany({
+		// 	where: { publicPort: { not: null } },
+		// 	include: { service: { include: { destinationDocker: true } } }
+		// });
+		// for (const minio of minioInstances) {
+		// 	const { service, publicPort } = minio;
+		// 	const { destinationDockerId, destinationDocker, id } = service;
+		// 	if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
+		// 		await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
+		// 	}
+		// }
 	} catch (error) {
 
 	}

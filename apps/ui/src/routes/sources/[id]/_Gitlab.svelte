@@ -169,7 +169,7 @@
 				<a
 					href="https://docs.coollabs.io/coolify/sources#how-to-integrate-with-gitlab"
 					class="font-bold "
-					target="_blank"
+					target="_blank noreferrer"
 					rel="noopener noreferrer">Documentation and detailed instructions.</a
 				>
 				<div class="grid grid-cols-2 items-center">

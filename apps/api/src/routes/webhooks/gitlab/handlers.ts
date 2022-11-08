@@ -1,4 +1,3 @@
-import axios from "axios";
 import cuid from "cuid";
 import crypto from "crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
@@ -10,6 +9,7 @@ import type { ConfigureGitLabApp, GitLabEvents } from "./types";
 
 export async function configureGitLabApp(request: FastifyRequest<ConfigureGitLabApp>, reply: FastifyReply) {
     try {
+        const { default: got } = await import('got')
         const { code, state } = request.query;
         const { fqdn } = await listSettings();
         const { gitSource: { gitlabApp: { appId, appSecret }, htmlUrl } }: any = await getApplicationFromDB(state, undefined);
@@ -19,19 +19,21 @@ export async function configureGitLabApp(request: FastifyRequest<ConfigureGitLab
         if (isDev) {
             domain = getAPIUrl();
         }
-        const params = new URLSearchParams({
-            client_id: appId,
-            client_secret: appSecret,
-            code,
-            state,
-            grant_type: 'authorization_code',
-            redirect_uri: `${domain}/webhooks/gitlab`
-        });
-        const { data } = await axios.post(`${htmlUrl}/oauth/token`, params)
+
+        const { access_token } = await got.post(`${htmlUrl}/oauth/token`, {
+            searchParams: {
+                client_id: appId,
+                client_secret: appSecret,
+                code,
+                state,
+                grant_type: 'authorization_code',
+                redirect_uri: `${domain}/webhooks/gitlab`
+            }
+        }).json()
         if (isDev) {
-            return reply.redirect(`${getUIUrl()}/webhooks/success?token=${data.access_token}`)
+            return reply.redirect(`${getUIUrl()}/webhooks/success?token=${access_token}`)
         }
-        return reply.redirect(`/webhooks/success?token=${data.access_token}`)
+        return reply.redirect(`/webhooks/success?token=${access_token}`)
     } catch ({ status, message, ...other }) {
         return errorHandler({ status, message })
     }

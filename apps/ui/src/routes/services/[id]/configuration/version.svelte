@@ -37,9 +37,6 @@
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
-	let recommendedVersion = $appSession.supportedServiceTypesAndVersions.find(
-		({ name }) => name === type
-	)?.recommendedVersion;
 
 	onMount(async () => {
 		if (versions.length === 1) {

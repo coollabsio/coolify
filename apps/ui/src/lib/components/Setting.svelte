@@ -8,7 +8,7 @@
 	export let setting: any;
 	export let title: any;
 	export let isBeta: any = false;
-	export let description: any;
+	export let description: any = null;
 	export let isCenter = true;
 	export let disabled = false;
 	export let dataTooltip: any = null;
@@ -31,6 +31,7 @@
 	</div>
 </div>
 <div class:text-center={isCenter} class={`flex justify-center ${customClass}`}>
+	<!-- svelte-ignore a11y-click-events-have-key-events -->
 	<div
 		on:click
 		aria-pressed="false"

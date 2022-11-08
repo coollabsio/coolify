@@ -1,6 +1,7 @@
 <script lang="ts">
 	export let name = '';
 	export let value = '';
+	export let readonly = false;
 	export let isNewSecret = false;
 
 	import { page } from '$app/stores';
@@ -50,24 +51,27 @@
 
 <td>
 	<input
-		
-	style="min-width: 350px !important;"
+		style="min-width: 350px !important;"
 		id={isNewSecret ? 'secretName' : 'secretNameNew'}
 		bind:value={name}
 		required
 		placeholder="EXAMPLE_VARIABLE"
-		readonly={!isNewSecret}
-		class:bg-transparent={!isNewSecret}
-		class:cursor-not-allowed={!isNewSecret}
+		readonly={!isNewSecret || readonly}
+		class="w-full"
+		class:bg-coolblack={!isNewSecret}
+		class:border={!isNewSecret}
+		class:border-dashed={!isNewSecret}
+		class:border-coolgray-300={!isNewSecret}
 	/>
 </td>
 <td>
 	<CopyPasswordField
 		id={isNewSecret ? 'secretValue' : 'secretValueNew'}
 		name={isNewSecret ? 'secretValue' : 'secretValueNew'}
+		disabled={readonly}
+		{readonly}
 		isPasswordField={true}
 		bind:value
-		required
 		placeholder="J$#@UIO%HO#$U%H"
 		inputStyle="min-width: 350px; !important"
 	/>
@@ -76,12 +80,12 @@
 <td>
 	{#if isNewSecret}
 		<div class="flex items-center justify-center">
-			<button class="btn btn-sm bg-services" on:click={() => saveSecret(true)}>Add</button>
+			<button class="btn btn-sm btn-primary" on:click={() => saveSecret(true)}>Add</button>
 		</div>
-	{:else}
+	{:else if !readonly}
 		<div class="flex flex-row justify-center space-x-2">
 			<div class="flex items-center justify-center">
-				<button class="btn btn-sm bg-services" on:click={() => saveSecret(false)}>Set</button>
+				<button class="btn btn-sm btn-primary" on:click={() => saveSecret(false)}>Set</button>
 			</div>
 			<div class="flex justify-center items-end">
 				<button class="btn btn-sm bg-error" on:click={removeSecret}>Remove</button>

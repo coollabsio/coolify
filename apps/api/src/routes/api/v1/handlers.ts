@@ -1,7 +1,8 @@
-import axios from "axios";
 import { compareVersions } from "compare-versions";
 import cuid from "cuid";
 import bcrypt from "bcryptjs";
+import fs from 'fs/promises';
+import yaml from 'js-yaml';
 import {
 	asyncExecShell,
 	asyncSleep,
@@ -13,7 +14,6 @@ import {
 	uniqueName,
 	version,
 } from "../../../lib/common";
-import { supportedServiceTypesAndVersions } from "../../../lib/services/supportedVersions";
 import { scheduler } from "../../../lib/scheduler";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Login, Update } from ".";
@@ -36,16 +36,59 @@ export async function cleanupManually(request: FastifyRequest) {
 		return errorHandler({ status, message });
 	}
 }
+export async function refreshTags() {
+	try {
+		const { default: got } = await import('got')
+		try {
+			if (isDev) {
+				const tags = await fs.readFile('./devTags.json', 'utf8')
+				await fs.writeFile('./tags.json', tags)
+			} else {
+				const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text()
+				await fs.writeFile('/app/tags.json', tags)
+			}
+		} catch (error) {
+			console.log(error)
+		}
+
+		return {};
+	} catch ({ status, message }) {
+		return errorHandler({ status, message });
+	}
+}
+export async function refreshTemplates() {
+	try {
+		const { default: got } = await import('got')
+		try {
+			if (isDev) {
+				const response = await fs.readFile('./devTemplates.yaml', 'utf8')
+				await fs.writeFile('./templates.json', JSON.stringify(yaml.load(response)))
+			} else {
+				const response = await got.get('https://get.coollabs.io/coolify/service-templates.yaml').text()
+				await fs.writeFile('/app/templates.json', JSON.stringify(yaml.load(response)))
+			}
+		} catch (error) {
+			console.log(error)
+		}
+		return {};
+	} catch ({ status, message }) {
+		return errorHandler({ status, message });
+	}
+}
 export async function checkUpdate(request: FastifyRequest) {
 	try {
+		const { default: got } = await import('got')
 		const isStaging =
 			request.hostname === "staging.coolify.io" ||
 			request.hostname === "arm.coolify.io";
 		const currentVersion = version;
-		const { data: versions } = await axios.get(
-			`https://get.coollabs.io/versions.json?appId=${process.env["COOLIFY_APP_ID"]}&version=${currentVersion}`
-		);
-		const latestVersion = versions["coolify"].main.version;
+		const { coolify } = await got.get('https://get.coollabs.io/versions.json', {
+			searchParams: {
+				appId: process.env['COOLIFY_APP_ID'] || undefined,
+				version: currentVersion
+			}
+		}).json()
+		const latestVersion = coolify.main.version;
 		const isUpdateAvailable = compareVersions(latestVersion, currentVersion);
 		if (isStaging) {
 			return {
@@ -357,7 +400,6 @@ export async function getCurrentUser(
 	return {
 		settings: await prisma.setting.findFirst(),
 		pendingInvitations,
-		supportedServiceTypesAndVersions,
 		token,
 		...request.user,
 	};

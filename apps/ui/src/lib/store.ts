@@ -1,7 +1,11 @@
 import { dev } from '$app/env';
 import cuid from 'cuid';
+import Cookies from 'js-cookie';
 import { writable, readable, type Writable } from 'svelte/store';
+import { io as ioClient } from 'socket.io-client';
+const socket = ioClient(dev ? 'http://localhost:3001' : '/', { auth: { token: Cookies.get('token') }, autoConnect: false });
 
+export const io = socket;
 interface AppSession {
     isRegistrationEnabled: boolean;
     ipv4: string | null,
@@ -19,7 +23,6 @@ interface AppSession {
         github: string | null,
         gitlab: string | null,
     },
-    supportedServiceTypesAndVersions: Array<any>
     pendingInvitations: Array<any>
 }
 interface AddToast {
@@ -48,7 +51,6 @@ export const appSession: Writable<AppSession> = writable({
         github: null,
         gitlab: null
     },
-    supportedServiceTypesAndVersions: [],
     pendingInvitations: []
 });
 export const disabledButton: Writable<boolean> = writable(false);
@@ -81,9 +83,10 @@ export const status: Writable<any> = writable({
         initialLoading: true
     },
     service: {
-        isRunning: false,
-        isExited: false,
+        statuses: [],
+        overallStatus: 'stopped',
         loading: false,
+        startup: {},
         initialLoading: true
     },
     database: {
@@ -162,3 +165,10 @@ export const addToast = (toast: AddToast) => {
 }
 
 export const selectedBuildId: any = writable(null)
+
+type State = {
+    requests: Array<Request>;
+};
+export const state = writable<State>({
+    requests: [],
+});

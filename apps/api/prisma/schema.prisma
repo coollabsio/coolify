@@ -29,6 +29,7 @@ model Setting {
   proxyPassword         String
   proxyUser             String
   proxyHash             String?
+  proxyDefaultRedirect  String?
   isAutoUpdateEnabled   Boolean  @default(false)
   isDNSCheckEnabled     Boolean  @default(true)
   DNSServers            String?
@@ -193,14 +194,17 @@ model ApplicationPersistentStorage {
 }
 
 model ServicePersistentStorage {
-  id        String   @id @default(cuid())
-  serviceId String
-  path      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  service   Service  @relation(fields: [serviceId], references: [id])
+  id          String   @id @default(cuid())
+  serviceId   String
+  path        String
+  volumeName  String?
+  predefined  Boolean  @default(false)
+  containerId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  service     Service  @relation(fields: [serviceId], references: [id])
 
-  @@unique([serviceId, path])
+  @@unique([serviceId, containerId, path])
 }
 
 model Secret {
@@ -392,12 +396,14 @@ model Service {
   dualCerts           Boolean                    @default(false)
   type                String?
   version             String?
+  templateVersion     String                     @default("0.0.0")
   destinationDockerId String?
   createdAt           DateTime                   @default(now())
   updatedAt           DateTime                   @updatedAt
   destinationDocker   DestinationDocker?         @relation(fields: [destinationDockerId], references: [id])
   persistentStorage   ServicePersistentStorage[]
   serviceSecret       ServiceSecret[]
+  serviceSetting      ServiceSetting[]
   teams               Team[]
 
   fider              Fider?
@@ -415,6 +421,19 @@ model Service {
   searxng            Searxng?
   weblate            Weblate?
   taiga              Taiga?
+}
+
+model ServiceSetting {
+  id           String   @id @default(cuid())
+  serviceId    String
+  name         String
+  value        String
+  variableName String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  service      Service  @relation(fields: [serviceId], references: [id])
+
+  @@unique([serviceId, name])
 }
 
 model PlausibleAnalytics {
@@ -462,10 +481,10 @@ model Wordpress {
   ownMysql              Boolean  @default(false)
   mysqlHost             String?
   mysqlPort             Int?
-  mysqlUser             String
-  mysqlPassword         String
-  mysqlRootUser         String
-  mysqlRootUserPassword String
+  mysqlUser             String?
+  mysqlPassword         String?
+  mysqlRootUser         String?
+  mysqlRootUserPassword String?
   mysqlDatabase         String?
   mysqlPublicPort       Int?
   ftpEnabled            Boolean  @default(false)

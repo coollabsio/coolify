@@ -10,7 +10,8 @@ export interface SaveSettings {
         maxPort: number,
         isAutoUpdateEnabled: boolean,
         isDNSCheckEnabled: boolean,
-        DNSServers: string
+        DNSServers: string,
+        proxyDefaultRedirect: string
     }
 }
 export interface DeleteDomain {

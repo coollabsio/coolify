@@ -1,4 +1,4 @@
 export interface OnlyId {
-    Params: { id: string },
+    Params: { id?: string },
 }
 
