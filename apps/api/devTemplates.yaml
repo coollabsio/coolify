@@ -786,6 +786,11 @@
       label: MariaDB | _APP_DB_USER
       defaultValue: user
       description: MariaDB server user name.
+    - id: "$$secret__app_db_root_pass"
+      name: MARIADB_ROOT_PASSWORD
+      label: MariaDB | MARIADB_ROOT_PASSWORD
+      defaultValue: "$$generate_hex(16)"
+      description: MariaDB server root user password.
     - id: "$$secret__app_db_pass"
       name: _APP_DB_PASS
       label: MariaDB | _APP_DB_PASS
