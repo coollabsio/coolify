@@ -129,10 +129,10 @@ function generateRouters(serviceId, domain, nakedDomain, pathPrefix, isHttps, is
 		}
 	}
 	return {
-		[serviceId]: { ...http },
-		[`${serviceId}-secure`]: { ...https },
-		[`${serviceId}-www`]: { ...httpWWW },
-		[`${serviceId}-secure-www`]: { ...httpsWWW },
+		[`${serviceId}-${pathPrefix}`]: { ...http },
+		[`${serviceId}-${pathPrefix}-secure`]: { ...https },
+		[`${serviceId}-${pathPrefix}-www`]: { ...httpWWW },
+		[`${serviceId}-${pathPrefix}-secure-www`]: { ...httpsWWW },
 	}
 }
 export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote: boolean = false) {
@@ -310,7 +310,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 									const pathPrefix = '/'
 									const isCustomSSL = false;
 									const dualCerts = false;
-									const serviceId = `${id}-${port || 'default'}-${pathPrefix}`
+									const serviceId = `${id}-${port || 'default'}`
 
 									traefik.http.routers = { ...traefik.http.routers, ...generateRouters(serviceId, domain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
 									traefik.http.services = { ...traefik.http.services, ...generateServices(serviceId, containerId, port) }
@@ -329,7 +329,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 					const isHttps = fqdn.startsWith('https://');
 					const isWWW = fqdn.includes('www.');
 					const pathPrefix = '/'
-					const serviceId = `${id}-${port || 'default'}-${pathPrefix}`
+					const serviceId = `${id}-${port || 'default'}`
 					traefik.http.routers = { ...traefik.http.routers, ...generateRouters(serviceId, domain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
 					traefik.http.services = { ...traefik.http.services, ...generateServices(serviceId, id, port) }
 					if (previews) {
@@ -344,7 +344,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 								const previewDomain = `${container.split('-')[1]}.${domain}`;
 								const nakedDomain = previewDomain.replace(/^www\./, '');
 								const pathPrefix = '/'
-								const serviceId = `${container}-${port || 'default'}-${pathPrefix}`
+								const serviceId = `${container}-${port || 'default'}`
 								traefik.http.routers = { ...traefik.http.routers, ...generateRouters(serviceId, previewDomain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
 								traefik.http.services = { ...traefik.http.services, ...generateServices(serviceId, container, port) }
 							}
@@ -426,7 +426,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 								const isHttps = fqdn.startsWith('https://');
 								const isWWW = fqdn.includes('www.');
 								const isCustomSSL = false;
-								const serviceId = `${oneService}-${port || 'default'}-${pathPrefix}`
+								const serviceId = `${oneService}-${port || 'default'}`
 								traefik.http.routers = { ...traefik.http.routers, ...generateRouters(serviceId, domain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
 								traefik.http.services = { ...traefik.http.services, ...generateServices(serviceId, oneService, port) }
 							}
@@ -443,7 +443,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 								const isWWW = fqdn.includes('www.');
 								const pathPrefix = '/'
 								const isCustomSSL = false
-								const serviceId = `${oneService}-${port || 'default'}-${pathPrefix}`
+								const serviceId = `${oneService}-${port || 'default'}`
 								traefik.http.routers = { ...traefik.http.routers, ...generateRouters(serviceId, domain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
 								traefik.http.services = { ...traefik.http.services, ...generateServices(serviceId, id, port) }
 							}
@@ -468,7 +468,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 			const port = 3000
 			const pathPrefix = '/'
 			const isCustomSSL = false
-			const serviceId = `${id}-${port || 'default'}-${pathPrefix}`
+			const serviceId = `${id}-${port || 'default'}`
 			traefik.http.routers = { ...traefik.http.routers, ...generateRouters(serviceId, domain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
 			traefik.http.services = { ...traefik.http.services, ...generateServices(serviceId, container, port) }
 		}
