@@ -1891,6 +1891,7 @@
       description: ""
       showOnConfiguration: true
 - templateVersion: 1.0.0
+  ignore: true
   defaultVersion: latest
   documentation: https://ghost.org/resources/
   type: ghost-mariadb
