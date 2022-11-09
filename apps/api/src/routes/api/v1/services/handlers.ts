@@ -149,9 +149,11 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                     }
                 }
                 parsedTemplate[realKey] = {
+                    value,
                     name,
                     documentation: value.documentation || foundTemplate.documentation || 'https://docs.coollabs.io',
                     image: value.image,
+                    files: value?.files,
                     environment: [],
                     fqdns: [],
                     proxy: {}
@@ -189,7 +191,7 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                             const variable = foundTemplate.variables.find(v => v.id === proxyValue.domain)
                             if (variable) {
                                 const { id, name, label, description, defaultValue, required = false } = variable
-                                const found = await prisma.serviceSetting.findFirst({ where: { serviceId: service.id , variableName: proxyValue.domain } })
+                                const found = await prisma.serviceSetting.findFirst({ where: { serviceId: service.id, variableName: proxyValue.domain } })
                                 parsedTemplate[realKey].fqdns.push(
                                     { id, name, value: found?.value || '', label, description, defaultValue, required }
                                 )
@@ -208,7 +210,7 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
         strParsedTemplate = strParsedTemplate.replaceAll('$$id', service.id)
         strParsedTemplate = strParsedTemplate.replaceAll('$$core_version', service.version || foundTemplate.defaultVersion)
 
-        // replace $$fqdn
+        // replace $$workdir
         if (workdir) {
             strParsedTemplate = strParsedTemplate.replaceAll('$$workdir', workdir)
         }
@@ -217,15 +219,15 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
         if (service.serviceSetting.length > 0) {
             for (const setting of service.serviceSetting) {
                 const { value, variableName } = setting
-                const regex = new RegExp(`\\$\\$config_${variableName.replace('$$config_', '')}\\"`, 'gi')
+                const regex = new RegExp(`\\$\\$config_${variableName.replace('$$config_', '')}`, 'gi')
                 if (value === '$$generate_fqdn') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn + "\"" || '' + "\"")
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn || '')
                 } else if (value === '$$generate_domain') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, getDomain(service.fqdn) + "\"")
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, getDomain(service.fqdn))
                 } else if (service.destinationDocker?.network && value === '$$generate_network') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.destinationDocker.network + "\"")
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.destinationDocker.network)
                 } else {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value + "\"")
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value)
                 }
             }
         }
@@ -233,15 +235,13 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
         // replace $$secret
         if (service.serviceSecret.length > 0) {
             for (const secret of service.serviceSecret) {
-                const { name, value } = secret
-                const regexHashed = new RegExp(`\\$\\$hashed\\$\\$secret_${name}\\"`, 'gi')
-                const regex = new RegExp(`\\$\\$secret_${name}\\"`, 'gi')
+                let { name, value } = secret
+                name = name.toLowerCase()
+                const regexHashed = new RegExp(`\\$\\$hashed\\$\\$secret_${name}`, 'gi')
+                const regex = new RegExp(`\\$\\$secret_${name}`, 'gi')
                 if (value) {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, bcrypt.hashSync(value.replaceAll("\"", "\\\""), 10) + "\"")
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value.replaceAll("\"", "\\\"") + "\"")
-                } else {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, "\"")
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, "\"")
+                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, bcrypt.hashSync(value.replaceAll("\"", "\\\""), 10))
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value.replaceAll("\"", "\\\""))
                 }
             }
         }

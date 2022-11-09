@@ -1664,7 +1664,6 @@
   services:
     $$id:
       name: Umami
-      documentation: "Official docs are [here](https://umami.is/docs/getting-started)"
       depends_on:
         - $$id-postgresql
       image: "ghcr.io/umami-software/umami:$$core_version"
@@ -1678,7 +1677,6 @@
         - "3000"
     $$id-postgresql:
       name: PostgreSQL
-      documentation: "Official docs are [here](https://umami.is/docs/getting-started)"
       depends_on: []
       image: "postgres:12-alpine"
       volumes:
@@ -1873,7 +1871,6 @@
   services:
     $$id:
       name: Umami
-      documentation: "Official docs are [here](https://umami.is/docs/getting-started)"
       depends_on:
         - $$id-postgresql
       image: "ghcr.io/umami-software/umami:$$core_version"
@@ -1887,7 +1884,6 @@
         - "3000"
     $$id-postgresql:
       name: PostgreSQL
-      documentation: "Official docs are [here](https://umami.is/docs/getting-started)"
       depends_on: []
       image: "postgres:12-alpine"
       volumes:
@@ -2080,7 +2076,7 @@
   services:
     $$id:
       name: MeiliSearch
-      documentation: "https://docs.meilisearch.com/"
+      documentation: https://docs.meilisearch.com/
       depends_on: []
       image: "getmeili/meilisearch:$$core_version"
       volumes:
@@ -2102,7 +2098,7 @@
 - templateVersion: 1.0.0
   ignore: true
   defaultVersion: latest
-  documentation: https://ghost.org/resources/
+  documentation: https://docs.ghost.org
   type: ghost-mariadb
   name: Ghost
   subname: (MariaDB)
@@ -2114,7 +2110,6 @@
   services:
     $$id:
       name: Ghost
-      documentation: "Taken from https://docs.ghost.org/"
       depends_on:
         - $$id-mariadb
       image: "bitnami/ghost:$$core_version"
@@ -2220,7 +2215,7 @@
       description: ""
 - templateVersion: 1.0.0
   defaultVersion: "5.22"
-  documentation: https://ghost.org/resources/
+  documentation: https://docs.ghost.org
   type: ghost-only
   name: Ghost
   subname: (without Database)
@@ -2229,7 +2224,6 @@
   services:
     $$id:
       name: Ghost
-      documentation: "Taken from https://docs.ghost.org/"
       image: "ghost:$$core_version"
       volumes:
         - "$$id-ghost:/var/lib/ghost/content"
@@ -2285,7 +2279,7 @@
       required: true
 - templateVersion: 1.0.0
   defaultVersion: "5.22"
-  documentation: https://ghost.org/resources/
+  documentation: https://docs.ghost.org
   type: ghost-mysql
   name: Ghost
   subname: (MySQL)
@@ -2294,7 +2288,6 @@
   services:
     $$id:
       name: Ghost
-      documentation: "Taken from https://docs.ghost.org/"
       depends_on:
         - $$id-mysql
       image: "ghost:$$core_version"
@@ -2375,7 +2368,6 @@
   services:
     $$id:
       name: WordPress
-      documentation: " Taken from https://docs.docker.com/compose/wordpress/"
       depends_on:
         - $$id-mysql
       image: "wordpress:$$core_version"
@@ -2466,7 +2458,6 @@
   services:
     $$id:
       name: WordPress
-      documentation: "Taken from https://docs.docker.com/compose/wordpress/"
       image: "wordpress:$$core_version"
       volumes:
         - "$$id-wordpress-data:/var/www/html"
@@ -2540,7 +2531,6 @@
   services:
     $$id:
       name: VSCode Server
-      documentation: "Taken from https://github.com/coder/code-server/. "
       depends_on: []
       image: "codercom/code-server:$$core_version"
       volumes:
@@ -2572,7 +2562,6 @@
     $$id:
       name: MinIO
       command: "server /data --console-address :9001"
-      documentation: "Taken from https://docs.min.io/docs/minio-docker-quickstart-guide.html"
       depends_on: []
       image: "minio/minio:$$core_version"
       volumes:
@@ -2632,7 +2621,6 @@
     $$id:
       name: Fider
       image: "getfider/fider:$$core_version"
-      documentation: "Taken from https://hub.docker.com/r/getfider/fider/"
       depends_on:
         - $$id-postgresql
       environment:
@@ -2652,7 +2640,6 @@
         - "3000"
     $$id-postgresql:
       name: PostgreSQL
-      documentation: "Taken from https://hub.docker.com/r/getfider/fider/"
       depends_on: []
       image: "postgres:12-alpine"
       volumes:
@@ -2755,7 +2742,6 @@
   services:
     $$id:
       name: N8n
-      documentation: "Taken from https://hub.docker.com/r/n8nio/n8n"
       depends_on: []
       image: "n8nio/n8n:$$core_version"
       volumes:
@@ -2788,7 +2774,6 @@
   services:
     $$id:
       name: Plausible Analytics
-      documentation: "Taken from https://plausible.io/"
       command: >-
         sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db
         migrate && /entrypoint.sh db init-admin && /entrypoint.sh run"
@@ -2810,7 +2795,6 @@
         - "8000"
     $$id-postgresql:
       name: PostgreSQL
-      documentation: "Taken from https://plausible.io/"
       image: "bitnami/postgresql:13.2.0"
       volumes:
         - "$$id-postgresql-data:/bitnami/postgresql"
@@ -2820,7 +2804,6 @@
         - POSTGRESQL_DATABASE=$$config_postgresql_database
     $$id-clickhouse:
       name: Clickhouse
-      documentation: "Taken from https://plausible.io/"
       volumes:
         - "$$id-clickhouse-data:/var/lib/clickhouse"
       image: "yandex/clickhouse-server:21.3.2.5"
