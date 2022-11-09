@@ -287,11 +287,10 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 					if (
 						!runningContainers[destinationDockerId] ||
 						runningContainers[destinationDockerId].length === 0 ||
-						!runningContainers[destinationDockerId].includes(id)
+						runningContainers[destinationDockerId].filter((container) => container.startsWith(id)).length === 0
 					) {
 						continue
 					}
-
 					if (buildPack === 'compose') {
 						const services = Object.entries(JSON.parse(dockerComposeConfiguration))
 						if (services.length > 0) {
