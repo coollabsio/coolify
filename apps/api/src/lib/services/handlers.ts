@@ -107,6 +107,8 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
             if (template.services[s].ports?.length > 0) {
                 port = template.services[s].ports[0]
             }
+            console.log({ arm })
+            console.log(template.services[s].imageArm)
             config[s] = {
                 container_name: s,
                 build: template.services[s].build || undefined,
