@@ -46,7 +46,8 @@
 		save: false,
 		remove: false,
 		proxyMigration: false,
-		restart: false
+		restart: false,
+		rollback: false
 	};
 	let rollbackVersion = localStorage.getItem('lastVersion');
 
@@ -55,14 +56,20 @@
 			const sure = confirm(`Are you sure you want rollback Coolify to ${rollbackVersion}?`);
 			if (sure) {
 				try {
+					loading.rollback = true;
+					console.log('loading.rollback', loading.rollback);
 					if (dev) {
 						console.log('rolling back to', rollbackVersion);
 						await asyncSleep(4000);
 						return window.location.reload();
 					} else {
+						addToast({
+							message: 'Rollback started...',
+							type: 'success'
+						});
 						await post(`/update`, { type: 'update', latestVersion: rollbackVersion });
 						addToast({
-							message: 'Update completed.<br><br>Waiting for the new version to start...',
+							message: 'Rollback completed.<br><br>Waiting for the new version to start...',
 							type: 'success'
 						});
 
@@ -89,7 +96,7 @@
 				} catch (error) {
 					return errorNotification(error);
 				} finally {
-					loading.remove = false;
+					loading.rollback = false;
 				}
 			}
 		}
@@ -374,8 +381,11 @@
 						name="rollbackVersion"
 						id="rollbackVersion"
 					/>
-					<button class="btn btn-primary ml-2" disabled={!rollbackVersion} on:click|preventDefault|stopPropagation={rollback}
-						>Rollback</button
+					<button
+						class:loading={loading.rollback}
+						class="btn btn-primary ml-2"
+						disabled={!rollbackVersion || loading.rollback}
+						on:click|preventDefault|stopPropagation={rollback}>Rollback</button
 					>
 				</div>
 				<div class="grid grid-cols-2 items-center">
