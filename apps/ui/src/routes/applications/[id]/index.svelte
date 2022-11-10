@@ -34,6 +34,7 @@
 	import { onMount } from 'svelte';
 	import Select from 'svelte-select';
 	import { get, getAPIUrl, post } from '$lib/api';
+	import { dev } from '$app/env';
 	import cuid from 'cuid';
 	import {
 		addToast,
@@ -337,10 +338,12 @@
 		return await new Promise<void>((resolve, reject) => {
 			const left = screen.width / 2 - 1020 / 2;
 			const top = screen.height / 2 - 618 / 2;
+      let url = settings?.fqdn ? settings.fqdn : window.location.origin;
+      if (dev) url = getAPIUrl();
 			const newWindow = open(
 				`${htmlUrl}/oauth/authorize?client_id=${
 					application.gitSource.gitlabApp.appId
-				}&redirect_uri=${getAPIUrl()}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${
+				}&redirect_uri=${url}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${
 					$page.params.id
 				}`,
 				'GitLab',

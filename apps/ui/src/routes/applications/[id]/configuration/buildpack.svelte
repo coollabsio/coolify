@@ -2,7 +2,7 @@
 	import type { Load } from '@sveltejs/kit';
 	export const load: Load = async ({ fetch, params, url, stuff }) => {
 		try {
-			const { application } = stuff;
+			const { application, settings } = stuff;
 			if (application?.buildPack && !url.searchParams.get('from')) {
 				return {
 					status: 302,
@@ -13,6 +13,7 @@
 			return {
 				props: {
 					application,
+					settings,
 					...response
 				}
 			};
@@ -33,11 +34,13 @@
 	export let type: any;
 	export let application: any;
 	export let isPublicRepository: boolean;
+  export let settings: any;
 
 	import { onMount } from 'svelte';
 
 	import { page } from '$app/stores';
 	import { get, getAPIUrl } from '$lib/api';
+	import { dev } from '$app/env';
 	import { appSession } from '$lib/store';
 	import { t } from '$lib/translations';
 	import { buildPacks, findBuildPack, scanningTemplates } from '$lib/templates';
@@ -71,10 +74,12 @@
 		return await new Promise<void>((resolve, reject) => {
 			const left = screen.width / 2 - 1020 / 2;
 			const top = screen.height / 2 - 618 / 2;
+      let url = settings?.fqdn ? settings.fqdn : window.location.origin;
+      if (dev) url = getAPIUrl();
 			const newWindow = open(
 				`${htmlUrl}/oauth/authorize?client_id=${
 					application.gitSource.gitlabApp.appId
-				}&redirect_uri=${getAPIUrl()}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${
+				}&redirect_uri=${url}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${
 					$page.params.id
 				}`,
 				'GitLab',
