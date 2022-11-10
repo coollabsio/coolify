@@ -51,44 +51,46 @@
 	let rollbackVersion = localStorage.getItem('lastVersion');
 
 	async function rollback() {
-		const sure = confirm(`Are you sure you want rollback Coolify to ${rollbackVersion}?`);
-		if (sure) {
-			try {
-				if (dev) {
-					console.log('rolling back to', rollbackVersion);
-					await asyncSleep(4000);
-					return window.location.reload();
-				} else {
-					await post(`/update`, { type: 'update', latestVersion: rollbackVersion });
-					addToast({
-						message: 'Update completed.<br><br>Waiting for the new version to start...',
-						type: 'success'
-					});
-
-					let reachable = false;
-					let tries = 0;
-					do {
+		if (rollbackVersion) {
+			const sure = confirm(`Are you sure you want rollback Coolify to ${rollbackVersion}?`);
+			if (sure) {
+				try {
+					if (dev) {
+						console.log('rolling back to', rollbackVersion);
 						await asyncSleep(4000);
-						try {
-							await get(`/undead`);
-							reachable = true;
-						} catch (error) {
-							reachable = false;
-						}
-						if (reachable) break;
-						tries++;
-					} while (!reachable || tries < 120);
-					addToast({
-						message: 'New version reachable. Reloading...',
-						type: 'success'
-					});
-					await asyncSleep(3000);
-					return window.location.reload();
+						return window.location.reload();
+					} else {
+						await post(`/update`, { type: 'update', latestVersion: rollbackVersion });
+						addToast({
+							message: 'Update completed.<br><br>Waiting for the new version to start...',
+							type: 'success'
+						});
+
+						let reachable = false;
+						let tries = 0;
+						do {
+							await asyncSleep(4000);
+							try {
+								await get(`/undead`);
+								reachable = true;
+							} catch (error) {
+								reachable = false;
+							}
+							if (reachable) break;
+							tries++;
+						} while (!reachable || tries < 120);
+						addToast({
+							message: 'New version reachable. Reloading...',
+							type: 'success'
+						});
+						await asyncSleep(3000);
+						return window.location.reload();
+					}
+				} catch (error) {
+					return errorNotification(error);
+				} finally {
+					loading.remove = false;
 				}
-			} catch (error) {
-				return errorNotification(error);
-			} finally {
-				loading.remove = false;
 			}
 		}
 	}
@@ -361,7 +363,7 @@
 						Rollback to a specific version
 						<Explainer
 							position="dropdown-bottom"
-							explanation="You can rollback to a specific version of your application. This will not affect your current running resources. <a href='https://github.com/coollabsio/coolify/releases' target='_blank'>See available versions</a>"
+							explanation="You can rollback to a specific version of Coolify. This will not affect your current running resources.<br><br><a href='https://github.com/coollabsio/coolify/releases' target='_blank'>See available versions</a>"
 						/>
 					</div>
 					<input
@@ -369,10 +371,12 @@
 						bind:value={rollbackVersion}
 						readonly={!$appSession.isAdmin}
 						disabled={!$appSession.isAdmin}
-						name="lastVersion"
-						id="lastVersion"
+						name="rollbackVersion"
+						id="rollbackVersion"
 					/>
-					<button class="btn btn-primary ml-2" on:click|preventDefault|stopPropagation={rollback}>Rollback</button>
+					<button class="btn btn-primary ml-2" disabled={!rollbackVersion} on:click|preventDefault|stopPropagation={rollback}
+						>Rollback</button
+					>
 				</div>
 				<div class="grid grid-cols-2 items-center">
 					<div>
