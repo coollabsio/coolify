@@ -1,7 +1,6 @@
 <script lang="ts">
 	export let type: string;
 	export let isAbsolute = false;
-
 	let extension = 'png';
 	let svgs = [
 		'languagetool',
@@ -31,8 +30,14 @@
 	function generateClass() {
 		switch (name) {
 			case 'n8n':
+				if (isAbsolute) {
+					return 'w-12 h-12 absolute -m-9 -mt-12';
+				}
 				return 'w-12 h-12 -mt-3';
 			case 'weblate':
+				if (isAbsolute) {
+					return 'w-12 h-12 absolute -m-9 -mt-12';
+				}
 				return 'w-12 h-12 -mt-3';
 			default:
 				return isAbsolute ? 'w-10 h-10 absolute -m-4 -mt-9 left-0' : 'w-10 h-10';
