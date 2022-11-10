@@ -972,7 +972,7 @@ export function generateDatabaseConfiguration(database: any, arch: string): Data
 	}
 }
 export function isARM(arch: string) {
-	if (arch === 'arm' || arch === 'arm64') {
+	if (arch === 'arm' || arch === 'arm64' || arch === 'aarch' || arch === 'aarch64') {
 		return true;
 	}
 	return false;

@@ -34,7 +34,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const arm = isARM(service.arch)
+        const arm = isARM(process.arch);
         const { type, destinationDockerId, destinationDocker, persistentStorage, exposePort } =
             service;
 
@@ -107,14 +107,16 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
             if (template.services[s].ports?.length > 0) {
                 port = template.services[s].ports[0]
             }
-            console.log({ arm })
-            console.log(template.services[s].imageArm)
+            let image = template.services[s].image
+            if (arm && template.services[s].imageArm) {
+                image = template.services[s].imageArm
+            }
             config[s] = {
                 container_name: s,
                 build: template.services[s].build || undefined,
                 command: template.services[s].command,
                 entrypoint: template.services[s]?.entrypoint,
-                image: arm ? template.services[s].imageArm : template.services[s].image,
+                image,
                 expose: template.services[s].ports,
                 ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
                 volumes: Array.from(volumes),
@@ -126,6 +128,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
                 labels: makeLabelForServices(type),
                 ...defaultComposeConfiguration(network),
             }
+            console.log(config[s].image)
 
             // Generate files for builds
             if (template.services[s]?.files?.length > 0) {
