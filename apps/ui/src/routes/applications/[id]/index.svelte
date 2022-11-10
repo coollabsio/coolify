@@ -338,8 +338,8 @@
 		return await new Promise<void>((resolve, reject) => {
 			const left = screen.width / 2 - 1020 / 2;
 			const top = screen.height / 2 - 618 / 2;
-      let url = settings?.fqdn ? settings.fqdn : window.location.origin;
-      if (dev) url = getAPIUrl();
+			let url = settings?.fqdn ? settings.fqdn : window.location.origin;
+			if (dev) url = getAPIUrl();
 			const newWindow = open(
 				`${htmlUrl}/oauth/authorize?client_id=${
 					application.gitSource.gitlabApp.appId
