@@ -276,20 +276,25 @@
 			</div>
 			<div class="grid grid-cols-2 items-center">
 				<label for="version">Version / Tag</label>
-				<div class="custom-select-wrapper w-full">
-					<Select
-						form="saveForm"
-						containerClasses={isDisabled && containerClass()}
-						{isDisabled}
-						id="version"
-						showIndicator={!isDisabled}
-						items={[...tags.tags]}
-						on:select={selectTag}
-						value={service.version}
-						isClearable={false}
-					/>
-				</div>
+				{#if tags.tags?.length > 0}
+					<div class="custom-select-wrapper w-full">
+						<Select
+							form="saveForm"
+							containerClasses={isDisabled && containerClass()}
+							{isDisabled}
+							id="version"
+							showIndicator={!isDisabled}
+							items={[...tags.tags]}
+							on:select={selectTag}
+							value={service.version}
+							isClearable={false}
+						/>
+					</div>
+				{:else}
+					<input class="w-full border-red-500" disabled placeholder="Error getting tags...">
+				{/if}
 			</div>
+
 			<div class="grid grid-cols-2 items-center">
 				<label for="destination">{$t('application.destination')}</label>
 				<div>
