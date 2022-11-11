@@ -16,9 +16,11 @@
 		updateStatus.loading = true;
 		try {
 			if (dev) {
-				await asyncSleep(4000);
+				localStorage.setItem('lastVersion', $appSession.version);
+				await asyncSleep(1000);
 				return window.location.reload();
 			} else {
+				localStorage.setItem('lastVersion', $appSession.version);
 				await post(`/update`, { type: 'update', latestVersion });
 				addToast({
 					message: 'Update completed.<br><br>Waiting for the new version to start...',

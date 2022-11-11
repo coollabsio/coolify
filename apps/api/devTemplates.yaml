@@ -1,4 +1,66 @@
 - templateVersion: 1.0.0
+  defaultVersion: v3.6
+  documentation: https://github.com/freyacodes/Lavalink
+  description: Standalone audio sending node based on Lavaplayer.
+  type: lavalink
+  name: Lavalink
+  labels:
+    - discord
+    - discord bot
+    - audio
+    - lavalink
+    - jda
+  services:
+    $$id:
+      name: Lavalink
+      image: fredboat/lavalink:$$core_version
+      environment: []
+      volumes:
+        - $$id-lavalink:/lavalink
+      ports:
+        - "2333"
+      files:
+        - location: /opt/Lavalink/application.yml
+          content: >-
+            server:
+              port: $$config_port
+              address: 0.0.0.0
+            lavalink:
+              server:
+                password: "$$secret_password"
+                sources:
+                  youtube: true
+                  bandcamp: true
+                  soundcloud: true
+                  twitch: true
+                  vimeo: true
+                  http: true
+                  local: false
+
+            logging:
+              file:
+                path: ./logs/
+
+              level:
+                root: INFO
+                lavalink: INFO
+
+              logback:
+                rollingpolicy:
+                  max-file-size: 1GB
+                  max-history: 30
+  variables:
+    - id: $$config_port
+      name: PORT
+      label: Port
+      defaultValue: '2333'
+      required: true
+    - id: $$secret_password
+      name: PASSWORD
+      label: Password
+      defaultValue: $$generate_password
+      required: true
+- templateVersion: 1.0.0
   defaultVersion: v1.8.6
   documentation: https://docs.appsmith.com/getting-started/setup/instance-configuration/
   type: appsmith
@@ -2385,7 +2447,7 @@
       name: MySQL
       depends_on: []
       image: "bitnami/mysql:5.7"
-      imageArm: "mysql:5.7"
+      imageArm: "mysql:8.0"
       volumes:
         - "$$id-mysql-data:/bitnami/mysql/data"
       volumesArm:

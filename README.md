@@ -93,15 +93,13 @@ Deploy your resource to:
 - [Fider](https://fider.io)
 - [Hasura](https://hasura.io)
 - [GlitchTip](https://glitchtip.com)
-
-## Migration from v1
-
-A fresh installation is necessary. v2 and v3 are not compatible with v1.
+- And more...
 
 ## Support
 
-- Twitter: [@andrasbacsai](https://twitter.com/andrasbacsai)
+- Mastodon: [@andrasbacsai@fosstodon.org](https://fosstodon.org/@andrasbacsai)
 - Telegram: [@andrasbacsai](https://t.me/andrasbacsai)
+- Twitter: [@andrasbacsai](https://twitter.com/andrasbacsai)
 - Email: [andras@coollabs.io](mailto:andras@coollabs.io)
 - Discord: [Invitation](https://coollabs.io/discord)
 
