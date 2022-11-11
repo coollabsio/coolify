@@ -34,7 +34,6 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        console.log({service})
         const arm = isARM(service.arch);
         const { type, destinationDockerId, destinationDocker, persistentStorage, exposePort } =
             service;
