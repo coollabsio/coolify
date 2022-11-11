@@ -2,13 +2,16 @@ import { isDev } from "./common";
 import fs from 'fs/promises';
 export async function getTemplates() {
     const templatePath = isDev ? './templates.json' : '/app/templates.json';
+    const open = await fs.open(templatePath, 'r');
+    let data;
     try {
-        const ts = await fs.readFile(templatePath, 'utf8')
-        if (ts) {
-            return JSON.parse(ts);
-        }
-    } catch (error) { }
-    return [];
+        data = await open.readFile({ encoding: 'utf-8' });
+        return JSON.parse(data);
+    } catch (error) {
+        return []
+    } finally {
+        await open?.close()
+    }
 }
 const compareSemanticVersions = (a: string, b: string) => {
     const a1 = a.split('.');
