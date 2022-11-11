@@ -117,7 +117,7 @@
 					<div class="flex items-center justify-center space-x-2">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
-							class="h-8 w-8 mx-auto"
+							class="h-8 w-8"
 							viewBox="0 0 24 24"
 							stroke-width="1.5"
 							stroke="currentColor"
