@@ -90,31 +90,50 @@
 		return {
 			applications:
 				!onlyOthers &&
-				applications.filter((application: any) => application.teams[0].id === $appSession.teamId),
+				applications.filter(
+					(application: any) =>
+						application?.teams.length > 0 && application.teams[0].id === $appSession.teamId
+				),
 			otherApplications: applications.filter(
-				(application: any) => application.teams[0].id !== $appSession.teamId
+				(application: any) =>
+					application?.teams.length > 0 && application.teams[0].id !== $appSession.teamId
 			),
 			databases:
 				!onlyOthers &&
-				databases.filter((database: any) => database.teams[0].id === $appSession.teamId),
+				databases.filter(
+					(database: any) =>
+						database?.teams.length > 0 && database.teams[0].id === $appSession.teamId
+				),
 			otherDatabases: databases.filter(
-				(database: any) => database.teams[0].id !== $appSession.teamId
+				(database: any) => database?.teams.length > 0 && database.teams[0].id !== $appSession.teamId
 			),
 			services:
 				!onlyOthers &&
-				services.filter((service: any) => service.teams[0].id === $appSession.teamId),
-			otherServices: services.filter((service: any) => service.teams[0].id !== $appSession.teamId),
+				services.filter(
+					(service: any) => service?.teams.length > 0 && service.teams[0].id === $appSession.teamId
+				),
+			otherServices: services.filter(
+				(service: any) => service?.teams.length > 0 && service.teams[0].id !== $appSession.teamId
+			),
 			gitSources:
 				!onlyOthers &&
-				gitSources.filter((gitSource: any) => gitSource.teams[0].id === $appSession.teamId),
+				gitSources.filter(
+					(gitSource: any) =>
+						gitSource?.teams.length > 0 && gitSource.teams[0].id === $appSession.teamId
+				),
 			otherGitSources: gitSources.filter(
-				(gitSource: any) => gitSource.teams[0].id !== $appSession.teamId
+				(gitSource: any) =>
+					gitSource?.teams.length > 0 && gitSource.teams[0].id !== $appSession.teamId
 			),
 			destinations:
 				!onlyOthers &&
-				destinations.filter((destination: any) => destination.teams[0].id === $appSession.teamId),
+				destinations.filter(
+					(destination: any) =>
+						destination?.teams.length > 0 && destination.teams[0].id === $appSession.teamId
+				),
 			otherDestinations: destinations.filter(
-				(destination: any) => destination.teams[0].id !== $appSession.teamId
+				(destination: any) =>
+					destination?.teams.length > 0 && destination.teams[0].id !== $appSession.teamId
 			)
 		};
 	}
@@ -682,7 +701,11 @@
 
 									<div class="flex justify-end items-end space-x-2 h-10">
 										{#if application?.fqdn}
-											<a href={application?.fqdn} target="_blank noreferrer" class="icons hover:bg-green-500">
+											<a
+												href={application?.fqdn}
+												target="_blank noreferrer"
+												class="icons hover:bg-green-500"
+											>
 												<svg
 													xmlns="http://www.w3.org/2000/svg"
 													class="h-6 w-6"
@@ -788,7 +811,11 @@
 
 								<div class="flex justify-end items-end space-x-2 h-10">
 									{#if application?.fqdn}
-										<a href={application?.fqdn} target="_blank noreferrer" class="icons hover:bg-green-500">
+										<a
+											href={application?.fqdn}
+											target="_blank noreferrer"
+											class="icons hover:bg-green-500"
+										>
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
 												class="h-6 w-6"
@@ -897,7 +924,11 @@
 									</div>
 									<div class="flex justify-end items-end space-x-2 h-10">
 										{#if service?.fqdn}
-											<a href={service?.fqdn} target="_blank noreferrer" class="icons hover:bg-pink-500">
+											<a
+												href={service?.fqdn}
+												target="_blank noreferrer"
+												class="icons hover:bg-pink-500"
+											>
 												<svg
 													xmlns="http://www.w3.org/2000/svg"
 													class="h-6 w-6"
@@ -970,7 +1001,11 @@
 								</div>
 								<div class="flex justify-end items-end space-x-2 h-10">
 									{#if service?.fqdn}
-										<a href={service?.fqdn} target="_blank noreferrer" class="icons hover:bg-pink-500">
+										<a
+											href={service?.fqdn}
+											target="_blank noreferrer"
+											class="icons hover:bg-pink-500"
+										>
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
 												class="h-6 w-6"

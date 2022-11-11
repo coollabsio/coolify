@@ -17,7 +17,7 @@ import { day } from './dayjs';
 import { saveBuildLog } from './buildPacks/common';
 import { scheduler } from './scheduler';
 
-export const version = '3.11.6';
+export const version = '3.11.7';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
