@@ -32,6 +32,7 @@ interface AddToast {
 }
 export const updateLoading: Writable<boolean> = writable(false);
 export const isUpdateAvailable: Writable<boolean> = writable(false);
+export const latestVersion: Writable<string> = writable('latest');
 export const search: any = writable('')
 export const loginEmail: Writable<string | undefined> = writable()
 export const appSession: Writable<AppSession> = writable({

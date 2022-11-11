@@ -34,7 +34,8 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
         const { id } = request.params;
         const teamId = request.user.teamId;
         const service = await getServiceFromDB({ id, teamId });
-        const arm = isARM(process.arch);
+        console.log({service})
+        const arm = isARM(service.arch);
         const { type, destinationDockerId, destinationDocker, persistentStorage, exposePort } =
             service;
 
@@ -128,7 +129,6 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
                 labels: makeLabelForServices(type),
                 ...defaultComposeConfiguration(network),
             }
-            console.log(config[s].image)
 
             // Generate files for builds
             if (template.services[s]?.files?.length > 0) {

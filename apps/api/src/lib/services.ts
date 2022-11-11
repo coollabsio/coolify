@@ -22,15 +22,22 @@ const compareSemanticVersions = (a: string, b: string) => {
     return b1.length - a1.length;
 };
 export async function getTags(type: string) {
-    if (type) {
-        const tagsPath = isDev ? './tags.json' : '/app/tags.json';
-        const data = await fs.readFile(tagsPath, 'utf8')
-        let tags = JSON.parse(data)
-        if (tags) {
-            tags = tags.find((tag: any) => tag.name.includes(type))
-            tags.tags = tags.tags.sort(compareSemanticVersions).reverse();
-            return tags
+
+    try {
+        if (type) {
+            const tagsPath = isDev ? './tags.json' : '/app/tags.json';
+            const data = await fs.readFile(tagsPath, 'utf8')
+            let tags = JSON.parse(data)
+            if (tags) {
+                tags = tags.find((tag: any) => tag.name.includes(type))
+                tags.tags = tags.tags.sort(compareSemanticVersions).reverse();
+                return tags
+            }
         }
+    } catch (error) {
+        return []
+
     }
-    return []
+
+
 }

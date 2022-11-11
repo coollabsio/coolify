@@ -8,7 +8,7 @@
 </script>
 
 {#if linkToDocs}
-	<DocLink url={template[service.id].documentation} text={`Documentation`} isExternal={true} />
+	<DocLink url={template[service.id]?.documentation || 'https://docs.coollabs.io'} text={`Documentation`} isExternal={true} />
 {:else}
 	<ServiceIcons type={service.type} />
 {/if}
