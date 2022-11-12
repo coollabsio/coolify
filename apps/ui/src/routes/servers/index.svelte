@@ -24,14 +24,16 @@
 	export let servers: any;
 	import { appSession } from '$lib/store';
 	import { goto } from '$app/navigation';
+	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	if ($appSession.teamId !== '0') {
 		goto('/');
 	}
 </script>
 
-<div class="header">
-	<h1 class="text-2xl font-bold">Servers</h1>
-</div>
+<ContextMenu>
+	<h1 class="title">Servers</h1>
+</ContextMenu>
+
 <div class="container lg:mx-auto lg:p-0 px-8 p-5">
 	{#if servers.length > 0}
 		<div class="grid grid-col gap-8 auto-cols-max grid-cols-1  p-4">
