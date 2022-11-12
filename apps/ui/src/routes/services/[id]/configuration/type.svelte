@@ -84,7 +84,7 @@
 	}
 </script>
 
-<div class="container lg:mx-auto lg:p-0 px-8 pt-5">
+<div class="container-fluid lg:p-0 px-8 pt-5">
 	<div class="input-group flex w-full">
 		<!-- svelte-ignore a11y-click-events-have-key-events -->
 		<div class="btn btn-square cursor-default no-animation hover:bg-error" on:click={cleanupSearch}>

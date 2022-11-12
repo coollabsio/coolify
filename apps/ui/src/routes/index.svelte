@@ -39,6 +39,7 @@
 	import ApplicationsIcons from '$lib/components/svg/applications/ApplicationIcons.svelte';
 	import DatabaseIcons from '$lib/components/svg/databases/DatabaseIcons.svelte';
 	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
+	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	import { dev } from '$app/env';
 	import NewResource from './_NewResource.svelte';
 	import { onMount } from 'svelte';
@@ -434,13 +435,14 @@
 	}
 </script>
 
-<nav class="header">
+<ContextMenu>
 	<h1 class="mr-4 text-2xl font-bold">{$t('index.dashboard')}</h1>
 	{#if $appSession.isAdmin && (applications.length !== 0 || destinations.length !== 0 || databases.length !== 0 || services.length !== 0 || gitSources.length !== 0 || destinations.length !== 0)}
 		<NewResource />
 	{/if}
-</nav>
-<div class="container lg:mx-auto lg:p-0 px-8 pt-5">
+</ContextMenu>
+
+<div class="container-fluid lg:p-0 px-8 pt-5">
 	{#if applications.length !== 0 || destinations.length !== 0 || databases.length !== 0 || services.length !== 0 || gitSources.length !== 0 || destinations.length !== 0}
 		<div class="space-x-2 lg:flex lg:justify-center text-center mb-4 ">
 			<button
