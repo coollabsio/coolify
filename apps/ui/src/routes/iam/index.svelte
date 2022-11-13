@@ -26,6 +26,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import Account from './_Account.svelte';
+	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	let search = '';
 	let searchResults: any = [];
 
@@ -36,15 +37,11 @@
 	}
 </script>
 
-<div class="w-full">
-	<div class="mx-auto w-full">
-		<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2 items-center">
-			<div class="title font-bold pb-3">
-				{$appSession.userId === '0' && $appSession.teamId === '0' ? 'Accounts' : 'Your account'}
-			</div>
-		</div>
+<ContextMenu>
+	<div class="subtitle">
+		{$appSession.userId === '0' && $appSession.teamId === '0' ? 'Accounts' : 'Your account'}
 	</div>
-</div>
+</ContextMenu>
 
 {#if $appSession.userId === '0' && $appSession.teamId === '0'}
 	<div class="w-full grid gap-2">

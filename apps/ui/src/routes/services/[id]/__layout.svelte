@@ -225,7 +225,7 @@
 </script>
 
 <ContextMenu>
-	<div class="title flex flex-1 justify-between items-center">
+	<div class='title'>
 		{#if $page.url.pathname === `/services/${id}/configuration/type`}
 			Select a Service Type
 		{:else if $page.url.pathname === `/services/${id}/configuration/version`}
@@ -233,18 +233,20 @@
 		{:else if $page.url.pathname === `/services/${id}/configuration/destination`}
 			Select a Destination
 		{:else}
-			<div>Configurations</div>
-			<div>
-				<StatusBadge status={$status.service.overallStatus} />
-				{#if $status.service.overallStatus === 'stopped'}
-					<DeployButton disabled={!$isDeploymentEnabled} action={startService}/>	
-				{/if}
-				{#if $page.url.pathname.startsWith(`/services/${id}/configuration/`)}
-					<DeleteButton action={deleteService} disabled={!$appSession.isAdmin} />
-				{/if}
-			</div>
+			Configurations
 		{/if}
 	</div>
+
+	<div slot="actions">
+		<StatusBadge status={$status.service.overallStatus} />
+		{#if $status.service.overallStatus === 'stopped'}
+			<DeployButton disabled={!$isDeploymentEnabled} action={startService}/>	
+		{/if}
+		{#if $page.url.pathname.startsWith(`/services/${id}/configuration/`)}
+			<DeleteButton action={deleteService} disabled={!$appSession.isAdmin} />
+		{/if}
+	</div>
+	
 </ContextMenu>
 
 

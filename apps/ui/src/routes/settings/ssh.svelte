@@ -22,6 +22,7 @@
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import Menu from './_Menu.svelte';
+	import ContextMenu from '$lib/components/ContextMenu.svelte';
 
 	let loading = {
 		save: false
@@ -57,42 +58,43 @@
 	}
 </script>
 
-<div class="w-full">
-	<div class="flex border-b border-coolgray-500 mb-6">
-		<div class="title font-bold pb-3 pr-4">SSH Keys</div>
+
+<ContextMenu>
+	<div class="subtitle">SSH Keys</div>
+	<div slot="actions">
 		<label for="my-modal" class="btn btn-sm btn-primary" on:click={() => (isModalActive = true)}
 			>Add SSH Key</label
 		>
 	</div>
-	{#if sshKeys.length === 0}
-		<div class="text-sm">No SSH keys found</div>
-	{:else}
-		<div class="mx-auto w-full">
-			<table class="table w-full">
-				<thead>
-					<tr>
-						<th>Name</th>
-						<th>CreatedAt</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each sshKeys as key}
-						<tr>
-							<td>{key.name}</td>
-							<td>{key.createdAt}</td>
-							<td
-								><button on:click={() => deleteSSHKey(key.id)} class="btn btn-sm btn-error"
-									>Delete</button
-								></td
-							>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
-	{/if}
-</div>
+</ContextMenu>
+
+{#if sshKeys.length === 0}
+	<div class="text-sm">No SSH keys found</div>
+{:else}
+	<table class="table w-full">
+		<thead>
+			<tr>
+				<th>Name</th>
+				<th>CreatedAt</th>
+				<th>Actions</th>
+			</tr>
+		</thead>
+		<tbody>
+			{#each sshKeys as key}
+				<tr>
+					<td>{key.name}</td>
+					<td>{key.createdAt}</td>
+					<td
+						><button on:click={() => deleteSSHKey(key.id)} class="btn btn-sm btn-error"
+							>Delete</button
+						></td
+					>
+				</tr>
+			{/each}
+		</tbody>
+	</table>
+{/if}
+
 
 {#if isModalActive}
 	<input type="checkbox" id="my-modal" class="modal-toggle" />

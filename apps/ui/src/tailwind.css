@@ -102,6 +102,32 @@ a {
 .title {
 	@apply text-lg lg:text-2xl font-bold;
 }
+.subtitle{
+	@apply text-lg lg:text-xl font-bold text-indigo-300;
+}
+.label{
+	@apply text-sm leading-6 font-semibold text-sky-500 dark:text-sky-400;	
+}
+.card{
+	@apply border bg-coolgray-100 border-coolgray-200 rounded p-2 space-y-2 sticky top-4 mb-2 items-center
+}
+.icon-holder{
+	overflow: hidden;
+	height: 30px;
+	border-radius: 5px;
+	margin-right: 8px;
+	background: linear-gradient(0deg, #999, #ddd);
+}
+.instance-status-on{
+	border-bottom: 3px solid #3df721;
+}
+.instance-status-off{
+	border-bottom: 3px solid #f23131;
+}
+.instance-status-degraded{
+	border-bottom: 3px solid #f7b121;
+}
+
 .nav-main {
 	@apply fixed top-0 left-0 min-h-screen w-16 min-w-[4rem] overflow-hidden border-r border-stone-800 bg-coolgray-200 scrollbar-w-1  scrollbar-thumb-coollabs scrollbar-track-coolgray-200 xl:overflow-visible;
 }
