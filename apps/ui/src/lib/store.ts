@@ -6,6 +6,7 @@ import { io as ioClient } from 'socket.io-client';
 const socket = ioClient(dev ? 'http://localhost:3001' : '/', { auth: { token: Cookies.get('token') }, autoConnect: false });
 
 export const io = socket;
+export let resources:any = writable({});
 interface AppSession {
     isRegistrationEnabled: boolean;
     ipv4: string | null,

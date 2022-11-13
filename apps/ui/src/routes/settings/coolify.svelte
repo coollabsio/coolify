@@ -25,6 +25,7 @@
 	import { asyncSleep, errorNotification, getDomain } from '$lib/common';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { dev } from '$app/env';
+	import ContextMenu from '$lib/components/ContextMenu.svelte';
 
 	let isAPIDebuggingEnabled = settings.isAPIDebuggingEnabled;
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
@@ -251,9 +252,10 @@
 
 <div class="mx-auto w-full">
 	<form on:submit|preventDefault={handleSubmit}>
-		<div class="flex flex-row border-b border-coolgray-500 mb-6">
-			<div class="title font-bold pb-3 pr-4">Coolify Settings</div>
-			<div class="flex flex-row space-x-2">
+		<ContextMenu>
+			<div class="subtitle">Coolify Settings</div>
+
+			<div slot="actions">
 				<button
 					class="btn btn-sm btn-primary"
 					type="submit"
@@ -279,7 +281,8 @@
 					class="btn btn-sm btn-error">Restart Coolify</button
 				>
 			</div>
-		</div>
+		</ContextMenu>
+
 		<div class="flex lg:flex-row flex-col">
 			<div class="grid grid-flow-row gap-2 px-4 pr-5">
 				<div class="grid grid-cols-2 items-center">
