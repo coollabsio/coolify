@@ -1,9 +1,12 @@
 <script lang="ts">
 	import DestinationBadge from "../badges/DestinationBadge.svelte";
-import DatabaseIcons from "../svg/databases/DatabaseIcons.svelte";
+  // Icons
+  import DatabaseIcons from "../svg/databases/DatabaseIcons.svelte";
 	import LocalDockerIcon from "../svg/servers/LocalDockerIcon.svelte";
 	import GithubIcon from "../svg/sources/GithubIcon.svelte";
 	import GitlabIcon from "../svg/sources/GitlabIcon.svelte";
+  import ApplicationsIcons from '$lib/components/svg/applications/ApplicationIcons.svelte';
+	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
 
   export let thing:any;
   export let kind:any; // Receives: app (application or service), server, database, source
@@ -22,8 +25,16 @@ import DatabaseIcons from "../svg/databases/DatabaseIcons.svelte";
     if(typeof(thing.title) != 'undefined') return thing.title;
     return thing.name;
   }
+
+  let allStatus = function(){
+    return ''
+      // $status.application.statuses.
+      // concat($status.service.statuses).
+      // concat($status.database.statuses)
+  }
   let instanceStatus = function(){
-    'instance-status-on'
+    console.log(allStatus());
+    return 'instance-status-on';
     'instance-status-off'
     'instance-status-degraded'
   }
@@ -43,7 +54,8 @@ import DatabaseIcons from "../svg/databases/DatabaseIcons.svelte";
       {:else if kind == 'server'}
         <LocalDockerIcon/>
       {:else if kind == 'app'}
-        <LocalDockerIcon/>
+        <ApplicationsIcons application={thing} isAbsolute={false}/>
+        <ServiceIcons type={thing.type} isAbsolute={false}/>
       {/if}
     </div>
   </div>
