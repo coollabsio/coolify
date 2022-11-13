@@ -4,7 +4,7 @@
 </script>
 <div class="drawer">
 	<input id="main-drawer" type="checkbox" class="drawer-toggle" />
-	<div class="drawer-content px-10">
+	<div class="drawer-content">
 		<!--MainNavigation/-->
 		<div
 			class="navbar lg:hidden space-x-2 flex flex-row items-center bg-coollabs"
@@ -22,7 +22,7 @@
 			</div>
 		</div>
 		<main>
-			<div>
+			<div  class="mx-2">
 				<slot name="drawer-content"/>
 			</div>
 		</main>
