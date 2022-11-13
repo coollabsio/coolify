@@ -1,4 +1,4 @@
-<script type="ts">
+<script lang="ts">
   export let location:string;
 </script>
 <a href={location} target="_blank noreferrer" class="btn btn-sm gap-2 text-sm bg-primary"

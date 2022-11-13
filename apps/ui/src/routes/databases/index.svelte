@@ -16,6 +16,10 @@
   import ContextMenu from "$lib/components/ContextMenu.svelte";
   import DatabaseIcons from '$lib/components/svg/databases/DatabaseIcons.svelte';
   import StatusBadge from '$lib/components/badges/StatusBadge.svelte';
+	import TeamsBadge from '$lib/components/badges/TeamsBadge.svelte';
+	import DestinationBadge from '$lib/components/badges/DestinationBadge.svelte';
+  import LgCard from "$lib/components/cards/LgCard.svelte";
+	import Grid3 from '$lib/components/grids/Grid3.svelte';
 </script>
 
 <ContextMenu>
@@ -26,46 +30,32 @@
   </div>
 </ContextMenu>
 
-<div
-  class="grid grid-col gap-8 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4"
->
+<Grid3>
   {#if databases.length > 0}
     {#each databases as database}
-      <a class="no-underline mb-5" href={`/databases/${database.id}`}>
-        <div
-          class="w-full rounded p-5 bg-coolgray-200 hover:bg-databases indicator duration-150"
-        >
-          <StatusBadge thing={database}/>
-          <div class="w-full flex flex-row">
-            <DatabaseIcons type={database.type} isAbsolute={true} />
-            <div class="w-full flex flex-col">
-              <div class="h-10">
-                <h1 class="font-bold text-base truncate">{database.name}</h1>
-                <div class="h-10 text-xs">
-                  {#if database?.version}
-                    <h2 class="">{database?.version}</h2>
-                  {:else}
-                    <h2 class="text-red-500">Not version not configured</h2>
-                  {/if}
-                  {#if database.destinationDocker?.name}
-                    <div class="truncate">{database.destinationDocker?.name}</div>
-                  {/if}
-                  {#if database.teams.length > 0 && database.teams[0]?.name}
-                    <div class="truncate">{database.teams[0]?.name}</div>
-                  {/if}
-                </div>
-              </div>
-              <div class="flex justify-end items-end space-x-2 h-10">
-                {#if database.settings?.isPublic}
-                  <PublicBadge/>
-                {/if}
-              </div>
-            </div>
+      <LgCard>
+        <DatabaseIcons type={database.type} isAbsolute={true} />
+        <div class="w-full flex flex-col">
+          <a class="no-underline" href={`/databases/${database.id}`}>
+            <h1 class="font-bold text-base truncate">{database.name}</h1>
+          </a>
+          <div class="h-10 text-xs">
+            {#if database?.version}
+              <h2 class="text-gray-500">{database?.version}</h2>
+            {:else}
+              <h2 class="text-red-500">Not version not configured</h2>
+            {/if}
+            <DestinationBadge name={database.destinationDocker?.name} thingId={database.id}/>
+            <TeamsBadge teams={database.teams} thing={database}/>
           </div>
+          <StatusBadge thing={database}/>
+          {#if database.settings?.isPublic}
+            <PublicBadge/>
+          {/if}
         </div>
-      </a>
+      </LgCard>
     {/each}
   {:else}
     <h1 class="">Nothing here.</h1>
   {/if}
-</div>
+</Grid3>

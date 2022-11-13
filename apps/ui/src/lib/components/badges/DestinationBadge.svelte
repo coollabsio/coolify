@@ -1,10 +1,10 @@
 <script>
 	import Tooltip from "../Tooltip.svelte";
-
+  import {initials} from '$lib/common';
   export let name;
   export let thingId;
   let id = 'destination' + thingId;
-  let initials = (str) => (str||'').split(' ').map( (wrd) => wrd[0]).join('')
+  
 </script>
 
 {#if (name||'').length > 0}

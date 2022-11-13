@@ -1,6 +1,7 @@
 <script lang="ts">
 	import DestinationBadge from "../badges/DestinationBadge.svelte";
   import PublicBadge from "../badges/PublicBadge.svelte";
+	import TeamsBadge from "../badges/TeamsBadge.svelte";
   
 	import InstanceIcon from "./InstanceIcon.svelte";
 
@@ -25,6 +26,7 @@
       <br/>
       <DestinationBadge name={thing.destinationDocker?.name} thingId={thing.id}/>
       <a href={thing.fqdn} target='_blank' style="color: #777;">{thing.fqdn || ''}</a>
+      <TeamsBadge teams={thing.teams} {thing}/>
     </a>
   </div>
   {#if thing.settings?.isPublic}

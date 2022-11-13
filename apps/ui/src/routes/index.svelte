@@ -15,6 +15,7 @@
 	import { t } from '$lib/translations';	
 	import { appSession } from '$lib/store';
 
+	import AppsBlank from '$lib/screens/AppsBlank.svelte'
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	import NewResource from './_NewResource.svelte';
 
@@ -41,7 +42,13 @@
 <RightSidebar>
 	<div slot="content">
 		<div class="subtitle mb-4">Apps & Services</div>
-		<SmList kind="app" things={sorted(appsAndServices)} />
+		{#if appsAndServices.length > 0}
+			<SmList kind="app" things={sorted(appsAndServices)} />
+		{:else}
+			<AppsBlank>
+				<NewResource><button class="btn btn-primary">Let's Get Started</button></NewResource>
+  		</AppsBlank>
+		{/if}
 	</div>
 	<div slot="sidebar">
 		<div class="label">Databases</div>
