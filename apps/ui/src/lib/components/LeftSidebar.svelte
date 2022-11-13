@@ -1,8 +1,8 @@
-<div class="flex flex-row">
-  <div class="w-64 mr-5">
+<div class="flex flex-col md:flex-row">
+  <div class="md:w-64 md:mr-5">
     <slot name="sidebar"/>
   </div>
-  <div class="flex-grow">
+  <div class="md:flex-grow">
     <slot name="content"/>
   </div>
 </div>

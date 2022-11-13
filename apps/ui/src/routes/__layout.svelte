@@ -134,7 +134,7 @@
 
 <MainNavigationNew/>
 <Drawer>
-	<div slot="drawer-content"><slot/></div>
+	<div slot="drawer-content" class="mx-2 md:mx-0"><slot/></div>
 </Drawer>
 
 <Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
