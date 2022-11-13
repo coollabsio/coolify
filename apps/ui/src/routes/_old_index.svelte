@@ -1,16 +1,20 @@
+<script>
+	import { cleanup } from "$lib/api/cleanup";
+	import { refreshStatus } from "$lib/api/status";
+</script>
 
 	{#if (filtered.applications.length > 0 && applications.length > 0) || filtered.otherApplications.length > 0}
   <div class="flex items-center mt-10 space-x-2">
     <h1 class="title lg:text-3xl">Applications</h1>
-    <button class="btn btn-sm btn-primary" on:click={refreshStatusApplications}
-      >{noInitialStatus.applications ? 'Load Status' : 'Refresh Status'}</button
+    <button class="btn btn-sm btn-primary" on:click={()=>refreshStatus('applications', applications)}
+    
     >
     {#if resources.foundUnconfiguredApplication}
       <button
         class="btn btn-sm"
         class:loading={loading.applications}
         disabled={loading.applications}
-        on:click={cleanupApplications}>Cleanup Unconfigured Resources</button
+        on:click={() => cleanup('applications')}>Cleanup Unconfigured Resources</button
       >
     {/if}
   </div>
@@ -29,19 +33,7 @@
             {#await getStatus(application)}
               <span class="indicator-item badge bg-yellow-300 badge-sm" />
             {:then}
-              {#if !noInitialStatus.applications}
-                {#if status[application.id] === 'loading'}
-                  <span class="indicator-item badge bg-yellow-300 badge-sm" />
-                {:else if status[application.id] === 'running'}
-                  <span class="indicator-item badge bg-success badge-sm" />
-                {:else if status[application.id] === 'degraded'}
-                  <span
-                    class="indicator-item indicator-middle indicator-center badge bg-warning  text-black font-bold badge-xl"
-                    >Degraded</span
-                  >
-                {:else}
-                  <span class="indicator-item badge bg-error badge-sm" />
-                {/if}
+              
               {/if}
             {/await}
             <div class="w-full flex flex-row">
@@ -145,14 +137,7 @@
           {#await getStatus(application)}
             <span class="indicator-item badge bg-yellow-300 badge-sm" />
           {:then}
-            {#if !noInitialStatus.applications}
-              {#if status[application.id] === 'loading'}
-                <span class="indicator-item badge bg-yellow-300 badge-sm" />
-              {:else if status[application.id] === 'running'}
-                <span class="indicator-item badge bg-success badge-sm" />
-              {:else}
-                <span class="indicator-item badge bg-error badge-sm" />
-              {/if}
+            RefreshStatus 
             {/if}
           {/await}
           <div class="w-full flex flex-row">
@@ -238,15 +223,15 @@
 {#if (filtered.services.length > 0 && services.length > 0) || filtered.otherServices.length > 0}
   <div class="flex items-center mt-10 space-x-2">
     <h1 class="title lg:text-3xl">Services</h1>
-    <button class="btn btn-sm btn-primary" on:click={refreshStatusServices}
-      >{noInitialStatus.services ? 'Load Status' : 'Refresh Status'}</button
+    <button class="btn btn-sm btn-primary" on:click={refreshStatus('services', services)}
+      
     >
     {#if resources.foundUnconfiguredService}
       <button
         class="btn btn-sm"
         class:loading={loading.services}
         disabled={loading.services}
-        on:click={cleanupServices}>Cleanup Unconfigured Resources</button
+        on:click={() => cleanup('services'}>Cleanup Unconfigured Resources</button
       >
     {/if}
   </div>
@@ -265,14 +250,7 @@
             {#await getStatus(service)}
               <span class="indicator-item badge bg-yellow-300 badge-sm" />
             {:then}
-              {#if !noInitialStatus.services}
-                {#if status[service.id] === 'loading'}
-                  <span class="indicator-item badge bg-yellow-300 badge-sm" />
-                {:else if status[service.id] === 'running'}
-                  <span class="indicator-item badge bg-success badge-sm" />
-                {:else}
-                  <span class="indicator-item badge bg-error badge-sm" />
-                {/if}
+              RefreshStatus
               {/if}
             {/await}
             <div class="w-full flex flex-row">
@@ -342,14 +320,7 @@
           {#await getStatus(service)}
             <span class="indicator-item badge bg-yellow-300 badge-sm" />
           {:then}
-            {#if !noInitialStatus.services}
-              {#if status[service.id] === 'loading'}
-                <span class="indicator-item badge bg-yellow-300 badge-sm" />
-              {:else if status[service.id] === 'running'}
-                <span class="indicator-item badge bg-success badge-sm" />
-              {:else}
-                <span class="indicator-item badge bg-error badge-sm" />
-              {/if}
+            
             {/if}
           {/await}
           <div class="w-full flex flex-row">
