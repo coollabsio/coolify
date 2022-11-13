@@ -56,6 +56,8 @@
 	import { appSession } from '$lib/store';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import ContextMenu from '$lib/components/ContextMenu.svelte';
+	import DeleteButton from '$lib/components/buttons/DeleteButton.svelte';
 
 	const isDestinationDeletable =
 		(destination?.application.length === 0 &&
@@ -88,29 +90,18 @@
 </script>
 
 {#if $page.params.id !== 'new'}
-	<nav class="header lg:flex-row flex-col-reverse">
-		<div class="flex flex-row space-x-2 font-bold pt-10 lg:pt-0">
-			<div class="flex flex-col items-center justify-center title">
-				{#if $page.url.pathname === `/destinations/${$page.params.id}`}
-					Configurations
-				{:else if $page.url.pathname.startsWith(`/destinations/${$page.params.id}/configuration/sshkey`)}
-					Select a SSH Key
-				{/if}
-			</div>
+	<ContextMenu>
+		<div class="title">
+			{#if $page.url.pathname === `/destinations/${$page.params.id}`}
+				Configurations
+			{:else if $page.url.pathname.startsWith(`/destinations/${$page.params.id}/configuration/sshkey`)}
+				Select a SSH Key
+			{/if}
 		</div>
-		<div class="lg:block hidden flex-1" />
-		<div class="flex flex-row flex-wrap space-x-3 justify-center lg:justify-start lg:py-0">
-			<button
-				id="delete"
-				on:click={() => deleteDestination(destination)}
-				type="submit"
-				disabled={!$appSession.isAdmin && isDestinationDeletable}
-				class:hover:text-red-500={$appSession.isAdmin && isDestinationDeletable}
-				class="icons bg-transparent text-sm"
-				class:text-stone-600={!isDestinationDeletable}><DeleteIcon /></button
-			>
-			<Tooltip triggeredBy="#delete">{deletable()}</Tooltip>
+		<div class="actions">
+			<DeleteButton action={() => deleteDestination(destination)} disabled={!$appSession.isAdmin && isDestinationDeletable}/>
 		</div>
-	</nav>
+	</ContextMenu>
 {/if}
+
 <slot />
