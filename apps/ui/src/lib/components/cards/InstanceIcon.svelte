@@ -1,4 +1,4 @@
-<script type="ts">
+<script lang="ts">
   export let thing:any;
   export let kind:any;
   // Icons

@@ -23,7 +23,7 @@
           ></svg
         >
       </h1>
-      <p class="py-6 text-xl">It looks like you did not configure anything yet.</p>
+      <p class="py-6 text-xl">It looks like you did not configure any App yet.</p>
       <slot/>
     </div>
   </div>

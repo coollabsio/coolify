@@ -1,10 +1,11 @@
-<script type="ts">
+<script lang="ts">
   import {getStatus} from '$lib/api/status'
-	import { status } from '$lib/store';
+
 	import { onDestroy, onMount } from 'svelte';
   export let thing:any;
   let getting = getStatus(thing)
-  let refreshing;
+  let refreshing:any;
+  let status:any;
   // AutoUpdates Status every 5 seconds
   onMount( ()=>{
     refreshing = setInterval( () =>{

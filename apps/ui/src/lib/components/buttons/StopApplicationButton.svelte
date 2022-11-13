@@ -1,4 +1,4 @@
-<script type="ts">
+<script lang="ts">
   export let stopApplication:any;
   export let isDisabled:any
 </script>

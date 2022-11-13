@@ -1,4 +1,4 @@
-<script type="ts">
+<script lang="ts">
   export let things:any;
   export let what:string;
   import {containerStatus, refreshStatus} from '$lib/api/status';
