@@ -33,6 +33,7 @@
 	import { appSession } from '$lib/store';
 	import PublicRepository from './_PublicRepository.svelte';
 	import DocLink from '$lib/components/DocLink.svelte';
+	import HalfScreen from '$lib/components/HalfScreen.svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
@@ -67,11 +68,15 @@
 	}
 </script>
 
-<div class="max-w-screen-2xl mx-auto px-9">
-	{#if !filteredSources}
-		<div class="title pb-8">Git App</div>
-	{/if}
-	<div class="flex flex-wrap justify-center">
+<HalfScreen>
+	<div slot="content" class="flex flex-wrap justify-center">
+		<div class="flex-grow mb-4">
+			<div class="title py-4 pr-4">Load from one of you Sources</div>
+			<p class="">Select a Source to begin.</p>
+		</div>
+		{#if !filteredSources}
+			<div class="title pb-8">Git App</div>
+		{/if}
 		{#if !filteredSources}
 			<div class="flex-col">
 				<div class="pb-2 text-center font-bold">
@@ -242,9 +247,11 @@
 			</div>
 		{/if}
 	</div>
-	<div class="flex flex-row items-center">
-		<div class="title py-4 pr-4">Public Repository</div>
+	<div slot="sidebar">
+		<div class="title py-4 pr-4">Or... Public Repository</div>
+		<p>You can paste a publish repository link here and import the project.</p>
 		<DocLink url="https://docs.coollabs.io/coolify/applications/#public-repository" />
+		<PublicRepository />
 	</div>
-	<PublicRepository />
-</div>
+	
+</HalfScreen>

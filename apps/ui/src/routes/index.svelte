@@ -11,6 +11,8 @@
 	export let destinations:any;
 	export let gitSources:any;
 	export let services:any;
+	export let foundUnconfiguredApplication:any;
+	export let foundUnconfiguredService:any;
 
 	import { t } from '$lib/translations';	
 	import { appSession } from '$lib/store';
@@ -18,6 +20,7 @@
 	import AppsBlank from '$lib/screens/AppsBlank.svelte'
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	import NewResource from './_NewResource.svelte';
+	import CleanUnconfiguredButton from '$lib/components/buttons/CleanUnconfiguredButton.svelte';
 
 	import RightSidebar from '$lib/components/RightSidebar.svelte';
 	import SmList from '$lib/components/resources/SmList.svelte';
@@ -36,6 +39,8 @@
 		{#if canCreate}
 			<NewResource />
 		{/if}
+		<CleanUnconfiguredButton what='applications' unconfigured={foundUnconfiguredApplication}/>
+		<CleanUnconfiguredButton what='services' unconfigured={foundUnconfiguredService}/>
 	</div>
 </ContextMenu>
 

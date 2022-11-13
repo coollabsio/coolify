@@ -3,6 +3,7 @@
 	import { t } from '$lib/translations';
 	import NewLocalDocker from './_NewLocalDocker.svelte';
 	import NewRemoteDocker from './_NewRemoteDocker.svelte';
+	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	let payload = {};
 	let selected = 'localDocker';
 	function setPredefined(type: any) {
@@ -34,9 +35,10 @@
 	}
 </script>
 
-<div class="flex space-x-1 p-6 font-bold">
-	<div class="mr-4 text-2xl tracking-tight">{$t('destination.new.add_new_destination')}</div>
-</div>
+<ContextMenu>
+	<div class="title">{$t('destination.new.add_new_destination')}</div>
+</ContextMenu>
+
 <div class="flex-col space-y-2 pb-10 text-center">
 	<div class="text-xl font-bold text-white">{$t('destination.new.predefined_destinations')}</div>
 	<div class="flex justify-center space-x-2">

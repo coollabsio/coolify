@@ -19,21 +19,23 @@ export async function refreshStatus(list:Array<any>) {
 }
 
 export async function getStatus(resource: any, force: boolean = false) {
-  const { id, buildPack, dualCerts } = resource;
+  const { id, buildPack, dualCerts, engine } = resource;
   let newStatus = 'stopped';
 
   // Already set and we're not forcing
   if (getStore(containerStatus)[id] && !force) return getStore(containerStatus)[id];
 
   try {
-    if (buildPack) {
+    if (buildPack) { // Application
       const response = await get(`/applications/${id}/status`);
       newStatus = parseApplicationsResponse(response);
-    } 
-    else if (typeof dualCerts !== 'undefined') {
+    } else if (typeof dualCerts !== 'undefined') { // Service
       const response = await get(`/services/${id}/status`);
       newStatus = parseServiceResponse(response);
-    } else {
+    } else if (typeof engine !== 'undefined'){ // Destination/Server
+      const response = await get(`/destinations/${id}/status`);
+      newStatus = response.isRunning ? 'running' : 'stopped';
+    } else { // Database
       const response = await get(`/databases/${id}/status`);
       newStatus = response.isRunning ? 'running' : 'stopped';
     }

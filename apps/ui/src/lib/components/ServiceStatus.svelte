@@ -1,4 +1,5 @@
 <script lang="ts">
+	// @TODO: migrate to StatusBadge (add restarting and excluded as accepted states)
 	export let id: any;
 	import { status } from '$lib/store';
 	let serviceStatus = {
@@ -31,7 +32,7 @@
 {:else if serviceStatus.isRunning}
 	<span class="badge font-bold uppercase rounded text-green-500 mt-2">Running</span>
 {:else if serviceStatus.isStopped || serviceStatus.isExited}
-	<span class="badge font-bold uppercase rounded text-red-500 mt-2">Stopped</span>
+	<span class="badge font-bold uppercase rounded text-sky-500 mt-2">Stopped</span>
 {:else if serviceStatus.isRestarting}
 	<span class="badge font-bold uppercase rounded text-yellow-500 mt-2">Restarting</span>
 {/if}

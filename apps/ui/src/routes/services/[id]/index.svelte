@@ -32,7 +32,7 @@
 
 	import DocLink from '$lib/components/DocLink.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
-	import ServiceStatus from '$lib/components/ServiceStatus.svelte';
+	import ServiceStatus from '$lib/components/ServiceStatus.svelte'; // @TODO: migrate to StatusBadge
 	import { saveForm } from './utils';
 	import Select from 'svelte-select';
 	import Wordpress from './_Services/wordpress.svelte';

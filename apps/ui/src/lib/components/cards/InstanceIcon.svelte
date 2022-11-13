@@ -10,6 +10,7 @@
 	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
 
   import {getStatus} from '$lib/api/status';
+	import Tooltip from "../Tooltip.svelte";
 
   // @TODO: try to always have "type" coming from the API;
   let type = function(){
@@ -19,14 +20,17 @@
     return '?'
   }
 
+  let lastStatus:any = 'stopped'
   async function instanceStatus(){
-    return `instance-status-${await getStatus(thing)}`;
+    lastStatus = await getStatus(thing)
+    return `instance-status-${lastStatus}`;
   }
+  let htmlId = `icon-instance-${thing.id}`;
 </script>
 {#await instanceStatus()}
   <div class="icon-holder">...</div>
 {:then status}
-  <div class="icon-holder {status}">
+  <div class="icon-holder {status}" id={htmlId}>
     {#if kind == 'database'}
       <DatabaseIcons type={thing.type}/>
     {:else if kind == 'source'}
@@ -42,4 +46,5 @@
       <ServiceIcons type={thing.type} isAbsolute={false}/>
     {/if}
   </div>
+  <Tooltip triggeredBy={`#${htmlId}`} placement="right">{lastStatus}</Tooltip>
 {/await}

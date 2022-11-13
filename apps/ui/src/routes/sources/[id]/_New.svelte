@@ -1,6 +1,9 @@
 <script lang="ts">
 	export let source: any;
 	export let settings: any;
+	import ContextMenu from '$lib/components/ContextMenu.svelte';
+	import GithubIcon from '$lib/components/svg/sources/GithubIcon.svelte';
+	import GitlabIcon from '$lib/components/svg/sources/GitlabIcon.svelte';
 	import Github from './_Github.svelte';
 	import Gitlab from './_Gitlab.svelte';
 	function setPredefined(type: string) {
@@ -35,19 +38,24 @@
 	}
 </script>
 
-<div class="flex h-20 items-center space-x-2 p-5 px-6 font-bold">
-	<div class="-mb-1 flex-col">
-		<div class="md:max-w-64 truncate text-base tracking-tight md:text-2xl lg:block">
-			New Git Source
-		</div>
+<ContextMenu>
+	<div class="title">
+		New Git Source
 	</div>
-</div>
+</ContextMenu>
+
 <div class="flex flex-col justify-center">
 	<div class="flex-col space-y-2 pb-10 text-center">
-		<div class="text-xl font-bold text-white">Select a git type</div>
+		<div class="text-xl font-bold text-white mb-8">Please, select a git server to connect</div>
 		<div class="flex justify-center space-x-2">
-			<button class="btn btn-sm" on:click={() => setPredefined('github')}>GitHub</button>
-			<button class="btn btn-sm" on:click={() => setPredefined('gitlab')}>GitLab</button>
+			<button class="btn btn-lg" on:click={() => setPredefined('github')}>
+				<GithubIcon />
+				<div class="ml-4">GitHub</div>
+			</button>
+			<button class="btn btn-lg" on:click={() => setPredefined('gitlab')}>
+				<GitlabIcon />
+				<div class="ml-4">GitLab</div>
+			</button>
 		</div>
 	</div>
 	{#if source?.type}
