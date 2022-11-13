@@ -1,123 +1,70 @@
-import {asyncSleep } from '$lib/common'
+// 
+// Maps Container ID x Operation Status
+// 
+// Example response of $status => {'123asdf': 'degraded', '124asdf': 'running'}
 
-export let numberOfGetStatus = 0;
-export let status: any = {};
-export let noInitialStatus: any = {
-  applications: false,
-  services: false,
-  databases: false
-};
+import { writable, get as getStore } from 'svelte/store';
+import { get } from '$lib/api';
 
-export async function refreshStatusApplications() {
-		noInitialStatus.applications = false;
-		numberOfGetStatus = 0;
-		for (const application of applications) {
-			status[application.id] = 'loading';
-			getStatus(application, true);
-		}
-	}
-export async function refreshStatusServices() {
-		noInitialStatus.services = false;
-		numberOfGetStatus = 0;
-		for (const service of services) {
-			status[service.id] = 'loading';
-			getStatus(service, true);
-		}
-	}
-export async function refreshStatusDatabases() {
-		noInitialStatus.databases = false;
-		numberOfGetStatus = 0;
-		for (const database of databases) {
-			status[database.id] = 'loading';
-			getStatus(database, true);
-		}
-	}
+export let containerStatus = writable({});
 
+let PERMITED_STATUS = ['loading', 'running', 'healthy', 'building', 'degraded', 'stopped', 'error'];
 
-export async function getStatus(resources: any, force: boolean = false) {
-  const { id, buildPack, dualCerts, type } = resources;
-  if (buildPack && applications.length + filtered.otherApplications.length > 10 && !force) {
-    noInitialStatus.applications = true;
-    return;
+// refreshStatus([{id}])
+export async function refreshStatus(list:Array<any>) {
+  for (const item of list) {
+    setStatus(item.id, 'loading');
+    getStatus(item, true);
   }
-  if (type && services.length + filtered.otherServices.length > 10 && !force) {
-    noInitialStatus.services = true;
-    return;
-  }
-  if (databases.length + filtered.otherDatabases.length > 10 && !force) {
-    noInitialStatus.databases = true;
-    return;
-  }
-  if (status[id] && !force) return status[id];
-  while (numberOfGetStatus > 1) {
-    await asyncSleep(getRndInteger(100, 500));
-  }
+}
+
+export async function getStatus(resource: any, force: boolean = false) {
+  const { id, buildPack, dualCerts } = resource;
+  let newStatus = 'stopped';
+
+  // Already set and we're not forcing
+  if (getStore(containerStatus)[id] && !force) return getStore(containerStatus)[id];
+
   try {
-    numberOfGetStatus++;
-    let isRunning = false;
-    let isDegraded = false;
     if (buildPack) {
       const response = await get(`/applications/${id}/status`);
-      if (response.length === 0) {
-        isRunning = false;
-      } else if (response.length === 1) {
-        isRunning = response[0].status.isRunning;
-      } else {
-        let overallStatus = false;
-        for (const oneStatus of response) {
-          if (oneStatus.status.isRunning) {
-            overallStatus = true;
-          } else {
-            isDegraded = true;
-            break;
-          }
-        }
-        if (overallStatus) {
-          isRunning = true;
-        } else {
-          isRunning = false;
-        }
-      }
-    } else if (typeof dualCerts !== 'undefined') {
+      newStatus = parseApplicationsResponse(response);
+    } 
+    else if (typeof dualCerts !== 'undefined') {
       const response = await get(`/services/${id}/status`);
-      if (Object.keys(response).length === 0) {
-        isRunning = false;
-      } else {
-        let overallStatus = false;
-        for (const oneStatus of Object.keys(response)) {
-          if (response[oneStatus].status.isRunning) {
-            overallStatus = true;
-          } else {
-            isDegraded = true;
-            break;
-          }
-        }
-        if (overallStatus) {
-          isRunning = true;
-        } else {
-          isRunning = false;
-        }
-      }
+      newStatus = parseServiceResponse(response);
     } else {
       const response = await get(`/databases/${id}/status`);
-      isRunning = response.isRunning;
-    }
-
-    if (isRunning) {
-      status[id] = 'running';
-      return 'running';
-    } else if (isDegraded) {
-      status[id] = 'degraded';
-      return 'degraded';
-    } else {
-      status[id] = 'stopped';
-      return 'stopped';
+      newStatus = response.isRunning ? 'running' : 'stopped';
     }
   } catch (error) {
-    status[id] = 'error';
-    return 'error';
-  } finally {
-    status = { ...status };
-    numberOfGetStatus--;
+    newStatus = 'error';
   }
+
+  setStatus(id, newStatus);
+  return newStatus
+}
+
+const setStatus = (thingId, newStatus) => {
+  if(!PERMITED_STATUS.includes(newStatus)) 
+    throw(`Change to ${newStatus} is not permitted. Try: ${PERMITED_STATUS.join(', ')}`);
+  containerStatus.update(n => Object.assign(n, {thingId: newStatus}));
+};
+
+// -- Response Parsing
+
+function parseApplicationsResponse(list:Array<any>){
+  if (list.length === 0) return 'stopped';
+  if (list.length === 1) return list[0].status.isRunning ? 'running' : 'stopped';  
+  return allWorking(list.map( (el:any) => el.status.isRunning ))
+}
+
+function parseServiceResponse(response:any){
+  if (Object.keys(response).length === 0) return 'stopped';
+  let list = Object.keys(response).map((el) => el.status.isRunning)
+  return allWorking(list) ? 'running' : 'degraded'
+}
+
+function allWorking(list:Array<any>){
+  return list.reduce((acum:boolean,res:boolean) => acum && res) ? 'running' : 'degraded';
 }

@@ -7,31 +7,22 @@
 <script lang="ts">
   export let databases:any;
   export let foundUnconfiguredDatabase:any;
-  let loading = {database: false};
-  let status = {}
 
-  import {getStatus,cleanupDatabases,refreshStatusDatabases} from '$lib/api/dashboard';
-  import {noInitialStatus} from '$lib/api/dashboard.js';
+  import {containerStatus,getStatus,refreshStatus} from '$lib/api/status';
+
 	import PublicBadge from '$lib/components/badges/PublicBadge.svelte';
-
+  import RefreshButton from '$lib/components/buttons/RefreshButton.svelte';
+  import CleanUnconfiguredButton from '$lib/components/buttons/CleanUnconfiguredButton.svelte';
   import ContextMenu from "$lib/components/ContextMenu.svelte";
   import DatabaseIcons from '$lib/components/svg/databases/DatabaseIcons.svelte';
+  import StatusBadge from '$lib/components/badges/StatusBadge.svelte';
 </script>
 
 <ContextMenu>
 	<div class="title">Databases</div>
   <div slot="actions">
-    <button class="btn btn-sm btn-primary" on:click={refreshStatusDatabases}
-      >{noInitialStatus.databases ? 'Load Status' : 'Refresh Status'}</button
-    >
-    {#if foundUnconfiguredDatabase}
-      <button
-        class="btn btn-sm"
-        class:loading={loading.databases}
-        disabled={loading.databases}
-        on:click={cleanupDatabases}>Cleanup Unconfigured Resources</button
-      >
-    {/if}
+    <RefreshButton things={databases} what='databases'/>
+    <CleanUnconfiguredButton what='databases' unconfigured={foundUnconfiguredDatabase}/>
   </div>
 </ContextMenu>
 
@@ -46,16 +37,8 @@
         >
           {#await getStatus(database)}
             <span class="indicator-item badge bg-yellow-300 badge-sm" />
-          {:then}
-            {#if !noInitialStatus.databases}
-              {#if status[database.id] === 'loading'}
-                <span class="indicator-item badge bg-yellow-300 badge-sm" />
-              {:else if status[database.id] === 'running'}
-                <span class="indicator-item badge bg-success badge-sm" />
-              {:else}
-                <span class="indicator-item badge bg-error badge-sm" />
-              {/if}
-            {/if}
+          {:then status}
+            <StatusBadge {status}/>
           {/await}
           <div class="w-full flex flex-row">
             <DatabaseIcons type={database.type} isAbsolute={true} />

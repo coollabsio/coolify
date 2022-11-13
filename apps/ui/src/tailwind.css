@@ -118,15 +118,14 @@ a {
 	margin-right: 8px;
 	background: linear-gradient(0deg, #999, #ddd);
 }
-.instance-status-on{
-	border-bottom: 3px solid #3df721;
-}
-.instance-status-off{
-	border-bottom: 3px solid #f23131;
-}
-.instance-status-degraded{
-	border-bottom: 3px solid #f7b121;
-}
+.instance-status-running{ box-shadow: 1px 4px 5px #3df721; }
+.instance-status-stopped{ box-shadow: 1px 4px 5px #f23131; }
+.instance-status-error{ box-shadow: 1px 4px 5px #fb00ff; }
+.instance-status-degraded{ box-shadow: 1px 4px 5px #f7b121; }
+.badge-status-healthy,
+.badge-status-running { @apply text-green-500 }
+.badge-status-degraded { @apply text-green-500 }
+.badge-status-stopped { @apply text-red-500 }
 
 .nav-main {
 	@apply fixed top-0 left-0 min-h-screen w-16 min-w-[4rem] overflow-hidden border-r border-stone-800 bg-coolgray-200 scrollbar-w-1  scrollbar-thumb-coollabs scrollbar-track-coolgray-200 xl:overflow-visible;
