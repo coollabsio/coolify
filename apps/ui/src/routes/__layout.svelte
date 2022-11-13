@@ -103,14 +103,6 @@
 	if (permission) $appSession.permission = permission;
 	if (isAdmin) $appSession.isAdmin = isAdmin;
 
-	async function logout() {
-		try {
-			Cookies.remove('token');
-			return window.location.replace('/login');
-		} catch (error) {
-			return errorNotification(error);
-		}
-	}
 	onMount(async () => {
 		io.connect();
 		io.on('start-service', (message) => {
