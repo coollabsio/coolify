@@ -42,6 +42,7 @@ export async function getStatus(resource: any, force: boolean = false) {
   }
 
   setStatus(id, newStatus);
+  // console.log("GOT:", id, newStatus)
   return newStatus
 }
 

@@ -35,11 +35,7 @@
         <div
           class="w-full rounded p-5 bg-coolgray-200 hover:bg-databases indicator duration-150"
         >
-          {#await getStatus(database)}
-            <span class="indicator-item badge bg-yellow-300 badge-sm" />
-          {:then status}
-            <StatusBadge {status}/>
-          {/await}
+          <StatusBadge thing={database}/>
           <div class="w-full flex flex-row">
             <DatabaseIcons type={database.type} isAbsolute={true} />
             <div class="w-full flex flex-col">
