@@ -48,7 +48,7 @@
 	<div slot="content">
 		<div class="subtitle mb-4">Apps & Services</div>
 		{#if appsAndServices.length > 0}
-			<SmList kind="app" things={sorted(appsAndServices)} />
+			<SmList kind="app" url='' things={sorted(appsAndServices)} />
 		{:else}
 			<AppsBlank>
 				<NewResource><button class="btn btn-primary">Let's Get Started</button></NewResource>

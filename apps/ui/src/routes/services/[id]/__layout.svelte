@@ -79,6 +79,7 @@
 	import DeployButton from '$lib/components/buttons/DeployButton.svelte';
 	import DeleteButton from '$lib/components/buttons/DeleteButton.svelte';
 	import StatusBadge from '$lib/components/badges/StatusBadge.svelte';
+	import ThingStatusToggler from '$lib/components/buttons/ThingStatusToggler.svelte';
 	const { id } = $page.params;
 
 	$isDeploymentEnabled = checkIfDeploymentEnabledServices($appSession.isAdmin, service);
@@ -238,6 +239,11 @@
 	</div>
 
 	<div slot="actions">
+		<ThingStatusToggler {id} 
+				what='services' 
+				thing={service} 
+				valid={true}
+			/>
 		<StatusBadge thing={service} />
 		{#if $status.service.overallStatus === 'stopped'}
 			<DeployButton disabled={!$isDeploymentEnabled} action={startService}/>	

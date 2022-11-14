@@ -1,9 +1,19 @@
 import { addToast } from '$lib/store';
+import Cookies from 'js-cookie';
 
 export const asyncSleep = (delay: number) =>
 	new Promise((resolve) => setTimeout(resolve, delay));
 
 export let initials = (str:string) => (str||'').split(' ').map( (wrd) => wrd[0]).join('')
+
+export async function logout() {
+	try {
+		Cookies.remove('token');
+		return window.location.replace('/login');
+	} catch (error) {
+		errorNotification(error);
+	}
+}
 
 export function errorNotification(error: any | { message: string }): void {
 	if (error.message) {
