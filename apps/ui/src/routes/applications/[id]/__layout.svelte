@@ -501,7 +501,7 @@
 	</div>
 </div>
 <div
-	class="mx-auto max-w-screen-2xl px-0 lg:px-2 grid grid-cols-1"
+	class="mx-auto max-w-screen-2xl px-0 lg:px-10 grid grid-cols-1"
 	class:lg:grid-cols-4={!$page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
 >
 	{#if !$page.url.pathname.startsWith(`/applications/${id}/configuration/`)}

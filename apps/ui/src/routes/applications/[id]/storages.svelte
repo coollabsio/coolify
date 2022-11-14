@@ -71,7 +71,7 @@
 			</div>
 		{/if}
 		{#if persistentStorages.length > 0}
-			<div class="title pt-10">Custom Volumes</div>
+			<div class="title" class:pt-10={predefinedVolumes.length > 0}>Custom Volumes</div>
 		{/if}
 		{#each persistentStorages as storage}
 			{#key storage.id}
