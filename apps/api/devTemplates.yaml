@@ -1,4 +1,89 @@
 - templateVersion: 1.0.0
+  defaultVersion: '20.0'
+  documentation: https://www.keycloak.org/documentation
+  type: keycloak
+  name: Keycloak
+  description: "Keycloak provides user federation, strong authentication, user management, fine-grained authorization, and more."
+  labels:
+    - authentication
+    - authorization
+    - oidconnect
+    - saml2
+  services:
+    $$id:
+      name: Keycloak
+      command: start --db=postgres
+      depends_on:
+        - $$id-postgresql
+      image: "quay.io/keycloak/keycloak:$$core_version"
+      volumes:
+        - $$id-import:/opt/keycloak/data/import
+      environment:
+        - KC_HEALTH_ENABLED=true
+        - KC_PROXY=edge
+        - KC_DB=postgres
+        - KC_HOSTNAME=$$config_keycloak_domain
+        - KEYCLOAK_ADMIN=$$config_admin_user
+        - KEYCLOAK_ADMIN_PASSWORD=$$secret_keycloak_admin_password
+        - KC_DB_PASSWORD=$$secret_postgres_password
+        - KC_DB_USERNAME=$$config_postgres_user
+        - KC_DB_URL=$$secret_keycloak_database_url
+      ports:
+        - '8080'
+    $$id-postgresql:
+      name: PostgreSQL
+      depends_on: []
+      image: "postgres:14-alpine"
+      volumes:
+        - "$$id-postgresql-data:/var/lib/postgresql/data"
+      environment:
+        - POSTGRES_USER=$$config_postgres_user
+        - POSTGRES_PASSWORD=$$secret_postgres_password
+        - POSTGRES_DB=$$config_postgres_db
+      ports: []
+  variables:
+    - id: $$config_keycloak_domain
+      name: KEYCLOAK_DOMAIN
+      label: Keycloak Domain
+      defaultValue: $$generate_domain
+      description: ""
+    - id: $$secret_keycloak_database_url
+      name: KEYCLOAK_DATABASE_URL
+      label: Keycloak Database Url
+      defaultValue: >-
+        jdbc:postgresql://$$id-postgresql:5432/$$config_postgres_db
+      description: ""
+    - id: $$config_admin_user
+      name: KEYCLOAK_ADMIN
+      label: Keycloak Admin User
+      defaultValue: $$generate_username
+      description: ""
+    - id: $$secret_keycloak_admin_password
+      name: KEYCLOAK_ADMIN_PASSWORD
+      label: Keycloak Admin Password
+      defaultValue: $$generate_password
+      description: ""
+      showOnConfiguration: true
+    - id: $$config_postgres_user
+      main: $$id-postgresql
+      name: POSTGRES_USER
+      label: PostgreSQL User
+      defaultValue: $$generate_username
+      description: ""
+    - id: $$secret_postgres_password
+      main: $$id-postgresql
+      name: POSTGRES_PASSWORD
+      label: PostgreSQL Password
+      defaultValue: $$generate_password
+      description: ""
+      showOnConfiguration: true
+    - id: $$config_postgres_db
+      main: $$id-postgresql
+      name: POSTGRES_DB
+      label: PostgreSQL Database
+      defaultValue: keycloak
+      description: ""
+- templateVersion: 1.0.0
   defaultVersion: v3.6
   documentation: https://github.com/freyacodes/Lavalink
   description: Standalone audio sending node based on Lavaplayer.

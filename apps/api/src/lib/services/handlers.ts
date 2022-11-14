@@ -118,7 +118,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
                 entrypoint: template.services[s]?.entrypoint,
                 image,
                 expose: template.services[s].ports,
-                ...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+                ...(exposePort && port ? { ports: [`${exposePort}:${port}`] } : {}),
                 volumes: Array.from(volumes),
                 environment: newEnvironments,
                 depends_on: template.services[s]?.depends_on,

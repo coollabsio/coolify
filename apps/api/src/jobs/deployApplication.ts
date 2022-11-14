@@ -117,8 +117,10 @@ import * as buildpacks from '../lib/buildPacks';
 								let domain = getDomain(fqdn);
 								const volumes =
 									persistentStorage?.map((storage) => {
-										return `${applicationId}${storage.path.replace(/\//gi, '-')}:${buildPack !== 'docker' ? '/app' : ''
-											}${storage.path}`;
+										if (storage.oldPath) {
+											return `${applicationId}${storage.path.replace(/\//gi, '-').replace('-app','')}:${storage.path}`;
+										}
+										return `${applicationId}${storage.path.replace(/\//gi, '-')}:${storage.path}`;
 									}) || [];
 								// Previews, we need to get the source branch and set subdomain
 								if (pullmergeRequestId) {

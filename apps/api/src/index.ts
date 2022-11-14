@@ -17,7 +17,7 @@ import yaml from 'js-yaml'
 import fs from 'fs/promises';
 import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handlers';
 import { checkContainer } from './lib/docker';
-import { migrateServicesToNewTemplate } from './lib';
+import { migrateApplicationPersistentStorage, migrateServicesToNewTemplate } from './lib';
 import { refreshTags, refreshTemplates } from './routes/api/v1/handlers';
 
 declare module 'fastify' {
@@ -142,7 +142,8 @@ const host = '0.0.0.0';
 		await socketIOServer(fastify)
 		console.log(`Coolify's API is listening on ${host}:${port}`);
 
-		migrateServicesToNewTemplate()
+		migrateServicesToNewTemplate();
+		await migrateApplicationPersistentStorage();
 		await initServer();
 
 		const graceful = new Graceful({ brees: [scheduler] });

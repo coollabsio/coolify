@@ -61,7 +61,10 @@
 
 	$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
 	let statues: any = {};
-	let loading = false;
+	let loading = {
+		save: false,
+		reloadCompose: false
+	};
 	let fqdnEl: any = null;
 	let forceSave = false;
 	let isPublicRepository = application.settings.isPublicRepository;
@@ -102,7 +105,6 @@
 			label: 'Uvicorn'
 		}
 	];
-
 	function normalizeDockerServices(services: any[]) {
 		const tempdockerComposeServices = [];
 		for (const [name, data] of Object.entries(services)) {
@@ -237,8 +239,8 @@
 		}
 	}
 	async function handleSubmit(toast: boolean = true) {
-		if (loading) return;
-		if (toast) loading = true;
+		if (loading.save) return;
+		if (toast) loading.save = true;
 		try {
 			nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
 			if (application.deploymentType)
@@ -299,7 +301,7 @@
 			}
 			return errorNotification(error);
 		} finally {
-			loading = false;
+			loading.save = false;
 		}
 	}
 	async function selectWSGI(event: any) {
@@ -361,6 +363,8 @@
 		});
 	}
 	async function reloadCompose() {
+		if (loading.reloadCompose) return;
+		loading.reloadCompose = true;
 		try {
 			if (application.gitSource.type === 'github') {
 				const headers = isPublicRepository
@@ -427,6 +431,8 @@
 			});
 		} catch (error) {
 			errorNotification(error);
+		} finally {
+			loading.reloadCompose = false;
 		}
 	}
 	$: if ($status.application.statuses) {
@@ -464,10 +470,10 @@
 					<button
 						class="btn btn-sm  btn-primary"
 						type="submit"
-						class:loading
+						class:loading={loading.save}
 						class:bg-orange-600={forceSave}
 						class:hover:bg-orange-400={forceSave}
-						disabled={loading}>{$t('forms.save')}</button
+						disabled={loading.save}>{$t('forms.save')}</button
 					>
 				{/if}
 			</div>
@@ -993,8 +999,11 @@
 				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
 					Stack <Beta />
 					{#if $appSession.isAdmin}
-						<button class="btn btn-sm  btn-primary" on:click|preventDefault={reloadCompose}
-							>Reload Docker Compose File</button
+						<button
+							class="btn btn-sm btn-primary"
+							class:loading={loading.reloadCompose}
+							disabled={loading.reloadCompose}
+							on:click|preventDefault={reloadCompose}>Reload Docker Compose File</button
 						>
 					{/if}
 				</div>
