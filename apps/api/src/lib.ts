@@ -2,6 +2,32 @@ import cuid from "cuid";
 import { decrypt, encrypt, fixType, generatePassword, prisma } from "./lib/common";
 import { getTemplates } from "./lib/services";
 
+export async function migrateApplicationPersistentStorage() {
+    const settings = await prisma.setting.findFirst()
+    if (settings) {
+        const { id: settingsId, applicationStoragePathMigrationFinished } = settings
+        try {
+            if (!applicationStoragePathMigrationFinished) {
+                const applications = await prisma.application.findMany({ include: { persistentStorage: true } });
+                for (const application of applications) {
+                    if (application.persistentStorage && application.persistentStorage.length > 0 && application?.buildPack !== 'docker') {
+                        for (const storage of application.persistentStorage) {
+                            let { id, path } = storage
+                            if (!path.startsWith('/app')) {
+                                path = `/app${path}`
+                                await prisma.applicationPersistentStorage.update({ where: { id }, data: { path, oldPath: true } })
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.log(error)
+        } finally {
+            await prisma.setting.update({ where: { id: settingsId }, data: { applicationStoragePathMigrationFinished: true } })
+        }
+    }
+}
 export async function migrateServicesToNewTemplate() {
     // This function migrates old hardcoded services to the new template based services
     try {
@@ -456,9 +482,9 @@ async function migrateSettings(settings: any[], service: any, template: any) {
                 variableName = `$$config_${name.toLowerCase()}`
             }
             // console.log('Migrating setting', name, value, 'for service', service.id, ', service name:', service.name, 'variableName: ', variableName)
-    
+
             await prisma.serviceSetting.findFirst({ where: { name: minio, serviceId: service.id } }) || await prisma.serviceSetting.create({ data: { name: minio, value, variableName, service: { connect: { id: service.id } } } })
-        } catch(error) {
+        } catch (error) {
             console.log(error)
         }
     }
@@ -473,7 +499,7 @@ async function migrateSecrets(secrets: any[], service: any) {
             }
             // console.log('Migrating secret', name, value, 'for service', service.id, ', service name:', service.name)
             await prisma.serviceSecret.findFirst({ where: { name, serviceId: service.id } }) || await prisma.serviceSecret.create({ data: { name, value, service: { connect: { id: service.id } } } })
-        } catch(error) {
+        } catch (error) {
             console.log(error)
         }
     }

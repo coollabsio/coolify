@@ -60,49 +60,54 @@
 </script>
 
 <div class="w-full lg:px-0 px-4">
-	<div class="grid grid-col-1 lg:grid-cols-3 lg:space-x-4" class:pt-8={isNew}>
-		{#if storage.id}
-			<div class="flex flex-col">
-				<label for="name" class="pb-2 uppercase font-bold">Volume name</label>
-				<input
-					disabled
-					readonly
-					class="w-full lg:w-64"
-					value="{storage.id}{storage.path.replace(/\//gi, '-')}"
-				/>
-			</div>
-		{/if}
-		<div class="flex flex-col">
-			<label for="name" class="pb-2 uppercase font-bold">{isNew ? 'New Path' : 'Path'}</label>
+	{#if storage.predefined}
+		<div class="flex flex-col lg:flex-row gap-4 pb-2">
+			<input disabled readonly class="w-full" value={storage.id} />
+			<input disabled readonly class="w-full" bind:value={storage.path} />
+		</div>
+	{:else}
+		<div class="flex gap-4 pb-2" class:pt-8={isNew}>
+			{#if storage.applicationId}
+				{#if storage.oldPath}
+					<input
+						disabled
+						readonly
+						class="w-full"
+						value="{storage.applicationId}{storage.path.replace(/\//gi, '-').replace('-app', '')}"
+					/>
+				{:else}
+					<input
+						disabled
+						readonly
+						class="w-full"
+						value="{storage.applicationId}{storage.path.replace(/\//gi, '-')}"
+					/>
+				{/if}
+			{/if}
 			<input
-				class="w-full lg:w-64"
+				disabled={!isNew}
+				readonly={!isNew}
+				class="w-full"
 				bind:value={storage.path}
 				required
-				placeholder="eg: /sqlite.db"
+				placeholder="eg: /data"
 			/>
-		</div>
 
-		<div class="pt-8">
-			{#if isNew}
-				<div class="flex items-center justify-center w-full lg:w-64">
-					<button class="btn btn-sm btn-primary w-full" on:click={() => saveStorage(true)}
-						>{$t('forms.add')}</button
-					>
-				</div>
-			{:else}
-				<div class="flex flex-row items-center justify-center space-x-2 w-full lg:w-64">
-					<div class="flex items-center justify-center">
-						<button class="btn btn-sm btn-primary" on:click={() => saveStorage(false)}
-							>{$t('forms.set')}</button
+			<div class="flex items-center justify-center">
+				{#if isNew}
+					<div class="w-full lg:w-64">
+						<button class="btn btn-sm btn-primary w-full" on:click={() => saveStorage(true)}
+							>{$t('forms.add')}</button
 						>
 					</div>
+				{:else}
 					<div class="flex justify-center">
 						<button class="btn btn-sm btn-error" on:click={removeStorage}
 							>{$t('forms.remove')}</button
 						>
 					</div>
-				</div>
-			{/if}
+				{/if}
+			</div>
 		</div>
-	</div>
+	{/if}
 </div>

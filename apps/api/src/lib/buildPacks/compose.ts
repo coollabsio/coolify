@@ -64,13 +64,14 @@ export default async function (data) {
     } catch (error) {
         //
     }
-    const composeVolumes = volumes.map((volume) => {
-        return {
-            [`${volume.split(':')[0]}`]: {
-                name: volume.split(':')[0]
-            }
-        };
-    });
+    const composeVolumes = [];
+    for (const volume of volumes) {
+        let [v, _] = volume.split(':');
+        composeVolumes[v] = {
+            name: v,
+        }
+     
+    }
     let networks = {}
     for (let [key, value] of Object.entries(dockerComposeYaml.services)) {
         value['container_name'] = `${applicationId}-${key}`
@@ -79,16 +80,19 @@ export default async function (data) {
         // TODO: If we support separated volume for each service, we need to add it here
         if (value['volumes'].length > 0) {
             value['volumes'] = value['volumes'].map((volume) => {
-                let [v, path] = volume.split(':');
+                let [v, path, permission] = volume.split(':');
                 v = `${applicationId}-${v}`
                 composeVolumes[v] = {
                     name: v
                 }
-                return `${v}:${path}`
+                return `${v}:${path}${permission ? ':' + permission : ''}`
             })
         }
+
         if (volumes.length > 0) {
-            value['volumes'] = [...value['volumes'] || '', volumes]
+            for (const volume of volumes) {
+                value['volumes'].push(volume)
+            }
         }
         if (dockerComposeConfiguration[key].port) {
             value['expose'] = [dockerComposeConfiguration[key].port]
@@ -104,7 +108,7 @@ export default async function (data) {
         dockerComposeYaml.services[key] = { ...dockerComposeYaml.services[key], restart: defaultComposeConfiguration(network).restart, deploy: defaultComposeConfiguration(network).deploy }
     }
     if (Object.keys(composeVolumes).length > 0) {
-        dockerComposeYaml['volumes'] = {...composeVolumes}
+        dockerComposeYaml['volumes'] = { ...composeVolumes }
     }
     dockerComposeYaml['networks'] = Object.assign({ ...networks }, { [network]: { external: true } })
     await fs.writeFile(`${workdir}/docker-compose.${isYml ? 'yml' : 'yaml'}`, yaml.dump(dockerComposeYaml));
