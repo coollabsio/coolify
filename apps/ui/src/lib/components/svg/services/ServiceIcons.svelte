@@ -1,6 +1,8 @@
 <script lang="ts">
 	export let type: string;
 	export let isAbsolute = false;
+	let fallback = '/icons/default.png';
+	const handleError = (ev: { target: { src: string } }) => (ev.target.src = fallback);
 	let extension = 'png';
 	let svgs = [
 		'languagetool',
@@ -46,5 +48,10 @@
 </script>
 
 {#if name}
-	<img class={generateClass()} src={`/icons/${name}.${extension}`} alt={`Icon of ${name}`} />
+	<img
+		class={generateClass()}
+		src={`/icons/${name}.${extension}`}
+		on:error={handleError}
+		alt={`Icon of ${name}`}
+	/>
 {/if}
