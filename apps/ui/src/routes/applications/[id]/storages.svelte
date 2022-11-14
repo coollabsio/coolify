@@ -27,7 +27,7 @@
 	import { get } from '$lib/api';
 	import { t } from '$lib/translations';
 	import Explainer from '$lib/components/Explainer.svelte';
-	
+
 	let composeJson = JSON.parse(application?.dockerComposeFile || '{}');
 	let predefinedVolumes: any[] = [];
 	if (composeJson?.services) {
@@ -35,7 +35,12 @@
 			if (service?.volumes) {
 				for (const [_, volumeName] of Object.entries(service.volumes)) {
 					let [volume, target] = volumeName.split(':');
-					volume = `${application.id}-${volume}`;
+					if (!target) {
+						target = volume;
+						volume = `${application.id}${volume.replace(/\//gi, '-')}`;
+					} else {
+						volume = `${application.id}-${volume}`;
+					}
 					predefinedVolumes.push({ id: volume, path: target, predefined: true });
 				}
 			}

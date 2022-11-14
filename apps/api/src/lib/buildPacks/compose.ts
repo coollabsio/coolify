@@ -38,9 +38,10 @@ export default async function (data) {
     if (!dockerComposeYaml.services) {
         throw 'No Services found in docker-compose file.'
     }
-    const envs = [
-        `PORT=${port}`
-    ];
+    const envs = [];
+    if (Object.entries(dockerComposeYaml.services).length === 1) {
+        envs.push(`PORT=${port}`)
+    }
     if (secrets.length > 0) {
         secrets.forEach((secret) => {
             if (pullmergeRequestId) {
@@ -65,30 +66,36 @@ export default async function (data) {
         //
     }
     const composeVolumes = [];
-    for (const volume of volumes) {
-        let [v, _] = volume.split(':');
-        composeVolumes[v] = {
-            name: v,
+    if (volumes.length > 0) {
+        for (const volume of volumes) {
+            let [v, path] = volume.split(':');
+            composeVolumes[v] = {
+                name: v,
+            }
         }
-     
     }
+
     let networks = {}
     for (let [key, value] of Object.entries(dockerComposeYaml.services)) {
         value['container_name'] = `${applicationId}-${key}`
         value['env_file'] = envFound ? [`${workdir}/.env`] : []
         value['labels'] = labels
         // TODO: If we support separated volume for each service, we need to add it here
-        if (value['volumes'].length > 0) {
+        if (value['volumes']?.length > 0) {
             value['volumes'] = value['volumes'].map((volume) => {
                 let [v, path, permission] = volume.split(':');
-                v = `${applicationId}-${v}`
+                if (!path) {
+                    path = v;
+                    v = `${applicationId}${v.replace(/\//gi, '-')}`
+                } else {
+                    v = `${applicationId}-${v}`
+                }
                 composeVolumes[v] = {
                     name: v
                 }
                 return `${v}:${path}${permission ? ':' + permission : ''}`
             })
         }
-
         if (volumes.length > 0) {
             for (const volume of volumes) {
                 value['volumes'].push(volume)
@@ -106,6 +113,7 @@ export default async function (data) {
         }
         value['networks'] = [...value['networks'] || '', network]
         dockerComposeYaml.services[key] = { ...dockerComposeYaml.services[key], restart: defaultComposeConfiguration(network).restart, deploy: defaultComposeConfiguration(network).deploy }
+
     }
     if (Object.keys(composeVolumes).length > 0) {
         dockerComposeYaml['volumes'] = { ...composeVolumes }
