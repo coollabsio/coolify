@@ -76,7 +76,20 @@ export default async function (data) {
         value['container_name'] = `${applicationId}-${key}`
         value['env_file'] = envFound ? [`${workdir}/.env`] : []
         value['labels'] = labels
-        value['volumes'] = volumes
+        // TODO: If we support separated volume for each service, we need to add it here
+        if (value['volumes'].length > 0) {
+            value['volumes'] = value['volumes'].map((volume) => {
+                let [v, path] = volume.split(':');
+                v = `${applicationId}-${v}`
+                composeVolumes[v] = {
+                    name: v
+                }
+                return `${v}:${path}`
+            })
+        }
+        if (volumes.length > 0) {
+            value['volumes'] = [...value['volumes'] || '', volumes]
+        }
         if (dockerComposeConfiguration[key].port) {
             value['expose'] = [dockerComposeConfiguration[key].port]
         }
@@ -90,7 +103,9 @@ export default async function (data) {
         value['networks'] = [...value['networks'] || '', network]
         dockerComposeYaml.services[key] = { ...dockerComposeYaml.services[key], restart: defaultComposeConfiguration(network).restart, deploy: defaultComposeConfiguration(network).deploy }
     }
-    dockerComposeYaml['volumes'] = Object.assign({ ...dockerComposeYaml['volumes'] }, ...composeVolumes)
+    if (Object.keys(composeVolumes).length > 0) {
+        dockerComposeYaml['volumes'] = {...composeVolumes}
+    }
     dockerComposeYaml['networks'] = Object.assign({ ...networks }, { [network]: { external: true } })
     await fs.writeFile(`${workdir}/docker-compose.${isYml ? 'yml' : 'yaml'}`, yaml.dump(dockerComposeYaml));
     await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker compose --project-directory ${workdir} pull` })
