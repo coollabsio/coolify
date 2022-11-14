@@ -242,6 +242,9 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                 if (value) {
                     strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, bcrypt.hashSync(value.replaceAll("\"", "\\\""), 10))
                     strParsedTemplate = strParsedTemplate.replaceAll(regex, value.replaceAll("\"", "\\\""))
+                } else {
+                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, '')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, '')
                 }
             }
         }
