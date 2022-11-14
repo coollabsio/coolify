@@ -10,16 +10,8 @@
 	import SettingsIcon from './svg/menu/SettingsIcon.svelte';
 	import LogoutIcon from './svg/menu/LogoutIcon.svelte';
 	import SourcesIcon from './svg/menu/SourcesIcon.svelte';
-  import {errorNotification} from '$lib/common';
-  import Cookies from 'js-cookie';
-  async function logout() {
-		try {
-			Cookies.remove('token');
-			return window.location.replace('/login');
-		} catch (error) {
-			errorNotification(error);
-		}
-	}
+  import {logout} from '$lib/common';
+  
 </script>
 
 {#if $appSession.userId}

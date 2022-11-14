@@ -33,17 +33,8 @@
 				};
 			}
 			return {
-				props: {
-					database,
-					versions,
-					privatePort
-				},
-				stuff: {
-					database,
-					versions,
-					privatePort,
-					settings
-				}
+				props: {database,versions,privatePort},
+				stuff: {database,versions,privatePort,settings}
 			};
 		} catch (error) {
 			return handlerNotFoundLoad(error, url);
@@ -52,24 +43,25 @@
 </script>
 
 <script lang="ts">
-	export let database: any;
+	export let settings, iat, token, versions, privatePort, database;
+
 	import { del, get, post } from '$lib/api';
-	import { t } from '$lib/translations';
 	import { page } from '$app/stores';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
-	import { appSession, status, isDeploymentEnabled } from '$lib/store';
-	import { onDestroy, onMount } from 'svelte';
-	import Tooltip from '$lib/components/Tooltip.svelte';
+	import { appSession, status } from '$lib/store';
 	import DatabaseLinks from './_DatabaseLinks.svelte';
 	import ContextMenu from '$lib/components/ContextMenu.svelte';
 	import DeleteButton from '$lib/components/buttons/DeleteButton.svelte';
+	import ConfigurationsIcoButton from '$lib/components/buttons/ConfigurationsIcoButton.svelte';
+	import LogsIcoButton from '$lib/components/buttons/LogsIcoButton.svelte';
+	import ThingStatusToggler from '$lib/components/buttons/ThingStatusToggler.svelte';
 	const { id } = $page.params;
 
-	$status.database.isPublic = database.settings.isPublic || false;
-	let statusInterval: any = false;
-	let forceDelete = false;
+	
 
-	$isDeploymentEnabled = !$appSession.isAdmin;
+	$status.database.isPublic = database.settings.isPublic || false;
+	
+	let forceDelete = false;
 
 	async function deleteDatabase(force: boolean) {
 		const sure = confirm(`Are you sure you would like to delete '${database.name}'?`);
@@ -85,68 +77,7 @@
 			}
 		}
 	}
-	async function stopDatabase() {
-		const sure = confirm($t('database.confirm_stop', { name: database.name }));
-		if (sure) {
-			$status.database.initialLoading = true;
-			$status.database.loading = true;
-			try {
-				await post(`/databases/${database.id}/stop`, {});
-				$status.database.isPublic = false;
-			} catch (error) {
-				return errorNotification(error);
-			} finally {
-				$status.database.initialLoading = false;
-				$status.database.loading = false;
-				await getStatus();
-			}
-		}
-	}
-	async function startDatabase() {
-		$status.database.initialLoading = true;
-		$status.database.loading = true;
-		try {
-			await post(`/databases/${database.id}/start`, {});
-		} catch (error) {
-			return errorNotification(error);
-		} finally {
-			$status.database.initialLoading = false;
-			$status.database.loading = false;
-			await getStatus();
-		}
-	}
-	async function getStatus() {
-		if ($status.database.loading) return;
-		$status.database.loading = true;
-		const data = await get(`/databases/${id}/status`);
-		$status.database.isRunning = data.isRunning;
-		$status.database.initialLoading = false;
-		$status.database.loading = false;
-	}
-	onDestroy(() => {
-		$status.database.initialLoading = true;
-		$status.database.isRunning = false;
-		$status.database.isExited = false;
-		$status.database.loading = false;
-		clearInterval(statusInterval);
-	});
-	onMount(async () => {
-		$status.database.isRunning = false;
-		$status.database.loading = false;
-		if (
-			database.type &&
-			database.destinationDockerId &&
-			database.version &&
-			database.defaultDatabase
-		) {
-			await getStatus();
-			statusInterval = setInterval(async () => {
-				await getStatus();
-			}, 2000);
-		} else {
-			$status.database.initialLoading = false;
-		}
-	});
+
 </script>
 
 {#if id !== 'new'}
@@ -167,9 +98,14 @@
 				{/if}
 			</div>
 		</div>
-		<div slot="actions">
-			<!-- Configuration -->
-			<!-- logsico -->
+		<div slot="actions" class="flex flex-row">
+			<ThingStatusToggler {id} 
+				what='databases' 
+				thing={database} 
+				valid={database.type && database.destinationDockerId && database.version && database.defaultDatabase}
+			/>
+			<ConfigurationsIcoButton {id} what="databases"/>
+			<LogsIcoButton {id} what="databases"/>
 			<DeleteButton action={() => deleteDatabase(forceDelete)} disabled={!$appSession.isAdmin}/>
 		</div>
 	</ContextMenu>

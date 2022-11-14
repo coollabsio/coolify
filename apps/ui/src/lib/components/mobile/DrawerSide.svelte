@@ -1,6 +1,7 @@
 <script>
   import { navigating, page } from '$app/stores';
   import { appSession } from '$lib/store';
+  import {logout} from '$lib/common';
   import UpdateAvailable from '$lib/components/UpdateAvailable.svelte';
 </script>
 <div class="drawer-side">

@@ -8,8 +8,6 @@
   export let databases:any;
   export let foundUnconfiguredDatabase:any;
 
-  import {containerStatus,getStatus,refreshStatus} from '$lib/api/status';
-
 	import PublicBadge from '$lib/components/badges/PublicBadge.svelte';
   import RefreshButton from '$lib/components/buttons/RefreshButton.svelte';
   import CleanUnconfiguredButton from '$lib/components/buttons/CleanUnconfiguredButton.svelte';

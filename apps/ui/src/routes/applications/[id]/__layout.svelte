@@ -75,8 +75,6 @@
 	import StopApplicationButton from '$lib/components/buttons/StopApplicationButton.svelte';
 	import OpenButton from '$lib/components/buttons/OpenButton.svelte';
 	import StatusBadge from '$lib/components/badges/StatusBadge.svelte';
-	import ContextMenu from '$lib/components/ContextMenu.svelte';
-	import DeleteButton from '$lib/components/buttons/DeleteButton.svelte';
 
 	let statusInterval: any;
 	let forceDelete = false;
@@ -220,8 +218,8 @@
 </script>
 
 
-<ContextMenu>
-	<div class="title">
+<nav class="header flex flex-row order-2 lg:order-1 px-0 lg:px-4 items-start">
+	<div class="title lg:pb-10">
 		{#if $page.url.pathname === `/applications/${id}/configuration/source`}
 			Select a Source
 		{:else if $page.url.pathname === `/applications/${id}/configuration/destination`}
@@ -251,10 +249,30 @@
 	</div>
 	{#if $page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
 		<div class="px-2">
-			<DeleteButton action={() => deleteApplication(application.name, forceDelete)} disabled={!$appSession.isAdmin}/>
+			{#if forceDelete}
+				<button
+					on:click={() => deleteApplication(application.name, true)}
+					disabled={!$appSession.isAdmin}
+					class:bg-red-600={$appSession.isAdmin}
+					class:hover:bg-red-500={$appSession.isAdmin}
+					class="btn btn-sm btn-error text-sm"
+				>
+					Force Delete Application
+				</button>
+			{:else}
+				<button
+					on:click={() => deleteApplication(application.name, false)}
+					disabled={!$appSession.isAdmin}
+					class:bg-red-600={$appSession.isAdmin}
+					class:hover:bg-red-500={$appSession.isAdmin}
+					class="btn btn-sm btn-error text-sm"
+				>
+					Delete Application
+				</button>
+			{/if}
 		</div>
 	{/if}
-</ContextMenu>
+</nav>
 
 <div
 	class="pt-4 flex flex-row items-start justify-center lg:justify-end space-x-2 order-1 lg:order-2"

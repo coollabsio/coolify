@@ -30,18 +30,24 @@
 			delete tempBuildPack.hoverColor;
 			let composeConfiguration: any = {}
 			if (!dockerComposeConfiguration && dockerComposeFile) {
-				for (const [name, _] of Object.entries(JSON.parse(dockerComposeFile).services)) {
-					composeConfiguration[name] = {};
+				let services = JSON.parse(dockerComposeFile).services
+				if(typeof(services) == 'undefined') 
+					throw('The dockerfile/compose does not contain services.');
+				let entries = Object.entries(services);
+				for (const [name, _] of entries) {
+					if(typeof(name) !== 'undefined')
+						composeConfiguration[name] = {};
 				}
 				
 			}
-			await post(`/applications/${id}`, {
+			let data = {
 				...tempBuildPack,
 				buildPack: name,
 				dockerComposeFile,
 				dockerComposeFileLocation,
 				dockerComposeConfiguration: JSON.stringify(composeConfiguration) || JSON.stringify({})
-			});
+			}
+			await post(`/applications/${id}`, data);
 			await post(`/applications/${id}/configuration/buildpack`, { buildPack: name });
 			return await goto(from || `/applications/${id}`);
 		} catch (error) {

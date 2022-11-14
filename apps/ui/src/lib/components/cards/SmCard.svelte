@@ -26,7 +26,7 @@
       <br/>
       <DestinationBadge name={thing.destinationDocker?.name} thingId={thing.id}/>
       <TeamsBadge teams={thing.teams} {thing}/>
-      <a href={thing.fqdn} target='_blank' style="color: #777;">{thing.fqdn || ''}</a>
+      <a href={thing.fqdn} target='_blank' rel='noreferrer' style="color: #777;">{thing.fqdn || ''}</a>
     </a>
   </div>
   {#if thing.settings?.isPublic}
