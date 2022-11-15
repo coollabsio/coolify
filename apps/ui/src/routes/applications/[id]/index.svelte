@@ -67,17 +67,17 @@
 	};
 	let fqdnEl: any = null;
 	let forceSave = false;
-	let isPublicRepository = application.settings.isPublicRepository;
+	let isPublicRepository = application.settings?.isPublicRepository;
 	let apiUrl = application.gitSource.apiUrl;
 	let branch = application.branch;
 	let repository = application.repository;
-	let debug = application.settings.debug;
-	let previews = application.settings.previews;
-	let dualCerts = application.settings.dualCerts;
-	let isCustomSSL = application.settings.isCustomSSL;
-	let autodeploy = application.settings.autodeploy;
-	let isBot = application.settings.isBot;
-	let isDBBranching = application.settings.isDBBranching;
+	let debug = application.settings?.debug;
+	let previews = application.settings?.previews;
+	let dualCerts = application.settings?.dualCerts;
+	let isCustomSSL = application.settings?.isCustomSSL;
+	let autodeploy = application.settings?.autodeploy;
+	let isBot = application.settings?.isBot;
+	let isDBBranching = application.settings?.isDBBranching;
 	let htmlUrl = application.gitSource.htmlUrl;
 
 	let dockerComposeFile = JSON.parse(application.dockerComposeFile) || null;
@@ -575,13 +575,13 @@
 							<input
 								bind:this={fqdnEl}
 								class="w-full"
-								required={!application.settings.isBot}
+								required={!application.settings?.isBot}
 								readonly={isDisabled}
 								disabled={isDisabled}
 								name="fqdn"
 								id="fqdn"
-								class:border={!application.settings.isBot && !application.fqdn}
-								class:border-red-500={!application.settings.isBot && !application.fqdn}
+								class:border={!application.settings?.isBot && !application.fqdn}
+								class:border-red-500={!application.settings?.isBot && !application.fqdn}
 								bind:value={application.fqdn}
 								pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 								placeholder="eg: https://coollabs.io"
@@ -720,7 +720,7 @@
 						</div>
 					{/if}
 					{#if $features.beta}
-						{#if !application.settings.isBot && !application.settings.isPublicRepository}
+						{#if !application.settings?.isBot && !application.settings?.isPublicRepository}
 							<div class="grid grid-cols-2 items-center">
 								<Setting
 									id="isDBBranching"
