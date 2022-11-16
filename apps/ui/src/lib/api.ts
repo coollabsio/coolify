@@ -11,7 +11,7 @@ export function getAPIUrl() {
 		return `https://${CODESANDBOX_HOST.replace(/\$PORT/, '3001')}`;
 	}
 	return dev
-		? 'http://localhost:3001'
+		? `http://${window.location.hostname}:3001`
 		: 'http://localhost:3000';
 }
 export function getWebhookUrl(type: string) {

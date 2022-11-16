@@ -3,7 +3,7 @@ import cuid from 'cuid';
 import Cookies from 'js-cookie';
 import { writable, readable, type Writable } from 'svelte/store';
 import { io as ioClient } from 'socket.io-client';
-const socket = ioClient(dev ? 'http://localhost:3001' : '/', { auth: { token: Cookies.get('token') }, autoConnect: false });
+const socket = ioClient(dev ? `http://${window.location.hostname}:3001` : '/', { auth: { token: Cookies.get('token') }, autoConnect: false });
 
 export const io = socket;
 interface AppSession {
