@@ -82,14 +82,17 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
             if (containersArray.length > 0 && containersArray[0] !== '') {
                 const templates = await getTemplates();
                 let template = templates.find(t => t.type === service.type);
-                template = JSON.parse(JSON.stringify(template).replaceAll('$$id', service.id));
+                const templateStr = JSON.stringify(template)
+                if (templateStr) {
+                    template = JSON.parse(templateStr.replaceAll('$$id', service.id));
+                }
                 for (const container of containersArray) {
                     let isRunning = false;
                     let isExited = false;
                     let isRestarting = false;
                     let isExcluded = false;
                     const containerObj = JSON.parse(container);
-                    const exclude = template.services[containerObj.Names]?.exclude;
+                    const exclude = template?.services[containerObj.Names]?.exclude;
                     if (exclude) {
                         payload[containerObj.Names] = {
                             status: {
