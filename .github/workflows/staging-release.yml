@@ -2,6 +2,9 @@ name: staging-release
 
 on:
   push:
+    paths:
+      - "!others/fluentbit"
+      - "!.github/workflows/fluent-bit-release.yml"
     branches:
       - next
 
