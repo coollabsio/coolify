@@ -5,6 +5,7 @@
 	const handleError = (ev: { target: { src: string } }) => (ev.target.src = fallback);
 	let extension = 'png';
 	let svgs = [
+		'gitea',
 		'languagetool',
 		'meilisearch',
 		'n8n',
