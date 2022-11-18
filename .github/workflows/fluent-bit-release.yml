@@ -1,4 +1,4 @@
-name: production-release
+name: fluent-bit-release
 
 on:
   push:
@@ -47,7 +47,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
-          context: others/fluentbit
+          context: others/fluentbit/
           platforms: linux/amd64
           push: true
           tags: coollabsio/coolify-fluent-bit-test:1.0.0-amd64
@@ -68,7 +68,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v2
         with:
-          context: others/fluentbit
+          context: others/fluentbit/
           platforms: linux/aarch64
           push: true
           tags: coollabsio/coolify-fluent-bit-test:1.0.0-aarch64
