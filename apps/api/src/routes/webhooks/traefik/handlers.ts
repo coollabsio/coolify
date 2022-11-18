@@ -395,8 +395,8 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 					}
 					found = JSON.parse(JSON.stringify(found).replaceAll('$$id', id));
 					for (const oneService of Object.keys(found.services)) {
-						const isProxyConfiguration = found.services[oneService].proxy;
-						if (isProxyConfiguration) {
+						const isDomainConfiguration = found.services[oneService].proxy && found.services[oneService].proxy.filter(p => p.domain);
+						if (isDomainConfiguration.length > 0) {
 							const { proxy } = found.services[oneService];
 							for (let configuration of proxy) {
 								if (configuration.domain) {
@@ -431,20 +431,24 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 							}
 						} else {
 							if (found.services[oneService].ports && found.services[oneService].ports.length > 0) {
-								let port = found.services[oneService].ports[0]
-								const foundPortVariable = serviceSetting.find((a) => a.name.toLowerCase() === 'port')
-								if (foundPortVariable) {
-									port = foundPortVariable.value
+								for (let [index, port] of found.services[oneService].ports.entries()) {
+									if (port == 22) continue;
+									if (index === 0) {
+										const foundPortVariable = serviceSetting.find((a) => a.name.toLowerCase() === 'port')
+										if (foundPortVariable) {
+											port = foundPortVariable.value
+										}
+									}
+									const domain = getDomain(fqdn);
+									const nakedDomain = domain.replace(/^www\./, '');
+									const isHttps = fqdn.startsWith('https://');
+									const isWWW = fqdn.includes('www.');
+									const pathPrefix = '/'
+									const isCustomSSL = false
+									const serviceId = `${oneService}-${port || 'default'}`
+									traefik.http.routers = { ...traefik.http.routers, ...generateRouters(serviceId, domain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
+									traefik.http.services = { ...traefik.http.services, ...generateServices(serviceId, id, port) }
 								}
-								const domain = getDomain(fqdn);
-								const nakedDomain = domain.replace(/^www\./, '');
-								const isHttps = fqdn.startsWith('https://');
-								const isWWW = fqdn.includes('www.');
-								const pathPrefix = '/'
-								const isCustomSSL = false
-								const serviceId = `${oneService}-${port || 'default'}`
-								traefik.http.routers = { ...traefik.http.routers, ...generateRouters(serviceId, domain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
-								traefik.http.services = { ...traefik.http.services, ...generateServices(serviceId, id, port) }
 							}
 						}
 					}

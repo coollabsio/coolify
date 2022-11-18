@@ -4,7 +4,7 @@ import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
 import cuid from 'cuid';
 
-import { prisma, uniqueName, asyncExecShell, getServiceFromDB, getContainerUsage, isDomainConfigured, fixType, decrypt, encrypt, ComposeFile, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, executeDockerCmd, checkDomainsIsValidInDNS, checkExposedPort, listSettings } from '../../../../lib/common';
+import { prisma, uniqueName, asyncExecShell, getServiceFromDB, getContainerUsage, isDomainConfigured, fixType, decrypt, encrypt, ComposeFile, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, executeDockerCmd, checkDomainsIsValidInDNS, checkExposedPort, listSettings, generateToken } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, } from '../../../../lib/docker';
 import { removeService } from '../../../../lib/services/common';
@@ -159,13 +159,17 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                     files: value?.files,
                     environment: [],
                     fqdns: [],
+                    hostPorts: [],
                     proxy: {}
                 }
                 if (value.environment?.length > 0) {
                     for (const env of value.environment) {
                         let [envKey, ...envValue] = env.split('=')
                         envValue = envValue.join("=")
-                        const variable = foundTemplate.variables.find(v => v.name === envKey) || foundTemplate.variables.find(v => v.id === envValue)
+                        let variable = null
+                        if (foundTemplate?.variables) {
+                            variable = foundTemplate?.variables.find(v => v.name === envKey) || foundTemplate?.variables.find(v => v.id === envValue)
+                        }
                         if (variable) {
                             const id = variable.id.replaceAll('$$', '')
                             const label = variable?.label
@@ -191,7 +195,7 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                 if (value?.proxy && value.proxy.length > 0) {
                     for (const proxyValue of value.proxy) {
                         if (proxyValue.domain) {
-                            const variable = foundTemplate.variables.find(v => v.id === proxyValue.domain)
+                            const variable = foundTemplate?.variables.find(v => v.id === proxyValue.domain)
                             if (variable) {
                                 const { id, name, label, description, defaultValue, required = false } = variable
                                 const found = await prisma.serviceSetting.findFirst({ where: { serviceId: service.id, variableName: proxyValue.domain } })
@@ -199,7 +203,16 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                                     { id, name, value: found?.value || '', label, description, defaultValue, required }
                                 )
                             }
-
+                        }
+                        if (proxyValue.hostPort) {
+                            const variable = foundTemplate?.variables.find(v => v.id === proxyValue.hostPort)
+                            if (variable) {
+                                const { id, name, label, description, defaultValue, required = false } = variable
+                                const found = await prisma.serviceSetting.findFirst({ where: { serviceId: service.id, variableName: proxyValue.hostPort } })
+                                parsedTemplate[realKey].hostPorts.push(
+                                    { id, name, value: found?.value || '', label, description, defaultValue, required }
+                                )
+                            }
                         }
                     }
                 }
@@ -225,6 +238,8 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                 const regex = new RegExp(`\\$\\$config_${variableName.replace('$$config_', '')}`, 'gi')
                 if (value === '$$generate_fqdn') {
                     strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn || '')
+                } else if (value === '$$generate_fqdn_slash') {
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn + '/')
                 } else if (value === '$$generate_domain') {
                     strParsedTemplate = strParsedTemplate.replaceAll(regex, getDomain(service.fqdn))
                 } else if (service.destinationDocker?.network && value === '$$generate_network') {
@@ -297,42 +312,46 @@ export async function saveServiceType(request: FastifyRequest<SaveServiceType>, 
         let foundTemplate = templates.find(t => fixType(t.type) === fixType(type))
         if (foundTemplate) {
             foundTemplate = JSON.parse(JSON.stringify(foundTemplate).replaceAll('$$id', id))
-            if (foundTemplate.variables.length > 0) {
+            if (foundTemplate.variables) {
+                if (foundTemplate.variables.length > 0) {
+                    for (const variable of foundTemplate.variables) {
+                        const { defaultValue } = variable;
+                        const regex = /^\$\$.*\((\d+)\)$/g;
+                        const length = Number(regex.exec(defaultValue)?.[1]) || undefined
+                        if (variable.defaultValue.startsWith('$$generate_password')) {
+                            variable.value = generatePassword({ length });
+                        } else if (variable.defaultValue.startsWith('$$generate_hex')) {
+                            variable.value = generatePassword({ length, isHex: true });
+                        } else if (variable.defaultValue.startsWith('$$generate_username')) {
+                            variable.value = cuid();
+                        } else if (variable.defaultValue.startsWith('$$generate_token')) {
+                            variable.value = generateToken()
+                        } else {
+                            variable.value = variable.defaultValue || '';
+                        }
+                        const foundVariableSomewhereElse = foundTemplate.variables.find(v => v.defaultValue.includes(variable.id))
+                        if (foundVariableSomewhereElse) {
+                            foundVariableSomewhereElse.value = foundVariableSomewhereElse.value.replaceAll(variable.id, variable.value)
+                        }
+                    }
+                }
                 for (const variable of foundTemplate.variables) {
-                    const { defaultValue } = variable;
-                    const regex = /^\$\$.*\((\d+)\)$/g;
-                    const length = Number(regex.exec(defaultValue)?.[1]) || undefined
-                    if (variable.defaultValue.startsWith('$$generate_password')) {
-                        variable.value = generatePassword({ length });
-                    } else if (variable.defaultValue.startsWith('$$generate_hex')) {
-                        variable.value = generatePassword({ length, isHex: true });
-                    } else if (variable.defaultValue.startsWith('$$generate_username')) {
-                        variable.value = cuid();
-                    } else {
-                        variable.value = variable.defaultValue || '';
-                    }
-                    const foundVariableSomewhereElse = foundTemplate.variables.find(v => v.defaultValue.includes(variable.id))
-                    if (foundVariableSomewhereElse) {
-                        foundVariableSomewhereElse.value = foundVariableSomewhereElse.value.replaceAll(variable.id, variable.value)
-                    }
-                }
-            }
-            for (const variable of foundTemplate.variables) {
-                if (variable.id.startsWith('$$secret_')) {
-                    const found = await prisma.serviceSecret.findFirst({ where: { name: variable.name, serviceId: id } })
-                    if (!found) {
-                        await prisma.serviceSecret.create({
-                            data: { name: variable.name, value: encrypt(variable.value) || '', service: { connect: { id } } }
-                        })
-                    }
+                    if (variable.id.startsWith('$$secret_')) {
+                        const found = await prisma.serviceSecret.findFirst({ where: { name: variable.name, serviceId: id } })
+                        if (!found) {
+                            await prisma.serviceSecret.create({
+                                data: { name: variable.name, value: encrypt(variable.value) || '', service: { connect: { id } } }
+                            })
+                        }
 
-                }
-                if (variable.id.startsWith('$$config_')) {
-                    const found = await prisma.serviceSetting.findFirst({ where: { name: variable.name, serviceId: id } })
-                    if (!found) {
-                        await prisma.serviceSetting.create({
-                            data: { name: variable.name, value: variable.value.toString(), variableName: variable.id, service: { connect: { id } } }
-                        })
+                    }
+                    if (variable.id.startsWith('$$config_')) {
+                        const found = await prisma.serviceSetting.findFirst({ where: { name: variable.name, serviceId: id } })
+                        if (!found) {
+                            await prisma.serviceSetting.create({
+                                data: { name: variable.name, value: variable.value.toString(), variableName: variable.id, service: { connect: { id } } }
+                            })
+                        }
                     }
                 }
             }
@@ -538,7 +557,7 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
                 }
                 if (isNew) {
                     if (!variableName) {
-                        variableName = foundTemplate.variables.find(v => v.name === name).id
+                        variableName = foundTemplate?.variables.find(v => v.name === name).id
                     }
                     await prisma.serviceSetting.create({ data: { name, value, variableName, service: { connect: { id } } } })
                 }

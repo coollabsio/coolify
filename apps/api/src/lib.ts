@@ -1,5 +1,5 @@
 import cuid from "cuid";
-import { decrypt, encrypt, fixType, generatePassword, prisma } from "./lib/common";
+import { decrypt, encrypt, fixType, generatePassword, generateToken, prisma } from "./lib/common";
 import { getTemplates } from "./lib/services";
 
 export async function migrateApplicationPersistentStorage() {
@@ -83,39 +83,42 @@ export async function migrateServicesToNewTemplate() {
                     } catch (error) {
                         console.log(error)
                     }
-
-                    if (template.variables.length > 0) {
+                    if (template.variables) {
+                        if (template.variables.length > 0) {
+                            for (const variable of template.variables) {
+                                const { defaultValue } = variable;
+                                const regex = /^\$\$.*\((\d+)\)$/g;
+                                const length = Number(regex.exec(defaultValue)?.[1]) || undefined
+                                if (variable.defaultValue.startsWith('$$generate_password')) {
+                                    variable.value = generatePassword({ length });
+                                } else if (variable.defaultValue.startsWith('$$generate_hex')) {
+                                    variable.value = generatePassword({ length, isHex: true });
+                                } else if (variable.defaultValue.startsWith('$$generate_username')) {
+                                    variable.value = cuid();
+                                } else if (variable.defaultValue.startsWith('$$generate_token')) {
+                                    variable.value = generateToken()
+                                } else {
+                                    variable.value = variable.defaultValue || '';
+                                }
+                            }
+                        }
                         for (const variable of template.variables) {
-                            const { defaultValue } = variable;
-                            const regex = /^\$\$.*\((\d+)\)$/g;
-                            const length = Number(regex.exec(defaultValue)?.[1]) || undefined
-                            if (variable.defaultValue.startsWith('$$generate_password')) {
-                                variable.value = generatePassword({ length });
-                            } else if (variable.defaultValue.startsWith('$$generate_hex')) {
-                                variable.value = generatePassword({ length, isHex: true });
-                            } else if (variable.defaultValue.startsWith('$$generate_username')) {
-                                variable.value = cuid();
-                            } else {
-                                variable.value = variable.defaultValue || '';
-                            }
-                        }
-                    }
-                    for (const variable of template.variables) {
-                        if (variable.id.startsWith('$$secret_')) {
-                            const found = await prisma.serviceSecret.findFirst({ where: { name: variable.name, serviceId: id } })
-                            if (!found) {
-                                await prisma.serviceSecret.create({
-                                    data: { name: variable.name, value: encrypt(variable.value) || '', service: { connect: { id } } }
-                                })
-                            }
+                            if (variable.id.startsWith('$$secret_')) {
+                                const found = await prisma.serviceSecret.findFirst({ where: { name: variable.name, serviceId: id } })
+                                if (!found) {
+                                    await prisma.serviceSecret.create({
+                                        data: { name: variable.name, value: encrypt(variable.value) || '', service: { connect: { id } } }
+                                    })
+                                }
 
-                        }
-                        if (variable.id.startsWith('$$config_')) {
-                            const found = await prisma.serviceSetting.findFirst({ where: { name: variable.name, serviceId: id } })
-                            if (!found) {
-                                await prisma.serviceSetting.create({
-                                    data: { name: variable.name, value: variable.value.toString(), variableName: variable.id, service: { connect: { id } } }
-                                })
+                            }
+                            if (variable.id.startsWith('$$config_')) {
+                                const found = await prisma.serviceSetting.findFirst({ where: { name: variable.name, serviceId: id } })
+                                if (!found) {
+                                    await prisma.serviceSetting.create({
+                                        data: { name: variable.name, value: variable.value.toString(), variableName: variable.id, service: { connect: { id } } }
+                                    })
+                                }
                             }
                         }
                     }

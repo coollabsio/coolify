@@ -11,7 +11,7 @@ import { promises as dns } from 'dns';
 import { PrismaClient } from '@prisma/client';
 import os from 'os';
 import sshConfig from 'ssh-config';
-
+import jsonwebtoken from 'jsonwebtoken';
 import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import { saveBuildLog } from './buildPacks/common';
@@ -722,6 +722,11 @@ export async function listSettings(): Promise<any> {
 	return settings;
 }
 
+export function generateToken() {
+	return jsonwebtoken.sign({
+		nbf: Math.floor(Date.now() / 1000) - 30,
+	}, process.env['COOLIFY_SECRET_KEY'])
+}
 export function generatePassword({
 	length = 24,
 	symbols = false,
@@ -1614,7 +1619,7 @@ export function persistentVolumes(id, persistentStorage, config) {
 		for (const [key, value] of Object.entries(config)) {
 			if (value.volumes) {
 				for (const volume of value.volumes) {
-					if (!volume.startsWith('/var/run/docker.sock')) {
+					if (!volume.startsWith('/')) {
 						volumeSet.add(volume);
 					}
 				}

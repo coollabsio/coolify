@@ -291,7 +291,7 @@
 						/>
 					</div>
 				{:else}
-					<input class="w-full border-red-500" disabled placeholder="Error getting tags...">
+					<input class="w-full border-red-500" disabled placeholder="Error getting tags..." />
 				{/if}
 			</div>
 
@@ -441,6 +441,16 @@
 											name={variable.name}
 											id={variable.name}
 											value={service.fqdn}
+											placeholder={variable.placeholder}
+											required={variable?.required}
+										/>
+									{:else if variable.defaultValue === '$$generate_fqdn_slash'}
+										<CopyPasswordField
+											disabled
+											readonly
+											name={variable.name}
+											id={variable.name}
+											value={service.fqdn + '/' || ''}
 											placeholder={variable.placeholder}
 											required={variable?.required}
 										/>
