@@ -82,7 +82,6 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
             if (containersArray.length > 0 && containersArray[0] !== '') {
                 const templates = await getTemplates();
                 let template = templates.find(t => t.type === service.type);
-                console.log(service.type)
                 const templateStr = JSON.stringify(template)
                 if (templateStr) {
                     template = JSON.parse(templateStr.replaceAll('$$id', service.id));

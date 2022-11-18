@@ -2243,7 +2243,6 @@
       description: ""
       showOnConfiguration: true
 - templateVersion: 1.0.0
-  ignore: true
   defaultVersion: latest
   documentation: https://docs.ghost.org
   type: ghost-mariadb
