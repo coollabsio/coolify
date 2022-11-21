@@ -235,17 +235,17 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
         if (service.serviceSetting.length > 0) {
             for (const setting of service.serviceSetting) {
                 const { value, variableName } = setting
-                const regex = new RegExp(`\\$\\$config_${variableName.replace('$$config_', '')}`, 'gi')
+                const regex = new RegExp(`\\$\\$config_${variableName.replace('$$config_', '')}\"`, 'gi')
                 if (value === '$$generate_fqdn') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn || '')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn + '"' || '' + '"')
                 } else if (value === '$$generate_fqdn_slash') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn + '/')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn + '/'  + '"')
                 } else if (value === '$$generate_domain') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, getDomain(service.fqdn))
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, getDomain(service.fqdn) + '"')
                 } else if (service.destinationDocker?.network && value === '$$generate_network') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.destinationDocker.network)
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.destinationDocker.network  + '"')
                 } else {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value)
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value  + '"')
                 }
             }
         }
@@ -255,14 +255,14 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
             for (const secret of service.serviceSecret) {
                 let { name, value } = secret
                 name = name.toLowerCase()
-                const regexHashed = new RegExp(`\\$\\$hashed\\$\\$secret_${name}`, 'gi')
-                const regex = new RegExp(`\\$\\$secret_${name}`, 'gi')
+                const regexHashed = new RegExp(`\\$\\$hashed\\$\\$secret_${name}\"`, 'gi')
+                const regex = new RegExp(`\\$\\$secret_${name}\"`, 'gi')
                 if (value) {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, bcrypt.hashSync(value.replaceAll("\"", "\\\""), 10))
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value.replaceAll("\"", "\\\""))
+                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, bcrypt.hashSync(value.replaceAll("\"", "\\\""), 10) + '"')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value.replaceAll("\"", "\\\"") + '"')
                 } else {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, '')
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, '')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, '' + '"')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, '' + '"')
                 }
             }
         }
