@@ -1,12 +1,11 @@
-name: staging-release
+name: fluent-bit-release
 
 on:
   push:
     paths:
-      - '**'
-      - "!others/fluentbit"
-      - "!.github/workflows/fluent-bit-release.yml"
-    branches:
+      - "others/fluentbit"
+      - ".github/workflows/fluent-bit-release.yml"
+    branches:    
       - next
 
 jobs:
@@ -15,8 +14,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        with:
-          ref: "next"
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
@@ -26,25 +23,18 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Get current package version
-        uses: martinbeentjes/npm-get-version-action@v1.2.3
-        id: package-version
       - name: Build and push
         uses: docker/build-push-action@v2
         with:
-          context: .
+          context: others/fluentbit/
           platforms: linux/arm64
           push: true
-          tags: coollabsio/coolify:next-arm64
-          cache-from: type=registry,ref=coollabsio/coolify:buildcache-next-arm64
-          cache-to: type=registry,ref=coollabsio/coolify:buildcache-next-arm64,mode=max
+          tags: coollabsio/coolify-fluent-bit:1.0.0-arm64
   amd64:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        with:
-          ref: "next"
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
@@ -54,21 +44,37 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Get current package version
-        uses: martinbeentjes/npm-get-version-action@v1.2.3
-        id: package-version
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
-          context: .
+          context: others/fluentbit/
           platforms: linux/amd64
           push: true
-          tags: coollabsio/coolify:next-amd64
-          cache-from: type=registry,ref=coollabsio/coolify:buildcache-next-amd64
-          cache-to: type=registry,ref=coollabsio/coolify:buildcache-next-amd64,mode=max
+          tags: coollabsio/coolify-fluent-bit:1.0.0-amd64
+  aarch64:
+    runs-on: [self-hosted, arm64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: others/fluentbit/
+          platforms: linux/aarch64
+          push: true
+          tags: coollabsio/coolify-fluent-bit:1.0.0-aarch64
   merge-manifest:
     runs-on: ubuntu-latest
-    needs: [arm64, amd64]
+    needs: [amd64, arm64, aarch64]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -83,9 +89,5 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Create & publish manifest
         run: |
-          docker manifest create coollabsio/coolify:next --amend coollabsio/coolify:next-amd64 --amend coollabsio/coolify:next-arm64
-          docker manifest push coollabsio/coolify:next
-      - uses: sarisia/actions-status-discord@v1
-        if: always()
-        with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL }}
+          docker manifest create coollabsio/coolify-fluent-bit:1.0.0 --amend coollabsio/coolify-fluent-bit:1.0.0-amd64 --amend coollabsio/coolify-fluent-bit:1.0.0-arm64 --amend coollabsio/coolify-fluent-bit:1.0.0-aarch64
+          docker manifest push coollabsio/coolify-fluent-bit:1.0.0

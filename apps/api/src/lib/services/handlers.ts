@@ -103,9 +103,19 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
                     }
                 }
             }
-            let port = null
-            if (template.services[s].ports?.length > 0) {
-                port = template.services[s].ports[0]
+            let ports = []
+            if (template.services[s].proxy?.length > 0) {
+                for (const proxy of template.services[s].proxy) {
+                    if (proxy.hostPort) {
+                        ports.push(`${proxy.hostPort}:${proxy.port}`)
+                    }
+                }
+            } else {
+                if (template.services[s].ports?.length === 1) {
+                    for (const port of template.services[s].ports) {
+                        ports.push(`${exposePort}:${exposePort}`)
+                    }
+                }
             }
             let image = template.services[s].image
             if (arm && template.services[s].imageArm) {
@@ -118,7 +128,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
                 entrypoint: template.services[s]?.entrypoint,
                 image,
                 expose: template.services[s].ports,
-                ...(exposePort && port ? { ports: [`${exposePort}:${port}`] } : {}),
+                ports,
                 volumes: Array.from(volumes),
                 environment: newEnvironments,
                 depends_on: template.services[s]?.depends_on,
@@ -128,7 +138,6 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
                 labels: makeLabelForServices(type),
                 ...defaultComposeConfiguration(network),
             }
-
             // Generate files for builds
             if (template.services[s]?.files?.length > 0) {
                 if (!config[s].build) {
@@ -182,7 +191,6 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
                         `docker container ls -a --filter 'name=${id}-' --format {{.ID}}|xargs -r -n 1 docker container rm -f`
                 });
             } catch (error) { }
-
         }
         return {}
     } catch ({ status, message }) {

@@ -1,5 +1,73 @@
 - templateVersion: 1.0.0
-  defaultVersion: '20.0'
+  ignore: true
+  defaultVersion: "1.17"
+  documentation: https://docs.gitea.io
+  type: gitea
+  name: Gitea
+  description: Gitea is a community managed lightweight code hosting solution written in Go.
+  labels:
+    - storage
+    - git
+  services:
+    $$id:
+      name: Gitea
+      documentation: https://docs.gitea.io
+      image: gitea/gitea:$$core_version
+      volumes:
+        - $$id-data:/data
+        - /etc/timezone:/etc/timezone:ro
+        - /etc/localtime:/etc/localtime:ro
+      environment:
+        - USER_UID=1000
+        - USER_GID=1000
+        - DOMAIN=$$config_domain
+        - SSH_DOMAIN=$$config_ssh_domain
+        - ROOT_URL=$$config_root_url
+        - SECRET_KEY=$$secret_secret_key
+        - INTERNAL_TOKEN=$$secret_internal_token
+        - SSH_PORT=$$config_hostport_ssh
+      ports:
+        - "3000"
+        - "22"
+      proxy:
+        - port: "22"
+          hostPort: $$config_hostport_ssh
+  variables:
+    - id: $$config_hostport_ssh
+      name: SSH_PORT
+      label: SSH Port
+      defaultValue: "8022"
+      description: ""
+      required: true
+    - id: $$config_domain
+      name: DOMAIN
+      label: Domain
+      defaultValue: $$generate_domain
+      description: ""
+    - id: $$config_ssh_domain
+      name: SSH_DOMAIN
+      label: SSH Domain
+      defaultValue: $$generate_domain
+      description: ""
+    - id: $$config_root_url
+      name: ROOT_URL
+      label: Root URL of Gitea
+      defaultValue: $$generate_fqdn_slash
+      description: ""
+    - id: $$secret_secret_key
+      name: SECRET_KEY
+      label: Secret Key
+      defaultValue: $$generate_hex(32)
+      description: ""
+      showOnConfiguration: true
+    - id: $$secret_internal_token
+      name: INTERNAL_TOKEN
+      label: Internal JWT Token
+      defaultValue: $$generate_token
+      description: ""
+      showOnConfiguration: true
+- templateVersion: 1.0.0
+  defaultVersion: "20.0"
   documentation: https://www.keycloak.org/documentation
   type: keycloak
   name: Keycloak
@@ -12,7 +80,7 @@
   services:
     $$id:
       name: Keycloak
-      command: start --db=postgres
+      command: start --db=postgres --features=token-exchange --import-realm
       depends_on:
         - $$id-postgresql
       image: "quay.io/keycloak/keycloak:$$core_version"
@@ -29,7 +97,7 @@
         - KC_DB_USERNAME=$$config_postgres_user
         - KC_DB_URL=$$secret_keycloak_database_url
       ports:
-        - '8080'
+        - "8080"
     $$id-postgresql:
       name: PostgreSQL
       depends_on: []
@@ -138,7 +206,7 @@
     - id: $$config_port
       name: PORT
       label: Port
-      defaultValue: '2333'
+      defaultValue: "2333"
       required: true
     - id: $$secret_password
       name: PASSWORD

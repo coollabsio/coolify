@@ -182,7 +182,7 @@ const host = '0.0.0.0';
 
 		setInterval(async () => {
 			await migrateServicesToNewTemplate()
-		}, 60000)
+		}, isDev ? 1000 : 60000)
 
 		setInterval(async () => {
 			await copySSLCertificates();

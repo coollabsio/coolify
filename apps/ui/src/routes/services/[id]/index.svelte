@@ -38,6 +38,11 @@
 	import Wordpress from './_Services/wordpress.svelte';
 
 	const { id } = $page.params;
+	let hostPorts = Object.keys(template).filter((key) => {
+		if (template[key]?.hostPorts?.length > 0) {
+			return true;
+		}
+	});
 	$: isDisabled =
 		!$appSession.isAdmin ||
 		$status.service.overallStatus === 'degraded' ||
@@ -291,7 +296,7 @@
 						/>
 					</div>
 				{:else}
-					<input class="w-full border-red-500" disabled placeholder="Error getting tags...">
+					<input class="w-full border-red-500" disabled placeholder="Error getting tags..." />
 				{/if}
 			</div>
 
@@ -389,22 +394,24 @@
 					on:click={() => !$status.service.isRunning && changeSettings('dualCerts')}
 				/>
 			</div>
-			<div class="grid grid-cols-2 items-center">
-				<label for="exposePort"
-					>Exposed Port <Explainer
-						explanation={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
-					/></label
-				>
-				<input
-					class="w-full"
-					readonly={isDisabled}
-					disabled={isDisabled}
-					name="exposePort"
-					id="exposePort"
-					bind:value={service.exposePort}
-					placeholder="12345"
-				/>
-			</div>
+			{#if hostPorts.length === 0}
+				<div class="grid grid-cols-2 items-center">
+					<label for="exposePort"
+						>Exposed Port <Explainer
+							explanation={'You can expose your application to a port on the host system.<br><br>Useful if you would like to use your own reverse proxy or tunnel and also in development mode. Otherwise leave empty.'}
+						/></label
+					>
+					<input
+						class="w-full"
+						readonly={isDisabled}
+						disabled={isDisabled}
+						name="exposePort"
+						id="exposePort"
+						bind:value={service.exposePort}
+						placeholder="12345"
+					/>
+				</div>
+			{/if}
 		</div>
 		<div class="pt-6">
 			{#each Object.keys(template) as oneService}
@@ -441,6 +448,16 @@
 											name={variable.name}
 											id={variable.name}
 											value={service.fqdn}
+											placeholder={variable.placeholder}
+											required={variable?.required}
+										/>
+									{:else if variable.defaultValue === '$$generate_fqdn_slash'}
+										<CopyPasswordField
+											disabled
+											readonly
+											name={variable.name}
+											id={variable.name}
+											value={service.fqdn + '/' || ''}
 											placeholder={variable.placeholder}
 											required={variable?.required}
 										/>
