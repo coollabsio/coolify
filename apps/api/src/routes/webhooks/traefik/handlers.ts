@@ -395,7 +395,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 					}
 					found = JSON.parse(JSON.stringify(found).replaceAll('$$id', id));
 					for (const oneService of Object.keys(found.services)) {
-						const isDomainConfiguration = found.services[oneService].proxy && found.services[oneService].proxy.filter(p => p.domain);
+						const isDomainConfiguration = found?.services[oneService]?.proxy?.filter(p => p.domain) ?? [];
 						if (isDomainConfiguration.length > 0) {
 							const { proxy } = found.services[oneService];
 							for (let configuration of proxy) {
