@@ -113,7 +113,9 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
             } else {
                 if (template.services[s].ports?.length === 1) {
                     for (const port of template.services[s].ports) {
-                        ports.push(`${exposePort}:${exposePort}`)
+                        if (exposePort) {
+                            ports.push(`${exposePort}:${port}`)
+                        }
                     }
                 }
             }
@@ -128,7 +130,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
                 entrypoint: template.services[s]?.entrypoint,
                 image,
                 expose: template.services[s].ports,
-                ports,
+                ports: ports.length > 0 ? ports : undefined,
                 volumes: Array.from(volumes),
                 environment: newEnvironments,
                 depends_on: template.services[s]?.depends_on,
