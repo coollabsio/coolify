@@ -11,11 +11,11 @@
 	import LogoutIcon from './svg/menu/LogoutIcon.svelte';
 	import SourcesIcon from './svg/menu/SourcesIcon.svelte';
   import {logout} from '$lib/common';
-  
+
 </script>
 
 {#if $appSession.userId}
-  <nav class="hidden lg:flex flex-row " style="background: rgb(32 32 32 / var(--tw-bg-opacity)); border-bottom: thin solid #8884">
+  <nav class="hidden menu-bar lg:flex" style="background: rgb(32 32 32 / var(--tw-bg-opacity)); border-bottom: thin solid #8884">
     <!-- Logo vs Whitelabel -->
     {#if !$appSession.whiteLabeled}
       <div class="m-2 h-10 w-10">
@@ -28,7 +28,7 @@
     {/if}
 
     <!-- Left menu -->
-    <div class="flex flex-row" class:mt-2={$appSession.whiteLabeled}>
+    <div class="flex" class:mt-2={$appSession.whiteLabeled}>
       <a
         id="dashboard"
         sveltekit:prefetch
@@ -80,14 +80,14 @@
     <Tooltip triggeredBy="#servers" placement="right">Servers</Tooltip>
     <Tooltip triggeredBy="#databases" placement="right">Databases</Tooltip>
     <Tooltip triggeredBy="#sources" placement="right">Sources</Tooltip>
-    
+
     <div class="flex-1" />
     <div class="lg:block hidden">
       <UpdateAvailable />
     </div>
 
     <!-- Right menu -->
-    <div class="flex flex-row">
+    <div class="flex">
       <a
         id="iam"
         sveltekit:prefetch
