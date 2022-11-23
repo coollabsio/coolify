@@ -11,11 +11,19 @@
 	import LogoutIcon from './svg/menu/LogoutIcon.svelte';
 	import SourcesIcon from './svg/menu/SourcesIcon.svelte';
   import {logout} from '$lib/common';
+<<<<<<< HEAD
 
 </script>
 
 {#if $appSession.userId}
   <nav class="hidden menu-bar lg:flex" style="background: rgb(32 32 32 / var(--tw-bg-opacity)); border-bottom: thin solid #8884">
+=======
+  
+</script>
+
+{#if $appSession.userId}
+  <nav class="hidden lg:flex flex-row " style="background: rgb(32 32 32 / var(--tw-bg-opacity)); border-bottom: thin solid #8884">
+>>>>>>> afd4cbb8f982b70a1c7ab2e0f68538c080dc103f
     <!-- Logo vs Whitelabel -->
     {#if !$appSession.whiteLabeled}
       <div class="m-2 h-10 w-10">
@@ -28,7 +36,11 @@
     {/if}
 
     <!-- Left menu -->
+<<<<<<< HEAD
     <div class="flex" class:mt-2={$appSession.whiteLabeled}>
+=======
+    <div class="flex flex-row" class:mt-2={$appSession.whiteLabeled}>
+>>>>>>> afd4cbb8f982b70a1c7ab2e0f68538c080dc103f
       <a
         id="dashboard"
         sveltekit:prefetch
@@ -80,14 +92,22 @@
     <Tooltip triggeredBy="#servers" placement="right">Servers</Tooltip>
     <Tooltip triggeredBy="#databases" placement="right">Databases</Tooltip>
     <Tooltip triggeredBy="#sources" placement="right">Sources</Tooltip>
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> afd4cbb8f982b70a1c7ab2e0f68538c080dc103f
     <div class="flex-1" />
     <div class="lg:block hidden">
       <UpdateAvailable />
     </div>
 
     <!-- Right menu -->
+<<<<<<< HEAD
     <div class="flex">
+=======
+    <div class="flex flex-row">
+>>>>>>> afd4cbb8f982b70a1c7ab2e0f68538c080dc103f
       <a
         id="iam"
         sveltekit:prefetch
@@ -138,4 +158,8 @@
       >Powered by <a href="https://coolify.io" target="_blank noreferrer">Coolify</a></span
     >
   {/if}
+<<<<<<< HEAD
 {/if}
+=======
+{/if}
+>>>>>>> afd4cbb8f982b70a1c7ab2e0f68538c080dc103f
