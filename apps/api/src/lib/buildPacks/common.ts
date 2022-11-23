@@ -480,6 +480,7 @@ export const saveBuildLog = async ({
 			}
 		})
 	} catch (error) {
+		console.log(error)
 		return await prisma.buildLog.create({
 			data: {
 				line: addTimestamp, buildId, time: Number(day().valueOf()), applicationId
