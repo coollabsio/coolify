@@ -250,7 +250,7 @@ async function hasura(service: any, template: any) {
     const { id } = service
 
     const secrets = [
-        `HASURA_GRAPHQL_ADMIN_PASSWORD@@@${graphQLAdminPassword}`,
+        `HASURA_GRAPHQL_ADMIN_SECRET@@@${graphQLAdminPassword}`,
         `HASURA_GRAPHQL_METADATA_DATABASE_URL@@@${encrypt(`postgres://${postgresqlUser}:${decrypt(postgresqlPassword)}@${id}-postgresql:5432/${postgresqlDatabase}`)}`,
         `POSTGRES_PASSWORD@@@${postgresqlPassword}`,
     ]

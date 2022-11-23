@@ -1824,7 +1824,7 @@
         - HASURA_GRAPHQL_ENABLE_CONSOLE=$$config_hasura_graphql_enable_console
         - >-
           HASURA_GRAPHQL_METADATA_DATABASE_URL=$$secret_hasura_graphql_metadata_database_url
-        - HASURA_GRAPHQL_ADMIN_PASSWORD=$$secret_hasura_graphql_admin_password
+        - HASURA_GRAPHQL_ADMIN_SECRET=$$secret_hasura_graphql_admin_secret
       ports:
         - "8080"
     $$id-postgresql:
@@ -1850,8 +1850,8 @@
       defaultValue: >-
         postgresql://$$config_postgres_user:$$secret_postgres_password@$$id-postgresql:5432/$$config_postgres_db
       description: ""
-    - id: $$secret_hasura_graphql_admin_password
-      name: HASURA_GRAPHQL_ADMIN_PASSWORD
+    - id: $$secret_hasura_graphql_admin_secret
+      name: HASURA_GRAPHQL_ADMIN_SECRET
       label: Hasura Admin Password
       defaultValue: $$generate_password
       description: ""
