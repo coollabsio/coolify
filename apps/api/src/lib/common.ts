@@ -17,7 +17,7 @@ import { day } from './dayjs';
 import { saveBuildLog } from './buildPacks/common';
 import { scheduler } from './scheduler';
 
-export const version = '3.11.12';
+export const version = '3.11.13';
 export const isDev = process.env.NODE_ENV === 'development';
 
 const algorithm = 'aes-256-ctr';
@@ -28,9 +28,6 @@ const customConfig: Config = {
 	length: 3
 };
 
-export const defaultProxyImage = `coolify-haproxy-alpine:latest`;
-export const defaultProxyImageTcp = `coolify-haproxy-tcp-alpine:latest`;
-export const defaultProxyImageHttp = `coolify-haproxy-http-alpine:latest`;
 export const defaultTraefikImage = `traefik:v2.8`;
 export function getAPIUrl() {
 	if (process.env.GITPOD_WORKSPACE_URL) {

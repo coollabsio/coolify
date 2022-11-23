@@ -1,5 +1,4 @@
 - templateVersion: 1.0.0
-  ignore: true
   defaultVersion: "1.17"
   documentation: https://docs.gitea.io
   type: gitea
@@ -25,7 +24,8 @@
         - ROOT_URL=$$config_root_url
         - SECRET_KEY=$$secret_secret_key
         - INTERNAL_TOKEN=$$secret_internal_token
-        - SSH_PORT=$$config_hostport_ssh
+        - SSH_PORT=22
+        - START_SSH_SERVER=$$config_start_ssh_server
       ports:
         - "3000"
         - "22"
@@ -49,6 +49,11 @@
       label: SSH Domain
       defaultValue: $$generate_domain
       description: ""
+    - id: $$config_start_ssh_server
+      name: START_SSH_SERVER
+      label: Start SSH Server
+      defaultValue: "true"
+      description: ""
     - id: $$config_root_url
       name: ROOT_URL
       label: Root URL of Gitea
@@ -59,13 +64,11 @@
       label: Secret Key
       defaultValue: $$generate_hex(32)
       description: ""
-      showOnConfiguration: true
     - id: $$secret_internal_token
       name: INTERNAL_TOKEN
       label: Internal JWT Token
       defaultValue: $$generate_token
       description: ""
-      showOnConfiguration: true
 - templateVersion: 1.0.0
   defaultVersion: "20.0"
   documentation: https://www.keycloak.org/documentation
@@ -1821,7 +1824,7 @@
         - HASURA_GRAPHQL_ENABLE_CONSOLE=$$config_hasura_graphql_enable_console
         - >-
           HASURA_GRAPHQL_METADATA_DATABASE_URL=$$secret_hasura_graphql_metadata_database_url
-        - HASURA_GRAPHQL_ADMIN_PASSWORD=$$secret_hasura_graphql_admin_password
+        - HASURA_GRAPHQL_ADMIN_SECRET=$$secret_hasura_graphql_admin_secret
       ports:
         - "8080"
     $$id-postgresql:
@@ -1847,8 +1850,8 @@
       defaultValue: >-
         postgresql://$$config_postgres_user:$$secret_postgres_password@$$id-postgresql:5432/$$config_postgres_db
       description: ""
-    - id: $$secret_hasura_graphql_admin_password
-      name: HASURA_GRAPHQL_ADMIN_PASSWORD
+    - id: $$secret_hasura_graphql_admin_secret
+      name: HASURA_GRAPHQL_ADMIN_SECRET
       label: Hasura Admin Password
       defaultValue: $$generate_password
       description: ""

@@ -61,12 +61,27 @@
 			fromDb = from;
 
 			streamInterval = setInterval(async () => {
+				const nextSequence = logs[logs.length - 1]?.time || 0;
 				if (status !== 'running' && status !== 'queued') {
 					loading = false;
+					try {
+						const data = await get(
+							`/applications/${id}/logs/build/${$selectedBuildId}?sequence=${nextSequence}`
+						);
+						status = data.status;
+						currentStatus = status;
+						fromDb = data.fromDb;
+
+						logs = logs.concat(
+							data.logs.map((log: any) => ({ ...log, line: cleanAnsiCodes(log.line) }))
+						);
+						loading = false;
+					} catch (error) {
+						return errorNotification(error);
+					}
 					clearInterval(streamInterval);
 					return;
 				}
-				const nextSequence = logs[logs.length - 1]?.time || 0;
 				try {
 					const data = await get(
 						`/applications/${id}/logs/build/${$selectedBuildId}?sequence=${nextSequence}`

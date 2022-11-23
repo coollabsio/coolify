@@ -462,7 +462,13 @@ export const saveBuildLog = async ({
 	applicationId: string;
 }): Promise<any> => {
 	const { default: got } = await import('got')
-
+	if (typeof line === 'object' && line) {
+		if (line.shortMessage) {
+			line = line.shortMessage + '\n' + line.stderr; 
+		} else {
+			line = JSON.stringify(line);
+		}
+	}
 	if (line && typeof line === 'string' && line.includes('ghs_')) {
 		const regex = /ghs_.*@/g;
 		line = line.replace(regex, '<SENSITIVE_DATA_DELETED>@');
@@ -589,15 +595,15 @@ export async function buildImage({
 	}
 	if (!debug) {
 		await saveBuildLog({
-			line: `Debug turned off. To see more details, allow it in the features tab.`,
+			line: `Debug logging is disabled. Enable it above if necessary!`,
 			buildId,
 			applicationId
 		});
 	}
 	const dockerFile = isCache ? `${dockerFileLocation}-cache` : `${dockerFileLocation}`
 	const cache = `${applicationId}:${tag}${isCache ? '-cache' : ''}`
-	
-	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })	
+
+	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })
 
 	const { status } = await prisma.build.findUnique({ where: { id: buildId } })
 	if (status === 'canceled') {

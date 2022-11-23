@@ -37,9 +37,9 @@
 					let [volume, target] = volumeName.split(':');
 					if (!target) {
 						target = volume;
-						volume = `${application.id}${volume.replace(/\//gi, '-')}`;
+						volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;
 					} else {
-						volume = `${application.id}-${volume}`;
+						volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;
 					}
 					predefinedVolumes.push({ id: volume, path: target, predefined: true });
 				}
