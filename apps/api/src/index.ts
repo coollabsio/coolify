@@ -26,7 +26,6 @@ declare module 'fastify' {
 			COOLIFY_APP_ID: string,
 			COOLIFY_SECRET_KEY: string,
 			COOLIFY_DATABASE_URL: string,
-			COOLIFY_SENTRY_DSN: string,
 			COOLIFY_IS_ON: string,
 			COOLIFY_WHITE_LABELED: string,
 			COOLIFY_WHITE_LABELED_ICON: string | null,
@@ -57,10 +56,6 @@ const host = '0.0.0.0';
 			COOLIFY_DATABASE_URL: {
 				type: 'string',
 				default: 'file:../db/dev.db'
-			},
-			COOLIFY_SENTRY_DSN: {
-				type: 'string',
-				default: null
 			},
 			COOLIFY_IS_ON: {
 				type: 'string',
