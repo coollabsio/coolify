@@ -48,3 +48,11 @@ export interface OnlyIdInBody {
         id: string
      }
 }
+
+export interface SetDefaultRegistry {
+    Body: {
+        id: string
+        username: string
+        password: string
+    }
+}

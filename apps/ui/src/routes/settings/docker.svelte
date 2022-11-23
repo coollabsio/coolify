@@ -20,16 +20,17 @@
 	export let registries: any;
 	import { del, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
+	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	const publicRegistries = registries.public;
 	const privateRegistries = registries.private;
 
 	let isModalActive = false;
 
 	let newRegistry = {
-		name: null,
-		username: null,
-		password: null,
-		url: null,
+		name: '',
+		username: '',
+		password: '',
+		url: '',
 		isSystemWide: false
 	};
 
@@ -42,6 +43,11 @@
 			errorNotification(error);
 			return false;
 		}
+	}
+	async function setRegistry(registry: any) {
+		try {
+			await post(`/settings/registry`, registry);
+		} catch (error) {}
 	}
 	async function deleteSSHKey(id: string) {
 		const sure = confirm('Are you sure you would like to delete this SSH key?');
@@ -83,6 +89,39 @@
 					<tr>
 						<td>{registry.name}</td>
 						<td>{(registry.isSystemWide && 'Yes') || 'No'}</td>
+						<td>
+							<CopyPasswordField
+								name="username"
+								id="Username"
+								bind:value={registry.username}
+								placeholder="Username"
+							/></td
+						>
+						<td
+							><CopyPasswordField
+								isPasswordField={true}
+								name="Password"
+								id="Password"
+								bind:value={registry.password}
+								placeholder="Password"
+							/></td
+						>
+						<td>
+							<button on:click={() => setRegistry(registry)} class="btn btn-sm btn-primary"
+								>Set</button
+							>
+							{#if !registry.isSystemWide}
+								<button on:click={() => deleteSSHKey(registry.id)} class="btn btn-sm btn-error"
+									>Delete</button
+								>
+							{/if}
+						</td>
+					</tr>
+				{/each}
+				{#each privateRegistries as registry}
+					<tr>
+						<td>{registry.name}</td>
+						<td>{(registry.isSystemWide && 'Yes') || 'No'}</td>
 						<td>{registry.username ?? 'N/A'}</td>
 						<td>{registry.password ?? 'N/A'}</td>
 
@@ -95,22 +134,6 @@
 						</td>
 					</tr>
 				{/each}
-				{#each privateRegistries as registry}
-				<tr>
-					<td>{registry.name}</td>
-					<td>{(registry.isSystemWide && 'Yes') || 'No'}</td>
-					<td>{registry.username ?? 'N/A'}</td>
-					<td>{registry.password ?? 'N/A'}</td>
-
-					<td>
-						{#if !registry.isSystemWide}
-							<button on:click={() => deleteSSHKey(registry.id)} class="btn btn-sm btn-error"
-								>Delete</button
-							>
-						{/if}
-					</td>
-				</tr>
-			{/each}
 			</tbody>
 		</table>
 	</div>
@@ -121,49 +144,46 @@
 	<div class="modal modal-bottom sm:modal-middle">
 		<div class="modal-box rounded bg-coolgray-300">
 			<h3 class="font-bold text-lg">Add a Docker Registry to Coolify</h3>
-			<div >
+			<div>
 				<form on:submit|preventDefault={handleSubmit}>
 					<label for="name" class="label">
 						<span class="label-text">Name</span>
 					</label>
-					<input
+					<CopyPasswordField
 						id="name"
-						type="text"
+						name="name"
 						bind:value={newRegistry.name}
 						placeholder="Docker Registry Name"
-						class="input input-primary w-full bg-coolgray-100"
 						required
 					/>
 					<label for="url" class="label">
 						<span class="label-text">URL</span>
 					</label>
-					<input
+					<CopyPasswordField
 						id="url"
-						type="text"
+						name="url"
 						bind:value={newRegistry.url}
 						placeholder="Docker Registry URL"
-						class="input input-primary w-full bg-coolgray-100"
 						required
 					/>
 					<label for="Username" class="label">
 						<span class="label-text">Username</span>
 					</label>
-					<input
+					<CopyPasswordField
 						id="Username"
-						type="text"
+						name="username"
 						bind:value={newRegistry.username}
 						placeholder="Username"
-						class="input input-primary w-full bg-coolgray-100"
 					/>
 					<label for="Password" class="label">
 						<span class="label-text">Password</span>
 					</label>
-					<input
+					<CopyPasswordField
+						isPasswordField={true}
 						id="Password"
-						type="text"
+						name="password"
 						bind:value={newRegistry.password}
 						placeholder="Password"
-						class="input input-primary w-full  bg-coolgray-100"
 					/>
 					<div class="flex items-center">
 						<label for="systemwide" class="label">
