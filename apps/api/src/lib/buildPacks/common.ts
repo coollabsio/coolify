@@ -464,7 +464,7 @@ export const saveBuildLog = async ({
 	const { default: got } = await import('got')
 	if (typeof line === 'object' && line) {
 		if (line.shortMessage) {
-			line = line.shortMessage;
+			line = line.shortMessage + '\n' + line.stderr; 
 		} else {
 			line = JSON.stringify(line);
 		}
