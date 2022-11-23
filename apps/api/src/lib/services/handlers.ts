@@ -7,6 +7,7 @@ import { parseAndFindServiceTemplates } from '../../routes/api/v1/services/handl
 
 import { ServiceStartStop } from '../../routes/api/v1/services/types';
 import { OnlyId } from '../../types';
+import { verifyAndDecryptServiceSecrets } from './common';
 
 export async function stopService(request: FastifyRequest<ServiceStartStop>) {
     try {
@@ -65,15 +66,17 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
                     }
                 }
             }
-
-            const secrets = await prisma.serviceSecret.findMany({ where: { serviceId: id } })
+            const secrets = await verifyAndDecryptServiceSecrets(id)
             for (const secret of secrets) {
                 const { name, value } = secret
                 if (value) {
                     const foundEnv = !!template.services[s].environment?.find(env => env.startsWith(`${name}=`))
                     const foundNewEnv = !!newEnvironments?.find(env => env.startsWith(`${name}=`))
                     if (foundEnv && !foundNewEnv) {
-                        newEnvironments.push(`${name}=${decrypt(value)}`)
+                        newEnvironments.push(`${name}=${value}`)
+                    }
+                    if (!foundEnv && !foundNewEnv && s === id) {
+                        newEnvironments.push(`${name}=${value}`)
                     }
                 }
             }

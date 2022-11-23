@@ -28,9 +28,6 @@ const customConfig: Config = {
 	length: 3
 };
 
-export const defaultProxyImage = `coolify-haproxy-alpine:latest`;
-export const defaultProxyImageTcp = `coolify-haproxy-tcp-alpine:latest`;
-export const defaultProxyImageHttp = `coolify-haproxy-http-alpine:latest`;
 export const defaultTraefikImage = `traefik:v2.8`;
 export function getAPIUrl() {
 	if (process.env.GITPOD_WORKSPACE_URL) {

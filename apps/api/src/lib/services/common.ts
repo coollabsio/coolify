@@ -1,5 +1,5 @@
 
-import { prisma } from '../common';
+import { decrypt, prisma } from '../common';
 
 export async function removeService({ id }: { id: string }): Promise<void> {
 	await prisma.serviceSecret.deleteMany({ where: { serviceId: id } });
@@ -22,4 +22,18 @@ export async function removeService({ id }: { id: string }): Promise<void> {
 	await prisma.taiga.deleteMany({ where: { serviceId: id } });
 
 	await prisma.service.delete({ where: { id } });
+}
+export async function verifyAndDecryptServiceSecrets(id: string) {
+	const secrets = await prisma.serviceSecret.findMany({ where: { serviceId: id } })
+	let decryptedSecrets = secrets.map(secret => {
+		const { name, value } = secret
+		if (value) {
+			let rawValue = decrypt(value)
+			rawValue = rawValue.replaceAll(/\$/gi, '$$$')
+			return { name, value: rawValue }
+		}
+		return { name, value }
+
+	})
+	return decryptedSecrets
 }
