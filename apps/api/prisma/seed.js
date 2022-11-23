@@ -1,18 +1,8 @@
 const dotEnvExtended = require('dotenv-extended');
 dotEnvExtended.load();
 const crypto = require('crypto');
-const generator = require('generate-password');
-const cuid = require('cuid');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-
-function generatePassword(length = 24) {
-	return generator.generate({
-		length,
-		numbers: true,
-		strict: true
-	});
-}
 const algorithm = 'aes-256-ctr';
 
 async function main() {
@@ -22,8 +12,6 @@ async function main() {
 		await prisma.setting.create({
 			data: {
 				isRegistrationEnabled: true,
-				proxyPassword: encrypt(generatePassword()),
-				proxyUser: cuid(),
 				arch: process.arch,
 				DNSServers: '1.1.1.1,8.8.8.8'
 			}

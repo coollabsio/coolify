@@ -714,9 +714,7 @@ export async function stopTraefikProxy(
 }
 
 export async function listSettings(): Promise<any> {
-	const settings = await prisma.setting.findFirst({});
-	if (settings.proxyPassword) settings.proxyPassword = decrypt(settings.proxyPassword);
-	return settings;
+	return await prisma.setting.findFirst({});
 }
 
 export function generateToken() {

@@ -21,26 +21,23 @@ model Certificate {
 model Setting {
   id                                      String   @id @default(cuid())
   fqdn                                    String?  @unique
-  isAPIDebuggingEnabled                   Boolean? @default(false)
-  isRegistrationEnabled                   Boolean  @default(false)
   dualCerts                               Boolean  @default(false)
   minPort                                 Int      @default(9000)
   maxPort                                 Int      @default(9100)
-  proxyPassword                           String
-  proxyUser                               String
-  proxyHash                               String?
-  proxyDefaultRedirect                    String?
-  isAutoUpdateEnabled                     Boolean  @default(false)
-  isDNSCheckEnabled                       Boolean  @default(true)
   DNSServers                              String?
-  isTraefikUsed                           Boolean  @default(true)
-  createdAt                               DateTime @default(now())
-  updatedAt                               DateTime @updatedAt
   ipv4                                    String?
   ipv6                                    String?
   arch                                    String?
   concurrentBuilds                        Int      @default(1)
   applicationStoragePathMigrationFinished Boolean  @default(false)
+  proxyDefaultRedirect                    String?
+  isAPIDebuggingEnabled                   Boolean? @default(false)
+  isRegistrationEnabled                   Boolean  @default(false)
+  isAutoUpdateEnabled                     Boolean  @default(false)
+  isDNSCheckEnabled                       Boolean  @default(true)
+  isTraefikUsed                           Boolean  @default(true)
+  createdAt                               DateTime @default(now())
+  updatedAt                               DateTime @updatedAt
 }
 
 model User {
