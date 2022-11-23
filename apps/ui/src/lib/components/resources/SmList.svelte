@@ -1,5 +1,6 @@
 <script>
 	import SmCard from "../cards/SmCard.svelte";
+  import {slide} from "svelte/transition";
   export let things;
   export let url;
   export let kind;
@@ -10,5 +11,9 @@
   }
 </script>
 {#each things as thing}
-  <SmCard {thing} url={chooseUrl(thing, url)} {kind}/>
+  {#if thing.visible}
+    <div transition:slide|local>
+      <SmCard {thing} url={chooseUrl(thing, url)} {kind}/>
+    </div>
+  {/if}
 {/each}

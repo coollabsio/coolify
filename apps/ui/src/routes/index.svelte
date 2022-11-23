@@ -14,7 +14,7 @@
 	export let foundUnconfiguredApplication:any;
 	export let foundUnconfiguredService:any;
 
-	import { t } from '$lib/translations';	
+	import { t } from '$lib/translations';
 	import { appSession } from '$lib/store';
 
 	import AppsBlank from '$lib/screens/AppsBlank.svelte'
@@ -24,18 +24,43 @@
 
 	import RightSidebar from '$lib/components/RightSidebar.svelte';
 	import SmList from '$lib/components/resources/SmList.svelte';
+	import SearchBar from '$lib/components/SearchBar.svelte';
+	import { beforeUpdate } from 'svelte';
 
-	let sorted = (items) => items.sort( (a,b) => a.name.localeCompare(b.name) )
-	$: appsAndServices = applications.concat(services)
-	$: canCreate = $appSession.isAdmin && (applications.length !== 0 || 
-		destinations.length !== 0 || databases.length !== 0 || 
-		services.length !== 0 || gitSources.length !== 0 || 
+
+	$: appsAndServices = applications.concat(services);
+	$: canCreate = $appSession.isAdmin && (applications.length !== 0 ||
+		destinations.length !== 0 || databases.length !== 0 ||
+		services.length !== 0 || gitSources.length !== 0 ||
 		destinations.length !== 0)
+
+	// Filtering
+	let filter = '';
+	let filtered = {};
+	let setVisible = (el:any) => {
+		let txt = el.title ? el.title : el.name;
+		el.visible = `${txt}`.toLowerCase().indexOf(filter.toLowerCase()) !== -1
+		return el
+	}
+	let sorted = (items:any) => {
+		let list = items.map(setVisible);
+		return list.sort( (a:any,b:any) => a.name.localeCompare(b.name) )
+	}
+	beforeUpdate( () =>{
+		filtered ={
+			apps: sorted(appsAndServices),
+			dbs: sorted(databases),
+			gits: sorted(gitSources),
+			destinations: sorted(destinations)
+		}
+	})
+
 </script>
 
 <ContextMenu>
 	<h1 class="mr-4 text-2xl font-bold">{$t('index.dashboard')}</h1>
 	<div slot="actions">
+		<SearchBar bind:filter={filter} placeholder="Search Apps"/>
 		{#if canCreate}
 			<NewResource />
 		{/if}
@@ -48,7 +73,7 @@
 	<div slot="content">
 		<div class="subtitle mb-4">Apps & Services</div>
 		{#if appsAndServices.length > 0}
-			<SmList kind="app" url='' things={sorted(appsAndServices)} />
+			<SmList kind="app" url='' things={filtered.apps}/>
 		{:else}
 			<AppsBlank>
 				<NewResource><button class="btn btn-primary">Let's Get Started</button></NewResource>
@@ -57,11 +82,11 @@
 	</div>
 	<div slot="sidebar">
 		<div class="label">Databases</div>
-		<SmList kind="database" url="/databases/" things={sorted(databases)} />
+		<SmList kind="database" url="/databases/" things={filtered.dbs}/>
 		<br/>
 		<div class="label">Git Sources</div>
-		<SmList kind="source" url="/sources/" things={sorted(gitSources)} />
+		<SmList kind="source" url="/sources/" things={filtered.gits}/>
 		<div class="label">Servers / Destinations</div>
-		<SmList kind="server" url="/destinations/" things={sorted(destinations)} />
+		<SmList kind="server" url="/destinations/" things={filtered.destinations}/>
 	</div>
 </RightSidebar>
