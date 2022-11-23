@@ -589,7 +589,7 @@ export async function buildImage({
 	}
 	if (!debug) {
 		await saveBuildLog({
-			line: `Debug turned off. To see more details, allow it in the features tab.`,
+			line: `Debug logging is disabled. Enable it above if necessary!`,
 			buildId,
 			applicationId
 		});

@@ -44,7 +44,6 @@
 
 	const { id } = $page.params;
 
-	let debug = application.settings.debug;
 	let previews = application.settings.previews;
 	let dualCerts = application.settings.dualCerts;
 	let autodeploy = application.settings.autodeploy;
@@ -52,9 +51,6 @@
 	let isDBBranching = application.settings.isDBBranching;
 
 	async function changeSettings(name: any) {
-		if (name === 'debug') {
-			debug = !debug;
-		}
 		if (name === 'previews') {
 			previews = !previews;
 		}
@@ -77,7 +73,6 @@
 		try {
 			await post(`/applications/${id}/settings`, {
 				previews,
-				debug,
 				dualCerts,
 				isBot,
 				autodeploy,
@@ -90,9 +85,6 @@
 				type: 'success'
 			});
 		} catch (error) {
-			if (name === 'debug') {
-				debug = !debug;
-			}
 			if (name === 'previews') {
 				previews = !previews;
 			}
@@ -132,8 +124,7 @@
 						description={$t('application.enable_auto_deploy_webhooks')}
 					/>
 				</div>
-			{/if}
-			{#if !application.settings.isBot && !application.settings.isPublicRepository}
+				{#if !application.settings.isBot}
 				<div class="grid grid-cols-2 items-center">
 					<Setting
 						id="previews"
@@ -144,17 +135,10 @@
 						description={$t('application.enable_preview_deploy_mr_pr_requests')}
 					/>
 				</div>
+				{/if}
+				{:else} 
+				No features available for this application
 			{/if}
-			<div class="grid grid-cols-2 items-center w-full">
-				<Setting
-					id="debug"
-					isCenter={false}
-					bind:setting={debug}
-					on:click={() => changeSettings('debug')}
-					title={$t('application.debug_logs')}
-					description={$t('application.enable_debug_log_during_build')}
-				/>
-			</div>
 		</div>
 	</div>
 </div>

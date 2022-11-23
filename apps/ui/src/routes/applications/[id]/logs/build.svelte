@@ -32,7 +32,7 @@
 	import { day } from '$lib/dayjs';
 	import { onDestroy, onMount } from 'svelte';
 	const { id } = $page.params;
-
+	let debug = application.settings.debug;
 	let loadBuildLogsInterval: any = null;
 
 	let skip = 0;
@@ -104,42 +104,74 @@
 			return 'text-white';
 		}
 	}
+	async function changeSettings(name: any) {
+		if (name === 'debug') {
+			debug = !debug;
+		}
+		try {
+			await post(`/applications/${id}/settings`, {
+				debug,
+				branch: application.branch,
+				projectId: application.projectId
+			});
+			return addToast({
+				message: $t('application.settings_saved'),
+				type: 'success'
+			});
+		} catch (error) {
+			if (name === 'debug') {
+				debug = !debug;
+			}
+
+			return errorNotification(error);
+		}
+	}
 </script>
 
-<div class="mx-auto w-full">
-	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
+<div class="mx-auto w-full lg:px-0 px-1">
+	<div class="flex lg:flex-row flex-col border-b border-coolgray-500 mb-6 space-x-2">
 		<div class="flex flex-row">
 			<div class="title font-bold pb-3 pr-3">Build Logs</div>
 			<button class="btn btn-sm bg-error" on:click={resetQueue}>Reset Build Queue</button>
 		</div>
+		<div class=" flex-1" />
+		<div class="form-control">
+			<label class="label cursor-pointer">
+				<span class="label-text text-white pr-4 font-bold">Enable Debug Logs</span>
+				<input
+					type="checkbox"
+					checked={debug}
+					class="checkbox checkbox-success"
+					on:click={() => changeSettings('debug')}
+				/>
+			</label>
+		</div>
 	</div>
 </div>
-<div class="block flex-col justify-start space-x-5 flex flex-col-reverse lg:flex-row">
+<div class="justify-start space-x-5 flex flex-col-reverse lg:flex-row">
 	<div class="flex-1 md:w-96">
 		{#if $selectedBuildId}
 			{#key $selectedBuildId}
 				<svelte:component this={BuildLog} />
 			{/key}
+		{:else if buildCount === 0}
+			Not build logs found.
 		{:else}
-		{#if buildCount === 0}
-		 Not build logs found.
-			{:else}
 			Select a build to see the logs.
-
-			{/if}
 		{/if}
 	</div>
 	<div class="mb-4 min-w-[16rem] space-y-2 md:mb-0 ">
 		<div class="top-4 md:sticky">
-					<div class="flex space-x-2 pb-2">
-						<button
-							disabled={noMoreBuilds}
-							class:btn-primary={!noMoreBuilds}
-							class=" btn btn-sm w-full"
-							on:click={loadMoreBuilds}>{$t('application.build.load_more')}</button
-						>
-					</div>
+			<div class="flex space-x-2 pb-2">
+				<button
+					disabled={noMoreBuilds}
+					class:btn-primary={!noMoreBuilds}
+					class=" btn btn-sm w-full"
+					on:click={loadMoreBuilds}>{$t('application.build.load_more')}</button
+				>
+			</div>
 			{#each builds as build, index (build.id)}
+				<!-- svelte-ignore a11y-click-events-have-key-events -->
 				<div
 					id={`building-${build.id}`}
 					on:click={() => loadBuild(build.id)}
