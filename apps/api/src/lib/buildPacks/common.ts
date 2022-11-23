@@ -470,9 +470,9 @@ export const saveBuildLog = async ({
 	const addTimestamp = `[${generateTimestamp()}] ${line}`;
 	const fluentBitUrl = isDev ? process.env.COOLIFY_CONTAINER_DEV === 'true' ? 'http://coolify-fluentbit:24224' : 'http://localhost:24224' : 'http://coolify-fluentbit:24224';
 
-	if (isDev && !process.env.COOLIFY_CONTAINER_DEV) {
+	// if (isDev && !process.env.COOLIFY_CONTAINER_DEV) {
 		console.debug(`[${applicationId}] ${addTimestamp}`);
-	}
+	// }
 	try {
 		return await got.post(`${fluentBitUrl}/${applicationId}_buildlog_${buildId}.csv`, {
 			json: {

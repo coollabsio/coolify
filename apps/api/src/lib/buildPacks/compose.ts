@@ -86,9 +86,11 @@ export default async function (data) {
                 let [v, path, permission] = volume.split(':');
                 if (!path) {
                     path = v;
-                    v = `${applicationId}${v.replace(/\//gi, '-')}`
+                    // v = `${applicationId}${v.replace(/\//gi, '-').replace(/\./gi, '')}`
+                    v = `${applicationId}${v}`
                 } else {
-                    v = `${applicationId}-${v}`
+                    // v = `${applicationId}${v.replace(/\//gi, '-').replace(/\./gi, '')}`
+                    v = `${applicationId}${v}`
                 }
                 composeVolumes[v] = {
                     name: v
