@@ -125,18 +125,18 @@
 					/>
 				</div>
 				{#if !application.settings.isBot}
-				<div class="grid grid-cols-2 items-center">
-					<Setting
-						id="previews"
-						isCenter={false}
-						bind:setting={previews}
-						on:click={() => changeSettings('previews')}
-						title={$t('application.enable_mr_pr_previews')}
-						description={$t('application.enable_preview_deploy_mr_pr_requests')}
-					/>
-				</div>
+					<div class="grid grid-cols-2 items-center">
+						<Setting
+							id="previews"
+							isCenter={false}
+							bind:setting={previews}
+							on:click={() => changeSettings('previews')}
+							title={$t('application.enable_mr_pr_previews')}
+							description={$t('application.enable_preview_deploy_mr_pr_requests')}
+						/>
+					</div>
 				{/if}
-				{:else} 
+			{:else}
 				No features available for this application
 			{/if}
 		</div>
