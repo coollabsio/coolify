@@ -462,7 +462,13 @@ export const saveBuildLog = async ({
 	applicationId: string;
 }): Promise<any> => {
 	const { default: got } = await import('got')
-
+	if (typeof line === 'object' && line) {
+		if (line.shortMessage) {
+			line = line.shortMessage;
+		} else {
+			line = JSON.stringify(line);
+		}
+	}
 	if (line && typeof line === 'string' && line.includes('ghs_')) {
 		const regex = /ghs_.*@/g;
 		line = line.replace(regex, '<SENSITIVE_DATA_DELETED>@');
@@ -470,9 +476,9 @@ export const saveBuildLog = async ({
 	const addTimestamp = `[${generateTimestamp()}] ${line}`;
 	const fluentBitUrl = isDev ? process.env.COOLIFY_CONTAINER_DEV === 'true' ? 'http://coolify-fluentbit:24224' : 'http://localhost:24224' : 'http://coolify-fluentbit:24224';
 
-	// if (isDev && !process.env.COOLIFY_CONTAINER_DEV) {
+	if (isDev && !process.env.COOLIFY_CONTAINER_DEV) {
 		console.debug(`[${applicationId}] ${addTimestamp}`);
-	// }
+	}
 	try {
 		return await got.post(`${fluentBitUrl}/${applicationId}_buildlog_${buildId}.csv`, {
 			json: {
@@ -480,7 +486,6 @@ export const saveBuildLog = async ({
 			}
 		})
 	} catch (error) {
-		console.log(error)
 		return await prisma.buildLog.create({
 			data: {
 				line: addTimestamp, buildId, time: Number(day().valueOf()), applicationId
@@ -597,8 +602,8 @@ export async function buildImage({
 	}
 	const dockerFile = isCache ? `${dockerFileLocation}-cache` : `${dockerFileLocation}`
 	const cache = `${applicationId}:${tag}${isCache ? '-cache' : ''}`
-	
-	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })	
+
+	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })
 
 	const { status } = await prisma.build.findUnique({ where: { id: buildId } })
 	if (status === 'canceled') {
