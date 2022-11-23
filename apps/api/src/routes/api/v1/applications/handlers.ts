@@ -241,7 +241,8 @@ export async function getApplicationFromDB(id: string, teamId: string) {
                 secrets: true,
                 persistentStorage: true,
                 connectedDatabase: true,
-                previewApplication: true
+                previewApplication: true,
+                dockerRegistry: true
             }
         });
         if (!application) {

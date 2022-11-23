@@ -23,7 +23,6 @@ async function main() {
 			},
 			data: {
 				isTraefikUsed: true,
-				proxyHash: null
 			}
 		});
 	}
@@ -91,6 +90,11 @@ async function main() {
 				await prisma.secret.create({ data: { ...secret, id: undefined, isPRMRSecret: true } })
 			}
 		}
+	}
+	// Add default docker registry (dockerhub) 
+	const registries = await prisma.dockerRegistry.findMany()
+	if (registries.length === 0) {
+		await prisma.dockerRegistry.create({ data: { id: "0", name: 'Docker Hub', url: 'https://index.docker.io/v1/', isSystemWide: true } })
 	}
 }
 main()

@@ -11,6 +11,8 @@ export async function listAllSettings(request: FastifyRequest) {
         const teamId = request.user.teamId;
         const settings = await listSettings();
         const sshKeys = await prisma.sshKey.findMany({ where: { team: { id: teamId } } })
+        const publicRegistries = await prisma.dockerRegistry.findMany({ where: { isSystemWide: true } })
+        const registries = await prisma.dockerRegistry.findMany({ where: { team: { id: teamId } } })
         const unencryptedKeys = []
         if (sshKeys.length > 0) {
             for (const key of sshKeys) {
@@ -27,7 +29,11 @@ export async function listAllSettings(request: FastifyRequest) {
         return {
             settings,
             certificates: cns,
-            sshKeys: unencryptedKeys
+            sshKeys: unencryptedKeys,
+            registries: {
+                public: publicRegistries,
+                private: registries
+            }
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
