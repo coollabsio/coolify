@@ -2,13 +2,14 @@
 	export let payload: any;
 
 	import { goto } from '$app/navigation';
-
+	import { page } from '$app/stores';
 	import { post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import Setting from '$lib/components/Setting.svelte';
 	import { appSession } from '$lib/store';
 	import { t } from '$lib/translations';
 
+	const from = $page.url.searchParams.get('from');
 	let loading = false;
 
 	async function handleSubmit() {
@@ -19,8 +20,7 @@
 			const { id } = await post(`/destinations/new`, {
 				...payload
 			});
-			await goto(`/destinations/${id}`);
-			window.location.reload();
+			return await goto(from || `/destinations/${id}`);
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
@@ -31,9 +31,15 @@
 
 <div class="flex justify-center px-6 pb-8">
 	<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
-		<div class="flex items-start lg:items-center space-x-0 lg:space-x-4 pb-5 flex-col lg:flex-row space-y-4 lg:space-y-0">
+		<div
+			class="flex items-start lg:items-center space-x-0 lg:space-x-4 pb-5 flex-col lg:flex-row space-y-4 lg:space-y-0"
+		>
 			<div class="title font-bold">{$t('forms.configuration')}</div>
-			<button type="submit" class="btn btn-sm bg-destinations w-full lg:w-fit" class:loading disabled={loading}
+			<button
+				type="submit"
+				class="btn btn-sm bg-destinations w-full lg:w-fit"
+				class:loading
+				disabled={loading}
 				>{loading
 					? payload.isCoolifyProxyUsed
 						? $t('destination.new.saving_and_configuring_proxy')
