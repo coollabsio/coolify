@@ -34,7 +34,7 @@ You'll need a set of skills to [get started](docs/contribution/GettingStarted.md
 
 ```sh
 # Or... Copy and paste commands bellow:
-cp apps/api/.env.example apps/api.env
+cp apps/api/.env.example apps/api/.env
 pnpm install
 pnpm db:push
 pnpm db:seed
