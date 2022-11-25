@@ -244,14 +244,14 @@
 			{/if}
 		</div>
 		{#if $page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
-			<div class="px-2">
+			<div class="px-4">
 				{#if forceDelete}
 					<button
 						on:click={() => deleteApplication(application.name, true)}
 						disabled={!$appSession.isAdmin}
 						class:bg-red-600={$appSession.isAdmin}
 						class:hover:bg-red-500={$appSession.isAdmin}
-						class="btn btn-sm btn-error text-sm"
+						class="btn btn-sm btn-error hover:bg-red-700 text-sm w-64"
 					>
 						Force Delete Application
 					</button>
@@ -261,7 +261,7 @@
 						disabled={!$appSession.isAdmin}
 						class:bg-red-600={$appSession.isAdmin}
 						class:hover:bg-red-500={$appSession.isAdmin}
-						class="btn btn-sm btn-error text-sm"
+						class="btn btn-sm btn-error hover:bg-red-700 text-sm w-64"
 					>
 						Delete Application
 					</button>

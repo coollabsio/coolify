@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import yaml from 'js-yaml';
 
 import { copyBaseConfigurationFiles, makeLabelForStandaloneApplication, saveBuildLog, setDefaultConfiguration } from '../lib/buildPacks/common';
-import { createDirectories, decrypt, defaultComposeConfiguration, executeDockerCmd, getDomain, prisma, decryptApplication } from '../lib/common';
+import { createDirectories, decrypt, defaultComposeConfiguration, executeDockerCmd, getDomain, prisma, decryptApplication, isDev } from '../lib/common';
 import * as importers from '../lib/importers';
 import * as buildpacks from '../lib/buildPacks';
 
@@ -426,7 +426,9 @@ import * as buildpacks from '../lib/buildPacks';
 									await saveBuildLog({ line: error, buildId, applicationId: application.id });
 								}
 							} finally {
-								await fs.rm(workdir, { recursive: true, force: true });
+								if (!isDev) {
+									await fs.rm(workdir, { recursive: true, force: true });
+								}
 							}
 						});
 					}

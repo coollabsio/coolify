@@ -21,6 +21,7 @@
 	import { del, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
+	import { addToast } from '$lib/store';
 	const publicRegistries = registries.public;
 	const privateRegistries = registries.private;
 
@@ -36,9 +37,8 @@
 
 	async function handleSubmit() {
 		try {
-			console.log(newRegistry);
-			// await post(`/settings/sshKey`, { ...newSSHKey });
-			// return window.location.reload();
+			await post(`/settings/registry/new`, newRegistry);
+			return window.location.reload();
 		} catch (error) {
 			errorNotification(error);
 			return false;
@@ -47,14 +47,23 @@
 	async function setRegistry(registry: any) {
 		try {
 			await post(`/settings/registry`, registry);
-		} catch (error) {}
+			return addToast({
+				message: 'Registry updated successfully.',
+				type: 'success'
+			});
+		} catch (error) {
+			errorNotification(error);
+			return false;
+		}
 	}
-	async function deleteSSHKey(id: string) {
-		const sure = confirm('Are you sure you would like to delete this SSH key?');
+	async function deleteDockerRegistry(id: string) {
+		const sure = confirm(
+			'Are you sure you would like to delete this Docker Registry? All dependent resources will be affected and fails to redeploy.'
+		);
 		if (sure) {
 			try {
 				if (!id) return;
-				// await del(`/settings/sshKey`, { id });
+				await del(`/settings/registry`, { id });
 				return window.location.reload();
 			} catch (error) {
 				errorNotification(error);
@@ -78,7 +87,7 @@
 			<thead>
 				<tr>
 					<th>Name</th>
-					<th>Public</th>
+					<th>SystemWide</th>
 					<th>Username</th>
 					<th>Password</th>
 					<th>Actions</th>
@@ -87,7 +96,7 @@
 			<tbody>
 				{#each publicRegistries as registry}
 					<tr>
-						<td>{registry.name}</td>
+						<td>{registry.name}<div class="text-xs">{registry.url}</div></td>
 						<td>{(registry.isSystemWide && 'Yes') || 'No'}</td>
 						<td>
 							<CopyPasswordField
@@ -110,9 +119,10 @@
 							<button on:click={() => setRegistry(registry)} class="btn btn-sm btn-primary"
 								>Set</button
 							>
-							{#if !registry.isSystemWide}
-								<button on:click={() => deleteSSHKey(registry.id)} class="btn btn-sm btn-error"
-									>Delete</button
+							{#if registry.id !== '0'}
+								<button
+									on:click={() => deleteDockerRegistry(registry.id)}
+									class="btn btn-sm btn-error">Delete</button
 								>
 							{/if}
 						</td>
@@ -120,15 +130,34 @@
 				{/each}
 				{#each privateRegistries as registry}
 					<tr>
-						<td>{registry.name}</td>
+						<td>{registry.name} <div class="text-xs">{registry.url}</div></td>
 						<td>{(registry.isSystemWide && 'Yes') || 'No'}</td>
-						<td>{registry.username ?? 'N/A'}</td>
-						<td>{registry.password ?? 'N/A'}</td>
+						<td>
+							<CopyPasswordField
+								name="username"
+								id="Username"
+								bind:value={registry.username}
+								placeholder="Username"
+							/></td
+						>
+						<td
+							><CopyPasswordField
+								isPasswordField={true}
+								name="Password"
+								id="Password"
+								bind:value={registry.password}
+								placeholder="Password"
+							/></td
+						>
 
 						<td>
-							{#if !registry.isSystemWide}
-								<button on:click={() => deleteSSHKey(registry.id)} class="btn btn-sm btn-error"
-									>Delete</button
+							<button on:click={() => setRegistry(registry)} class="btn btn-sm btn-primary"
+								>Set</button
+							>
+							{#if registry.id !== '0'}
+								<button
+									on:click={() => deleteDockerRegistry(registry.id)}
+									class="btn btn-sm btn-error">Delete</button
 								>
 							{/if}
 						</td>

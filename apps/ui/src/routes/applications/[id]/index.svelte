@@ -523,6 +523,27 @@
 					{/if}
 				</div>
 				<div class="grid grid-cols-2 items-center">
+					<label for="registry">Docker Registry</label>
+					{#if isDisabled}
+						<input
+							class="capitalize w-full"
+							disabled={isDisabled}
+							value={application.dockerRegistry.name}
+						/>
+					{:else}
+						<a
+							href={`/applications/${id}/configuration/registry?from=/applications/${id}`}
+							class="no-underline"
+						>
+							<input
+								value={application.dockerRegistry.name}
+								id="registry"
+								class="cursor-pointer hover:bg-coolgray-500 capitalize w-full"
+							/></a
+						>
+					{/if}
+				</div>
+				<div class="grid grid-cols-2 items-center">
 					<label for="buildPack">{$t('application.build_pack')} </label>
 					{#if isDisabled}
 						<input class="capitalize w-full" disabled={isDisabled} value={application.buildPack} />

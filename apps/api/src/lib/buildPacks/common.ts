@@ -590,13 +590,14 @@ export async function saveDockerRegistryCredentials({ url, username, password, w
 	} catch (error) {
 		console.log(error);
 	}
-	await fs.writeFile(`${location}/config.json`, JSON.stringify({
+	const payload = JSON.stringify({
 		"auths": {
 			[url]: {
 				"auth": Buffer.from(`${username}:${decryptedPassword}`).toString('base64')
 			}
 		}
-	}))
+	})
+	await fs.writeFile(`${location}/config.json`, payload)
 	return location
 }
 export async function buildImage({
@@ -626,6 +627,8 @@ export async function buildImage({
 	const cache = `${applicationId}:${tag}${isCache ? '-cache' : ''}`
 	const { dockerRegistry: { url, username, password } } = await prisma.application.findUnique({ where: { id: applicationId }, select: { dockerRegistry: true } })
 	const location = await saveDockerRegistryCredentials({ url, username, password, workdir })
+	console.log(`docker ${location ? `--config ${location}` : ''} build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}`)
+
 	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker ${location ? `--config ${location}` : ''} build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })
 
 	const { status } = await prisma.build.findUnique({ where: { id: buildId } })

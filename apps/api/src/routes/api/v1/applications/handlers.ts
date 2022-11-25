@@ -877,6 +877,16 @@ export async function getBuildPack(request) {
     }
 }
 
+export async function saveRegistry(request, reply) {
+    try {
+        const { id } = request.params
+        const { registryId } = request.body
+        await prisma.application.update({ where: { id }, data: { dockerRegistry: { connect: { id: registryId } } } });
+        return reply.code(201).send()
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function saveBuildPack(request, reply) {
     try {
         const { id } = request.params
