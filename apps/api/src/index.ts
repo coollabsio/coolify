@@ -202,14 +202,14 @@ async function getIPAddress() {
 	try {
 		const settings = await listSettings();
 		if (!settings.ipv4) {
-			console.log(`Getting public IPv4 address...`);
 			const ipv4 = await publicIpv4({ timeout: 2000 })
+			console.log(`Getting public IPv4 address...`);
 			await prisma.setting.update({ where: { id: settings.id }, data: { ipv4 } })
 		}
 
 		if (!settings.ipv6) {
-			console.log(`Getting public IPv6 address...`);
 			const ipv6 = await publicIpv6({ timeout: 2000 })
+			console.log(`Getting public IPv6 address...`);
 			await prisma.setting.update({ where: { id: settings.id }, data: { ipv6 } })
 		}
 
@@ -223,13 +223,13 @@ async function getTagsTemplates() {
 			const tags = await fs.readFile('./devTags.json', 'utf8')
 			await fs.writeFile('./templates.json', JSON.stringify(yaml.load(templates)))
 			await fs.writeFile('./tags.json', tags)
-			console.log('Tags and templates loaded in dev mode...')
+			console.log('[004] Tags and templates loaded in dev mode...')
 		} else {
 			const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text()
 			const response = await got.get('https://get.coollabs.io/coolify/service-templates.yaml').text()
 			await fs.writeFile('/app/templates.json', JSON.stringify(yaml.load(response)))
 			await fs.writeFile('/app/tags.json', tags)
-			console.log('Tags and templates loaded...')
+			console.log('[004] Tags and templates loaded...')
 		}
 
 	} catch (error) {
@@ -239,15 +239,22 @@ async function getTagsTemplates() {
 }
 async function initServer() {
 	try {
-		console.log(`Initializing server...`);
+		console.log(`[001] Initializing server...`);
 		await asyncExecShell(`docker network create --attachable coolify`);
 	} catch (error) { }
 	try {
+		console.log(`[002] Set stuck builds to failed...`);
 		const isOlder = compareVersions('3.8.1', version);
 		if (isOlder === 1) {
 			await prisma.build.updateMany({ where: { status: { in: ['running', 'queued'] } }, data: { status: 'failed' } });
 		}
 	} catch (error) { }
+	try {
+		console.log('[003] Cleaning up old build sources under /tmp/build-sources/...');
+		await fs.rm('/tmp/build-sources', { recursive: true, force: true })
+	} catch (error) {
+		console.log(error)
+	}
 }
 
 async function getArch() {

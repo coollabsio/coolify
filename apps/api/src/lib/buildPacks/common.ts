@@ -1,4 +1,4 @@
-import { base64Encode, encrypt, executeDockerCmd, generateTimestamp, getDomain, isDev, prisma, version } from "../common";
+import { base64Encode, decrypt, encrypt, executeDockerCmd, generateTimestamp, getDomain, isDev, prisma, version } from "../common";
 import { promises as fs } from 'fs';
 import { day } from "../dayjs";
 
@@ -464,7 +464,7 @@ export const saveBuildLog = async ({
 	const { default: got } = await import('got')
 	if (typeof line === 'object' && line) {
 		if (line.shortMessage) {
-			line = line.shortMessage + '\n' + line.stderr; 
+			line = line.shortMessage + '\n' + line.stderr;
 		} else {
 			line = JSON.stringify(line);
 		}
@@ -577,6 +577,28 @@ export function checkPnpm(installCommand = null, buildCommand = null, startComma
 	);
 }
 
+export async function saveDockerRegistryCredentials({ url, username, password, workdir }) {
+	let decryptedPassword = decrypt(password);
+	const location = `${workdir}/.docker`;
+
+	if (!username || !password) {
+		return null
+	}
+
+	try {
+		await fs.mkdir(`${workdir}/.docker`);
+	} catch (error) {
+		console.log(error);
+	}
+	await fs.writeFile(`${location}/config.json`, JSON.stringify({
+		"auths": {
+			[url]: {
+				"auth": Buffer.from(`${username}:${decryptedPassword}`).toString('base64')
+			}
+		}
+	}))
+	return location
+}
 export async function buildImage({
 	applicationId,
 	tag,
@@ -602,8 +624,9 @@ export async function buildImage({
 	}
 	const dockerFile = isCache ? `${dockerFileLocation}-cache` : `${dockerFileLocation}`
 	const cache = `${applicationId}:${tag}${isCache ? '-cache' : ''}`
-
-	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })
+	const { dockerRegistry: { url, username, password } } = await prisma.application.findUnique({ where: { id: applicationId }, select: { dockerRegistry: true } })
+	const location = await saveDockerRegistryCredentials({ url, username, password, workdir })
+	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker ${location ? `--config ${location}` : ''} build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })
 
 	const { status } = await prisma.build.findUnique({ where: { id: buildId } })
 	if (status === 'canceled') {
