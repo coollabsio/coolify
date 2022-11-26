@@ -2976,7 +2976,7 @@
       label: Webhook URL
       defaultValue: $$generate_fqdn
       description: ""
-- templateVersion: 1.0.0
+- templateVersion: 1.1.0
   defaultVersion: stable
   documentation: https://plausible.io/doc/
   type: plausibleanalytics
@@ -3013,9 +3013,9 @@
         - "8000"
     $$id-postgresql:
       name: PostgreSQL
-      image: "bitnami/postgresql:13.2.0"
+      image: "postgres:14-alpine"
       volumes:
-        - "$$id-postgresql-data:/bitnami/postgresql"
+        - "$$id-postgresql-data:/postgresql"
       environment:
         - POSTGRESQL_PASSWORD=$$secret_postgresql_password
         - POSTGRESQL_USERNAME=$$config_postgresql_username
@@ -3024,7 +3024,7 @@
       name: Clickhouse
       volumes:
         - "$$id-clickhouse-data:/var/lib/clickhouse"
-      image: "yandex/clickhouse-server:21.3.2.5"
+      image: "clickhouse/clickhouse-server:22.9-alpine"
       ulimits:
         nofile:
           soft: 262144
