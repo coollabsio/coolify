@@ -363,6 +363,7 @@ export const setDefaultConfiguration = async (data: any) => {
 		publishDirectory,
 		baseDirectory,
 		dockerFileLocation,
+		dockerComposeFileLocation,
 		denoMainFile
 	} = data;
 	//@ts-ignore
@@ -392,6 +393,12 @@ export const setDefaultConfiguration = async (data: any) => {
 	} else {
 		dockerFileLocation = '/Dockerfile';
 	}
+	if (dockerComposeFileLocation) {
+		if (!dockerComposeFileLocation.startsWith('/')) dockerComposeFileLocation = `/${dockerComposeFileLocation}`;
+		if (dockerComposeFileLocation.endsWith('/')) dockerComposeFileLocation = dockerComposeFileLocation.slice(0, -1);
+	} else {
+		dockerComposeFileLocation = '/Dockerfile';
+	}
 	if (!denoMainFile) {
 		denoMainFile = 'main.ts';
 	}
@@ -405,6 +412,7 @@ export const setDefaultConfiguration = async (data: any) => {
 		publishDirectory,
 		baseDirectory,
 		dockerFileLocation,
+		dockerComposeFileLocation,
 		denoMainFile
 	};
 };

@@ -17,23 +17,11 @@ export default async function (data) {
         secrets,
         pullmergeRequestId,
         port,
-        dockerComposeConfiguration
+        dockerComposeConfiguration,
+        dockerComposeFileLocation
     } = data
-    const fileYml = `${workdir}${baseDirectory}/docker-compose.yml`;
-    const fileYaml = `${workdir}${baseDirectory}/docker-compose.yaml`;
-    let dockerComposeRaw = null;
-    let isYml = false;
-    try {
-        dockerComposeRaw = await fs.readFile(`${fileYml}`, 'utf8')
-        isYml = true
-    } catch (error) { }
-    try {
-        dockerComposeRaw = await fs.readFile(`${fileYaml}`, 'utf8')
-    } catch (error) { }
-
-    if (!dockerComposeRaw) {
-        throw ('docker-compose.yml or docker-compose.yaml are not found!');
-    }
+    const fileYaml = `${workdir}${baseDirectory}${dockerComposeFileLocation}`
+    const dockerComposeRaw = await fs.readFile(fileYaml, 'utf8');
     const dockerComposeYaml = yaml.load(dockerComposeRaw)
     if (!dockerComposeYaml.services) {
         throw 'No Services found in docker-compose file.'
@@ -119,7 +107,7 @@ export default async function (data) {
         dockerComposeYaml['volumes'] = { ...composeVolumes }
     }
     dockerComposeYaml['networks'] = Object.assign({ ...networks }, { [network]: { external: true } })
-    await fs.writeFile(`${workdir}/docker-compose.${isYml ? 'yml' : 'yaml'}`, yaml.dump(dockerComposeYaml));
+    await fs.writeFile(fileYaml, yaml.dump(dockerComposeYaml));
     await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker compose --project-directory ${workdir} pull` })
     await saveBuildLog({ line: 'Pulling images from Compose file.', buildId, applicationId });
     await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker compose --project-directory ${workdir} build --progress plain` })

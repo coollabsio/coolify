@@ -351,6 +351,7 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             publishDirectory,
             baseDirectory,
             dockerFileLocation,
+            dockerComposeFileLocation,
             denoMainFile
         });
         if (baseDatabaseBranch) {
@@ -820,7 +821,7 @@ export async function saveRepository(request, reply) {
         let { repository, branch, projectId, autodeploy, webhookToken, isPublicRepository = false } = request.body
 
         repository = repository.toLowerCase();
-        
+
         projectId = Number(projectId);
         if (webhookToken) {
             await prisma.application.update({

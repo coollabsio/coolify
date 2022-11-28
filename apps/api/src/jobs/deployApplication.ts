@@ -78,6 +78,7 @@ import * as buildpacks from '../lib/buildPacks';
 								baseDirectory,
 								publishDirectory,
 								dockerFileLocation,
+								dockerComposeFileLocation,
 								dockerComposeConfiguration,
 								denoMainFile
 							} = application
@@ -158,6 +159,7 @@ import * as buildpacks from '../lib/buildPacks';
 									publishDirectory = configuration.publishDirectory;
 									baseDirectory = configuration.baseDirectory || '';
 									dockerFileLocation = configuration.dockerFileLocation;
+									dockerComposeFileLocation = configuration.dockerComposeFileLocation;
 									denoMainFile = configuration.denoMainFile;
 									const commit = await importers[gitSource.type]({
 										applicationId,
@@ -266,6 +268,7 @@ import * as buildpacks from '../lib/buildPacks';
 												pythonVariable,
 												dockerFileLocation,
 												dockerComposeConfiguration,
+												dockerComposeFileLocation,
 												denoMainFile,
 												denoOptions,
 												baseImage,

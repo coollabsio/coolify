@@ -82,8 +82,8 @@
 
 	let dockerComposeFile = JSON.parse(application.dockerComposeFile) || null;
 	let dockerComposeServices: any[] = [];
-	let dockerComposeFileLocation = application.dockerComposeFileLocation;
 	let dockerComposeConfiguration = JSON.parse(application.dockerComposeConfiguration) || {};
+	let originalDockerComposeFileLocation = application.dockerComposeFileLocation;
 
 	let baseDatabaseBranch: any = application?.connectedDatabase?.hostedDatabaseDBName || null;
 	let nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
@@ -243,8 +243,12 @@
 		if (toast) loading.save = true;
 		try {
 			nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
-			if (application.deploymentType)
+			if (application.deploymentType) {
 				application.deploymentType = application.deploymentType.toLowerCase();
+			}
+			if (originalDockerComposeFileLocation !== application.dockerComposeFileLocation) {
+				await reloadCompose();
+			}
 			if (!isBot) {
 				await post(`/applications/${id}/check`, {
 					fqdn: application.fqdn,
@@ -365,6 +369,9 @@
 	async function reloadCompose() {
 		if (loading.reloadCompose) return;
 		loading.reloadCompose = true;
+		const composeLocation = application.dockerComposeFileLocation.startsWith('/')
+			? application.dockerComposeFileLocation
+			: `/${application.dockerComposeFileLocation}`;
 		try {
 			if (application.gitSource.type === 'github') {
 				const headers = isPublicRepository
@@ -373,9 +380,10 @@
 							Authorization: `token ${$appSession.tokens.github}`
 					  };
 				const data = await get(
-					`${apiUrl}/repos/${repository}/contents/${dockerComposeFileLocation}?ref=${branch}`,
+					`${apiUrl}/repos/${repository}/contents/${composeLocation}?ref=${branch}`,
 					{
 						...headers,
+						'If-None-Match': '',
 						Accept: 'application/vnd.github.v2.json'
 					}
 				);
@@ -405,7 +413,7 @@
 				});
 				const dockerComposeFileYml = files.find(
 					(file: { name: string; type: string }) =>
-						file.name === dockerComposeFileLocation && file.type === 'blob'
+						file.name === composeLocation && file.type === 'blob'
 				);
 				const id = dockerComposeFileYml.id;
 
@@ -424,12 +432,17 @@
 					await handleSubmit(false);
 				}
 			}
-
+			originalDockerComposeFileLocation = application.dockerComposeFileLocation;
 			addToast({
 				message: 'Compose file reloaded.',
 				type: 'success'
 			});
-		} catch (error) {
+		} catch (error: any) {
+			if (error.message === 'Not Found') {
+				error.message = `Can't find ${application.dockerComposeFileLocation} file.`;
+				errorNotification(error);
+				throw error;
+			}
 			errorNotification(error);
 		} finally {
 			loading.reloadCompose = false;
@@ -1029,6 +1042,25 @@
 					{/if}
 				</div>
 				<div class="grid grid-flow-row gap-2">
+					<div class="grid grid-cols-2 items-center px-8 pb-4">
+						<label for="dockerComposeFileLocation"
+							>Docker Compose File Location
+							<Explainer
+								explanation="You can specify a custom docker compose file location. <br> Should be absolute path, like <span class='text-settings font-bold'>/data/docker-compose.yml</span> or <span class='text-settings font-bold'>/docker-compose.yml.</span>"
+							/>
+						</label>
+						<div>
+							<input
+								class="w-full"
+								disabled={isDisabled}
+								readonly={!$appSession.isAdmin}
+								name="dockerComposeFileLocation"
+								id="dockerComposeFileLocation"
+								bind:value={application.dockerComposeFileLocation}
+								placeholder="eg: /docker-compose.yml"
+							/>
+						</div>
+					</div>
 					{#each dockerComposeServices as service}
 						<div
 							class="grid items-center bg-coolgray-100 rounded border border-coolgray-300 p-2 px-4"
