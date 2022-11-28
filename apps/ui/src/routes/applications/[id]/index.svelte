@@ -68,7 +68,7 @@
 	let fqdnEl: any = null;
 	let forceSave = false;
 	let isPublicRepository = application.settings?.isPublicRepository;
-	let apiUrl = application.gitSource.apiUrl;
+	let apiUrl = application.gitSource?.apiUrl;
 	let branch = application.branch;
 	let repository = application.repository;
 	let debug = application.settings?.debug;
@@ -78,7 +78,7 @@
 	let autodeploy = application.settings?.autodeploy;
 	let isBot = application.settings?.isBot;
 	let isDBBranching = application.settings?.isDBBranching;
-	let htmlUrl = application.gitSource.htmlUrl;
+	let htmlUrl = application.gitSource?.htmlUrl;
 
 	let dockerComposeFile = JSON.parse(application.dockerComposeFile) || null;
 	let dockerComposeServices: any[] = [];
@@ -501,14 +501,14 @@
 						<input
 							disabled={isDisabled || application.settings.isPublicRepository}
 							class="w-full"
-							value={application.gitSource.name}
+							value={application.gitSource?.name}
 						/>
 					{:else}
 						<a
 							href={`/applications/${id}/configuration/source?from=/applications/${id}`}
 							class="no-underline"
 							><input
-								value={application.gitSource.name}
+								value={application.gitSource?.name}
 								id="gitSource"
 								class="cursor-pointer hover:bg-coolgray-500 w-full"
 							/></a
