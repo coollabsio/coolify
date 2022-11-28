@@ -44,16 +44,14 @@ async function main() {
 
 	// Set auto-update based on env variable
 	const isAutoUpdateEnabled = process.env['COOLIFY_AUTO_UPDATE'] === 'true';
-	if (settings) {
-		await prisma.setting.update({
-			where: {
-				id: '0'
-			},
-			data: {
-				isAutoUpdateEnabled
-			}
-		});
-	}
+	await prisma.setting.update({
+		where: {
+			id: '0'
+		},
+		data: {
+			isAutoUpdateEnabled
+		}
+	});
 	const github = await prisma.gitSource.findFirst({
 		where: { htmlUrl: 'https://github.com', forPublic: true }
 	});
