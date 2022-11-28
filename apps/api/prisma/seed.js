@@ -11,6 +11,7 @@ async function main() {
 	if (!settingsFound) {
 		await prisma.setting.create({
 			data: {
+				id: '0',
 				isRegistrationEnabled: true,
 				arch: process.arch,
 				DNSServers: '1.1.1.1,8.8.8.8'
@@ -22,6 +23,7 @@ async function main() {
 				id: settingsFound.id
 			},
 			data: {
+				id: '0',
 				isTraefikUsed: true,
 			}
 		});
@@ -42,11 +44,10 @@ async function main() {
 
 	// Set auto-update based on env variable
 	const isAutoUpdateEnabled = process.env['COOLIFY_AUTO_UPDATE'] === 'true';
-	const settings = await prisma.setting.findFirst({});
 	if (settings) {
 		await prisma.setting.update({
 			where: {
-				id: settings.id
+				id: '0'
 			},
 			data: {
 				isAutoUpdateEnabled

@@ -31,7 +31,8 @@ model Setting {
   concurrentBuilds                        Int      @default(1)
   applicationStoragePathMigrationFinished Boolean  @default(false)
   proxyDefaultRedirect                    String?
-  isAPIDebuggingEnabled                   Boolean? @default(false)
+  doNotTrack                              Boolean  @default(false)
+  isAPIDebuggingEnabled                   Boolean  @default(false)
   isRegistrationEnabled                   Boolean  @default(false)
   isAutoUpdateEnabled                     Boolean  @default(false)
   isDNSCheckEnabled                       Boolean  @default(true)
@@ -640,8 +641,8 @@ model GlitchTip {
   emailSmtpPort              Int?     @default(25)
   emailSmtpUser              String?
   emailSmtpPassword          String?
-  emailSmtpUseTls            Boolean? @default(false)
-  emailSmtpUseSsl            Boolean? @default(false)
+  emailSmtpUseTls            Boolean  @default(false)
+  emailSmtpUseSsl            Boolean  @default(false)
   emailBackend               String?
   mailgunApiKey              String?
   sendgridApiKey             String?

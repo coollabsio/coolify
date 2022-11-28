@@ -239,6 +239,16 @@ async function getTagsTemplates() {
 }
 async function initServer() {
 	try {
+		const appId = process.env['COOLIFY_APP_ID'];
+		let doNotTrack = false
+		if (appId === '') {
+			doNotTrack = true
+		}
+		await prisma.setting.update({ where: { id: '0' }, data: { doNotTrack } })
+	} catch (error) {
+		console.log(error)
+	}
+	try {
 		console.log(`[001] Initializing server...`);
 		await asyncExecShell(`docker network create --attachable coolify`);
 	} catch (error) { }
