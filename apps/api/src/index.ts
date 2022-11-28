@@ -36,6 +36,8 @@ declare module 'fastify' {
 
 const port = isDev ? 3001 : 3000;
 const host = '0.0.0.0';
+const sentryDSN = 'https://40285978081c4739b3aed4093f0abe7d@o1082494.ingest.sentry.io/6091062';
+
 (async () => {
 	const settings = await prisma.setting.findFirst()
 	const fastify = Fastify({
@@ -177,7 +179,7 @@ const host = '0.0.0.0';
 
 		setInterval(async () => {
 			await migrateServicesToNewTemplate()
-		}, isDev ? 1000 : 60000)
+		}, isDev ? 10000 : 60000)
 
 		setInterval(async () => {
 			await copySSLCertificates();
@@ -238,13 +240,28 @@ async function getTagsTemplates() {
 	}
 }
 async function initServer() {
+	const appId = process.env['COOLIFY_APP_ID'];
 	try {
-		const appId = process.env['COOLIFY_APP_ID'];
 		let doNotTrack = false
 		if (appId === '') {
 			doNotTrack = true
 		}
 		await prisma.setting.update({ where: { id: '0' }, data: { doNotTrack } })
+	} catch (error) {
+		console.log(error)
+	}
+	try {
+		const settings = await prisma.setting.findUnique({ where: { id: '0' } })
+		if (!settings.sentryDSN) {
+			if (appId == '') {
+				console.log('Telemetry disabled')
+				return
+			} else {
+				await prisma.setting.update({ where: { id: '0' }, data: { sentryDSN } })
+			}
+		}
+		// Initialize Sentry
+
 	} catch (error) {
 		console.log(error)
 	}

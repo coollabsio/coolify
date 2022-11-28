@@ -32,6 +32,7 @@ model Setting {
   applicationStoragePathMigrationFinished Boolean  @default(false)
   proxyDefaultRedirect                    String?
   doNotTrack                              Boolean  @default(false)
+  sentryDSN                               String?
   isAPIDebuggingEnabled                   Boolean  @default(false)
   isRegistrationEnabled                   Boolean  @default(false)
   isAutoUpdateEnabled                     Boolean  @default(false)
