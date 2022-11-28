@@ -8,6 +8,7 @@ import type { Config } from 'unique-names-generator';
 import generator from 'generate-password';
 import crypto from 'crypto';
 import { promises as dns } from 'dns';
+import * as Sentry from '@sentry/node';
 import { PrismaClient } from '@prisma/client';
 import os from 'os';
 import sshConfig from 'ssh-config';
@@ -19,7 +20,7 @@ import { scheduler } from './scheduler';
 
 export const version = '3.12.0';
 export const isDev = process.env.NODE_ENV === 'development';
-
+export const sentryDSN = 'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
 const algorithm = 'aes-256-ctr';
 const customConfig: Config = {
 	dictionaries: [adjectives, colors, animals],
@@ -1491,6 +1492,7 @@ export function errorHandler({
 	message: string | any;
 }) {
 	if (message.message) message = message.message;
+	Sentry.captureException({ status, message });
 	throw { status, message };
 }
 export async function generateSshKeyPair(): Promise<{ publicKey: string; privateKey: string }> {

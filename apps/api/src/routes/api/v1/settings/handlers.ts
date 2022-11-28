@@ -1,8 +1,8 @@
 import { promises as dns } from 'dns';
 import { X509Certificate } from 'node:crypto';
-
+import * as Sentry from '@sentry/node';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { asyncExecShell, checkDomainsIsValidInDNS, decrypt, encrypt, errorHandler, isDev, isDNSValid, isDomainConfigured, listSettings, prisma } from '../../../../lib/common';
+import { asyncExecShell, checkDomainsIsValidInDNS, decrypt, encrypt, errorHandler, isDev, isDNSValid, isDomainConfigured, listSettings, prisma, sentryDSN, version } from '../../../../lib/common';
 import { AddDefaultRegistry, CheckDNS, CheckDomain, DeleteDomain, OnlyIdInBody, SaveSettings, SaveSSHKey, SetDefaultRegistry } from './types';
 
 
@@ -78,6 +78,15 @@ export async function saveSettings(request: FastifyRequest<SaveSettings>, reply:
         if (minPort && maxPort) {
             await prisma.setting.update({ where: { id }, data: { minPort, maxPort } });
         }
+        if (doNotTrack === false) {
+            Sentry.init({
+                debug: true,
+                dsn: sentryDSN,
+                environment: isDev ? 'development' : 'production',
+                release: version
+            });
+            console.log('Sentry initialized')
+        }
         return reply.code(201).send()
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -110,7 +119,7 @@ export async function checkDomain(request: FastifyRequest<CheckDomain>) {
         if (fqdn) fqdn = fqdn.toLowerCase();
         const found = await isDomainConfigured({ id, fqdn });
         if (found) {
-            throw "Domain already configured";
+            throw { message: "Domain already configured" };
         }
         if (isDNSCheckEnabled && !forceSave && !isDev) {
             const hostname = request.hostname.split(':')[0]

@@ -9,7 +9,7 @@ import autoLoad from '@fastify/autoload';
 import socketIO from 'fastify-socket.io'
 import socketIOServer from './realtime'
 
-import { asyncExecShell, cleanupDockerStorage, createRemoteEngineConfiguration, decrypt, encrypt, executeDockerCmd, executeSSHCmd, generateDatabaseConfiguration, isDev, listSettings, prisma, startTraefikProxy, startTraefikTCPProxy, version } from './lib/common';
+import { asyncExecShell, cleanupDockerStorage, createRemoteEngineConfiguration, decrypt, executeDockerCmd, executeSSHCmd, generateDatabaseConfiguration, isDev, listSettings, prisma, sentryDSN, startTraefikProxy, startTraefikTCPProxy, version } from './lib/common';
 import { scheduler } from './lib/scheduler';
 import { compareVersions } from 'compare-versions';
 import Graceful from '@ladjs/graceful'
@@ -36,7 +36,6 @@ declare module 'fastify' {
 
 const port = isDev ? 3001 : 3000;
 const host = '0.0.0.0';
-const sentryDSN = 'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
 
 (async () => {
 	const settings = await prisma.setting.findFirst()
@@ -240,39 +239,36 @@ async function getTagsTemplates() {
 }
 async function initServer() {
 	const appId = process.env['COOLIFY_APP_ID'];
+	const settings = await prisma.setting.findUnique({ where: { id: '0' } })
 	try {
 		let doNotTrack = false
-		if (appId === '') {
-			doNotTrack = true
-		}
+		if (appId === '') doNotTrack = true
+		doNotTrack = settings.doNotTrack
 		await prisma.setting.update({ where: { id: '0' }, data: { doNotTrack } })
 	} catch (error) {
 		console.log(error)
 	}
 	try {
-		const settings = await prisma.setting.findUnique({ where: { id: '0' } })
-		if (!settings.sentryDSN) {
-			if (appId == '') {
-				console.log('Telemetry disabled')
-				return
-			} else {
-				await prisma.setting.update({ where: { id: '0' }, data: { sentryDSN } })
-			}
+		if (settings.doNotTrack === true) {
+			console.log('[000] Telemetry disabled...')
+
 		} else {
 			if (settings.sentryDSN !== sentryDSN) {
 				await prisma.setting.update({ where: { id: '0' }, data: { sentryDSN } })
 			}
+			// Initialize Sentry
+			Sentry.init({
+				debug: true,
+				dsn: sentryDSN,
+				environment: isDev ? 'development' : 'production',
+				release: version
+			});
+			console.log('[000] Sentry initialized...')
 		}
-		// Initialize Sentry
-		Sentry.init({
-			dsn: sentryDSN,
-			environment: isDev ? 'development' : 'production',
-			release: version
-		});
+
 	} catch (error) {
 		console.error(error)
 	}
-
 	try {
 		console.log(`[001] Initializing server...`);
 		await asyncExecShell(`docker network create --attachable coolify`);
