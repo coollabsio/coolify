@@ -36,7 +36,7 @@ declare module 'fastify' {
 
 const port = isDev ? 3001 : 3000;
 const host = '0.0.0.0';
-const sentryDSN = 'http://5c32291aa76244988b7a327c77f7588f@glitchtip.example.coolify.io/1';
+const sentryDSN = 'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
 
 (async () => {
 	const settings = await prisma.setting.findFirst()
