@@ -19,7 +19,7 @@ import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handler
 import { checkContainer } from './lib/docker';
 import { migrateApplicationPersistentStorage, migrateServicesToNewTemplate } from './lib';
 import { refreshTags, refreshTemplates } from './routes/api/v1/handlers';
-
+import * as Sentry from '@sentry/node';
 declare module 'fastify' {
 	interface FastifyInstance {
 		config: {
@@ -36,7 +36,7 @@ declare module 'fastify' {
 
 const port = isDev ? 3001 : 3000;
 const host = '0.0.0.0';
-const sentryDSN = 'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
+const sentryDSN = 'http://5c32291aa76244988b7a327c77f7588f@glitchtip.example.coolify.io/1';
 
 (async () => {
 	const settings = await prisma.setting.findFirst()
@@ -111,7 +111,6 @@ const sentryDSN = 'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sent
 			origin: isDev ? "*" : ''
 		}
 	})
-
 	// To detect allowed origins
 	// fastify.addHook('onRequest', async (request, reply) => {
 	// 	console.log(request.headers.host)
@@ -259,12 +258,21 @@ async function initServer() {
 			} else {
 				await prisma.setting.update({ where: { id: '0' }, data: { sentryDSN } })
 			}
+		} else {
+			if (settings.sentryDSN !== sentryDSN) {
+				await prisma.setting.update({ where: { id: '0' }, data: { sentryDSN } })
+			}
 		}
 		// Initialize Sentry
-
+		Sentry.init({
+			dsn: sentryDSN,
+			environment: isDev ? 'development' : 'production',
+			release: version
+		});
 	} catch (error) {
-		console.log(error)
+		console.error(error)
 	}
+
 	try {
 		console.log(`[001] Initializing server...`);
 		await asyncExecShell(`docker network create --attachable coolify`);

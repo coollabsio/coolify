@@ -35,6 +35,7 @@
 	let minPort = settings.minPort;
 	let maxPort = settings.maxPort;
 	let proxyDefaultRedirect = settings.proxyDefaultRedirect;
+	let doNotTrack = settings.doNotTrack;
 
 	let forceSave = false;
 	let fqdn = settings.fqdn;
@@ -117,6 +118,9 @@
 	async function changeSettings(name: any) {
 		try {
 			resetView();
+			if (name === 'doNotTrack') {
+				doNotTrack = !doNotTrack;
+			}
 			if (name === 'isRegistrationEnabled') {
 				isRegistrationEnabled = !isRegistrationEnabled;
 			}
@@ -133,6 +137,7 @@
 				isAPIDebuggingEnabled = !isAPIDebuggingEnabled;
 			}
 			await post(`/settings`, {
+				doNotTrack,
 				isAPIDebuggingEnabled,
 				isRegistrationEnabled,
 				dualCerts,
@@ -456,6 +461,15 @@
 						title={$t('setting.auto_update_enabled')}
 						description={$t('setting.auto_update_enabled_explainer')}
 						on:click={() => changeSettings('isAutoUpdateEnabled')}
+					/>
+				</div>
+				<div class="grid grid-cols-2 items-center">
+					<Setting
+						id="doNotTrack"
+						bind:setting={doNotTrack}
+						title="Do Not Track"
+						description="Do not send error reports to Coolify developers or any telemetry."
+						on:click={() => changeSettings('doNotTrack')}
 					/>
 				</div>
 			</div>

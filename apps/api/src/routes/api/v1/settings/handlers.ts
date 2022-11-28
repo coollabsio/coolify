@@ -54,6 +54,7 @@ export async function listAllSettings(request: FastifyRequest) {
 export async function saveSettings(request: FastifyRequest<SaveSettings>, reply: FastifyReply) {
     try {
         const {
+            doNotTrack,
             fqdn,
             isAPIDebuggingEnabled,
             isRegistrationEnabled,
@@ -68,7 +69,7 @@ export async function saveSettings(request: FastifyRequest<SaveSettings>, reply:
         const { id } = await listSettings();
         await prisma.setting.update({
             where: { id },
-            data: { isRegistrationEnabled, dualCerts, isAutoUpdateEnabled, isDNSCheckEnabled, DNSServers, isAPIDebuggingEnabled, }
+            data: { doNotTrack, isRegistrationEnabled, dualCerts, isAutoUpdateEnabled, isDNSCheckEnabled, DNSServers, isAPIDebuggingEnabled, }
         });
         if (fqdn) {
             await prisma.setting.update({ where: { id }, data: { fqdn } });

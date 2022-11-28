@@ -2,6 +2,7 @@ import { OnlyId } from "../../../../types"
 
 export interface SaveSettings {
     Body: {
+        doNotTrack: boolean,
         fqdn: string,
         isAPIDebuggingEnabled: boolean,
         isRegistrationEnabled: boolean,
