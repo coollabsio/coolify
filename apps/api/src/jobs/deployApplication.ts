@@ -65,6 +65,7 @@ import * as buildpacks from '../lib/buildPacks';
 								baseImage,
 								baseBuildImage,
 								deploymentType,
+								gitCommitHash,
 							} = application
 
 							let {
@@ -169,7 +170,7 @@ import * as buildpacks from '../lib/buildPacks';
 										githubAppId: gitSource.githubApp?.id,
 										gitlabAppId: gitSource.gitlabApp?.id,
 										customPort: gitSource.customPort,
-										gitCommitHash: gitCommitHash,
+										gitCommitHash,
 										configuration,
 										repository,
 										branch,

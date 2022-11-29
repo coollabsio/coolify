@@ -53,7 +53,8 @@ export async function listAllSettings(request: FastifyRequest) {
 }
 export async function saveSettings(request: FastifyRequest<SaveSettings>, reply: FastifyReply) {
     try {
-        const {
+        let {
+            numberOfDockerImagesKeptLocally,
             doNotTrack,
             fqdn,
             isAPIDebuggingEnabled,
@@ -67,9 +68,12 @@ export async function saveSettings(request: FastifyRequest<SaveSettings>, reply:
             proxyDefaultRedirect
         } = request.body
         const { id } = await listSettings();
+        if (numberOfDockerImagesKeptLocally) {
+            numberOfDockerImagesKeptLocally = Number(numberOfDockerImagesKeptLocally)
+        }
         await prisma.setting.update({
             where: { id },
-            data: { doNotTrack, isRegistrationEnabled, dualCerts, isAutoUpdateEnabled, isDNSCheckEnabled, DNSServers, isAPIDebuggingEnabled, }
+            data: { numberOfDockerImagesKeptLocally, doNotTrack, isRegistrationEnabled, dualCerts, isAutoUpdateEnabled, isDNSCheckEnabled, DNSServers, isAPIDebuggingEnabled, }
         });
         if (fqdn) {
             await prisma.setting.update({ where: { id }, data: { fqdn } });

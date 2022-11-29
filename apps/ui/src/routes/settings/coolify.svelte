@@ -36,6 +36,7 @@
 	let maxPort = settings.maxPort;
 	let proxyDefaultRedirect = settings.proxyDefaultRedirect;
 	let doNotTrack = settings.doNotTrack;
+	let numberOfDockerImagesKeptLocally = settings.numberOfDockerImagesKeptLocally;
 
 	let forceSave = false;
 	let fqdn = settings.fqdn;
@@ -164,6 +165,9 @@
 			}
 			if (proxyDefaultRedirect !== settings.proxyDefaultRedirect) {
 				await post(`/settings`, { proxyDefaultRedirect });
+			}
+			if (numberOfDockerImagesKeptLocally !== settings.numberOfDockerImagesKeptLocally) {
+				await post(`/settings`, { numberOfDockerImagesKeptLocally });
 			}
 			if (minPort !== settings.minPort || maxPort !== settings.maxPort) {
 				await post(`/settings`, { minPort, maxPort });
@@ -392,6 +396,25 @@
 						disabled={!rollbackVersion || loading.rollback}
 						on:click|preventDefault|stopPropagation={rollback}>Rollback</button
 					>
+				</div>
+				<div class="grid grid-cols-2 items-center">
+					<div>
+						Number of Docker Images kept locally
+						<Explainer
+							position="dropdown-bottom"
+							explanation="The number of Docker images kept locally on the server for EACH application. The oldest images will be deleted when the limit is reached.<br><br>Useful to rollback to a specific version of your applications quickly, but it will use more storage locally."
+						/>
+					</div>
+					<input
+						type="number"
+						class="w-full"
+						bind:value={numberOfDockerImagesKeptLocally}
+						readonly={!$appSession.isAdmin}
+						disabled={!$appSession.isAdmin}
+						name="numberOfDockerImagesKeptLocally"
+						id="numberOfDockerImagesKeptLocally"
+						placeholder="default: 3"
+					/>
 				</div>
 				<div class="grid grid-cols-2 items-center">
 					<div>

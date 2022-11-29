@@ -2,6 +2,7 @@ import { OnlyId } from "../../../../types"
 
 export interface SaveSettings {
     Body: {
+        numberOfDockerImagesKeptLocally: number,
         doNotTrack: boolean,
         fqdn: string,
         isAPIDebuggingEnabled: boolean,

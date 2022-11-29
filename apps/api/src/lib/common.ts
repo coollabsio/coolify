@@ -1587,22 +1587,44 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 		}
 	} catch (error) { }
 	if (lowDiskSpace || force) {
-		// if (isDev) {
-		// 	if (!force) console.log(`[DEV MODE] Low disk space: ${lowDiskSpace}`);
-		// 	return;
-		// }
+		// Cleanup images that are not used
+		try {
+			await executeDockerCmd({ dockerId, command: `docker image prune -f` });
+		} catch (error) { }
+
+		const { numberOfDockerImagesKeptLocally } = await prisma.setting.findUnique({ where: { id: '0' } })
+		const { stdout: images } = await executeDockerCmd({
+			dockerId,
+			command: `docker images | grep -v "<none>" | grep -v REPOSITORY | awk '{print $1, $2}'`
+		});
+		const imagesArray = images.trim().replaceAll(' ', ':').split('\n');
+		const imagesSet = new Set(imagesArray.map((image) => image.split(':')[0]));
+		let deleteImage = []
+		for (const image of imagesSet) {
+			let keepImage = []
+			for (const image2 of imagesArray) {
+				if (image2.startsWith(image)) {
+					if (keepImage.length >= numberOfDockerImagesKeptLocally) {
+						deleteImage.push(image2)
+					} else {
+						keepImage.push(image2)
+					}
+				}
+
+			}
+		}
+		for (const image of deleteImage) {
+			await executeDockerCmd({ dockerId, command: `docker image rm -f ${image}` });
+		}
+
+		// Prune coolify managed containers
 		try {
 			await executeDockerCmd({
 				dockerId,
 				command: `docker container prune -f --filter "label=coolify.managed=true"`
 			});
 		} catch (error) { }
-		try {
-			await executeDockerCmd({ dockerId, command: `docker image prune -f` });
-		} catch (error) { }
-		try {
-			await executeDockerCmd({ dockerId, command: `docker image prune -a -f` });
-		} catch (error) { }
+
 		// Cleanup build caches
 		try {
 			await executeDockerCmd({ dockerId, command: `docker builder prune -a -f` });

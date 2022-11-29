@@ -30,6 +30,7 @@ model Setting {
   arch                                    String?
   concurrentBuilds                        Int      @default(1)
   applicationStoragePathMigrationFinished Boolean  @default(false)
+  numberOfDockerImagesKeptLocally         Int      @default(3)
   proxyDefaultRedirect                    String?
   doNotTrack                              Boolean  @default(false)
   sentryDSN                               String?

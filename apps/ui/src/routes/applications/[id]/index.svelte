@@ -517,20 +517,28 @@
 				</div>
 				<div class="grid grid-cols-2 items-center">
 					<label for="repository">Git commit</label>
-					{#if isDisabled}
+					<div class="flex gap-2">
 						<input
 							class="w-full"
-							disabled={isDisabled || application.settings.isPublicRepository}
+							disabled={isDisabled}
 							placeholder="default: latest commit"
 							bind:value={application.gitCommitHash}
 						/>
-					{:else}
-						<input
-							class="w-full"
-							placeholder="default: latest commit"
-							bind:value={application.gitCommitHash}
-						/>
-					{/if}
+						<a href={application.gitSource.htmlUrl}/{application.repository}/commits/{application.branch} target="_blank" rel="noreferrer" class="btn btn-primary text-xs" >Commits<svg
+							xmlns="http://www.w3.org/2000/svg"
+							fill="currentColor"
+							viewBox="0 0 24 24"
+							stroke-width="3"
+							stroke="currentColor"
+							class="w-3 h-3 text-white ml-2"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
+							/>
+						</svg></a>
+					</div>
 				</div>
 				<div class="grid grid-cols-2 items-center">
 					<label for="repository">{$t('application.git_repository')}</label>
