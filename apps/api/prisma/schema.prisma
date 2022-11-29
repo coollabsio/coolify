@@ -34,6 +34,7 @@ model Setting {
   proxyDefaultRedirect                    String?
   doNotTrack                              Boolean  @default(false)
   sentryDSN                               String?
+  previewSeparator                        String   @default(".")
   isAPIDebuggingEnabled                   Boolean  @default(false)
   isRegistrationEnabled                   Boolean  @default(true)
   isAutoUpdateEnabled                     Boolean  @default(false)

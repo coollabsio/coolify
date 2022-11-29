@@ -92,6 +92,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
             throw { status: 500, message: 'Cannot parse projectId or branch from the webhook?!' }
         }
         const applicationsFound = await getApplicationFromDBWebhook(projectId, branch);
+        const settings = await prisma.setting.findUnique({ where: { id: '0' } });
         if (applicationsFound && applicationsFound.length > 0) {
             for (const application of applicationsFound) {
                 const buildId = cuid();
@@ -192,7 +193,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                                         data: {
                                             pullmergeRequestId,
                                             sourceBranch,
-                                            customDomain: `${protocol}${pullmergeRequestId}.${getDomain(application.fqdn)}`,
+                                            customDomain: `${protocol}${pullmergeRequestId}${settings.previewSeparator}${getDomain(application.fqdn)}`,
                                             application: { connect: { id: application.id } }
                                         }
                                     })

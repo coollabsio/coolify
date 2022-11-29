@@ -46,6 +46,7 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
         if (!webhookToken && !isDev) {
             throw { status: 500, message: 'Invalid webhookToken.' }
         }
+        const settings = await prisma.setting.findUnique({ where: { id: '0' } });
         if (objectKind === 'push') {
             const projectId = Number(project_id);
             const branch = ref.split('/')[2];
@@ -140,7 +141,7 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                                         data: {
                                             pullmergeRequestId,
                                             sourceBranch,
-                                            customDomain: `${protocol}${pullmergeRequestId}.${getDomain(application.fqdn)}`,
+                                            customDomain: `${protocol}${pullmergeRequestId}${settings.previewSeparator}${getDomain(application.fqdn)}`,
                                             application: { connect: { id: application.id } }
                                         }
                                     })
