@@ -68,7 +68,6 @@
 	export let sentryDSN: any;
 	export let baseSettings: any;
 	export let pendingInvitations: any = 0;
-	console.log(settings, sentryDSN);
 
 	$appSession.isRegistrationEnabled = baseSettings.isRegistrationEnabled;
 	$appSession.ipv4 = baseSettings.ipv4;
@@ -107,7 +106,7 @@
 	if (teamId) $appSession.teamId = teamId;
 	if (permission) $appSession.permission = permission;
 	if (isAdmin) $appSession.isAdmin = isAdmin;
-	if (settings.doNotTrack === false) {
+	if (settings?.doNotTrack === false) {
 		Sentry.init({
 			dsn: sentryDSN,
 			environment: dev ? 'development' : 'production',
@@ -125,14 +124,16 @@
 		}
 	}
 	onMount(async () => {
-		io.connect();
-		io.on('start-service', (message) => {
-			const { serviceId, state } = message;
-			$status.service.startup[serviceId] = state;
-			if (state === 0 || state === 1) {
-				delete $status.service.startup[serviceId];
-			}
-		});
+		if ($appSession.userId) {
+			io.connect();
+			io.on('start-service', (message) => {
+				const { serviceId, state } = message;
+				$status.service.startup[serviceId] = state;
+				if (state === 0 || state === 1) {
+					delete $status.service.startup[serviceId];
+				}
+			});
+		}
 	});
 </script>
 
@@ -156,6 +157,11 @@
 	<input id="main-drawer" type="checkbox" class="drawer-toggle" />
 	<div class="drawer-content">
 		{#if $appSession.userId}
+			<Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
+			<Tooltip triggeredBy="#settings" placement="right" color="bg-settings text-black"
+				>Settings</Tooltip
+			>
+			<Tooltip triggeredBy="#logout" placement="right" color="bg-red-600">Logout</Tooltip>
 			<nav class="nav-main hidden lg:block z-20">
 				<div class="flex h-screen w-full flex-col items-center transition-all duration-100">
 					{#if !$appSession.whiteLabeled}
@@ -500,7 +506,3 @@
 		</ul>
 	</div>
 </div>
-
-<Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
-<Tooltip triggeredBy="#settings" placement="right" color="bg-settings text-black">Settings</Tooltip>
-<Tooltip triggeredBy="#logout" placement="right" color="bg-red-600">Logout</Tooltip>
