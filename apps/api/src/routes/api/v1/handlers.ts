@@ -13,6 +13,7 @@ import {
 	prisma,
 	uniqueName,
 	version,
+	sentryDSN,
 } from "../../../lib/common";
 import { scheduler } from "../../../lib/scheduler";
 import type { FastifyReply, FastifyRequest } from "fastify";
@@ -398,7 +399,8 @@ export async function getCurrentUser(
 	}
 	const pendingInvitations = await prisma.teamInvitation.findMany({ where: { uid: request.user.userId } })
 	return {
-		settings: await prisma.setting.findFirst(),
+		settings: await prisma.setting.findUnique({ where: { id: "0" } }),
+		sentryDSN,
 		pendingInvitations,
 		token,
 		...request.user,

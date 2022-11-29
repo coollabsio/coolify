@@ -64,6 +64,8 @@
 </script>
 
 <script lang="ts">
+	export let settings: any;
+	export let sentryDSN: any;
 	export let baseSettings: any;
 	export let pendingInvitations: any = 0;
 
@@ -96,12 +98,23 @@
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { onMount } from 'svelte';
 	import LocalePicker from '$lib/components/LocalePicker.svelte';
+	import * as Sentry from '@sentry/svelte';
+	import { BrowserTracing } from '@sentry/tracing';
+	import { dev } from '$app/env';
 
 	if (userId) $appSession.userId = userId;
 	if (teamId) $appSession.teamId = teamId;
 	if (permission) $appSession.permission = permission;
 	if (isAdmin) $appSession.isAdmin = isAdmin;
-
+	if (settings.doNotTrack === false) {
+		Sentry.init({
+			dsn: sentryDSN,
+			environment: dev ? 'development' : 'production',
+			integrations: [new BrowserTracing()],
+			release: $appSession.version?.toString(),
+			tracesSampleRate: 0.2
+		});
+	}
 	async function logout() {
 		try {
 			Cookies.remove('token');
@@ -137,6 +150,7 @@
 		<PageLoader />
 	</div>
 {/if}
+
 <div class="drawer">
 	<input id="main-drawer" type="checkbox" class="drawer-toggle" />
 	<div class="drawer-content">
