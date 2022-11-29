@@ -3,6 +3,8 @@ import { addToast } from '$lib/store';
 export const asyncSleep = (delay: number) =>
 	new Promise((resolve) => setTimeout(resolve, delay));
 
+export let initials = (str:string) => (str||'').split(' ').map( (wrd) => wrd[0]).join('')
+
 export function errorNotification(error: any | { message: string }): void {
 	if (error.message) {
 		if (error.message === 'Cannot read properties of undefined (reading \'postMessage\')') {
