@@ -84,12 +84,12 @@ export async function saveSettings(request: FastifyRequest<SaveSettings>, reply:
             await prisma.setting.update({ where: { id }, data: { minPort, maxPort } });
         }
         if (doNotTrack === false) {
-            Sentry.init({
-                dsn: sentryDSN,
-                environment: isDev ? 'development' : 'production',
-                release: version
-            });
-            console.log('Sentry initialized')
+            // Sentry.init({
+            //     dsn: sentryDSN,
+            //     environment: isDev ? 'development' : 'production',
+            //     release: version
+            // });
+            // console.log('Sentry initialized')
         }
         return reply.code(201).send()
     } catch ({ status, message }) {

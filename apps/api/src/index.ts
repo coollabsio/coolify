@@ -249,12 +249,12 @@ async function initServer() {
 				await prisma.setting.update({ where: { id: '0' }, data: { sentryDSN } })
 			}
 			// Initialize Sentry
-			Sentry.init({
-				dsn: sentryDSN,
-				environment: isDev ? 'development' : 'production',
-				release: version
-			});
-			console.log('[000] Sentry initialized...')
+			// Sentry.init({
+			// 	dsn: sentryDSN,
+			// 	environment: isDev ? 'development' : 'production',
+			// 	release: version
+			// });
+			// console.log('[000] Sentry initialized...')
 		}
 	} catch (error) {
 		console.error(error)

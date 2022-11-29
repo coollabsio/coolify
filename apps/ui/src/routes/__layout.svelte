@@ -106,15 +106,15 @@
 	if (teamId) $appSession.teamId = teamId;
 	if (permission) $appSession.permission = permission;
 	if (isAdmin) $appSession.isAdmin = isAdmin;
-	if (settings?.doNotTrack === false) {
-		Sentry.init({
-			dsn: sentryDSN,
-			environment: dev ? 'development' : 'production',
-			integrations: [new BrowserTracing()],
-			release: $appSession.version?.toString(),
-			tracesSampleRate: 0.2
-		});
-	}
+	// if (settings?.doNotTrack === false) {
+	// 	Sentry.init({
+	// 		dsn: sentryDSN,
+	// 		environment: dev ? 'development' : 'production',
+	// 		integrations: [new BrowserTracing()],
+	// 		release: $appSession.version?.toString(),
+	// 		tracesSampleRate: 0.2
+	// 	});
+	// }
 	async function logout() {
 		try {
 			Cookies.remove('token');
