@@ -1,5 +1,6 @@
 .DS_Store
 node_modules
+.pnpm-store
 build
 .svelte-kit
 package
@@ -10,3 +11,7 @@ dist
 client
 apps/api/db/*.db
 local-serve
+apps/api/db/migration.db-journal
+apps/api/core*
+logs
+others/certificates

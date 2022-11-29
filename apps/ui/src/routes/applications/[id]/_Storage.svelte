@@ -59,36 +59,55 @@
 	}
 </script>
 
-<div class="w-full font-bold grid gap-2">
-	<div class="flex flex-col pb-2">
-		
-		<div class="flex flex-col lg:flex-row lg:space-y-0 space-y-2">
+<div class="w-full lg:px-0 px-4">
+	{#if storage.predefined}
+		<div class="flex flex-col lg:flex-row gap-4 pb-2">
+			<input disabled readonly class="w-full" value={storage.id} />
+			<input disabled readonly class="w-full" bind:value={storage.path} />
+		</div>
+	{:else}
+		<div class="flex gap-4 pb-2" class:pt-8={isNew}>
+			{#if storage.applicationId}
+				{#if storage.oldPath}
+					<input
+						disabled
+						readonly
+						class="w-full"
+						value="{storage.applicationId}{storage.path.replace(/\//gi, '-').replace('-app', '')}"
+					/>
+				{:else}
+					<input
+						disabled
+						readonly
+						class="w-full"
+						value="{storage.applicationId}{storage.path.replace(/\//gi, '-')}"
+					/>
+				{/if}
+			{/if}
 			<input
-				class="w-full lg:w-64"
+				disabled={!isNew}
+				readonly={!isNew}
+				class="w-full"
 				bind:value={storage.path}
 				required
-				placeholder="eg: /sqlite.db"
+				placeholder="eg: /data"
 			/>
-			{#if isNew}
-				<div class="flex items-center justify-center w-full lg:w-64">
-					<button class="btn btn-sm btn-primary" on:click={() => saveStorage(true)}
-						>{$t('forms.add')}</button
-					>
-				</div>
-			{:else}
-				<div class="flex flex-row items-center justify-center space-x-2 w-full lg:w-64">
-					<div class="flex items-center justify-center">
-						<button class="btn btn-sm btn-primary" on:click={() => saveStorage(false)}
-							>{$t('forms.set')}</button
+
+			<div class="flex items-center justify-center">
+				{#if isNew}
+					<div class="w-full lg:w-64">
+						<button class="btn btn-sm btn-primary w-full" on:click={() => saveStorage(true)}
+							>{$t('forms.add')}</button
 						>
 					</div>
+				{:else}
 					<div class="flex justify-center">
 						<button class="btn btn-sm btn-error" on:click={removeStorage}
 							>{$t('forms.remove')}</button
 						>
 					</div>
-				</div>
-			{/if}
+				{/if}
+			</div>
 		</div>
-	</div>
+	{/if}
 </div>

@@ -19,8 +19,7 @@
 
 <script lang="ts">
 	export let sources: any = [];
-	import { get, post } from '$lib/api';
-	import { goto } from '$app/navigation';
+	import { get } from '$lib/api';
 	import { getDomain } from '$lib/common';
 	import { t } from '$lib/translations';
 	import { appSession } from '$lib/store';

@@ -88,7 +88,7 @@ label {
 	@apply inline-block;
 }
 .btn {
-	@apply text-white text-base min-w-fit;
+	@apply text-white text-base min-w-fit no-animation;
 }
 
 a {
@@ -102,6 +102,40 @@ a {
 .title {
 	@apply text-lg lg:text-2xl font-bold;
 }
+.subtitle{
+	@apply text-lg lg:text-xl font-bold text-indigo-300;
+}
+.label{
+	@apply text-sm leading-6 font-semibold text-sky-500 dark:text-sky-400;
+}
+.card{
+	@apply border bg-coolgray-100 border-coolgray-200 rounded p-2 space-y-2 sticky top-4 mb-2 items-center
+}
+.icon-holder{
+	overflow: hidden;
+	height: 30px;
+	border-radius: 5px;
+	margin-right: 8px;
+	background: linear-gradient(0deg, #999, #ddd);
+}
+.instance-status-running{ box-shadow: 1px 4px 5px #3df721; }
+.instance-status-stopped{ box-shadow: 1px 4px 5px rgb(110, 191, 225); }
+.instance-status-error{ box-shadow: 1px 4px 5px #fb00ff; }
+.instance-status-degraded{ box-shadow: 1px 4px 5px #f7b121; }
+.badge-status-healthy,
+.badge-status-running { @apply text-green-500 }
+.badge-status-degraded { @apply text-green-500 }
+.badge-status-stopped { @apply text-sky-500 }
+.delete-button{ @apply bg-red-600 }
+.delete-button:hover{ @apply bg-red-500}
+/* Interchange menu position */
+.menu-left { display: flex; flex-direction: row; }
+.menu-left .menu-bar{ display: flex; flex-direction: column;}
+.menu-left .menu-bar > * {display: flex; flex-direction: column;}
+.menu-top { display: flex; flex-direction: column; }
+.menu-top .menu-bar{ display: flex; flex-direction: row;}
+.menu-top .menu-bar > * {display: flex; flex-direction: row;}
+
 .nav-main {
 	@apply fixed top-0 left-0 min-h-screen w-16 min-w-[4rem] overflow-hidden border-r border-stone-800 bg-coolgray-200 scrollbar-w-1  scrollbar-thumb-coollabs scrollbar-track-coolgray-200 xl:overflow-visible;
 }
@@ -156,7 +190,7 @@ a {
 }
 
 .box-selection {
-	@apply min-w-[16rem] max-w-[24rem] justify-center rounded border-transparent bg-coolgray-200 p-6 hover:border-transparent hover:bg-coolgray-400;
+	@apply min-w-[16rem]  justify-center rounded border-transparent bg-coolgray-200 p-6 hover:border-transparent hover:bg-coolgray-400;
 }
 
 .lds-heart {

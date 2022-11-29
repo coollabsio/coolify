@@ -2,6 +2,7 @@ import { OnlyId } from "../../../../types"
 
 export interface SaveSettings {
     Body: {
+        doNotTrack: boolean,
         fqdn: string,
         isAPIDebuggingEnabled: boolean,
         isRegistrationEnabled: boolean,
@@ -10,7 +11,8 @@ export interface SaveSettings {
         maxPort: number,
         isAutoUpdateEnabled: boolean,
         isDNSCheckEnabled: boolean,
-        DNSServers: string
+        DNSServers: string,
+        proxyDefaultRedirect: string
     }
 }
 export interface DeleteDomain {
@@ -20,30 +22,47 @@ export interface DeleteDomain {
 }
 export interface CheckDomain extends OnlyId {
     Body: {
-        fqdn: string, 
-        forceSave: boolean, 
-        dualCerts: boolean, 
-        isDNSCheckEnabled: boolean, 
+        fqdn: string,
+        forceSave: boolean,
+        dualCerts: boolean,
+        isDNSCheckEnabled: boolean,
     }
 }
 export interface CheckDNS {
     Params: {
-        domain: string, 
+        domain: string,
     }
 }
 export interface SaveSSHKey {
     Body: {
-        privateKey: string, 
+        privateKey: string,
         name: string
     }
 }
 export interface DeleteSSHKey {
     Body: {
-       id: string
+        id: string
     }
 }
 export interface OnlyIdInBody {
     Body: {
         id: string
-     }
+    }
+}
+
+export interface SetDefaultRegistry {
+    Body: {
+        id: string
+        username: string
+        password: string
+    }
+}
+export interface AddDefaultRegistry {
+    Body: {
+        url: string
+        name: string
+        username: string
+        password: string
+        isSystemWide: boolean
+    }
 }

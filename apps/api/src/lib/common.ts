@@ -8,21 +8,19 @@ import type { Config } from 'unique-names-generator';
 import generator from 'generate-password';
 import crypto from 'crypto';
 import { promises as dns } from 'dns';
+import * as Sentry from '@sentry/node';
 import { PrismaClient } from '@prisma/client';
 import os from 'os';
 import sshConfig from 'ssh-config';
-
+import jsonwebtoken from 'jsonwebtoken';
 import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
-import * as serviceFields from './services/serviceFields';
 import { saveBuildLog } from './buildPacks/common';
 import { scheduler } from './scheduler';
-import { supportedServiceTypesAndVersions } from './services/supportedVersions';
-import { includeServices } from './services/common';
 
-export const version = '3.10.16';
+export const version = '3.12.0';
 export const isDev = process.env.NODE_ENV === 'development';
-
+export const sentryDSN = 'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
 const algorithm = 'aes-256-ctr';
 const customConfig: Config = {
 	dictionaries: [adjectives, colors, animals],
@@ -31,9 +29,6 @@ const customConfig: Config = {
 	length: 3
 };
 
-export const defaultProxyImage = `coolify-haproxy-alpine:latest`;
-export const defaultProxyImageTcp = `coolify-haproxy-tcp-alpine:latest`;
-export const defaultProxyImageHttp = `coolify-haproxy-http-alpine:latest`;
 export const defaultTraefikImage = `traefik:v2.8`;
 export function getAPIUrl() {
 	if (process.env.GITPOD_WORKSPACE_URL) {
@@ -44,7 +39,7 @@ export function getAPIUrl() {
 	if (process.env.CODESANDBOX_HOST) {
 		return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/, '3001')}`;
 	}
-	return isDev ? 'http://localhost:3001' : 'http://localhost:3000';
+	return isDev ? 'http://host.docker.internal:3001' : 'http://localhost:3000';
 }
 
 export function getUIUrl() {
@@ -198,7 +193,7 @@ export const encrypt = (text: string) => {
 	if (text) {
 		const iv = crypto.randomBytes(16);
 		const cipher = crypto.createCipheriv(algorithm, process.env['COOLIFY_SECRET_KEY'], iv);
-		const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
+		const encrypted = Buffer.concat([cipher.update(text.trim()), cipher.final()]);
 		return JSON.stringify({
 			iv: iv.toString('hex'),
 			content: encrypted.toString('hex')
@@ -244,7 +239,11 @@ export async function isDNSValid(hostname: any, domain: string): Promise<any> {
 }
 
 export function getDomain(domain: string): string {
-	return domain?.replace('https://', '').replace('http://', '');
+	if (domain) {
+		return domain?.replace('https://', '').replace('http://', '');
+	} else {
+		return '';
+	}
 }
 
 export async function isDomainConfigured({
@@ -279,9 +278,7 @@ export async function isDomainConfigured({
 		where: {
 			OR: [
 				{ fqdn: { endsWith: `//${nakedDomain}` } },
-				{ fqdn: { endsWith: `//www.${nakedDomain}` } },
-				{ minio: { apiFqdn: { endsWith: `//${nakedDomain}` } } },
-				{ minio: { apiFqdn: { endsWith: `//www.${nakedDomain}` } } }
+				{ fqdn: { endsWith: `//www.${nakedDomain}` } }
 			],
 			id: { not: checkOwn ? undefined : id },
 			destinationDocker: {
@@ -396,12 +393,6 @@ export function generateTimestamp(): string {
 	return `${day().format('HH:mm:ss.SSS')}`;
 }
 
-export async function listServicesWithIncludes(): Promise<any> {
-	return await prisma.service.findMany({
-		include: includeServices,
-		orderBy: { createdAt: 'desc' }
-	});
-}
 
 export const supportedDatabaseTypesAndVersions = [
 	{
@@ -511,56 +502,62 @@ export async function createRemoteEngineConfiguration(id: string) {
 	const localPort = await getFreeSSHLocalPort(id);
 	const {
 		sshKey: { privateKey },
+		network,
 		remoteIpAddress,
 		remotePort,
 		remoteUser
 	} = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } });
 	await fs.writeFile(sshKeyFile, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 });
 	// Needed for remote docker compose
-	const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(
-		`ps ax | grep [s]sh-agent | grep coolify-ssh-agent.pid | grep -v grep | wc -l`
-	);
-	if (numberOfSSHAgentsRunning !== '' && Number(numberOfSSHAgentsRunning.trim()) == 0) {
-		try {
-			await fs.stat(`/tmp/coolify-ssh-agent.pid`);
-			await fs.rm(`/tmp/coolify-ssh-agent.pid`);
-		} catch (error) { }
-		await asyncExecShell(`eval $(ssh-agent -sa /tmp/coolify-ssh-agent.pid)`);
-	}
-	await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh-add -q ${sshKeyFile}`);
+	// const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(
+	// 	`ps ax | grep [s]sh-agent | grep coolify-ssh-agent.pid | grep -v grep | wc -l`
+	// );
+	// if (numberOfSSHAgentsRunning !== '' && Number(numberOfSSHAgentsRunning.trim()) == 0) {
+	// 	try {
+	// 		await fs.stat(`/tmp/coolify-ssh-agent.pid`);
+	// 		await fs.rm(`/tmp/coolify-ssh-agent.pid`);
+	// 	} catch (error) { }
+	// 	await asyncExecShell(`eval $(ssh-agent -sa /tmp/coolify-ssh-agent.pid)`);
+	// }
+	// await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh-add -q ${sshKeyFile}`);
 
-	const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(
-		`ps ax | grep 'ssh -F /dev/null -o StrictHostKeyChecking no -fNL ${localPort}:localhost:${remotePort}' | grep -v grep | wc -l`
-	);
-	if (numberOfSSHTunnelsRunning !== '' && Number(numberOfSSHTunnelsRunning.trim()) == 0) {
-		try {
-			await asyncExecShell(
-				`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh -F /dev/null -o "StrictHostKeyChecking no" -fNL ${localPort}:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`
-			);
-		} catch (error) { }
-	}
+	// const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(
+	// 	`ps ax | grep 'ssh -F /dev/null -o StrictHostKeyChecking no -fNL ${localPort}:localhost:${remotePort}' | grep -v grep | wc -l`
+	// );
+	// if (numberOfSSHTunnelsRunning !== '' && Number(numberOfSSHTunnelsRunning.trim()) == 0) {
+	// 	try {
+	// 		await asyncExecShell(
+	// 			`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh -F /dev/null -o "StrictHostKeyChecking no" -fNL ${localPort}:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`
+	// 		);
+	// 	} catch (error) { }
+	// }
 	const config = sshConfig.parse('');
-	const foundWildcard = config.find({ Host: '*' });
-	if (!foundWildcard) {
-		config.append({
-			Host: '*',
-			StrictHostKeyChecking: 'no',
-			ControlMaster: 'auto',
-			ControlPath: `${homedir}/.ssh/coolify-%r@%h:%p`,
-			ControlPersist: '10m'
-		})
-	}
-	const found = config.find({ Host: remoteIpAddress });
-	if (!found) {
-		config.append({
-			Host: remoteIpAddress,
-			Hostname: 'localhost',
-			Port: localPort.toString(),
-			User: remoteUser,
-			IdentityFile: sshKeyFile,
-			StrictHostKeyChecking: 'no'
-		});
-	}
+	const Host = `${remoteIpAddress}-remote`
+
+	try {
+		await asyncExecShell(`ssh-keygen -R ${Host}`);
+		await asyncExecShell(`ssh-keygen -R ${remoteIpAddress}`);
+		await asyncExecShell(`ssh-keygen -R localhost:${localPort}`);
+	} catch (error) { }
+
+
+	const found = config.find({ Host });
+	const foundIp = config.find({ Host: remoteIpAddress });
+
+	if (found) config.remove({ Host })
+	if (foundIp) config.remove({ Host: remoteIpAddress })
+
+	config.append({
+		Host,
+		Hostname: remoteIpAddress,
+		Port: remotePort.toString(),
+		User: remoteUser,
+		StrictHostKeyChecking: 'no',
+		IdentityFile: sshKeyFile,
+		ControlMaster: 'auto',
+		ControlPath: `${homedir}/.ssh/coolify-${remoteIpAddress}-%r@%h:%p`,
+		ControlPersist: '10m'
+	});
 
 	try {
 		await fs.stat(`${homedir}/.ssh/`);
@@ -571,27 +568,23 @@ export async function createRemoteEngineConfiguration(id: string) {
 }
 export async function executeSSHCmd({ dockerId, command }) {
 	const { execaCommand } = await import('execa')
-	let { remoteEngine, remoteIpAddress, engine, remoteUser } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
+	let { remoteEngine, remoteIpAddress } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
 	if (remoteEngine) {
 		await createRemoteEngineConfiguration(dockerId)
-		engine = `ssh://${remoteIpAddress}`
-	} else {
-		engine = 'unix:///var/run/docker.sock'
 	}
 	if (process.env.CODESANDBOX_HOST) {
 		if (command.startsWith('docker compose')) {
 			command = command.replace(/docker compose/gi, 'docker-compose')
 		}
 	}
-	command = `ssh ${remoteIpAddress} ${command}`
-	return await execaCommand(command)
+	return await execaCommand(`ssh ${remoteIpAddress}-remote ${command}`)
 }
 export async function executeDockerCmd({ debug, buildId, applicationId, dockerId, command }: { debug?: boolean, buildId?: string, applicationId?: string, dockerId: string, command: string }): Promise<any> {
 	const { execaCommand } = await import('execa')
-	let { remoteEngine, remoteIpAddress, engine, remoteUser } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
+	let { remoteEngine, remoteIpAddress, engine } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
 	if (remoteEngine) {
 		await createRemoteEngineConfiguration(dockerId);
-		engine = `ssh://${remoteIpAddress}`;
+		engine = `ssh://${remoteIpAddress}-remote`;
 	} else {
 		engine = 'unix:///var/run/docker.sock';
 	}
@@ -722,11 +715,14 @@ export async function stopTraefikProxy(
 }
 
 export async function listSettings(): Promise<any> {
-	const settings = await prisma.setting.findFirst({});
-	if (settings.proxyPassword) settings.proxyPassword = decrypt(settings.proxyPassword);
-	return settings;
+	return await prisma.setting.findFirst({});
 }
 
+export function generateToken() {
+	return jsonwebtoken.sign({
+		nbf: Math.floor(Date.now() / 1000) - 30,
+	}, process.env['COOLIFY_SECRET_KEY'])
+}
 export function generatePassword({
 	length = 24,
 	symbols = false,
@@ -977,7 +973,7 @@ export function generateDatabaseConfiguration(database: any, arch: string): Data
 	}
 }
 export function isARM(arch: string) {
-	if (arch === 'arm' || arch === 'arm64') {
+	if (arch === 'arm' || arch === 'arm64' || arch === 'aarch' || arch === 'aarch64') {
 		return true;
 	}
 	return false;
@@ -1095,6 +1091,7 @@ export const createDirectories = async ({
 	repository: string;
 	buildId: string;
 }): Promise<{ workdir: string; repodir: string }> => {
+	repository = repository.replaceAll(' ', '')
 	const repodir = `/tmp/build-sources/${repository}/`;
 	const workdir = `/tmp/build-sources/${repository}/${buildId}`;
 	let workdirFound = false;
@@ -1399,7 +1396,7 @@ export async function startTraefikTCPProxy(
 							`--entrypoints.tcp.address=:${publicPort}`,
 							`--entryPoints.tcp.forwardedHeaders.insecure=true`,
 							`--providers.http.endpoint=${traefikUrl}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp&address=${dependentId}`,
-							'--providers.http.pollTimeout=2s',
+							'--providers.http.pollTimeout=10s',
 							'--log.level=error'
 						],
 						ports: [`${publicPort}:${publicPort}`],
@@ -1447,13 +1444,19 @@ export async function getServiceFromDB({
 	const settings = await prisma.setting.findFirst();
 	const body = await prisma.service.findFirst({
 		where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-		include: includeServices
+		include: {
+			destinationDocker: true,
+			persistentStorage: true,
+			serviceSecret: true,
+			serviceSetting: true,
+			wordpress: true,
+			plausibleAnalytics: true,
+		}
 	});
 	if (!body) {
 		return null
 	}
-	let { type } = body;
-	type = fixType(type);
+	// body.type = fixType(body.type);
 
 	if (body?.serviceSecret.length > 0) {
 		body.serviceSecret = body.serviceSecret.map((s) => {
@@ -1461,86 +1464,17 @@ export async function getServiceFromDB({
 			return s;
 		});
 	}
+	if (body.wordpress) {
+		body.wordpress.ftpPassword = decrypt(body.wordpress.ftpPassword);
+	}
 
-	body[type] = { ...body[type], ...getUpdateableFields(type, body[type]) };
 	return { ...body, settings };
 }
 
-export function getServiceImage(type: string): string {
-	const found = supportedServiceTypesAndVersions.find((t) => t.name === type);
-	if (found) {
-		return found.baseImage;
-	}
-	return '';
-}
-
-export function getServiceImages(type: string): string[] {
-	const found = supportedServiceTypesAndVersions.find((t) => t.name === type);
-	if (found) {
-		return found.images;
-	}
-	return [];
-}
-
-export function saveUpdateableFields(type: string, data: any) {
-	const update = {};
-	if (type && serviceFields[type]) {
-		serviceFields[type].map((k) => {
-			let temp = data[k.name];
-			if (temp) {
-				if (k.isEncrypted) {
-					temp = encrypt(temp);
-				}
-				if (k.isLowerCase) {
-					temp = temp.toLowerCase();
-				}
-				if (k.isNumber) {
-					temp = Number(temp);
-				}
-				if (k.isBoolean) {
-					temp = Boolean(temp);
-				}
-			}
-			if (k.isNumber && temp === '') {
-				temp = null;
-			}
-			update[k.name] = temp;
-		});
-	}
-	return update;
-}
-
-export function getUpdateableFields(type: string, data: any) {
-	const update = {};
-	if (type && serviceFields[type]) {
-		serviceFields[type].map((k) => {
-			let temp = data[k.name];
-			if (temp) {
-				if (k.isEncrypted) {
-					temp = decrypt(temp);
-				}
-				update[k.name] = temp;
-			}
-			update[k.name] = temp;
-		});
-	}
-	return update;
-}
 
 export function fixType(type) {
-	// Hack to fix the type case sensitivity...
-	if (type === 'plausibleanalytics') type = 'plausibleAnalytics';
-	if (type === 'meilisearch') type = 'meiliSearch';
-	return type;
+	return type?.replaceAll(' ', '').toLowerCase() || null;
 }
-
-export const getServiceMainPort = (service: string) => {
-	const serviceType = supportedServiceTypesAndVersions.find((s) => s.name === service);
-	if (serviceType) {
-		return serviceType.ports.main;
-	}
-	return null;
-};
 
 export function makeLabelForServices(type) {
 	return [
@@ -1558,6 +1492,7 @@ export function errorHandler({
 	message: string | any;
 }) {
 	if (message.message) message = message.message;
+	Sentry.captureException(message);
 	throw { status, message };
 }
 export async function generateSshKeyPair(): Promise<{ publicKey: string; privateKey: string }> {
@@ -1681,7 +1616,9 @@ export function persistentVolumes(id, persistentStorage, config) {
 		for (const [key, value] of Object.entries(config)) {
 			if (value.volumes) {
 				for (const volume of value.volumes) {
-					volumeSet.add(volume);
+					if (!volume.startsWith('/')) {
+						volumeSet.add(volume);
+					}
 				}
 			}
 		}

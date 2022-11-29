@@ -6,21 +6,26 @@ import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
-import { asyncExecShell, cleanupDockerStorage, createRemoteEngineConfiguration, decrypt, executeDockerCmd, executeSSHCmd, generateDatabaseConfiguration, getDomain, isDev, listSettings, prisma, startTraefikProxy, startTraefikTCPProxy, version } from './lib/common';
+import socketIO from 'fastify-socket.io'
+import socketIOServer from './realtime'
+
+import { asyncExecShell, cleanupDockerStorage, createRemoteEngineConfiguration, decrypt, executeDockerCmd, executeSSHCmd, generateDatabaseConfiguration, isDev, listSettings, prisma, sentryDSN, startTraefikProxy, startTraefikTCPProxy, version } from './lib/common';
 import { scheduler } from './lib/scheduler';
 import { compareVersions } from 'compare-versions';
 import Graceful from '@ladjs/graceful'
-import axios from 'axios';
+import yaml from 'js-yaml'
 import fs from 'fs/promises';
 import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handlers';
 import { checkContainer } from './lib/docker';
+import { migrateApplicationPersistentStorage, migrateServicesToNewTemplate } from './lib';
+import { refreshTags, refreshTemplates } from './routes/api/v1/handlers';
+import * as Sentry from '@sentry/node';
 declare module 'fastify' {
 	interface FastifyInstance {
 		config: {
 			COOLIFY_APP_ID: string,
 			COOLIFY_SECRET_KEY: string,
 			COOLIFY_DATABASE_URL: string,
-			COOLIFY_SENTRY_DSN: string,
 			COOLIFY_IS_ON: string,
 			COOLIFY_WHITE_LABELED: string,
 			COOLIFY_WHITE_LABELED_ICON: string | null,
@@ -31,6 +36,7 @@ declare module 'fastify' {
 
 const port = isDev ? 3001 : 3000;
 const host = '0.0.0.0';
+
 (async () => {
 	const settings = await prisma.setting.findFirst()
 	const fastify = Fastify({
@@ -51,10 +57,6 @@ const host = '0.0.0.0';
 			COOLIFY_DATABASE_URL: {
 				type: 'string',
 				default: 'file:../db/dev.db'
-			},
-			COOLIFY_SENTRY_DSN: {
-				type: 'string',
-				default: null
 			},
 			COOLIFY_IS_ON: {
 				type: 'string',
@@ -103,27 +105,40 @@ const host = '0.0.0.0';
 	});
 	fastify.register(cookie)
 	fastify.register(cors);
-	fastify.addHook('onRequest', async (request, reply) => {
-		let allowedList = ['coolify:3000'];
-		const { ipv4, ipv6, fqdn } = await prisma.setting.findFirst({})
-
-		ipv4 && allowedList.push(`${ipv4}:3000`);
-		ipv6 && allowedList.push(ipv6);
-		fqdn && allowedList.push(getDomain(fqdn));
-		isDev && allowedList.push('localhost:3000') && allowedList.push('localhost:3001') && allowedList.push('host.docker.internal:3001');
-		const remotes = await prisma.destinationDocker.findMany({ where: { remoteEngine: true, remoteVerified: true } })
-		if (remotes.length > 0) {
-			remotes.forEach(remote => {
-				allowedList.push(`${remote.remoteIpAddress}:3000`);
-			})
-		}
-		if (!allowedList.includes(request.headers.host)) {
-			// console.log('not allowed', request.headers.host)
+	fastify.register(socketIO, {
+		cors: {
+			origin: isDev ? "*" : ''
 		}
 	})
+	// To detect allowed origins
+	// fastify.addHook('onRequest', async (request, reply) => {
+	// 	console.log(request.headers.host)
+	// 	let allowedList = ['coolify:3000'];
+	// 	const { ipv4, ipv6, fqdn } = await prisma.setting.findFirst({})
+
+	// 	ipv4 && allowedList.push(`${ipv4}:3000`);
+	// 	ipv6 && allowedList.push(ipv6);
+	// 	fqdn && allowedList.push(getDomain(fqdn));
+	// 	isDev && allowedList.push('localhost:3000') && allowedList.push('localhost:3001') && allowedList.push('host.docker.internal:3001');
+	// 	const remotes = await prisma.destinationDocker.findMany({ where: { remoteEngine: true, remoteVerified: true } })
+	// 	if (remotes.length > 0) {
+	// 		remotes.forEach(remote => {
+	// 			allowedList.push(`${remote.remoteIpAddress}:3000`);
+	// 		})
+	// 	}
+	// 	if (!allowedList.includes(request.headers.host)) {
+	// 		// console.log('not allowed', request.headers.host)
+	// 	}
+	// })
+
+
 	try {
 		await fastify.listen({ port, host })
+		await socketIOServer(fastify)
 		console.log(`Coolify's API is listening on ${host}:${port}`);
+
+		migrateServicesToNewTemplate();
+		await migrateApplicationPersistentStorage();
 		await initServer();
 
 		const graceful = new Graceful({ brees: [scheduler] });
@@ -145,21 +160,36 @@ const host = '0.0.0.0';
 			await cleanupStorage()
 		}, 60000 * 10)
 
-		// checkProxies and checkFluentBit
+		// checkProxies, checkFluentBit & refresh templates
 		setInterval(async () => {
 			await checkProxies();
 			await checkFluentBit();
-		}, 10000)
+		}, 60000)
+
+		// Refresh and check templates
+		setInterval(async () => {
+			await refreshTemplates()
+		}, 60000)
+
+		setInterval(async () => {
+			await refreshTags()
+		}, 60000)
+
+		setInterval(async () => {
+			await migrateServicesToNewTemplate()
+		}, isDev ? 10000 : 60000)
 
 		setInterval(async () => {
 			await copySSLCertificates();
-		}, 2000)
+		}, 10000)
 
 		await Promise.all([
+			getTagsTemplates(),
 			getArch(),
 			getIPAddress(),
 			configureRemoteDockers(),
 		])
+
 	} catch (error) {
 		console.error(error);
 		process.exit(1);
@@ -172,31 +202,82 @@ async function getIPAddress() {
 	try {
 		const settings = await listSettings();
 		if (!settings.ipv4) {
-			console.log(`Getting public IPv4 address...`);
 			const ipv4 = await publicIpv4({ timeout: 2000 })
+			console.log(`Getting public IPv4 address...`);
 			await prisma.setting.update({ where: { id: settings.id }, data: { ipv4 } })
 		}
 
 		if (!settings.ipv6) {
-			console.log(`Getting public IPv6 address...`);
 			const ipv6 = await publicIpv6({ timeout: 2000 })
+			console.log(`Getting public IPv6 address...`);
 			await prisma.setting.update({ where: { id: settings.id }, data: { ipv6 } })
 		}
 
 	} catch (error) { }
 }
-async function initServer() {
+async function getTagsTemplates() {
+	const { default: got } = await import('got')
 	try {
-		console.log(`Initializing server...`);
+		if (isDev) {
+			const templates = await fs.readFile('./devTemplates.yaml', 'utf8')
+			const tags = await fs.readFile('./devTags.json', 'utf8')
+			await fs.writeFile('./templates.json', JSON.stringify(yaml.load(templates)))
+			await fs.writeFile('./tags.json', tags)
+			console.log('[004] Tags and templates loaded in dev mode...')
+		} else {
+			const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text()
+			const response = await got.get('https://get.coollabs.io/coolify/service-templates.yaml').text()
+			await fs.writeFile('/app/templates.json', JSON.stringify(yaml.load(response)))
+			await fs.writeFile('/app/tags.json', tags)
+			console.log('[004] Tags and templates loaded...')
+		}
+
+	} catch (error) {
+		console.log("Couldn't get latest templates.")
+		console.log(error)
+	}
+}
+async function initServer() {
+	const appId = process.env['COOLIFY_APP_ID'];
+	const settings = await prisma.setting.findUnique({ where: { id: '0' } })
+	try {
+		if (settings.doNotTrack === true) {
+			console.log('[000] Telemetry disabled...')
+
+		} else {
+			if (settings.sentryDSN !== sentryDSN) {
+				await prisma.setting.update({ where: { id: '0' }, data: { sentryDSN } })
+			}
+			// Initialize Sentry
+			Sentry.init({
+				dsn: sentryDSN,
+				environment: isDev ? 'development' : 'production',
+				release: version
+			});
+			console.log('[000] Sentry initialized...')
+		}
+	} catch (error) {
+		console.error(error)
+	}
+	try {
+		console.log(`[001] Initializing server...`);
 		await asyncExecShell(`docker network create --attachable coolify`);
 	} catch (error) { }
 	try {
+		console.log(`[002] Cleanup stucked builds...`);
 		const isOlder = compareVersions('3.8.1', version);
 		if (isOlder === 1) {
 			await prisma.build.updateMany({ where: { status: { in: ['running', 'queued'] } }, data: { status: 'failed' } });
 		}
 	} catch (error) { }
+	try {
+		console.log('[003] Cleaning up old build sources under /tmp/build-sources/...');
+		await fs.rm('/tmp/build-sources', { recursive: true, force: true })
+	} catch (error) {
+		console.log(error)
+	}
 }
+
 async function getArch() {
 	try {
 		const settings = await prisma.setting.findFirst({})
@@ -226,17 +307,15 @@ async function configureRemoteDockers() {
 
 async function autoUpdater() {
 	try {
+		const { default: got } = await import('got')
 		const currentVersion = version;
-		const { data: versions } = await axios
-			.get(
-				`https://get.coollabs.io/versions.json`
-				, {
-					params: {
-						appId: process.env['COOLIFY_APP_ID'] || undefined,
-						version: currentVersion
-					}
-				})
-		const latestVersion = versions['coolify'].main.version;
+		const { coolify } = await got.get('https://get.coollabs.io/versions.json', {
+			searchParams: {
+				appId: process.env['COOLIFY_APP_ID'] || undefined,
+				version: currentVersion
+			}
+		}).json()
+		const latestVersion = coolify.main.version;
 		const isUpdateAvailable = compareVersions(latestVersion, currentVersion);
 		if (isUpdateAvailable === 1) {
 			const activeCount = 0
@@ -258,7 +337,9 @@ async function autoUpdater() {
 				}
 			}
 		}
-	} catch (error) { }
+	} catch (error) {
+		console.log(error)
+	}
 }
 
 async function checkFluentBit() {
@@ -338,17 +419,17 @@ async function checkProxies() {
 		}
 
 		// HTTP Proxies
-		const minioInstances = await prisma.minio.findMany({
-			where: { publicPort: { not: null } },
-			include: { service: { include: { destinationDocker: true } } }
-		});
-		for (const minio of minioInstances) {
-			const { service, publicPort } = minio;
-			const { destinationDockerId, destinationDocker, id } = service;
-			if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
-				await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
-			}
-		}
+		// const minioInstances = await prisma.minio.findMany({
+		// 	where: { publicPort: { not: null } },
+		// 	include: { service: { include: { destinationDocker: true } } }
+		// });
+		// for (const minio of minioInstances) {
+		// 	const { service, publicPort } = minio;
+		// 	const { destinationDockerId, destinationDocker, id } = service;
+		// 	if (destinationDockerId && destinationDocker.isCoolifyProxyUsed) {
+		// 		await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
+		// 	}
+		// }
 	} catch (error) {
 
 	}

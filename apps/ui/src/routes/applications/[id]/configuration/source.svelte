@@ -68,7 +68,9 @@
 </script>
 
 <div class="max-w-screen-2xl mx-auto px-9">
-	<div class="title pb-8">Git App</div>
+	{#if !filteredSources}
+		<div class="title pb-8">Git App</div>
+	{/if}
 	<div class="flex flex-wrap justify-center">
 		{#if !filteredSources}
 			<div class="flex-col">
@@ -76,10 +78,7 @@
 					{$t('application.configuration.no_configurable_git')}
 				</div>
 				<div class="flex justify-center">
-					<a
-						href="/sources/new?from={$page.url.pathname}"
-						class="add-icon bg-orange-600 hover:bg-orange-500"
-					>
+					<a href="/sources/new?from={$page.url.pathname}" class="add-icon">
 						<svg
 							class="w-6"
 							xmlns="http://www.w3.org/2000/svg"
@@ -141,7 +140,7 @@
 							<button
 								disabled={source.gitlabApp && !source.gitlabAppId}
 								type="submit"
-								class="disabled:opacity-95 bg-coolgray-200 disabled:text-white box-selection hover:bg-orange-700 group w-full lg:w-96"
+								class="disabled:opacity-95 disabled:text-white box-selection hover:btn-primary group w-full lg:w-96"
 								class:border-red-500={source.gitlabApp && !source.gitlabAppId}
 								class:border-0={source.gitlabApp && !source.gitlabAppId}
 								class:border-l-4={source.gitlabApp && !source.gitlabAppId}
@@ -244,7 +243,7 @@
 		{/if}
 	</div>
 	<div class="flex flex-row items-center">
-		<div class="title py-4">Public Repository</div>
+		<div class="title py-4 pr-4">Public Repository</div>
 		<DocLink url="https://docs.coollabs.io/coolify/applications/#public-repository" />
 	</div>
 	<PublicRepository />

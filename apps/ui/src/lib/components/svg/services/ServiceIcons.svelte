@@ -1,49 +1,58 @@
 <script lang="ts">
 	export let type: string;
-	export let isAbsolute = true;
-	import * as Icons from '$lib/components/svg/services';
+	export let isAbsolute = false;
+	let fallback = '/icons/default.png';
+	const handleError = (ev: { target: { src: string } }) => (ev.target.src = fallback);
+	let extension = 'png';
+	let svgs = [
+		'gitea',
+		'languagetool',
+		'meilisearch',
+		'n8n',
+		'glitchtip',
+		'searxng',
+		'umami',
+		'uptimekuma',
+		'vaultwarden',
+		'weblate',
+		'wordpress'
+	];
+
+	const name: any =
+		type &&
+		(type[0].toUpperCase() + type.substring(1).toLowerCase())
+			.replaceAll('.', '')
+			.replaceAll(' ', '')
+			.split('-')[0]
+			.toLowerCase();
+
+	if (svgs.includes(name)) {
+		extension = 'svg';
+	}
+
+	function generateClass() {
+		switch (name) {
+			case 'n8n':
+				if (isAbsolute) {
+					return 'w-12 h-12 absolute -m-9 -mt-12';
+				}
+				return 'w-12 h-12 -mt-3';
+			case 'weblate':
+				if (isAbsolute) {
+					return 'w-12 h-12 absolute -m-9 -mt-12';
+				}
+				return 'w-12 h-12 -mt-3';
+			default:
+				return isAbsolute ? 'w-10 h-10 absolute -m-4 -mt-9 left-0' : 'w-10 h-10';
+		}
+	}
 </script>
 
-{#if type === 'plausibleanalytics'}
-	<Icons.PlausibleAnalytics {isAbsolute} />
-{:else if type === 'nocodb'}
-	<Icons.NocoDb {isAbsolute} />
-{:else if type === 'minio'}
-	<Icons.MinIo {isAbsolute} />
-{:else if type === 'vscodeserver'}
-	<Icons.VsCodeServer {isAbsolute} />
-{:else if type === 'wordpress'}
-	<Icons.Wordpress {isAbsolute} />
-{:else if type === 'vaultwarden'}
-	<Icons.VaultWarden {isAbsolute} />
-{:else if type === 'languagetool'}
-	<Icons.LanguageTool {isAbsolute} />
-{:else if type === 'n8n'}
-	<Icons.N8n {isAbsolute} />
-{:else if type === 'uptimekuma'}
-	<Icons.UptimeKuma {isAbsolute} />
-{:else if type === 'ghost'}
-	<Icons.Ghost {isAbsolute} />
-{:else if type === 'meilisearch'}
-	<Icons.MeiliSearch {isAbsolute} />
-{:else if type === 'umami'}
-	<Icons.Umami {isAbsolute} />
-{:else if type === 'hasura'}
-	<Icons.Hasura {isAbsolute} />
-{:else if type === 'fider'}
-	<Icons.Fider {isAbsolute} />
-{:else if type === 'appwrite'}
-	<Icons.Appwrite {isAbsolute} />
-{:else if type === 'moodle'}
-	<Icons.Moodle {isAbsolute} />
-{:else if type === 'glitchTip'}
-	<Icons.GlitchTip {isAbsolute} />
-{:else if type === 'searxng'}
-	<Icons.Searxng {isAbsolute} />
-{:else if type === 'weblate'}
-	<Icons.Weblate {isAbsolute} />
-{:else if type === 'grafana'}
-	<Icons.Grafana {isAbsolute} />
-{:else if type === 'trilium'}
-	<Icons.Trilium {isAbsolute} />
+{#if name}
+	<img
+		class={generateClass()}
+		src={`/icons/${name}.${extension}`}
+		on:error={handleError}
+		alt={`Icon of ${name}`}
+	/>
 {/if}

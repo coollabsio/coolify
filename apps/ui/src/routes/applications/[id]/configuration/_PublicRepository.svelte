@@ -39,12 +39,18 @@
 				if (branch[0] === 'tree' && branch[1]) {
 					branchName = branch[1];
 				}
+				if (branch.length === 1) {
+					branchName = branch[0]
+				}
 			}
 			if (host === 'gitlab.com') {
 				host = 'gitlab.com/api/v4';
 				type = 'gitlab';
 				if (branch[1] === 'tree' && branch[2]) {
 					branchName = branch[2];
+				}
+				if (branch.length === 1) {
+					branchName = branch[0]
 				}
 			}
 			const apiUrl = `${protocol}://${host}`;
@@ -165,7 +171,7 @@
 				placeholder="eg: https://github.com/coollabsio/nodejs-example/tree/main"
 				bind:value={publicRepositoryLink}
 			/>
-				<button class="btn bg-orange-600" type="submit">
+				<button class="btn btn-primary" disabled={loading.branches} type="submit" class:loading={loading.branches}>
 					Load Repository
 				</button>
 			</div>

@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import yaml from 'js-yaml';
 
 import { copyBaseConfigurationFiles, makeLabelForStandaloneApplication, saveBuildLog, setDefaultConfiguration } from '../lib/buildPacks/common';
-import { createDirectories, decrypt, defaultComposeConfiguration, executeDockerCmd, getDomain, prisma, decryptApplication } from '../lib/common';
+import { createDirectories, decrypt, defaultComposeConfiguration, executeDockerCmd, getDomain, prisma, decryptApplication, isDev } from '../lib/common';
 import * as importers from '../lib/importers';
 import * as buildpacks from '../lib/buildPacks';
 
@@ -38,57 +38,71 @@ import * as buildpacks from '../lib/buildPacks';
 					for (const queueBuild of queuedBuilds) {
 						actions.push(async () => {
 							let application = await prisma.application.findUnique({ where: { id: queueBuild.applicationId }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, persistentStorage: true, secrets: true, settings: true, teams: true } })
+
 							let { id: buildId, type, sourceBranch = null, pullmergeRequestId = null, previewApplicationId = null, forceRebuild, sourceRepository = null } = queueBuild
+
 							application = decryptApplication(application)
+
 							const originalApplicationId = application.id
+							const {
+								id: applicationId,
+								name,
+								destinationDocker,
+								destinationDockerId,
+								gitSource,
+								configHash,
+								fqdn,
+								projectId,
+								secrets,
+								phpModules,
+								settings,
+								persistentStorage,
+								pythonWSGI,
+								pythonModule,
+								pythonVariable,
+								denoOptions,
+								exposePort,
+								baseImage,
+								baseBuildImage,
+								deploymentType,
+							} = application
+
+							let {
+								branch,
+								repository,
+								buildPack,
+								port,
+								installCommand,
+								buildCommand,
+								startCommand,
+								baseDirectory,
+								publishDirectory,
+								dockerFileLocation,
+								dockerComposeFileLocation,
+								dockerComposeConfiguration,
+								denoMainFile
+							} = application
+
+							let imageId = applicationId;
+							let domain = getDomain(fqdn);
+
 							if (pullmergeRequestId) {
 								const previewApplications = await prisma.previewApplication.findMany({ where: { applicationId: originalApplicationId, pullmergeRequestId } })
 								if (previewApplications.length > 0) {
 									previewApplicationId = previewApplications[0].id
 								}
+								// Previews, we need to get the source branch and set subdomain
+								branch = sourceBranch;
+								domain = `${pullmergeRequestId}.${domain}`;
+								imageId = `${applicationId}-${pullmergeRequestId}`;
+								repository = sourceRepository || repository;
 							}
-							const usableApplicationId = previewApplicationId || originalApplicationId
+							const { workdir, repodir } = await createDirectories({ repository, buildId });
 							try {
 								if (queueBuild.status === 'running') {
 									await saveBuildLog({ line: 'Building halted, restarting...', buildId, applicationId: application.id });
 								}
-								const {
-									id: applicationId,
-									name,
-									destinationDocker,
-									destinationDockerId,
-									gitSource,
-									configHash,
-									fqdn,
-									gitCommitHash,
-									projectId,
-									secrets,
-									phpModules,
-									settings,
-									persistentStorage,
-									pythonWSGI,
-									pythonModule,
-									pythonVariable,
-									denoOptions,
-									exposePort,
-									baseImage,
-									baseBuildImage,
-									deploymentType,
-								} = application
-								let {
-									branch,
-									repository,
-									buildPack,
-									port,
-									installCommand,
-									buildCommand,
-									startCommand,
-									baseDirectory,
-									publishDirectory,
-									dockerFileLocation,
-									dockerComposeConfiguration,
-									denoMainFile
-								} = application
+
 								const currentHash = crypto
 									.createHash('sha256')
 									.update(
@@ -114,25 +128,18 @@ import * as buildpacks from '../lib/buildPacks';
 									)
 									.digest('hex');
 								const { debug } = settings;
-								let imageId = applicationId;
-								let domain = getDomain(fqdn);
 								const volumes =
 									persistentStorage?.map((storage) => {
-										return `${applicationId}${storage.path.replace(/\//gi, '-')}:${buildPack !== 'docker' ? '/app' : ''
-											}${storage.path}`;
+										if (storage.oldPath) {
+											return `${applicationId}${storage.path.replace(/\//gi, '-').replace('-app', '')}:${storage.path}`;
+										}
+										return `${applicationId}${storage.path.replace(/\//gi, '-')}:${storage.path}`;
 									}) || [];
-								// Previews, we need to get the source branch and set subdomain
-								if (pullmergeRequestId) {
-									branch = sourceBranch;
-									domain = `${pullmergeRequestId}.${domain}`;
-									imageId = `${applicationId}-${pullmergeRequestId}`;
-									repository = sourceRepository || repository;
-								}
+
 
 								try {
 									dockerComposeConfiguration = JSON.parse(dockerComposeConfiguration)
 								} catch (error) { }
-								
 								let deployNeeded = true;
 								let destinationType;
 
@@ -141,7 +148,7 @@ import * as buildpacks from '../lib/buildPacks';
 								}
 								if (destinationType === 'docker') {
 									await prisma.build.update({ where: { id: buildId }, data: { status: 'running' } });
-									const { workdir, repodir } = await createDirectories({ repository, buildId });
+
 									const configuration = await setDefaultConfiguration(application);
 
 									buildPack = configuration.buildPack;
@@ -152,6 +159,7 @@ import * as buildpacks from '../lib/buildPacks';
 									publishDirectory = configuration.publishDirectory;
 									baseDirectory = configuration.baseDirectory || '';
 									dockerFileLocation = configuration.dockerFileLocation;
+									dockerComposeFileLocation = configuration.dockerComposeFileLocation;
 									denoMainFile = configuration.denoMainFile;
 									const commit = await importers[gitSource.type]({
 										applicationId,
@@ -262,6 +270,7 @@ import * as buildpacks from '../lib/buildPacks';
 												pythonVariable,
 												dockerFileLocation,
 												dockerComposeConfiguration,
+												dockerComposeFileLocation,
 												denoMainFile,
 												denoOptions,
 												baseImage,
@@ -316,11 +325,11 @@ import * as buildpacks from '../lib/buildPacks';
 										try {
 											await executeDockerCmd({
 												dockerId: destinationDockerId,
-												command: `docker ps -a --filter 'label=com.docker.compose.service=${applicationId}' --format {{.ID}}|xargs -r -n 1 docker stop -t 0`
+												command: `docker ps -a --filter 'label=com.docker.compose.service=${pullmergeRequestId ? imageId : applicationId}' --format {{.ID}}|xargs -r -n 1 docker stop -t 0`
 											})
 											await executeDockerCmd({
 												dockerId: destinationDockerId,
-												command: `docker ps -a --filter 'label=com.docker.compose.service=${applicationId}' --format {{.ID}}|xargs -r -n 1 docker rm --force`
+												command: `docker ps -a --filter 'label=com.docker.compose.service=${pullmergeRequestId ? imageId : applicationId}' --format {{.ID}}|xargs -r -n 1 docker rm --force`
 											})
 										} catch (error) {
 											//
@@ -420,6 +429,10 @@ import * as buildpacks from '../lib/buildPacks';
 								}
 								if (error !== 1) {
 									await saveBuildLog({ line: error, buildId, applicationId: application.id });
+								}
+							} finally {
+								if (!isDev) {
+									await fs.rm(workdir, { recursive: true, force: true });
 								}
 							}
 						});

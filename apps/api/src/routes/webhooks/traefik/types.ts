@@ -1,4 +1,4 @@
-export interface TraefikOtherConfiguration {
+export interface OtherProxyConfiguration {
     Querystring: {
         id: string,
         privatePort: number,

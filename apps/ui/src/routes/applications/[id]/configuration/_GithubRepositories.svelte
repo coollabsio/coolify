@@ -92,27 +92,9 @@
 			label: branch.name
 		}));
 	}
-	async function isBranchAlreadyUsed(event: any) {
+	async function selectBranch(event: any) {
 		selected.branch = event.detail.value;
-		try {
-			// const data = await get(
-			// 	`/applications/${id}/configuration/repository?repository=${selected.repository}&branch=${selected.branch}`
-			// );
-			// if (data.used) {
-			// 	const sure = confirm($t('application.configuration.branch_already_in_use'));
-			// 	if (sure) {
-			// 		selected.autodeploy = false;
-			// 		showSave = true;
-			// 		return true;
-			// 	}
-			// 	showSave = false;
-			// 	return true;
-			// }
-			showSave = true;
-		} catch (error) {
-			showSave = false;
-			return errorNotification(error);
-		}
+		showSave = true;
 	}
 
 	onMount(async () => {
@@ -178,7 +160,7 @@
 						isWaiting={loading.branches}
 						showIndicator={selected.repository && !loading.branches}
 						id="branches"
-						on:select={isBranchAlreadyUsed}
+						on:select={selectBranch}
 						items={branchSelectOptions}
 						isDisabled={loading.branches || !selected.repository}
 						isClearable={false}
@@ -186,10 +168,9 @@
 				</div></div>
 		<div class="pt-5 flex-col flex justify-center items-center space-y-4">
 			<button
-				class="btn btn-wide"
+				class="btn btn-wide btn-primary"
 				type="submit"
 				disabled={!showSave}
-				class:bg-applications={showSave}
 				>{$t('forms.save')}</button
 			>
 		</div>

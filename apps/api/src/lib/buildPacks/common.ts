@@ -1,4 +1,4 @@
-import { base64Encode, encrypt, executeDockerCmd, generateTimestamp, getDomain, isDev, prisma, version } from "../common";
+import { base64Encode, decrypt, encrypt, executeDockerCmd, generateTimestamp, getDomain, isDev, prisma, version } from "../common";
 import { promises as fs } from 'fs';
 import { day } from "../dayjs";
 
@@ -363,6 +363,7 @@ export const setDefaultConfiguration = async (data: any) => {
 		publishDirectory,
 		baseDirectory,
 		dockerFileLocation,
+		dockerComposeFileLocation,
 		denoMainFile
 	} = data;
 	//@ts-ignore
@@ -392,6 +393,12 @@ export const setDefaultConfiguration = async (data: any) => {
 	} else {
 		dockerFileLocation = '/Dockerfile';
 	}
+	if (dockerComposeFileLocation) {
+		if (!dockerComposeFileLocation.startsWith('/')) dockerComposeFileLocation = `/${dockerComposeFileLocation}`;
+		if (dockerComposeFileLocation.endsWith('/')) dockerComposeFileLocation = dockerComposeFileLocation.slice(0, -1);
+	} else {
+		dockerComposeFileLocation = '/Dockerfile';
+	}
 	if (!denoMainFile) {
 		denoMainFile = 'main.ts';
 	}
@@ -405,6 +412,7 @@ export const setDefaultConfiguration = async (data: any) => {
 		publishDirectory,
 		baseDirectory,
 		dockerFileLocation,
+		dockerComposeFileLocation,
 		denoMainFile
 	};
 };
@@ -462,7 +470,13 @@ export const saveBuildLog = async ({
 	applicationId: string;
 }): Promise<any> => {
 	const { default: got } = await import('got')
-
+	if (typeof line === 'object' && line) {
+		if (line.shortMessage) {
+			line = line.shortMessage + '\n' + line.stderr;
+		} else {
+			line = JSON.stringify(line);
+		}
+	}
 	if (line && typeof line === 'string' && line.includes('ghs_')) {
 		const regex = /ghs_.*@/g;
 		line = line.replace(regex, '<SENSITIVE_DATA_DELETED>@');
@@ -480,7 +494,6 @@ export const saveBuildLog = async ({
 			}
 		})
 	} catch (error) {
-		if (isDev) return
 		return await prisma.buildLog.create({
 			data: {
 				line: addTimestamp, buildId, time: Number(day().valueOf()), applicationId
@@ -572,6 +585,29 @@ export function checkPnpm(installCommand = null, buildCommand = null, startComma
 	);
 }
 
+export async function saveDockerRegistryCredentials({ url, username, password, workdir }) {
+	let decryptedPassword = decrypt(password);
+	const location = `${workdir}/.docker`;
+
+	if (!username || !password) {
+		return null
+	}
+
+	try {
+		await fs.mkdir(`${workdir}/.docker`);
+	} catch (error) {
+		console.log(error);
+	}
+	const payload = JSON.stringify({
+		"auths": {
+			[url]: {
+				"auth": Buffer.from(`${username}:${decryptedPassword}`).toString('base64')
+			}
+		}
+	})
+	await fs.writeFile(`${location}/config.json`, payload)
+	return location
+}
 export async function buildImage({
 	applicationId,
 	tag,
@@ -590,15 +626,18 @@ export async function buildImage({
 	}
 	if (!debug) {
 		await saveBuildLog({
-			line: `Debug turned off. To see more details, allow it in the features tab.`,
+			line: `Debug logging is disabled. Enable it above if necessary!`,
 			buildId,
 			applicationId
 		});
 	}
 	const dockerFile = isCache ? `${dockerFileLocation}-cache` : `${dockerFileLocation}`
 	const cache = `${applicationId}:${tag}${isCache ? '-cache' : ''}`
-	
-	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })	
+	const { dockerRegistry: { url, username, password } } = await prisma.application.findUnique({ where: { id: applicationId }, select: { dockerRegistry: true } })
+	const location = await saveDockerRegistryCredentials({ url, username, password, workdir })
+	console.log(`docker ${location ? `--config ${location}` : ''} build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}`)
+
+	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker ${location ? `--config ${location}` : ''} build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })
 
 	const { status } = await prisma.build.findUnique({ where: { id: buildId } })
 	if (status === 'canceled') {

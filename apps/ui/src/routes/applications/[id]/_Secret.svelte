@@ -39,11 +39,11 @@
 
 	async function addNewSecret() {
 		try {
-			if (!name) return errorNotification({ message: 'Name is required.' });
-			if (!value) return errorNotification({ message: 'Value is required.' });
+			if (!name.trim()) return errorNotification({ message: 'Name is required.' });
+			if (!value.trim()) return errorNotification({ message: 'Value is required.' });
 			await post(`/applications/${id}/secrets`, {
-				name,
-				value,
+				name: name.trim(),
+				value: value.trim(),
 				isBuildSecret
 			});
 			cleanupState();
@@ -64,8 +64,8 @@
 		if (isNewSecret) return;
 		try {
 			await put(`/applications/${id}/secrets`, {
-				name,
-				value,
+				name: name.trim(),
+				value: value.trim(),
 				isBuildSecret: changeIsBuildSecret ? isBuildSecret : undefined
 			});
 			addToast({
@@ -79,10 +79,10 @@
 	}
 </script>
 
-<div class="w-full font-bold grid grid-cols-1 lg:grid-cols-4 gap-2 pb-2">
+<div class="w-full grid grid-cols-1 lg:grid-cols-4 gap-2 pb-2">
 	<div class="flex flex-col">
 		{#if (index === 0 && !isNewSecret) || length === 0}
-			<label for="name" class="pb-2 uppercase">name</label>
+			<label for="name" class="pb-2 uppercase font-bold">name</label>
 		{/if}
 
 		<input
@@ -91,7 +91,7 @@
 			required
 			placeholder="EXAMPLE_VARIABLE"
 			readonly={!isNewSecret}
-			class=" w-full"
+			class="w-full"
 			class:bg-coolblack={!isNewSecret}
 			class:border={!isNewSecret}
 			class:border-dashed={!isNewSecret}
@@ -101,7 +101,7 @@
 	</div>
 	<div class="flex flex-col">
 		{#if (index === 0 && !isNewSecret) || length === 0}
-			<label for="value" class="pb-2 uppercase">value</label>
+			<label for="value" class="pb-2 uppercase font-bold">value</label>
 		{/if}
 
 		<CopyPasswordField
@@ -114,9 +114,12 @@
 	</div>
 	<div class="flex lg:flex-col flex-row justify-start items-center pt-3 lg:pt-0">
 		{#if (index === 0 && !isNewSecret) || length === 0}
-			<label for="name" class="pb-2 uppercase lg:block hidden">Need during buildtime?</label>
+			<label for="name" class="pb-2 uppercase lg:block hidden font-bold"
+				>Need during buildtime?</label
+			>
 		{/if}
-		<label for="name" class="pb-2 uppercase lg:hidden block">Need during buildtime?</label>
+		<label for="name" class="pb-2 uppercase lg:hidden block font-bold">Need during buildtime?</label
+		>
 
 		<div class="flex justify-center h-full items-center pt-0 lg:pt-0 pl-4 lg:pl-0">
 			<button
@@ -166,7 +169,7 @@
 	</div>
 	<div class="flex flex-row lg:flex-col lg:items-center items-start">
 		{#if (index === 0 && !isNewSecret) || length === 0}
-			<label for="name" class="pb-2 uppercase lg:block hidden">Actions</label>
+			<label for="name" class="pb-5 uppercase lg:block hidden font-bold" />
 		{/if}
 
 		<div class="flex justify-center h-full items-center pt-3">

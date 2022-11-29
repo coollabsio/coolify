@@ -65,7 +65,6 @@
 
 <script lang="ts">
 	export let baseSettings: any;
-	export let supportedServiceTypesAndVersions: any;
 	export let pendingInvitations: any = 0;
 
 	$appSession.isRegistrationEnabled = baseSettings.isRegistrationEnabled;
@@ -74,7 +73,6 @@
 	$appSession.version = baseSettings.version;
 	$appSession.whiteLabeled = baseSettings.whiteLabeled;
 	$appSession.whiteLabeledDetails.icon = baseSettings.whiteLabeledIcon;
-	$appSession.supportedServiceTypesAndVersions = supportedServiceTypesAndVersions;
 
 	$appSession.pendingInvitations = pendingInvitations;
 
@@ -83,6 +81,7 @@
 	export let permission: string;
 	export let isAdmin: boolean;
 
+	import { status, io } from '$lib/store';
 	import '../tailwind.css';
 	import Cookies from 'js-cookie';
 	import { fade } from 'svelte/transition';
@@ -95,6 +94,8 @@
 	import { appSession } from '$lib/store';
 	import Toasts from '$lib/components/Toasts.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import { onMount } from 'svelte';
+	import LocalePicker from '$lib/components/LocalePicker.svelte';
 
 	if (userId) $appSession.userId = userId;
 	if (teamId) $appSession.teamId = teamId;
@@ -109,6 +110,16 @@
 			return errorNotification(error);
 		}
 	}
+	onMount(async () => {
+		io.connect();
+		io.on('start-service', (message) => {
+			const { serviceId, state } = message;
+			$status.service.startup[serviceId] = state;
+			if (state === 0 || state === 1) {
+				delete $status.service.startup[serviceId];
+			}
+		});
+	});
 </script>
 
 <svelte:head>
@@ -259,6 +270,7 @@
 							</svg>
 						</a>
 
+						<!-- svelte-ignore a11y-click-events-have-key-events -->
 						<div
 							id="logout"
 							class="icons bg-coolgray-200 hover:text-error cursor-pointer"
@@ -281,13 +293,16 @@
 								<path d="M7 12h14l-3 -3m0 6l3 -3" />
 							</svg>
 						</div>
+						<!-- <div class="lg:block">
+							<LocalePicker/>
+						</div> -->
 						<div
 							class="w-full text-center font-bold text-stone-400 hover:bg-coolgray-200 hover:text-white"
 						>
 							<a
 								class="text-[10px] no-underline"
 								href={`https://github.com/coollabsio/coolify/releases/tag/v${$appSession.version}`}
-								target="_blank">v{$appSession.version}</a
+								target="_blank noreferrer">v{$appSession.version}</a
 							>
 						</div>
 					</div>
@@ -295,24 +310,27 @@
 			</nav>
 			{#if $appSession.whiteLabeled}
 				<span class="fixed bottom-0 left-[50px] z-50 m-2 px-4 text-xs text-stone-700"
-					>Powered by <a href="https://coolify.io" target="_blank">Coolify</a></span
+					>Powered by <a href="https://coolify.io" target="_blank noreferrer">Coolify</a></span
 				>
 			{/if}
 		{/if}
 		<div
-			class="navbar lg:hidden space-x-2 flex flex-row items-center bg-coollabs"
+			class="navbar lg:hidden space-x-2 flex flex-row justify-between bg-coollabs"
 			class:hidden={!$appSession.userId}
 		>
-			<label for="main-drawer" class="drawer-button btn btn-square btn-ghost flex-col">
-				<span class="burger bg-white" />
-				<span class="burger bg-white" />
-				<span class="burger bg-white" />
-			</label>
-			<div class="prose flex flex-row justify-between space-x-1 w-full items-center pr-3">
-				{#if !$appSession.whiteLabeled}
-					<h3 class="mb-0 text-white">Coolify</h3>
-				{/if}
+			<div>
+				<label for="main-drawer" class="drawer-button btn btn-square btn-ghost flex-col">
+					<span class="burger bg-white" />
+					<span class="burger bg-white" />
+					<span class="burger bg-white" />
+				</label>
+				<div class="prose flex flex-row justify-between space-x-1 w-full items-center pr-3">
+					{#if !$appSession.whiteLabeled}
+						<h3 class="mb-0 text-white">Coolify</h3>
+					{/if}
+				</div>
 			</div>
+			<!-- <LocalePicker /> -->
 		</div>
 		<main>
 			<div class={$appSession.userId ? 'lg:pl-16' : null}>
@@ -436,6 +454,7 @@
 				<UpdateAvailable />
 			</div>
 			<li>
+				<!-- svelte-ignore a11y-click-events-have-key-events -->
 				<div class="no-underline icons hover:bg-error" on:click={logout}>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -460,7 +479,7 @@
 				<a
 					class="text-xs hover:bg-coolgray-200 no-underline hover:text-white text-right"
 					href={`https://github.com/coollabsio/coolify/releases/tag/v${$appSession.version}`}
-					target="_blank">v{$appSession.version}</a
+					target="_blank noreferrer">v{$appSession.version}</a
 				>
 			</li>
 		</ul>

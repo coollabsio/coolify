@@ -18,16 +18,13 @@
 
 <script lang="ts">
 	export let settings: any;
-	export let certificates: any;
 	import Setting from '$lib/components/Setting.svelte';
 	import { del, get, post } from '$lib/api';
-	import { browser } from '$app/env';
 	import { t } from '$lib/translations';
 	import { addToast, appSession, features } from '$lib/store';
 	import { asyncSleep, errorNotification, getDomain } from '$lib/common';
-	import Menu from './_Menu.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
-	import Upload from '$lib/components/Upload.svelte';
+	import { dev } from '$app/env';
 
 	let isAPIDebuggingEnabled = settings.isAPIDebuggingEnabled;
 	let isRegistrationEnabled = settings.isRegistrationEnabled;
@@ -37,6 +34,8 @@
 	let DNSServers = settings.DNSServers;
 	let minPort = settings.minPort;
 	let maxPort = settings.maxPort;
+	let proxyDefaultRedirect = settings.proxyDefaultRedirect;
+	let doNotTrack = settings.doNotTrack;
 
 	let forceSave = false;
 	let fqdn = settings.fqdn;
@@ -48,9 +47,61 @@
 		save: false,
 		remove: false,
 		proxyMigration: false,
-		restart: false
+		restart: false,
+		rollback: false
 	};
+	let rollbackVersion = localStorage.getItem('lastVersion');
 
+	async function rollback() {
+		if (rollbackVersion) {
+			const sure = confirm(`Are you sure you want rollback Coolify to ${rollbackVersion}?`);
+			if (sure) {
+				try {
+					loading.rollback = true;
+					console.log('loading.rollback', loading.rollback);
+					if (dev) {
+						console.log('rolling back to', rollbackVersion);
+						await asyncSleep(4000);
+						return window.location.reload();
+					} else {
+						addToast({
+							message: 'Rollback started...',
+							type: 'success'
+						});
+						await post(`/update`, { type: 'update', latestVersion: rollbackVersion });
+						addToast({
+							message: 'Rollback completed.<br><br>Waiting for the new version to start...',
+							type: 'success'
+						});
+
+						let reachable = false;
+						let tries = 0;
+						do {
+							await asyncSleep(4000);
+							try {
+								await get(`/undead`);
+								reachable = true;
+							} catch (error) {
+								reachable = false;
+							}
+							if (reachable) break;
+							tries++;
+						} while (!reachable || tries < 120);
+						addToast({
+							message: 'New version reachable. Reloading...',
+							type: 'success'
+						});
+						await asyncSleep(3000);
+						return window.location.reload();
+					}
+				} catch (error) {
+					return errorNotification(error);
+				} finally {
+					loading.rollback = false;
+				}
+			}
+		}
+	}
 	async function removeFqdn() {
 		if (fqdn) {
 			loading.remove = true;
@@ -67,6 +118,9 @@
 	async function changeSettings(name: any) {
 		try {
 			resetView();
+			if (name === 'doNotTrack') {
+				doNotTrack = !doNotTrack;
+			}
 			if (name === 'isRegistrationEnabled') {
 				isRegistrationEnabled = !isRegistrationEnabled;
 			}
@@ -83,6 +137,7 @@
 				isAPIDebuggingEnabled = !isAPIDebuggingEnabled;
 			}
 			await post(`/settings`, {
+				doNotTrack,
 				isAPIDebuggingEnabled,
 				isRegistrationEnabled,
 				dualCerts,
@@ -106,6 +161,9 @@
 				await post(`/settings/check`, { fqdn, forceSave, dualCerts, isDNSCheckEnabled });
 				await post(`/settings`, { fqdn });
 				return window.location.reload();
+			}
+			if (proxyDefaultRedirect !== settings.proxyDefaultRedirect) {
+				await post(`/settings`, { proxyDefaultRedirect });
 			}
 			if (minPort !== settings.minPort || maxPort !== settings.maxPort) {
 				await post(`/settings`, { minPort, maxPort });
@@ -228,7 +286,7 @@
 			</div>
 		</div>
 		<div class="flex lg:flex-row flex-col">
-			<div class="grid grid-flow-row gap-2  px-4 pr-5">
+			<div class="grid grid-flow-row gap-2 px-4 pr-5">
 				<div class="grid grid-cols-2 items-center">
 					<div>
 						{$t('application.url_fqdn')}
@@ -291,6 +349,49 @@
 						description={$t('setting.generate_www_non_www_ssl')}
 						on:click={() => !isFqdnSet && changeSettings('dualCerts')}
 					/>
+				</div>
+				<div class="grid grid-cols-2 items-center">
+					<div>
+						Default Redirect URL
+						<Explainer
+							position="dropdown-bottom"
+							explanation="You can specify where to redirect all requests that does not have a running resource."
+						/>
+					</div>
+					<input
+						class="w-full"
+						bind:value={proxyDefaultRedirect}
+						readonly={!$appSession.isAdmin}
+						disabled={!$appSession.isAdmin}
+						name="proxyDefaultRedirect"
+						id="proxyDefaultRedirect"
+						pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
+						placeholder="{$t('forms.eg')}: https://coolify.io"
+					/>
+				</div>
+
+				<div class="grid grid-cols-4 items-center">
+					<div class="col-span-2">
+						Rollback to a specific version
+						<Explainer
+							position="dropdown-bottom"
+							explanation="You can rollback to a specific version of Coolify. This will not affect your current running resources.<br><br><a href='https://github.com/coollabsio/coolify/releases' target='_blank'>See available versions</a>"
+						/>
+					</div>
+					<input
+						class="w-full"
+						bind:value={rollbackVersion}
+						readonly={!$appSession.isAdmin}
+						disabled={!$appSession.isAdmin}
+						name="rollbackVersion"
+						id="rollbackVersion"
+					/>
+					<button
+						class:loading={loading.rollback}
+						class="btn btn-primary ml-2"
+						disabled={!rollbackVersion || loading.rollback}
+						on:click|preventDefault|stopPropagation={rollback}>Rollback</button
+					>
 				</div>
 				<div class="grid grid-cols-2 items-center">
 					<div>
@@ -360,6 +461,15 @@
 						title={$t('setting.auto_update_enabled')}
 						description={$t('setting.auto_update_enabled_explainer')}
 						on:click={() => changeSettings('isAutoUpdateEnabled')}
+					/>
+				</div>
+				<div class="grid grid-cols-2 items-center">
+					<Setting
+						id="doNotTrack"
+						bind:setting={doNotTrack}
+						title="Do Not Track"
+						description="Do not send error reports to Coolify developers or any telemetry."
+						on:click={() => changeSettings('doNotTrack')}
 					/>
 				</div>
 			</div>

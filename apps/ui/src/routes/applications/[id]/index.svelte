@@ -61,26 +61,29 @@
 
 	$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
 	let statues: any = {};
-	let loading = false;
+	let loading = {
+		save: false,
+		reloadCompose: false
+	};
 	let fqdnEl: any = null;
 	let forceSave = false;
-	let isPublicRepository = application.settings.isPublicRepository;
-	let apiUrl = application.gitSource.apiUrl;
+	let isPublicRepository = application.settings?.isPublicRepository;
+	let apiUrl = application.gitSource?.apiUrl;
 	let branch = application.branch;
 	let repository = application.repository;
-	let debug = application.settings.debug;
-	let previews = application.settings.previews;
-	let dualCerts = application.settings.dualCerts;
-	let isCustomSSL = application.settings.isCustomSSL;
-	let autodeploy = application.settings.autodeploy;
-	let isBot = application.settings.isBot;
-	let isDBBranching = application.settings.isDBBranching;
-	let htmlUrl = application.gitSource.htmlUrl;
+	let debug = application.settings?.debug;
+	let previews = application.settings?.previews;
+	let dualCerts = application.settings?.dualCerts;
+	let isCustomSSL = application.settings?.isCustomSSL;
+	let autodeploy = application.settings?.autodeploy;
+	let isBot = application.settings?.isBot;
+	let isDBBranching = application.settings?.isDBBranching;
+	let htmlUrl = application.gitSource?.htmlUrl;
 
 	let dockerComposeFile = JSON.parse(application.dockerComposeFile) || null;
 	let dockerComposeServices: any[] = [];
-	let dockerComposeFileLocation = application.dockerComposeFileLocation;
 	let dockerComposeConfiguration = JSON.parse(application.dockerComposeConfiguration) || {};
+	let originalDockerComposeFileLocation = application.dockerComposeFileLocation;
 
 	let baseDatabaseBranch: any = application?.connectedDatabase?.hostedDatabaseDBName || null;
 	let nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
@@ -102,7 +105,6 @@
 			label: 'Uvicorn'
 		}
 	];
-
 	function normalizeDockerServices(services: any[]) {
 		const tempdockerComposeServices = [];
 		for (const [name, data] of Object.entries(services)) {
@@ -237,12 +239,16 @@
 		}
 	}
 	async function handleSubmit(toast: boolean = true) {
-		if (loading) return;
-		if (toast) loading = true;
+		if (loading.save) return;
+		if (toast) loading.save = true;
 		try {
 			nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
-			if (application.deploymentType)
+			if (application.deploymentType) {
 				application.deploymentType = application.deploymentType.toLowerCase();
+			}
+			if (originalDockerComposeFileLocation !== application.dockerComposeFileLocation) {
+				await reloadCompose();
+			}
 			if (!isBot) {
 				await post(`/applications/${id}/check`, {
 					fqdn: application.fqdn,
@@ -299,7 +305,7 @@
 			}
 			return errorNotification(error);
 		} finally {
-			loading = false;
+			loading.save = false;
 		}
 	}
 	async function selectWSGI(event: any) {
@@ -361,6 +367,11 @@
 		});
 	}
 	async function reloadCompose() {
+		if (loading.reloadCompose) return;
+		loading.reloadCompose = true;
+		const composeLocation = application.dockerComposeFileLocation.startsWith('/')
+			? application.dockerComposeFileLocation
+			: `/${application.dockerComposeFileLocation}`;
 		try {
 			if (application.gitSource.type === 'github') {
 				const headers = isPublicRepository
@@ -369,9 +380,10 @@
 							Authorization: `token ${$appSession.tokens.github}`
 					  };
 				const data = await get(
-					`${apiUrl}/repos/${repository}/contents/${dockerComposeFileLocation}?ref=${branch}`,
+					`${apiUrl}/repos/${repository}/contents/${composeLocation}?ref=${branch}`,
 					{
 						...headers,
+						'If-None-Match': '',
 						Accept: 'application/vnd.github.v2.json'
 					}
 				);
@@ -401,7 +413,7 @@
 				});
 				const dockerComposeFileYml = files.find(
 					(file: { name: string; type: string }) =>
-						file.name === dockerComposeFileLocation && file.type === 'blob'
+						file.name === composeLocation && file.type === 'blob'
 				);
 				const id = dockerComposeFileYml.id;
 
@@ -420,13 +432,20 @@
 					await handleSubmit(false);
 				}
 			}
-
+			originalDockerComposeFileLocation = application.dockerComposeFileLocation;
 			addToast({
 				message: 'Compose file reloaded.',
 				type: 'success'
 			});
-		} catch (error) {
+		} catch (error: any) {
+			if (error.message === 'Not Found') {
+				error.message = `Can't find ${application.dockerComposeFileLocation} file.`;
+				errorNotification(error);
+				throw error;
+			}
 			errorNotification(error);
+		} finally {
+			loading.reloadCompose = false;
 		}
 	}
 	$: if ($status.application.statuses) {
@@ -459,15 +478,15 @@
 	<form on:submit|preventDefault={() => handleSubmit()}>
 		<div class="mx-auto w-full">
 			<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
-				<div class="title font-bold pb-3 ">General</div>
+				<div class="title font-bold pb-3">General</div>
 				{#if $appSession.isAdmin}
 					<button
 						class="btn btn-sm  btn-primary"
 						type="submit"
-						class:loading
+						class:loading={loading.save}
 						class:bg-orange-600={forceSave}
 						class:hover:bg-orange-400={forceSave}
-						disabled={loading}>{$t('forms.save')}</button
+						disabled={loading.save}>{$t('forms.save')}</button
 					>
 				{/if}
 			</div>
@@ -482,14 +501,14 @@
 						<input
 							disabled={isDisabled || application.settings.isPublicRepository}
 							class="w-full"
-							value={application.gitSource.name}
+							value={application.gitSource?.name}
 						/>
 					{:else}
 						<a
 							href={`/applications/${id}/configuration/source?from=/applications/${id}`}
 							class="no-underline"
 							><input
-								value={application.gitSource.name}
+								value={application.gitSource?.name}
 								id="gitSource"
 								class="cursor-pointer hover:bg-coolgray-500 w-full"
 							/></a
@@ -529,6 +548,27 @@
 								value="{application.repository}/{application.branch}"
 								id="repository"
 								class="cursor-pointer hover:bg-coolgray-500 w-full"
+							/></a
+						>
+					{/if}
+				</div>
+				<div class="grid grid-cols-2 items-center">
+					<label for="registry">Docker Registry</label>
+					{#if isDisabled}
+						<input
+							class="capitalize w-full"
+							disabled={isDisabled}
+							value={application.dockerRegistry.name}
+						/>
+					{:else}
+						<a
+							href={`/applications/${id}/configuration/registry?from=/applications/${id}`}
+							class="no-underline"
+						>
+							<input
+								value={application.dockerRegistry.name}
+								id="registry"
+								class="cursor-pointer hover:bg-coolgray-500 capitalize w-full"
 							/></a
 						>
 					{/if}
@@ -586,13 +626,13 @@
 							<input
 								bind:this={fqdnEl}
 								class="w-full"
-								required={!application.settings.isBot}
+								required={!application.settings?.isBot}
 								readonly={isDisabled}
 								disabled={isDisabled}
 								name="fqdn"
 								id="fqdn"
-								class:border={!application.settings.isBot && !application.fqdn}
-								class:border-red-500={!application.settings.isBot && !application.fqdn}
+								class:border={!application.settings?.isBot && !application.fqdn}
+								class:border-red-500={!application.settings?.isBot && !application.fqdn}
 								bind:value={application.fqdn}
 								pattern="^https?://([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{'{'}2,{'}'}$"
 								placeholder="eg: https://coollabs.io"
@@ -661,7 +701,7 @@
 			</div>
 			{#if application.buildPack !== 'compose'}
 				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
-					Build & Deploy
+					Configuration
 				</div>
 				<div class="grid grid-flow-row gap-2 px-4 pr-5">
 					{#if application.buildCommand || application.buildPack === 'rust' || application.buildPack === 'laravel'}
@@ -731,7 +771,7 @@
 						</div>
 					{/if}
 					{#if $features.beta}
-						{#if !application.settings.isBot && !application.settings.isPublicRepository}
+						{#if !application.settings?.isBot && !application.settings?.isPublicRepository}
 							<div class="grid grid-cols-2 items-center">
 								<Setting
 									id="isDBBranching"
@@ -855,8 +895,8 @@
 						>
 						<input
 							class="w-full"
-							readonly={!isDisabled}
 							disabled={isDisabled}
+							readonly={!$appSession.isAdmin}
 							name="exposePort"
 							id="exposePort"
 							bind:value={application.exposePort}
@@ -1010,12 +1050,34 @@
 				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
 					Stack <Beta />
 					{#if $appSession.isAdmin}
-						<button class="btn btn-sm  btn-primary" on:click|preventDefault={reloadCompose}
-							>Reload Docker Compose File</button
+						<button
+							class="btn btn-sm btn-primary"
+							class:loading={loading.reloadCompose}
+							disabled={loading.reloadCompose}
+							on:click|preventDefault={reloadCompose}>Reload Docker Compose File</button
 						>
 					{/if}
 				</div>
 				<div class="grid grid-flow-row gap-2">
+					<div class="grid grid-cols-2 items-center px-8 pb-4">
+						<label for="dockerComposeFileLocation"
+							>Docker Compose File Location
+							<Explainer
+								explanation="You can specify a custom docker compose file location. <br> Should be absolute path, like <span class='text-settings font-bold'>/data/docker-compose.yml</span> or <span class='text-settings font-bold'>/docker-compose.yml.</span>"
+							/>
+						</label>
+						<div>
+							<input
+								class="w-full"
+								disabled={isDisabled}
+								readonly={!$appSession.isAdmin}
+								name="dockerComposeFileLocation"
+								id="dockerComposeFileLocation"
+								bind:value={application.dockerComposeFileLocation}
+								placeholder="eg: /docker-compose.yml"
+							/>
+						</div>
+					</div>
 					{#each dockerComposeServices as service}
 						<div
 							class="grid items-center bg-coolgray-100 rounded border border-coolgray-300 p-2 px-4"

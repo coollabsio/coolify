@@ -1,7 +1,14 @@
 <script lang="ts">
 	import { dev } from '$app/env';
 	import { get, post } from '$lib/api';
-	import { addToast, appSession, features, updateLoading, isUpdateAvailable } from '$lib/store';
+	import {
+		addToast,
+		appSession,
+		features,
+		updateLoading,
+		isUpdateAvailable,
+		latestVersion
+	} from '$lib/store';
 	import { asyncSleep, errorNotification } from '$lib/common';
 	import { onMount } from 'svelte';
 	import Tooltip from './Tooltip.svelte';
@@ -11,15 +18,17 @@
 		loading: false,
 		success: null
 	};
-	let latestVersion = 'latest';
 	async function update() {
 		updateStatus.loading = true;
 		try {
 			if (dev) {
-				await asyncSleep(4000);
+				localStorage.setItem('lastVersion', $appSession.version);
+				await asyncSleep(1000);
+				updateStatus.loading = false;
 				return window.location.reload();
 			} else {
-				await post(`/update`, { type: 'update', latestVersion });
+				localStorage.setItem('lastVersion', $appSession.version);
+				await post(`/update`, { type: 'update', latestVersion: $latestVersion });
 				addToast({
 					message: 'Update completed.<br><br>Waiting for the new version to start...',
 					type: 'success'
@@ -62,7 +71,7 @@
 					$updateLoading = true;
 					const data = await get(`/update`);
 					if (overrideVersion || data?.isUpdateAvailable) {
-						latestVersion = overrideVersion || data.latestVersion;
+						$latestVersion = overrideVersion || data.latestVersion;
 						if (overrideVersion) {
 							$isUpdateAvailable = true;
 						} else {
@@ -91,7 +100,7 @@
 				{#if updateStatus.loading}
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						class="lds-heart h-8 w-8"
+						class="lds-heart h-8 w-8 mx-auto"
 						viewBox="0 0 24 24"
 						stroke-width="1.5"
 						stroke="currentColor"

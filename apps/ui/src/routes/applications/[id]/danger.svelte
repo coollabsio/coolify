@@ -61,7 +61,7 @@
 			disabled={!$appSession.isAdmin}
 			class:bg-red-600={$appSession.isAdmin}
 			class:hover:bg-red-500={$appSession.isAdmin}
-			class="btn btn-sm btn-error text-sm"
+			class="btn btn-lg btn-error hover:bg-red-700 text-sm w-64"
 		>
 			Force Delete Application
 		</button>
@@ -71,7 +71,7 @@
 			on:click={() => deleteApplication(application.name, false)}
 			type="submit"
 			disabled={!$appSession.isAdmin}
-			class="btn btn-lg btn-error hover:bg-red-700 text-sm"
+			class="btn btn-lg btn-error hover:bg-red-700 text-sm w-64"
 		>
 			Delete Application
 		</button>

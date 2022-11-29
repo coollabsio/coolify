@@ -19,26 +19,27 @@ model Certificate {
 }
 
 model Setting {
-  id                    String   @id @default(cuid())
-  fqdn                  String?  @unique
-  isAPIDebuggingEnabled Boolean? @default(false)
-  isRegistrationEnabled Boolean  @default(false)
-  dualCerts             Boolean  @default(false)
-  minPort               Int      @default(9000)
-  maxPort               Int      @default(9100)
-  proxyPassword         String
-  proxyUser             String
-  proxyHash             String?
-  isAutoUpdateEnabled   Boolean  @default(false)
-  isDNSCheckEnabled     Boolean  @default(true)
-  DNSServers            String?
-  isTraefikUsed         Boolean  @default(true)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  ipv4                  String?
-  ipv6                  String?
-  arch                  String?
-  concurrentBuilds      Int      @default(1)
+  id                                      String   @id @default(cuid())
+  fqdn                                    String?  @unique
+  dualCerts                               Boolean  @default(false)
+  minPort                                 Int      @default(9000)
+  maxPort                                 Int      @default(9100)
+  DNSServers                              String   @default("1.1.1.1,8.8.8.8")
+  ipv4                                    String?
+  ipv6                                    String?
+  arch                                    String?
+  concurrentBuilds                        Int      @default(1)
+  applicationStoragePathMigrationFinished Boolean  @default(false)
+  proxyDefaultRedirect                    String?
+  doNotTrack                              Boolean  @default(false)
+  sentryDSN                               String?
+  isAPIDebuggingEnabled                   Boolean  @default(false)
+  isRegistrationEnabled                   Boolean  @default(true)
+  isAutoUpdateEnabled                     Boolean  @default(false)
+  isDNSCheckEnabled                       Boolean  @default(true)
+  isTraefikUsed                           Boolean  @default(true)
+  createdAt                               DateTime @default(now())
+  updatedAt                               DateTime @updatedAt
 }
 
 model User {
@@ -81,6 +82,7 @@ model Team {
   service           Service[]
   users             User[]
   certificate       Certificate[]
+  dockerRegistry    DockerRegistry[]
 }
 
 model TeamInvitation {
@@ -135,6 +137,8 @@ model Application {
   teams                      Team[]
   connectedDatabase          ApplicationConnectedDatabase?
   previewApplication         PreviewApplication[]
+  dockerRegistryId           String                         @default("0")
+  dockerRegistry             DockerRegistry                 @relation(fields: [dockerRegistryId], references: [id])
 }
 
 model PreviewApplication {
@@ -186,6 +190,7 @@ model ApplicationPersistentStorage {
   id            String      @id @default(cuid())
   applicationId String
   path          String
+  oldPath       Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   application   Application @relation(fields: [applicationId], references: [id])
@@ -194,14 +199,17 @@ model ApplicationPersistentStorage {
 }
 
 model ServicePersistentStorage {
-  id        String   @id @default(cuid())
-  serviceId String
-  path      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  service   Service  @relation(fields: [serviceId], references: [id])
+  id          String   @id @default(cuid())
+  serviceId   String
+  path        String
+  volumeName  String?
+  predefined  Boolean  @default(false)
+  containerId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  service     Service  @relation(fields: [serviceId], references: [id])
 
-  @@unique([serviceId, path])
+  @@unique([serviceId, containerId, path])
 }
 
 model Secret {
@@ -289,6 +297,20 @@ model SshKey {
   teamId            String?
   team              Team?               @relation(fields: [teamId], references: [id])
   destinationDocker DestinationDocker[]
+}
+
+model DockerRegistry {
+  id           String        @id @default(cuid())
+  name         String
+  url          String
+  username     String?
+  password     String?
+  isSystemWide Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  teamId       String?
+  team         Team?         @relation(fields: [teamId], references: [id])
+  application  Application[]
 }
 
 model GitSource {
@@ -393,12 +415,14 @@ model Service {
   dualCerts           Boolean                    @default(false)
   type                String?
   version             String?
+  templateVersion     String                     @default("0.0.0")
   destinationDockerId String?
   createdAt           DateTime                   @default(now())
   updatedAt           DateTime                   @updatedAt
   destinationDocker   DestinationDocker?         @relation(fields: [destinationDockerId], references: [id])
   persistentStorage   ServicePersistentStorage[]
   serviceSecret       ServiceSecret[]
+  serviceSetting      ServiceSetting[]
   teams               Team[]
 
   fider              Fider?
@@ -416,6 +440,19 @@ model Service {
   searxng            Searxng?
   weblate            Weblate?
   taiga              Taiga?
+}
+
+model ServiceSetting {
+  id           String   @id @default(cuid())
+  serviceId    String
+  name         String
+  value        String
+  variableName String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  service      Service  @relation(fields: [serviceId], references: [id])
+
+  @@unique([serviceId, name])
 }
 
 model PlausibleAnalytics {
@@ -463,10 +500,10 @@ model Wordpress {
   ownMysql              Boolean  @default(false)
   mysqlHost             String?
   mysqlPort             Int?
-  mysqlUser             String
-  mysqlPassword         String
-  mysqlRootUser         String
-  mysqlRootUserPassword String
+  mysqlUser             String?
+  mysqlPassword         String?
+  mysqlRootUser         String?
+  mysqlRootUserPassword String?
   mysqlDatabase         String?
   mysqlPublicPort       Int?
   ftpEnabled            Boolean  @default(false)
@@ -606,8 +643,8 @@ model GlitchTip {
   emailSmtpPort              Int?     @default(25)
   emailSmtpUser              String?
   emailSmtpPassword          String?
-  emailSmtpUseTls            Boolean? @default(false)
-  emailSmtpUseSsl            Boolean? @default(false)
+  emailSmtpUseTls            Boolean  @default(false)
+  emailSmtpUseSsl            Boolean  @default(false)
   emailBackend               String?
   mailgunApiKey              String?
   sendgridApiKey             String?

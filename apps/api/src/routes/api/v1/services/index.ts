@@ -16,7 +16,6 @@ import {
     getServiceStorages,
     getServiceType,
     getServiceUsage,
-    getServiceVersions,
     listServices,
     newService,
     saveService,
@@ -64,16 +63,15 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.get('/:id/configuration/type', async (request) => await getServiceType(request));
     fastify.post<SaveServiceType>('/:id/configuration/type', async (request, reply) => await saveServiceType(request, reply));
 
-    fastify.get<OnlyId>('/:id/configuration/version', async (request) => await getServiceVersions(request));
     fastify.post<SaveServiceVersion>('/:id/configuration/version', async (request, reply) => await saveServiceVersion(request, reply));
 
     fastify.post<SaveServiceDestination>('/:id/configuration/destination', async (request, reply) => await saveServiceDestination(request, reply));
 
     fastify.get<OnlyId>('/:id/usage', async (request) => await getServiceUsage(request));
-    fastify.get<GetServiceLogs>('/:id/logs', async (request) => await getServiceLogs(request));
+    fastify.get<GetServiceLogs>('/:id/logs/:containerId', async (request) => await getServiceLogs(request));
 
-    fastify.post<ServiceStartStop>('/:id/:type/start', async (request) => await startService(request));
-    fastify.post<ServiceStartStop>('/:id/:type/stop', async (request) => await stopService(request));
+    fastify.post<ServiceStartStop>('/:id/start', async (request) => await startService(request, fastify));
+    fastify.post<ServiceStartStop>('/:id/stop', async (request) => await stopService(request));
     fastify.post<ServiceStartStop & SetWordpressSettings & SetGlitchTipSettings>('/:id/:type/settings', async (request, reply) => await setSettingsService(request, reply));
 
     fastify.post<OnlyId>('/:id/plausibleanalytics/activate', async (request, reply) => await activatePlausibleUsers(request, reply));
