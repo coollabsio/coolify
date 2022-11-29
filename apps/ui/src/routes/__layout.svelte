@@ -293,9 +293,9 @@
 								<path d="M7 12h14l-3 -3m0 6l3 -3" />
 							</svg>
 						</div>
-						<div class="lg:block">
+						<!-- <div class="lg:block">
 							<LocalePicker/>
-						</div>
+						</div> -->
 						<div
 							class="w-full text-center font-bold text-stone-400 hover:bg-coolgray-200 hover:text-white"
 						>
@@ -330,7 +330,7 @@
 					{/if}
 				</div>
 			</div>
-			<LocalePicker/>	
+			<!-- <LocalePicker /> -->
 		</div>
 		<main>
 			<div class={$appSession.userId ? 'lg:pl-16' : null}>

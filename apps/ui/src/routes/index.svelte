@@ -29,7 +29,7 @@
 	export let settings: any;
 	export let gitSources: any;
 	export let destinations: any;
-
+	
 	let filtered: any = setInitials();
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
