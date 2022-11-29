@@ -95,6 +95,7 @@
 	import Toasts from '$lib/components/Toasts.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { onMount } from 'svelte';
+	import LocalePicker from '$lib/components/LocalePicker.svelte';
 
 	if (userId) $appSession.userId = userId;
 	if (teamId) $appSession.teamId = teamId;
@@ -292,6 +293,9 @@
 								<path d="M7 12h14l-3 -3m0 6l3 -3" />
 							</svg>
 						</div>
+						<div class="lg:block">
+							<LocalePicker/>
+						</div>
 						<div
 							class="w-full text-center font-bold text-stone-400 hover:bg-coolgray-200 hover:text-white"
 						>
@@ -311,19 +315,22 @@
 			{/if}
 		{/if}
 		<div
-			class="navbar lg:hidden space-x-2 flex flex-row items-center bg-coollabs"
+			class="navbar lg:hidden space-x-2 flex flex-row justify-between bg-coollabs"
 			class:hidden={!$appSession.userId}
 		>
-			<label for="main-drawer" class="drawer-button btn btn-square btn-ghost flex-col">
-				<span class="burger bg-white" />
-				<span class="burger bg-white" />
-				<span class="burger bg-white" />
-			</label>
-			<div class="prose flex flex-row justify-between space-x-1 w-full items-center pr-3">
-				{#if !$appSession.whiteLabeled}
-					<h3 class="mb-0 text-white">Coolify</h3>
-				{/if}
+			<div>
+				<label for="main-drawer" class="drawer-button btn btn-square btn-ghost flex-col">
+					<span class="burger bg-white" />
+					<span class="burger bg-white" />
+					<span class="burger bg-white" />
+				</label>
+				<div class="prose flex flex-row justify-between space-x-1 w-full items-center pr-3">
+					{#if !$appSession.whiteLabeled}
+						<h3 class="mb-0 text-white">Coolify</h3>
+					{/if}
+				</div>
 			</div>
+			<LocalePicker/>	
 		</div>
 		<main>
 			<div class={$appSession.userId ? 'lg:pl-16' : null}>
