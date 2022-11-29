@@ -241,14 +241,6 @@ async function initServer() {
 	const appId = process.env['COOLIFY_APP_ID'];
 	const settings = await prisma.setting.findUnique({ where: { id: '0' } })
 	try {
-		let doNotTrack = false
-		if (appId === '') doNotTrack = true
-		doNotTrack = settings.doNotTrack
-		await prisma.setting.update({ where: { id: '0' }, data: { doNotTrack } })
-	} catch (error) {
-		console.log(error)
-	}
-	try {
 		if (settings.doNotTrack === true) {
 			console.log('[000] Telemetry disabled...')
 
@@ -258,14 +250,12 @@ async function initServer() {
 			}
 			// Initialize Sentry
 			Sentry.init({
-				debug: true,
 				dsn: sentryDSN,
 				environment: isDev ? 'development' : 'production',
 				release: version
 			});
 			console.log('[000] Sentry initialized...')
 		}
-
 	} catch (error) {
 		console.error(error)
 	}
@@ -274,7 +264,7 @@ async function initServer() {
 		await asyncExecShell(`docker network create --attachable coolify`);
 	} catch (error) { }
 	try {
-		console.log(`[002] Set stuck builds to failed...`);
+		console.log(`[002] Cleanup stucked builds...`);
 		const isOlder = compareVersions('3.8.1', version);
 		if (isOlder === 1) {
 			await prisma.build.updateMany({ where: { status: { in: ['running', 'queued'] } }, data: { status: 'failed' } });

@@ -80,7 +80,6 @@ export async function saveSettings(request: FastifyRequest<SaveSettings>, reply:
         }
         if (doNotTrack === false) {
             Sentry.init({
-                debug: true,
                 dsn: sentryDSN,
                 environment: isDev ? 'development' : 'production',
                 release: version

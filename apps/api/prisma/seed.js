@@ -12,9 +12,7 @@ async function main() {
 		await prisma.setting.create({
 			data: {
 				id: '0',
-				isRegistrationEnabled: true,
 				arch: process.arch,
-				DNSServers: '1.1.1.1,8.8.8.8'
 			}
 		});
 	} else {
@@ -23,11 +21,11 @@ async function main() {
 				id: settingsFound.id
 			},
 			data: {
-				id: '0',
-				isTraefikUsed: true,
+				id: '0'
 			}
 		});
 	}
+	// Create local docker engine
 	const localDocker = await prisma.destinationDocker.findFirst({
 		where: { engine: '/var/run/docker.sock' }
 	});
@@ -52,11 +50,9 @@ async function main() {
 			isAutoUpdateEnabled
 		}
 	});
+	// Create public github source
 	const github = await prisma.gitSource.findFirst({
 		where: { htmlUrl: 'https://github.com', forPublic: true }
-	});
-	const gitlab = await prisma.gitSource.findFirst({
-		where: { htmlUrl: 'https://gitlab.com', forPublic: true }
 	});
 	if (!github) {
 		await prisma.gitSource.create({
@@ -69,6 +65,10 @@ async function main() {
 			}
 		});
 	}
+	// Create public gitlab source
+	const gitlab = await prisma.gitSource.findFirst({
+		where: { htmlUrl: 'https://gitlab.com', forPublic: true }
+	});
 	if (!gitlab) {
 		await prisma.gitSource.create({
 			data: {

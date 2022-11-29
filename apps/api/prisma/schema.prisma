@@ -24,7 +24,7 @@ model Setting {
   dualCerts                               Boolean  @default(false)
   minPort                                 Int      @default(9000)
   maxPort                                 Int      @default(9100)
-  DNSServers                              String?
+  DNSServers                              String   @default("1.1.1.1,8.8.8.8")
   ipv4                                    String?
   ipv6                                    String?
   arch                                    String?
@@ -34,7 +34,7 @@ model Setting {
   doNotTrack                              Boolean  @default(false)
   sentryDSN                               String?
   isAPIDebuggingEnabled                   Boolean  @default(false)
-  isRegistrationEnabled                   Boolean  @default(false)
+  isRegistrationEnabled                   Boolean  @default(true)
   isAutoUpdateEnabled                     Boolean  @default(false)
   isDNSCheckEnabled                       Boolean  @default(true)
   isTraefikUsed                           Boolean  @default(true)
