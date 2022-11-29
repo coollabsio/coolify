@@ -68,6 +68,7 @@
 	export let sentryDSN: any;
 	export let baseSettings: any;
 	export let pendingInvitations: any = 0;
+	console.log(settings, sentryDSN);
 
 	$appSession.isRegistrationEnabled = baseSettings.isRegistrationEnabled;
 	$appSession.ipv4 = baseSettings.ipv4;
