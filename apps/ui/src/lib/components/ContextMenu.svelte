@@ -1,4 +1,4 @@
-<nav class="header justify-between px-0 mb-5" style="border-bottom: 2px solid #666;">
-  <slot />
-  <slot name="actions"></slot>
+<nav class="header justify-between px-2 mb-5 lg:px-10">
+	<slot />
+	<slot name="actions" />
 </nav>

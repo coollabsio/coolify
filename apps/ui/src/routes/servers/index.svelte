@@ -58,18 +58,17 @@
 	{/if}
 </div>
 
-<div class="flex items-center mt-10">
+<ContextMenu>
 	<h1 class="title lg:text-3xl">Destinations</h1>
-</div>
+</ContextMenu>
 
 {#if destinations.length > 0}
-	<div class="divider" />
 	<Grid3>
 		{#if destinations.length > 0}
 			{#each destinations as destination}
 				<a class="no-underline mb-5" href={`/destinations/${destination.id}`}>
 					<div
-						class="w-full rounded p-5 bg-coolgray-200 hover:bg-destinations indicator duration-150"
+						class="w-full rounded p-5 bg-coolgray-200 indicator duration-150"
 					>
 						<div class="w-full flex flex-row">
 							<div class="absolute top-0 left-0 -m-5 h-10 w-10">
