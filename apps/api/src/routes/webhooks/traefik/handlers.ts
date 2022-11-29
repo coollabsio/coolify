@@ -341,7 +341,6 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 						if (containers.length > 0) {
 							for (const container of containers) {
 								const previewDomain = `${container.split('-')[1]}${coolifySettings.previewSeparator}${domain}`;
-								console.log(previewDomain)
 								const nakedDomain = previewDomain.replace(/^www\./, '');
 								const pathPrefix = '/'
 								const serviceId = `${container}-${port || 'default'}`
