@@ -9,7 +9,7 @@
     "db:studio": "prisma studio",
     "db:migrate": "COOLIFY_DATABASE_URL=file:../db/migration.db prisma migrate dev --skip-seed --name",
     "dev": "nodemon",
-    "build": "rimraf build && esbuild `find src \\( -name '*.ts' \\)| grep -v client/` --minify=true --platform=node --outdir=build --format=cjs",
+    "build": "rimraf build && esbuild `find src \\( -name '*.ts' \\)| grep -v client/` --platform=node --outdir=build --format=cjs",
     "format": "prettier --write 'src/**/*.{js,ts,json,md}'",
     "lint": "prettier --check 'src/**/*.{js,ts,json,md}' && eslint --ignore-path .eslintignore .",
     "start": "NODE_ENV=production pnpm prisma migrate deploy && pnpm prisma generate && pnpm prisma db seed && node index.js"
