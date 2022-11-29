@@ -9,6 +9,7 @@ export default async function ({
 	githubAppId,
 	repository,
 	apiUrl,
+	gitCommitHash,
 	htmlUrl,
 	branch,
 	buildId,
@@ -20,6 +21,7 @@ export default async function ({
 	githubAppId: string;
 	repository: string;
 	apiUrl: string;
+	gitCommitHash?: string;
 	htmlUrl: string;
 	branch: string;
 	buildId: string;
@@ -36,7 +38,7 @@ export default async function ({
 			applicationId
 		});
 		await asyncExecShell(
-			`git clone -q -b ${branch} https://${url}/${repository}.git ${workdir}/ && cd ${workdir} && git submodule update --init --recursive && git lfs pull && cd .. `
+			`git clone -q -b ${branch} https://${url}/${repository}.git ${workdir}/ && cd ${workdir} && git checkout ${gitCommitHash || "-"} && git submodule update --init --recursive && git lfs pull && cd .. `
 		);
 
 	} else {
@@ -67,7 +69,7 @@ export default async function ({
 			applicationId
 		});
 		await asyncExecShell(
-			`git clone -q -b ${branch} https://x-access-token:${token}@${url}/${repository}.git --config core.sshCommand="ssh -p ${customPort}" ${workdir}/ && cd ${workdir} && git submodule update --init --recursive && git lfs pull && cd .. `
+			`git clone -q -b ${branch} https://x-access-token:${token}@${url}/${repository}.git --config core.sshCommand="ssh -p ${customPort}" ${workdir}/ && cd ${workdir} && git checkout ${gitCommitHash || "-"} && git submodule update --init --recursive && git lfs pull && cd .. `
 		);
 	}
 	const { stdout: commit } = await asyncExecShell(`cd ${workdir}/ && git rev-parse HEAD`);

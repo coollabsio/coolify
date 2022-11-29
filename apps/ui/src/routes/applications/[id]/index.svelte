@@ -516,6 +516,23 @@
 					{/if}
 				</div>
 				<div class="grid grid-cols-2 items-center">
+					<label for="repository">Git commit</label>
+					{#if isDisabled}
+						<input
+							class="w-full"
+							disabled={isDisabled || application.settings.isPublicRepository}
+							placeholder="default: latest commit"
+							bind:value={application.gitCommitHash}
+						/>
+					{:else}
+						<input
+							class="w-full"
+							placeholder="default: latest commit"
+							bind:value={application.gitCommitHash}
+						/>
+					{/if}
+				</div>
+				<div class="grid grid-cols-2 items-center">
 					<label for="repository">{$t('application.git_repository')}</label>
 					{#if isDisabled || application.settings.isPublicRepository}
 						<input

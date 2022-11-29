@@ -126,6 +126,7 @@ model Application {
   updatedAt                  DateTime                       @updatedAt
   destinationDockerId        String?
   gitSourceId                String?
+  gitCommitHash              String?
   baseImage                  String?
   baseBuildImage             String?
   gitSource                  GitSource?                     @relation(fields: [gitSourceId], references: [id])

@@ -169,6 +169,8 @@ import * as buildpacks from '../lib/buildPacks';
 										githubAppId: gitSource.githubApp?.id,
 										gitlabAppId: gitSource.gitlabApp?.id,
 										customPort: gitSource.customPort,
+										gitCommitHash: gitCommitHash,
+										configuration,
 										repository,
 										branch,
 										buildId,
