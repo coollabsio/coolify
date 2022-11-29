@@ -1,6 +1,3 @@
--- AlterTable
-ALTER TABLE "Application" ADD COLUMN "gitCommitHash" TEXT;
-
 -- RedefineTables
 PRAGMA foreign_keys=OFF;
 CREATE TABLE "new_Setting" (
