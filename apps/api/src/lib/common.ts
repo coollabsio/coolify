@@ -1486,13 +1486,17 @@ export function makeLabelForServices(type) {
 }
 export function errorHandler({
 	status = 500,
-	message = 'Unknown error.'
+	message = 'Unknown error.',
+	type = 'normal'
 }: {
 	status: number;
 	message: string | any;
+	type?: string | null;
 }) {
 	if (message.message) message = message.message;
-	Sentry.captureException(message);
+	if (type === 'normal') {
+		Sentry.captureException(message);
+	}
 	throw { status, message };
 }
 export async function generateSshKeyPair(): Promise<{ publicKey: string; privateKey: string }> {

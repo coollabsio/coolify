@@ -44,7 +44,7 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
         const allowedActions = ['opened', 'reopen', 'close', 'open', 'update'];
         const webhookToken = request.headers['x-gitlab-token'];
         if (!webhookToken && !isDev) {
-            throw { status: 500, message: 'Invalid webhookToken.' }
+            throw { status: 500, message: 'Invalid webhookToken.', type: 'webhook' }
         }
         const settings = await prisma.setting.findUnique({ where: { id: '0' } });
         if (objectKind === 'push') {
@@ -96,10 +96,10 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
             const pullmergeRequestId = request.body.object_attributes.iid.toString();
             const projectId = Number(id);
             if (!allowedActions.includes(action)) {
-                throw { status: 500, message: 'Action not allowed.' }
+                throw { status: 500, message: 'Action not allowed.', type: 'webhook' }
             }
             if (isDraft) {
-                throw { status: 500, message: 'Draft MR, do nothing.' }
+                throw { status: 500, message: 'Draft MR, do nothing.', type: 'webhook' }
             }
             const applicationsFound = await getApplicationFromDBWebhook(projectId, targetBranch);
             if (applicationsFound && applicationsFound.length > 0) {
@@ -114,11 +114,11 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                                 }
                             );
                             if (!isRunning) {
-                                throw { status: 500, message: 'Application not running.' }
+                                throw { status: 500, message: 'Application not running.', type: 'webhook' }
                             }
                         }
                         if (!isDev && application.gitSource.gitlabApp.webhookToken !== webhookToken) {
-                            throw { status: 500, message: 'Invalid webhookToken. Are you doing something nasty?!' }
+                            throw { status: 500, message: 'Invalid webhookToken. Are you doing something nasty?!', type: 'webhook' }
                         }
                         if (
                             action === 'opened' ||
@@ -189,7 +189,7 @@ export async function gitLabEvents(request: FastifyRequest<GitLabEvents>) {
                 }
             }
         }
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
+    } catch ({ status, message, type }) {
+        return errorHandler({ status, message, type })
     }
 }

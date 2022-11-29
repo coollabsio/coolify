@@ -71,7 +71,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
         const githubEvent = request.headers['x-github-event']?.toString().toLowerCase();
         const githubSignature = request.headers['x-hub-signature-256']?.toString().toLowerCase();
         if (!allowedGithubEvents.includes(githubEvent)) {
-            throw { status: 500, message: 'Event not allowed.' }
+            throw { status: 500, message: 'Event not allowed.', type: 'webhook' }
         }
         if (githubEvent === 'ping') {
             return { pong: 'cool' }
@@ -89,7 +89,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
             branch = body.pull_request.base.ref
         }
         if (!projectId || !branch) {
-            throw { status: 500, message: 'Cannot parse projectId or branch from the webhook?!' }
+            throw { status: 500, message: 'Cannot parse projectId or branch from the webhook?!', type: 'webhook' }
         }
         const applicationsFound = await getApplicationFromDBWebhook(projectId, branch);
         const settings = await prisma.setting.findUnique({ where: { id: '0' } });
@@ -107,7 +107,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                     const checksum = Buffer.from(githubSignature, 'utf8');
                     //@ts-ignore
                     if (checksum.length !== digest.length || !crypto.timingSafeEqual(digest, checksum)) {
-                        throw { status: 500, message: 'SHA256 checksum failed. Are you doing something fishy?' }
+                        throw { status: 500, message: 'SHA256 checksum failed. Are you doing something fishy?', type: 'webhook' }
                     };
                 }
 
@@ -157,7 +157,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                     const sourceBranch = body.pull_request.head.ref
                     const sourceRepository = body.pull_request.head.repo.full_name
                     if (!allowedActions.includes(pullmergeRequestAction)) {
-                        throw { status: 500, message: 'Action not allowed.' }
+                        throw { status: 500, message: 'Action not allowed.', type: 'webhook' }
                     }
 
                     if (application.settings.previews) {
@@ -169,7 +169,7 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                                 }
                             );
                             if (!isRunning) {
-                                throw { status: 500, message: 'Application not running.' }
+                                throw { status: 500, message: 'Application not running.', type: 'webhook' }
                             }
                         }
                         if (
@@ -258,8 +258,8 @@ export async function gitHubEvents(request: FastifyRequest<GitHubEvents>): Promi
                 }
             }
         }
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
+    } catch ({ status, message, type }) {
+        return errorHandler({ status, message, type })
     }
 
 }

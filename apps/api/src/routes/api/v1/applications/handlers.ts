@@ -281,7 +281,7 @@ export async function getApplicationFromDBWebhook(projectId: number, branch: str
             }
         });
         if (applications.length === 0) {
-            throw { status: 500, message: 'Application not configured.' }
+            throw { status: 500, message: 'Application not configured.', type: 'webhook' }
         }
         applications = applications.map((application: any) => {
             application = decryptApplication(application);
@@ -303,8 +303,8 @@ export async function getApplicationFromDBWebhook(projectId: number, branch: str
 
         return applications;
 
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
+    } catch ({ status, message, type }) {
+        return errorHandler({ status, message, type })
     }
 }
 export async function saveApplication(request: FastifyRequest<SaveApplication>, reply: FastifyReply) {
