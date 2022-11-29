@@ -1492,7 +1492,7 @@ export function errorHandler({
 	message: string | any;
 }) {
 	if (message.message) message = message.message;
-	Sentry.captureException({ status, message });
+	Sentry.captureException(message);
 	throw { status, message };
 }
 export async function generateSshKeyPair(): Promise<{ publicKey: string; privateKey: string }> {

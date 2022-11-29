@@ -239,13 +239,13 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                 if (value === '$$generate_fqdn') {
                     strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn + '"' || '' + '"')
                 } else if (value === '$$generate_fqdn_slash') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn + '/'  + '"')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn + '/' + '"')
                 } else if (value === '$$generate_domain') {
                     strParsedTemplate = strParsedTemplate.replaceAll(regex, getDomain(service.fqdn) + '"')
                 } else if (service.destinationDocker?.network && value === '$$generate_network') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.destinationDocker.network  + '"')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.destinationDocker.network + '"')
                 } else {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value  + '"')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value + '"')
                 }
             }
         }
