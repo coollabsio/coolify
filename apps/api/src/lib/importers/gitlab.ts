@@ -42,11 +42,11 @@ export default async function ({
 
 	if (forPublic) {
 		await asyncExecShell(
-			`git clone -q -b ${branch} https://${url}/${repository}.git ${workdir}/ && cd ${workdir}/ && git checkout ${gitCommitHash || "-"} && git submodule update --init --recursive && git lfs pull && cd .. `
+			`git clone -q -b ${branch} https://${url}/${repository}.git ${workdir}/ && cd ${workdir}/ && git checkout ${gitCommitHash || ""} && git submodule update --init --recursive && git lfs pull && cd .. `
 		);
 	} else {
 		await asyncExecShell(
-			`git clone -q -b ${branch} git@${url}:${repository}.git --config core.sshCommand="ssh -p ${customPort} -q -i ${repodir}id.rsa -o StrictHostKeyChecking=no" ${workdir}/ && cd ${workdir}/ && git checkout ${gitCommitHash || "-"} && git submodule update --init --recursive && git lfs pull && cd .. `
+			`git clone -q -b ${branch} git@${url}:${repository}.git --config core.sshCommand="ssh -p ${customPort} -q -i ${repodir}id.rsa -o StrictHostKeyChecking=no" ${workdir}/ && cd ${workdir}/ && git checkout ${gitCommitHash || ""} && git submodule update --init --recursive && git lfs pull && cd .. `
 		);
 	}
 	
