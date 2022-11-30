@@ -667,7 +667,7 @@ export async function buildImage({
 
 	const { status } = await prisma.build.findUnique({ where: { id: buildId } })
 	if (status === 'canceled') {
-		throw new Error('Deployment |  Canceled!!!')
+		throw new Error('Deployment | Canceled.')
 	}
 	if (isCache) {
 		await saveBuildLog({ line: `Cache | Successful! 🎉`, buildId, applicationId });
