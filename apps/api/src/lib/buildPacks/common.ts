@@ -326,8 +326,8 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 	};
 	if (nodeBased.includes(buildPack)) {
 		if (deploymentType === 'static') {
-			payload.baseImage = 'webdevops/nginx:alpine';
-			payload.baseImages = staticVersions
+			payload.baseImage = isARM(process.arch) ? 'nginx:alpine' : 'webdevops/nginx:alpine';
+			payload.baseImages = isARM(process.arch) ? staticVersions.filter((version) => !version.value.includes('webdevops')) : staticVersions;
 			payload.baseBuildImage = 'node:lts';
 			payload.baseBuildImages = nodeVersions;
 		} else {
@@ -339,7 +339,7 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 	}
 	if (staticApps.includes(buildPack)) {
 		payload.baseImage = isARM(process.arch) ? 'nginx:alpine' : 'webdevops/nginx:alpine';
-		payload.baseImages = staticVersions.filter((version) => !version.value.includes('webdevops'));
+		payload.baseImages = isARM(process.arch) ? staticVersions.filter((version) => !version.value.includes('webdevops')) : staticVersions;
 		payload.baseBuildImage = 'node:lts';
 		payload.baseBuildImages = nodeVersions;
 	}
@@ -358,11 +358,11 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 	}
 	if (buildPack === 'php') {
 		payload.baseImage = isARM(process.arch) ? 'php:8.1-fpm-alpine' : 'webdevops/php-apache:8.2-alpine';
-		payload.baseImages = phpVersions.filter((version) => !version.value.includes('webdevops'));
+		payload.baseImages = isARM(process.arch) ? phpVersions.filter((version) => !version.value.includes('webdevops')) : phpVersions
 	}
 	if (buildPack === 'laravel') {
 		payload.baseImage = isARM(process.arch) ? 'php:8.1-fpm-alpine' : 'webdevops/php-apache:8.2-alpine';
-		payload.baseImages = phpVersions.filter((version) => !version.value.includes('webdevops'));
+		payload.baseImages = isARM(process.arch) ? phpVersions.filter((version) => !version.value.includes('webdevops')) : phpVersions
 		payload.baseBuildImage = 'node:18';
 		payload.baseBuildImages = nodeVersions;
 	}
