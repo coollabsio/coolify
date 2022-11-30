@@ -18,7 +18,11 @@ const createDockerfile = async (data, image): Promise<void> => {
 	const Dockerfile: Array<string> = [];
 
 	Dockerfile.push(`FROM ${image}`);
-	Dockerfile.push('WORKDIR /app');
+	if (baseImage?.includes('httpd')) {
+		Dockerfile.push('WORKDIR /usr/local/apache2/htdocs/');
+	} else {
+		Dockerfile.push('WORKDIR /app');
+	}
 	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {

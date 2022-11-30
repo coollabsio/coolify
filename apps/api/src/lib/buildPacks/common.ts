@@ -58,8 +58,8 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 			label: 'nginx:alpine'
 		},
 		{
-			value: 'apache:alpine',
-			label: 'apache:alpine'
+			value: 'httpd:alpine',
+			label: 'httpd:alpine (Apache)'
 		}
 	];
 	const rustVersions = [
@@ -592,6 +592,7 @@ export async function copyBaseConfigurationFiles(
             `
 			);
 		}
+		// TODO: Add more configuration files for other buildpacks, like apache2, etc.
 	} catch (error) {
 		throw new Error(error);
 	}
