@@ -301,7 +301,7 @@ import * as buildpacks from '../lib/buildPacks';
 										}
 										try {
 											await executeDockerCmd({ debug, buildId, applicationId, dockerId: destinationDocker.id, command: `docker compose --project-directory ${workdir} up -d` })
-											await saveBuildLog({ line: 'Deployment |  Successful! 🎉', buildId, applicationId });
+											await saveBuildLog({ line: 'Deployment | Successful! 🎉', buildId, applicationId });
 											await prisma.build.update({ where: { id: buildId }, data: { status: 'success' } });
 											await prisma.application.update({
 												where: { id: applicationId },
@@ -362,7 +362,7 @@ import * as buildpacks from '../lib/buildPacks';
 											//
 										}
 										try {
-											await saveBuildLog({ line: 'Deployment |  Deployment initiated.', buildId, applicationId });
+											await saveBuildLog({ line: 'Deployment | Deployment initiated.', buildId, applicationId });
 											const composeVolumes = volumes.map((volume) => {
 												return {
 													[`${volume.split(':')[0]}`]: {
@@ -394,7 +394,7 @@ import * as buildpacks from '../lib/buildPacks';
 											};
 											await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
 											await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose --project-directory ${workdir} up -d` })
-											await saveBuildLog({ line: 'Deployment |  Successful! 🎉', buildId, applicationId });
+											await saveBuildLog({ line: 'Deployment | Successful! 🎉', buildId, applicationId });
 										} catch (error) {
 											await saveBuildLog({ line: error, buildId, applicationId });
 											const foundBuild = await prisma.build.findUnique({ where: { id: buildId } })
