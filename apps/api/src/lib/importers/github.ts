@@ -30,16 +30,16 @@ export default async function ({
 }): Promise<string> {
 	const { default: got } = await import('got')
 	const url = htmlUrl.replace('https://', '').replace('http://', '');
-	await saveBuildLog({ line: '[IMPORTER] Warming up GitHub importer.', buildId, applicationId });
+	await saveBuildLog({ line: 'Importer | Warming up GitHub importer.', buildId, applicationId });
 	if (forPublic) {
 		await saveBuildLog({
-			line: `[IMPORTER] Cloning ${repository}:${branch} branch.`,
+			line: `Importer | Cloning ${repository}:${branch} branch.`,
 			buildId,
 			applicationId
 		});
 		if (gitCommitHash) {
 			await saveBuildLog({
-				line: `[IMPORTER] Checking out ${gitCommitHash} commit.`,
+				line: `Importer | Checking out ${gitCommitHash} commit.`,
 				buildId,
 				applicationId
 			});
@@ -71,13 +71,13 @@ export default async function ({
 			})
 			.json();
 		await saveBuildLog({
-			line: `[IMPORTER] Cloning ${repository}:${branch} branch.`,
+			line: `Importer | Cloning ${repository}:${branch} branch.`,
 			buildId,
 			applicationId
 		});
 		if (gitCommitHash) {
 			await saveBuildLog({
-				line: `[IMPORTER] Checking out ${gitCommitHash} commit.`,
+				line: `Importer | Checking out ${gitCommitHash} commit.`,
 				buildId,
 				applicationId
 			});

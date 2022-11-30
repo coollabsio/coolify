@@ -1535,7 +1535,7 @@ export async function stopBuild(buildId, applicationId) {
 						scheduler.workers.get('deployApplication').postMessage('cancel');
 					}
 					await cleanupDB(buildId, applicationId);
-					return reject(new Error('[DEPLOYMENT] Canceled!!!'));
+					return reject(new Error('Deployment |  Canceled!!!'));
 				}
 				const { stdout: buildContainers } = await executeDockerCmd({
 					dockerId,
@@ -1568,7 +1568,7 @@ async function cleanupDB(buildId: string, applicationId: string) {
 	if (data?.status === 'queued' || data?.status === 'running') {
 		await prisma.build.update({ where: { id: buildId }, data: { status: 'canceled' } });
 	}
-	await saveBuildLog({ line: '[DEPLOYMENT] Canceled!!!', buildId, applicationId });
+	await saveBuildLog({ line: 'Deployment |  Canceled!!!', buildId, applicationId });
 }
 
 export function convertTolOldVolumeNames(type) {
