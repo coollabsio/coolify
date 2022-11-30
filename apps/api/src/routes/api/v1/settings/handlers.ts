@@ -2,7 +2,7 @@ import { promises as dns } from 'dns';
 import { X509Certificate } from 'node:crypto';
 import * as Sentry from '@sentry/node';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { asyncExecShell, checkDomainsIsValidInDNS, decrypt, encrypt, errorHandler, isDev, isDNSValid, isDomainConfigured, listSettings, prisma, sentryDSN, version } from '../../../../lib/common';
+import { asyncExecShell, checkDomainsIsValidInDNS, decrypt, encrypt, errorHandler, getDomain, isDev, isDNSValid, isDomainConfigured, listSettings, prisma, sentryDSN, version } from '../../../../lib/common';
 import { AddDefaultRegistry, CheckDNS, CheckDomain, DeleteDomain, OnlyIdInBody, SaveSettings, SaveSSHKey, SetDefaultRegistry } from './types';
 
 
@@ -68,10 +68,26 @@ export async function saveSettings(request: FastifyRequest<SaveSettings>, reply:
             DNSServers,
             proxyDefaultRedirect
         } = request.body
-        const { id } = await listSettings();
+        const { id, previewSeparator: SetPreviewSeparator } = await listSettings();
         if (numberOfDockerImagesKeptLocally) {
             numberOfDockerImagesKeptLocally = Number(numberOfDockerImagesKeptLocally)
         }
+        if (previewSeparator == '') {
+            previewSeparator = '.'
+        }
+        if (SetPreviewSeparator != previewSeparator) {
+            const applications = await prisma.application.findMany({ where: { previewApplication: { some: { id: { not: undefined } } } }, include: { previewApplication: true } })
+            for (const application of applications) {
+                for (const preview of application.previewApplication) {
+                    const { protocol } = new URL(preview.customDomain)
+                    const { pullmergeRequestId } = preview
+                    const { fqdn } = application
+                    const newPreviewDomain = `${protocol}//${pullmergeRequestId}${previewSeparator}${getDomain(fqdn)}`
+                    await prisma.previewApplication.update({ where: { id: preview.id }, data: { customDomain: newPreviewDomain } })
+                }
+            }
+        }
+
         await prisma.setting.update({
             where: { id },
             data: { previewSeparator, numberOfDockerImagesKeptLocally, doNotTrack, isRegistrationEnabled, dualCerts, isAutoUpdateEnabled, isDNSCheckEnabled, DNSServers, isAPIDebuggingEnabled }

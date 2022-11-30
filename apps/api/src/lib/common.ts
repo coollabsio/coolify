@@ -715,7 +715,7 @@ export async function stopTraefikProxy(
 }
 
 export async function listSettings(): Promise<any> {
-	return await prisma.setting.findFirst({});
+	return await prisma.setting.findUnique({ where: { id: '0' } });
 }
 
 export function generateToken() {

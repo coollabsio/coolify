@@ -166,12 +166,15 @@
 			}
 			if (proxyDefaultRedirect !== settings.proxyDefaultRedirect) {
 				await post(`/settings`, { proxyDefaultRedirect });
+				settings.proxyDefaultRedirect = proxyDefaultRedirect;
 			}
 			if (numberOfDockerImagesKeptLocally !== settings.numberOfDockerImagesKeptLocally) {
 				await post(`/settings`, { numberOfDockerImagesKeptLocally });
+				settings.numberOfDockerImagesKeptLocally = numberOfDockerImagesKeptLocally;
 			}
 			if (previewSeparator !== settings.previewSeparator) {
 				await post(`/settings`, { previewSeparator });
+				settings.previewSeparator = previewSeparator;
 			}
 			if (minPort !== settings.minPort || maxPort !== settings.maxPort) {
 				await post(`/settings`, { minPort, maxPort });
@@ -422,7 +425,7 @@
 				</div>
 				<div class="grid grid-cols-2 items-center">
 					<div>
-						Preview Domain Seprator
+						Preview Domain Separator
 						<Explainer
 							position="dropdown-bottom"
 							explanation="The separator used in the PR/MR previews.<br><br>For example if you set it to: <span class='text-yellow-400 font-bold'>-</span><br> the preview domain will be like this: <br><br><span class='text-yellow-400 font-bold'>PRMRNumber-yourdomain.com</span><br><br>The default is: <span class='text-yellow-400 font-bold'>.</span><br>so the preview domain will be like this: <br><br><span class='text-yellow-400 font-bold'>PRMRNumber.yourdomain.com</span>"
@@ -430,6 +433,7 @@
 					</div>
 					<input
 						class="w-full"
+						required
 						bind:value={previewSeparator}
 						readonly={!$appSession.isAdmin}
 						disabled={!$appSession.isAdmin}
