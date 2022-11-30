@@ -139,8 +139,8 @@ model Application {
   teams                      Team[]
   connectedDatabase          ApplicationConnectedDatabase?
   previewApplication         PreviewApplication[]
-  dockerRegistryId           String                         @default("0")
-  dockerRegistry             DockerRegistry                 @relation(fields: [dockerRegistryId], references: [id])
+  dockerRegistryId           String?
+  dockerRegistry             DockerRegistry?                @relation(fields: [dockerRegistryId], references: [id])
 }
 
 model PreviewApplication {
@@ -302,17 +302,16 @@ model SshKey {
 }
 
 model DockerRegistry {
-  id           String        @id @default(cuid())
-  name         String
-  url          String
-  username     String?
-  password     String?
-  isSystemWide Boolean       @default(false)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  teamId       String?
-  team         Team?         @relation(fields: [teamId], references: [id])
-  application  Application[]
+  id          String        @id @default(cuid())
+  name        String
+  url         String
+  username    String?
+  password    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  teamId      String?
+  team        Team?         @relation(fields: [teamId], references: [id])
+  application Application[]
 }
 
 model GitSource {

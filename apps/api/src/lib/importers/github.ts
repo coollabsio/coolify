@@ -37,6 +37,13 @@ export default async function ({
 			buildId,
 			applicationId
 		});
+		if (gitCommitHash) {
+			await saveBuildLog({
+				line: `Checking out ${gitCommitHash} commit.`,
+				buildId,
+				applicationId
+			});
+		}
 		await asyncExecShell(
 			`git clone -q -b ${branch} https://${url}/${repository}.git ${workdir}/ && cd ${workdir} && git checkout ${gitCommitHash || ""} && git submodule update --init --recursive && git lfs pull && cd .. `
 		);
@@ -68,6 +75,13 @@ export default async function ({
 			buildId,
 			applicationId
 		});
+		if (gitCommitHash) {
+			await saveBuildLog({
+				line: `Checking out ${gitCommitHash} commit.`,
+				buildId,
+				applicationId
+			});
+		}
 		await asyncExecShell(
 			`git clone -q -b ${branch} https://x-access-token:${token}@${url}/${repository}.git --config core.sshCommand="ssh -p ${customPort}" ${workdir}/ && cd ${workdir} && git checkout ${gitCommitHash || ""} && git submodule update --init --recursive && git lfs pull && cd .. `
 		);

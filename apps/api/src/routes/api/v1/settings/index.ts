@@ -23,7 +23,6 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 	fastify.post<SetDefaultRegistry>('/registry', async (request, reply) => await setDockerRegistry(request, reply));
 	fastify.post<AddDefaultRegistry>('/registry/new', async (request, reply) => await addDockerRegistry(request, reply));
 	fastify.delete<OnlyIdInBody>('/registry', async (request, reply) => await deleteDockerRegistry(request, reply));
-	// fastify.delete<>('/registry', async (request, reply) => await deleteSSHKey(request, reply));
 
 	fastify.post('/upload', async (request) => {
 		try {

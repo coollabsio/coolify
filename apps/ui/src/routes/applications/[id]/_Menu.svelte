@@ -13,7 +13,7 @@
 			<a
 				id="git"
 				href="{application.gitSource.htmlUrl}/{application.repository}/tree/{application.branch}"
-				target="_blank"
+				target="_blank noreferrer"
 				class="no-underline"
 			>
 				{#if application.gitSource?.type === 'gitlab'}
@@ -165,7 +165,9 @@
 		class:bg-coollabs={$page.url.pathname === `/applications/${$page.params.id}/logs`}
 	>
 		<a
-			href={$status.application.overallStatus !== 'stopped' ? `/applications/${$page.params.id}/logs` : ''}
+			href={$status.application.overallStatus !== 'stopped'
+				? `/applications/${$page.params.id}/logs`
+				: ''}
 			class="no-underline w-full"
 			><svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -218,10 +220,36 @@
 	</li>
 	<li
 		class="rounded"
+		class:bg-coollabs={$page.url.pathname === `/applications/${$page.params.id}/revert`}
+	>
+		<a href={`/applications/${$page.params.id}/revert`} class="no-underline w-full">
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				class="w-6 h-6"
+				viewBox="0 0 24 24"
+				stroke-width="1.5"
+				stroke="currentColor"
+				fill="none"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+				<path d="M20 5v14l-12 -7z" />
+				<line x1="4" y1="5" x2="4" y2="19" />
+			</svg>
+			Revert</a
+		>
+	</li>
+	<li
+		class="rounded"
 		class:text-stone-600={$status.application.overallStatus !== 'healthy'}
 		class:bg-coollabs={$page.url.pathname === `/applications/${$page.params.id}/usage`}
 	>
-		<a href={$status.application.overallStatus === 'healthy' ? `/applications/${$page.params.id}/usage` : ''} class="no-underline w-full"
+		<a
+			href={$status.application.overallStatus === 'healthy'
+				? `/applications/${$page.params.id}/usage`
+				: ''}
+			class="no-underline w-full"
 			><svg
 				xmlns="http://www.w3.org/2000/svg"
 				class="w-6 h-6"

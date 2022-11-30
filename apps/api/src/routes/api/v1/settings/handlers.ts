@@ -11,15 +11,8 @@ export async function listAllSettings(request: FastifyRequest) {
         const teamId = request.user.teamId;
         const settings = await listSettings();
         const sshKeys = await prisma.sshKey.findMany({ where: { team: { id: teamId } } })
-        let publicRegistries = await prisma.dockerRegistry.findMany({ where: { isSystemWide: true } })
-        let privateRegistries = await prisma.dockerRegistry.findMany({ where: { team: { id: teamId }, isSystemWide: false } })
-        publicRegistries = publicRegistries.map((registry) => {
-            if (registry.password) {
-                registry.password = decrypt(registry.password)
-            }
-            return registry
-        })
-        privateRegistries = privateRegistries.map((registry) => {
+        let registries = await prisma.dockerRegistry.findMany({ where: { team: { id: teamId } } })
+        registries = registries.map((registry) => {
             if (registry.password) {
                 registry.password = decrypt(registry.password)
             }
@@ -42,10 +35,7 @@ export async function listAllSettings(request: FastifyRequest) {
             settings,
             certificates: cns,
             sshKeys: unencryptedKeys,
-            registries: {
-                public: publicRegistries,
-                private: privateRegistries
-            }
+            registries
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })
@@ -221,11 +211,11 @@ export async function setDockerRegistry(request: FastifyRequest<SetDefaultRegist
 export async function addDockerRegistry(request: FastifyRequest<AddDefaultRegistry>, reply: FastifyReply) {
     try {
         const teamId = request.user.teamId;
-        const { name, url, username, password, isSystemWide } = request.body;
+        const { name, url, username, password } = request.body;
 
         let encryptedPassword = ''
         if (password) encryptedPassword = encrypt(password)
-        await prisma.dockerRegistry.create({ data: { name, url, username, password: encryptedPassword, isSystemWide, team: { connect: { id: teamId } } } })
+        await prisma.dockerRegistry.create({ data: { name, url, username, password: encryptedPassword, team: { connect: { id: teamId } } } })
 
         return reply.code(201).send()
     } catch ({ status, message }) {
@@ -236,7 +226,7 @@ export async function deleteDockerRegistry(request: FastifyRequest<OnlyIdInBody>
     try {
         const teamId = request.user.teamId;
         const { id } = request.body;
-        await prisma.application.updateMany({ where: { dockerRegistryId: id }, data: { dockerRegistryId: '0' } })
+        await prisma.application.updateMany({ where: { dockerRegistryId: id }, data: { dockerRegistryId: null } })
         await prisma.dockerRegistry.deleteMany({ where: { id, teamId } })
         return reply.code(201).send()
     } catch ({ status, message }) {

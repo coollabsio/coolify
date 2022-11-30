@@ -1,8 +1,8 @@
 import { FastifyPluginAsync } from 'fastify';
 import { OnlyId } from '../../../../types';
-import { cancelDeployment, checkDNS, checkDomain, checkRepository, cleanupUnconfiguredApplications, deleteApplication, deleteSecret, deleteStorage, deployApplication, getApplication, getApplicationLogs, getApplicationStatus, getBuildIdLogs, getBuildPack, getBuilds, getGitHubToken, getGitLabSSHKey, getImages, getPreviews, getPreviewStatus, getSecrets, getStorages, getUsage, getUsageByContainer, listApplications, loadPreviews, newApplication, restartApplication, restartPreview, saveApplication, saveApplicationSettings, saveApplicationSource, saveBuildPack, saveConnectedDatabase, saveDeployKey, saveDestination, saveGitLabSSHKey,  saveRegistry,  saveRepository, saveSecret, saveStorage, stopApplication, stopPreviewApplication, updatePreviewSecret, updateSecret } from './handlers';
+import { cancelDeployment, checkDNS, checkDomain, checkRepository, cleanupUnconfiguredApplications, deleteApplication, deleteSecret, deleteStorage, deployApplication, getApplication, getApplicationLogs, getApplicationStatus, getBuildIdLogs, getBuildPack, getBuilds, getDockerImages, getGitHubToken, getGitLabSSHKey, getImages, getPreviews, getPreviewStatus, getSecrets, getStorages, getUsage, getUsageByContainer, listApplications, loadPreviews, newApplication, restartApplication, restartPreview, saveApplication, saveApplicationSettings, saveApplicationSource, saveBuildPack, saveConnectedDatabase, saveDeployKey, saveDestination, saveGitLabSSHKey,  saveRegistry,  saveRepository, saveSecret, saveStorage, stopApplication, stopPreviewApplication, updatePreviewSecret, updateSecret } from './handlers';
 
-import type { CancelDeployment, CheckDNS, CheckDomain, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, DeployApplication, GetApplicationLogs, GetBuildIdLogs, GetBuilds, GetImages, RestartPreviewApplication, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, StopPreviewApplication } from './types';
+import type { CancelDeployment, CheckDNS, CheckDomain, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, DeployApplication, GetApplicationLogs, GetBuildIdLogs, GetBuilds, GetImages, RestartApplication, RestartPreviewApplication, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, StopPreviewApplication } from './types';
 
 const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.addHook('onRequest', async (request) => {
@@ -21,7 +21,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 
     fastify.get<OnlyId>('/:id/status', async (request) => await getApplicationStatus(request));
 
-    fastify.post<OnlyId>('/:id/restart', async (request, reply) => await restartApplication(request, reply));
+    fastify.post<RestartApplication>('/:id/restart', async (request, reply) => await restartApplication(request, reply));
     fastify.post<OnlyId>('/:id/stop', async (request, reply) => await stopApplication(request, reply));
     fastify.post<StopPreviewApplication>('/:id/stop/preview', async (request, reply) => await stopPreviewApplication(request, reply));
 
@@ -52,6 +52,8 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 
     fastify.get('/:id/usage', async (request) => await getUsage(request))
     fastify.get('/:id/usage/:containerId', async (request) => await getUsageByContainer(request))
+
+    fastify.get('/:id/images', async (request) => await getDockerImages(request))
 
     fastify.post<DeployApplication>('/:id/deploy', async (request) => await deployApplication(request))
     fastify.post<CancelDeployment>('/:id/cancel', async (request, reply) => await cancelDeployment(request, reply));

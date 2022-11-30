@@ -96,6 +96,18 @@
 
 	async function handleDeploySubmit(forceRebuild = false) {
 		if (!$isDeploymentEnabled) return;
+		if (application.gitCommitHash && !application.settings.isPublicRepository) {
+			const sure = await confirm(
+				`Are you sure you want to deploy a specific commit (${application.gitCommitHash})? This will disable the "Automatic Deployment" feature to prevent accidental overwrites of incoming commits.`
+			);
+			if (!sure) {
+				return;
+			} else {
+				await post(`/applications/${id}/settings`, {
+					autodeploy: false
+				});
+			}
+		}
 		if (!statusInterval) {
 			statusInterval = setInterval(async () => {
 				await getStatus();

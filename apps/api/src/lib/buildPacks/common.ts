@@ -654,8 +654,14 @@ export async function buildImage({
 	}
 	const dockerFile = isCache ? `${dockerFileLocation}-cache` : `${dockerFileLocation}`
 	const cache = `${applicationId}:${tag}${isCache ? '-cache' : ''}`
-	const { dockerRegistry: { url, username, password } } = await prisma.application.findUnique({ where: { id: applicationId }, select: { dockerRegistry: true } })
-	const location = await saveDockerRegistryCredentials({ url, username, password, workdir })
+
+	let location = null
+
+	const { dockerRegistry } = await prisma.application.findUnique({ where: { id: applicationId }, select: { dockerRegistry: true } })
+	if (dockerRegistry) {
+		const { url, username, password } = dockerRegistry
+		location = await saveDockerRegistryCredentials({ url, username, password, workdir })
+	}
 
 	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker ${location ? `--config ${location}` : ''} build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })
 

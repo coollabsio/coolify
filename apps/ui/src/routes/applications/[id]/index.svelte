@@ -515,40 +515,37 @@
 						>
 					{/if}
 				</div>
-				{#if application.settings.isPublicRepository}
-					<div class="grid grid-cols-2 items-center">
-						<label for="repository">Git commit</label>
-						<div class="flex gap-2">
-							<input
-								class="w-full"
-								disabled={isDisabled}
-								placeholder="default: latest commit"
-								bind:value={application.gitCommitHash}
-							/>
-							<a
-								href="{application.gitSource
-									.htmlUrl}/{application.repository}/commits/{application.branch}"
-								target="_blank"
-								rel="noreferrer"
-								class="btn btn-primary text-xs"
-								>Commits<svg
-									xmlns="http://www.w3.org/2000/svg"
-									fill="currentColor"
-									viewBox="0 0 24 24"
-									stroke-width="3"
-									stroke="currentColor"
-									class="w-3 h-3 text-white ml-2"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
-									/>
-								</svg></a
+				<div class="grid grid-cols-2 items-center">
+					<label for="repository">Git commit</label>
+					<div class="flex gap-2">
+						<input
+							class="w-full"
+							disabled={isDisabled}
+							placeholder="default: latest commit"
+							bind:value={application.gitCommitHash}
+						/>
+						<a
+							href="{application.gitSource
+								.htmlUrl}/{application.repository}/commits/{application.branch}"
+							target="_blank noreferrer"
+							class="btn btn-primary text-xs"
+							>Commits<svg
+								xmlns="http://www.w3.org/2000/svg"
+								fill="currentColor"
+								viewBox="0 0 24 24"
+								stroke-width="3"
+								stroke="currentColor"
+								class="w-3 h-3 text-white ml-2"
 							>
-						</div>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
+								/>
+							</svg></a
+						>
 					</div>
-				{/if}
+				</div>
 				<div class="grid grid-cols-2 items-center">
 					<label for="repository">{$t('application.git_repository')}</label>
 					{#if isDisabled || application.settings.isPublicRepository}
@@ -575,7 +572,7 @@
 						<input
 							class="capitalize w-full"
 							disabled={isDisabled}
-							value={application.dockerRegistry.name}
+							value={application.dockerRegistry?.name || 'DockerHub (unauthenticated)'}
 						/>
 					{:else}
 						<a
@@ -583,7 +580,7 @@
 							class="no-underline"
 						>
 							<input
-								value={application.dockerRegistry.name}
+								value={application.dockerRegistry?.name || 'DockerHub (unauthenticated)'}
 								id="registry"
 								class="cursor-pointer hover:bg-coolgray-500 capitalize w-full"
 							/></a

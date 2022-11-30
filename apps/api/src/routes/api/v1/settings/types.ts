@@ -65,6 +65,5 @@ export interface AddDefaultRegistry {
         name: string
         username: string
         password: string
-        isSystemWide: boolean
     }
 }

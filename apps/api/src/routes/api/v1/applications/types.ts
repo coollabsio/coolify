@@ -142,3 +142,11 @@ export interface RestartPreviewApplication {
         pullmergeRequestId: string | null,
     }
 }
+export interface RestartApplication {
+    Params: {
+        id: string,
+    },
+    Body: {
+        imageId: string | null,
+    }
+}

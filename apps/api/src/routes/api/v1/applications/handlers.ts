@@ -12,7 +12,7 @@ import { checkDomainsIsValidInDNS, checkExposedPort, createDirectories, decrypt,
 import { checkContainer, formatLabelsOnDocker, removeContainer } from '../../../../lib/docker';
 
 import type { FastifyRequest } from 'fastify';
-import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain, StopPreviewApplication, RestartPreviewApplication, GetBuilds } from './types';
+import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain, StopPreviewApplication, RestartPreviewApplication, GetBuilds, RestartApplication } from './types';
 import { OnlyId } from '../../../../types';
 
 function filterObject(obj, callback) {
@@ -443,9 +443,10 @@ export async function stopPreviewApplication(request: FastifyRequest<StopPreview
     }
 }
 
-export async function restartApplication(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
+export async function restartApplication(request: FastifyRequest<RestartApplication>, reply: FastifyReply) {
     try {
         const { id } = request.params
+        const { imageId = null } = request.body
         const { teamId } = request.user
         let application: any = await getApplicationFromDB(id, teamId);
         if (application?.destinationDockerId) {
@@ -475,17 +476,22 @@ export async function restartApplication(request: FastifyRequest<OnlyId>, reply:
             const { workdir } = await createDirectories({ repository, buildId });
             const labels = []
             let image = null
-            const { stdout: container } = await executeDockerCmd({ dockerId, command: `docker container ls --filter 'label=com.docker.compose.service=${id}' --format '{{json .}}'` })
-            const containersArray = container.trim().split('\n');
-            for (const container of containersArray) {
-                const containerObj = formatLabelsOnDocker(container);
-                image = containerObj[0].Image
-                Object.keys(containerObj[0].Labels).forEach(function (key) {
-                    if (key.startsWith('coolify')) {
-                        labels.push(`${key}=${containerObj[0].Labels[key]}`)
-                    }
-                })
+            if (imageId) {
+                image = imageId
+            } else {
+                const { stdout: container } = await executeDockerCmd({ dockerId, command: `docker container ls --filter 'label=com.docker.compose.service=${id}' --format '{{json .}}'` })
+                const containersArray = container.trim().split('\n');
+                for (const container of containersArray) {
+                    const containerObj = formatLabelsOnDocker(container);
+                    image = containerObj[0].Image
+                    Object.keys(containerObj[0].Labels).forEach(function (key) {
+                        if (key.startsWith('coolify')) {
+                            labels.push(`${key}=${containerObj[0].Labels[key]}`)
+                        }
+                    })
+                }
             }
+
             let imageFound = false;
             try {
                 await executeDockerCmd({
@@ -676,6 +682,38 @@ export async function getUsage(request) {
         }
         return {
             usage
+        }
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
+export async function getDockerImages(request) {
+    try {
+        const { id } = request.params
+        const teamId = request.user?.teamId;
+        const application: any = await getApplicationFromDB(id, teamId);
+        const { stdout } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}' | grep -i ${id} | grep -v cache` });
+        const { stdout: runningImage } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker ps -a --filter 'label=com.docker.compose.service=${id}' --format {{.Image}}` });
+        const images = stdout.trim().split('\n');
+        let imagesAvailables = [];
+        for (const image of images) {
+            const [repository, tag, createdAt] = image.split('#');
+            if (tag.includes('-')) {
+                continue;
+            }
+            const [year, time] = createdAt.split(' ');
+            imagesAvailables.push({
+                repository,
+                tag,
+                createdAt: day(year + time).unix()
+            })
+        }
+
+        imagesAvailables = imagesAvailables.sort((a, b) => b.tag - a.tag);
+
+        return {
+            imagesAvailables,
+            runningImage
         }
     } catch ({ status, message }) {
         return errorHandler({ status, message })

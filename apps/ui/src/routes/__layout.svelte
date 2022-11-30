@@ -268,7 +268,7 @@
 						<a
 							id="settings"
 							sveltekit:prefetch
-							href={$appSession.teamId === '0' ? '/settings/coolify' : '/settings/ssh'}
+							href={$appSession.teamId === '0' ? '/settings/coolify' : '/settings/docker'}
 							class="icons hover:text-settings"
 							class:text-settings={$page.url.pathname.startsWith('/settings')}
 							class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
