@@ -641,9 +641,9 @@ export async function buildImage({
 	commit
 }) {
 	if (isCache) {
-		await saveBuildLog({ line: `Building cache image started.`, buildId, applicationId });
+		await saveBuildLog({ line: `[CACHE] Building cache image.`, buildId, applicationId });
 	} else {
-		await saveBuildLog({ line: `Building image started.`, buildId, applicationId });
+		await saveBuildLog({ line: `[PRODUCTION] Building production image.`, buildId, applicationId });
 	}
 	if (!debug) {
 		await saveBuildLog({
@@ -667,12 +667,12 @@ export async function buildImage({
 
 	const { status } = await prisma.build.findUnique({ where: { id: buildId } })
 	if (status === 'canceled') {
-		throw new Error('Deployment canceled.')
+		throw new Error('[DEPLOYMENT] Canceled!!!')
 	}
 	if (isCache) {
-		await saveBuildLog({ line: `Building cache image successful.`, buildId, applicationId });
+		await saveBuildLog({ line: `[CACHE] Successful! 🎉`, buildId, applicationId });
 	} else {
-		await saveBuildLog({ line: `Building image successful.`, buildId, applicationId });
+		await saveBuildLog({ line: `[PRODUCTION] Successful! 🎉`, buildId, applicationId });
 	}
 }
 

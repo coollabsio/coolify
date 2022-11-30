@@ -70,8 +70,8 @@
 		selectedBuildId
 	} from '$lib/store';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
-	import Tooltip from '$lib/components/Tooltip.svelte';
 	import Menu from './_Menu.svelte';
+	import { saveForm } from './utils';
 
 	let statusInterval: any;
 	let forceDelete = false;
@@ -114,6 +114,7 @@
 			}, 2000);
 		}
 		try {
+			await saveForm(id, application);
 			const { buildId } = await post(`/applications/${id}/deploy`, {
 				...application,
 				forceRebuild

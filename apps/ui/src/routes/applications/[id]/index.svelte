@@ -50,6 +50,7 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { goto } from '$app/navigation';
 	import Beta from '$lib/components/Beta.svelte';
+	import { saveForm } from './utils';
 
 	const { id } = $page.params;
 
@@ -267,11 +268,7 @@
 					}
 				}
 			}
-			await post(`/applications/${id}`, {
-				...application,
-				baseDatabaseBranch,
-				dockerComposeConfiguration: JSON.stringify(dockerComposeConfiguration)
-			});
+			await saveForm(id, application,baseDatabaseBranch, dockerComposeConfiguration);
 			setLocation(application, settings);
 			$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
 
@@ -519,6 +516,8 @@
 					<label for="repository">Git commit</label>
 					<div class="flex gap-2">
 						<input
+							id="commit"
+							name="commit"
 							class="w-full"
 							disabled={isDisabled}
 							placeholder="default: latest commit"
