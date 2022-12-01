@@ -568,8 +568,6 @@
 							>
 						{/if}
 					</div>
-				{:else}
-				
 				{/if}
 				<div class="grid grid-cols-2 items-center">
 					<label for="registry">Docker Registry</label>
@@ -592,6 +590,24 @@
 						>
 					{/if}
 				</div>
+				{#if application.dockerRegistry?.id && application.gitSourceId}
+					<div class="grid grid-cols-2 items-center">
+						<label for="registry"
+							>Push Image to Registry <Explainer
+								explanation="Push the build image to the specific Docker Registry.<br><br>This is useful if you want to use the image in other places. If you don't fill this the image will be only available on the server.<br><br>Tag is optional. If you don't fill it, the tag will be the same as the git commit hash."
+							/></label
+						>
+						<input
+							name="dockerRegistryImageName"
+							id="dockerRegistryImageName"
+							readonly={isDisabled}
+								disabled={isDisabled}
+							class="w-full"
+							placeholder="e.g. coollabsio/myimage (tag will be commit sha) or coollabsio/myimage:tag"
+							bind:value={application.dockerRegistryImageName}
+						/>
+					</div>
+				{/if}
 				{#if !isSimpleDockerfile}
 					<div class="grid grid-cols-2 items-center">
 						<label for="buildPack">{$t('application.build_pack')} </label>
@@ -728,13 +744,13 @@
 				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
 					Configuration
 				</div>
-			
+
 				<div class="grid grid-flow-row gap-2 px-4 pr-5">
 					<div class="grid grid-cols-2 items-center  pt-4">
 						<label for="simpleDockerfile">Dockerfile</label>
 						<div class="flex gap-2">
 							<textarea
-								rows=10
+								rows="10"
 								id="simpleDockerfile"
 								name="simpleDockerfile"
 								class="w-full"

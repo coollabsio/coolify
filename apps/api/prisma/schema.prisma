@@ -133,6 +133,7 @@ model Application {
   baseBuildImage             String?
   settings                   ApplicationSettings?
   dockerRegistryId           String?
+  dockerRegistryImageName    String?
   simpleDockerfile           String?
 
   persistentStorage  ApplicationPersistentStorage[]

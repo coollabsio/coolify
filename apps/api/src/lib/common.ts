@@ -15,7 +15,7 @@ import sshConfig from 'ssh-config';
 import jsonwebtoken from 'jsonwebtoken';
 import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
-import { saveBuildLog } from './buildPacks/common';
+import { saveBuildLog, saveDockerRegistryCredentials } from './buildPacks/common';
 import { scheduler } from './scheduler';
 
 export const version = '3.12.0';
@@ -1712,4 +1712,18 @@ export function decryptApplication(application: any) {
 
 		return application;
 	}
+}
+
+export async function pushToRegistry(application: any, workdir: string, tag: string, imageName: string, customTag: string) {
+	const location = `${workdir}/.docker`
+	const tagCommand = `docker tag ${application.id}:${tag} ${imageName}:${customTag}`
+	const pushCommand = `docker --config ${location} push ${imageName}:${customTag}`
+	await executeDockerCmd({
+		dockerId: application.destinationDockerId,
+		command: tagCommand
+	})
+	await executeDockerCmd({
+		dockerId: application.destinationDockerId,
+		command: pushCommand
+	})
 }

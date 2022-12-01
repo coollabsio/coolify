@@ -3,8 +3,8 @@ import crypto from 'crypto';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 
-import { copyBaseConfigurationFiles, makeLabelForSimpleDockerfile, makeLabelForStandaloneApplication, saveBuildLog, setDefaultConfiguration } from '../lib/buildPacks/common';
-import { createDirectories, decrypt, defaultComposeConfiguration, executeDockerCmd, getDomain, prisma, decryptApplication, isDev } from '../lib/common';
+import { copyBaseConfigurationFiles, makeLabelForSimpleDockerfile, makeLabelForStandaloneApplication, saveBuildLog, saveDockerRegistryCredentials, setDefaultConfiguration } from '../lib/buildPacks/common';
+import { createDirectories, decrypt, defaultComposeConfiguration, executeDockerCmd, getDomain, prisma, decryptApplication, isDev, pushToRegistry } from '../lib/common';
 import * as importers from '../lib/importers';
 import * as buildpacks from '../lib/buildPacks';
 
@@ -37,7 +37,7 @@ import * as buildpacks from '../lib/buildPacks';
 
 					for (const queueBuild of queuedBuilds) {
 						actions.push(async () => {
-							let application = await prisma.application.findUnique({ where: { id: queueBuild.applicationId }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, persistentStorage: true, secrets: true, settings: true, teams: true } })
+							let application = await prisma.application.findUnique({ where: { id: queueBuild.applicationId }, include: { dockerRegistry: true, destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, persistentStorage: true, secrets: true, settings: true, teams: true } })
 
 							let { id: buildId, type, gitSourceId, sourceBranch = null, pullmergeRequestId = null, previewApplicationId = null, forceRebuild, sourceRepository = null } = queueBuild
 							application = decryptApplication(application)
@@ -51,7 +51,8 @@ import * as buildpacks from '../lib/buildPacks';
 									port,
 									persistentStorage,
 									exposePort,
-									simpleDockerfile
+									simpleDockerfile,
+									dockerRegistry
 								} = application
 								const { workdir } = await createDirectories({ repository: applicationId, buildId });
 								try {
@@ -109,6 +110,11 @@ import * as buildpacks from '../lib/buildPacks';
 										}
 
 										await fs.writeFile(`${workdir}/Dockerfile`, simpleDockerfile);
+										if (dockerRegistry) {
+											const { url, username, password } = dockerRegistry
+											await saveDockerRegistryCredentials({ url, username, password, workdir })
+										}
+
 										const labels = makeLabelForSimpleDockerfile({
 											applicationId,
 											type,
@@ -164,7 +170,7 @@ import * as buildpacks from '../lib/buildPacks';
 											}
 											throw new Error(error);
 										}
-										await prisma.build.update({ where: { id: buildId }, data: { status: 'success' } });
+
 									}
 								} catch (error) {
 									const foundBuild = await prisma.build.findUnique({ where: { id: buildId } })
@@ -179,10 +185,27 @@ import * as buildpacks from '../lib/buildPacks';
 									if (error !== 1) {
 										await saveBuildLog({ line: error, buildId, applicationId: application.id });
 									}
+								}
+								try {
+									if (application.dockerRegistryImageName) {
+										const customTag = application.dockerRegistryImageName.split(':')[1] || buildId;
+										const imageName = application.dockerRegistryImageName.split(':')[0];
+										await saveBuildLog({ line: `Pushing ${imageName}:${customTag} to Docker Registry... It could take a while...`, buildId, applicationId: application.id });
+										await pushToRegistry(application, workdir, buildId, imageName, customTag)
+										await saveBuildLog({ line: "Success 🎉", buildId, applicationId: application.id });
+									}
+								} catch (error) {
+									if (error.stdout) {
+										await saveBuildLog({ line: error.stdout, buildId, applicationId });
+									}
+									if (error.stderr) {
+										await saveBuildLog({ line: error.stderr, buildId, applicationId });
+									}
 								} finally {
 									if (!isDev) {
 										await fs.rm(workdir, { recursive: true, force: true });
 									}
+									await prisma.build.update({ where: { id: buildId }, data: { status: 'success' } });
 								}
 								return;
 							}
@@ -211,6 +234,7 @@ import * as buildpacks from '../lib/buildPacks';
 								baseBuildImage,
 								deploymentType,
 								gitCommitHash,
+								dockerRegistry
 							} = application
 
 							let {
@@ -231,7 +255,7 @@ import * as buildpacks from '../lib/buildPacks';
 
 							let imageId = applicationId;
 							let domain = getDomain(fqdn);
-
+							let tag = null
 							if (pullmergeRequestId) {
 								const previewApplications = await prisma.previewApplication.findMany({ where: { applicationId: originalApplicationId, pullmergeRequestId } })
 								if (previewApplications.length > 0) {
@@ -330,7 +354,7 @@ import * as buildpacks from '../lib/buildPacks';
 									if (!commit) {
 										throw new Error('No commit found?');
 									}
-									let tag = commit.slice(0, 7);
+									tag = commit.slice(0, 7);
 									if (pullmergeRequestId) {
 										tag = `${commit.slice(0, 7)}-${pullmergeRequestId}`;
 									}
@@ -500,6 +524,9 @@ import * as buildpacks from '../lib/buildPacks';
 										}
 										await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
 
+										const { url, username, password } = dockerRegistry
+										await saveDockerRegistryCredentials({ url, username, password, workdir })
+
 										let envFound = false;
 										try {
 											envFound = !!(await fs.stat(`${workdir}/.env`));
@@ -553,7 +580,7 @@ import * as buildpacks from '../lib/buildPacks';
 											}
 											throw new Error(error);
 										}
-										await prisma.build.update({ where: { id: buildId }, data: { status: 'success' } });
+
 										if (!pullmergeRequestId) await prisma.application.update({
 											where: { id: applicationId },
 											data: { configHash: currentHash }
@@ -573,10 +600,28 @@ import * as buildpacks from '../lib/buildPacks';
 								if (error !== 1) {
 									await saveBuildLog({ line: error, buildId, applicationId: application.id });
 								}
+							}
+							try {
+								if (application.dockerRegistryImageName) {
+									const customTag = application.dockerRegistryImageName.split(':')[1] || tag;
+									const imageName = application.dockerRegistryImageName.split(':')[0];
+									await saveBuildLog({ line: `Pushing ${imageName}:${customTag} to Docker Registry... It could take a while...`, buildId, applicationId: application.id });
+									await pushToRegistry(application, workdir, tag, imageName, customTag)
+									await saveBuildLog({ line: "Success 🎉", buildId, applicationId: application.id });
+								}
+							} catch (error) {
+								if (error.stdout) {
+									await saveBuildLog({ line: error.stdout, buildId, applicationId });
+								}
+								if (error.stderr) {
+									await saveBuildLog({ line: error.stderr, buildId, applicationId });
+								}
+
 							} finally {
 								if (!isDev) {
 									await fs.rm(workdir, { recursive: true, force: true });
 								}
+								await prisma.build.update({ where: { id: buildId }, data: { status: 'success' } });
 							}
 						});
 					}

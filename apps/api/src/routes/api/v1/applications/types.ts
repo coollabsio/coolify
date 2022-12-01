@@ -26,7 +26,8 @@ export interface SaveApplication extends OnlyId {
         dockerComposeFile: string,
         dockerComposeFileLocation: string,
         dockerComposeConfiguration: string,
-        simpleDockerfile: string
+        simpleDockerfile: string,
+        dockerRegistryImageName: string
     }
 }
 export interface SaveApplicationSettings extends OnlyId {

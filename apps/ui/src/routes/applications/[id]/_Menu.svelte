@@ -218,7 +218,7 @@
 	<li class="menu-title">
 		<span>Advanced</span>
 	</li>
-	{#if !application.simpleDockerfile}
+	{#if application.gitSourceId}
 		<li
 			class="rounded"
 			class:bg-coollabs={$page.url.pathname === `/applications/${$page.params.id}/revert`}
@@ -267,7 +267,7 @@
 			</svg>Monitoring</a
 		>
 	</li>
-	{#if !application.settings.isBot && !application.simpleDockerfile}
+	{#if !application.settings.isBot && application.gitSourceId}
 		<li
 			class="rounded"
 			class:bg-coollabs={$page.url.pathname === `/applications/${$page.params.id}/previews`}

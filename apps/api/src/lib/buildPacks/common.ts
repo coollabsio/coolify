@@ -607,12 +607,12 @@ export function checkPnpm(installCommand = null, buildCommand = null, startComma
 }
 
 export async function saveDockerRegistryCredentials({ url, username, password, workdir }) {
-	let decryptedPassword = decrypt(password);
-	const location = `${workdir}/.docker`;
-
 	if (!username || !password) {
 		return null
 	}
+
+	let decryptedPassword = decrypt(password);
+	const location = `${workdir}/.docker`;
 
 	try {
 		await fs.mkdir(`${workdir}/.docker`);

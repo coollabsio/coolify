@@ -335,7 +335,8 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             dockerComposeFile,
             dockerComposeFileLocation,
             dockerComposeConfiguration,
-            simpleDockerfile
+            simpleDockerfile,
+            dockerRegistryImageName
         } = request.body
         if (port) port = Number(port);
         if (exposePort) {
@@ -375,6 +376,7 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
                     dockerComposeFileLocation,
                     dockerComposeConfiguration,
                     simpleDockerfile,
+                    dockerRegistryImageName,
                     ...defaultConfiguration,
                     connectedDatabase: { update: { hostedDatabaseDBName: baseDatabaseBranch } }
                 }
@@ -398,6 +400,7 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
                     dockerComposeFileLocation,
                     dockerComposeConfiguration,
                     simpleDockerfile,
+                    dockerRegistryImageName,
                     ...defaultConfiguration
                 }
             });
