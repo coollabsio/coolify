@@ -135,26 +135,28 @@
 			</svg>Persistent Volumes</a
 		>
 	</li>
-	<li
-		class="rounded"
-		class:bg-coollabs={$page.url.pathname === `/applications/${$page.params.id}/features`}
-	>
-		<a href={`/applications/${$page.params.id}/features`} class="no-underline w-full"
-			><svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="w-6 h-6"
-				viewBox="0 0 24 24"
-				stroke-width="1.5"
-				stroke="currentColor"
-				fill="none"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			>
-				<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-				<polyline points="13 3 13 10 19 10 11 21 11 14 5 14 13 3" />
-			</svg>Features</a
+	{#if !application.simpleDockerfile}
+		<li
+			class="rounded"
+			class:bg-coollabs={$page.url.pathname === `/applications/${$page.params.id}/features`}
 		>
-	</li>
+			<a href={`/applications/${$page.params.id}/features`} class="no-underline w-full"
+				><svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="w-6 h-6"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					fill="none"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+					<polyline points="13 3 13 10 19 10 11 21 11 14 5 14 13 3" />
+				</svg>Features</a
+			>
+		</li>
+	{/if}
 
 	<li class="menu-title">
 		<span>Logs</span>

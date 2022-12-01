@@ -859,7 +859,7 @@ export async function saveApplicationSource(request: FastifyRequest<SaveApplicat
         if (simpleDockerfile) {
             await prisma.application.update({
                 where: { id },
-                data: { simpleDockerfile }
+                data: { simpleDockerfile, settings: { update: { autodeploy: false } } }
             });
         }
 
