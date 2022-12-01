@@ -27,21 +27,19 @@ export default async function ({
 	forPublic: boolean;
 }): Promise<string> {
 	const url = htmlUrl.replace('https://', '').replace('http://', '').replace(/\/$/, '');
-	await saveBuildLog({ line: 'Importer | Warming up GitLab importer.', buildId, applicationId });
-
 	if (!forPublic) {
 		await asyncExecShell(`echo '${privateSshKey}' > ${repodir}/id.rsa`);
 		await asyncExecShell(`chmod 600 ${repodir}/id.rsa`);
 	}
 
 	await saveBuildLog({
-		line: `Importer | Cloning ${repository}:${branch} branch.`,
+		line: `Cloning ${repository}:${branch} branch`,
 		buildId,
 		applicationId
 	});
 	if (gitCommitHash) {
 		await saveBuildLog({
-			line: `Importer | Checking out ${gitCommitHash} commit.`,
+			line: `Checking out ${gitCommitHash} commit`,
 			buildId,
 			applicationId
 		});

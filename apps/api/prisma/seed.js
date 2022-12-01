@@ -90,11 +90,6 @@ async function main() {
 			}
 		}
 	}
-	// Add default docker registry (dockerhub) 
-	// const registries = await prisma.dockerRegistry.findMany()
-	// if (registries.length === 0) {
-	// 	await prisma.dockerRegistry.create({ data: { id: "0", name: 'Docker Hub', url: 'https://index.docker.io/v1/', isSystemWide: true, team: { connect: { id: '0' } } } })
-	// }
 }
 main()
 	.catch((e) => {
