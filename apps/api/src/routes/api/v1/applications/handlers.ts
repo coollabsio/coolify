@@ -7,7 +7,7 @@ import yaml from 'js-yaml';
 import csv from 'csvtojson';
 
 import { day } from '../../../../lib/dayjs';
-import { setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
+import { saveDockerRegistryCredentials, setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
 import { checkDomainsIsValidInDNS, checkExposedPort, createDirectories, decrypt, defaultComposeConfiguration, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, isDev, isDomainConfigured, listSettings, prisma, stopBuild, uniqueName } from '../../../../lib/common';
 import { checkContainer, formatLabelsOnDocker, removeContainer } from '../../../../lib/docker';
 
@@ -458,8 +458,8 @@ export async function restartApplication(request: FastifyRequest<RestartApplicat
         if (application?.destinationDockerId) {
             const buildId = cuid();
             const { id: dockerId, network } = application.destinationDocker;
-            const { secrets, pullmergeRequestId, port, repository, persistentStorage, id: applicationId, buildPack, exposePort } = application;
-
+            const { dockerRegistry, secrets, pullmergeRequestId, port, repository, persistentStorage, id: applicationId, buildPack, exposePort } = application;
+            let location = null;
             const envs = [
                 `PORT=${port}`
             ];
@@ -480,7 +480,9 @@ export async function restartApplication(request: FastifyRequest<RestartApplicat
                 });
             }
             const { workdir } = await createDirectories({ repository, buildId });
-            const labels = []
+            const labels = [
+                `coolify.managed=true`,
+            ]
             let image = null
             if (imageId) {
                 image = imageId
@@ -497,18 +499,30 @@ export async function restartApplication(request: FastifyRequest<RestartApplicat
                     })
                 }
             }
-
-            let imageFound = false;
+            const { url, username, password } = dockerRegistry
+            location = await saveDockerRegistryCredentials({ url, username, password, workdir })
+            let imageFoundLocally = false;
             try {
                 await executeDockerCmd({
                     dockerId,
                     command: `docker image inspect ${image}`
                 })
-                imageFound = true;
+                imageFoundLocally = true;
             } catch (error) {
                 //
             }
-            if (!imageFound) {
+            let imageFoundRemotely = false;
+            try {
+                await executeDockerCmd({
+                    dockerId,
+                    command: `docker ${location ? `--config ${location}` : ''} pull ${image}`
+                })
+                imageFoundRemotely = true;
+            } catch (error) {
+                //
+            }
+
+            if (!imageFoundLocally && !imageFoundRemotely) {
                 throw { status: 500, message: 'Image not found, cannot restart application.' }
             }
             await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
@@ -554,8 +568,13 @@ export async function restartApplication(request: FastifyRequest<RestartApplicat
                 volumes: Object.assign({}, ...composeVolumes)
             };
             await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
-            await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}` })
-            await executeDockerCmd({ dockerId, command: `docker rm ${id}` })
+            try {
+                await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}` })
+                await executeDockerCmd({ dockerId, command: `docker rm ${id}` })
+            } catch (error) {
+                //
+            }
+
             await executeDockerCmd({ dockerId, command: `docker compose --project-directory ${workdir} up -d` })
             return reply.code(201).send();
         }

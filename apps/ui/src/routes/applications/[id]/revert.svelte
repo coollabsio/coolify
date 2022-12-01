@@ -26,10 +26,12 @@
 	import { get, post } from '$lib/api';
 	import { status, addToast } from '$lib/store';
 	import { errorNotification } from '$lib/common';
+	import Explainer from '$lib/components/Explainer.svelte';
 
 	const { id } = $page.params;
+	let remoteImage: any = null;
 
-	async function revertApplication(image: any) {
+	async function revertToLocal(image: any) {
 		const sure = confirm(`Are you sure you want to revert to ${image.tag} ?`);
 		if (sure) {
 			try {
@@ -49,25 +51,46 @@
 			}
 		}
 	}
+	async function revertToRemote() {
+		const sure = confirm(`Are you sure you want to revert to ${remoteImage} ?`);
+		if (sure) {
+			try {
+				$status.application.initialLoading = true;
+				$status.application.loading = true;
+				await post(`/applications/${id}/restart`, { imageId: remoteImage });
+				addToast({
+					type: 'success',
+					message: 'Revert successful.'
+				});
+			} catch (error) {
+				return errorNotification(error);
+			} finally {
+				$status.application.initialLoading = false;
+				$status.application.loading = false;
+			}
+		}
+	}
 </script>
 
 <div class="w-full">
 	<div class="mx-auto w-full">
 		<div class="flex flex-row border-b border-coolgray-500 mb-6  space-x-2">
-			<div class="title font-bold pb-3">Revert</div>
+			<div class="title font-bold pb-3">
+				Revert <Explainer
+					position="dropdown-bottom"
+					explanation="You can revert application to a previously built image. Currently only locally stored images
+				supported."
+				/>
+			</div>
 		</div>
-		<div>
-			You can revert application to a previously built image. Currently only locally stored images
-			supported.
-		</div>
-		<br />
-		<div class="pb-4">
+		<div class="pb-4 text-xs">
 			If you do not want the next commit to overwrite the reverted application, temporary disable <span
 				class="text-yellow-400 font-bold">Automatic Deployment</span
 			>
 			feature <a href={`/applications/${id}/features`}>here</a>.
 		</div>
 		{#if imagesAvailables.length > 0}
+			<div class="text-xl font-bold pb-3">Local Images</div>
 			<div
 				class="px-4 lg:pb-10 pb-6 flex flex-wrap items-center justify-center lg:justify-start gap-8"
 			>
@@ -104,7 +127,7 @@
 								{#if image.repository + ':' + image.tag !== runningImage}
 									<button
 										class="btn btn-sm btn-primary w-full"
-										on:click={() => revertApplication(image)}>Revert Now</button
+										on:click={() => revertToLocal(image)}>Revert Now</button
 									>
 								{:else}
 									<button
@@ -118,9 +141,25 @@
 				{/each}
 			</div>
 		{:else}
-			<div class="flex flex-col justify-center items-center">
-				<div class="text-xl font-bold">No images available</div>
+			<div class="flex flex-col pb-10">
+				<div class="text-xl font-bold">No Local images available</div>
 			</div>
 		{/if}
+		<div class="text-xl font-bold pb-3">
+			Remote Images (Docker Registry) <Explainer
+				position="dropdown-bottom"
+				explanation="If the image is not available or you are unauthorized to access it, you will not be able to revert to it."
+			/>
+		</div>
+		<form on:submit|preventDefault={revertToRemote}>
+			<input
+				id="dockerImage"
+				name="dockerImage"
+				required
+				placeholder="coollabsio/coolify:0.0.1"
+				bind:value={remoteImage}
+			/>
+			<button class="btn btn-sm btn-primary" type="submit">Revert Now</button>
+		</form>
 	</div>
 </div>

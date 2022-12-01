@@ -214,7 +214,6 @@ import * as buildpacks from '../lib/buildPacks';
 								return;
 							}
 
-
 							const originalApplicationId = application.id
 							const {
 								id: applicationId,
@@ -259,7 +258,16 @@ import * as buildpacks from '../lib/buildPacks';
 
 							let imageId = applicationId;
 							let domain = getDomain(fqdn);
-							let tag = null
+
+							let location = null;
+
+							let tag = null;
+							let customTag = null;
+							let imageName = null;
+
+							let imageFoundLocally = false;
+							let imageFoundRemotely = false;
+
 							if (pullmergeRequestId) {
 								const previewApplications = await prisma.previewApplication.findMany({ where: { applicationId: originalApplicationId, pullmergeRequestId } })
 								if (previewApplications.length > 0) {
@@ -363,6 +371,12 @@ import * as buildpacks from '../lib/buildPacks';
 										tag = `${commit.slice(0, 7)}-${pullmergeRequestId}`;
 									}
 
+									customTag = application.dockerRegistryImageName.split(':')[1] || tag;
+									if (pullmergeRequestId) {
+										customTag = `${customTag}-${pullmergeRequestId}`;
+									}
+									imageName = application.dockerRegistryImageName.split(':')[0];
+
 									try {
 										await prisma.build.update({ where: { id: buildId }, data: { commit } });
 									} catch (err) { }
@@ -380,15 +394,31 @@ import * as buildpacks from '../lib/buildPacks';
 										deployNeeded = true;
 									}
 
-									let imageFound = false;
 									try {
 										await executeDockerCmd({
 											dockerId: destinationDocker.id,
 											command: `docker image inspect ${applicationId}:${tag}`
 										})
-										imageFound = true;
+										imageFoundLocally = true;
 									} catch (error) {
 										//
+									}
+
+									const { url, username, password } = dockerRegistry
+									location = await saveDockerRegistryCredentials({ url, username, password, workdir })
+
+									try {
+										await executeDockerCmd({
+											dockerId: destinationDocker.id,
+											command: `docker ${location ? `--config ${location}` : ''} pull ${imageName}:${customTag}`
+										})
+										imageFoundRemotely = true;
+									} catch (error) {
+										//
+									}
+									let imageFound = `${applicationId}:${tag}`
+									if (imageFoundRemotely) {
+										imageFound = `${imageName}:${customTag}`
 									}
 									await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId, baseImage);
 									const labels = makeLabelForStandaloneApplication({
@@ -410,7 +440,7 @@ import * as buildpacks from '../lib/buildPacks';
 										publishDirectory
 									});
 									if (forceRebuild) deployNeeded = true
-									if (!imageFound || deployNeeded) {
+									if ((!imageFoundLocally && !imageFoundRemotely) || deployNeeded) {
 										if (buildpacks[buildPack])
 											await buildpacks[buildPack]({
 												dockerId: destinationDocker.id,
@@ -456,7 +486,15 @@ import * as buildpacks from '../lib/buildPacks';
 											throw new Error(`Build pack ${buildPack} not found.`);
 										}
 									} else {
-										await saveBuildLog({ line: 'Build image already available - no rebuild required.', buildId, applicationId });
+										if (imageFoundRemotely) {
+											await saveBuildLog({ line: `Container image ${imageFound} found in Docker Registry - reuising it`, buildId, applicationId });
+										} else {
+											if (imageFoundLocally) {
+												await saveBuildLog({ line: `Container image ${imageFound} found locally - reuising it`, buildId, applicationId });
+											}
+										}
+
+
 									}
 
 									if (buildPack === 'compose') {
@@ -550,7 +588,7 @@ import * as buildpacks from '../lib/buildPacks';
 												version: '3.8',
 												services: {
 													[imageId]: {
-														image: `${applicationId}:${tag}`,
+														image: imageFound,
 														container_name: imageId,
 														volumes,
 														env_file: envFound ? [`${workdir}/.env`] : [],
@@ -610,9 +648,7 @@ import * as buildpacks from '../lib/buildPacks';
 								return;
 							}
 							try {
-								if (application.dockerRegistryImageName) {
-									const customTag = application.dockerRegistryImageName.split(':')[1] || tag;
-									const imageName = application.dockerRegistryImageName.split(':')[0];
+								if (application.dockerRegistryImageName && (!imageFoundRemotely || forceRebuild)) {
 									await saveBuildLog({ line: `Pushing ${imageName}:${customTag} to Docker Registry... It could take a while...`, buildId, applicationId: application.id });
 									await pushToRegistry(application, workdir, tag, imageName, customTag)
 									await saveBuildLog({ line: "Success 🎉", buildId, applicationId: application.id });
