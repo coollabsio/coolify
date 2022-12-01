@@ -185,6 +185,10 @@ import * as buildpacks from '../lib/buildPacks';
 									if (error !== 1) {
 										await saveBuildLog({ line: error, buildId, applicationId: application.id });
 									}
+									if (!isDev) {
+										await fs.rm(workdir, { recursive: true, force: true });
+									}
+									return;
 								}
 								try {
 									if (application.dockerRegistryImageName) {
@@ -600,6 +604,10 @@ import * as buildpacks from '../lib/buildPacks';
 								if (error !== 1) {
 									await saveBuildLog({ line: error, buildId, applicationId: application.id });
 								}
+								if (!isDev) {
+									await fs.rm(workdir, { recursive: true, force: true });
+								}
+								return;
 							}
 							try {
 								if (application.dockerRegistryImageName) {
