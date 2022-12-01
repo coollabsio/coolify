@@ -25,6 +25,8 @@
 </script>
 
 <script lang="ts">
+	export let sources: any;
+
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { get, post } from '$lib/api';
@@ -33,11 +35,12 @@
 	import { appSession } from '$lib/store';
 	import PublicRepository from './_PublicRepository.svelte';
 	import DocLink from '$lib/components/DocLink.svelte';
+	import Beta from '$lib/components/Beta.svelte';
 
 	const { id } = $page.params;
 	const from = $page.url.searchParams.get('from');
+	let simpleDockerfile: any = null;
 
-	export let sources: any;
 	const filteredSources = sources.filter(
 		(source: any) =>
 			(source.type === 'github' && source.githubAppId && source.githubApp.installationId) ||
@@ -61,18 +64,20 @@
 			return errorNotification(error);
 		}
 	}
-	async function newSource() {
-		const { id } = await post('/sources/new', {});
-		return await goto(`/sources/${id}`, { replaceState: true });
+	async function handleDockerImage() {
+		try {
+			await post(`/applications/${id}/configuration/source`, { simpleDockerfile });
+			return await goto(from || `/applications/${id}/configuration/destination`);
+		} catch (error) {
+			return errorNotification(error);
+		}
 	}
 </script>
 
 <div class="max-w-screen-2xl mx-auto px-9">
 	{#if !filteredSources}
 		<div class="title pb-8">Git App</div>
-	{/if}
-	<div class="flex flex-wrap justify-center">
-		{#if !filteredSources}
+		<div class="flex flex-wrap justify-center">
 			<div class="flex-col">
 				<div class="pb-2 text-center font-bold">
 					{$t('application.configuration.no_configurable_git')}
@@ -95,7 +100,13 @@
 					</a>
 				</div>
 			</div>
-		{:else}
+		</div>
+	{/if}
+	{#if ownSources.length > 0 || otherSources.length > 0}
+		<div class="title pb-8">Integrated with Git App</div>
+	{/if}
+	{#if ownSources.length > 0}
+		<div class="flex flex-wrap justify-center">
 			<div class="flex flex-col lg:flex-row lg:flex-wrap justify-center">
 				{#each ownSources as source}
 					<div class="p-2 relative">
@@ -240,11 +251,25 @@
 					</div>
 				{/each}
 			</div>
-		{/if}
-	</div>
+		</div>
+	{/if}
 	<div class="flex flex-row items-center">
-		<div class="title py-4 pr-4">Public Repository</div>
+		<div class="title py-4 pr-4">Public Repository from Git</div>
 		<DocLink url="https://docs.coollabs.io/coolify/applications/#public-repository" />
 	</div>
 	<PublicRepository />
+	<div class="flex flex-row items-center pt-10">
+		<div class="title py-4 pr-4">Simple Dockerfile <Beta /></div>
+		<DocLink url="https://docs.coollabs.io/coolify/applications/#dockerfile" />
+	</div>
+	<div class="mx-auto max-w-screen-2xl">
+		<form class="flex flex-col" on:submit|preventDefault={handleDockerImage}>
+			<div class="flex flex-col space-y-2 w-full">
+				<div class="flex flex-row space-x-2">
+					<textarea required class="w-full" rows="10" bind:value={simpleDockerfile} />
+					<button class="btn btn-primary" type="submit">Deploy Dockerfile</button>
+				</div>
+			</div>
+		</form>
+	</div>
 </div>

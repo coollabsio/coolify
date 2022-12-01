@@ -29,7 +29,7 @@
 	export let settings: any;
 	export let gitSources: any;
 	export let destinations: any;
-	
+
 	let filtered: any = setInitials();
 	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
@@ -151,7 +151,7 @@
 	}
 
 	async function getStatus(resources: any, force: boolean = false) {
-		const { id, buildPack, dualCerts, type } = resources;
+		const { id, buildPack, dualCerts, type, simpleDockerfile } = resources;
 		if (buildPack && applications.length + filtered.otherApplications.length > 10 && !force) {
 			noInitialStatus.applications = true;
 			return;
@@ -172,7 +172,7 @@
 			numberOfGetStatus++;
 			let isRunning = false;
 			let isDegraded = false;
-			if (buildPack) {
+			if (buildPack || simpleDockerfile) {
 				const response = await get(`/applications/${id}/status`);
 				if (response.length === 0) {
 					isRunning = false;

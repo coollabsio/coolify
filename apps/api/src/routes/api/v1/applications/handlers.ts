@@ -334,7 +334,8 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             baseDatabaseBranch,
             dockerComposeFile,
             dockerComposeFileLocation,
-            dockerComposeConfiguration
+            dockerComposeConfiguration,
+            simpleDockerfile
         } = request.body
         if (port) port = Number(port);
         if (exposePort) {
@@ -373,6 +374,7 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
                     dockerComposeFile,
                     dockerComposeFileLocation,
                     dockerComposeConfiguration,
+                    simpleDockerfile,
                     ...defaultConfiguration,
                     connectedDatabase: { update: { hostedDatabaseDBName: baseDatabaseBranch } }
                 }
@@ -395,6 +397,7 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
                     dockerComposeFile,
                     dockerComposeFileLocation,
                     dockerComposeConfiguration,
+                    simpleDockerfile,
                     ...defaultConfiguration
                 }
             });
@@ -770,22 +773,37 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
                 await prisma.application.update({ where: { id }, data: { configHash } });
             }
             await prisma.application.update({ where: { id }, data: { updatedAt: new Date() } });
-            await prisma.build.create({
-                data: {
-                    id: buildId,
-                    applicationId: id,
-                    sourceBranch: branch,
-                    branch: application.branch,
-                    pullmergeRequestId: pullmergeRequestId?.toString(),
-                    forceRebuild,
-                    destinationDockerId: application.destinationDocker?.id,
-                    gitSourceId: application.gitSource?.id,
-                    githubAppId: application.gitSource?.githubApp?.id,
-                    gitlabAppId: application.gitSource?.gitlabApp?.id,
-                    status: 'queued',
-                    type: pullmergeRequestId ? application.gitSource?.githubApp?.id ? 'manual_pr' : 'manual_mr' : 'manual'
-                }
-            });
+            if (application.gitSourceId) {
+                await prisma.build.create({
+                    data: {
+                        id: buildId,
+                        applicationId: id,
+                        sourceBranch: branch,
+                        branch: application.branch,
+                        pullmergeRequestId: pullmergeRequestId?.toString(),
+                        forceRebuild,
+                        destinationDockerId: application.destinationDocker?.id,
+                        gitSourceId: application.gitSource?.id,
+                        githubAppId: application.gitSource?.githubApp?.id,
+                        gitlabAppId: application.gitSource?.gitlabApp?.id,
+                        status: 'queued',
+                        type: pullmergeRequestId ? application.gitSource?.githubApp?.id ? 'manual_pr' : 'manual_mr' : 'manual'
+                    }
+                });
+            } else {
+                await prisma.build.create({
+                    data: {
+                        id: buildId,
+                        applicationId: id,
+                        branch: 'latest',
+                        forceRebuild,
+                        destinationDockerId: application.destinationDocker?.id,
+                        status: 'queued',
+                        type: 'manual'
+                    }
+                });
+            }
+
             return {
                 buildId
             };
@@ -800,19 +818,28 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
 export async function saveApplicationSource(request: FastifyRequest<SaveApplicationSource>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        const { gitSourceId, forPublic, type } = request.body
+        const { gitSourceId, forPublic, type, simpleDockerfile } = request.body
         if (forPublic) {
-            const publicGit = await prisma.gitSource.findFirst({ where: { type, forPublic } });
+            if (gitSourceId) {
+                await prisma.application.update({
+                    where: { id },
+                    data: { gitSource: { connect: { id: gitSourceId } } }
+                });
+            } else {
+                const publicGit = await prisma.gitSource.findFirst({ where: { type, forPublic } });
+                await prisma.application.update({
+                    where: { id },
+                    data: { gitSource: { connect: { id: publicGit.id } } }
+                });
+            }
+        }
+        if (simpleDockerfile) {
             await prisma.application.update({
                 where: { id },
-                data: { gitSource: { connect: { id: publicGit.id } } }
-            });
-        } else {
-            await prisma.application.update({
-                where: { id },
-                data: { gitSource: { connect: { id: gitSourceId } } }
+                data: { simpleDockerfile }
             });
         }
+
 
         return reply.code(201).send()
     } catch ({ status, message }) {
@@ -916,11 +943,11 @@ export async function getBuildPack(request) {
         const teamId = request.user?.teamId;
         const application: any = await getApplicationFromDB(id, teamId);
         return {
-            type: application.gitSource.type,
+            type: application.gitSource?.type || 'dockerRegistry',
             projectId: application.projectId,
             repository: application.repository,
             branch: application.branch,
-            apiUrl: application.gitSource.apiUrl,
+            apiUrl: application.gitSource?.apiUrl || null,
             isPublicRepository: application.settings.isPublicRepository
         }
     } catch ({ status, message }) {

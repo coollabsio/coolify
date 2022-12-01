@@ -2,8 +2,14 @@
 	import type { Load } from '@sveltejs/kit';
 	function checkConfiguration(application: any): string | null {
 		let configurationPhase = null;
-		if (!application.gitSourceId) {
-			configurationPhase = 'source';
+		if (!application.gitSourceId && !application.simpleDockerfile) {
+			return (configurationPhase = 'source');
+		}
+		if (application.simpleDockerfile) {
+			if (!application.destinationDockerId) {
+				configurationPhase = 'destination';
+			}
+			return configurationPhase;
 		} else if (!application.repository && !application.branch) {
 			configurationPhase = 'repository';
 		} else if (!application.destinationDockerId) {

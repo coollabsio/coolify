@@ -124,7 +124,7 @@
 						description={$t('application.enable_auto_deploy_webhooks')}
 					/>
 				</div>
-				{#if !application.settings.isBot}
+				{#if !application.settings.isBot && !application.simpleDockerfile}
 					<div class="grid grid-cols-2 items-center">
 						<Setting
 							id="previews"

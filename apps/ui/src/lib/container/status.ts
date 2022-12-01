@@ -19,14 +19,14 @@ export async function refreshStatus(list: Array<any>) {
 }
 
 export async function getStatus(resource: any, force: boolean = false) {
-  const { id, buildPack, dualCerts, engine } = resource;
+  const { id, buildPack, dualCerts, engine, simpleDockerfile } = resource;
   let newStatus = 'stopped';
 
   // Already set and we're not forcing
   if (getStore(containerStatus)[id] && !force) return getStore(containerStatus)[id];
 
   try {
-    if (buildPack) { // Application
+    if (buildPack || simpleDockerfile) { // Application
       const response = await get(`/applications/${id}/status`);
       newStatus = parseApplicationsResponse(response);
     } else if (typeof dualCerts !== 'undefined') { // Service

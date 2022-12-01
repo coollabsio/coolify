@@ -42,4 +42,6 @@
 	<Icons.Heroku {isAbsolute} />
 {:else if application.buildPack?.toLowerCase() === 'compose'}
 	<Icons.Compose {isAbsolute} />
+{:else if application.simpleDockerfile}
+	<Icons.Docker {isAbsolute} />
 {/if}

@@ -41,14 +41,13 @@ export async function checkContainer({ dockerId, container, remove = false }: { 
 					`docker rm ${container}`
 			});
 		}
-		
+
 		return {
 			found: containerFound,
 			status: {
 				isRunning,
 				isRestarting,
 				isExited
-
 			}
 		};
 	} catch (err) {

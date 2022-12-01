@@ -190,7 +190,7 @@ export async function showDashboard(request: FastifyRequest) {
 
 		let foundUnconfiguredApplication = false;
 		for (const application of applications) {
-			if (!application.buildPack || !application.destinationDockerId || !application.branch || (!application.settings?.isBot && !application?.fqdn) && application.buildPack !== "compose") {
+			if (((!application.buildPack || !application.branch) && !application.simpleDockerfile) || !application.destinationDockerId || (!application.settings?.isBot && !application?.fqdn) && application.buildPack !== "compose") {
 				foundUnconfiguredApplication = true
 			}
 		}

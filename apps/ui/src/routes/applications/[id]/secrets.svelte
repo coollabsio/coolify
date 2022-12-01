@@ -20,6 +20,7 @@
 
 <script lang="ts">
 	export let secrets: any;
+	export let application: any;
 	export let previewSecrets: any;
 	import pLimit from 'p-limit';
 	import { page } from '$app/stores';
@@ -28,7 +29,6 @@
 	import Secret from './_Secret.svelte';
 	import PreviewSecret from './_PreviewSecret.svelte';
 	import { errorNotification } from '$lib/common';
-	import { t } from '$lib/translations';
 	import Explainer from '$lib/components/Explainer.svelte';
 
 	const limit = pLimit(1);
@@ -110,6 +110,7 @@
 	<div class="lg:pt-0 pt-10">
 		<Secret on:refresh={refreshSecrets} length={secrets.length} isNewSecret />
 	</div>
+	{#if !application.settings.isBot && !application.simpleDockerfile}
 	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
 		<div class="title font-bold pb-3 pt-8">
 			Preview Secrets <Explainer
@@ -132,6 +133,7 @@
 		{/each}
 	{:else}
 		Add secrets first to see Preview Secrets.
+	{/if}
 	{/if}
 </div>
 <form on:submit|preventDefault={getValues} class="mb-12 w-full">

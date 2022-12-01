@@ -675,7 +675,14 @@ export async function buildImage({
 		await saveBuildLog({ line: `Building production image built successful 🎉`, buildId, applicationId });
 	}
 }
-
+export function makeLabelForSimpleDockerfile({ applicationId, port, type }) {
+	return [
+		'coolify.managed=true',
+		`coolify.version=${version}`,
+		`coolify.applicationId=${applicationId}`,
+		`coolify.type=standalone-application`
+	];
+}
 export function makeLabelForStandaloneApplication({
 	applicationId,
 	fqdn,

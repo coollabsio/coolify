@@ -57,14 +57,15 @@ export const appSession: Writable<AppSession> = writable({
 export const disabledButton: Writable<boolean> = writable(false);
 export const isDeploymentEnabled: Writable<boolean> = writable(false);
 export function checkIfDeploymentEnabledApplications(isAdmin: boolean, application: any) {
-    return (
+    return !!(
         isAdmin &&
         (application.buildPack === 'compose') ||
         (application.fqdn || application.settings.isBot) &&
-        application.gitSource &&
+        ((application.gitSource &&
         application.repository &&
-        application.destinationDocker &&
-        application.buildPack
+        application.buildPack) || application.simpleDockerfile) &&
+        application.destinationDocker
+       
     );
 }
 export function checkIfDeploymentEnabledServices(isAdmin: boolean, service: any) {

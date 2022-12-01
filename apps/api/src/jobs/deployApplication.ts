@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 
-import { copyBaseConfigurationFiles, makeLabelForStandaloneApplication, saveBuildLog, setDefaultConfiguration } from '../lib/buildPacks/common';
+import { copyBaseConfigurationFiles, makeLabelForSimpleDockerfile, makeLabelForStandaloneApplication, saveBuildLog, setDefaultConfiguration } from '../lib/buildPacks/common';
 import { createDirectories, decrypt, defaultComposeConfiguration, executeDockerCmd, getDomain, prisma, decryptApplication, isDev } from '../lib/common';
 import * as importers from '../lib/importers';
 import * as buildpacks from '../lib/buildPacks';
@@ -39,9 +39,154 @@ import * as buildpacks from '../lib/buildPacks';
 						actions.push(async () => {
 							let application = await prisma.application.findUnique({ where: { id: queueBuild.applicationId }, include: { destinationDocker: true, gitSource: { include: { githubApp: true, gitlabApp: true } }, persistentStorage: true, secrets: true, settings: true, teams: true } })
 
-							let { id: buildId, type, sourceBranch = null, pullmergeRequestId = null, previewApplicationId = null, forceRebuild, sourceRepository = null } = queueBuild
-
+							let { id: buildId, type, gitSourceId, sourceBranch = null, pullmergeRequestId = null, previewApplicationId = null, forceRebuild, sourceRepository = null } = queueBuild
 							application = decryptApplication(application)
+
+							if (!gitSourceId && application.simpleDockerfile) {
+								const {
+									id: applicationId,
+									destinationDocker,
+									destinationDockerId,
+									secrets,
+									port,
+									persistentStorage,
+									exposePort,
+									simpleDockerfile
+								} = application
+								const { workdir } = await createDirectories({ repository: applicationId, buildId });
+								try {
+									if (queueBuild.status === 'running') {
+										await saveBuildLog({ line: 'Building halted, restarting...', buildId, applicationId: application.id });
+									}
+									const volumes =
+										persistentStorage?.map((storage) => {
+											if (storage.oldPath) {
+												return `${applicationId}${storage.path.replace(/\//gi, '-').replace('-app', '')}:${storage.path}`;
+											}
+											return `${applicationId}${storage.path.replace(/\//gi, '-')}:${storage.path}`;
+										}) || [];
+
+									if (destinationDockerId) {
+										await prisma.build.update({ where: { id: buildId }, data: { status: 'running' } });
+										try {
+											await executeDockerCmd({
+												dockerId: destinationDockerId,
+												command: `docker ps -a --filter 'label=com.docker.compose.service=${applicationId}' --format {{.ID}}|xargs -r -n 1 docker stop -t 0`
+											})
+											await executeDockerCmd({
+												dockerId: destinationDockerId,
+												command: `docker ps -a --filter 'label=com.docker.compose.service=${applicationId}' --format {{.ID}}|xargs -r -n 1 docker rm --force`
+											})
+										} catch (error) {
+											//
+										}
+										const envs = [
+											`PORT=${port}`
+										];
+										if (secrets.length > 0) {
+											secrets.forEach((secret) => {
+												if (pullmergeRequestId) {
+													const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
+													if (isSecretFound.length > 0) {
+														envs.push(`${secret.name}=${isSecretFound[0].value}`);
+													} else {
+														envs.push(`${secret.name}=${secret.value}`);
+													}
+												} else {
+													if (!secret.isPRMRSecret) {
+														envs.push(`${secret.name}=${secret.value}`);
+													}
+												}
+											});
+										}
+										await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
+
+										let envFound = false;
+										try {
+											envFound = !!(await fs.stat(`${workdir}/.env`));
+										} catch (error) {
+											//
+										}
+
+										await fs.writeFile(`${workdir}/Dockerfile`, simpleDockerfile);
+										const labels = makeLabelForSimpleDockerfile({
+											applicationId,
+											type,
+											port: exposePort ? `${exposePort}:${port}` : port,
+										});
+										try {
+											await saveBuildLog({ line: 'Deployment initiated', buildId, applicationId });
+											const composeVolumes = volumes.map((volume) => {
+												return {
+													[`${volume.split(':')[0]}`]: {
+														name: volume.split(':')[0]
+													}
+												};
+											});
+											const composeFile = {
+												version: '3.8',
+												services: {
+													[applicationId]: {
+														build: {
+															context: workdir,
+														},
+														image: `${applicationId}:${buildId}`,
+														container_name: applicationId,
+														volumes,
+														labels,
+														env_file: envFound ? [`${workdir}/.env`] : [],
+														depends_on: [],
+														expose: [port],
+														...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
+														...defaultComposeConfiguration(destinationDocker.network),
+													}
+												},
+												networks: {
+													[destinationDocker.network]: {
+														external: true
+													}
+												},
+												volumes: Object.assign({}, ...composeVolumes)
+											};
+											await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
+											await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose --project-directory ${workdir} up -d` })
+											await saveBuildLog({ line: 'Deployed successfully 🎉', buildId, applicationId });
+										} catch (error) {
+											await saveBuildLog({ line: error, buildId, applicationId });
+											const foundBuild = await prisma.build.findUnique({ where: { id: buildId } })
+											if (foundBuild) {
+												await prisma.build.update({
+													where: { id: buildId },
+													data: {
+														status: 'failed'
+													}
+												});
+											}
+											throw new Error(error);
+										}
+										await prisma.build.update({ where: { id: buildId }, data: { status: 'success' } });
+									}
+								} catch (error) {
+									const foundBuild = await prisma.build.findUnique({ where: { id: buildId } })
+									if (foundBuild) {
+										await prisma.build.update({
+											where: { id: buildId },
+											data: {
+												status: 'failed'
+											}
+										});
+									}
+									if (error !== 1) {
+										await saveBuildLog({ line: error, buildId, applicationId: application.id });
+									}
+								} finally {
+									if (!isDev) {
+										await fs.rm(workdir, { recursive: true, force: true });
+									}
+								}
+								return;
+							}
+
 
 							const originalApplicationId = application.id
 							const {
@@ -415,8 +560,7 @@ import * as buildpacks from '../lib/buildPacks';
 										});
 									}
 								}
-							}
-							catch (error) {
+							} catch (error) {
 								const foundBuild = await prisma.build.findUnique({ where: { id: buildId } })
 								if (foundBuild) {
 									await prisma.build.update({

@@ -66,6 +66,7 @@
 		save: false,
 		reloadCompose: false
 	};
+	let isSimpleDockerfile = !!application.simpleDockerfile;
 	let fqdnEl: any = null;
 	let forceSave = false;
 	let isPublicRepository = application.settings?.isPublicRepository;
@@ -268,7 +269,7 @@
 					}
 				}
 			}
-			await saveForm(id, application,baseDatabaseBranch, dockerComposeConfiguration);
+			await saveForm(id, application, baseDatabaseBranch, dockerComposeConfiguration);
 			setLocation(application, settings);
 			$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
 
@@ -492,79 +493,84 @@
 					<label for="name">{$t('forms.name')}</label>
 					<input name="name" id="name" class="w-full" bind:value={application.name} required />
 				</div>
-				<div class="grid grid-cols-2 items-center">
-					<label for="gitSource">{$t('application.git_source')}</label>
-					{#if isDisabled || application.settings.isPublicRepository}
-						<input
-							disabled={isDisabled || application.settings.isPublicRepository}
-							class="w-full"
-							value={application.gitSource?.name}
-						/>
-					{:else}
-						<a
-							href={`/applications/${id}/configuration/source?from=/applications/${id}`}
-							class="no-underline"
-							><input
+				{#if !isSimpleDockerfile}
+					<div class="grid grid-cols-2 items-center">
+						<label for="gitSource">{$t('application.git_source')}</label>
+						{#if isDisabled || application.settings.isPublicRepository}
+							<input
+								disabled={isDisabled || application.settings.isPublicRepository}
+								class="w-full"
 								value={application.gitSource?.name}
-								id="gitSource"
-								class="cursor-pointer hover:bg-coolgray-500 w-full"
-							/></a
-						>
-					{/if}
-				</div>
-				<div class="grid grid-cols-2 items-center">
-					<label for="repository">Git commit</label>
-					<div class="flex gap-2">
-						<input
-							id="commit"
-							name="commit"
-							class="w-full"
-							disabled={isDisabled}
-							placeholder="default: latest commit"
-							bind:value={application.gitCommitHash}
-						/>
-						<a
-							href="{application.gitSource
-								.htmlUrl}/{application.repository}/commits/{application.branch}"
-							target="_blank noreferrer"
-							class="btn btn-primary text-xs"
-							>Commits<svg
-								xmlns="http://www.w3.org/2000/svg"
-								fill="currentColor"
-								viewBox="0 0 24 24"
-								stroke-width="3"
-								stroke="currentColor"
-								class="w-3 h-3 text-white ml-2"
+							/>
+						{:else}
+							<a
+								href={`/applications/${id}/configuration/source?from=/applications/${id}`}
+								class="no-underline"
+								><input
+									value={application.gitSource?.name}
+									id="gitSource"
+									class="cursor-pointer hover:bg-coolgray-500 w-full"
+								/></a
 							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
-								/>
-							</svg></a
-						>
+						{/if}
 					</div>
-				</div>
-				<div class="grid grid-cols-2 items-center">
-					<label for="repository">{$t('application.git_repository')}</label>
-					{#if isDisabled || application.settings.isPublicRepository}
-						<input
-							class="w-full"
-							disabled={isDisabled || application.settings.isPublicRepository}
-							value="{application.repository}/{application.branch}"
-						/>
-					{:else}
-						<a
-							href={`/applications/${id}/configuration/repository?from=/applications/${id}&to=/applications/${id}/configuration/buildpack`}
-							class="no-underline"
-							><input
+
+					<div class="grid grid-cols-2 items-center">
+						<label for="repository">Git commit</label>
+						<div class="flex gap-2">
+							<input
+								id="commit"
+								name="commit"
+								class="w-full"
+								disabled={isDisabled}
+								placeholder="default: latest commit"
+								bind:value={application.gitCommitHash}
+							/>
+							<a
+								href="{application.gitSource
+									.htmlUrl}/{application.repository}/commits/{application.branch}"
+								target="_blank noreferrer"
+								class="btn btn-primary text-xs"
+								>Commits<svg
+									xmlns="http://www.w3.org/2000/svg"
+									fill="currentColor"
+									viewBox="0 0 24 24"
+									stroke-width="3"
+									stroke="currentColor"
+									class="w-3 h-3 text-white ml-2"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
+									/>
+								</svg></a
+							>
+						</div>
+					</div>
+					<div class="grid grid-cols-2 items-center">
+						<label for="repository">{$t('application.git_repository')}</label>
+						{#if isDisabled || application.settings.isPublicRepository}
+							<input
+								class="w-full"
+								disabled={isDisabled || application.settings.isPublicRepository}
 								value="{application.repository}/{application.branch}"
-								id="repository"
-								class="cursor-pointer hover:bg-coolgray-500 w-full"
-							/></a
-						>
-					{/if}
-				</div>
+							/>
+						{:else}
+							<a
+								href={`/applications/${id}/configuration/repository?from=/applications/${id}&to=/applications/${id}/configuration/buildpack`}
+								class="no-underline"
+								><input
+									value="{application.repository}/{application.branch}"
+									id="repository"
+									class="cursor-pointer hover:bg-coolgray-500 w-full"
+								/></a
+							>
+						{/if}
+					</div>
+				{:else}
+				
+				{/if}
 				<div class="grid grid-cols-2 items-center">
 					<label for="registry">Docker Registry</label>
 					{#if isDisabled}
@@ -586,23 +592,29 @@
 						>
 					{/if}
 				</div>
-				<div class="grid grid-cols-2 items-center">
-					<label for="buildPack">{$t('application.build_pack')} </label>
-					{#if isDisabled}
-						<input class="capitalize w-full" disabled={isDisabled} value={application.buildPack} />
-					{:else}
-						<a
-							href={`/applications/${id}/configuration/buildpack?from=/applications/${id}`}
-							class="no-underline"
-						>
+				{#if !isSimpleDockerfile}
+					<div class="grid grid-cols-2 items-center">
+						<label for="buildPack">{$t('application.build_pack')} </label>
+						{#if isDisabled}
 							<input
+								class="capitalize w-full"
+								disabled={isDisabled}
 								value={application.buildPack}
-								id="buildPack"
-								class="cursor-pointer hover:bg-coolgray-500 capitalize w-full"
-							/></a
-						>
-					{/if}
-				</div>
+							/>
+						{:else}
+							<a
+								href={`/applications/${id}/configuration/buildpack?from=/applications/${id}`}
+								class="no-underline"
+							>
+								<input
+									value={application.buildPack}
+									id="buildPack"
+									class="cursor-pointer hover:bg-coolgray-500 capitalize w-full"
+								/></a
+							>
+						{/if}
+					</div>
+				{/if}
 				<div class="grid grid-cols-2 items-center">
 					<label for="destination">{$t('application.destination')}</label>
 					<div class="no-underline">
@@ -712,7 +724,44 @@
 					{/if}
 				{/if}
 			</div>
-			{#if application.buildPack !== 'compose'}
+			{#if isSimpleDockerfile}
+				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
+					Configuration
+				</div>
+			
+				<div class="grid grid-flow-row gap-2 px-4 pr-5">
+					<div class="grid grid-cols-2 items-center  pt-4">
+						<label for="simpleDockerfile">Dockerfile</label>
+						<div class="flex gap-2">
+							<textarea
+								rows=10
+								id="simpleDockerfile"
+								name="simpleDockerfile"
+								class="w-full"
+								disabled={isDisabled}
+								bind:value={application.simpleDockerfile}
+							/>
+						</div>
+					</div>
+					<div class="grid grid-cols-2 items-center">
+						<label for="port"
+							>{$t('forms.port')}
+							<Explainer
+								explanation={'The port your application listens inside the docker container.'}
+							/></label
+						>
+						<input
+							class="w-full"
+							disabled={isDisabled}
+							readonly={!$appSession.isAdmin}
+							name="port"
+							id="port"
+							bind:value={application.port}
+							placeholder="{$t('forms.default')}: 3000"
+						/>
+					</div>
+				</div>
+			{:else if application.buildPack !== 'compose'}
 				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
 					Configuration
 				</div>

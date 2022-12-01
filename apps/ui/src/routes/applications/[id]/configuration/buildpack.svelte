@@ -9,6 +9,12 @@
 					redirect: `/applications/${params.id}`
 				};
 			}
+			if (application.simpleDockerfile) {
+				return {
+					status: 302,
+					redirect: `/applications/${params.id}`
+				};
+			}
 			const response = await get(`/applications/${params.id}/configuration/buildpack`);
 			return {
 				props: {
@@ -47,7 +53,7 @@
 
 	const { id } = $page.params;
 
-	let htmlUrl = application.gitSource.htmlUrl;
+	let htmlUrl = application.gitSource?.htmlUrl || null;
 
 	let scanning: boolean = true;
 	let foundConfig: any = null;

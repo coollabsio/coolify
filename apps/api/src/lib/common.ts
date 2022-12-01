@@ -1091,7 +1091,7 @@ export const createDirectories = async ({
 	repository: string;
 	buildId: string;
 }): Promise<{ workdir: string; repodir: string }> => {
-	repository = repository.replaceAll(' ', '')
+	if (repository) repository = repository.replaceAll(' ', '')
 	const repodir = `/tmp/build-sources/${repository}/`;
 	const workdir = `/tmp/build-sources/${repository}/${buildId}`;
 	let workdirFound = false;
