@@ -167,7 +167,7 @@
 		}
 	}
 	async function getStatus() {
-		if ($status.application.loading && stopping) return;
+		if (($status.application.loading && stopping) || $status.application.restarting === true) return;
 		$status.application.loading = true;
 		const data = await get(`/applications/${id}/status`);
 
@@ -185,26 +185,6 @@
 		if ($status.application.statuses.length === 0) {
 			$status.application.overallStatus = 'stopped';
 		} else {
-			// if ($status.application.statuses.length !== numberOfApplications) {
-			// 	$status.application.overallStatus = 'degraded';
-			// } else {
-			// 	for (const oneStatus of $status.application.statuses) {
-			// 		if (oneStatus.status.isExited || oneStatus.status.isRestarting) {
-			// 			$status.application.overallStatus = 'degraded';
-			// 			break;
-			// 		}
-			// 		if (oneStatus.status.isRunning) {
-			// 			$status.application.overallStatus = 'healthy';
-			// 		}
-			// 		if (
-			// 			!oneStatus.status.isExited &&
-			// 			!oneStatus.status.isRestarting &&
-			// 			!oneStatus.status.isRunning
-			// 		) {
-			// 			$status.application.overallStatus = 'stopped';
-			// 		}
-			// 	}
-			// }
 			for (const oneStatus of $status.application.statuses) {
 				if (oneStatus.status.isExited || oneStatus.status.isRestarting) {
 					$status.application.overallStatus = 'degraded';

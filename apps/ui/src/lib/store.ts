@@ -62,10 +62,10 @@ export function checkIfDeploymentEnabledApplications(isAdmin: boolean, applicati
         (application.buildPack === 'compose') ||
         (application.fqdn || application.settings.isBot) &&
         ((application.gitSource &&
-        application.repository &&
-        application.buildPack) || application.simpleDockerfile) &&
+            application.repository &&
+            application.buildPack) || application.simpleDockerfile) &&
         application.destinationDocker
-       
+
     );
 }
 export function checkIfDeploymentEnabledServices(isAdmin: boolean, service: any) {
@@ -82,6 +82,7 @@ export const status: Writable<any> = writable({
         statuses: [],
         overallStatus: 'stopped',
         loading: false,
+        restarting: false,
         initialLoading: true
     },
     service: {

@@ -57,6 +57,7 @@
 			try {
 				$status.application.initialLoading = true;
 				$status.application.loading = true;
+				$status.application.restarting = true;
 				await post(`/applications/${id}/restart`, { imageId: remoteImage });
 				addToast({
 					type: 'success',
@@ -67,6 +68,7 @@
 			} finally {
 				$status.application.initialLoading = false;
 				$status.application.loading = false;
+				$status.application.restarting = false;
 			}
 		}
 	}

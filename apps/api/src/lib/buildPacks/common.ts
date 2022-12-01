@@ -641,16 +641,9 @@ export async function buildImage({
 	commit
 }) {
 	if (isCache) {
-		await saveBuildLog({ line: `Building cache image`, buildId, applicationId });
+		await saveBuildLog({ line: `Building cache image...`, buildId, applicationId });
 	} else {
-		await saveBuildLog({ line: `Building production image`, buildId, applicationId });
-	}
-	if (!debug) {
-		await saveBuildLog({
-			line: `Debug logging is disabled. Enable it above if necessary!`,
-			buildId,
-			applicationId
-		});
+		await saveBuildLog({ line: `Building production image...`, buildId, applicationId });
 	}
 	const dockerFile = isCache ? `${dockerFileLocation}-cache` : `${dockerFileLocation}`
 	const cache = `${applicationId}:${tag}${isCache ? '-cache' : ''}`
@@ -670,9 +663,9 @@ export async function buildImage({
 		throw new Error('Canceled.')
 	}
 	if (isCache) {
-		await saveBuildLog({ line: `Building cache image built successful 🎉`, buildId, applicationId });
+		await saveBuildLog({ line: `Built successfully`, buildId, applicationId });
 	} else {
-		await saveBuildLog({ line: `Building production image built successful 🎉`, buildId, applicationId });
+		await saveBuildLog({ line: `Built successfully`, buildId, applicationId });
 	}
 }
 export function makeLabelForSimpleDockerfile({ applicationId, port, type }) {

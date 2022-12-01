@@ -53,13 +53,11 @@
 	import { saveForm } from './utils';
 
 	const { id } = $page.params;
-
 	$: isDisabled =
 		!$appSession.isAdmin ||
 		$status.application.overallStatus === 'degraded' ||
 		$status.application.overallStatus === 'healthy' ||
 		$status.application.initialLoading;
-
 	$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
 	let statues: any = {};
 	let loading = {
@@ -274,12 +272,13 @@
 			$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
 
 			forceSave = false;
-
-			toast &&
+			if (toast) {
 				addToast({
 					message: 'Configuration saved.',
 					type: 'success'
 				});
+			}
+
 			if (application.fqdn && application.fqdn.startsWith('https')) {
 				isHttps = true;
 			} else {
@@ -514,7 +513,6 @@
 							>
 						{/if}
 					</div>
-
 					<div class="grid grid-cols-2 items-center">
 						<label for="repository">Git commit</label>
 						<div class="flex gap-2">
@@ -601,7 +599,7 @@
 							name="dockerRegistryImageName"
 							id="dockerRegistryImageName"
 							readonly={isDisabled}
-								disabled={isDisabled}
+							disabled={isDisabled}
 							class="w-full"
 							placeholder="e.g. coollabsio/myimage (tag will be commit sha) or coollabsio/myimage:tag"
 							bind:value={application.dockerRegistryImageName}

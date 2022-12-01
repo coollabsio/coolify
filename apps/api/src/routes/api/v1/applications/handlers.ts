@@ -480,9 +480,7 @@ export async function restartApplication(request: FastifyRequest<RestartApplicat
                 });
             }
             const { workdir } = await createDirectories({ repository, buildId });
-            const labels = [
-                `coolify.managed=true`,
-            ]
+            const labels = []
             let image = null
             if (imageId) {
                 image = imageId
@@ -499,8 +497,11 @@ export async function restartApplication(request: FastifyRequest<RestartApplicat
                     })
                 }
             }
-            const { url, username, password } = dockerRegistry
-            location = await saveDockerRegistryCredentials({ url, username, password, workdir })
+            if (dockerRegistry) {
+                const { url, username, password } = dockerRegistry
+                location = await saveDockerRegistryCredentials({ url, username, password, workdir })
+            }
+
             let imageFoundLocally = false;
             try {
                 await executeDockerCmd({
