@@ -35,6 +35,9 @@
 			if (service?.volumes) {
 				for (const [_, volumeName] of Object.entries(service.volumes)) {
 					let [volume, target] = volumeName.split(':');
+					if (volume === '.') {
+						volume = target;
+					}
 					if (!target) {
 						target = volume;
 						volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;

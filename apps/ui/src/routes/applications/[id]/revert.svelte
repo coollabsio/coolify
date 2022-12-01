@@ -54,7 +54,7 @@
 <div class="w-full">
 	<div class="mx-auto w-full">
 		<div class="flex flex-row border-b border-coolgray-500 mb-6  space-x-2">
-			<div class="title font-bold pb-3">Revert Application</div>
+			<div class="title font-bold pb-3">Revert</div>
 		</div>
 		<div>
 			You can revert application to a previously built image. Currently only locally stored images
@@ -67,53 +67,60 @@
 			>
 			feature <a href={`/applications/${id}/features`}>here</a>.
 		</div>
-		<div
-			class="px-4 lg:pb-10 pb-6 flex flex-wrap items-center justify-center lg:justify-start gap-8"
-		>
-			{#each imagesAvailables as image}
-				<div class="gap-2 py-4 m-2">
-					<div class="flex flex-col justify-center items-center">
-						<div class="text-xl font-bold">
-							{image.tag}
-						</div>
-						<div>
-							<a
-								class="flex no-underline text-xs my-4"
-								href="{application.gitSource.htmlUrl}/{application.repository}/commit/{image.tag}"
-								target="_blank noreferrer"
-							>
-								<button class="btn btn-sm">
-									Check Commit
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										fill="currentColor"
-										viewBox="0 0 24 24"
-										stroke-width="3"
-										stroke="currentColor"
-										class="w-3 h-3 text-white ml-2"
+		{#if imagesAvailables.length > 0}
+			<div
+				class="px-4 lg:pb-10 pb-6 flex flex-wrap items-center justify-center lg:justify-start gap-8"
+			>
+				{#each imagesAvailables as image}
+					<div class="gap-2 py-4 m-2">
+						<div class="flex flex-col justify-center items-center">
+							<div class="text-xl font-bold">
+								{image.tag}
+							</div>
+							<div>
+								<a
+									class="flex no-underline text-xs my-4"
+									href="{application.gitSource.htmlUrl}/{application.repository}/commit/{image.tag}"
+									target="_blank noreferrer"
+								>
+									<button class="btn btn-sm">
+										Check Commit
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											fill="currentColor"
+											viewBox="0 0 24 24"
+											stroke-width="3"
+											stroke="currentColor"
+											class="w-3 h-3 text-white ml-2"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
+											/>
+										</svg>
+									</button></a
+								>
+								{#if image.repository + ':' + image.tag !== runningImage}
+									<button
+										class="btn btn-sm btn-primary w-full"
+										on:click={() => revertApplication(image)}>Revert Now</button
 									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
-										/>
-									</svg>
-								</button></a
-							>
-							{#if image.repository + ':' + image.tag !== runningImage}
-								<button
-									class="btn btn-sm btn-primary w-full"
-									on:click={() => revertApplication(image)}>Revert Now</button
-								>
-							{:else}
-								<button class="btn btn-sm btn-primary w-full btn-disabled bg-transparent underline"
-									>Currently Used</button
-								>
-							{/if}
+								{:else}
+									<button
+										class="btn btn-sm btn-primary w-full btn-disabled bg-transparent underline"
+										>Currently Used</button
+									>
+								{/if}
+							</div>
 						</div>
 					</div>
-				</div>
-			{/each}
-		</div>
+				{/each}
+			</div>
+		{:else}
+			<div class="flex flex-col justify-center items-center">
+				<div class="text-xl font-bold">No images available</div>
+			</div>
+		{/if}
 	</div>
 </div>

@@ -692,30 +692,39 @@ export async function getDockerImages(request) {
         const { id } = request.params
         const teamId = request.user?.teamId;
         const application: any = await getApplicationFromDB(id, teamId);
-        const { stdout } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}' | grep -i ${id} | grep -v cache` });
-        const { stdout: runningImage } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker ps -a --filter 'label=com.docker.compose.service=${id}' --format {{.Image}}` });
-        const images = stdout.trim().split('\n');
         let imagesAvailables = [];
-        for (const image of images) {
-            const [repository, tag, createdAt] = image.split('#');
-            if (tag.includes('-')) {
-                continue;
+        try {
+            const { stdout } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}' | grep -i ${id} | grep -v cache` });
+            const { stdout: runningImage } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker ps -a --filter 'label=com.docker.compose.service=${id}' --format {{.Image}}` });
+            const images = stdout.trim().split('\n');
+
+            for (const image of images) {
+                const [repository, tag, createdAt] = image.split('#');
+                if (tag.includes('-')) {
+                    continue;
+                }
+                const [year, time] = createdAt.split(' ');
+                imagesAvailables.push({
+                    repository,
+                    tag,
+                    createdAt: day(year + time).unix()
+                })
             }
-            const [year, time] = createdAt.split(' ');
-            imagesAvailables.push({
-                repository,
-                tag,
-                createdAt: day(year + time).unix()
-            })
+
+            imagesAvailables = imagesAvailables.sort((a, b) => b.tag - a.tag);
+
+            return {
+                imagesAvailables,
+                runningImage
+            }
+        } catch (error) {
+            return {
+                imagesAvailables,
+            }
         }
 
-        imagesAvailables = imagesAvailables.sort((a, b) => b.tag - a.tag);
-
-        return {
-            imagesAvailables,
-            runningImage
-        }
     } catch ({ status, message }) {
+
         return errorHandler({ status, message })
     }
 }

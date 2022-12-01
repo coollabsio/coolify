@@ -272,7 +272,7 @@ async function initServer() {
 	} catch (error) { }
 	try {
 		console.log('[003] Cleaning up old build sources under /tmp/build-sources/...');
-		await fs.rm('/tmp/build-sources', { recursive: true, force: true })
+		if (!isDev) await fs.rm('/tmp/build-sources', { recursive: true, force: true })
 	} catch (error) {
 		console.log(error)
 	}

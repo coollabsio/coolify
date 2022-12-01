@@ -109,7 +109,7 @@ export default async function (data) {
     dockerComposeYaml['networks'] = Object.assign({ ...networks }, { [network]: { external: true } })
     await fs.writeFile(fileYaml, yaml.dump(dockerComposeYaml));
     await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker compose --project-directory ${workdir} pull` })
-    await saveBuildLog({ line: 'Pulling images from Compose file.', buildId, applicationId });
+    await saveBuildLog({ line: 'Pulling images from Compose file', buildId, applicationId });
     await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker compose --project-directory ${workdir} build --progress plain` })
-    await saveBuildLog({ line: 'Building images from Compose file.', buildId, applicationId });
+    await saveBuildLog({ line: 'Building images from Compose file', buildId, applicationId });
 }

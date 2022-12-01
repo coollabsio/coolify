@@ -45,7 +45,6 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     fastify.get<RestartPreviewApplication>('/:id/previews/:pullmergeRequestId/status', async (request) => await getPreviewStatus(request));
     fastify.post<RestartPreviewApplication>('/:id/previews/:pullmergeRequestId/restart', async (request, reply) => await restartPreview(request, reply));
 
-    // fastify.get<GetApplicationLogs>('/:id/logs', async (request) => await getApplicationLogs(request));
     fastify.get<GetApplicationLogs>('/:id/logs/:containerId', async (request) => await getApplicationLogs(request));
     fastify.get<GetBuilds>('/:id/logs/build', async (request) => await getBuilds(request));
     fastify.get<GetBuildIdLogs>('/:id/logs/build/:buildId', async (request) => await getBuildIdLogs(request));

@@ -312,30 +312,6 @@
 						await getGitlabToken();
 					}
 					scanRepository(isPublicRepository);
-					// let htmlUrl = application.gitSource.htmlUrl;
-					// const left = screen.width / 2 - 1020 / 2;
-					// const top = screen.height / 2 - 618 / 2;
-					// const newWindow = open(
-					// 	`${htmlUrl}/oauth/authorize?client_id=${
-					// 		application.gitSource.gitlabApp.appId
-					// 	}&redirect_uri=${getAPIUrl()}/webhooks/gitlab&response_type=code&scope=api+email+read_repository&state=${
-					// 		$page.params.id
-					// 	}`,
-					// 	'GitLab',
-					// 	'resizable=1, scrollbars=1, fullscreen=0, height=618, width=1020,top=' +
-					// 		top +
-					// 		', left=' +
-					// 		left +
-					// 		', toolbar=0, menubar=0, status=0'
-					// );
-					// const timer = setInterval(() => {
-					// 	if (newWindow?.closed) {
-					// 		clearInterval(timer);
-					// 		$appSession.tokens.gitlab = localStorage.getItem('gitLabToken');
-					// 		// localStorage.removeItem('gitLabToken'	);
-
-					// 	}
-					// }, 100);
 				}
 			} else if (error.message === 'Bad credentials') {
 				const { token } = await get(`/applications/${id}/configuration/githubToken`);

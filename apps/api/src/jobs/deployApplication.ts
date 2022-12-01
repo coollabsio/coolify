@@ -198,7 +198,7 @@ import * as buildpacks from '../lib/buildPacks';
 										if (configHash !== currentHash) {
 											deployNeeded = true;
 											if (configHash) {
-												await saveBuildLog({ line: 'Configuration changed.', buildId, applicationId });
+												await saveBuildLog({ line: 'Configuration changed', buildId, applicationId });
 											}
 										} else {
 											deployNeeded = false;
