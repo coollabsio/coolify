@@ -14,6 +14,7 @@ import {
 	uniqueName,
 	version,
 	sentryDSN,
+	executeDockerCmd,
 } from "../../../lib/common";
 import { scheduler } from "../../../lib/scheduler";
 import type { FastifyReply, FastifyRequest } from "fastify";
@@ -25,6 +26,35 @@ export async function hashPassword(password: string): Promise<string> {
 	return bcrypt.hash(password, saltRounds);
 }
 
+export async function backup(request: FastifyRequest) {
+	try {
+		const { backupData } = request.params;
+		let std = null;
+		const [id, backupType, type, zipped, storage] = backupData.split(':')
+		console.log(id, backupType, type, zipped, storage)
+		const database = await prisma.database.findUnique({ where: { id } })
+		if (database) {
+			// await executeDockerCmd({
+			// 	dockerId: database.destinationDockerId,
+			// 	command: `docker pull coollabsio/backup:latest`,
+			// })
+			std = await executeDockerCmd({
+				dockerId: database.destinationDockerId,
+				command: `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v coolify-local-backup:/app/backups -e CONTAINERS_TO_BACKUP="${backupData}" coollabsio/backup`
+			})
+
+		}
+		if (std.stdout) {
+			return std.stdout;
+		}
+		if (std.stderr) {
+			return std.stderr;
+		}
+		return 'nope';
+	} catch ({ status, message }) {
+		return errorHandler({ status, message });
+	}
+}
 export async function cleanupManually(request: FastifyRequest) {
 	try {
 		const { serverId } = request.body;

@@ -467,7 +467,6 @@ async function plausibleAnalytics(service: any, template: any) {
     // Disconnect old service data
     // await prisma.service.update({ where: { id: service.id }, data: { plausibleAnalytics: { disconnect: true } } })
 }
-
 async function migrateSettings(settings: any[], service: any, template: any) {
     for (const setting of settings) {
         try {
