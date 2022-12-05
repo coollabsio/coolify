@@ -104,7 +104,7 @@ model Application {
   branch                     String?
   buildPack                  String?
   projectId                  Int?
-  port                       Int?
+  port                       BigInt?
   exposePort                 Int?
   installCommand             String?
   buildCommand               String?
